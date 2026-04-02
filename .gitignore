@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+Backend/node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment files — contain secrets, never commit these
+.env
+.env.local
+.env.*.local
+Backend/.env
+
+# Vite cache
+node_modules/.vite/
+node_modules/.cache/
+
+# User-uploaded files (runtime data, not source code)
+Backend/passport-files/
+Backend/uploads/
+Backend/repository-files/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / local tools
+.vscode/
+.idea/
+.claude/

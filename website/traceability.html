@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="How ClarosDPP delivers circularity workflows, material traceability through the passport platform, and ISO 14067 carbon footprint studies for Digital Product Passports." />
+  <!-- ══ SEO ══ update https://clarosdpp.com to your domain before deployment ══ -->
+  <meta name="robots"      content="index, follow" />
+  <meta name="author"      content="ClarosDPP" />
+  <meta name="keywords"    content="material traceability DPP, product carbon footprint ISO 14067, circularity scoring, lifecycle assessment LCA, Scope 1 2 3 emissions, EPR compliance, circular economy DPP, material origin tracking" />
+  <meta name="theme-color" content="#0b1826" />
+  <link rel="canonical"    href="https://clarosdpp.com/traceability.html" />
+  <!-- Favicon: inline SVG — no files needed in dev. Before launch replace with real favicon.ico + site.webmanifest -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <meta property="og:type"         content="article" />
+  <meta property="og:site_name"    content="ClarosDPP" />
+  <meta property="og:title"        content="Circularity, Material Traceability & Carbon Footprint — ClarosDPP" />
+  <meta property="og:description"  content="Circularity workflows, material traceability through the passport platform, ISO 14067 carbon footprint studies, and lifecycle assessment for DPP compliance." />
+  <meta property="og:url"          content="https://clarosdpp.com/traceability.html" />
+  <meta property="og:image"        content="https://clarosdpp.com/og-image.jpg" />
+  <meta property="og:image:width"  content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale"       content="en_US" />
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:site"        content="@ClarosDPP" />
+  <meta name="twitter:title"       content="Circularity, Material Traceability & Carbon Footprint — ClarosDPP" />
+  <meta name="twitter:description" content="Circularity workflows, material traceability through the passport platform, ISO 14067 carbon footprint studies, and lifecycle assessment for DPP compliance." />
+  <meta name="twitter:image"       content="https://clarosdpp.com/og-image.jpg" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": "https://clarosdpp.com/traceability.html",
+    "url": "https://clarosdpp.com/traceability.html",
+    "name": "Circularity, Material Traceability & Carbon Footprint — ClarosDPP",
+    "description": "Circularity workflows, material traceability through the passport platform, ISO 14067 carbon footprint studies, and lifecycle assessment for DPP compliance.",
+    "publisher": { "@type": "Organization", "name": "ClarosDPP", "url": "https://clarosdpp.com" },
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home",              "item": "https://clarosdpp.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Circularity & Carbon", "item": "https://clarosdpp.com/traceability.html" }
+      ]
+    }
+  }
+  </script>
+  <title>Circularity, Material Traceability & Carbon Footprint — ClarosDPP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Trace steps */
+    .trace-steps { display: flex; flex-direction: column; gap: 0; }
+    .trace-step {
+      display: flex; gap: 1.2rem; align-items: flex-start;
+      padding: 1.4rem 1.5rem 1.4rem 1.8rem;
+      border-left: 2px solid rgba(13,181,176,0.2);
+      position: relative; transition: border-color 0.2s;
+    }
+    .trace-step::before {
+      content: ''; position: absolute; left: -8px; top: 1.8rem;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--navy); border: 2px solid rgba(13,181,176,0.35);
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .trace-step.active { border-left-color: var(--teal); }
+    .trace-step.active::before {
+      background: var(--teal); border-color: var(--teal);
+      box-shadow: 0 0 14px rgba(13,181,176,0.5);
+    }
+    .trace-step:hover { border-left-color: var(--teal); }
+    .ts-icon {
+      width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+      background: var(--teal-dim); display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+    }
+    .trace-step h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.35rem; }
+    .trace-step p { font-size: 0.84rem; color: var(--lgray); line-height: 1.72; }
+
+    /* Circularity visual */
+    .circularity-diagram {
+      position: relative; display: flex; align-items: center; justify-content: center;
+      width: 360px; height: 360px; margin: 0 auto;
+    }
+    .ring {
+      position: absolute; border-radius: 50%; border: 1px solid;
+    }
+    .ring-outer {
+      width: 340px; height: 340px; border-color: rgba(13,181,176,0.18);
+      animation: spinSlow 40s linear infinite;
+    }
+    .ring-mid {
+      width: 240px; height: 240px; border-color: rgba(13,181,176,0.28);
+      animation: spinSlow 25s linear infinite reverse;
+    }
+    .ring-inner {
+      width: 130px; height: 130px;
+      background: rgba(13,181,176,0.08); border-color: var(--teal);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+    }
+    @keyframes spinSlow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    .ring-inner-text { font-size: 0.72rem; font-weight: 800; color: var(--teal); letter-spacing: 2px; text-transform: uppercase; line-height: 1.4; }
+    .ring-node {
+      position: absolute; width: 38px; height: 38px; border-radius: 50%;
+      background: var(--navy2); border: 2px solid var(--teal);
+      display: flex; align-items: center; justify-content: center; font-size: 1rem;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    }
+
+    /* Carbon bars */
+    .carbon-bar-row {
+      display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;
+    }
+    .cb-label { font-size: 0.82rem; color: var(--lgray); width: 150px; flex-shrink: 0; }
+    .cb-track { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .cb-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--teal), var(--teal2));
+      transform-origin: left; animation: growBar 1.4s cubic-bezier(0.4,0,0.2,1) forwards;
+      transform: scaleX(0);
+    }
+    @keyframes growBar { to { transform: scaleX(1); } }
+    .cb-val { font-size: 0.78rem; font-weight: 700; color: var(--teal); width: 40px; text-align: right; flex-shrink: 0; }
+
+    /* Carbon steps */
+    .carbon-step {
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 1.1rem 1.3rem; margin-bottom: 0.9rem;
+      background: rgba(13,181,176,0.06); border: 1px solid var(--teal-bdr);
+      border-radius: 12px; transition: background 0.2s;
+    }
+    .carbon-step:hover { background: rgba(13,181,176,0.1); }
+    .cs-num {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      background: var(--teal); color: var(--navy); font-weight: 800; font-size: 0.8rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .carbon-step h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .carbon-step p { font-size: 0.82rem; color: var(--lgray); line-height: 1.68; }
+
+    /* Stat cards */
+    .stat-mini { background: var(--card-bg); border: 1px solid var(--card-bdr); border-radius: 12px; padding: 1.2rem; }
+    .stat-mini strong { font-family: var(--serif); font-size: 1.7rem; color: var(--teal); display: block; margin-bottom: 0.25rem; }
+    .stat-mini span { font-size: 0.78rem; color: var(--lgray); }
+  </style>
+</head>
+<body class="page-body">
+
+  <div class="page-hero">
+    <div class="container">
+      <div class="reveal">
+        <span class="section-eyebrow">Traceability · Circularity · Carbon</span>
+        <h1>Turning <span class="hl">Data Into Compliance</span></h1>
+        <p>Circularity workflows, material traceability through the passport platform, and carbon footprint calculation are three of the most technically demanding parts of DPP compliance. Here's how we operationalise them end to end.</p>
+        <a href="contact.html" class="btn btn-primary">Request a Platform Demo →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRACEABILITY -->
+  <section class="section section-dark" id="traceability" aria-labelledby="trace-title">
+    <div class="container">
+      <div class="reveal" style="margin-bottom:3rem;">
+        <span class="section-eyebrow">Service 04</span>
+        <h2 class="section-title" id="trace-title">Circularity &amp; Material <span class="hl">Traceability</span></h2>
+        <p class="section-lead">We use the passport platform to connect material provenance, compliance evidence, repair data, and recovery outcomes into one verifiable record that stays useful across the full product lifecycle.</p>
+      </div>
+      <div class="two-col center">
+        <div class="reveal">
+          <div class="trace-steps">
+            <div class="trace-step active">
+              <div class="ts-icon">⛏️</div>
+              <div>
+                <h4>Material Origin Evidence</h4>
+                <p>We structure origin declarations, recycled content evidence, and component provenance into the passport so compliance teams can substantiate ESPR and Battery Regulation disclosures without relying on disconnected spreadsheets.</p>
+              </div>
+            </div>
+            <div class="trace-step active">
+              <div class="ts-icon">⚗️</div>
+              <div>
+                <h4>Substance &amp; Compliance Mapping</h4>
+                <p>Every material entry can be mapped to REACH SVHC, RoHS, PFAS, and product-specific compliance requirements. The platform flags changes when regulatory lists evolve, keeping disclosures current and reviewable.</p>
+              </div>
+            </div>
+            <div class="trace-step active">
+              <div class="ts-icon">🏭</div>
+              <div>
+                <h4>Manufacturing &amp; Process Records</h4>
+                <p>Factory energy data, production batches, process records, and quality documentation are linked to each passport so public, customer, and regulator views all point back to the same source of truth.</p>
+              </div>
+            </div>
+            <div class="trace-step active">
+              <div class="ts-icon">🚚</div>
+              <div>
+                <h4>Transport &amp; Distribution Data</h4>
+                <p>Distribution events can be captured alongside emission factors and transport modes, giving teams the data needed for product carbon footprint calculations and downstream passport reporting.</p>
+              </div>
+            </div>
+            <div class="trace-step">
+              <div class="ts-icon">🛒</div>
+              <div>
+                <h4>Repair &amp; In-Use Documentation</h4>
+                <p>For connected or serviceable products, we connect maintenance records, warranty events, and repair instructions to the passport so durability and repairability evidence remains available over time.</p>
+              </div>
+            </div>
+            <div class="trace-step">
+              <div class="ts-icon">🔄</div>
+              <div>
+                <h4>End-of-Life &amp; Loop Closure</h4>
+                <p>Recovery, refurbishment, recycling, and recycled-content outcomes are captured back into the passport workflow so circularity claims are supported by evidence rather than point-in-time declarations.</p>
+              </div>
+            </div>
+          </div>
+          <div class="cta-strip">
+            <p>Want to see how circularity and material traceability work inside the passport platform? <span>For more details, reach out to our team here!</span></p>
+            <a href="contact.html" class="btn btn-primary btn-sm">Request Demo →</a>
+          </div>
+        </div>
+
+        <!-- Circularity visual + benefits -->
+        <div class="reveal reveal-d2" style="display:flex;flex-direction:column;align-items:center;gap:2rem;" id="circularity">
+          <div class="circularity-diagram" aria-hidden="true">
+            <div class="ring ring-outer">
+              <div class="ring-node" style="top:8px;left:50%;transform:translateX(-50%)">🌍</div>
+              <div class="ring-node" style="bottom:8px;left:50%;transform:translateX(-50%)">♻️</div>
+            </div>
+            <div class="ring ring-mid">
+              <div class="ring-node" style="left:-19px;top:50%;transform:translateY(-50%)">🏭</div>
+              <div class="ring-node" style="right:-19px;top:50%;transform:translateY(-50%)">🚚</div>
+            </div>
+            <div class="ring ring-inner">
+              <div class="ring-inner-text">Circular<br/>Economy<br/>Loop</div>
+            </div>
+          </div>
+          <div style="background:rgba(13,181,176,0.07);border:1px solid var(--teal-bdr);border-radius:16px;padding:1.6rem;width:100%;max-width:320px;">
+            <h4 style="font-size:0.9rem;font-weight:700;color:var(--teal);margin-bottom:1rem;">What the Passport Workflow Enables</h4>
+            <ul style="display:flex;flex-direction:column;gap:0.75rem;">
+              <li style="font-size:0.83rem;color:var(--lgray);display:flex;gap:0.6rem;align-items:flex-start;"><span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>Evidence-backed circularity and recyclability claims</li>
+              <li style="font-size:0.83rem;color:var(--lgray);display:flex;gap:0.6rem;align-items:flex-start;"><span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>Real-time regulatory compliance status</li>
+              <li style="font-size:0.83rem;color:var(--lgray);display:flex;gap:0.6rem;align-items:flex-start;"><span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>Audit-ready provenance, repair, and recovery records</li>
+              <li style="font-size:0.83rem;color:var(--lgray);display:flex;gap:0.6rem;align-items:flex-start;"><span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>Consumer-facing QR code passport data</li>
+              <li style="font-size:0.83rem;color:var(--lgray);display:flex;gap:0.6rem;align-items:flex-start;"><span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>Recycling stream optimisation data</li>
+              <li style="font-size:0.83rem;color:var(--lgray);display:flex;gap:0.6rem;align-items:flex-start;"><span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>Anti-counterfeiting and product authentication</li>
+              <li style="font-size:0.83rem;color:var(--lgray);display:flex;gap:0.6rem;align-items:flex-start;"><span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>Conflict minerals and human rights due diligence</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARBON FOOTPRINT -->
+  <section class="section section-alt" id="carbon" aria-labelledby="carbon-title">
+    <div class="container">
+      <div class="reveal" style="margin-bottom:3rem;">
+        <span class="section-eyebrow">Service 03 · Regulatory Requirement</span>
+        <h2 class="section-title" id="carbon-title">Carbon Footprint <span class="hl">Made Simple</span></h2>
+        <p class="section-lead">Product-level carbon calculation is one of the most technically demanding elements of DPP compliance — and a growing mandatory requirement. We strip away the complexity and deliver a regulation-ready study for every product in your portfolio.</p>
+      </div>
+
+      <div class="two-col">
+        <div class="reveal">
+          <h3 style="font-size:1.05rem;font-weight:700;margin-bottom:1.5rem;color:var(--white);">Why Carbon Calculation Is So Complex</h3>
+          <p style="font-size:0.87rem;color:var(--lgray);line-height:1.8;margin-bottom:1.5rem;">
+            Most companies underestimate what product carbon footprint (PCF) calculation actually involves. It is not simply measuring what comes out of your factory chimney. Scope 3 emissions — the emissions embedded in your supply chain, your suppliers' suppliers, and the end-of-life disposal of your product — account for over 70% of a typical manufactured product's total carbon footprint, yet require data from hundreds of supplier tiers across multiple countries and processes.
+          </p>
+          <div style="background:var(--card-bg);border:1px solid var(--card-bdr);border-radius:14px;padding:1.8rem;margin-bottom:1.5rem;">
+            <h4 style="font-size:0.9rem;font-weight:700;margin-bottom:1.2rem;color:var(--teal);">Carbon Footprint Complexity by Scope</h4>
+            <div class="carbon-bar-row"><span class="cb-label">Scope 1 — Direct</span><div class="cb-track"><div class="cb-fill" style="width:60%;animation-delay:0.2s"></div></div><span class="cb-val">60%</span></div>
+            <div class="carbon-bar-row"><span class="cb-label">Scope 2 — Energy</span><div class="cb-track"><div class="cb-fill" style="width:72%;animation-delay:0.4s"></div></div><span class="cb-val">72%</span></div>
+            <div class="carbon-bar-row"><span class="cb-label">Scope 3 — Supply Chain</span><div class="cb-track"><div class="cb-fill" style="width:96%;animation-delay:0.6s"></div></div><span class="cb-val">96%</span></div>
+            <div class="carbon-bar-row"><span class="cb-label">Logistics Emissions</span><div class="cb-track"><div class="cb-fill" style="width:68%;animation-delay:0.8s"></div></div><span class="cb-val">68%</span></div>
+            <div class="carbon-bar-row"><span class="cb-label">End-of-Life Phase</span><div class="cb-track"><div class="cb-fill" style="width:55%;animation-delay:1s"></div></div><span class="cb-val">55%</span></div>
+            <p style="font-size:0.75rem;color:var(--gray);margin-top:0.8rem;">Relative data complexity score per scope. Scope 3 data demands data from suppliers who may themselves lack measurement capabilities.</p>
+          </div>
+          <div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.18);border-radius:12px;padding:1.3rem;">
+            <p style="font-size:0.85rem;color:var(--lgray);line-height:1.75;">
+              <strong style="color:#ef4444;">⚠️ Regulatory mandate:</strong> EU Battery Regulation requires carbon footprint declarations from February 2025 for large stationary batteries, with performance class thresholds tightening from 2027. ESPR DPPs for electronics, textiles, and construction materials will require carbon intensity data from 2027–2028.
+            </p>
+          </div>
+        </div>
+
+        <div class="reveal reveal-d2">
+          <h3 style="font-size:1.05rem;font-weight:700;margin-bottom:1.5rem;color:var(--white);">How ClarosDPP Simplifies It — 5 Steps</h3>
+          <div class="carbon-step">
+            <div class="cs-num">1</div>
+            <div>
+              <h4>Product Data Intake & BOM Mapping</h4>
+              <p>We collect your product's Bill of Materials, manufacturing energy data, and logistics information through a structured onboarding process — accepting data from ERP systems, spreadsheets, or our supplier portal. No special software or data format required from you.</p>
+            </div>
+          </div>
+          <div class="carbon-step">
+            <div class="cs-num">2</div>
+            <div>
+              <h4>Supplier Emission Factor Assignment</h4>
+              <p>Our database maps each material and process to certified emission factors from ecoinvent 3, GaBi, and IPCC databases. Where primary supplier data is unavailable, we apply conservative, transparent secondary data with documented assumptions that hold up to auditor scrutiny.</p>
+            </div>
+          </div>
+          <div class="carbon-step">
+            <div class="cs-num">3</div>
+            <div>
+              <h4>Full ISO 14067 / PEF Lifecycle Assessment</h4>
+              <p>We run a complete product carbon footprint calculation aligned to ISO 14067 and EU Product Environmental Footprint (PEF) methodology — covering all lifecycle stages from raw material extraction through manufacturing, distribution, use phase, and end-of-life disposal or recycling.</p>
+            </div>
+          </div>
+          <div class="carbon-step">
+            <div class="cs-num">4</div>
+            <div>
+              <h4>DPP-Ready Carbon Declaration</h4>
+              <p>Results are structured and formatted for direct embedding into your Digital Product Passport — satisfying EU Battery Regulation Article 7 carbon intensity declarations and ESPR DPP data schema requirements. Third-party review available for enhanced credibility.</p>
+            </div>
+          </div>
+          <div class="carbon-step">
+            <div class="cs-num">5</div>
+            <div>
+              <h4>Reduction Roadmap & Scenario Modelling</h4>
+              <p>We identify carbon hotspots across your product's lifecycle and model alternative sourcing, manufacturing process, and logistics scenarios — giving you an actionable roadmap to reduce your carbon intensity and stay ahead of tightening regulatory thresholds over time.</p>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.2rem;">
+            <div class="stat-mini"><strong>ISO 14067</strong><span>Aligned PCF methodology for every study</span></div>
+            <div class="stat-mini"><strong>PEF Ready</strong><span>EU Product Environmental Footprint compliant</span></div>
+            <div class="stat-mini"><strong>Scope 1–3</strong><span>Full emissions coverage, no hidden hotspots</span></div>
+            <div class="stat-mini"><strong>Audit Trail</strong><span>Every assumption documented and defensible</span></div>
+          </div>
+          <div class="cta-strip" style="margin-top:1.2rem;">
+            <p><span>Need a carbon study for your product?</span></p>
+            <a href="contact.html" class="btn btn-primary btn-sm">Get a Carbon Footprint Quote →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="shared.js"></script>
+</body>
+</html>

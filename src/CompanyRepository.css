@@ -1,0 +1,182 @@
+/* ============================================
+   COMPANY FILE REPOSITORY
+   ============================================ */
+
+.repo-page { padding-bottom: 60px; }
+
+/* Header */
+.repo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.repo-title    { margin: 0 0 4px; font-size: 28px; font-weight: 700; color: var(--onyx); }
+.repo-subtitle { margin: 0; font-size: 28px; color: var(--charcoal, #555); }
+
+.repo-toolbar  { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* Buttons */
+.repo-btn {
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 28px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, transform 0.1s;
+  font-family: inherit;
+}
+.repo-btn:active { transform: translateY(1px); }
+.repo-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.repo-btn-primary   { background: var(--jet, #1C3738); color: #F4FFF8; }
+.repo-btn-primary:hover:not(:disabled) { background: #000F08; }
+.repo-btn-secondary { background: #f0f4f4; color: var(--onyx); border: 1px solid #dde; }
+.repo-btn-secondary:hover:not(:disabled) { background: #e4ecec; }
+
+/* New folder form */
+.repo-folder-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #f9fafb;
+  border: 1px solid #e0e7e7;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.repo-folder-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 28px;
+  font-family: inherit;
+}
+.repo-folder-input:focus { outline: none; border-color: var(--jet); }
+
+/* Breadcrumb */
+.repo-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 0 14px;
+  border-bottom: 1px solid #e0e7e7;
+  margin-bottom: 16px;
+}
+.repo-crumb {
+  background: none;
+  border: none;
+  padding: 3px 6px;
+  font-size: 28px;
+  color: var(--jet, #1C3738);
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: inherit;
+  font-weight: 600;
+  transition: background 0.12s;
+}
+.repo-crumb:hover { background: #e4ecec; }
+.repo-crumb-sep { color: #aaa; font-size: 28px; }
+
+/* Empty state */
+.repo-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--steel, #888);
+  font-size: 28px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 2px dashed #dde;
+}
+
+/* File list */
+.repo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.repo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  background: white;
+  border: 1px solid #e8eded;
+  border-radius: 8px;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.repo-item:hover { background: #f4faf9; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.repo-item.folder .repo-item-info { cursor: pointer; }
+
+.repo-item-icon { font-size: 28px; flex-shrink: 0; }
+
+.repo-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.repo-item-name {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--onyx);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.repo-item.folder .repo-item-name { color: var(--jet, #1C3738); }
+.repo-item-meta {
+  font-size: 11px;
+  color: var(--steel, #888);
+}
+
+.repo-rename-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--jet);
+  border-radius: 5px;
+  font-size: 28px;
+  font-family: inherit;
+}
+.repo-rename-input:focus { outline: none; }
+
+/* Actions */
+.repo-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.repo-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 28px;
+  text-decoration: none;
+  background: #f0f4f4;
+  color: var(--onyx);
+  transition: background 0.12s;
+}
+.repo-action-btn:hover { background: #ddeaea; }
+.repo-action-btn.delete:hover { background: #fee2e2; }
+.repo-action-btn.ok     { background: #d1fae5; color: #065f46; font-weight: 700; }
+.repo-action-btn.cancel { background: #fee2e2; color: #991b1b; font-weight: 700; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .repo-header { flex-direction: column; }
+  .repo-toolbar { width: 100%; }
+  .repo-btn { flex: 1; text-align: center; }
+  .repo-item-meta { display: none; }
+}

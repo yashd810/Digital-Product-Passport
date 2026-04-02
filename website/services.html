@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="ClarosDPP services — DPP Platform, Compliance Governance, Carbon Footprint Studies, Circularity & Material Traceability, Regulatory Consulting, and Lifecycle Assessment." />
+  <!-- ══ SEO ══ update https://clarosdpp.com to your domain before deployment ══ -->
+  <meta name="robots"      content="index, follow" />
+  <meta name="author"      content="ClarosDPP" />
+  <meta name="keywords"    content="digital product passport services, DPP platform, EU compliance governance, carbon footprint study ISO 14067, circularity, material traceability, regulatory consulting ESPR, lifecycle assessment LCA, EPR compliance" />
+  <meta name="theme-color" content="#0b1826" />
+  <link rel="canonical"    href="https://clarosdpp.com/services.html" />
+  <!-- Favicon: inline SVG — no files needed in dev. Before launch replace with real favicon.ico + site.webmanifest -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <meta property="og:type"         content="website" />
+  <meta property="og:site_name"    content="ClarosDPP" />
+  <meta property="og:title"        content="DPP Platform & Compliance Services — ClarosDPP" />
+  <meta property="og:description"  content="DPP Platform, EU Compliance Governance, Carbon Footprint Studies, Circularity & Material Traceability, and Regulatory Consulting — all under one roof." />
+  <meta property="og:url"          content="https://clarosdpp.com/services.html" />
+  <meta property="og:image"        content="https://clarosdpp.com/og-image.jpg" />
+  <meta property="og:image:width"  content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale"       content="en_US" />
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:site"        content="@ClarosDPP" />
+  <meta name="twitter:title"       content="DPP Platform & Compliance Services — ClarosDPP" />
+  <meta name="twitter:description" content="DPP Platform, EU Compliance Governance, Carbon Footprint Studies, Circularity & Material Traceability, and Regulatory Consulting." />
+  <meta name="twitter:image"       content="https://clarosdpp.com/og-image.jpg" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": "https://clarosdpp.com/services.html",
+    "url": "https://clarosdpp.com/services.html",
+    "name": "DPP Platform & Compliance Services — ClarosDPP",
+    "description": "DPP Platform, Compliance Governance, Carbon Footprint Studies, Circularity & Material Traceability, Regulatory Consulting, and Lifecycle Assessment.",
+    "publisher": { "@type": "Organization", "name": "ClarosDPP", "url": "https://clarosdpp.com" },
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home",     "item": "https://clarosdpp.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Services", "item": "https://clarosdpp.com/services.html" }
+      ]
+    }
+  }
+  </script>
+  <title>DPP Platform & Compliance Services — ClarosDPP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Full service cards */
+    .service-full {
+      background: var(--card-bg); border: 1px solid var(--card-bdr);
+      border-radius: 20px; padding: 2.2rem;
+      transition: border-color 0.25s;
+      position: relative; overflow: hidden;
+    }
+    .service-full:hover { border-color: var(--teal-bdr); }
+    .service-full::after {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--teal), var(--teal2));
+      transform: scaleX(0); transform-origin: left; transition: transform 0.3s;
+    }
+    .service-full:hover::after { transform: scaleX(1); }
+    .sf-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 1.2rem; }
+    .sf-icon {
+      width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
+      background: var(--teal-dim); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+    }
+    .sf-label { display: flex; flex-direction: column; gap: 0.3rem; }
+    .sf-label h2 { font-size: 1.05rem; font-weight: 700; }
+    .service-full p { font-size: 0.87rem; color: var(--lgray); line-height: 1.8; margin-bottom: 1.2rem; }
+    .sf-features { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 1.5rem; }
+    .sf-feature { display: flex; gap: 0.6rem; font-size: 0.83rem; color: var(--lgray); align-items: flex-start; }
+    .sf-feature::before { content: '→'; color: var(--teal); font-weight: 700; flex-shrink: 0; }
+
+    /* Comparison table */
+    .compare-table { width: 100%; border-collapse: collapse; }
+    .compare-table th {
+      text-align: left; padding: 1rem; font-size: 0.8rem; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; color: var(--teal);
+      background: var(--card-bg); border-bottom: 1px solid var(--divider);
+    }
+    .compare-table td {
+      padding: 1rem; font-size: 0.85rem; color: var(--lgray);
+      border-bottom: 1px solid var(--divider); vertical-align: top;
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table tr:hover td { background: rgba(13,181,176,0.04); color: var(--white); }
+    .check { color: var(--green); font-weight: 700; }
+    .cross { color: var(--gray); }
+  </style>
+</head>
+<body class="page-body">
+
+  <div class="page-hero">
+    <div class="container">
+      <div class="reveal">
+        <span class="section-eyebrow">Full-Spectrum Compliance</span>
+        <h1>Our <span class="hl">Services</span></h1>
+        <p>From a single product passport to an enterprise-wide compliance programme — ClarosDPP provides every service you need to meet EU sustainability mandates with confidence.</p>
+        <a href="contact.html" class="btn btn-primary">Get a Custom Quote →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- DPP PLATFORM -->
+  <section class="section section-dark" id="platform" aria-labelledby="platform-title">
+    <div class="container">
+      <div class="two-col">
+        <div class="reveal">
+          <span class="section-eyebrow">Service 01</span>
+          <h2 class="section-title" id="platform-title">Digital Product <span class="hl">Passport Platform</span></h2>
+          <p class="section-lead">Issue, govern, and continuously update fully compliant DPPs for your entire product portfolio — from a single operational dashboard.</p>
+          <div class="service-full">
+            <div class="sf-header">
+              <div class="sf-icon">🪪</div>
+              <div class="sf-label">
+                <h2>DPP Platform — Core Features</h2>
+                <span class="badge badge-teal">ESPR · Battery · Toys · Construction · Detergents</span>
+              </div>
+            </div>
+            <p>Our cloud-based DPP platform generates machine-readable passports for every SKU, complete with unique data carriers (QR codes, RFID tags), structured data schemas aligned to each applicable regulation, and a hosted endpoint that remains accessible over the product's full lifetime — a specific ESPR requirement.</p>
+            <p>As regulatory schemas evolve and new delegated acts are published, your passports are automatically updated. You never face a compliance drift when rules change — our governance engine handles it continuously.</p>
+            <div class="sf-features">
+              <div class="sf-feature">Unique QR code and data carrier generation per product unit or batch</div>
+              <div class="sf-feature">ESPR plus battery, toys, construction products, detergents, and other product-specific passport schemas</div>
+              <div class="sf-feature">Hosted, always-available data endpoints (EU-based servers)</div>
+              <div class="sf-feature">ERP and PLM system integration via REST API</div>
+              <div class="sf-feature">Bulk import for large SKU catalogues</div>
+              <div class="sf-feature">Automatic schema updates when delegated acts are published</div>
+              <div class="sf-feature">Audit trail and version history for every passport</div>
+              <div class="sf-feature">Consumer-facing and B2B views of passport data</div>
+            </div>
+            <a href="contact.html" class="btn btn-ghost btn-sm">For more details, reach out to our team here →</a>
+          </div>
+        </div>
+        <div class="reveal reveal-d2" style="display:flex;flex-direction:column;gap:1.2rem;padding-top:5rem;">
+          <!-- Mini passport preview UI -->
+          <div style="background:var(--navy3);border:1px solid var(--teal-bdr);border-radius:16px;padding:1.5rem;">
+            <div style="font-size:0.75rem;color:var(--teal);font-weight:600;margin-bottom:1rem;letter-spacing:1px;">PLATFORM DASHBOARD · LIVE VIEW</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--divider);">
+              <div>
+                <div style="font-size:0.85rem;font-weight:700;">Active Passports</div>
+                <div style="font-family:var(--serif);font-size:2rem;color:var(--teal);font-weight:700;">1,247</div>
+              </div>
+              <div>
+                <div style="font-size:0.85rem;font-weight:700;">Compliant</div>
+                <div style="font-family:var(--serif);font-size:2rem;color:var(--green);font-weight:700;">98.4%</div>
+              </div>
+              <div>
+                <div style="font-size:0.85rem;font-weight:700;">Needs Update</div>
+                <div style="font-family:var(--serif);font-size:2rem;color:var(--gold);font-weight:700;">19</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.6rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82rem;padding:0.5rem 0.7rem;background:rgba(13,181,176,0.07);border-radius:8px;">
+                <span>BT-Industrial-Module-2024</span>
+                <span style="color:var(--green);font-size:0.72rem;font-weight:600;">✓ COMPLIANT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82rem;padding:0.5rem 0.7rem;background:rgba(13,181,176,0.07);border-radius:8px;">
+                <span>TX-JacketFabric-EU-v2</span>
+                <span style="color:var(--green);font-size:0.72rem;font-weight:600;">✓ COMPLIANT</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82rem;padding:0.5rem 0.7rem;background:rgba(240,165,0,0.08);border-radius:8px;border:1px solid rgba(240,165,0,0.2);">
+                <span>EL-Laptop-Pro-14-2025</span>
+                <span style="color:var(--gold);font-size:0.72rem;font-weight:600;">⚠ UPDATE DUE</span>
+              </div>
+            </div>
+          </div>
+          <div class="cta-strip" style="margin-top:0;">
+            <p><span>Interested in a platform demo?</span></p>
+            <a href="contact.html" class="btn btn-primary btn-sm">Book Demo →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPLIANCE GOVERNANCE -->
+  <section class="section section-alt" id="compliance" aria-labelledby="compliance-title">
+    <div class="container">
+      <div class="reveal">
+        <span class="section-eyebrow">Service 02 · Core Strength</span>
+        <h2 class="section-title" id="compliance-title">Compliance Governance & <span class="hl">Regulation Intelligence</span></h2>
+        <p class="section-lead">This is our strongest capability. We don't just help you comply today — we keep you compliant as the regulation network evolves, forever.</p>
+      </div>
+      <div class="two-col">
+        <div class="reveal">
+          <div class="service-full">
+            <div class="sf-header">
+              <div class="sf-icon">📋</div>
+              <div class="sf-label"><h2>What Compliance Governance Includes</h2></div>
+            </div>
+            <p>The EU sustainability regulation landscape is not static — it is a fast-moving, interconnected network of regulations, delegated acts, implementing acts, and standards that interact with each other in complex ways. ESPR delegated acts are published progressively. Battery Regulation thresholds tighten on a phased schedule. REACH SVHC lists are updated twice yearly. Member states implement directives with varying national nuances.</p>
+            <p>Our compliance governance service ensures your organisation has a continuously updated, accurate view of its regulatory position — and that your DPPs, product designs, and supply chain practices reflect the current and anticipated regulatory requirements at all times.</p>
+            <div class="sf-features">
+              <div class="sf-feature">Continuous monitoring of ESPR, Battery Regulation, REACH, CSDDD, RoHS, WEEE, and 15+ frameworks</div>
+              <div class="sf-feature">Regulatory change alerts with impact assessment for your specific product categories</div>
+              <div class="sf-feature">Compliance calendar with personalised deadline tracking</div>
+              <div class="sf-feature">Quarterly regulatory briefings tailored to your portfolio</div>
+              <div class="sf-feature">Delegated act tracking — we read and interpret every new technical regulation published</div>
+              <div class="sf-feature">National implementation monitoring across all 27 EU member states</div>
+              <div class="sf-feature">Compliance posture dashboard with traffic-light status per regulation per product</div>
+            </div>
+            <a href="contact.html" class="btn btn-ghost btn-sm">For more details, reach out to our team here →</a>
+          </div>
+        </div>
+        <div class="reveal reveal-d2">
+          <h3 style="font-family:var(--serif);font-size:1.3rem;font-weight:700;margin-bottom:1.2rem;">Frameworks We Monitor</h3>
+          <div style="overflow:auto;border-radius:12px;border:1px solid var(--card-bdr);">
+            <table class="compare-table" style="min-width:340px;">
+              <thead>
+                <tr><th>Regulation</th><th>Scope</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>ESPR 2024/1781</td><td>All product categories</td><td><span class="check">● Active</span></td></tr>
+                <tr><td>Battery Reg 2023/1542</td><td>Batteries &amp; EVs</td><td><span class="check">● Active</span></td></tr>
+                <tr><td>CSDDD 2024/1760</td><td>Value chain due diligence</td><td><span class="check">● Phasing</span></td></tr>
+                <tr><td>REACH 1907/2006</td><td>Chemical substances</td><td><span class="check">● Active</span></td></tr>
+                <tr><td>RoHS 2011/65/EU</td><td>Electronics restricted substances</td><td><span class="check">● Active</span></td></tr>
+                <tr><td>WEEE 2012/19/EU</td><td>Electrical waste</td><td><span class="check">● Active</span></td></tr>
+                <tr><td>EU Green Claims Dir.</td><td>Sustainability claims</td><td><span style="color:var(--gold);">● Finalising</span></td></tr>
+                <tr><td>Textile DPP (Delegated Act)</td><td>Apparel &amp; footwear</td><td><span style="color:var(--gold);">● In Development</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REGULATORY CONSULTING -->
+  <section class="section section-dark" id="consulting" aria-labelledby="consult-title">
+    <div class="container">
+      <div class="reveal">
+        <span class="section-eyebrow">Service 03</span>
+        <h2 class="section-title" id="consult-title">Regulatory Consulting for <span class="hl">Product Companies</span></h2>
+        <p class="section-lead">If you're building your own digital or physical product, the regulation network is just as complex — and the stakes are just as high. We provide expert consulting to navigate it.</p>
+      </div>
+      <div class="three-col">
+        <div class="service-full reveal reveal-d1">
+          <div class="sf-header">
+            <div class="sf-icon">📐</div>
+            <div class="sf-label"><h2>Regulatory Gap Analysis</h2></div>
+          </div>
+          <p>We audit your product against all applicable EU directives, ESPR delegated acts, and global sustainability regulations — identifying compliance gaps before they become penalties, product withdrawals, or market access issues.</p>
+          <div class="sf-features">
+            <div class="sf-feature">Full regulatory applicability assessment</div>
+            <div class="sf-feature">Gap analysis against current and upcoming requirements</div>
+            <div class="sf-feature">Written compliance report with prioritised findings</div>
+          </div>
+          <a href="contact.html" class="btn btn-ghost btn-sm">Enquire →</a>
+        </div>
+        <div class="service-full reveal reveal-d2">
+          <div class="sf-header">
+            <div class="sf-icon">🗺️</div>
+            <div class="sf-label"><h2>Compliance Roadmapping</h2></div>
+          </div>
+          <p>A phased, prioritised compliance plan built around your product development and go-to-market timelines — with clear owners, milestones, regulatory deadlines, and resource estimates for each workstream.</p>
+          <div class="sf-features">
+            <div class="sf-feature">Multi-year regulatory roadmap</div>
+            <div class="sf-feature">Integrated with your product development cycle</div>
+            <div class="sf-feature">Budget and resource planning guidance</div>
+          </div>
+          <a href="contact.html" class="btn btn-ghost btn-sm">Enquire →</a>
+        </div>
+        <div class="service-full reveal reveal-d3">
+          <div class="sf-header">
+            <div class="sf-icon">⚗️</div>
+            <div class="sf-label"><h2>Substance Compliance (REACH/RoHS)</h2></div>
+          </div>
+          <p>Verify your product's material composition against REACH Substances of Very High Concern (SVHCs), RoHS restricted substances lists, and emerging PFAS regulations — with supplier questionnaires and third-party testing support.</p>
+          <div class="sf-features">
+            <div class="sf-feature">SVHC and restricted substance screening</div>
+            <div class="sf-feature">Supplier chemical data collection</div>
+            <div class="sf-feature">Testing lab coordination</div>
+          </div>
+          <a href="contact.html" class="btn btn-ghost btn-sm">Enquire →</a>
+        </div>
+        <div class="service-full reveal reveal-d1">
+          <div class="sf-header">
+            <div class="sf-icon">📊</div>
+            <div class="sf-label"><h2>Sustainability Reporting</h2></div>
+          </div>
+          <p>From CSRD-aligned sustainability reports to investor ESG disclosures, we translate your DPP product data into credible, auditable sustainability narratives — backed by your digital passport data infrastructure.</p>
+          <div class="sf-features">
+            <div class="sf-feature">CSRD reporting support</div>
+            <div class="sf-feature">ESG investor disclosures</div>
+            <div class="sf-feature">Product-level environmental declarations (EPDs)</div>
+          </div>
+          <a href="contact.html" class="btn btn-ghost btn-sm">Enquire →</a>
+        </div>
+        <div class="service-full reveal reveal-d2">
+          <div class="sf-header">
+            <div class="sf-icon">⚡</div>
+            <div class="sf-label"><h2>Regulatory Change Monitoring</h2></div>
+          </div>
+          <p>Stay ahead of regulatory change with our continuous monitoring service. We alert your team to new delegated acts, updated thresholds, and emerging requirements before they impact your product, supply chain, or market position.</p>
+          <div class="sf-features">
+            <div class="sf-feature">Monthly regulatory intelligence reports</div>
+            <div class="sf-feature">Priority alerts for high-impact changes</div>
+            <div class="sf-feature">Impact assessment per product category</div>
+          </div>
+          <a href="contact.html" class="btn btn-ghost btn-sm">Enquire →</a>
+        </div>
+        <div class="service-full reveal reveal-d3">
+          <div class="sf-header">
+            <div class="sf-icon">🤝</div>
+            <div class="sf-label"><h2>Circularity &amp; Material Data Enablement</h2></div>
+          </div>
+          <p>Your DPP is only as strong as the evidence behind it. We help teams improve circularity and material traceability through the passport platform so recycled content, substances, and end-of-life data are structured, current, and audit-ready.</p>
+          <div class="sf-features">
+            <div class="sf-feature">Material composition and recycled content evidence capture</div>
+            <div class="sf-feature">Circularity scoring and end-of-life data modelling</div>
+            <div class="sf-feature">Passport workflows for provenance, repair, and recovery records</div>
+          </div>
+          <a href="contact.html" class="btn btn-ghost btn-sm">Enquire →</a>
+        </div>
+      </div>
+      <div class="cta-strip reveal">
+        <p>Building a product and need clarity on your compliance obligations? <span>For more details, reach out to our team here!</span></p>
+        <a href="contact.html" class="btn btn-primary btn-sm">Talk to a Compliance Expert →</a>
+      </div>
+    </div>
+  </section>
+
+  <script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Why Digital Product Passports are mandatory under EU ESPR and Battery Regulation — what's required, key deadlines, and the cost of non-compliance." />
+  <!-- ══ SEO ══ update https://clarosdpp.com to your domain before deployment ══ -->
+  <meta name="robots"      content="index, follow" />
+  <meta name="author"      content="ClarosDPP" />
+  <meta name="keywords"    content="why digital product passport mandatory, EU ESPR regulation, DPP requirements, EU battery regulation compliance, REACH RoHS, CSDDD, product sustainability regulation, DPP deadline" />
+  <meta name="theme-color" content="#0b1826" />
+  <link rel="canonical"    href="https://clarosdpp.com/why-dpp.html" />
+  <!-- Favicon: inline SVG — no files needed in dev. Before launch replace with real favicon.ico + site.webmanifest -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <meta property="og:type"         content="article" />
+  <meta property="og:site_name"    content="ClarosDPP" />
+  <meta property="og:title"        content="Why Digital Product Passports Are Mandatory — ClarosDPP" />
+  <meta property="og:description"  content="EU ESPR and Battery Regulation are making DPPs mandatory. Understand what's required, key deadlines, and the cost of non-compliance." />
+  <meta property="og:url"          content="https://clarosdpp.com/why-dpp.html" />
+  <meta property="og:image"        content="https://clarosdpp.com/og-image.jpg" />
+  <meta property="og:image:width"  content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale"       content="en_US" />
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:site"        content="@ClarosDPP" />
+  <meta name="twitter:title"       content="Why Digital Product Passports Are Mandatory — ClarosDPP" />
+  <meta name="twitter:description" content="EU ESPR and Battery Regulation are making DPPs mandatory. Understand what's required, key deadlines, and the cost of non-compliance." />
+  <meta name="twitter:image"       content="https://clarosdpp.com/og-image.jpg" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "@id": "https://clarosdpp.com/why-dpp.html",
+    "url": "https://clarosdpp.com/why-dpp.html",
+    "headline": "Why Digital Product Passports Are Mandatory",
+    "description": "EU ESPR and Battery Regulation are making DPPs mandatory. Understand what's required, key deadlines, and the cost of non-compliance.",
+    "publisher": { "@type": "Organization", "name": "ClarosDPP", "url": "https://clarosdpp.com" },
+    "breadcrumb": {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home",    "item": "https://clarosdpp.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Why DPP", "item": "https://clarosdpp.com/why-dpp.html" }
+      ]
+    }
+  }
+  </script>
+  <title>Why Digital Product Passports Are Mandatory — ClarosDPP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* Regulation highlight box */
+    .reg-box {
+      background: var(--card-bg); border: 1px solid var(--card-bdr);
+      border-left: 3px solid var(--teal);
+      border-radius: 0 14px 14px 0; padding: 1.6rem;
+      margin-bottom: 1.2rem; transition: border-left-color 0.2s;
+    }
+    .reg-box:hover { border-left-color: var(--teal2); }
+    .reg-box-header { display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 0.8rem; }
+    .reg-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .reg-box h3 { font-size: 0.97rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .reg-box .reg-ref { font-size: 0.75rem; color: var(--teal); font-weight: 600; font-family: var(--mono); }
+    .reg-box p { font-size: 0.86rem; color: var(--lgray); line-height: 1.75; }
+
+    /* Numbered reasons */
+    .reason-list { display: flex; flex-direction: column; gap: 1.1rem; }
+    .reason-item {
+      display: flex; gap: 1.1rem; align-items: flex-start;
+      padding: 1.3rem 1.5rem; background: var(--card-bg);
+      border: 1px solid var(--card-bdr); border-radius: 14px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .reason-item:hover { border-color: var(--teal-bdr); transform: translateX(3px); }
+    .reason-num {
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+      background: var(--teal-dim); color: var(--teal);
+      font-weight: 800; font-size: 0.88rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .reason-item h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .reason-item p { font-size: 0.83rem; color: var(--lgray); line-height: 1.7; }
+
+    /* Penalty box */
+    .penalty-box {
+      background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.2);
+      border-radius: 14px; padding: 1.8rem;
+    }
+    .penalty-box h3 { font-size: 1rem; font-weight: 700; color: #ef4444; margin-bottom: 1rem; }
+    .penalty-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .penalty-item { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 1rem; }
+    .penalty-item .p-val { font-family: var(--serif); font-size: 1.5rem; font-weight: 700; color: #ef4444; }
+    .penalty-item .p-desc { font-size: 0.8rem; color: var(--lgray); margin-top: 0.2rem; }
+
+    /* Data requirements table */
+    .data-req-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-top: 2rem; }
+    .dr-card {
+      background: var(--card-bg); border: 1px solid var(--card-bdr);
+      border-radius: 12px; padding: 1.3rem;
+    }
+    .dr-card .dr-icon { font-size: 1.3rem; margin-bottom: 0.6rem; }
+    .dr-card h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .dr-card p { font-size: 0.8rem; color: var(--lgray); line-height: 1.65; }
+  </style>
+</head>
+<body class="page-body">
+
+  <!-- PAGE HERO -->
+  <div class="page-hero">
+    <div class="container">
+      <div class="reveal">
+        <span class="section-eyebrow">The Regulatory Reality</span>
+        <h1>Why Every Product <span class="hl">Needs a Passport</span></h1>
+        <p>The EU's regulatory framework is fundamentally changing how products are made, sold, and recycled. Here is what it means for your business — and what's at stake if you wait.</p>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+          <a href="timeline.html" class="btn btn-ghost">View Full Timeline →</a>
+          <a href="contact.html" class="btn btn-primary">Assess My Readiness</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MARQUEE -->
+  <div class="marquee-bar" aria-hidden="true">
+    <div class="marquee-track">
+      <span class="marquee-item">ESPR 2024/1781</span><span class="marquee-item">Battery Regulation 2023/1542</span>
+      <span class="marquee-item">CSDDD Corporate Due Diligence</span><span class="marquee-item">REACH SVHCs</span>
+      <span class="marquee-item">EU Green Claims Directive</span><span class="marquee-item">RoHS 2011/65/EU</span>
+      <span class="marquee-item">ESPR 2024/1781</span><span class="marquee-item">Battery Regulation 2023/1542</span>
+      <span class="marquee-item">CSDDD Corporate Due Diligence</span><span class="marquee-item">REACH SVHCs</span>
+      <span class="marquee-item">EU Green Claims Directive</span><span class="marquee-item">RoHS 2011/65/EU</span>
+    </div>
+  </div>
+
+  <!-- KEY REGULATIONS -->
+  <section class="section section-dark" aria-labelledby="reg-title">
+    <div class="container">
+      <div class="two-col center">
+        <div class="reveal">
+          <span class="section-eyebrow">Legislation in Force</span>
+          <h2 class="section-title" id="reg-title">The Key <span class="hl">Regulations</span> Driving DPP</h2>
+          <p class="section-lead">These are not proposals or guidelines — they are enacted laws with binding deadlines and enforceable penalties.</p>
+
+          <div class="reg-box">
+            <div class="reg-box-header">
+              <div class="reg-icon">📜</div>
+              <div>
+                <h3>Ecodesign for Sustainable Products Regulation (ESPR)</h3>
+                <div class="reg-ref">Regulation (EU) 2024/1781 · In Force July 2024</div>
+              </div>
+            </div>
+            <p>ESPR replaces the Ecodesign Directive and establishes Digital Product Passports as mandatory for most product categories sold in the EU. It covers energy-related products, textiles, electronics, furniture, construction materials, chemicals, and more. Every DPP must be accessible via a unique data carrier (QR code or RFID) and contain structured sustainability data as specified in product-specific delegated acts.</p>
+          </div>
+
+          <div class="reg-box">
+            <div class="reg-box-header">
+              <div class="reg-icon">🔋</div>
+              <div>
+                <h3>EU Battery Regulation</h3>
+                <div class="reg-ref">Regulation (EU) 2023/1542 · DPP Mandatory Feb 2027</div>
+              </div>
+            </div>
+            <p>The first regulation to mandate Digital Product Passports. From February 18, 2027, all industrial batteries and EV batteries sold in the EU must carry a compliant DPP containing carbon footprint declarations, supply chain due diligence data, recycled content percentages, and end-of-life information. Carbon footprint declarations became enforceable in February 2025 for large stationary batteries.</p>
+          </div>
+
+          <div class="reg-box">
+            <div class="reg-box-header">
+              <div class="reg-icon">🏢</div>
+              <div>
+                <h3>Corporate Sustainability Due Diligence Directive (CSDDD)</h3>
+                <div class="reg-ref">Directive (EU) 2024/1760 · Phased from 2027</div>
+              </div>
+            </div>
+            <p>CSDDD requires large companies to identify, prevent, and address adverse human rights and environmental impacts across their value chains. In practice, that means product-level evidence, controlled provenance records, and auditable passport data that can stand up to regulator and customer scrutiny.</p>
+          </div>
+
+          <div class="reg-box">
+            <div class="reg-box-header">
+              <div class="reg-icon">⚗️</div>
+              <div>
+                <h3>REACH Regulation & Substances of Concern</h3>
+                <div class="reg-ref">Regulation (EC) 1907/2006 · Ongoing + DPP Integration 2027</div>
+              </div>
+            </div>
+            <p>ESPR mandates that DPPs disclose all Substances of Very High Concern (SVHCs) present in products above 0.1% by weight — directly integrating REACH obligations into the passport data schema. This affects virtually every manufactured product and requires reliable material-level evidence inside the passport record.</p>
+          </div>
+
+          <div class="reg-box">
+            <div class="reg-box-header">
+              <div class="reg-icon">🧩</div>
+              <div>
+                <h3>Additional Product Rules Requiring Digital Passports</h3>
+                <div class="reg-ref">Toys · Construction Products · Detergents · Sector-specific acts</div>
+              </div>
+            </div>
+            <p>The DPP conversation is bigger than ESPR. Toys, construction products, detergents, and other regulated categories are moving toward structured digital passport requirements or passport-like product data obligations. A platform approach lets you reuse the same governance, viewer, audit trail, and analytics capabilities across each category instead of building one-off solutions.</p>
+          </div>
+        </div>
+
+        <!-- Why 6 reasons -->
+        <div class="reveal reveal-d2">
+          <h3 style="font-family:var(--serif);font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;">6 Reasons You <span class="hl">Cannot Ignore</span> This</h3>
+          <div class="reason-list">
+            <div class="reason-item">
+              <div class="reason-num">1</div>
+              <div>
+                <h4>Market Access Blocked Without DPP</h4>
+                <p>Products without valid DPPs will be prohibited from EU market placement. Customs authorities and market surveillance bodies will verify DPP validity at the border and point of sale — no exceptions for large or established brands.</p>
+              </div>
+            </div>
+            <div class="reason-item">
+              <div class="reason-num">2</div>
+              <div>
+                <h4>Greenwashing is Now a Legal Liability</h4>
+                <p>The EU Green Claims Directive criminalises unsubstantiated sustainability claims. Every green claim on packaging must be backed by verifiable DPP data — making the passport a legal shield, not just a compliance checkbox.</p>
+              </div>
+            </div>
+            <div class="reason-item">
+              <div class="reason-num">3</div>
+              <div>
+                <h4>Data Aggregation Takes 18–36 Months</h4>
+                <p>Collecting verified, audit-ready product evidence across materials, manufacturing, carbon, repair, and circularity workflows is not a quick project. Companies that wait until 12 months before deadline face impossible timelines and costly rushed implementations.</p>
+              </div>
+            </div>
+            <div class="reason-item">
+              <div class="reason-num">4</div>
+              <div>
+                <h4>Financial Penalties Are Significant</h4>
+                <p>Member states must impose effective, proportionate, and dissuasive penalties for non-compliance. Early indications from national regulators suggest penalties calculated as a percentage of annual EU turnover.</p>
+              </div>
+            </div>
+            <div class="reason-item">
+              <div class="reason-num">5</div>
+              <div>
+                <h4>Investors and Procurement Demand It</h4>
+                <p>CSRD-mandated sustainability reports require product-level environmental data. B2B procurement teams at major brands now include DPP readiness in supplier qualification criteria — making it a commercial prerequisite, not just regulatory.</p>
+              </div>
+            </div>
+            <div class="reason-item">
+              <div class="reason-num">6</div>
+              <div>
+                <h4>Early Adopters Gain Competitive Advantage</h4>
+                <p>Companies with DPPs can credibly market product sustainability, qualify for ecodesign incentives, streamline EPR reporting, and differentiate in procurement processes — turning compliance cost into commercial opportunity.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT DATA IS REQUIRED -->
+  <section class="section section-alt" aria-labelledby="data-title">
+    <div class="container">
+      <div class="reveal">
+        <span class="section-eyebrow">Data Requirements</span>
+        <h2 class="section-title" id="data-title">What a DPP Must <span class="hl">Contain</span></h2>
+        <p class="section-lead">A Digital Product Passport is not a simple label — it is a structured, machine-readable data record covering the full product lifecycle. Here are the key data categories mandated under ESPR and Battery Regulation.</p>
+      </div>
+      <div class="data-req-grid">
+        <div class="dr-card reveal reveal-d1">
+          <div class="dr-icon">🌍</div>
+          <h4>Material Origin & Composition</h4>
+          <p>Country of origin, mining certifications, material composition percentages, and recycled content fractions. Required for REACH SVHC disclosure and Battery Reg recycled content mandates.</p>
+        </div>
+        <div class="dr-card reveal reveal-d2">
+          <div class="dr-icon">🌿</div>
+          <h4>Carbon Footprint</h4>
+          <p>Product-level carbon footprint declaration (kg CO₂e) across all lifecycle stages — raw materials, manufacturing, distribution, use, and end-of-life — following ISO 14067 or PEF methodology.</p>
+        </div>
+        <div class="dr-card reveal reveal-d3">
+          <div class="dr-icon">♻️</div>
+          <h4>Recyclability & Circularity</h4>
+          <p>Recyclability index, disassembly instructions, recycled content thresholds (e.g. 16% recycled cobalt by 2031 under Battery Reg), and end-of-life routing information for recyclers.</p>
+        </div>
+        <div class="dr-card reveal reveal-d1">
+          <div class="dr-icon">⚗️</div>
+          <h4>Substances of Concern</h4>
+          <p>All REACH SVHCs present above 0.1% threshold, RoHS restricted substances, and PFAS disclosures. Linked to unique substance identifiers (CAS numbers) for machine-readability.</p>
+        </div>
+        <div class="dr-card reveal reveal-d2">
+          <div class="dr-icon">🔧</div>
+          <h4>Repairability & Durability</h4>
+          <p>Spare parts availability, repair documentation, software update commitments (for electronic products), and durability ratings under ESPR minimum performance requirements.</p>
+        </div>
+        <div class="dr-card reveal reveal-d3">
+          <div class="dr-icon">🏭</div>
+          <h4>Compliance Provenance &amp; Circularity Evidence</h4>
+          <p>Material provenance, sourcing certifications, recycled content evidence, repair records, and recovery outcomes needed for CSDDD, Battery Regulation, and product-category passport obligations.</p>
+        </div>
+      </div>
+
+      <div class="cta-strip reveal">
+        <p>Not sure what data you need to collect? <span>For more details, reach out to our team here!</span></p>
+        <a href="contact.html" class="btn btn-primary btn-sm">Get a Data Readiness Assessment →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- PENALTY SECTION -->
+  <section class="section section-dark">
+    <div class="container">
+      <div class="two-col center">
+        <div class="reveal">
+          <span class="section-eyebrow">Risk of Non-Compliance</span>
+          <h2 class="section-title">What Happens If <span class="hl">You Don't Comply</span></h2>
+          <p style="font-size:0.95rem;color:var(--lgray);line-height:1.8;margin-bottom:2rem;">ESPR requires EU member states to establish national penalties for non-compliance. The regulation specifies they must be effective, proportionate, and dissuasive — and must account for the severity, duration, and extent of the infringement.</p>
+          <div class="penalty-box">
+            <h3>⚠️ Potential Consequences</h3>
+            <div class="penalty-grid">
+              <div class="penalty-item">
+                <div class="p-val">Market Ban</div>
+                <div class="p-desc">Products without valid DPPs banned from EU market placement and sales</div>
+              </div>
+              <div class="penalty-item">
+                <div class="p-val">% Turnover</div>
+                <div class="p-desc">Penalties linked to annual EU-market turnover for continued infringement</div>
+              </div>
+              <div class="penalty-item">
+                <div class="p-val">Recall Orders</div>
+                <div class="p-desc">National authorities can order recall of non-compliant products already on market</div>
+              </div>
+              <div class="penalty-item">
+                <div class="p-val">Public Disclosure</div>
+                <div class="p-desc">Non-compliant economic operators publicly named in EU enforcement registers</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="reveal reveal-d2" style="background:var(--card-bg);border:1px solid var(--card-bdr);border-radius:18px;padding:2rem;">
+          <h3 style="font-family:var(--serif);font-size:1.3rem;font-weight:700;margin-bottom:1.2rem;">The <span class="hl">Opportunity</span> in Compliance</h3>
+          <p style="font-size:0.87rem;color:var(--lgray);line-height:1.8;margin-bottom:1rem;">Forward-thinking companies are already using DPP readiness as a commercial differentiator — not just a compliance exercise. A well-built DPP programme delivers:</p>
+          <ul style="display:flex;flex-direction:column;gap:0.8rem;">
+            <li style="display:flex;gap:0.7rem;font-size:0.85rem;color:var(--lgray);">
+              <span style="color:var(--green);font-weight:700;">✓</span>
+              <span><strong style="color:var(--white);">Procurement advantage</strong> — EU public procurement increasingly requires DPP data for sustainable public purchasing</span>
+            </li>
+            <li style="display:flex;gap:0.7rem;font-size:0.85rem;color:var(--lgray);">
+              <span style="color:var(--green);font-weight:700;">✓</span>
+              <span><strong style="color:var(--white);">Brand trust</strong> — Consumer-facing QR codes build tangible transparency that drives purchase decisions</span>
+            </li>
+            <li style="display:flex;gap:0.7rem;font-size:0.85rem;color:var(--lgray);">
+              <span style="color:var(--green);font-weight:700;">✓</span>
+              <span><strong style="color:var(--white);">Financing access</strong> — Green bonds and sustainability-linked loans increasingly require verified product-level ESG data</span>
+            </li>
+            <li style="display:flex;gap:0.7rem;font-size:0.85rem;color:var(--lgray);">
+              <span style="color:var(--green);font-weight:700;">✓</span>
+              <span><strong style="color:var(--white);">Operational insight</strong> — The data infrastructure built for DPPs generates valuable supply chain intelligence that reduces costs</span>
+            </li>
+            <li style="display:flex;gap:0.7rem;font-size:0.85rem;color:var(--lgray);">
+              <span style="color:var(--green);font-weight:700;">✓</span>
+              <span><strong style="color:var(--white);">Circular revenue</strong> — Accurate recyclability data enables EPR cost reduction and secondary material revenue streams</span>
+            </li>
+          </ul>
+          <div style="margin-top:1.5rem;">
+            <a href="contact.html" class="btn btn-primary btn-sm">Start Your DPP Journey →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="shared.js"></script>
+</body>
+</html>
