@@ -167,6 +167,10 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 </NavLink>
               )}
 
+              <NavLink to="/dashboard/repository" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                🗂️ Repository
+              </NavLink>
+
               <p className="sidebar-section-label sidebar-section-label-spaced">Audit</p>
               <NavLink to="/dashboard/audit-logs" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📋 {t("auditLogs")}

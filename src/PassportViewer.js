@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Routes, Route, useParams, useNavigate, useLocation } from "react-router-dom";
-import { PASSPORT_VIEWER_THEME } from "./ThemeContext";
 import { LANGUAGES, translateFieldValue, translateSchemaLabel, translateText } from "./i18n";
 import { generateQRCode, fetchQRCodeFromDatabase, saveQRCodeToDatabase } from "./QRcode";
-import PassportIntro from "./PassportIntro";
+import { getViewerBrandTheme } from "./ThemeContext";
+// PassportIntro merged inline — no separate file needed
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
 import "./PassportViewer.css";
@@ -18,15 +18,61 @@ const ACCESS_LABEL_MAP = {
   legitimate_interest: "Person with Legitimate Interest",
 };
 
-function Header({ displayName, lang, setLang, guid }) {
+// ─── Passport intro card (merged from PassportIntro.js) ──────
+function PassportIntro({ passport, companyData }) {
+  if (!passport) return null;
+
+  const statusLabel = ["in_revision", "revised"].includes(passport.release_status)
+    ? "In Revision"
+    : String(passport.release_status || "").split("_")
+        .map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+
+  return (
+    <div className="intro-content">
+      <div className="intro-info">
+        <h1>{passport.model_name}</h1>
+
+        {companyData?.company_logo && (
+          <div className="intro-header-logo-box">
+            <img src={companyData.company_logo} alt="Company Logo" className="intro-header-logo" />
+          </div>
+        )}
+
+        <div className="intro-info-list">
+          <p><strong>Product ID:</strong> {passport.product_id || "—"}</p>
+          <p><strong>Type:</strong> {passport.passport_type}</p>
+          <p><strong>GUID:</strong> {passport.guid}</p>
+          <p><strong>Version:</strong> v{passport.version_number}</p>
+          <p><strong>Status:</strong> {statusLabel}</p>
+          <p><strong>Consumer page:</strong>{" "}
+            <a href={`/p/${passport.guid}`} target="_blank" rel="noopener noreferrer"
+              className="intro-consumer-link">
+              /p/{passport.guid.substring(0, 8)}…
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Header({ displayName, lang, setLang, guid, companyData, brandTheme }) {
   return (
     <header className="viewer-header">
       <div className="viewer-header-inner viewer-header-shell">
         <div>
-          <h1>🌍 Digital Product Passport</h1>
-          <p>{displayName}</p>
+          <h1>{brandTheme?.title || "🌍 Digital Product Passport"}</h1>
+          <p>{companyData?.company_name ? `${companyData.company_name} · ${displayName}` : displayName}</p>
+          {brandTheme?.companyWebsite && (
+            <a href={brandTheme.companyWebsite} target="_blank" rel="noopener noreferrer" className="viewer-header-website">
+              {brandTheme.companyWebsite.replace(/^https?:\/\//i, "")}
+            </a>
+          )}
         </div>
         <div className="viewer-header-actions">
+          {companyData?.company_logo && (
+            <img src={companyData.company_logo} alt={`${companyData.company_name || "Company"} logo`} className="viewer-header-brand-logo" />
+          )}
           <ScanBadge guid={guid} />
           <ViewerLangSelector lang={lang} setLang={setLang} />
         </div>
@@ -35,11 +81,13 @@ function Header({ displayName, lang, setLang, guid }) {
   );
 }
 
-function Footer() {
+function Footer({ brandTheme }) {
   return (
     <footer className="viewer-footer">
-      <p>© 2026 Digital Product Passport. All rights reserved.</p>
-      <p>Passport data is presented in sector views via sidebar navigation.</p>
+      <p className="viewer-footer-provider">Powered by ClarosDPP, digital passport provider via software as a service.</p>
+      <p className="viewer-footer-subtle">
+        <a href="mailto:digitalproductpass@gmail.com" className="viewer-footer-link">Contact information</a>
+      </p>
     </footer>
   );
 }
@@ -111,7 +159,7 @@ function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, 
     setChartTypes(p => ({ ...p, [fieldKey]: type }));
 
   if (!sectionDef || !passport) return null;
-  const isFileUrl = v => typeof v === "string" && v.startsWith("http") && v.includes("/passport-files/");
+  const isFileUrl = v => typeof v === "string" && v.startsWith("http");
 
   return (
     <div className="section-view">
@@ -170,6 +218,21 @@ function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, 
               } else {
                 display = "—";
               }
+            } else if (f.type === "symbol" && raw) {
+              display = (
+                <img
+                  src={raw}
+                  alt={f.label}
+                  className="field-symbol-img"
+                />
+              );
+            } else if (f.type === "url" && raw) {
+              const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+              display = (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="field-url-link">
+                  {raw}
+                </a>
+              );
             } else {
               display = raw || "—";
             }
@@ -259,17 +322,46 @@ function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, 
 }
 
 // ─── File cell with inline PDF preview ───────────────────────
+// Fetches the PDF as a blob to create a same-origin URL,
+// which bypasses X-Frame-Options restrictions on the backend.
 function FileCell({ url, label }) {
-  const [open, setOpen] = useState(false);
+  const [open,    setOpen]    = useState(false);
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err,     setErr]     = useState(null);
+
+  const handleToggle = async () => {
+    if (open) { setOpen(false); return; }
+    if (blobUrl) { setOpen(true); return; }
+    setLoading(true);
+    setErr(null);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Could not load PDF (${res.status})`);
+      const blob = await res.blob();
+      setBlobUrl(URL.createObjectURL(blob));
+      setOpen(true);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="pdf-viewer-container">
-      <div className="pdf-viewer-actions">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="pdf-open-link">📄 {label}</a>
-        <button className="pdf-toggle-btn" onClick={() => setOpen(o => !o)}>
-          {open ? "▲ Hide preview" : "▼ Preview PDF"}
+    <div className="pdf-cell">
+      <div className="pdf-cell-actions">
+        <a href={url} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
+          📄 Open PDF
+        </a>
+        <button className="pdf-preview-btn" onClick={handleToggle} disabled={loading}>
+          {loading ? "Loading…" : open ? "▲ Hide preview" : "▼ Show preview"}
         </button>
       </div>
-      {open && <iframe src={url} title={label} className="pdf-iframe" />}
+      {err && <div className="pdf-err">{err}</div>}
+      {open && blobUrl && (
+        <iframe src={blobUrl} title={label} className="pdf-iframe" />
+      )}
     </div>
   );
 }
@@ -383,7 +475,7 @@ function IntroductionSection({ passport }) {
 
 // ─── Print view ───────────────────────────────────────────────
 function PrintView({ passport, companyData, sections }) {
-  const isFileUrl = v => typeof v === "string" && v.startsWith("http") && v.includes("/passport-files/");
+  const isFileUrl = v => typeof v === "string" && v.startsWith("http");
   const statusLabel = ["in_revision", "revised"].includes(passport.release_status)
     ? "In Revision"
     : String(passport.release_status || "").split("_").map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
@@ -635,13 +727,17 @@ function PassportViewer() {
 
   const passportType = passport.passport_type;
   const displayName  = typeDef?.display_name || passportType;
-  const theme = PASSPORT_VIEWER_THEME;
   const dashboardBackPath = `/dashboard/passports/${passportType}`;
+  const brandTheme = getViewerBrandTheme(companyData?.branding_json);
 
   return (
-    <>
+    <div
+      data-theme="light"
+      className={`viewer-brand-shell viewer-variant-${brandTheme.variant || "classic"}`}
+      style={brandTheme.style}
+    >
       <div className="no-print">
-        <Header displayName={displayName} lang={lang} setLang={setLang} guid={guid} />
+        <Header displayName={displayName} lang={lang} setLang={setLang} guid={guid} companyData={companyData} brandTheme={brandTheme} />
 
         <div className="viewer-layout">
           <PassportNavBar
@@ -698,10 +794,7 @@ function PassportViewer() {
 
             <PassportIntro
               passport={passport}
-              isLoggedIn={isLoggedIn}
-              onBack={() => navigate(dashboardBackPath)}
-              onPrint={() => { setTimeout(() => window.print(), 300); }}
-              theme={theme}
+              companyData={companyData}
             />
 
             <Routes>
@@ -724,7 +817,7 @@ function PassportViewer() {
           </div>
         </div>
 
-        <Footer />
+        <Footer brandTheme={brandTheme} />
       </div>
 
       <div className="print-only" ref={printRef}>
@@ -762,7 +855,7 @@ function PassportViewer() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 

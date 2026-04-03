@@ -10,11 +10,41 @@ const TRANS_LANGS = LANGUAGES.filter(l => l.code !== "en");
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 // Auto-generate a safe slug from any label
-const toSlug = (str) =>
-  str.toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 30);
+const slugWords = (str) =>
+  str.trim().toLowerCase()
+    .replace(/[^a-z0-9\s]+/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+
+// Primary: 2 from front + 2 from back
+const toSlug = (str) => {
+  const w = slugWords(str);
+  if (w.length <= 4) return w.join("_");
+  return [w[0], w[1], w[w.length - 2], w[w.length - 1]].join("_");
+};
+
+// Fallback: 2 from front + 3 from back (used when primary produces a collision)
+const toSlugFallback = (str) => {
+  const w = slugWords(str);
+  if (w.length <= 5) return w.join("_");
+  return [w[0], w[1], w[w.length - 3], w[w.length - 2], w[w.length - 1]].join("_");
+};
+
+// Recalculate auto-generated keys; resolve collisions with fallback slug
+const rekeySection = (sec) => ({
+  ...sec,
+  key: sec._keyManual ? sec.key : toSlug(sec.label),
+  fields: (() => {
+    const seen = new Set();
+    return (sec.fields || []).map(f => {
+      if (f._keyManual) { seen.add(f.key); return f; }
+      const primary  = toSlug(f.label);
+      const key      = seen.has(primary) ? toSlugFallback(f.label) : primary;
+      seen.add(key);
+      return { ...f, key };
+    });
+  })(),
+});
 
 // Parse CSV text into [{fieldLabel, sectionLabel}] rows
 // Column A = field label, Column B = section name
@@ -96,6 +126,8 @@ const FIELD_TYPES = [
   { value: "text",     label: "Text (single line)" },
   { value: "textarea", label: "Text (multi-line)" },
   { value: "boolean",  label: "Yes / No" },
+  { value: "date",     label: "Date" },
+  { value: "url",      label: "URL / URI" },
   { value: "file",     label: "File upload (PDF)" },
   { value: "table",    label: "Table (rows × columns)" },
   { value: "symbol",   label: "Symbol (from repository)" },
@@ -178,7 +210,7 @@ function AdminCreatePassportType() {
     setUmbrellaIcon(draft.umbrellaIcon || "📋");
     setTypeName(draft.typeName || "");
     setTypeNameManual(draft.typeNameManual || false);
-    const restored = (draft.sections || []).map(sec => ({
+    const restored = (draft.sections || []).map(sec => rekeySection({
       ...sec,
       _id:       Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
@@ -226,7 +258,7 @@ function AdminCreatePassportType() {
       body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, typeName, typeNameManual, sections } }),
     })
       .then(r => r.ok ? (
-        setSuccess("✅ Draft saved successfully!"),
+        setSuccess("Draft saved successfully!"),
         setDraftSaved(true),
         setTimeout(() => setDraftSaved(false), 2000)
       ) : null)
@@ -274,7 +306,7 @@ function AdminCreatePassportType() {
     setUmbrellaIcon(ed.umbrella_icon || "📋");
     setTypeName(ed.type_name || "");
     setTypeNameManual(true); // lock type_name, it cannot change
-    const editSections = (ed.fields_json?.sections || []).map(sec => ({
+    const editSections = (ed.fields_json?.sections || []).map(sec => rekeySection({
       ...sec,
       _id:       Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
@@ -292,7 +324,7 @@ function AdminCreatePassportType() {
     setDisplayName(`Clone of ${cd.display_name || cd.type_name}`);
     setUmbrella(cd.umbrella_category || "");
     setUmbrellaIcon(cd.umbrella_icon || "📋");
-    const clonedSections = (cd.fields_json?.sections || []).map(sec => ({
+    const clonedSections = (cd.fields_json?.sections || []).map(sec => rekeySection({
       ...sec,
       _id:       Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
@@ -516,7 +548,7 @@ function AdminCreatePassportType() {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || (editMode ? "Failed to update passport type" : "Failed to create passport type"));
 
-      setSuccess(editMode ? "✅ Passport type updated successfully!" : "✅ Passport type created successfully!");
+      setSuccess(editMode ? "Passport type updated successfully!" : "Passport type created successfully!");
       if (draftEnabled) fetch(DRAFT_API, { method: "DELETE", headers: authHeaders() }).catch(() => {});
       setError("");
       setInvalidFields([]);
@@ -697,8 +729,16 @@ function AdminCreatePassportType() {
           {sections.map((section, si) => (
             <div key={section._id} className="acpt-section">
               <div className="acpt-section-head">
+                <button
+                  type="button"
+                  className={`acpt-collapse-btn${section._collapsed ? " collapsed" : ""}`}
+                  onClick={() => updateSection(section._id, { _collapsed: !section._collapsed })}
+                  title={section._collapsed ? "Expand section" : "Collapse section"}
+                >
+                  ▾
+                </button>
                 <div className="acpt-section-meta">
-                  <span className="acpt-section-num">Section {si + 1}</span>
+                  <span className="acpt-section-num">Section {si + 1} {section._collapsed && section.fields.length > 0 && <span className="acpt-section-field-count">· {section.fields.length} field{section.fields.length !== 1 ? "s" : ""}</span>}</span>
                   <div className="acpt-section-name-row">
                     <input
                       type="text"
@@ -752,7 +792,7 @@ function AdminCreatePassportType() {
               </div>
 
               {/* Fields */}
-              <div className="acpt-fields">
+              {!section._collapsed && <div className="acpt-fields">
                 {section.fields.length === 0 && (
                   <div className="acpt-fields-empty">No fields yet — add one below</div>
                 )}
@@ -769,24 +809,6 @@ function AdminCreatePassportType() {
                           placeholder="Field label, e.g. Manufacturer"
                           className={`acpt-input acpt-field-label-input${hasInvalid(field._id) ? " acpt-input-error" : ""}`}
                         />
-                        <div className="acpt-field-key-row">
-                          <span className="acpt-key-label">key:</span>
-                          <input
-                            type="text"
-                            value={field.key}
-                            onChange={e => { updateField(section._id, field._id, { key: e.target.value.toLowerCase() }); setFieldKeyManual(section._id, field._id); setError(""); setInvalidFields([]); }}
-                            className={`acpt-key-input acpt-mono${hasInvalid(field._id) ? " acpt-input-error" : ""}`}
-                            placeholder="field_key"
-                          />
-                          <button
-                            type="button"
-                            className={`acpt-i18n-toggle${field._i18nOpen ? " open" : ""}`}
-                            onClick={() => updateField(section._id, field._id, { _i18nOpen: !field._i18nOpen })}
-                            title="Add translations for this field label"
-                          >
-                            🌐
-                          </button>
-                        </div>
                         {field._i18nOpen && (
                           <div className="acpt-i18n-panel acpt-i18n-panel-field">
                             {TRANS_LANGS.map(l => (
@@ -806,6 +828,15 @@ function AdminCreatePassportType() {
                           </div>
                         )}
                       </div>
+
+                      <button
+                        type="button"
+                        className={`acpt-i18n-toggle${field._i18nOpen ? " open" : ""}`}
+                        onClick={() => updateField(section._id, field._id, { _i18nOpen: !field._i18nOpen })}
+                        title="Add translations for this field label"
+                      >
+                        🌐
+                      </button>
 
                       <select
                         value={field.type}
@@ -858,8 +889,9 @@ function AdminCreatePassportType() {
                       })}
                     </div>
 
-                    {/* ── Composition toggle — for text/textarea/table containing material % ── */}
-                    {["text", "textarea", "table"].includes(field.type) && (
+                    {/* ── Composition / AAS Semantic ID / Dynamic — single row ── */}
+                    <div className="acpt-field-meta-row">
+                      {/* Composition toggle */}
                       <div className="acpt-field-composition">
                         <label className="acpt-composition-toggle">
                           <input
@@ -871,34 +903,32 @@ function AdminCreatePassportType() {
                             Composition (pie chart)
                             <span className="acpt-composition-hint">
                               Field contains material percentages. A pie chart will be shown automatically in the public passport view.
-                              {field.type === "table" ? " Use first column for material name, second for percentage." : " Format: \"Steel: 60%, Aluminium: 25%\" or one entry per line."}
+                              Format: "Steel: 60%, Aluminium: 25%" or one entry per line.
                             </span>
                           </span>
                         </label>
                       </div>
-                    )}
 
-                    {/* ── AAS Semantic ID — optional, for machine-readable export ── */}
-                    <div className="acpt-field-semantic">
-                      <label className="acpt-semantic-label">
-                        🔗 AAS Semantic ID
-                        <span className="acpt-semantic-hint">
-                          Optional IRI that links this field to a global standard definition (ECLASS, IEC CDD, IDTA).
-                          Used when exporting to Asset Administration Shell (AAS) format.
-                          Example: <code>0173-1#02-AAO677#002</code>
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        value={field.semanticId || ""}
-                        onChange={e => updateField(section._id, field._id, { semanticId: e.target.value })}
-                        placeholder="e.g. 0173-1#02-AAO677#002 or https://admin-shell.io/..."
-                        className="acpt-input acpt-mono acpt-input-small"
-                      />
-                    </div>
+                      {/* AAS Semantic ID */}
+                      <div className="acpt-field-semantic">
+                        <label className="acpt-semantic-label">
+                          🔗 AAS Semantic ID
+                          <span className="acpt-semantic-hint">
+                            Optional IRI that links this field to a global standard definition (ECLASS, IEC CDD, IDTA).
+                            Used when exporting to Asset Administration Shell (AAS) format.
+                            Example: <code>0173-1#02-AAO677#002</code>
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={field.semanticId || ""}
+                          onChange={e => updateField(section._id, field._id, { semanticId: e.target.value })}
+                          placeholder="e.g. 0173-1#02-AAO677#002 or https://admin-shell.io/..."
+                          className="acpt-input acpt-mono acpt-input-small"
+                        />
+                      </div>
 
-                    {/* ── Dynamic (live data) toggle — only for scalar types ── */}
-                    {["text", "textarea", "boolean"].includes(field.type) && (
+                      {/* Dynamic (live data) toggle */}
                       <div className="acpt-field-dynamic">
                         <label className="acpt-dynamic-toggle">
                           <input
@@ -914,18 +944,11 @@ function AdminCreatePassportType() {
                           </span>
                         </label>
                       </div>
-                    )}
+                    </div>
 
                     {field.type === "table" && (
                       <div className="acpt-table-config">
                         <div className="acpt-table-dims">
-                          <label>Rows</label>
-                          <input
-                            type="number" min="1" max="20"
-                            value={field.table_rows || 2}
-                            onChange={e => updateField(section._id, field._id, { table_rows: Math.max(1, parseInt(e.target.value) || 1) })}
-                            className="acpt-table-num-input"
-                          />
                           <label>Columns</label>
                           <input
                             type="number" min="1" max="10"
@@ -960,49 +983,13 @@ function AdminCreatePassportType() {
                   onClick={() => addField(section._id)}>
                   + Add Field
                 </button>
-              </div>
+              </div>}
             </div>
           ))}
 
           <button type="button" className="acpt-add-section-btn" onClick={addSection}>
             + Add Section
           </button>
-        </div>
-
-        {/* ── Preview ── */}
-        <div className="acpt-card acpt-preview-card">
-          <h3 className="acpt-card-title">Preview</h3>
-          <div className="acpt-preview">
-            <div className="acpt-preview-header">
-              <span className="acpt-preview-icon">{umbrellaIcon}</span>
-              <div>
-                <div className="acpt-preview-umbrella">{umbrella || "Umbrella Category"}</div>
-                <div className="acpt-preview-indent">└── {displayName || "Type Display Name"}</div>
-              </div>
-            </div>
-            <div className="acpt-preview-tabs">
-              {sections.map(s => (
-                <span key={s._id} className="acpt-preview-tab">
-                  {s.label || "Section"}
-                </span>
-              ))}
-            </div>
-            <div className="acpt-preview-fields">
-              {sections.map(s =>
-                s.fields.slice(0, 3).map(f => (
-                  <div key={f._id} className="acpt-preview-field">
-                    <span className="acpt-preview-field-label">{f.label || "Field"}</span>
-                    <span className="acpt-preview-field-type">{f.type}</span>
-                  </div>
-                ))
-              )}
-              {sections.reduce((n, s) => n + s.fields.length, 0) > 9 && (
-                <div className="acpt-preview-more">
-                  +{sections.reduce((n, s) => n + s.fields.length, 0) - 9} more fields…
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* ── Actions ── */}

@@ -92,7 +92,7 @@ function ManageTeam({ user, companyId }) {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Failed");
-      flash("success", `✅ Invitation sent to ${inviteEmail}`);
+      flash("success", `Invitation sent to ${inviteEmail}`);
       setInviteEmail("");
     } catch (err) {
       flash("error", err.message);
@@ -110,7 +110,7 @@ function ManageTeam({ user, companyId }) {
         body: JSON.stringify({ role: editRole }),
       });
       if (!r.ok) throw new Error();
-      flash("success", "✅ Role updated");
+      flash("success", "Role updated");
       setEditingId(null);
       fetchMembers();
     } catch {
@@ -127,7 +127,7 @@ function ManageTeam({ user, companyId }) {
         headers: { Authorization: "Bearer cookie-session" },
       });
       if (!r.ok) throw new Error();
-      flash("success", "✅ User deactivated");
+      flash("success", "User deactivated");
       fetchMembers();
     } catch {
       flash("error", "Failed to deactivate user");

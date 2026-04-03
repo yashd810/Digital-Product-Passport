@@ -159,7 +159,7 @@ function CSVImportGuide({ token, user, companyId }) {
           }
         }
 
-        setSuccess(`✅ Successfully created ${successCount} passport(s)!`);
+        setSuccess(`Successfully created ${successCount} passport(s)!`);
         setTimeout(() => {
           navigate(`/dashboard/passports/${passportType}`);
         }, 2000);

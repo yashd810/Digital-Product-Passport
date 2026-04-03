@@ -1,3 +1,4 @@
+"use strict";
 require("dotenv").config();
 const express        = require("express");
 const { Pool }       = require("pg");
@@ -11,6 +12,8 @@ const nodemailer     = require("nodemailer");
 const fs             = require("fs");
 const path           = require("path");
 
+const emailStyles = fs.readFileSync(path.join(__dirname, "../src/email-styles.css"), "utf8");
+
 const app  = express();
 const PORT = process.env.PORT || 3001;
 app.disable("x-powered-by");
@@ -20,6 +23,7 @@ app.set("trust proxy", 1);
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:3000")
   .split(",").map(s => s.trim()).filter(Boolean);
 const allowedOriginSet = new Set(allowedOrigins);
+
 app.use(cors({
   origin: (origin, cb) => {
     // Allow non-browser requests (health checks, server-to-server) and listed origins
@@ -243,7 +247,6 @@ const createPassportTable = async (typeName) => {
       product_id     VARCHAR(255),
       release_status VARCHAR(50)  NOT NULL DEFAULT 'draft',
       version_number INTEGER      NOT NULL DEFAULT 1,
-      color_scheme   VARCHAR(50)  DEFAULT 'mint',
       qr_code        TEXT,
       created_by     INTEGER      REFERENCES users(id) ON DELETE SET NULL,
       updated_by     INTEGER      REFERENCES users(id) ON DELETE SET NULL,
@@ -316,56 +319,27 @@ const queryTableStats = async (typeName, companyId = null) => {
 async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_registry (
-      guid          UUID        PRIMARY KEY,
-      company_id    INTEGER     NOT NULL,
-      passport_type VARCHAR(50) NOT NULL,
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      guid           UUID        PRIMARY KEY,
+      company_id     INTEGER     NOT NULL,
+      passport_type  VARCHAR(50) NOT NULL,
+      access_key     VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
+      device_api_key VARCHAR(64) NOT NULL DEFAULT replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_registry_company
       ON passport_registry(company_id)
   `);
-  // Add access_key column to passport_registry (idempotent migration)
-  await pool.query(`
-    ALTER TABLE passport_registry
-      ADD COLUMN IF NOT EXISTS access_key VARCHAR(36) DEFAULT gen_random_uuid()::text
-  `);
-  // Backfill any existing rows that have no access_key yet
-  await pool.query(`
-    UPDATE passport_registry SET access_key = gen_random_uuid()::text WHERE access_key IS NULL
-  `);
-  // Migrate passport_types table — add new columns if missing (idempotent)
-  await pool.query(`
-    ALTER TABLE passport_types
-      ADD COLUMN IF NOT EXISTS display_name      VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS umbrella_category VARCHAR(100),
-      ADD COLUMN IF NOT EXISTS umbrella_icon     VARCHAR(10)  DEFAULT '📋',
-      ADD COLUMN IF NOT EXISTS fields_json       JSONB        NOT NULL DEFAULT '{"sections":[]}',
-      ADD COLUMN IF NOT EXISTS is_active         BOOLEAN      NOT NULL DEFAULT TRUE,
-      ADD COLUMN IF NOT EXISTS created_by        INT REFERENCES users(id) ON DELETE SET NULL
-  `);
-  // Backfill display_name from label column if it exists and display_name is null
-  await pool.query(`
-    UPDATE passport_types SET display_name = COALESCE(
-      (SELECT label FROM information_schema.columns
-       WHERE table_name='passport_types' AND column_name='label' LIMIT 1),
-      type_name
-    ) WHERE display_name IS NULL
-  `).catch(() => {});
-  await pool.query(`UPDATE passport_types SET display_name = type_name WHERE display_name IS NULL`);
-  await pool.query(`UPDATE passport_types SET umbrella_category = display_name WHERE umbrella_category IS NULL`);
-  await pool.query(`ALTER TABLE passport_types ALTER COLUMN display_name SET NOT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE passport_types ALTER COLUMN umbrella_category SET NOT NULL`).catch(() => {});
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_umbrella ON passport_types(umbrella_category)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_active   ON passport_types(is_active)`);
 
-  // Ensure company_passport_access exists (may be missing on older installs)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS company_passport_access (
       id               SERIAL PRIMARY KEY,
       company_id       INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
       passport_type_id INT NOT NULL REFERENCES passport_types(id) ON DELETE CASCADE,
+      access_revoked   BOOLEAN NOT NULL DEFAULT FALSE,
       granted_at       TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (company_id, passport_type_id)
     )
@@ -412,11 +386,6 @@ async function initDb() {
       ON company_repository(company_id, parent_id)
   `);
 
-  // Two-factor authentication
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(64)`);
-  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ`);
-
   // Global symbol repository (super-admin managed, visible to all users)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS symbols (
@@ -448,6 +417,12 @@ async function initDb() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash    ON api_keys(key_hash)`);
 
+  // Company-managed branding for public passport viewer and consumer pages
+  await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS branding_json JSONB NOT NULL DEFAULT '{}'::jsonb
+  `);
+
   // Dynamic field values — time-series: every push appends a new row, nothing is ever overwritten
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_dynamic_values (
@@ -465,38 +440,6 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_dv_passport_field
       ON passport_dynamic_values(passport_guid, field_key, updated_at DESC)
   `);
-  // Drop the old UNIQUE constraint if it exists from a previous schema version
-  await pool.query(`
-    ALTER TABLE passport_dynamic_values
-      DROP CONSTRAINT IF EXISTS passport_dynamic_values_passport_guid_field_key_key
-  `).catch(() => {});
-
-  // Device API key on passport_registry — lets IoT devices push dynamic value updates
-  await pool.query(`
-    ALTER TABLE passport_registry
-      ADD COLUMN IF NOT EXISTS device_api_key VARCHAR(64) DEFAULT replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')
-  `);
-  // Backfill any rows that have no device_api_key yet
-  await pool.query(`
-    UPDATE passport_registry SET device_api_key = replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')
-    WHERE device_api_key IS NULL
-  `);
-
-  // Allow audit_logs.company_id to be NULL (needed for super-admin actions like CREATE_PASSPORT_TYPE)
-  await pool.query(`
-    ALTER TABLE audit_logs ALTER COLUMN company_id DROP NOT NULL
-  `).catch(() => {});
-
-  // Add access_revoked flag to company_passport_access so revoked types keep their passports visible
-  await pool.query(`
-    ALTER TABLE company_passport_access ADD COLUMN IF NOT EXISTS access_revoked BOOLEAN NOT NULL DEFAULT FALSE
-  `).catch(() => {});
-
-  // Add vc_json column to passport_signatures for W3C VC storage
-  await pool.query(`
-    ALTER TABLE passport_signatures ADD COLUMN IF NOT EXISTS vc_json TEXT
-  `).catch(() => {});
-
   // Digital signatures — one row per released passport version
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_signatures (
@@ -556,25 +499,8 @@ async function initDb() {
       ON passport_edit_sessions(user_id)
   `);
 
-  // Drop legacy per-company tables left over from the old architecture.
-  // Old naming: company_{id}_{type}_passports  →  new: {type}_passports
-  const legacyTables = await pool.query(`
-    SELECT table_name FROM information_schema.tables
-    WHERE table_schema = 'public'
-      AND table_name ~ '^company_[0-9]+_.+_passports$'
-  `);
-  for (const { table_name } of legacyTables.rows) {
-    await pool.query(`DROP TABLE IF EXISTS "${table_name}"`);
-    console.log(`[initDb] Dropped legacy table: ${table_name}`);
-  }
 
-  // Add previous_release_status column to passport_workflow (idempotent migration)
-  await pool.query(`
-    ALTER TABLE passport_workflow
-      ADD COLUMN IF NOT EXISTS previous_release_status VARCHAR(50)
-  `);
-
-  // Migration: ensure shared passport tables exist for all passport types.
+  // Ensure shared passport tables exist for all passport types.
   // Idempotent — uses CREATE TABLE IF NOT EXISTS.
   const ptRows = await pool.query("SELECT type_name FROM passport_types");
   for (const { type_name } of ptRows.rows) {
@@ -706,27 +632,7 @@ const createTransporter = () => nodemailer.createTransport({
 const brandedEmail = ({ preheader, bodyHtml }) => `
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  body{margin:0;padding:0;background:#07131f;font-family:Arial,Helvetica,sans-serif}
-  .wrapper{max-width:640px;margin:36px auto;border-radius:18px;overflow:hidden;border:1px solid rgba(13,181,176,.2);box-shadow:0 16px 50px rgba(0,0,0,.45)}
-  .hdr{background:linear-gradient(135deg,#0e2234 0%,#07131f 100%);padding:34px 40px;text-align:center;border-bottom:1px solid rgba(13,181,176,.18)}
-  .hdr-logo{font-size:28px;margin-bottom:6px}
-  .hdr-title{color:#f0f6fa;font-size:21px;font-weight:700;margin:0}
-  .hdr-sub{color:rgba(184,204,217,.82);font-size:13px;margin:6px 0 0}
-  .body{background:#102132;padding:36px 40px}
-  .body p{font-size:15px;color:#d5e4ee;line-height:1.75;margin:0 0 16px}
-  .body strong{color:#ffffff}
-  .info-box{background:rgba(13,181,176,.07);border:1px solid rgba(13,181,176,.18);border-radius:12px;padding:18px 22px;margin:20px 0}
-  .info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px}
-  .info-row:last-child{border-bottom:none}
-  .info-label{color:#0db5b0;font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.6px}
-  .info-value{color:#f0f6fa;font-weight:600}
-  .cta-wrap{text-align:center;margin:28px 0}
-  .cta-btn{display:inline-block;background:linear-gradient(135deg,#14b8a6 0%,#0f766e 100%);color:#06131d!important;text-decoration:none;padding:14px 36px;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:.3px;box-shadow:0 10px 24px rgba(13,181,176,.25)}
-  .footer{background:#07131f;padding:20px 40px;text-align:center;border-top:1px solid rgba(255,255,255,.06)}
-  .footer p{font-size:12px;color:#7e97aa;margin:4px 0}
-  a{color:#57d8d0}
-</style></head><body>
+<style>${emailStyles}</style></head><body>
 <div class="wrapper">
   <div class="hdr">
     <div class="hdr-logo">🌍</div>
@@ -796,13 +702,38 @@ const repoUpload = multer({
     file.mimetype === "application/pdf" ? cb(null, true)
       : cb(new Error("Only PDF files are allowed"), false),
 });
+
+const repoSymbolStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(REPO_BASE_DIR, String(req.params.companyId), "symbols");
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${uuidv4()}${ext}`);
+  },
+});
+const repoSymbolUpload = multer({
+  storage: repoSymbolStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_, file, cb) => {
+    const allowed = [".svg", ".png", ".jpg", ".jpeg", ".webp"];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error("Only SVG, PNG, JPG, WebP files are allowed"));
+  },
+});
 app.use("/repository-files", express.static(REPO_BASE_DIR, {
   setHeaders: (res, fp) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Cross-Origin-Resource-Policy", "same-site");
     if (fp.endsWith(".pdf")) {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", "inline");
+      // Allow PDFs to be embedded in iframes from the frontend origin
+      res.removeHeader("X-Frame-Options");
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    } else {
+      res.setHeader("Cross-Origin-Resource-Policy", "same-site");
     }
   },
 }));
@@ -1146,66 +1077,12 @@ async function verifyPassportSignature(guid, versionNumber) {
     }
   }
 
-  // ── Legacy RSA-SHA256 verification (pre-VC passports) ─────────────────
-  const reg = await pool.query(
-    "SELECT passport_type FROM passport_registry WHERE guid = $1", [guid]
-  );
-  if (!reg.rows.length) return { status: "not_found" };
-  const { passport_type } = reg.rows[0];
-  const tbl = getTable(passport_type);
-
-  const pRow = await pool.query(
-    `SELECT * FROM ${tbl} WHERE guid = $1 AND version_number = $2 AND deleted_at IS NULL`,
-    [guid, versionNumber]
-  );
-  if (!pRow.rows.length) return { status: "not_found" };
-
-  const typeRes = await pool.query("SELECT * FROM passport_types WHERE type_name = $1", [passport_type]);
-  const typeDef = typeRes.rows[0] || null;
-
-  // Rebuild legacy canonical payload using stored released_at
-  const legacyCanonical = canonicalJSON({
-    algorithm:      "RSA-SHA256",
-    company_id:     pRow.rows[0].company_id,
-    fields:         (() => {
-      const f = {};
-      for (const s of (typeDef?.fields_json?.sections || [])) {
-        for (const field of (s.fields || [])) {
-          if (field.dynamic) continue;
-          const v = pRow.rows[0][field.key];
-          if (v !== null && v !== undefined && v !== "") f[field.key] = String(v);
-        }
-      }
-      return f;
-    })(),
-    guid:           pRow.rows[0].guid,
-    model_name:     pRow.rows[0].model_name  || null,
-    passport_type,
-    product_id:     pRow.rows[0].product_id  || null,
-    released_at:    sig.released_at,
-    version_number: pRow.rows[0].version_number,
-  });
-
-  if (crypto.createHash("sha256").update(legacyCanonical).digest("hex") !== sig.data_hash) {
-    return { status: "tampered", signedAt: sig.signed_at, keyId: sig.signing_key_id, releasedAt: sig.released_at };
-  }
-
-  try {
-    const verifier = crypto.createVerify("SHA256");
-    verifier.update(legacyCanonical);
-    verifier.end();
-    const valid = verifier.verify(publicKeyPem, sig.signature, "base64");
-    return {
-      status:     valid ? "valid" : "invalid",
-      signedAt:   sig.signed_at,
-      keyId:      sig.signing_key_id,
-      dataHash:   sig.data_hash,
-      releasedAt: sig.released_at,
-      algorithm:  sig.algorithm,
-    };
-  } catch {
-    return { status: "invalid", signedAt: sig.signed_at, keyId: sig.signing_key_id };
-  }
+  return {
+    status: "invalid",
+    signedAt: sig.signed_at,
+    keyId: sig.signing_key_id,
+    releasedAt: sig.released_at,
+  };
 }
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -1364,6 +1241,7 @@ app.post("/api/auth/login", authRateLimit, async (req, res) => {
     setAuthCookie(res, sessionToken);
     res.json({
       success: true,
+      token: sessionToken,
       user: { id: u.id, email: u.email, companyId: u.company_id, role: u.role,
               first_name: u.first_name, last_name: u.last_name, company_name: u.company_name },
     });
@@ -1411,6 +1289,7 @@ app.post("/api/auth/verify-otp", otpRateLimit, async (req, res) => {
     setAuthCookie(res, sessionToken);
     res.json({
       success: true,
+      token: sessionToken,
       user: { id: u.id, email: u.email, companyId: u.company_id, role: u.role,
               first_name: u.first_name, last_name: u.last_name, company_name: u.company_name },
     });
@@ -1561,7 +1440,7 @@ app.post("/api/companies/:companyId/invite", authenticateToken, checkCompanyAcce
           <div class="info-row"><span class="info-label">Company</span><span class="info-value">${company_name}</span></div>
           <div class="info-row"><span class="info-label">Role</span><span class="info-value">${finalRole}</span></div>
         </div>
-        <div style="background:#fef3c7;border:1px solid #f5d76e;border-radius:6px;padding:10px 14px;margin:16px 0;font-size:13px;color:#7a5c00">
+        <div style="background:#fef3c7;border:1px solid #f5d76e;border-radius:6px;padding:10px 14px;margin:16px 0;font-size:13px;color:#3d2e00">
           ⏰ This invitation expires in <strong>48 hours</strong> and can only be used <strong>once</strong>.
         </div>
         <div class="cta-wrap"><a href="${registerUrl}" class="cta-btn">Accept Invitation →</a></div>` }),
@@ -1872,14 +1751,14 @@ app.post("/api/admin/passport-types", authenticateToken, isSuperAdmin, async (re
     for (const section of sections) {
       if (!section.key || !section.label || !Array.isArray(section.fields))
         return res.status(400).json({ error: "Each section must have key, label, and fields array" });
-      if (!/^[a-z][a-z0-9_]{0,29}$/.test(section.key))
+      if (!/^[a-z][a-z0-9_]{0,79}$/.test(section.key))
         return res.status(400).json({ error: `Invalid section key: ${section.key}` });
       for (const field of section.fields) {
         if (!field.key || !field.label || !field.type)
           return res.status(400).json({ error: "Each field must have key, label, and type" });
         if (!/^[a-z][a-z0-9_]{0,49}$/.test(field.key))
           return res.status(400).json({ error: `Invalid field key: ${field.key}` });
-        if (!["text","textarea","boolean","file","table"].includes(field.type))
+        if (!["text","textarea","boolean","file","table","url","date","symbol"].includes(field.type))
           return res.status(400).json({ error: `Invalid field type: ${field.type}` });
       }
     }
@@ -2692,8 +2571,18 @@ app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyA
                           "created_by_email","first_name","last_name","updated_by","updated_at"]);
     const dataFields = Object.keys(fields).filter(k => !systemFields.has(k));
 
+    // Convert array/table fields to JSON strings
+    const processedFields = {};
+    for (const key of dataFields) {
+      const value = fields[key];
+      // If value is array/object, convert to JSON string; otherwise keep as is
+      processedFields[key] = (Array.isArray(value) || (typeof value === "object" && value !== null)) 
+        ? JSON.stringify(value) 
+        : value;
+    }
+
     const allCols = ["guid","company_id","model_name","product_id","created_by", ...dataFields];
-    const allVals = [guid, companyId, normalizedModelName, product_id || null, userId, ...dataFields.map(k => fields[k])];
+    const allVals = [guid, companyId, normalizedModelName, product_id || null, userId, ...dataFields.map(k => processedFields[k])];
     const places  = allCols.map((_, i) => `$${i + 1}`).join(", ");
 
     const result = await pool.query(
@@ -2763,8 +2652,18 @@ app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCom
         }
 
         const dataFields = Object.keys(fields).filter(k => !systemFields.has(k) && /^[a-z][a-z0-9_]+$/.test(k));
+        
+        // Convert array/table fields to JSON strings
+        const processedFields = {};
+        for (const key of dataFields) {
+          const value = fields[key];
+          processedFields[key] = (Array.isArray(value) || (typeof value === "object" && value !== null)) 
+            ? JSON.stringify(value) 
+            : value;
+        }
+
         const allCols  = ["guid","company_id","model_name","product_id","created_by", ...dataFields];
-        const allVals  = [guid, companyId, normalizedModelName, product_id || null, userId, ...dataFields.map(k => fields[k])];
+        const allVals  = [guid, companyId, normalizedModelName, product_id || null, userId, ...dataFields.map(k => processedFields[k])];
         const places   = allCols.map((_, idx) => `$${idx + 1}`).join(", ");
 
         const r = await pool.query(
@@ -3333,12 +3232,19 @@ app.patch("/api/companies/:companyId/passports/:guid", authenticateToken, checkC
     const updateFields = Object.keys(fields).filter(k => !excluded.has(k) && /^[a-z][a-z0-9_]+$/.test(k));
     if (!updateFields.length) return res.status(400).json({ error: "No fields to update" });
 
+    // Convert array/table fields to JSON strings
+    const processedVals = updateFields.map(k => {
+      const value = fields[k];
+      return (Array.isArray(value) || (typeof value === "object" && value !== null)) 
+        ? JSON.stringify(value) 
+        : value;
+    });
+
     const sets = updateFields.map((col, i) => `${col} = $${i + 1}`).join(", ");
-    const vals = updateFields.map(k => fields[k]);
     await pool.query(
-      `UPDATE ${tableName} SET ${sets}, updated_by = $${vals.length + 1}, updated_at = NOW()
-       WHERE id = $${vals.length + 2}`,
-      [...vals, userId, rowId]
+      `UPDATE ${tableName} SET ${sets}, updated_by = $${processedVals.length + 1}, updated_at = NOW()
+       WHERE id = $${processedVals.length + 2}`,
+      [...processedVals, userId, rowId]
     );
 
     await logAudit(companyId, userId, "UPDATE", tableName, guid, null, { fields_updated: updateFields });
@@ -3821,10 +3727,19 @@ app.post("/api/passports/:guid/dynamic-values", devicePushRateLimit, async (req,
     if (!entries.length) return res.status(400).json({ error: "No valid field keys provided" });
 
     for (const [fieldKey, value] of entries) {
+      // Convert arrays/objects to JSON strings
+      let storedValue = value;
+      if (value !== null && value !== undefined) {
+        if (Array.isArray(value) || typeof value === "object") {
+          storedValue = JSON.stringify(value);
+        } else {
+          storedValue = String(value);
+        }
+      }
       await pool.query(
         `INSERT INTO passport_dynamic_values (passport_guid, field_key, value, updated_at)
          VALUES ($1, $2, $3, NOW())`,
-        [guid, fieldKey, value === null || value === undefined ? null : String(value)]
+        [guid, fieldKey, storedValue]
       );
     }
 
@@ -3906,7 +3821,7 @@ app.patch("/api/companies/:companyId/passports/:guid/dynamic-values",
 app.get("/api/companies/:companyId/profile", publicReadRateLimit, async (req, res) => {
   try {
     const r = await pool.query(
-      "SELECT id, company_name, company_logo, introduction_text FROM companies WHERE id = $1",
+      "SELECT id, company_name, company_logo, introduction_text, branding_json FROM companies WHERE id = $1",
       [req.params.companyId]
     );
     if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
@@ -3916,12 +3831,20 @@ app.get("/api/companies/:companyId/profile", publicReadRateLimit, async (req, re
 
 app.post("/api/companies/:companyId/profile", authenticateToken, checkCompanyAccess, async (req, res) => {
   try {
-    const { company_logo, introduction_text } = req.body;
+    const { company_logo, introduction_text, branding_json } = req.body;
     await pool.query(
       `UPDATE companies
-       SET company_logo = $1, introduction_text = COALESCE($2, introduction_text), updated_at = NOW()
-       WHERE id = $3`,
-      [company_logo !== undefined ? company_logo : null, introduction_text || null, req.params.companyId]
+       SET company_logo = $1,
+           introduction_text = COALESCE($2, introduction_text),
+           branding_json = COALESCE($3::jsonb, branding_json),
+           updated_at = NOW()
+       WHERE id = $4`,
+      [
+        company_logo !== undefined ? company_logo : null,
+        introduction_text || null,
+        branding_json ? JSON.stringify(branding_json) : null,
+        req.params.companyId,
+      ]
     );
     res.json({ success: true });
   } catch { res.status(500).json({ error: "Failed to save company profile" }); }
@@ -4061,6 +3984,81 @@ app.delete("/api/companies/:companyId/repository/:itemId", authenticateToken, ch
     await pool.query("DELETE FROM company_repository WHERE id = $1", [row.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: "Failed to delete" }); }
+});
+
+// LIST company symbols (images only)
+app.get("/api/companies/:companyId/repository/symbols", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, name, mime_type, file_url, size_bytes, created_at
+       FROM company_repository
+       WHERE company_id = $1 AND type = 'file' AND mime_type LIKE 'image/%'
+       ORDER BY name ASC`,
+      [req.params.companyId]
+    );
+    res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: "Failed to fetch symbols" }); }
+});
+
+// UPLOAD company symbol (image file)
+app.post(
+  "/api/companies/:companyId/repository/symbols/upload",
+  authenticateToken, checkCompanyAccess, requireEditor, repoSymbolUpload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const { companyId } = req.params;
+      const displayName = req.body.name?.trim() || req.file.originalname.replace(/\.[^.]+$/, "");
+      const serverBase = process.env.SERVER_URL || "http://localhost:3001";
+      const fileUrl = `${serverBase}/repository-files/${companyId}/symbols/${req.file.filename}`;
+      const r = await pool.query(
+        `INSERT INTO company_repository
+           (company_id, parent_id, name, type, file_path, file_url, mime_type, size_bytes, created_by)
+         VALUES ($1, NULL, $2, 'file', $3, $4, $5, $6, $7) RETURNING *`,
+        [companyId, displayName, req.file.path, fileUrl, req.file.mimetype, req.file.size, req.user.userId]
+      );
+      res.status(201).json(r.rows[0]);
+    } catch (e) {
+      console.error("Company symbol upload error:", e.message);
+      res.status(500).json({ error: e.message || "Upload failed" });
+    }
+  }
+);
+
+// MIGRATE global symbols into every company's repository (idempotent, super-admin only)
+app.post("/api/admin/migrate-symbols", authenticateToken, isSuperAdmin, async (req, res) => {
+  try {
+    const [symsRes, companiesRes] = await Promise.all([
+      pool.query("SELECT id, name, file_url FROM symbols WHERE is_active = true"),
+      pool.query("SELECT id FROM companies"),
+    ]);
+    const symbols   = symsRes.rows;
+    const companies = companiesRes.rows;
+    const extMime   = { ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" };
+
+    let inserted = 0, skipped = 0;
+    for (const company of companies) {
+      for (const sym of symbols) {
+        const exists = await pool.query(
+          "SELECT id FROM company_repository WHERE company_id = $1 AND file_url = $2",
+          [company.id, sym.file_url]
+        );
+        if (exists.rows.length) { skipped++; continue; }
+        const ext      = path.extname(sym.file_url).toLowerCase();
+        const mimeType = extMime[ext] || "image/png";
+        await pool.query(
+          `INSERT INTO company_repository (company_id, parent_id, name, type, file_url, mime_type, created_by)
+           VALUES ($1, NULL, $2, 'file', $3, $4, $5)`,
+          [company.id, sym.name, sym.file_url, mimeType, req.user.userId]
+        );
+        inserted++;
+      }
+    }
+    res.json({ success: true, inserted, skipped, symbols: symbols.length, companies: companies.length });
+  } catch (e) {
+    console.error("Symbol migration error:", e.message);
+    res.status(500).json({ error: "Migration failed: " + e.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

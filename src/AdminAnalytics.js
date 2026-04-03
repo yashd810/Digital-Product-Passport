@@ -244,10 +244,10 @@ function AdminAnalytics() {
           },
         ],
       });
-      setMessage({ type: "success", text: "✅ PDF export is ready. Choose “Save as PDF” in the print dialog." });
+      setMessage({ type: 'success', text: 'PDF export is ready. Choose Save as PDF in the print dialog.' });
       setTimeout(() => setMessage({ type: "", text: "" }), 4000);
     } catch {
-      setMessage({ type: "error", text: "❌ Failed to export PDF" });
+      setMessage({ type: "error", text: "Failed to export PDF" });
       setTimeout(() => setMessage({ type: "", text: "" }), 3000);
     } finally {
       setExporting(false);

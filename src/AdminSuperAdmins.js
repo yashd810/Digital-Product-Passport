@@ -71,9 +71,9 @@ function AdminSuperAdmins({ token }) {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || "Failed to send invitation");
       setInviteEmail("");
-      showMsg("success", `✅ Super admin invitation sent to ${inviteEmail.trim()}`);
+      showMsg("success", `Super admin invitation sent to ${inviteEmail.trim()}`);
     } catch (e) {
-      showMsg("error", `❌ ${e.message || "Failed to send invitation"}`);
+      showMsg("error", `${e.message || "Failed to send invitation"}`);
     } finally {
       setInviting(false);
     }
@@ -97,7 +97,7 @@ function AdminSuperAdmins({ token }) {
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || "Failed to update access");
-      showMsg("success", `${nextActive ? "✅ Restored" : "✅ Revoked"} access for ${admin.email}`);
+      showMsg("success", `${nextActive ? "Restored" : "Revoked"} access for ${admin.email}`);
       await load();
 
       if (data.revokedCurrentSessionUser) {
@@ -105,7 +105,7 @@ function AdminSuperAdmins({ token }) {
         window.location.href = "/login";
       }
     } catch (e) {
-      showMsg("error", `❌ ${e.message || "Failed to update access"}`);
+      showMsg("error", `${e.message || "Failed to update access"}`);
     } finally {
       setTogglingId(null);
     }

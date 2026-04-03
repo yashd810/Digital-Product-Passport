@@ -857,7 +857,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
       body: JSON.stringify({ passportType: pType }),
     });
     const data = await r.json().catch(() => ({}));
-    if (r.ok) { showSuccess(`✅ v${v} → v${data.newVersion} draft created!`); fetchPassports(); }
+    if (r.ok) { showSuccess(`v${v} → v${data.newVersion} draft created!`); fetchPassports(); }
     else showError(data.error || "Revise failed");
   };
 
@@ -883,7 +883,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
       method:"DELETE", headers:authHeaders({"Content-Type":"application/json"}),
       body: JSON.stringify({ passportType: pType }),
     });
-    if (r.ok) { showSuccess("✅ Deleted"); fetchPassports(); }
+    if (r.ok) { showSuccess("Deleted"); fetchPassports(); }
     else { const d = await r.json().catch(() => ({})); showError(d.error || "Delete failed"); }
   };
 
@@ -1053,11 +1053,11 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
         for (const [type, typePassports] of Object.entries(groupedByType)) {
           await exportTypeToCSV(type, typePassports);
         }
-        showSuccess(`✅ Exported ${exportList.length} passport(s) across ${Object.keys(groupedByType).length} types`);
+        showSuccess(`Exported ${exportList.length} passport(s) across ${Object.keys(groupedByType).length} types`);
       } else {
         const type = Object.keys(groupedByType)[0];
         await exportTypeToCSV(type, groupedByType[type]);
-        showSuccess(`✅ Exported ${exportList.length} passport(s) to CSV`);
+        showSuccess(`Exported ${exportList.length} passport(s) to CSV`);
       }
     } catch (error) {
       showError('Failed to export CSV');
@@ -1136,7 +1136,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
       }
 
       setPrintQrModalOpen(false);
-      showSuccess(`✅ Downloaded ${selectedPassportList.length} QR code file${selectedPassportList.length !== 1 ? "s" : ""}.`);
+      showSuccess(`Downloaded ${selectedPassportList.length} QR code file${selectedPassportList.length !== 1 ? "s" : ""}.`);
     } catch (error) {
       showError(error.message || "Failed to generate QR codes");
     } finally {
@@ -1563,7 +1563,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
         <ReleaseModal
           passport={releaseModal} companyId={companyId} user={user}
           onClose={() => setReleaseModal(null)}
-          onDone={(msg) => { setReleaseModal(null); showSuccess(`✅ ${msg}`); fetchPassports(); }}
+          onDone={(msg) => { setReleaseModal(null); showSuccess(`${msg}`); fetchPassports(); }}
         />
       )}
 
@@ -1582,7 +1582,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
           passportType={csvModal.pType}
           companyId={companyId}
           onClose={() => setCsvModal(null)}
-          onDone={(msg) => { setCsvModal(null); showSuccess(`✅ ${msg}`); fetchPassports(); }}
+          onDone={(msg) => { setCsvModal(null); showSuccess(`${msg}`); fetchPassports(); }}
         />
       )}
 
@@ -1593,7 +1593,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
           onClose={() => setBulkCreateOpen(false)}
           onDone={(createdCount) => {
             setBulkCreateOpen(false);
-            showSuccess(`✅ Created ${createdCount} draft passport${createdCount !== 1 ? "s" : ""}`);
+            showSuccess(`Created ${createdCount} draft passport${createdCount !== 1 ? "s" : ""}`);
             fetchPassports();
           }}
         />

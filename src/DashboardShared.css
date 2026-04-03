@@ -1,5 +1,50 @@
 /* Shared dashboard/admin shell and table controls */
 
+/* ── Alert / notification styles ── */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-left: 4px solid transparent;
+  line-height: 1.5;
+}
+.alert::before {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-top: 1px;
+}
+.alert-success {
+  background: var(--status-released-bg);
+  color: var(--status-released-text);
+  border-color: var(--success);
+}
+.alert-success::before { content: "✓"; color: var(--success); }
+.alert-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ff8f8f;
+  border-color: var(--danger);
+}
+.alert-error::before { content: "✕"; color: var(--danger); }
+.alert-info {
+  background: var(--status-revised-bg);
+  color: var(--status-revised-text);
+  border-color: #38bdf8;
+}
+.alert-info::before { content: "ℹ"; color: #38bdf8; }
+[data-theme="light"] .alert-success { background: #dcfce7; color: #0f8a63; border-color: #0f9a6b; }
+[data-theme="light"] .alert-success::before { color: #0f9a6b; }
+[data-theme="light"] .alert-error   { background: #fee2e2; color: #b42318; border-color: #dc2626; }
+[data-theme="light"] .alert-error::before { color: #dc2626; }
+[data-theme="light"] .alert-info    { background: #dff4ff; color: #0f7496; border-color: #38bdf8; }
+[data-theme="light"] .alert-info::before { color: #0284c7; }
+
 .header-content {
   max-width: 1400px;
   margin: 0 auto;

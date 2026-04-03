@@ -277,7 +277,7 @@ function AdminCompanyAnalytics() {
         body: JSON.stringify({ role: editRole }),
       });
       if (!response.ok) throw new Error("Failed");
-      flash("success", "✅ Role updated");
+      flash("success", "Role updated");
       setEditUserId(null);
       load();
     } catch (err) {
@@ -370,9 +370,9 @@ function AdminCompanyAnalytics() {
           },
         ],
       });
-      flash("success", "✅ PDF export is ready. Choose “Save as PDF” in the print dialog.", 4000);
+      flash("success", 'PDF export is ready. Choose "Save as PDF" in the print dialog.', 4000);
     } catch (err) {
-      flash("error", "❌ Failed to export PDF", 3000);
+      flash("error", "Failed to export PDF", 3000);
     } finally {
       setExporting(false);
     }

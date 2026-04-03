@@ -62,10 +62,6 @@ function AdminLayout({ user, onLogout }) {
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           📋 Passport Types
         </NavLink>
-        <NavLink to="/admin/symbols"
-          className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
-          🖼 Symbols
-        </NavLink>
         <NavLink to="/admin/admin-management"
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           👑 Admin Management

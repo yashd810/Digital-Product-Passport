@@ -228,6 +228,12 @@ function AdminCompanies() {
                     🔐 Access
                   </button>
                   <button
+                    className="manage-btn manage-btn-access"
+                    onClick={() => navigate(`/admin/company/${company.id}/profile`)}
+                  >
+                    🎨 Branding
+                  </button>
+                  <button
                     className="manage-btn manage-btn-invite"
                     onClick={() => navigate("/admin/invite", { state: { preselectedCompanyId: String(company.id) } })}
                   >

@@ -48,13 +48,13 @@ function AdminInvite() {
       });
       const data = await r.json();
       if (r.ok) {
-        setInviteMsg({ type: "success", text: `✅ Invitation sent to ${inviteEmail}` });
+        setInviteMsg({ type: "success", text: `Invitation sent to ${inviteEmail}` });
         setInviteEmail("");
       } else {
-        setInviteMsg({ type: "error", text: `❌ ${data.error || "Failed to send invitation"}` });
+        setInviteMsg({ type: "error", text: `${data.error || "Failed to send invitation"}` });
       }
     } catch {
-      setInviteMsg({ type: "error", text: "❌ Network error. Please try again." });
+      setInviteMsg({ type: "error", text: "Network error. Please try again." });
     } finally {
       setInviteLoading(false);
       setTimeout(() => setInviteMsg({ type: "", text: "" }), 5000);

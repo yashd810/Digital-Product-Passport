@@ -3,6 +3,10 @@ require("dotenv").config();
 
 const express    = require("express");
 const nodemailer = require("nodemailer");
+const fs         = require("fs");
+const path       = require("path");
+
+const emailStyles = fs.readFileSync(path.join(__dirname, "../src/email-styles.css"), "utf8");
 
 const app  = express();
 const PORT = process.env.CONTACT_PORT || 3002;
@@ -10,8 +14,6 @@ app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
-// Manual handler so preflight always gets the right headers.
-// "null" origin = file:// in browser; falsy origin = server-to-server.
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:3000")
   .split(",").map(s => s.trim()).filter(Boolean);
 const allowedOriginSet = new Set(allowedOrigins);
@@ -69,27 +71,7 @@ function notificationEmail({ fullName, email, company, sector, service_interest,
     : "";
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  body{margin:0;padding:0;background:#07131f;font-family:Arial,Helvetica,sans-serif}
-  .wrap{max-width:620px;margin:32px auto;border-radius:18px;overflow:hidden;border:1px solid rgba(13,181,176,.2);box-shadow:0 12px 42px rgba(0,0,0,.5)}
-  .hdr{background:linear-gradient(135deg,#0e2234 0%,#07131f 100%);padding:30px 40px;text-align:center;border-bottom:1px solid rgba(13,181,176,.2)}
-  .hdr-tag{font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#0db5b0;margin-bottom:7px}
-  .hdr-title{color:#f0f6fa;font-size:21px;font-weight:700;margin:0}
-  .hdr-sub{color:rgba(240,246,250,.55);font-size:12px;margin:5px 0 0}
-  .body{background:#102132;padding:32px 40px}
-  .body p{font-size:14px;color:#b8ccd9;line-height:1.75;margin:0 0 16px}
-  .tbl{width:100%;border-collapse:collapse;margin:18px 0;border:1px solid rgba(13,181,176,.15);border-radius:10px;overflow:hidden}
-  .tbl td{padding:10px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.05)}
-  .tbl tr:last-child td{border-bottom:none}
-  .tlbl{color:#0db5b0;font-weight:700;text-transform:uppercase;letter-spacing:.7px;font-size:11px;width:36%;white-space:nowrap;background:rgba(13,181,176,.06)}
-  .tval{color:#f0f6fa;font-weight:500}
-  .msg-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#0db5b0;margin-bottom:8px}
-  .msg-box{background:rgba(13,181,176,.07);border:1px solid rgba(13,181,176,.2);border-radius:10px;padding:16px;font-size:13px;color:#b8ccd9;line-height:1.8;white-space:pre-wrap;word-break:break-word}
-  .cta{text-align:center;margin:28px 0 8px}
-  .cta a{display:inline-block;background:linear-gradient(135deg,#14b8a6 0%,#0f766e 100%);color:#06131d!important;text-decoration:none;padding:13px 30px;border-radius:50px;font-size:14px;font-weight:700;box-shadow:0 10px 24px rgba(13,181,176,.22)}
-  .foot{background:#07131f;padding:16px 40px;text-align:center;border-top:1px solid rgba(255,255,255,.06)}
-  .foot p{font-size:11px;color:#7a94a8;margin:3px 0}
-</style></head><body>
+<style>${emailStyles}</style></head><body>
 <div class="wrap">
   <div class="hdr">
     <div class="hdr-tag">ClarosDPP</div>
@@ -123,22 +105,7 @@ function notificationEmail({ fullName, email, company, sector, service_interest,
 function confirmationEmail({ firstName }) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  body{margin:0;padding:0;background:#07131f;font-family:Arial,Helvetica,sans-serif}
-  .wrap{max-width:600px;margin:32px auto;border-radius:18px;overflow:hidden;border:1px solid rgba(13,181,176,.2);box-shadow:0 12px 42px rgba(0,0,0,.45)}
-  .hdr{background:linear-gradient(135deg,#0e2234 0%,#07131f 100%);padding:30px 40px;text-align:center;border-bottom:1px solid rgba(13,181,176,.2)}
-  .hdr-tag{font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#0db5b0;margin-bottom:7px}
-  .hdr-title{color:#f0f6fa;font-size:21px;font-weight:700;margin:0}
-  .body{background:#102132;padding:32px 40px}
-  .body p{font-size:14px;color:#b8ccd9;line-height:1.8;margin:0 0 14px}
-  .body h2{color:#f0f6fa;font-size:17px;font-weight:700;margin:0 0 14px}
-  .steps{padding:0;margin:18px 0}
-  .steps li{font-size:13px;color:#b8ccd9;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);list-style:none;display:flex;align-items:flex-start;gap:10px}
-  .steps li:last-child{border-bottom:none}
-  .tick{color:#0db5b0;font-weight:700;flex-shrink:0;margin-top:1px}
-  .foot{background:#07131f;padding:16px 40px;text-align:center;border-top:1px solid rgba(255,255,255,.06)}
-  .foot p{font-size:11px;color:#7a94a8;margin:3px 0}
-</style></head><body>
+<style>${emailStyles}</style></head><body>
 <div class="wrap">
   <div class="hdr">
     <div class="hdr-tag">ClarosDPP</div>

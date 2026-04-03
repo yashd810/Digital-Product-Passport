@@ -75,6 +75,20 @@ export const PASSPORT_VIEWER_THEME = {
   badge: "#dce8f0",
 };
 
+export const DEFAULT_COMPANY_BRANDING = {
+  primary_color: "#0db5b0",
+  secondary_color: "#132840",
+  accent_color: "#dce8f0",
+  background_gradient: "linear-gradient(135deg, #0b1826 0%, #132840 52%, #17304a 100%)",
+  viewer_variant: "classic",
+  consumer_variant: "classic",
+  public_page_title: "",
+  public_tagline: "",
+  company_website: "",
+  footer_text: "",
+  support_link: "",
+};
+
 const CONSUMER_BASE = {
   gradient: "linear-gradient(135deg, #0b1826 0%, #132840 52%, #17304a 100%)",
   cardBg: "rgba(220,232,240,0.2)",
@@ -119,6 +133,28 @@ export const CONSUMER_PAGE_THEMES = {
   },
 };
 
+export function normalizeCompanyBranding(branding) {
+  const src = branding && typeof branding === "object" ? branding : {};
+  return { ...DEFAULT_COMPANY_BRANDING, ...src };
+}
+
+export function getViewerBrandTheme(branding) {
+  const b = normalizeCompanyBranding(branding);
+  return {
+    variant: b.viewer_variant,
+    title: b.public_page_title,
+    companyWebsite: b.company_website,
+    footerText: b.footer_text,
+    supportLink: b.support_link,
+    style: {
+      "--brand-primary": b.primary_color,
+      "--brand-secondary": b.secondary_color,
+      "--brand-accent": b.accent_color,
+      "--brand-gradient": b.background_gradient,
+    },
+  };
+}
+
 export function applyTheme(themeKey) {
   const theme = THEMES[themeKey] || THEMES.dark;
   const root = document.documentElement;
@@ -138,5 +174,21 @@ export function setStoredTheme(userId, themeKey) {
   localStorage.setItem(`dpp_theme_${userId}`, themeKey);
 }
 
-export const getConsumerTheme = (passportType) =>
-  CONSUMER_PAGE_THEMES[passportType] || CONSUMER_PAGE_THEMES.battery;
+export const getConsumerTheme = (passportType, branding) => {
+  const base = CONSUMER_PAGE_THEMES[passportType] || CONSUMER_PAGE_THEMES.battery;
+  const b = normalizeCompanyBranding(branding);
+  return {
+    ...base,
+    accentColor: b.primary_color || base.accentColor,
+    cardBg: "rgba(220,232,240,0.2)",
+    gradient: b.background_gradient || base.gradient,
+    headline: b.public_page_title || base.headline,
+    tagline: b.public_tagline || base.tagline,
+    companyWebsite: b.company_website,
+    footerText: b.footer_text,
+    supportLink: b.support_link,
+    variant: b.consumer_variant,
+    secondaryColor: b.secondary_color,
+    accentSurface: b.accent_color,
+  };
+};

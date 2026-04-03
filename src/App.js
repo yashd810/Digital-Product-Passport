@@ -22,6 +22,7 @@ const AuditLogs = lazy(() => import("./AuditLogs"));
 const UserProfile = lazy(() => import("./UserProfile"));
 const CompanyProfile = lazy(() => import("./CompanyProfile"));
 const ManageTeam = lazy(() => import("./ManageTeam"));
+const CompanyRepository = lazy(() => import("./CompanyRepository"));
 const WorkflowDashboard = lazy(() => import("./WorkflowDashboard"));
 
 const ConsumerPage = lazy(() => import("./ConsumerPage"));
@@ -35,7 +36,6 @@ const AdminCompanyAnalytics = lazy(() => import("./AdminCompanyAnalytics"));
 const AdminPassportTypes = lazy(() => import("./AdminPassportTypes"));
 const AdminCreatePassportType = lazy(() => import("./AdminCreatePassportType"));
 const AdminPassportTypeFields = lazy(() => import("./AdminPassportTypeFields"));
-const AdminSymbolRepository = lazy(() => import("./AdminSymbolRepository"));
 const AdminSecurity = lazy(() => import("./AdminSecurity"));
 
 // Theme
@@ -176,6 +176,7 @@ function App() {
           <Route path="profile"         element={<UserProfile user={user} companyId={companyId} onUserUpdate={handleUserUpdate} />} />
           <Route path="company-profile" element={<CompanyProfile user={user} companyId={companyId} />} />
           <Route path="team"            element={<ManageTeam user={user} companyId={companyId} />} />
+          <Route path="repository"      element={<CompanyRepository user={user} companyId={companyId} />} />
         </Route>
 
         {/* Admin */}
@@ -191,12 +192,12 @@ function App() {
           <Route path="passport-types/new"           element={<AdminCreatePassportType />} />
           <Route path="passport-types/:typeName/fields" element={<AdminPassportTypeFields />} />
           <Route path="invite"                       element={<AdminInvite />} />
-          <Route path="symbols"                      element={<AdminSymbolRepository />} />
           <Route path="admin-management"             element={<AdminSecurity user={user} />} />
           <Route path="profile"                      element={<UserProfile user={user} companyId={companyId} onUserUpdate={handleUserUpdate} showWorkflowDefaults={false} showLanguageSelector={false} profileTitle="My Profile" profileSubtitle={user?.email} />} />
           <Route path="security"                     element={<Navigate to="/admin/admin-management" replace />} />
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
           <Route path="company/:companyId/analytics" element={<AdminCompanyAnalytics />} />
+          <Route path="company/:companyId/profile"   element={<CompanyProfile user={user} />} />
         </Route>
 
         {/* Create / Edit */}

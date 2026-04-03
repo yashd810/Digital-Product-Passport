@@ -86,13 +86,13 @@ function AdminSecurity({ user }) {
       if (!response.ok) throw new Error(data.error || "Failed to send invitation");
       if (data.emailSent === false) {
         const manualLinkCopy = data.registerUrl ? ` Manual link: ${data.registerUrl}` : "";
-        flash("success", `✅ ${data.message || `Super admin invite created for ${inviteEmail.trim()}.`}${manualLinkCopy}`, 9000);
+        flash("success", `${data.message || `Super admin invite created for ${inviteEmail.trim()}.`}${manualLinkCopy}`, 9000);
       } else {
-        flash("success", `✅ ${data.message || `Super admin invitation sent to ${inviteEmail.trim()}`}`, 5000);
+        flash("success", `${data.message || `Super admin invitation sent to ${inviteEmail.trim()}`}`, 5000);
       }
       setInviteEmail("");
     } catch (err) {
-      flash("error", `❌ ${err.message || "Failed to send invitation"}`, 5000);
+      flash("error", `${err.message || "Failed to send invitation"}`, 5000);
     } finally {
       setInviting(false);
     }
@@ -118,7 +118,7 @@ function AdminSecurity({ user }) {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to update access");
-      flash("success", `${nextActive ? "✅ Restored" : "✅ Revoked"} access for ${admin.email}`, 5000);
+      flash("success", `${nextActive ? "Restored" : "Revoked"} access for ${admin.email}`, 5000);
       setAccessTarget(null);
       await loadSuperAdmins();
 
@@ -127,7 +127,7 @@ function AdminSecurity({ user }) {
         window.location.href = "/login";
       }
     } catch (err) {
-      flash("error", `❌ ${err.message || "Failed to update access"}`, 5000);
+      flash("error", `${err.message || "Failed to update access"}`, 5000);
     } finally {
       setTogglingId(null);
     }

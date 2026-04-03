@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { PASSPORT_SECTIONS_MAP } from "./PassportFields";
 import { authHeaders } from "./authHeaders";
+import RepositoryPicker from "./RepositoryPicker";
 import "./CreatePass.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -30,6 +31,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const [formData,       setFormData]       = useState({});
   const [fileSelections, setFileSelections] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
+  const [repoPicker,     setRepoPicker]     = useState(null);  // field.key being picked, or null
+  const [symbolPicker,   setSymbolPicker]   = useState(null);  // field.key being picked, or null
+  const [symbols,        setSymbols]        = useState([]);
   const [isLoading,      setIsLoading]      = useState(mode === "edit");
   const [isSaving,       setIsSaving]       = useState(false);
   const [error,          setError]          = useState("");
@@ -57,6 +61,15 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       mountedRef.current = false;
     };
   }, []);
+
+  // Load symbols from company repository
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`${API}/api/companies/${companyId}/repository/symbols`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : [])
+      .then(setSymbols)
+      .catch(() => {});
+  }, [companyId]);
 
   // Load dynamic type definition from server if not in static map
   useEffect(() => {
@@ -152,11 +165,14 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       "id","guid","company_id","created_by","created_at","passport_type",
       "version_number","release_status","deleted_at","qr_code",
       "created_by_email","first_name","last_name","updated_by","updated_at",
+      "model_name","product_id",  // handled explicitly below — must not be overridden by cleanData
     ]);
     const cleanData = Object.fromEntries(
-      Object.entries(formData).filter(([k]) => !NON_SCHEMA.has(k))
+      Object.entries(formData)
+        .filter(([k]) => !NON_SCHEMA.has(k))
+        .map(([k, v]) => [k, Array.isArray(v) ? JSON.stringify(v) : v])
     );
-    return { passportType, product_id: productId || null, ...cleanData };
+    return { passportType, model_name: modelName || null, product_id: productId || null, ...cleanData };
   };
 
   const refreshEditPresence = async (method = "GET") => {
@@ -192,7 +208,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     sessionActiveRef.current = false;
   };
 
-  const saveEditChanges = async ({ navigateAfterSave = false, showSuccessMessage = false } = {}) => {
+  const saveEditChanges = async ({ showSuccessMessage = false } = {}) => {
     if (mode !== "edit" || !guid || !passportType || saveInFlightRef.current) return false;
 
     saveInFlightRef.current = true;
@@ -231,11 +247,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         setLastSavedAt(nowIso);
         setAutoSaveState("saved");
         if (showSuccessMessage) {
-          setSuccess(navigateAfterSave ? "✓ Changes saved! Redirecting…" : "✓ Changes saved automatically");
+          setSuccess("Changes saved automatically");
         }
-      }
-      if (navigateAfterSave) {
-        setTimeout(() => navigate(`/dashboard/passports/${passportType}`), 2000);
       }
       return true;
     } catch (e) {
@@ -299,7 +312,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       saveEditChanges();
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [mode, guid, passportType, companyId, productId, formData, fileSelections, isLoading]);
+  }, [mode, guid, passportType, companyId, modelName, productId, formData, fileSelections, isLoading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -309,9 +322,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       let passportGuid = guid;
 
       if (mode === "create") {
+        const serializedData = Object.fromEntries(
+          Object.entries(formData).map(([k, v]) => [k, Array.isArray(v) ? JSON.stringify(v) : v])
+        );
         const body = {
           passport_type: passportType, model_name: modelName,
-          product_id: productId || null, ...formData,
+          product_id: productId || null, ...serializedData,
         };
         const r = await fetch(`${API}/api/companies/${companyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
@@ -321,7 +337,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         const { passport } = await r.json();
         passportGuid = passport.guid;
       } else {
-        const saved = await saveEditChanges({ navigateAfterSave: true, showSuccessMessage: true });
+        const saved = await saveEditChanges({ showSuccessMessage: false });
         if (!saved) throw new Error("Failed to update");
       }
 
@@ -330,18 +346,16 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           if (file) await uploadFile(key, file, passportGuid);
         }
         setFileSelections({});
-        // For create mode: scroll up and show success message, don't navigate
         window.scrollTo({ top: 0, behavior: "smooth" });
-        setSuccess("✓ Passport created successfully");
+        setSuccess("Passport created successfully");
         setTimeout(() => setSuccess(""), 4000);
-        // Reset form
         setModelName("");
         setProductId("");
         setFormData({});
       } else {
-        // For edit mode: show success and navigate after 2 seconds
-        setSuccess("✓ Changes saved! Redirecting…");
-        setTimeout(() => navigate(`/dashboard/passports/${passportType}`), 2000);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setSuccess("Changes saved successfully");
+        setTimeout(() => setSuccess(""), 4000);
       }
     } catch (e) {
       setError(e.message);
@@ -363,50 +377,114 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     }
 
     if (field.type === "file") {
-      const existingUrl = typeof val==="string" && val.startsWith("http") ? val : null;
-      const selectedFile= fileSelections[field.key];
-      const progress    = uploadProgress[field.key];
+      const linkedUrl  = typeof val === "string" && val.startsWith("http") ? val : null;
+      const fileName   = linkedUrl ? linkedUrl.split("/").pop() : null;
       return (
         <div className="file-upload-widget">
-          {existingUrl && !selectedFile && (
+          {linkedUrl ? (
             <div className="file-existing">
-              <a href={existingUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
-                📄 {`${modelName}_${field.key}`}
+              <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
+                📄 {fileName}
               </a>
-              <button type="button" className="file-clear-btn"
-                onClick={() => handleField(field.key,"")}>✕ Remove</button>
+              <button type="button" className="file-clear-btn" disabled={disabled}
+                onClick={() => handleField(field.key, "")}>✕ Remove</button>
             </div>
+          ) : (
+            <button type="button" className="file-upload-label" disabled={disabled}
+              onClick={() => setRepoPicker(field.key)}>
+              <span className="file-placeholder">📁 Link PDF from Repository</span>
+            </button>
           )}
-          {(!existingUrl || selectedFile) && (
-            <>
-              <label className="file-upload-label" htmlFor={`f-${field.key}`}>
-                {selectedFile
-                  ? <span className="file-selected">📄 {selectedFile.name}
-                      <span className="file-size"> ({(selectedFile.size/1024/1024).toFixed(2)} MB)</span>
-                    </span>
-                  : <span className="file-placeholder">⬆ Upload PDF — {field.label}</span>}
-              </label>
-              <input id={`f-${field.key}`} type="file" accept="application/pdf"
-                className="file-input-hidden"
-                onChange={e => handleFile(field.key, e.target.files[0])} disabled={disabled} />
-              {selectedFile && (
-                <button type="button" className="file-clear-btn"
-                  onClick={() => setFileSelections(p=>({...p,[field.key]:null}))}>✕ Remove</button>
-              )}
-            </>
+          {linkedUrl && (
+            <button type="button" className="file-upload-label file-replace-label" disabled={disabled}
+              onClick={() => setRepoPicker(field.key)}>
+              <span className="file-placeholder">↺ Change</span>
+            </button>
           )}
-          {existingUrl && !selectedFile && (
-            <>
-              <label className="file-upload-label file-replace-label" htmlFor={`f-replace-${field.key}`}>
-                <span className="file-placeholder">↺ Replace PDF</span>
-              </label>
-              <input id={`f-replace-${field.key}`} type="file" accept="application/pdf"
-                className="file-input-hidden"
-                onChange={e => handleFile(field.key,e.target.files[0])} disabled={disabled} />
-            </>
+        </div>
+      );
+    }
+
+    if (field.type === "symbol") {
+      const linkedUrl = typeof val === "string" && val.startsWith("http") ? val : null;
+      const picked    = linkedUrl ? symbols.find(s => s.file_url === linkedUrl) : null;
+      return (
+        <div className="file-upload-widget">
+          {linkedUrl ? (
+            <div className="file-existing">
+              <img src={linkedUrl} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />
+              <span className="file-existing-link">{picked?.name || "Symbol"}</span>
+              <button type="button" className="file-clear-btn" disabled={disabled}
+                onClick={() => handleField(field.key, "")}>✕ Remove</button>
+            </div>
+          ) : (
+            <button type="button" className="file-upload-label" disabled={disabled}
+              onClick={() => setSymbolPicker(field.key)}>
+              <span className="file-placeholder">🔣 Link Symbol from Repository</span>
+            </button>
           )}
-          {progress==="uploading" && <span className="upload-status uploading">Uploading…</span>}
-          {progress==="done"      && <span className="upload-status done">✓ Uploaded</span>}
+          {linkedUrl && (
+            <button type="button" className="file-upload-label file-replace-label" disabled={disabled}
+              onClick={() => setSymbolPicker(field.key)}>
+              <span className="file-placeholder">↺ Change</span>
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    if (field.type === "table") {
+      const cols     = field.table_cols || 2;
+      const colNames = field.table_columns?.length ? field.table_columns : Array.from({ length: cols }, (_, i) => `Column ${i + 1}`);
+      let parsed = val;
+      if (typeof val === "string" && val.startsWith("[")) {
+        try { parsed = JSON.parse(val); } catch { parsed = null; }
+      }
+      const rows = Array.isArray(parsed) && parsed.length ? parsed : [Array(cols).fill("")];
+
+      const updateCell = (ri, ci, v) => {
+        const next = rows.map(r => [...r]);
+        next[ri][ci] = v;
+        handleField(field.key, next);
+      };
+      const addRow    = () => handleField(field.key, [...rows, Array(cols).fill("")]);
+      const removeRow = (ri) => {
+        const next = rows.filter((_, i) => i !== ri);
+        handleField(field.key, next.length ? next : [Array(cols).fill("")]);
+      };
+
+      return (
+        <div className="pf-table-wrap">
+          <table className="pf-table">
+            <thead>
+              <tr>
+                {colNames.map((name, ci) => <th key={ci}>{name}</th>)}
+                <th className="pf-table-action-col" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, ri) => (
+                <tr key={ri}>
+                  {Array(cols).fill(null).map((_, ci) => (
+                    <td key={ci}>
+                      <input
+                        type="text"
+                        value={row[ci] ?? ""}
+                        disabled={disabled}
+                        placeholder="—"
+                        onChange={e => updateCell(ri, ci, e.target.value)}
+                        className="pf-table-cell-input"
+                      />
+                    </td>
+                  ))}
+                  <td className="pf-table-action-col">
+                    <button type="button" className="pf-table-remove-row" onClick={() => removeRow(ri)} disabled={disabled} title="Remove row">✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" className="pf-table-add-row" onClick={addRow} disabled={disabled}>+ Add Row</button>
         </div>
       );
     }
@@ -415,6 +493,29 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       return <textarea value={val} disabled={disabled}
         placeholder={`Enter ${field.label.toLowerCase()}`}
         onChange={e => handleField(field.key,e.target.value)} />;
+    }
+
+    if (field.type === "date") {
+      // Store as YYYY-MM-DD (native date format); convert DD/MM/YYYY on load
+      const toInput = (v) => {
+        if (!v) return "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+        const [d, m, y] = v.split("/");
+        return d && m && y ? `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}` : "";
+      };
+      const fromInput = (v) => v; // keep YYYY-MM-DD internally
+      return (
+        <div className="pf-date-wrap">
+          <input
+            type="date"
+            value={toInput(val)}
+            disabled={disabled}
+            onChange={e => handleField(field.key, fromInput(e.target.value))}
+            className="pf-date-input"
+          />
+          <span className="pf-date-hint">DD/MM/YYYY</span>
+        </div>
+      );
     }
 
     return <input type="text" value={val} disabled={disabled}
@@ -462,14 +563,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           {/* Identity row */}
           <div className="passport-identity-row">
             <div className="passport-field-group">
-              <label htmlFor="modelName">
-                Model Name
-                {mode==="edit" && <span className="field-locked-badge">locked</span>}
-              </label>
+              <label htmlFor="modelName">Model Name</label>
               <input id="modelName" type="text" value={modelName}
-                className={`passport-model-input${mode==="edit" ? " passport-model-locked":""}`}
-                readOnly={mode==="edit"} disabled={mode==="edit"}
-                placeholder="Enter model name (optional)" onChange={e => setModelName(e.target.value)} />
+                className="passport-model-input"
+                placeholder="Enter model name (optional)"
+                onChange={e => { setModelName(e.target.value); dirtyRef.current = true; }} />
             </div>
             <div className="passport-field-group">
               <label htmlFor="productId">Product ID</label>
@@ -538,6 +636,47 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       <footer className="createpass-footer">
         <p>© 2024 Digital Product Passport System.</p>
       </footer>
+
+      {/* ── Repository PDF Picker ── */}
+      {repoPicker && (
+        <RepositoryPicker
+          token={token}
+          companyId={companyId}
+          onSelect={(url) => { handleField(repoPicker, url); setRepoPicker(null); }}
+          onClose={() => setRepoPicker(null)}
+        />
+      )}
+
+      {/* ── Symbol Picker ── */}
+      {symbolPicker && (
+        <div className="rp-overlay" onClick={e => e.target === e.currentTarget && setSymbolPicker(null)}>
+          <div className="rp-modal">
+            <div className="rp-modal-header">
+              <h3>🔣 Pick a Symbol</h3>
+              <button className="rp-close-btn" onClick={() => setSymbolPicker(null)}>✕</button>
+            </div>
+            <div className="pf-symbol-grid">
+              {symbols.length === 0 ? (
+                <div className="rp-empty">No symbols in repository yet.</div>
+              ) : symbols.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`pf-symbol-item${formData[symbolPicker] === s.file_url ? " selected" : ""}`}
+                  onClick={() => { handleField(symbolPicker, s.file_url); setSymbolPicker(null); }}
+                >
+                  <img src={s.file_url} alt={s.name} className="pf-symbol-grid-img" />
+                  <span className="pf-symbol-name">{s.name}</span>
+                  {s.category && <span className="pf-symbol-cat">{s.category}</span>}
+                </button>
+              ))}
+            </div>
+            <div className="rp-footer">
+              <button className="rp-cancel-btn" onClick={() => setSymbolPicker(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
