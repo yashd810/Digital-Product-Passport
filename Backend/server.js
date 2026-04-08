@@ -13,6 +13,7 @@ const fs             = require("fs");
 const path           = require("path");
 
 const emailStyles = fs.readFileSync(path.join(__dirname, "../src/email-styles.css"), "utf8");
+const ASSET_MANAGEMENT_DIR = path.join(__dirname, "asset-management");
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -20,9 +21,18 @@ app.disable("x-powered-by");
 app.set("trust proxy", 1);
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
-// Restrict CORS to known origins; defaults to localhost for development
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:3000")
+// Restrict CORS to known origins; include local dev origins and the backend's own origin
+const defaultAllowedOrigins = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  `http://localhost:${PORT}`,
+  `http://127.0.0.1:${PORT}`,
+];
+const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",").map(s => s.trim()).filter(Boolean);
+const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])];
 const allowedOriginSet = new Set(allowedOrigins);
 
 app.use(cors({
@@ -44,6 +54,7 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads/symbols", express.static(path.join(__dirname, "uploads", "symbols")));
+app.use("/asset-management", express.static(ASSET_MANAGEMENT_DIR));
 
 const pool = new Pool({
   user:     process.env.DB_USER,
@@ -55,12 +66,14 @@ const pool = new Pool({
 
 const JWT_SECRET             = process.env.JWT_SECRET || "change-me-in-production";
 const JWT_EXPIRY             = "7d";
+const ASSET_LAUNCH_TOKEN_EXPIRY = process.env.ASSET_LAUNCH_TOKEN_EXPIRY || "2h";
 const PEPPER                 = process.env.PEPPER_V1  || "change-this-pepper-in-production";
 const CURRENT_PEPPER_VERSION = 1;
 const SESSION_COOKIE_NAME    = process.env.SESSION_COOKIE_NAME || "dpp_session";
 const COOKIE_SECURE          = process.env.COOKIE_SECURE === "true";
 const COOKIE_SAME_SITE       = process.env.COOKIE_SAME_SITE || "lax";
 const COOKIE_DOMAIN          = process.env.COOKIE_DOMAIN || "";
+const ASSET_SHARED_SECRET    = process.env.ASSET_MANAGEMENT_SHARED_SECRET || "";
 
 if (IS_PRODUCTION) {
   const missingSecrets = [];
@@ -178,6 +191,69 @@ const LEGACY_IN_REVISION_STATUS = "revised";
 const IN_REVISION_STATUSES_SQL = `('${IN_REVISION_STATUS}','${LEGACY_IN_REVISION_STATUS}')`;
 const EDITABLE_RELEASE_STATUSES_SQL = `('draft','${IN_REVISION_STATUS}','${LEGACY_IN_REVISION_STATUS}')`;
 const REVISION_BLOCKING_STATUSES_SQL = `('draft','${IN_REVISION_STATUS}','${LEGACY_IN_REVISION_STATUS}','in_review')`;
+const ASSET_MATCH_FIELDS = new Set(["guid", "match_guid", "product_id", "match_product_id", "next_product_id"]);
+const ASSET_SCHEDULER_INTERVAL_MS = 60 * 1000;
+const ASSET_ERP_PRESETS = [
+  {
+    key: "generic_rest",
+    label: "Generic REST",
+    description: "Generic JSON API returning an array or records path.",
+    sourceConfig: {
+      method: "GET",
+      recordPath: "data.items",
+      fieldMap: {
+        guid: "guid",
+        product_id: "product_id",
+        model_name: "model_name",
+      },
+    },
+  },
+  {
+    key: "sap_s4hana_material",
+    label: "SAP S/4HANA Material Feed",
+    description: "Typical material master style mapping for SAP integrations.",
+    sourceConfig: {
+      method: "GET",
+      recordPath: "d.results",
+      fieldMap: {
+        Material: "product_id",
+        ProductUUID: "guid",
+        ProductDescription: "model_name",
+        Plant: "facility",
+      },
+    },
+  },
+  {
+    key: "microsoft_bc_items",
+    label: "Business Central Items",
+    description: "Business Central item sync using OData-style responses.",
+    sourceConfig: {
+      method: "GET",
+      recordPath: "value",
+      fieldMap: {
+        id: "guid",
+        number: "product_id",
+        displayName: "model_name",
+        inventoryPostingGroup: "category",
+      },
+    },
+  },
+  {
+    key: "netsuite_restlet",
+    label: "NetSuite Restlet",
+    description: "NetSuite restlet payload with items array.",
+    sourceConfig: {
+      method: "POST",
+      recordPath: "items",
+      fieldMap: {
+        internalId: "guid",
+        itemId: "product_id",
+        displayName: "model_name",
+        location: "facility",
+      },
+    },
+  },
+];
 
 const publicScanRateLimit = rateLimit({
   key: (req) => `public-scan:${req.ip}:${String(req.params?.guid || "")}`,
@@ -229,6 +305,77 @@ const authCookieOptions = {
   domain: COOKIE_DOMAIN || undefined,
   path: "/",
   maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
+const requireAssetManagementKey = (req, res, next) => {
+  if (!ASSET_SHARED_SECRET) return next();
+  const submitted = String(req.headers["x-asset-key"] || req.query.assetKey || "");
+  if (!submitted) return res.status(401).json({ error: "x-asset-key header required" });
+
+  const expectedBuf = Buffer.from(String(ASSET_SHARED_SECRET));
+  const submittedBuf = Buffer.from(submitted);
+  if (expectedBuf.length !== submittedBuf.length || !crypto.timingSafeEqual(expectedBuf, submittedBuf)) {
+    return res.status(403).json({ error: "Invalid asset key" });
+  }
+  next();
+};
+
+const generateAssetLaunchToken = ({ companyId, userId, role }) =>
+  jwt.sign(
+    { scope: "asset_management", companyId, userId, role },
+    JWT_SECRET,
+    { expiresIn: ASSET_LAUNCH_TOKEN_EXPIRY }
+  );
+
+async function getCompanyAssetSettings(companyId) {
+  const result = await pool.query(
+    `SELECT id, company_name, is_active, asset_management_enabled, asset_management_revoked_at
+     FROM companies
+     WHERE id = $1`,
+    [companyId]
+  );
+  return result.rows[0] || null;
+}
+
+async function assertAssetManagementEnabled(companyId) {
+  const company = await getCompanyAssetSettings(companyId);
+  if (!company) {
+    const error = new Error("Company not found");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (!company.asset_management_enabled) {
+    const error = new Error("Asset Management is not enabled for this company");
+    error.statusCode = 403;
+    throw error;
+  }
+  return company;
+}
+
+const authenticateAssetPlatform = async (req, res, next) => {
+  try {
+    const token = String(req.headers["x-asset-platform-token"] || req.query.launchToken || "");
+    if (!token) return res.status(401).json({ error: "x-asset-platform-token header required" });
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded?.scope !== "asset_management" || !decoded.companyId) {
+      return res.status(403).json({ error: "Invalid asset platform token" });
+    }
+    await assertAssetManagementEnabled(decoded.companyId);
+    req.assetContext = {
+      companyId: String(decoded.companyId),
+      userId: decoded.userId || null,
+      role: decoded.role || null,
+    };
+    next();
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Asset platform session expired. Open it again from the dashboard." });
+    }
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    return res.status(403).json({ error: "Invalid asset platform token" });
+  }
 };
 
 const setAuthCookie = (res, token) => {
@@ -718,9 +865,19 @@ async function initDb() {
       id               SERIAL PRIMARY KEY,
       company_name     VARCHAR(255) NOT NULL UNIQUE,
       is_active        BOOLEAN NOT NULL DEFAULT true,
+      asset_management_enabled BOOLEAN NOT NULL DEFAULT false,
+      asset_management_revoked_at TIMESTAMPTZ,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS asset_management_enabled BOOLEAN NOT NULL DEFAULT false
+  `);
+  await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS asset_management_revoked_at TIMESTAMPTZ
   `);
 
   await pool.query(`
@@ -905,6 +1062,55 @@ async function initDb() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dv_passport_field
       ON passport_dynamic_values(passport_guid, field_key, updated_at DESC)
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS asset_management_jobs (
+      id               SERIAL PRIMARY KEY,
+      company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      passport_type    VARCHAR(100) NOT NULL,
+      name             VARCHAR(255) NOT NULL,
+      source_kind      VARCHAR(40) NOT NULL DEFAULT 'manual',
+      source_config    JSONB NOT NULL DEFAULT '{}'::jsonb,
+      records_json     JSONB NOT NULL DEFAULT '[]'::jsonb,
+      options_json     JSONB NOT NULL DEFAULT '{}'::jsonb,
+      is_active        BOOLEAN NOT NULL DEFAULT true,
+      start_at         TIMESTAMPTZ,
+      interval_minutes INTEGER,
+      next_run_at      TIMESTAMPTZ,
+      last_run_at      TIMESTAMPTZ,
+      last_status      VARCHAR(30),
+      last_summary     JSONB,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_asset_jobs_company
+      ON asset_management_jobs(company_id, updated_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_asset_jobs_due
+      ON asset_management_jobs(next_run_at)
+      WHERE is_active = true
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS asset_management_runs (
+      id             SERIAL PRIMARY KEY,
+      job_id         INTEGER REFERENCES asset_management_jobs(id) ON DELETE SET NULL,
+      company_id     INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      passport_type  VARCHAR(100),
+      trigger_type   VARCHAR(40) NOT NULL,
+      source_kind    VARCHAR(40),
+      status         VARCHAR(30) NOT NULL,
+      summary_json   JSONB,
+      request_json   JSONB,
+      generated_json JSONB,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_asset_runs_company
+      ON asset_management_runs(company_id, created_at DESC)
   `);
   // Digital signatures — one row per released passport version
   await pool.query(`
@@ -1155,6 +1361,7 @@ pool.query("SELECT NOW()")
     await initDb();
     console.log("[DB] Initialized successfully");
     await loadOrGenerateSigningKey();
+    startAssetManagementScheduler();
   })
   .catch(err => {
     console.error("[DB] Fatal startup error:", err.message);
@@ -1707,6 +1914,772 @@ const createNotification = async (userId, type, title, message, passportGuid, ac
   } catch (e) { console.error("Notification error (non-fatal):", e.message); }
 };
 
+const isPlainObject = (value) =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getAssetFieldMap = (typeSchema) => {
+  const map = new Map();
+  [
+    { key: "guid", label: "Passport GUID", type: "text", system: true },
+    { key: "product_id", label: "Serial Number", type: "text", system: true },
+    { key: "model_name", label: "Model Name", type: "text", system: true },
+  ].forEach((field) => map.set(field.key, field));
+  (typeSchema?.schemaFields || []).forEach((field) => {
+    if (field?.key) map.set(field.key, field);
+  });
+  return map;
+};
+
+const getValueAtPath = (value, pathExpression) => {
+  if (!pathExpression) return value;
+  return String(pathExpression)
+    .split(".")
+    .filter(Boolean)
+    .reduce((acc, part) => {
+      if (acc === undefined || acc === null) return undefined;
+      const arrayMatch = part.match(/^(.+)\[(\d+)\]$/);
+      if (arrayMatch) {
+        const [, key, indexText] = arrayMatch;
+        const next = key ? acc[key] : acc;
+        return Array.isArray(next) ? next[Number(indexText)] : undefined;
+      }
+      return acc[part];
+    }, value);
+};
+
+const normalizeAssetHeaders = (headers) => {
+  if (!isPlainObject(headers)) return {};
+  return Object.entries(headers).reduce((acc, [key, value]) => {
+    if (!key) return acc;
+    acc[String(key)] = typeof value === "string" ? value : JSON.stringify(value);
+    return acc;
+  }, {});
+};
+
+const coerceAssetFieldValue = (fieldDef, rawValue) => {
+  if (rawValue === undefined) return { ok: false, error: "value is undefined" };
+  if (rawValue === null || rawValue === "") return { ok: true, value: rawValue };
+
+  const type = fieldDef?.type || "text";
+
+  if (type === "boolean") {
+    if (typeof rawValue === "boolean") return { ok: true, value: rawValue };
+    const normalized = String(rawValue).trim().toLowerCase();
+    if (["true", "1", "yes"].includes(normalized)) return { ok: true, value: true };
+    if (["false", "0", "no"].includes(normalized)) return { ok: true, value: false };
+    return { ok: false, error: `Expected boolean for ${fieldDef?.label || fieldDef?.key}` };
+  }
+
+  if (type === "table") {
+    if (Array.isArray(rawValue)) return { ok: true, value: rawValue };
+    if (typeof rawValue === "string") {
+      try {
+        const parsed = JSON.parse(rawValue);
+        if (Array.isArray(parsed)) return { ok: true, value: parsed };
+      } catch {}
+    }
+    return { ok: false, error: `Expected JSON array for ${fieldDef?.label || fieldDef?.key}` };
+  }
+
+  if (type === "date") {
+    const date = new Date(rawValue);
+    if (Number.isNaN(date.getTime())) {
+      return { ok: false, error: `Expected a valid date for ${fieldDef?.label || fieldDef?.key}` };
+    }
+    return { ok: true, value: date.toISOString().slice(0, 10) };
+  }
+
+  if ((type === "file" || type === "symbol") && typeof rawValue === "object") {
+    return { ok: false, error: `Expected a file URL string for ${fieldDef?.label || fieldDef?.key}` };
+  }
+
+  if (Array.isArray(rawValue) || typeof rawValue === "object") {
+    return { ok: false, error: `Expected a primitive value for ${fieldDef?.label || fieldDef?.key}` };
+  }
+
+  return { ok: true, value: String(rawValue) };
+};
+
+const toDynamicStoredValue = (value) => {
+  if (value === null || value === undefined) return null;
+  if (Array.isArray(value) || typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
+
+async function getLatestCompanyPassports({ companyId, passportType }) {
+  const tableName = getTable(passportType);
+  const result = await pool.query(
+    `SELECT DISTINCT ON (guid) *
+     FROM ${tableName}
+     WHERE company_id = $1
+       AND deleted_at IS NULL
+     ORDER BY guid, version_number DESC, updated_at DESC`,
+    [companyId]
+  );
+  return result.rows.map((row) => {
+    const normalized = normalizePassportRow(row);
+    return {
+      ...normalized,
+      is_editable: isEditablePassportStatus(normalized.release_status),
+    };
+  });
+}
+
+async function fetchAssetSourceRecords(sourceConfig = {}) {
+  const url = String(sourceConfig.url || "").trim();
+  if (!url) throw new Error("Source URL is required");
+
+  const parsedUrl = new URL(url);
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Only HTTP(S) ERP/API endpoints are supported");
+  }
+
+  const method = String(sourceConfig.method || "GET").trim().toUpperCase();
+  const headers = normalizeAssetHeaders(sourceConfig.headers);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const requestInit = {
+      method,
+      headers,
+      signal: controller.signal,
+    };
+
+    if (!["GET", "HEAD"].includes(method) && sourceConfig.body !== undefined && sourceConfig.body !== "") {
+      if (typeof sourceConfig.body === "string") {
+        requestInit.body = sourceConfig.body;
+      } else {
+        requestInit.body = JSON.stringify(sourceConfig.body);
+        if (!requestInit.headers["Content-Type"] && !requestInit.headers["content-type"]) {
+          requestInit.headers["Content-Type"] = "application/json";
+        }
+      }
+    }
+
+    const response = await fetch(parsedUrl, requestInit);
+    const text = await response.text();
+    let parsedPayload = text;
+    try { parsedPayload = text ? JSON.parse(text) : null; } catch {}
+
+    if (!response.ok) {
+      throw new Error(`ERP/API request failed (${response.status})`);
+    }
+
+    let extracted = sourceConfig.recordPath
+      ? getValueAtPath(parsedPayload, sourceConfig.recordPath)
+      : parsedPayload;
+
+    if (!Array.isArray(extracted) && isPlainObject(extracted)) {
+      extracted = extracted.items || extracted.records || extracted.rows || extracted.data;
+    }
+
+    if (!Array.isArray(extracted)) {
+      throw new Error("ERP/API source must resolve to an array of records");
+    }
+    if (extracted.length > 1000) {
+      throw new Error("ERP/API source returned more than 1000 records");
+    }
+
+    const fieldMap = isPlainObject(sourceConfig.fieldMap) ? sourceConfig.fieldMap : null;
+    const defaults = isPlainObject(sourceConfig.defaults) ? sourceConfig.defaults : {};
+    const records = extracted.map((item) => {
+      if (!isPlainObject(item)) return {};
+      if (!fieldMap) return { ...item, ...defaults };
+      return Object.entries(fieldMap).reduce((acc, [sourceKey, targetKey]) => {
+        if (!targetKey) return acc;
+        acc[String(targetKey)] = getValueAtPath(item, sourceKey);
+        return acc;
+      }, { ...defaults });
+    });
+
+    return {
+      count: records.length,
+      records,
+      sample: records.slice(0, 3),
+      endpoint: parsedUrl.toString(),
+      fetched_at: new Date().toISOString(),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function prepareAssetPayload({ companyId, passportType, records, options = {} }) {
+  if (!companyId) throw new Error("companyId is required");
+  if (!passportType) throw new Error("passport_type is required");
+  if (!Array.isArray(records) || !records.length) throw new Error("records array is required");
+  if (records.length > 1000) throw new Error("Max 1000 asset rows per request");
+
+  const typeSchema = await getPassportTypeSchema(passportType);
+  if (!typeSchema) throw new Error("Passport type not found");
+
+  const fieldMap = getAssetFieldMap(typeSchema);
+  const currentRows = await getLatestCompanyPassports({
+    companyId,
+    passportType: typeSchema.typeName,
+  });
+  const currentByGuid = new Map(currentRows.map((row) => [row.guid, row]));
+  const currentByProductId = new Map(
+    currentRows
+      .filter((row) => normalizeProductIdValue(row.product_id))
+      .map((row) => [normalizeProductIdValue(row.product_id), row])
+  );
+
+  const batchTargets = new Set();
+  const batchProductIds = new Map();
+  const generatedRecords = [];
+  const details = [];
+  const summary = {
+    total: records.length,
+    ready: 0,
+    ready_for_passport_update: 0,
+    ready_for_dynamic_push: 0,
+    skipped: 0,
+    failed: 0,
+  };
+
+  records.forEach((rawRecord, index) => {
+    if (!isPlainObject(rawRecord)) {
+      details.push({ row_index: index + 1, status: "failed", error: "Each asset row must be an object" });
+      summary.failed += 1;
+      return;
+    }
+
+    const matchGuid = String(rawRecord.match_guid || rawRecord.guid || "").trim();
+    const matchProductId = normalizeProductIdValue(
+      rawRecord.match_product_id !== undefined
+        ? rawRecord.match_product_id
+        : (!matchGuid ? rawRecord.product_id : "")
+    );
+
+    if (!matchGuid && !matchProductId) {
+      details.push({
+        row_index: index + 1,
+        status: "failed",
+        error: "Each asset row needs guid, match_guid, product_id, or match_product_id",
+      });
+      summary.failed += 1;
+      return;
+    }
+
+    const matchedRow = matchGuid
+      ? currentByGuid.get(matchGuid)
+      : currentByProductId.get(matchProductId);
+
+    if (!matchedRow) {
+      details.push({
+        row_index: index + 1,
+        guid: matchGuid || undefined,
+        product_id: matchProductId || undefined,
+        status: "skipped",
+        reason: "No matching passport was found",
+      });
+      summary.skipped += 1;
+      return;
+    }
+
+    if (batchTargets.has(matchedRow.guid)) {
+      details.push({
+        row_index: index + 1,
+        guid: matchedRow.guid,
+        status: "failed",
+        error: "This passport is targeted more than once in the same asset batch",
+      });
+      summary.failed += 1;
+      return;
+    }
+
+    const passportUpdate = {};
+    const dynamicValues = {};
+    const errors = [];
+    const nextProductIdProvided = rawRecord.next_product_id !== undefined;
+
+    Object.entries(rawRecord).forEach(([key, value]) => {
+      if (ASSET_MATCH_FIELDS.has(key)) return;
+
+      if (fieldMap.has(key)) {
+        if (key === "product_id" && !matchGuid && !nextProductIdProvided) return;
+        const coerced = coerceAssetFieldValue(fieldMap.get(key), value);
+        if (!coerced.ok) {
+          errors.push(coerced.error);
+          return;
+        }
+        passportUpdate[key] = coerced.value;
+        return;
+      }
+
+      errors.push(`Unknown field "${key}"`);
+    });
+
+    if (nextProductIdProvided) {
+      const normalizedNextProductId = normalizeProductIdValue(rawRecord.next_product_id);
+      if (!normalizedNextProductId) {
+        errors.push("next_product_id cannot be blank");
+      } else {
+        passportUpdate.product_id = normalizedNextProductId;
+      }
+    }
+
+    Object.keys(passportUpdate).forEach((key) => {
+      const fieldDef = fieldMap.get(key) || { key, type: "text" };
+      const nextComparable = comparableHistoryFieldValue(fieldDef, passportUpdate[key]);
+      const currentComparable = comparableHistoryFieldValue(fieldDef, matchedRow[key]);
+      if (nextComparable === currentComparable) {
+        delete passportUpdate[key];
+      }
+    });
+
+    const hasPassportUpdate = Object.keys(passportUpdate).length > 0;
+    const hasDynamicValues = Object.keys(dynamicValues).length > 0;
+
+    if (hasPassportUpdate && !matchedRow.is_editable) {
+      errors.push(`Passport is ${matchedRow.release_status} and can only receive dynamic pushes right now`);
+    }
+
+    if (passportUpdate.product_id !== undefined) {
+      const normalizedNextProductId = normalizeProductIdValue(passportUpdate.product_id);
+      if (!normalizedNextProductId) {
+        errors.push("product_id cannot be blank");
+      } else {
+        passportUpdate.product_id = normalizedNextProductId;
+        const duplicate = currentByProductId.get(normalizedNextProductId);
+        if (duplicate && duplicate.guid !== matchedRow.guid) {
+          errors.push(`Serial Number "${normalizedNextProductId}" already belongs to another passport`);
+        }
+        const reservedGuid = batchProductIds.get(normalizedNextProductId);
+        if (reservedGuid && reservedGuid !== matchedRow.guid) {
+          errors.push(`Serial Number "${normalizedNextProductId}" is assigned twice in this batch`);
+        } else {
+          batchProductIds.set(normalizedNextProductId, matchedRow.guid);
+        }
+      }
+    }
+
+    if (errors.length) {
+      details.push({
+        row_index: index + 1,
+        guid: matchedRow.guid,
+        product_id: matchedRow.product_id,
+        status: "failed",
+        error: errors.join("; "),
+      });
+      summary.failed += 1;
+      return;
+    }
+
+    if (!hasPassportUpdate && !hasDynamicValues) {
+      details.push({
+        row_index: index + 1,
+        guid: matchedRow.guid,
+        product_id: matchedRow.product_id,
+        status: "skipped",
+        reason: "No changes detected for this row",
+      });
+      summary.skipped += 1;
+      return;
+    }
+
+    batchTargets.add(matchedRow.guid);
+    generatedRecords.push({
+      row_index: index + 1,
+      matched_guid: matchedRow.guid,
+      matched_product_id: matchedRow.product_id,
+      matched_release_status: matchedRow.release_status,
+      is_editable: matchedRow.is_editable,
+      match: {
+        guid: matchGuid || null,
+        product_id: matchProductId || null,
+        matched_by: matchGuid ? "guid" : "product_id",
+      },
+      passport_update: passportUpdate,
+      dynamic_values: dynamicValues,
+    });
+
+    summary.ready += 1;
+    if (hasPassportUpdate) summary.ready_for_passport_update += 1;
+    if (hasDynamicValues) summary.ready_for_dynamic_push += 1;
+    details.push({
+      row_index: index + 1,
+      guid: matchedRow.guid,
+      product_id: matchedRow.product_id,
+      status: "ready",
+      passport_fields: Object.keys(passportUpdate),
+      dynamic_fields: Object.keys(dynamicValues),
+    });
+  });
+
+  return {
+    company_id: Number(companyId),
+    passport_type: typeSchema.typeName,
+    display_name: typeSchema.displayName,
+    generated_at: new Date().toISOString(),
+    fields: Array.from(fieldMap.values()),
+    summary,
+    details,
+    generated_payload: {
+      company_id: Number(companyId),
+      passport_type: typeSchema.typeName,
+      generated_at: new Date().toISOString(),
+      records: generatedRecords,
+    },
+  };
+}
+
+async function executeAssetPush({ companyId, generatedPayload, source = "asset_management" }) {
+  const passportType = generatedPayload?.passport_type;
+  const records = Array.isArray(generatedPayload?.records) ? generatedPayload.records : [];
+  if (!passportType) throw new Error("generated payload is missing passport_type");
+  if (!records.length) throw new Error("generated payload is empty");
+
+  const tableName = getTable(passportType);
+  const summary = {
+    processed: records.length,
+    passports_updated: 0,
+    dynamic_fields_pushed: 0,
+    skipped: 0,
+    failed: 0,
+  };
+  const details = [];
+
+  for (const item of records) {
+    const matchedGuid = String(item.matched_guid || "").trim();
+    const passportUpdate = isPlainObject(item.passport_update) ? { ...item.passport_update } : {};
+    const dynamicValues = isPlainObject(item.dynamic_values) ? { ...item.dynamic_values } : {};
+    const detail = {
+      row_index: item.row_index,
+      guid: matchedGuid || undefined,
+      passport_fields: Object.keys(passportUpdate),
+      dynamic_fields: Object.keys(dynamicValues),
+    };
+
+    try {
+      let updatedFields = [];
+      if (Object.keys(passportUpdate).length) {
+        const editable = await pool.query(
+          `SELECT id
+           FROM ${tableName}
+           WHERE guid = $1
+             AND company_id = $2
+             AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}
+             AND deleted_at IS NULL
+           ORDER BY version_number DESC
+           LIMIT 1`,
+          [matchedGuid, companyId]
+        );
+
+        if (!editable.rows.length) {
+          if (!Object.keys(dynamicValues).length) {
+            summary.skipped += 1;
+            details.push({ ...detail, status: "skipped", reason: "Passport is no longer editable" });
+            continue;
+          }
+          detail.passport_status = "skipped";
+          detail.passport_reason = "Passport is no longer editable";
+        } else {
+          if (passportUpdate.product_id !== undefined) {
+            const duplicate = await findExistingPassportByProductId({
+              tableName,
+              companyId,
+              productId: normalizeProductIdValue(passportUpdate.product_id),
+              excludeGuid: matchedGuid,
+            });
+            if (duplicate) {
+              throw new Error(`Serial Number "${passportUpdate.product_id}" already belongs to another passport`);
+            }
+          }
+
+          updatedFields = await updatePassportRowById({
+            tableName,
+            rowId: editable.rows[0].id,
+            userId: null,
+            data: passportUpdate,
+          });
+
+          if (updatedFields.length) {
+            await logAudit(
+              companyId,
+              null,
+              "ASSET_UPDATE",
+              tableName,
+              matchedGuid,
+              null,
+              { source, fields_updated: updatedFields }
+            );
+            summary.passports_updated += 1;
+            detail.passport_status = "updated";
+          } else {
+            detail.passport_status = "skipped";
+            detail.passport_reason = "No passport field changes detected";
+          }
+        }
+      }
+
+      const dynamicEntries = Object.entries(dynamicValues).filter(([fieldKey]) =>
+        /^[a-z][a-z0-9_]{0,99}$/.test(fieldKey)
+      );
+
+      if (dynamicEntries.length) {
+        for (const [fieldKey, value] of dynamicEntries) {
+          await pool.query(
+            `INSERT INTO passport_dynamic_values (passport_guid, field_key, value, updated_at)
+             VALUES ($1, $2, $3, NOW())`,
+            [matchedGuid, fieldKey, toDynamicStoredValue(value)]
+          );
+        }
+        await logAudit(
+          companyId,
+          null,
+          "ASSET_DYNAMIC_PUSH",
+          "passport_dynamic_values",
+          matchedGuid,
+          null,
+          { source, fields_updated: dynamicEntries.map(([fieldKey]) => fieldKey) }
+        );
+        summary.dynamic_fields_pushed += dynamicEntries.length;
+        detail.dynamic_status = "pushed";
+      }
+
+      if (!updatedFields.length && !dynamicEntries.length) {
+        summary.skipped += 1;
+        details.push({ ...detail, status: "skipped", reason: "No actionable updates remained" });
+        continue;
+      }
+
+      details.push({
+        ...detail,
+        status: detail.passport_status === "skipped" ? "partial" : "updated",
+      });
+    } catch (error) {
+      summary.failed += 1;
+      details.push({
+        ...detail,
+        status: "failed",
+        error: error.message,
+      });
+    }
+  }
+
+  return { summary, details };
+}
+
+async function recordAssetRun({
+  jobId = null,
+  companyId,
+  passportType,
+  triggerType,
+  sourceKind,
+  status,
+  summary,
+  requestJson,
+  generatedJson,
+}) {
+  const inserted = await pool.query(
+    `INSERT INTO asset_management_runs
+       (job_id, company_id, passport_type, trigger_type, source_kind, status, summary_json, request_json, generated_json)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     RETURNING id, created_at`,
+    [
+      jobId,
+      companyId,
+      passportType || null,
+      triggerType,
+      sourceKind || null,
+      status,
+      summary ? JSON.stringify(summary) : null,
+      requestJson ? JSON.stringify(requestJson) : null,
+      generatedJson ? JSON.stringify(generatedJson) : null,
+    ]
+  );
+  return inserted.rows[0];
+}
+
+const resolveAssetJobNextRunAt = ({ startAt, intervalMinutes, from = new Date() }) => {
+  if (!startAt) return null;
+  const start = new Date(startAt);
+  if (Number.isNaN(start.getTime())) return null;
+  const interval = Number.parseInt(intervalMinutes, 10);
+  if (!Number.isFinite(interval) || interval <= 0) {
+    return start > from ? start : null;
+  }
+  let next = new Date(start);
+  while (next <= from) {
+    next = new Date(next.getTime() + interval * 60 * 1000);
+  }
+  return next;
+};
+
+async function resolveAssetJobRecords(job) {
+  if (job.source_kind === "api") {
+    const fetched = await fetchAssetSourceRecords(job.source_config || {});
+    return {
+      records: fetched.records,
+      sourceMeta: {
+        endpoint: fetched.endpoint,
+        fetched_at: fetched.fetched_at,
+        count: fetched.count,
+      },
+    };
+  }
+
+  return {
+    records: Array.isArray(job.records_json) ? job.records_json : [],
+    sourceMeta: {
+      stored_records: Array.isArray(job.records_json) ? job.records_json.length : 0,
+    },
+  };
+}
+
+let assetSchedulerHandle = null;
+let assetSchedulerBusy = false;
+
+async function runAssetManagementJob(job, triggerType = "manual") {
+  const options = isPlainObject(job.options_json) ? job.options_json : {};
+  try {
+    await assertAssetManagementEnabled(job.company_id);
+    const resolved = await resolveAssetJobRecords(job);
+    const prepared = await prepareAssetPayload({
+      companyId: job.company_id,
+      passportType: job.passport_type,
+      records: resolved.records,
+      options,
+    });
+    const pushResult = await executeAssetPush({
+      companyId: job.company_id,
+      generatedPayload: prepared.generated_payload,
+      source: `asset_job:${job.id || "manual"}`,
+    });
+
+    const status = pushResult.summary.failed
+      ? (pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed")
+      : "success";
+    const nextRunAt = job.is_active
+      ? resolveAssetJobNextRunAt({
+          startAt: job.start_at || prepared.generated_at,
+          intervalMinutes: job.interval_minutes,
+          from: new Date(),
+        })
+      : null;
+
+    if (job.id) {
+      await pool.query(
+        `UPDATE asset_management_jobs
+         SET last_run_at = NOW(),
+             last_status = $2,
+             last_summary = $3,
+             next_run_at = $4,
+             is_active = $5,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [
+          job.id,
+          status,
+          JSON.stringify(pushResult.summary),
+          nextRunAt,
+          nextRunAt ? true : false,
+        ]
+      );
+    }
+
+    const run = await recordAssetRun({
+      jobId: job.id || null,
+      companyId: job.company_id,
+      passportType: job.passport_type,
+      triggerType,
+      sourceKind: job.source_kind,
+      status,
+      summary: pushResult.summary,
+      requestJson: {
+        options,
+        sourceMeta: resolved.sourceMeta,
+      },
+      generatedJson: prepared.generated_payload,
+    });
+
+    return {
+      status,
+      run,
+      preview: prepared,
+      result: pushResult,
+    };
+  } catch (error) {
+    const nextRunAt = job.is_active
+      ? resolveAssetJobNextRunAt({
+          startAt: job.start_at || new Date(),
+          intervalMinutes: job.interval_minutes,
+          from: new Date(),
+        })
+      : null;
+
+    if (job.id) {
+      await pool.query(
+        `UPDATE asset_management_jobs
+         SET last_run_at = NOW(),
+             last_status = 'failed',
+             last_summary = $2,
+             next_run_at = $3,
+             is_active = $4,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [
+          job.id,
+          JSON.stringify({ error: error.message }),
+          nextRunAt,
+          nextRunAt ? true : false,
+        ]
+      );
+    }
+
+    const run = await recordAssetRun({
+      jobId: job.id || null,
+      companyId: job.company_id,
+      passportType: job.passport_type,
+      triggerType,
+      sourceKind: job.source_kind,
+      status: "failed",
+      summary: { error: error.message },
+      requestJson: { options },
+      generatedJson: null,
+    });
+
+    return {
+      status: "failed",
+      run,
+      error,
+    };
+  }
+}
+
+async function processDueAssetJobs() {
+  if (assetSchedulerBusy) return;
+  assetSchedulerBusy = true;
+  try {
+    const dueJobs = await pool.query(
+      `SELECT *
+       FROM asset_management_jobs
+       WHERE is_active = true
+         AND next_run_at IS NOT NULL
+         AND next_run_at <= NOW()
+       ORDER BY next_run_at ASC
+       LIMIT 10`
+    );
+
+    for (const job of dueJobs.rows) {
+      await runAssetManagementJob(job, "scheduled");
+    }
+  } catch (error) {
+    console.error("[AssetManagement] scheduler error:", error.message);
+  } finally {
+    assetSchedulerBusy = false;
+  }
+}
+
+function startAssetManagementScheduler() {
+  if (assetSchedulerHandle) return;
+  assetSchedulerHandle = setInterval(processDueAssetJobs, ASSET_SCHEDULER_INTERVAL_MS);
+  setTimeout(processDueAssetJobs, 5000);
+}
+
 const submitPassportToWorkflow = async ({
   companyId,
   guid,
@@ -2174,7 +3147,7 @@ app.get("/api/users/me", authenticateToken, async (req, res) => {
     const r = await pool.query(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.company_id, u.avatar_url, u.phone, u.job_title, u.bio,
               u.preferred_language, u.default_reviewer_id, u.default_approver_id, u.created_at, u.last_login_at,
-              u.two_factor_enabled, c.company_name
+              u.two_factor_enabled, c.company_name, c.asset_management_enabled
        FROM users u
        LEFT JOIN companies c ON c.id = u.company_id
        WHERE u.id = $1`,
@@ -2197,6 +3170,28 @@ app.post("/api/users/me/token", authenticateToken, async (req, res) => {
     res.json({ token: freshToken });
   } catch {
     res.status(500).json({ error: "Failed to issue bearer token" });
+  }
+});
+
+app.post("/api/companies/:companyId/asset-management/launch", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const company = await assertAssetManagementEnabled(companyId);
+    const launchToken = generateAssetLaunchToken({
+      companyId,
+      userId: req.user.userId,
+      role: req.user.role,
+    });
+    res.json({
+      launchToken,
+      company: {
+        id: company.id,
+        company_name: company.company_name,
+      },
+      assetUrl: `/asset-management?launchToken=${encodeURIComponent(launchToken)}`,
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message || "Failed to open Asset Management" });
   }
 });
 
@@ -2372,6 +3367,392 @@ app.get("/api/passport-types/:typeName", publicReadRateLimit, async (req, res) =
     if (!r.rows.length) return res.status(404).json({ error: "Passport type not found" });
     res.json(r.rows[0]);
   } catch (e) { res.status(500).json({ error: "Failed to fetch passport type" }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ASSET MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+app.use("/api/asset-management", requireAssetManagementKey, authenticateAssetPlatform);
+
+app.get("/api/asset-management/bootstrap", publicReadRateLimit, async (req, res) => {
+  try {
+    const companyId = Number.parseInt(req.assetContext.companyId, 10);
+    const company = await assertAssetManagementEnabled(companyId);
+
+    const types = await pool.query(
+      `SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.fields_json
+       FROM passport_types pt
+       JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
+       WHERE cpa.company_id = $1
+         AND pt.is_active = true
+       ORDER BY pt.umbrella_category NULLS FIRST, pt.display_name ASC`,
+      [companyId]
+    );
+
+    res.json({
+      company,
+      passport_types: types.rows,
+      erp_presets: ASSET_ERP_PRESETS,
+      security: {
+        asset_key_required: !!ASSET_SHARED_SECRET,
+        company_scoped: true,
+      },
+      assumptions: {
+        editable_statuses: ["draft", IN_REVISION_STATUS],
+        dynamic_pushes_do_not_change_passport_versions: true,
+      },
+    });
+  } catch (error) {
+    console.error("Asset bootstrap error:", error.message);
+    res.status(500).json({ error: "Failed to load Asset Management bootstrap data" });
+  }
+});
+
+app.get("/api/asset-management/passports", publicReadRateLimit, async (req, res) => {
+  try {
+    const companyId = Number.parseInt(req.assetContext.companyId, 10);
+    const requestedType = String(req.query.passportType || "").trim();
+    if (!requestedType) {
+      return res.status(400).json({ error: "passportType query param is required" });
+    }
+
+    const typeSchema = await getPassportTypeSchema(requestedType);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+
+    const rows = await getLatestCompanyPassports({
+      companyId,
+      passportType: typeSchema.typeName,
+    });
+
+    const fields = Array.from(getAssetFieldMap(typeSchema).values());
+    res.json({
+      company_id: companyId,
+      passport_type: typeSchema.typeName,
+      display_name: typeSchema.displayName,
+      fields,
+      passports: rows,
+      summary: {
+        total: rows.length,
+        editable: rows.filter((row) => row.is_editable).length,
+        released_or_locked: rows.filter((row) => !row.is_editable).length,
+      },
+    });
+  } catch (error) {
+    console.error("Asset passport load error:", error.message);
+    res.status(500).json({ error: "Failed to load passports for Asset Management" });
+  }
+});
+
+app.post("/api/asset-management/source/fetch", async (req, res) => {
+  try {
+    const sourceConfig = isPlainObject(req.body?.sourceConfig) ? req.body.sourceConfig : {};
+    const fetched = await fetchAssetSourceRecords(sourceConfig);
+    res.json(fetched);
+  } catch (error) {
+    console.error("Asset source fetch error:", error.message);
+    res.status(400).json({ error: error.message || "Failed to fetch ERP/API records" });
+  }
+});
+
+app.post("/api/asset-management/preview", async (req, res) => {
+  try {
+    const normalizedBody = normalizePassportRequestBody(req.body || {});
+    const payload = await prepareAssetPayload({
+      companyId: Number.parseInt(req.assetContext.companyId, 10),
+      passportType: normalizedBody.passport_type,
+      records: normalizedBody.records,
+      options: normalizedBody.options,
+    });
+    res.json(payload);
+  } catch (error) {
+    console.error("Asset preview error:", error.message);
+    res.status(400).json({ error: error.message || "Failed to generate asset JSON" });
+  }
+});
+
+app.post("/api/asset-management/push", async (req, res) => {
+  try {
+    const normalizedBody = normalizePassportRequestBody(req.body || {});
+    const companyId = Number.parseInt(req.assetContext.companyId, 10);
+
+    let preview;
+    if (normalizedBody.generated_payload?.passport_type) {
+      preview = {
+        generated_payload: normalizedBody.generated_payload,
+      };
+    } else {
+      preview = await prepareAssetPayload({
+        companyId,
+        passportType: normalizedBody.passport_type,
+        records: normalizedBody.records,
+        options: normalizedBody.options,
+      });
+    }
+
+    const pushResult = await executeAssetPush({
+      companyId,
+      generatedPayload: preview.generated_payload,
+    });
+    const status = pushResult.summary.failed
+      ? (pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed")
+      : "success";
+    const run = await recordAssetRun({
+      companyId,
+      passportType: preview.generated_payload.passport_type,
+      triggerType: "manual",
+      sourceKind: normalizedBody.sourceKind || "manual",
+      status,
+      summary: pushResult.summary,
+      requestJson: {
+        options: normalizedBody.options || {},
+      },
+      generatedJson: preview.generated_payload,
+    });
+
+    res.json({
+      status,
+      run,
+      summary: pushResult.summary,
+      details: pushResult.details,
+      generated_payload: preview.generated_payload,
+    });
+  } catch (error) {
+    console.error("Asset push error:", error.message);
+    res.status(400).json({ error: error.message || "Failed to push asset payload" });
+  }
+});
+
+app.get("/api/asset-management/jobs", publicReadRateLimit, async (req, res) => {
+  try {
+    const companyId = Number.parseInt(req.assetContext.companyId, 10);
+
+    const jobs = await pool.query(
+      `SELECT *
+       FROM asset_management_jobs
+       WHERE company_id = $1
+       ORDER BY updated_at DESC, created_at DESC
+       LIMIT 50`,
+      [companyId]
+    );
+
+    res.json({ jobs: jobs.rows });
+  } catch (error) {
+    console.error("Asset jobs load error:", error.message);
+    res.status(500).json({ error: "Failed to load asset jobs" });
+  }
+});
+
+app.post("/api/asset-management/jobs", async (req, res) => {
+  try {
+    const normalizedBody = normalizePassportRequestBody(req.body || {});
+    const companyId = Number.parseInt(req.assetContext.companyId, 10);
+    const passportType = String(normalizedBody.passport_type || "").trim();
+    const name = String(normalizedBody.name || "").trim();
+    const sourceKind = String(normalizedBody.sourceKind || "manual").trim().toLowerCase();
+    const sourceConfig = isPlainObject(normalizedBody.sourceConfig) ? normalizedBody.sourceConfig : {};
+    const records = Array.isArray(normalizedBody.records) ? normalizedBody.records : [];
+    const options = isPlainObject(normalizedBody.options) ? normalizedBody.options : {};
+    const startAt = normalizedBody.startAt ? new Date(normalizedBody.startAt) : null;
+    const intervalMinutes = normalizedBody.intervalMinutes === "" || normalizedBody.intervalMinutes === undefined
+      ? null
+      : Number.parseInt(normalizedBody.intervalMinutes, 10);
+    const isActive = normalizedBody.isActive !== false;
+
+    if (!passportType || !name) {
+      return res.status(400).json({ error: "passport_type and name are required" });
+    }
+
+    const typeSchema = await getPassportTypeSchema(passportType);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+
+    if (sourceKind !== "api" && !records.length) {
+      return res.status(400).json({ error: "records are required for non-API asset jobs" });
+    }
+    if (sourceKind === "api" && !String(sourceConfig.url || "").trim()) {
+      return res.status(400).json({ error: "sourceConfig.url is required for API asset jobs" });
+    }
+
+    if (records.length) {
+      await prepareAssetPayload({
+        companyId,
+        passportType: typeSchema.typeName,
+        records,
+        options,
+      });
+    }
+
+    const nextRunAt = isActive
+      ? resolveAssetJobNextRunAt({
+          startAt: startAt || new Date(),
+          intervalMinutes,
+          from: new Date(),
+        })
+      : null;
+
+    const inserted = await pool.query(
+      `INSERT INTO asset_management_jobs
+         (company_id, passport_type, name, source_kind, source_config, records_json, options_json, is_active, start_at, interval_minutes, next_run_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING *`,
+      [
+        companyId,
+        typeSchema.typeName,
+        name,
+        sourceKind,
+        JSON.stringify(sourceConfig),
+        JSON.stringify(records),
+        JSON.stringify(options),
+        !!(isActive && nextRunAt),
+        startAt,
+        Number.isFinite(intervalMinutes) ? intervalMinutes : null,
+        nextRunAt,
+      ]
+    );
+
+    res.status(201).json({ job: inserted.rows[0] });
+  } catch (error) {
+    console.error("Asset job create error:", error.message);
+    res.status(400).json({ error: error.message || "Failed to save asset job" });
+  }
+});
+
+app.patch("/api/asset-management/jobs/:jobId", async (req, res) => {
+  try {
+    const jobId = Number.parseInt(req.params.jobId, 10);
+    const companyId = Number.parseInt(req.assetContext.companyId, 10);
+    if (!Number.isFinite(jobId)) return res.status(400).json({ error: "jobId must be numeric" });
+
+    const existing = await pool.query("SELECT * FROM asset_management_jobs WHERE id = $1 AND company_id = $2", [jobId, companyId]);
+    if (!existing.rows.length) return res.status(404).json({ error: "Asset job not found" });
+
+    const current = existing.rows[0];
+    const normalizedBody = normalizePassportRequestBody(req.body || {});
+    const passportType = normalizedBody.passport_type || current.passport_type;
+    const typeSchema = await getPassportTypeSchema(passportType);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+
+    const sourceKind = normalizedBody.sourceKind || current.source_kind;
+    const sourceConfig = normalizedBody.sourceConfig !== undefined
+      ? (isPlainObject(normalizedBody.sourceConfig) ? normalizedBody.sourceConfig : {})
+      : (current.source_config || {});
+    const records = normalizedBody.records !== undefined
+      ? (Array.isArray(normalizedBody.records) ? normalizedBody.records : [])
+      : (Array.isArray(current.records_json) ? current.records_json : []);
+    const options = normalizedBody.options !== undefined
+      ? (isPlainObject(normalizedBody.options) ? normalizedBody.options : {})
+      : (isPlainObject(current.options_json) ? current.options_json : {});
+    const startAt = normalizedBody.startAt !== undefined
+      ? (normalizedBody.startAt ? new Date(normalizedBody.startAt) : null)
+      : current.start_at;
+    const intervalMinutes = normalizedBody.intervalMinutes !== undefined
+      ? (normalizedBody.intervalMinutes === "" ? null : Number.parseInt(normalizedBody.intervalMinutes, 10))
+      : current.interval_minutes;
+    const isActive = normalizedBody.isActive !== undefined ? normalizedBody.isActive !== false : current.is_active;
+    const name = normalizedBody.name !== undefined ? String(normalizedBody.name || "").trim() : current.name;
+
+    if (!name) return res.status(400).json({ error: "Job name cannot be blank" });
+    if (sourceKind !== "api" && !records.length) {
+      return res.status(400).json({ error: "records are required for non-API asset jobs" });
+    }
+    if (sourceKind === "api" && !String(sourceConfig.url || "").trim()) {
+      return res.status(400).json({ error: "sourceConfig.url is required for API asset jobs" });
+    }
+
+    if (records.length) {
+      await prepareAssetPayload({
+        companyId,
+        passportType: typeSchema.typeName,
+        records,
+        options,
+      });
+    }
+
+    const nextRunAt = isActive
+      ? resolveAssetJobNextRunAt({
+          startAt: startAt || new Date(),
+          intervalMinutes,
+          from: new Date(),
+        })
+      : null;
+
+    const updated = await pool.query(
+      `UPDATE asset_management_jobs
+       SET passport_type = $2,
+           name = $3,
+           source_kind = $4,
+           source_config = $5,
+           records_json = $6,
+           options_json = $7,
+           is_active = $8,
+           start_at = $9,
+           interval_minutes = $10,
+           next_run_at = $11,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [
+        jobId,
+        typeSchema.typeName,
+        name,
+        sourceKind,
+        JSON.stringify(sourceConfig),
+        JSON.stringify(records),
+        JSON.stringify(options),
+        !!(isActive && nextRunAt),
+        startAt,
+        Number.isFinite(intervalMinutes) ? intervalMinutes : null,
+        nextRunAt,
+      ]
+    );
+
+    res.json({ job: updated.rows[0] });
+  } catch (error) {
+    console.error("Asset job update error:", error.message);
+    res.status(400).json({ error: error.message || "Failed to update asset job" });
+  }
+});
+
+app.post("/api/asset-management/jobs/:jobId/run", async (req, res) => {
+  try {
+    const jobId = Number.parseInt(req.params.jobId, 10);
+    const companyId = Number.parseInt(req.assetContext.companyId, 10);
+    if (!Number.isFinite(jobId)) return res.status(400).json({ error: "jobId must be numeric" });
+
+    const job = await pool.query("SELECT * FROM asset_management_jobs WHERE id = $1 AND company_id = $2", [jobId, companyId]);
+    if (!job.rows.length) return res.status(404).json({ error: "Asset job not found" });
+
+    const result = await runAssetManagementJob(job.rows[0], "manual_job_run");
+    if (result.error) {
+      return res.status(400).json({ error: result.error.message, run: result.run });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Asset job run error:", error.message);
+    res.status(400).json({ error: error.message || "Failed to run asset job" });
+  }
+});
+
+app.get("/api/asset-management/runs", publicReadRateLimit, async (req, res) => {
+  try {
+    const companyId = Number.parseInt(req.assetContext.companyId, 10);
+    const limit = Math.min(Number.parseInt(req.query.limit, 10) || 25, 100);
+
+    const runs = await pool.query(
+      `SELECT *
+       FROM asset_management_runs
+       WHERE company_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [companyId, limit]
+    );
+
+    res.json({ runs: runs.rows });
+  } catch (error) {
+    console.error("Asset run load error:", error.message);
+    res.status(500).json({ error: "Failed to load asset run history" });
+  }
 });
 
 // PATCH passport type metadata (super admin only)
@@ -2711,6 +4092,53 @@ app.get("/api/admin/companies", authenticateToken, isSuperAdmin, async (req, res
     `);
     res.json(r.rows);
   } catch (e) { res.status(500).json({ error: "Failed to fetch companies" }); }
+});
+
+app.patch("/api/admin/companies/:companyId/asset-management", authenticateToken, isSuperAdmin, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { enabled } = req.body || {};
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "enabled must be true or false" });
+    }
+
+    const updated = await pool.query(
+      `UPDATE companies
+       SET asset_management_enabled = $1,
+           asset_management_revoked_at = CASE WHEN $1 THEN NULL ELSE NOW() END,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, company_name, asset_management_enabled, asset_management_revoked_at`,
+      [enabled, companyId]
+    );
+    if (!updated.rows.length) return res.status(404).json({ error: "Company not found" });
+
+    await logAudit(
+      null,
+      req.user.userId,
+      enabled ? "ENABLE_ASSET_MANAGEMENT" : "REVOKE_ASSET_MANAGEMENT",
+      "companies",
+      companyId,
+      null,
+      { asset_management_enabled: enabled }
+    );
+
+    if (!enabled) {
+      await pool.query(
+        `UPDATE asset_management_jobs
+         SET is_active = false,
+             next_run_at = NULL,
+             updated_at = NOW()
+         WHERE company_id = $1`,
+        [companyId]
+      );
+    }
+
+    res.json({ success: true, company: updated.rows[0] });
+  } catch (e) {
+    console.error("Asset management toggle error:", e.message);
+    res.status(500).json({ error: "Failed to update Asset Management access" });
+  }
 });
 
 app.get("/api/admin/super-admins", authenticateToken, isSuperAdmin, async (req, res) => {

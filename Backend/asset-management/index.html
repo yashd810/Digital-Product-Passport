@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Asset Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script>
+      (function() {
+        var saved = localStorage.getItem("theme");
+        if (saved === "light") document.documentElement.setAttribute("data-theme", "light");
+        else if (!saved && window.matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.setAttribute("data-theme", "light");
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="asset-shell">
+
+      <!-- Hero -->
+      <header class="hero">
+        <div class="hero-content">
+          <div class="hero-top-bar">
+            <p class="eyebrow">Separate Operational Layer</p>
+            <button id="theme-toggle" class="theme-toggle-btn" type="button" aria-label="Toggle theme" title="Toggle theme"></button>
+          </div>
+          <h1>Asset Management</h1>
+          <span id="company-name" hidden>Not connected</span>
+          <p class="hero-copy">Stage bulk updates, validate field types, generate a JSON push package, and update many passports at once.</p>
+        </div>
+      </header>
+
+      <main class="layout">
+
+        <!-- Workspace -->
+        <section class="panel controls-panel">
+          <div class="panel-head"><div><h2>Workspace</h2><p>Pick a company and passport type, then load or ingest asset rows.</p></div></div>
+          <div class="control-grid">
+            <label><span>Company</span>
+              <div class="inline-field">
+                <input id="company-name-input" type="text" placeholder="Filled from dashboard launch" />
+                <button id="connect-company" class="ghost-btn" type="button">Sync</button>
+              </div>
+            </label>
+            <label><span>Asset Key</span><input id="asset-key" type="password" placeholder="Optional shared secret" /></label>
+            <label><span>Passport Type</span><div id="passport-type" class="custom-select" data-placeholder="Select a passport type"></div></label>
+          </div>
+          <div class="toolbar">
+            <button id="load-passports" class="primary-btn" type="button">Load Current Passports</button>
+            <button id="add-row" class="ghost-btn" type="button">Add Blank Row</button>
+            <button id="export-csv" class="ghost-btn" type="button">Export CSV</button>
+            <button id="download-json" class="ghost-btn" type="button" disabled>Download Generated JSON</button>
+          </div>
+          <div id="workspace-summary" class="stat-row"></div>
+        </section>
+
+        <!-- Ingest -->
+        <section class="panel ingest-panel">
+          <div class="panel-head"><div><h2>Ingest</h2><p>Bring data in from a spreadsheet, raw JSON, or an ERP/API feed.</p></div></div>
+          <div class="ingest-grid">
+            <div class="ingest-card">
+              <h3>CSV Import</h3>
+              <p>Row-based headers: <code>guid</code>, <code>product_id</code>, or field keys.</p>
+              <input id="csv-file" type="file" accept=".csv,text/csv" />
+            </div>
+            <div class="ingest-card">
+              <h3>JSON Paste</h3>
+              <p>Array of objects or <code>{ records: [...] }</code>.</p>
+              <textarea id="json-paste" rows="6" placeholder='[{"guid":"...","model_name":"..."}]'></textarea>
+              <button id="apply-json" class="ghost-btn" type="button">Apply JSON</button>
+            </div>
+            <div class="ingest-card api-card">
+              <h3>ERP / API Feed</h3>
+              <div class="api-row">
+                <label><span>Preset</span><div id="erp-preset" class="custom-select" data-placeholder="Choose a preset"></div></label>
+                <label class="api-preset-action"><span>&nbsp;</span><button id="apply-preset" class="ghost-btn" type="button">Apply Preset</button></label>
+                <div class="preset-copy" id="preset-description">Select a preset to prefill mappings.</div>
+              </div>
+              <div class="api-row">
+                <label><span>URL</span><input id="api-url" type="url" placeholder="https://erp.example.com/api/passports" /></label>
+                <label><span>Method</span><div id="api-method" class="custom-select" data-placeholder="GET"></div></label>
+                <label><span>Record Path</span><input id="api-record-path" type="text" placeholder="data.items" /></label>
+              </div>
+              <label><span>Headers JSON</span><textarea id="api-headers" rows="3" placeholder='{"x-api-key":"demo"}'></textarea></label>
+              <label><span>Body JSON</span><textarea id="api-body" rows="3" placeholder='{"site":"north-warehouse"}'></textarea></label>
+              <label><span>Field Map JSON</span><textarea id="api-field-map" rows="3" placeholder='{"passportGuid":"guid","sku":"product_id"}'></textarea></label>
+              <button id="fetch-api" class="ghost-btn" type="button">Fetch ERP / API Records</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Asset Grid -->
+        <section class="panel grid-panel">
+          <div class="panel-head">
+            <div><h2>Asset Grid</h2><p>Edit rows like a spreadsheet. Keep <code>guid</code> for safe rematching.</p></div>
+            <div class="toolbar">
+              <button id="validate-preview" class="primary-btn" type="button">Validate &amp; Build JSON</button>
+              <button id="push-backend" class="warn-btn" type="button" disabled>Push to Backend</button>
+            </div>
+          </div>
+          <div class="grid-filter-bar">
+            <label><span>Search</span><input id="grid-search" type="text" placeholder="guid, product_id, or any value" /></label>
+            <label><span>Status</span><div id="grid-status-filter" class="custom-select" data-placeholder="All rows"></div></label>
+            <div class="field-filter-group">
+              <span>Fields</span>
+              <div id="grid-field-dropdown" class="field-filter-dropdown">
+                <button id="grid-field-toggle" class="field-filter-toggle" type="button" aria-haspopup="true" aria-expanded="false">Any field</button>
+                <div id="grid-field-filter" class="checkbox-dropdown-menu" hidden>
+                  <div class="checkbox-filter-empty">Load passports to choose columns.</div>
+                </div>
+              </div>
+            </div>
+            <label><span>Value</span><input id="grid-field-value" type="text" placeholder="Filter by value" /></label>
+            <div class="grid-filter-actions"><button id="clear-grid-filters" class="ghost-btn" type="button">Clear</button></div>
+          </div>
+          <div id="grid-filter-summary" class="grid-filter-summary"></div>
+          <div id="grid-wrap" class="grid-wrap"><div class="empty-state">Load a passport type to start editing.</div></div>
+        </section>
+
+        <!-- Preview & Schedule -->
+        <section class="panel preview-panel">
+          <div class="panel-head"><div><h2>Preview &amp; Schedule</h2><p>Nothing changes on passports until you push this package.</p></div></div>
+          <div id="preview-summary" class="stat-row"></div>
+          <div class="schedule-grid">
+            <label><span>Job Name</span><input id="job-name" type="text" placeholder="Nightly ERP sync" /></label>
+            <label><span>Start At</span><input id="job-start-at" type="datetime-local" /></label>
+            <label><span>Interval (min)</span><input id="job-interval" type="number" min="1" placeholder="60" /></label>
+            <label class="checkbox-field"><input id="job-active" type="checkbox" checked /><span>Activate after saving</span></label>
+          </div>
+          <div class="toolbar">
+            <button id="save-job" class="ghost-btn" type="button">Save Scheduled Job</button>
+            <button id="refresh-jobs" class="ghost-btn" type="button">Refresh Jobs &amp; Runs</button>
+          </div>
+          <div class="preview-columns">
+            <div class="preview-box"><h3>Generated JSON</h3><pre id="preview-json">{}</pre></div>
+            <div class="preview-box"><h3>Validation Details</h3><div id="validation-details" class="detail-list"></div></div>
+          </div>
+        </section>
+
+        <!-- Jobs & Runs -->
+        <section class="panel jobs-panel">
+          <div class="panel-head"><div><h2>Saved Jobs</h2><p>Run a saved feed or inspect schedules.</p></div></div>
+          <div id="jobs-list" class="stack-list"></div>
+        </section>
+        <section class="panel runs-panel">
+          <div class="panel-head"><div><h2>Recent Pushes</h2><p>Manual pushes and scheduled runs.</p></div></div>
+          <div id="runs-list" class="stack-list"></div>
+        </section>
+
+      </main>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
