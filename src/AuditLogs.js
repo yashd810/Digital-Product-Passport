@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { authHeaders } from "./authHeaders";
 
 function AuditLogs({ companyId }) {
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ function AuditLogs({ companyId }) {
       setError("");
       const r = await fetch(
         `${API_BASE_URL}/api/companies/${companyId}/audit-logs?limit=1000`,
-        { headers: { Authorization: "Bearer cookie-session" } }
+        { headers: authHeaders() }
       );
       if (!r.ok) throw new Error("Failed to fetch audit logs");
       setLogs(await r.json());
@@ -74,13 +75,12 @@ function AuditLogs({ companyId }) {
         return s.includes(",") || s.includes('"') || s.includes("\n")
           ? `"${s.replace(/"/g, '""')}"` : s;
       };
-      const headers = ["Timestamp", "User", "Action", "Table", "Passport GUID", "Record ID"];
+      const headers = ["Timestamp", "User", "Action", "Table", "Record ID"];
       const rows = filteredLogs.map(l => [
         new Date(l.created_at).toLocaleString(),
         l.user_email || "System",
         l.action,
         l.table_name || "",
-        l.passport_guid || "",
         l.record_id || "",
       ]);
       const csv = [headers, ...rows].map(r => r.map(escape).join(",")).join("\n");
@@ -237,8 +237,8 @@ function AuditLogs({ companyId }) {
                         <strong>{(log.action || "").toUpperCase()}</strong>
                       </span>
                       <span className="log-table">{log.table_name}</span>
-                      {log.passport_guid && (
-                        <span className="log-guid">{log.passport_guid.substring(0, 8)}…</span>
+                      {log.record_id && (
+                        <span className="log-guid">{log.record_id.substring(0, 8)}…</span>
                       )}
                     </div>
 
@@ -273,7 +273,7 @@ function AuditLogs({ companyId }) {
                           </div>
                           <div className="detail-item">
                             <span className="detail-label">Passport GUID</span>
-                            <span className="detail-value">{log.passport_guid || "—"}</span>
+                            <span className="detail-value">{log.record_id || "—"}</span>
                           </div>
                           <div className="detail-item">
                             <span className="detail-label">Timestamp</span>

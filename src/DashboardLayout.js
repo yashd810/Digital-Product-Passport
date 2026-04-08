@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import NotificationsPanel from "./NotificationsPanel";
 import { applyTheme, getStoredTheme } from "./ThemeContext";
 import { useI18n } from "./i18n";
+import { authHeaders } from "./authHeaders";
 import "./Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -12,6 +13,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
   const { t, lang, setLang } = useI18n();
   const [passportTypes, setPassportTypes] = useState([]);
   const [currentTheme,  setCurrentTheme]  = useState(() => getStoredTheme(user?.id));
+  const [msgUnread, setMsgUnread] = useState(0);
 
   useEffect(() => {
     // Apply stored theme on mount
@@ -23,9 +25,21 @@ function DashboardLayout({ user, companyId, onLogout }) {
   useEffect(() => {
     if (!companyId) { navigate("/login"); return; }
     fetch(`${API}/api/companies/${companyId}/passport-types`,
-      { headers: { Authorization: "Bearer cookie-session" } })
+      { headers: authHeaders() })
       .then(r => r.json()).then(setPassportTypes).catch(() => {});
   }, [companyId]);
+
+  useEffect(() => {
+    const fetchMsgUnread = () => {
+      fetch(`${API}/api/messaging/unread`, { headers: authHeaders() })
+        .then(r => r.ok ? r.json() : { count: 0 })
+        .then(d => setMsgUnread(d.count || 0))
+        .catch(() => {});
+    };
+    fetchMsgUnread();
+    const iv = setInterval(fetchMsgUnread, 15000);
+    return () => clearInterval(iv);
+  }, []);
 
   const handleLogout = async () => {
     await onLogout?.();
@@ -117,6 +131,12 @@ function DashboardLayout({ user, companyId, onLogout }) {
             </div>
 
             <nav className="sidebar-nav">
+              {isEditor && (
+                <NavLink to="/dashboard/create" className={({isActive})=>`sidebar-link sidebar-create-btn${isActive?" active":""}`}>
+                  + Create Passport
+                </NavLink>
+              )}
+
               <p className="sidebar-section-label">Analytics</p>
               <NavLink to="/dashboard/overview" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
@@ -158,6 +178,9 @@ function DashboardLayout({ user, companyId, onLogout }) {
               <NavLink to="/dashboard/profile" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 {t("myProfile")}
               </NavLink>
+              <NavLink to="/dashboard/security" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                🔐 Security
+              </NavLink>
               <NavLink to="/dashboard/company-profile" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 🏢 Company Profile
               </NavLink>
@@ -170,10 +193,33 @@ function DashboardLayout({ user, companyId, onLogout }) {
               <NavLink to="/dashboard/repository" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 🗂️ Repository
               </NavLink>
+              <NavLink to="/dashboard/templates" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                📋 Templates
+              </NavLink>
+
+              <NavLink to="/dashboard/messages" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  💬 Messages
+                  {msgUnread > 0 && (
+                    <span style={{
+                      background: "var(--mint)", color: "#0b1826", fontSize: 10,
+                      fontWeight: 700, borderRadius: 10, padding: "1px 6px", minWidth: 16, textAlign: "center"
+                    }}>{msgUnread}</span>
+                  )}
+                </span>
+              </NavLink>
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Audit</p>
+              <NavLink to="/dashboard/notifications" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                🔔 Notifications
+              </NavLink>
               <NavLink to="/dashboard/audit-logs" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📋 {t("auditLogs")}
+              </NavLink>
+
+              <p className="sidebar-section-label sidebar-section-label-spaced">Help</p>
+              <NavLink to="/dashboard/manual" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                📘 Manual
               </NavLink>
             </nav>
           </aside>

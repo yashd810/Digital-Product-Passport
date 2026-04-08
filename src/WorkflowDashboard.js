@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "./tableControls";
 import { authHeaders } from "./authHeaders";
+import "./AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -289,6 +290,10 @@ function WorkflowDashboard({ user, companyId }) {
     { id:"backlog",    label:"My Backlog",    count: data.backlog.length },
     { id:"history",    label:"History",       count: data.history.length },
   ];
+  const openPublicPassport = (guid) => {
+    if (!guid) return;
+    window.open(`${window.location.origin}/p/${guid}`, "_blank", "noopener,noreferrer");
+  };
 
   const renderRow = (wf, showActions) => {
     const needsMyReview    = showActions && wf.reviewer_id === user?.id && wf.review_status === "pending";
@@ -297,7 +302,7 @@ function WorkflowDashboard({ user, companyId }) {
       <tr key={wf.id}>
         <td>
           <button className="model-link-btn"
-            onClick={() => navigate(`/passport/${wf.passport_guid}/introduction`)}>
+            onClick={() => openPublicPassport(wf.passport_guid)}>
             {wf.model_name}
           </button>
           <div className="workflow-meta-copy">

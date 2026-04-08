@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { authHeaders } from "./authHeaders";
 import "./Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -29,315 +30,402 @@ function parseCsvText(text) {
   return text.split("\n").map(l => l.trim()).filter(Boolean).map(parseCsvRow);
 }
 
-function CSVImportGuide({ token, user, companyId }) {
-  const navigate = useNavigate();
-  const { passportType } = useParams();
-  const fileInputRef = useRef(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+function ResultSummary({ summary, details, onDone }) {
+  const [showDetails, setShowDetails] = useState(false);
+  return (
+    <div className="upsert-result">
+      <div className="upsert-summary-row">
+        {summary.created > 0 && <div className="upsert-stat upsert-created"><span className="upsert-num">{summary.created}</span><span>created</span></div>}
+        {summary.updated > 0 && <div className="upsert-stat upsert-updated"><span className="upsert-num">{summary.updated}</span><span>updated</span></div>}
+        {summary.skipped > 0 && <div className="upsert-stat upsert-skipped"><span className="upsert-num">{summary.skipped}</span><span>skipped</span></div>}
+        {summary.failed  > 0 && <div className="upsert-stat upsert-failed"><span className="upsert-num">{summary.failed}</span><span>failed</span></div>}
+      </div>
+      {details?.length > 0 && (
+        <button className="upsert-detail-toggle" onClick={() => setShowDetails(s => !s)}>
+          {showDetails ? "Hide details ▲" : "Show details ▼"}
+        </button>
+      )}
+      {showDetails && (
+        <div className="upsert-detail-list">
+          {details.map((d, i) => (
+            <div key={i} className={`upsert-detail-row upsert-detail-${d.status}`}>
+              <span className="upsert-detail-status">{d.status}</span>
+              <span className="upsert-detail-id">{d.product_id || d.guid || d.model_name || `#${i+1}`}</span>
+              {d.reason && <span className="upsert-detail-reason">— {d.reason}</span>}
+              {d.error  && <span className="upsert-detail-reason">— {d.error}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      <button className="action-btn download-btn" style={{ marginTop: 16 }} onClick={onDone}>
+        Done
+      </button>
+    </div>
+  );
+}
 
+function CSVImportGuide({ user, companyId }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { passportType } = useParams();
+
+  // mode=update comes from template card "Import CSV / JSON" button
+  const isUpdateMode = new URLSearchParams(location.search).get("mode") === "update";
+  const [tab, setTab] = useState(isUpdateMode ? "update-csv" : "create");
+
+  // ── Create tab state ──
+  const createFileRef = useRef(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [createSuccess, setCreateSuccess] = useState("");
+
+  // ── Update tab state ──
+  const updateCsvRef  = useRef(null);
+  const updateJsonRef = useRef(null);
+  const [isUpdating,   setIsUpdating]   = useState(false);
+  const [updateResult, setUpdateResult] = useState(null); // { summary, details }
+  const [updateError,  setUpdateError]  = useState("");
+
+  // ─────────────────────────────────────────────
+  // CREATE: existing CSV import logic (unchanged)
+  // ─────────────────────────────────────────────
   const handleDownloadTemplate = async () => {
     try {
       const response = await fetch(`${API}/api/passport-types/${passportType}`);
-      if (!response.ok) {
-        setError("Failed to fetch passport type definition");
-        return;
-      }
-
+      if (!response.ok) { setCreateError("Failed to fetch passport type definition"); return; }
       const passportTypeData = await response.json();
       const sections = passportTypeData.fields_json?.sections || [];
-
       const csvRows = [];
       csvRows.push(["Field Name", "Passport 1", "Passport 2", "Passport 3"]);
-      csvRows.push(["model_name", "", "", ""]);
       csvRows.push(["product_id", "", "", ""]);
-
+      csvRows.push(["model_name", "", "", ""]);
       sections.forEach(section => {
-        if (section.fields && Array.isArray(section.fields)) {
-          section.fields.forEach(field => {
-            if (field.type !== "file" && field.type !== "table") {
-              csvRows.push([field.label, "", "", ""]);
-            }
-          });
-        }
+        (section.fields || []).forEach(field => {
+          if (field.type !== "file" && field.type !== "table") {
+            csvRows.push([field.label, "", "", ""]);
+          }
+        });
       });
-
       const csvContent = csvRows.map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `${passportType}_template.csv`;
       link.click();
-    } catch (error) {
-      setError("Failed to download template");
-    }
+    } catch { setCreateError("Failed to download template"); }
   };
 
   const handleCSVImport = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     setIsImporting(true);
-    setError("");
+    setCreateError("");
     try {
       const typeResponse = await fetch(`${API}/api/passport-types/${passportType}`);
-      if (!typeResponse.ok) {
-        throw new Error("Failed to fetch passport type definition");
-      }
+      if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
       const passportTypeData = await typeResponse.json();
       const sections = passportTypeData.fields_json?.sections || [];
       const allFields = sections.flatMap(section => section.fields || []);
-
       const text = await file.text();
       const rows = parseCsvText(text);
-
       if (rows.length < 2) throw new Error("CSV must have at least a header row and one data row");
-
-      const createdPassports = [];
-
-      // CSV is column-oriented: rows[0] = headers (Field Name, Passport 1, Passport 2…)
-      // rows[1..] = one row per field; columns[1..] = one column per passport
-      // Only fields present in the CSV are set — missing fields are left empty (partial import supported)
-      const numPassports = rows[0].length - 1; // subtract the "Field Name" label column
+      const numPassports = rows[0].length - 1;
       const fieldRows = rows.slice(1);
-
+      const createdPassports = [];
       for (let colIdx = 1; colIdx <= numPassports; colIdx++) {
         const passportData = {};
         let hasData = false;
-
         fieldRows.forEach(row => {
           const rawLabel = row[0];
           if (!rawLabel || !rawLabel.trim()) return;
           const normalized = rawLabel.trim().toLowerCase();
-          const value = (row[colIdx] || "").trim(); // this passport's value for this field
-
+          const value = (row[colIdx] || "").trim();
           if (!value) return;
           hasData = true;
-
-          // Match by label (case-insensitive) first, then by field key, then system fields
           const field =
             allFields.find(f => f.label?.trim().toLowerCase() === normalized) ||
             allFields.find(f => f.key?.toLowerCase() === normalized) ||
             (normalized === "model_name" ? { key: "model_name", type: "text" } : null) ||
             (normalized === "product_id" ? { key: "product_id", type: "text" } : null);
-
           if (field) {
-            if (field.type === "boolean") {
-              passportData[field.key] = value.toLowerCase() === "true" || value === "1";
-            } else {
-              passportData[field.key] = value;
-            }
+            passportData[field.key] = field.type === "boolean"
+              ? (value.toLowerCase() === "true" || value === "1")
+              : value;
           }
         });
-
-        if (hasData && passportData.model_name) {
-          createdPassports.push(passportData);
-        }
+        if (hasData && passportData.product_id) createdPassports.push(passportData);
       }
-
       if (createdPassports.length > 0) {
         let successCount = 0;
         for (const passportData of createdPassports) {
           try {
             const response = await fetch(`${API}/api/companies/${companyId}/passports`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                passport_type: passportType,
-                ...passportData,
-              }),
+              headers: authHeaders({ "Content-Type": "application/json" }),
+              body: JSON.stringify({ passport_type: passportType, ...passportData }),
             });
-
-            if (response.ok) {
-              successCount++;
-            }
-          } catch (error) {
-          }
+            if (response.ok) successCount++;
+          } catch {}
         }
-
-        setSuccess(`Successfully created ${successCount} passport(s)!`);
-        setTimeout(() => {
-          navigate(`/dashboard/passports/${passportType}`);
-        }, 2000);
+        setCreateSuccess(`Successfully created ${successCount} passport(s)!`);
+        setTimeout(() => navigate(`/dashboard/passports/${passportType}`), 2000);
       } else {
-        setError("No valid passports found in CSV. Please check your CSV format.");
+        setCreateError("No valid passports found in CSV. Please check your CSV format.");
       }
     } catch (error) {
-      setError(`CSV import failed: ${error.message}`);
+      setCreateError(`CSV import failed: ${error.message}`);
     } finally {
       setIsImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (createFileRef.current) createFileRef.current.value = "";
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // UPDATE: upsert CSV
+  // ─────────────────────────────────────────────
+  const handleUpdateCSV = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    setIsUpdating(true);
+    setUpdateError("");
+    setUpdateResult(null);
+    try {
+      const csv = await file.text();
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/upsert-csv`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ passport_type: passportType, csv }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Import failed");
+      setUpdateResult(data);
+    } catch (e) {
+      setUpdateError(e.message);
+    } finally {
+      setIsUpdating(false);
+      if (updateCsvRef.current) updateCsvRef.current.value = "";
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // UPDATE: upsert JSON
+  // ─────────────────────────────────────────────
+  const handleUpdateJSON = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    setIsUpdating(true);
+    setUpdateError("");
+    setUpdateResult(null);
+    try {
+      const text = await file.text();
+      let passports;
+      try { passports = JSON.parse(text); } catch { throw new Error("Invalid JSON file"); }
+      if (!Array.isArray(passports)) throw new Error("JSON must be an array of passport objects");
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/upsert-json`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ passport_type: passportType, passports }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Import failed");
+      setUpdateResult(data);
+    } catch (e) {
+      setUpdateError(e.message);
+    } finally {
+      setIsUpdating(false);
+      if (updateJsonRef.current) updateJsonRef.current.value = "";
     }
   };
 
   return (
     <div className="csv-import-guide">
+      <button className="csv-back-btn" onClick={() => navigate(`/dashboard/passports/${passportType}`)}>
+        ← Back
+      </button>
+
       <div className="guide-container">
-        <button className="back-btn" onClick={() => navigate(`/dashboard/passports/${passportType}`)}>
-          ← Back
-        </button>
+        <h1>📊 Import / Update Passports — {passportType}</h1>
 
-        <h1>📊 Import Passports from CSV</h1>
-
-        <section className="guide-section">
-          <h2>Step 1: Download the Template</h2>
-          <p>
-            Start by downloading a blank CSV template specific to your <strong>{passportType}</strong> passport type. This
-            template includes all the available fields you can fill in.
-          </p>
-          <button className="action-btn download-btn" onClick={handleDownloadTemplate}>
-            📥 Download Template CSV
+        {/* Tab switcher */}
+        <div className="upsert-tabs">
+          <button className={`upsert-tab${tab === "create" ? " active" : ""}`} onClick={() => setTab("create")}>
+            ✨ Create new passports
           </button>
-        </section>
+          <button className={`upsert-tab${tab === "update-csv" ? " active" : ""}`} onClick={() => setTab("update-csv")}>
+            📝 Update existing (CSV)
+          </button>
+          <button className={`upsert-tab${tab === "update-json" ? " active" : ""}`} onClick={() => setTab("update-json")}>
+            🔧 Update existing (JSON)
+          </button>
+        </div>
 
-        <section className="guide-section">
-          <h2>Step 2: Fill in Your Passport Data</h2>
-          <p>
-            Open the downloaded CSV file in a spreadsheet application (Excel, Google Sheets, etc.) and fill in your passport
-            information. Here's what you need to know:
-          </p>
+        {/* ── CREATE TAB ── */}
+        {tab === "create" && (
+          <>
+            <section className="guide-section">
+              <h2>Step 1: Download the Template</h2>
+              <p>Start by downloading a blank CSV template specific to your <strong>{passportType}</strong> passport type.</p>
+              <button className="action-btn download-btn" onClick={handleDownloadTemplate}>
+                📥 Download Template CSV
+              </button>
+            </section>
 
-          <div className="subsection">
-            <h3>Required Fields</h3>
-            <ul>
-              <li>
-                <strong>model_name</strong> - The name/identifier of your passport (required for each row)
-              </li>
-              <li>
-                <strong>product_id</strong> - The product ID associated with this passport (optional)
-              </li>
-            </ul>
-          </div>
+            <section className="guide-section">
+              <h2>Step 2: Fill in Your Passport Data</h2>
+              <div className="subsection">
+                <h3>Required Fields</h3>
+                <ul>
+                  <li><strong>product_id</strong> — The unique serial number for the passport (required)</li>
+                  <li><strong>model_name</strong> — Display name or model label for the product (optional)</li>
+                </ul>
+              </div>
+              <div className="subsection">
+                <h3>Example Format</h3>
+                <table className="example-table">
+                  <thead><tr><th>Field Name</th><th>Passport 1</th><th>Passport 2</th></tr></thead>
+                  <tbody>
+                    <tr><td className="field-name">product_id</td><td>SKU-001</td><td>SKU-002</td></tr>
+                    <tr><td className="field-name">model_name</td><td>Model A</td><td>Model B</td></tr>
+                    <tr><td className="field-name">Category</td><td>Electronics</td><td>Textiles</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-          <div className="subsection">
-            <h3>Additional Fields</h3>
-            <p>
-              Fill in any of the additional fields provided in your template based on your passport type. Leave fields blank if
-              they don't apply — or remove those rows from the CSV entirely. Only fields you include with a value will be set;
-              all other fields remain empty on the created passport.
-            </p>
-          </div>
+            <section className="guide-section">
+              <h2>Step 3: Upload Your CSV</h2>
+              <div className="upload-section">
+                <label className={`upload-label ${isImporting ? "disabled" : ""}`}>
+                  {isImporting ? "⏳ Importing…" : "🗂️ Choose CSV File"}
+                  <input ref={createFileRef} type="file" accept=".csv"
+                    onChange={handleCSVImport} style={{ display: "none" }} disabled={isImporting} />
+                </label>
+              </div>
+              {createError   && <div className="alert alert-error">{createError}</div>}
+              {createSuccess && <div className="alert alert-success">{createSuccess}</div>}
+            </section>
 
-          <div className="subsection">
-            <h3>Example Format</h3>
-            <table className="example-table">
-              <thead>
-                <tr>
-                  <th>Field Name</th>
-                  <th>Passport 1</th>
-                  <th>Passport 2</th>
-                  <th>Passport 3</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="field-name">model_name</td>
-                  <td>Model A</td>
-                  <td>Model B</td>
-                  <td>Model C</td>
-                </tr>
-                <tr>
-                  <td className="field-name">product_id</td>
-                  <td>SKU-001</td>
-                  <td>SKU-002</td>
-                  <td>SKU-003</td>
-                </tr>
-                <tr>
-                  <td className="field-name">Category</td>
-                  <td>Electronics</td>
-                  <td>Electronics</td>
-                  <td>Textiles</td>
-                </tr>
-                <tr>
-                  <td className="field-name">Description</td>
-                  <td>High quality product</td>
-                  <td>Premium variant</td>
-                  <td>Natural fibers</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+            <section className="guide-section tips-section">
+              <h2>💡 Tips</h2>
+              <ul>
+                <li><strong>Serial Number drives uniqueness</strong> — use a stable unit identifier; model names can repeat</li>
+                <li><strong>Boolean fields:</strong> use "true"/"false" or "1"/"0"</li>
+                <li><strong>Save as CSV</strong>, not .xlsx or .xls</li>
+                <li><strong>Partial fields supported</strong> — missing cells stay empty</li>
+                <li><strong>File/PDF fields</strong> cannot be set via CSV — upload manually after</li>
+              </ul>
+            </section>
+          </>
+        )}
 
-        <section className="guide-section">
-          <h2>Step 3: Add Multiple Passports</h2>
-          <p>
-            To import multiple passports at once, simply add more columns to your CSV file. Each column (after "Field Name")
-            represents one passport:
-          </p>
-          <ul>
-            <li>Column A: Field names (stays the same)</li>
-            <li>Column B: First passport data</li>
-            <li>Column C: Second passport data</li>
-            <li>Column D: Third passport data</li>
-            <li>And so on...</li>
-          </ul>
-          <p>
-            <strong>Tip:</strong> You can add as many columns as needed. Each column with valid data will create a new passport.
-          </p>
-        </section>
+        {/* ── UPDATE CSV TAB ── */}
+        {tab === "update-csv" && (
+          <>
+            <section className="guide-section">
+              <h2>Update existing drafts via CSV</h2>
+              <p>
+                Export your drafts from the <strong>Templates</strong> page using <em>"Export drafts CSV"</em>.
+                The file includes a <code>guid</code> row — <strong>keep it</strong>. Fill in the non-model fields
+                in Excel or Google Sheets, then upload below.
+              </p>
+              <div className="upsert-info-box">
+                <strong>How it works:</strong>
+                <ul>
+                  <li>Row has a <code>guid</code> → the matching draft passport is <strong>updated</strong></li>
+                  <li>No <code>guid</code> but matching <code>product_id</code> on an editable passport → that passport is <strong>updated</strong></li>
+                  <li>New <code>product_id</code> with no <code>guid</code> → a <strong>new passport is created</strong></li>
+                  <li>If the matching passport is released or in review, the row is skipped so you can revise it first</li>
+                </ul>
+              </div>
+            </section>
 
-        <section className="guide-section">
-          <h2>Step 4: Upload Your CSV File</h2>
-          <p>Once you've filled in all your passport data, upload the CSV file below to create all passports at once.</p>
-
-          <div className="upload-section">
-            <label className={`upload-label ${isImporting ? "disabled" : ""}`}>
-              {isImporting ? "⏳ Importing passport data..." : "🗂️ Choose CSV File"}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleCSVImport}
-                style={{ display: "none" }}
-                disabled={isImporting}
+            {updateResult ? (
+              <ResultSummary
+                summary={updateResult.summary}
+                details={updateResult.details}
+                onDone={() => { setUpdateResult(null); navigate(`/dashboard/passports/${passportType}`); }}
               />
-            </label>
-          </div>
+            ) : (
+              <section className="guide-section">
+                <h2>Upload filled CSV</h2>
+                <div className="upload-section">
+                  <label className={`upload-label ${isUpdating ? "disabled" : ""}`}>
+                    {isUpdating ? "⏳ Importing…" : "🗂️ Choose CSV File"}
+                    <input ref={updateCsvRef} type="file" accept=".csv"
+                      onChange={handleUpdateCSV} style={{ display: "none" }} disabled={isUpdating} />
+                  </label>
+                </div>
+                {updateError && <div className="alert alert-error">{updateError}</div>}
+              </section>
+            )}
+          </>
+        )}
 
-          {error && <div className="alert alert-error">{error}</div>}
-          {success && <div className="alert alert-success">{success}</div>}
-        </section>
+        {/* ── UPDATE JSON TAB ── */}
+        {tab === "update-json" && (
+          <>
+            <section className="guide-section">
+              <h2>Update existing drafts via JSON</h2>
+              <p>
+                Export your drafts from the <strong>Templates</strong> page using <em>"Export drafts JSON"</em>.
+                Edit the file — change any field values you need. Upload below.
+              </p>
+              <div className="upsert-info-box">
+                <strong>JSON format — array of objects:</strong>
+                <pre className="upsert-code">{`[
+  {
+    "guid": "existing-passport-guid",
+    "product_id": "SKU-1001",
+    "model_name": "Unit A",
+    "serial_number": "SN-1001",
+    "manufacture_date": "2024-01-15"
+  },
+  {
+    "product_id": "SKU-1002",
+    "serial_number": "SN-1002"
+  }
+]`}</pre>
+                <ul>
+                  <li>Object has a <code>guid</code> → the matching draft is <strong>updated</strong></li>
+                  <li>No <code>guid</code> but matching <code>product_id</code> on an editable passport → that passport is <strong>updated</strong></li>
+                  <li>New <code>product_id</code> with no <code>guid</code> → a <strong>new passport is created</strong></li>
+                  <li>If the matching passport is released or in review, the object is skipped so you can revise it first</li>
+                  <li>Only include fields you want to change — unspecified fields are left as-is</li>
+                </ul>
+              </div>
+            </section>
 
-        <section className="guide-section tips-section">
-          <h2>💡 Tips for Success</h2>
-          <ul>
-            <li>
-              <strong>Use consistent formatting:</strong> Ensure all cells are properly filled and formatted consistently
-            </li>
-            <li>
-              <strong>Boolean fields:</strong> Use "true" or "false" (or "1" or "0") for yes/no fields
-            </li>
-            <li>
-              <strong>Save as CSV:</strong> Make sure your file is saved as .csv format, not .xlsx or .xls
-            </li>
-            <li>
-              <strong>Partial fields supported:</strong> You don't need to include all fields — only rows you provide (with a value) will be filled. The rest remain empty until you edit the passport.
-            </li>
-            <li>
-              <strong>Model Name required:</strong> Every passport must have a model_name - it cannot be empty
-            </li>
-            <li>
-              <strong>File uploads not supported:</strong> PDF fields cannot be uploaded via CSV. Upload those manually after
-              creating the passports
-            </li>
-            <li>
-              <strong>Special characters:</strong> If using special characters, make sure your file is UTF-8 encoded
-            </li>
-          </ul>
-        </section>
+            {updateResult ? (
+              <ResultSummary
+                summary={updateResult.summary}
+                details={updateResult.details}
+                onDone={() => { setUpdateResult(null); navigate(`/dashboard/passports/${passportType}`); }}
+              />
+            ) : (
+              <section className="guide-section">
+                <h2>Upload JSON file</h2>
+                <div className="upload-section">
+                  <label className={`upload-label ${isUpdating ? "disabled" : ""}`}>
+                    {isUpdating ? "⏳ Importing…" : "🗂️ Choose JSON File"}
+                    <input ref={updateJsonRef} type="file" accept=".json"
+                      onChange={handleUpdateJSON} style={{ display: "none" }} disabled={isUpdating} />
+                  </label>
+                </div>
+                {updateError && <div className="alert alert-error">{updateError}</div>}
+              </section>
+            )}
+          </>
+        )}
 
         <div className="action-buttons">
           <button className="cancel-btn" onClick={() => navigate(`/dashboard/passports/${passportType}`)}>
             ✕ Cancel
           </button>
-          <button className="action-btn download-btn" onClick={handleDownloadTemplate}>
-            📥 Download Template Again
-          </button>
+          {tab === "create" && (
+            <button className="action-btn download-btn" onClick={handleDownloadTemplate}>
+              📥 Download Template Again
+            </button>
+          )}
         </div>
       </div>
     </div>

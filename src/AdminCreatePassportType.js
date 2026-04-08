@@ -9,28 +9,15 @@ const TRANS_LANGS = LANGUAGES.filter(l => l.code !== "en");
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-// Auto-generate a safe slug from any label
-const slugWords = (str) =>
+// Auto-generate a safe slug from any label — uses full label to avoid collisions
+const toSlug = (str) =>
   str.trim().toLowerCase()
     .replace(/[^a-z0-9\s]+/g, "")
     .split(/\s+/)
-    .filter(Boolean);
+    .filter(Boolean)
+    .join("_");
 
-// Primary: 2 from front + 2 from back
-const toSlug = (str) => {
-  const w = slugWords(str);
-  if (w.length <= 4) return w.join("_");
-  return [w[0], w[1], w[w.length - 2], w[w.length - 1]].join("_");
-};
-
-// Fallback: 2 from front + 3 from back (used when primary produces a collision)
-const toSlugFallback = (str) => {
-  const w = slugWords(str);
-  if (w.length <= 5) return w.join("_");
-  return [w[0], w[1], w[w.length - 3], w[w.length - 2], w[w.length - 1]].join("_");
-};
-
-// Recalculate auto-generated keys; resolve collisions with fallback slug
+// Recalculate auto-generated keys
 const rekeySection = (sec) => ({
   ...sec,
   key: sec._keyManual ? sec.key : toSlug(sec.label),
@@ -38,8 +25,7 @@ const rekeySection = (sec) => ({
     const seen = new Set();
     return (sec.fields || []).map(f => {
       if (f._keyManual) { seen.add(f.key); return f; }
-      const primary  = toSlug(f.label);
-      const key      = seen.has(primary) ? toSlugFallback(f.label) : primary;
+      const key = toSlug(f.label);
       seen.add(key);
       return { ...f, key };
     });
@@ -66,27 +52,36 @@ const parseCSV = (text) => {
   const HEADER_WORDS = /^(field|label|name|section|column|col|header)$/i;
   const start = HEADER_WORDS.test(rows[0]?.[0] || "") ? 1 : 0;
 
+  const VALID_TYPES = new Set(["text","textarea","boolean","date","url","file","table","symbol"]);
+
   return rows.slice(start)
     .filter(r => r[0])                        // skip blank rows
-    .map(r => ({ fieldLabel: r[0], sectionLabel: r[1]?.trim() || "General" }));
+    .map(r => {
+      const rawType = r[2]?.trim().toLowerCase() || "";
+      return {
+        fieldLabel:   r[0],
+        sectionLabel: r[1]?.trim() || "General",
+        fieldType:    VALID_TYPES.has(rawType) ? rawType : "text",
+      };
+    });
 };
 
 // Build sections array from parsed CSV rows (preserves section order)
 const buildSectionsFromCSV = (rows) => {
-  const map = new Map();  // section label → [fields]
-  for (const { fieldLabel, sectionLabel } of rows) {
+  const map = new Map();  // section label → [{label, type}]
+  for (const { fieldLabel, sectionLabel, fieldType } of rows) {
     if (!map.has(sectionLabel)) map.set(sectionLabel, []);
-    map.get(sectionLabel).push(fieldLabel);
+    map.get(sectionLabel).push({ label: fieldLabel, type: fieldType });
   }
-  return [...map.entries()].map(([sectionLabel, fieldLabels]) => ({
+  return [...map.entries()].map(([sectionLabel, fields]) => ({
     _id:    Math.random().toString(36).slice(2),
     key:    toSlug(sectionLabel),
     label:  sectionLabel,
-    fields: fieldLabels.map(label => ({
+    fields: fields.map(({ label, type }) => ({
       _id:   Math.random().toString(36).slice(2),
       key:   toSlug(label),
       label,
-      type:  "text",
+      type,
     })),
   }));
 };
@@ -94,16 +89,19 @@ const buildSectionsFromCSV = (rows) => {
 // Generate a sample CSV template for download
 const downloadTemplate = () => {
   const csv = [
-    "Field Label,Section",
-    "Manufacturer,General",
-    "Model Number,General",
-    "Serial Number,General",
-    "Weight (kg),Technical Specifications",
-    "Dimensions,Technical Specifications",
-    "Material Composition,Technical Specifications",
-    "Recycled Content (%),Sustainability",
-    "Carbon Footprint,Sustainability",
-    "Compliance Certificate,Compliance Documents",
+    "Field Label,Section,Type",
+    "Manufacturer,General,text",
+    "Model Number,General,text",
+    "Serial Number,General,text",
+    "Weight (kg),Technical Specifications,text",
+    "Dimensions,Technical Specifications,text",
+    "Material Composition,Technical Specifications,textarea",
+    "Is Recyclable,Sustainability,boolean",
+    "Manufacture Date,General,date",
+    "Product URL,General,url",
+    "Recycled Content (%),Sustainability,text",
+    "Carbon Footprint,Sustainability,text",
+    "Compliance Certificate,Compliance Documents,file",
   ].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const a = document.createElement("a");
@@ -393,19 +391,26 @@ function AdminCreatePassportType() {
             updated.table_rows = 2;
             updated.table_cols = 2;
             updated.table_columns = ["Column 1", "Column 2"];
+            updated.table_default_rows = [];
           }
           // Switching AWAY from table: clear config
           if ("type" in patch && patch.type !== "table") {
             delete updated.table_rows;
             delete updated.table_cols;
             delete updated.table_columns;
+            delete updated.table_default_rows;
           }
-          // Cols count changed: resize column names array
+          // Cols count changed: resize column names array and default rows
           if ("table_cols" in patch) {
             const n = Math.max(1, parseInt(patch.table_cols) || 1);
             const existing = f.table_columns || [];
             updated.table_columns = Array.from({ length: n }, (_, i) => existing[i] || `Column ${i + 1}`);
             updated.table_cols = n;
+            // Resize existing default rows to match new column count
+            const existingDefaultRows = f.table_default_rows || [];
+            updated.table_default_rows = existingDefaultRows.map(row =>
+              Array.from({ length: n }, (_, i) => row[i] ?? "")
+            );
           }
           return updated;
         }),
@@ -422,6 +427,39 @@ function AdminCreatePassportType() {
         ),
       };
     }));
+
+  const moveFieldWithinSection = (sectionId, fieldId, direction) =>
+    setSections(s => s.map(sec => {
+      if (sec._id !== sectionId) return sec;
+      const index = sec.fields.findIndex(f => f._id === fieldId);
+      if (index < 0) return sec;
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= sec.fields.length) return sec;
+      const nextFields = [...sec.fields];
+      [nextFields[index], nextFields[targetIndex]] = [nextFields[targetIndex], nextFields[index]];
+      return { ...sec, fields: nextFields };
+    }));
+
+  const moveFieldToSection = (sourceSectionId, targetSectionId, fieldId) =>
+    setSections(currentSections => {
+      if (!targetSectionId || sourceSectionId === targetSectionId) return currentSections;
+
+      let fieldToMove = null;
+      const nextSections = currentSections.map(sec => {
+        if (sec._id !== sourceSectionId) return sec;
+        fieldToMove = sec.fields.find(f => f._id === fieldId) || null;
+        if (!fieldToMove) return sec;
+        return { ...sec, fields: sec.fields.filter(f => f._id !== fieldId) };
+      });
+
+      if (!fieldToMove) return currentSections;
+
+      return nextSections.map(sec =>
+        sec._id === targetSectionId
+          ? { ...sec, fields: [...sec.fields, fieldToMove] }
+          : sec
+      );
+    });
 
   // ── Submit ─────────────────────────────────────────────────
   const handleSubmit = async (e) => {
@@ -446,10 +484,10 @@ function AdminCreatePassportType() {
         window.scrollTo({ top: 0, behavior: "smooth" });
         return setError("Type name (slug) is required.");
       }
-      if (!/^[a-z][a-z0-9_]{1,29}$/.test(typeName)) {
+      if (!/^[a-z][a-z0-9_]{1,99}$/.test(typeName)) {
         setInvalidFields(["typeName"]);
         window.scrollTo({ top: 0, behavior: "smooth" });
-        return setError("Type name must be lowercase letters/numbers/underscores, 2–30 chars, starting with a letter.");
+        return setError("Type name must be lowercase letters/numbers/underscores, 2–100 chars, starting with a letter.");
       }
     }
 
@@ -470,9 +508,10 @@ function AdminCreatePassportType() {
           );
           if (Object.keys(fi18n).length > 0) base.label_i18n = fi18n;
           if (f.type === "table") {
-            base.table_rows    = f.table_rows    || 2;
-            base.table_cols    = f.table_cols    || 2;
-            base.table_columns = f.table_columns || ["Column 1", "Column 2"];
+            base.table_rows         = f.table_rows    || 2;
+            base.table_cols         = f.table_cols    || 2;
+            base.table_columns      = f.table_columns || ["Column 1", "Column 2"];
+            base.table_default_rows = f.table_default_rows || [];
           }
           if (f.dynamic)     base.dynamic     = true;
           if (f.composition) base.composition = true;
@@ -848,6 +887,47 @@ function AdminCreatePassportType() {
                         ))}
                       </select>
 
+                      <div className="acpt-field-actions">
+                        <button
+                          type="button"
+                          className="acpt-move-btn"
+                          onClick={() => { moveFieldWithinSection(section._id, field._id, "up"); setError(""); setInvalidFields([]); }}
+                          title="Move field up"
+                          disabled={fi === 0}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="acpt-move-btn"
+                          onClick={() => { moveFieldWithinSection(section._id, field._id, "down"); setError(""); setInvalidFields([]); }}
+                          title="Move field down"
+                          disabled={fi === section.fields.length - 1}
+                        >
+                          ↓
+                        </button>
+                        <select
+                          value={section._id}
+                          onChange={e => {
+                            const targetSectionId = e.target.value;
+                            if (targetSectionId !== section._id) {
+                              moveFieldToSection(section._id, targetSectionId, field._id);
+                              setError("");
+                              setInvalidFields([]);
+                            }
+                          }}
+                          className="acpt-move-select"
+                          title="Move field to another section"
+                          disabled={sections.length < 2}
+                        >
+                          {sections.map(sec => (
+                            <option key={sec._id} value={sec._id}>
+                              {sec.label?.trim() || "Untitled section"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <button type="button" className="acpt-remove-btn"
                         onClick={() => removeField(section._id, field._id)} title="Remove field">✕</button>
                     </div>
@@ -973,6 +1053,66 @@ function AdminCreatePassportType() {
                               }}
                             />
                           ))}
+                        </div>
+                        {/* Default rows editor */}
+                        <div className="acpt-table-default-rows">
+                          <div className="acpt-table-default-rows-header">
+                            <span className="acpt-table-colnames-label">Default rows (optional):</span>
+                            <span className="acpt-table-default-hint">Users will see these pre-filled and can add more rows.</span>
+                          </div>
+                          {(field.table_default_rows || []).length > 0 && (
+                            <table className="acpt-default-row-table">
+                              <thead>
+                                <tr>
+                                  {(field.table_columns || []).map((col, ci) => (
+                                    <th key={ci}>{col || `Column ${ci + 1}`}</th>
+                                  ))}
+                                  <th />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(field.table_default_rows || []).map((row, ri) => (
+                                  <tr key={ri}>
+                                    {Array.from({ length: field.table_cols || 2 }, (_, ci) => (
+                                      <td key={ci}>
+                                        <input
+                                          type="text"
+                                          value={row[ci] ?? ""}
+                                          placeholder="—"
+                                          className="acpt-table-col-input"
+                                          onChange={e => {
+                                            const rows = (field.table_default_rows || []).map(r => [...r]);
+                                            rows[ri][ci] = e.target.value;
+                                            updateField(section._id, field._id, { table_default_rows: rows });
+                                          }}
+                                        />
+                                      </td>
+                                    ))}
+                                    <td>
+                                      <button
+                                        type="button"
+                                        className="acpt-default-row-remove"
+                                        title="Remove row"
+                                        onClick={() => {
+                                          const rows = (field.table_default_rows || []).filter((_, i) => i !== ri);
+                                          updateField(section._id, field._id, { table_default_rows: rows });
+                                        }}
+                                      >✕</button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                          <button
+                            type="button"
+                            className="acpt-add-default-row-btn"
+                            onClick={() => {
+                              const cols = field.table_cols || 2;
+                              const rows = [...(field.table_default_rows || []), Array(cols).fill("")];
+                              updateField(section._id, field._id, { table_default_rows: rows });
+                            }}
+                          >+ Add Default Row</button>
                         </div>
                       </div>
                     )}

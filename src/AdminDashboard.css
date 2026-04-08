@@ -1666,6 +1666,56 @@
 }
 .acpt-type-select:focus { border-color: var(--jet); }
 
+.acpt-field-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.acpt-move-btn {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background .15s, border-color .15s, color .15s, opacity .15s;
+}
+
+.acpt-move-btn:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.acpt-move-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.acpt-move-select {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: var(--charcoal);
+  outline: none;
+  background: #fff;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.acpt-move-select:focus {
+  border-color: var(--jet);
+}
+
 .acpt-add-field-btn {
   margin-top: 6px;
   background: #f0fdf4;
@@ -2093,6 +2143,84 @@
   background: #ffffff;
   color: var(--onyx);
   border-color: rgba(28,55,56,0.18);
+}
+
+.acpt-table-default-rows {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.acpt-table-default-rows-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.acpt-table-default-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.acpt-default-row-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.acpt-default-row-table th {
+  padding: 4px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.acpt-default-row-table td {
+  padding: 2px 4px;
+}
+
+.acpt-default-row-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.acpt-default-row-remove:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.acpt-add-default-row-btn {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.acpt-add-default-row-btn:hover {
+  background: rgba(13, 181, 176, 0.07);
+  border-color: var(--accent);
+}
+
+[data-theme="light"] .acpt-table-default-rows {
+  border-top-color: rgba(28,55,56,0.15);
+}
+
+[data-theme="light"] .acpt-add-default-row-btn {
+  border-color: rgba(13,181,176,0.4);
 }
 
 /* ── Actions row ─────────────────────────────────────────── */

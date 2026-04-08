@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "./tableControls";
+import { authHeaders } from "./authHeaders";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -48,19 +49,19 @@ function ManageTeam({ user, companyId }) {
     setSortConfig(nextDirection ? { key, direction: nextDirection } : { key: "", direction: "" });
   };
 
-  useEffect(() => { fetchMembers(); }, []);
+  useEffect(() => { if (companyId) fetchMembers(); }, [companyId]);
 
   const fetchMembers = async () => {
     setLoading(true);
     try {
       const r = await fetch(`${API}/api/companies/${companyId}/users`, {
-        headers: { Authorization: "Bearer cookie-session" },
+        headers: { ...authHeaders() },
       });
       if (!r.ok) throw new Error();
       const data = await r.json();
-      setMembers(data.filter(u => u.is_active !== false));
-      setPending(data.filter(u => u.is_pending));
-    } catch { }
+      setMembers(data.filter(u => u.is_active === true));
+      setPending(data.filter(u => u.is_active === false));
+    } catch (e) { console.error("Failed to load team members:", e); }
     finally { setLoading(false); }
   };
 
@@ -87,7 +88,7 @@ function ManageTeam({ user, companyId }) {
     try {
       const r = await fetch(`${API}/api/companies/${companyId}/invite`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer cookie-session" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ inviteeEmail: inviteEmail.trim(), roleToAssign: roleToSend }),
       });
       const d = await r.json();
@@ -106,7 +107,7 @@ function ManageTeam({ user, companyId }) {
     try {
       const r = await fetch(`${API}/api/companies/${companyId}/users/${userId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer cookie-session" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ role: editRole }),
       });
       if (!r.ok) throw new Error();
@@ -124,7 +125,7 @@ function ManageTeam({ user, companyId }) {
     try {
       const r = await fetch(`${API}/api/companies/${companyId}/users/${userId}/deactivate`, {
         method: "PATCH",
-        headers: { Authorization: "Bearer cookie-session" },
+        headers: { ...authHeaders() },
       });
       if (!r.ok) throw new Error();
       flash("success", "User deactivated");

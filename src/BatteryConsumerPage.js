@@ -58,7 +58,7 @@ function BatteryConsumerPage({ passport, company, typeDef, dynamicValues = {} })
           <div className="cp-hero-icon">{theme.icon}</div>
           <div className="cp-hero-type">{theme.headline}</div>
           <h1 className="cp-product-name">{passport.model_name}</h1>
-          {passport.product_id && <div className="cp-pid">Product ID: {passport.product_id}</div>}
+          {passport.product_id && <div className="cp-pid">Serial Number: {passport.product_id}</div>}
           {passport.release_status === "released" && (
             <div className="cp-verified"><span>✅</span> Verified Product Passport</div>
           )}
@@ -91,6 +91,10 @@ function BatteryConsumerPage({ passport, company, typeDef, dynamicValues = {} })
 
       {/* ── Body: 3 cards ── */}
       <div className="cp-body">
+        {company?.introduction_text && (
+          <div className="cp-intro-text"><p>{company.introduction_text}</p></div>
+        )}
+
         <div className="cp-cards-row">
 
           {/* Card 1 — Battery Information */}
@@ -151,7 +155,7 @@ function BatteryConsumerPage({ passport, company, typeDef, dynamicValues = {} })
         </div>
 
         <div className="cp-cta">
-          <a href={`/passport/${guid}/introduction`} className="cp-cta-btn">
+          <a href={`/passport/${guid}`} className="cp-cta-btn">
             View Full Technical Passport →
           </a>
         </div>

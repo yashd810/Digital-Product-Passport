@@ -70,6 +70,10 @@ function AdminLayout({ user, onLogout }) {
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           👤 My Profile
         </NavLink>
+        <NavLink to="/admin/manual"
+          className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
+          📘 Manual
+        </NavLink>
       </nav>
 
       {/* ── Child page ── */}

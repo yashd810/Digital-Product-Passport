@@ -34,7 +34,7 @@ const translations = {
     inApproval:       "In Approval",
     passportType:     "Passport Type",
     modelName:        "Model Name",
-    productId:        "Product ID",
+    productId:        "Serial Number",
     version:          "Version",
     status:           "Status",
     createdBy:        "Created By",

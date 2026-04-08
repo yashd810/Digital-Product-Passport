@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { authHeaders } from "./authHeaders";
 import "./AdminDashboard.css";
 
 function CompanyAccess() {
@@ -24,10 +25,10 @@ function CompanyAccess() {
         // Fetch all active passport types from the dynamic system
         const [typesRes, companiesRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/admin/passport-types`, {
-            headers: { Authorization: "Bearer cookie-session" },
+            headers: authHeaders(),
           }),
           fetch(`${API_BASE_URL}/api/admin/companies`, {
-            headers: { Authorization: "Bearer cookie-session" },
+            headers: authHeaders(),
           }),
         ]);
 
@@ -62,7 +63,7 @@ function CompanyAccess() {
       if (isGranted) {
         const r = await fetch(
           `${API_BASE_URL}/api/admin/company-access/${companyId}/${typeId}`,
-          { method: "DELETE", headers: { Authorization: "Bearer cookie-session" } }
+          { method: "DELETE", headers: authHeaders() }
         );
         if (!r.ok) throw new Error("Failed to revoke access");
         setGrantedTypeIds(ids => ids.filter(id => id !== typeId));
@@ -70,7 +71,7 @@ function CompanyAccess() {
       } else {
         const r = await fetch(`${API_BASE_URL}/api/admin/company-access`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer cookie-session" },
+          headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ companyId: parseInt(companyId), passportTypeId: parseInt(typeId) }),
         });
         if (!r.ok) {
@@ -119,7 +120,6 @@ function CompanyAccess() {
             <div className="company-info">
               <h2>{companyData.company_name}</h2>
               <p><strong>Company ID:</strong> {companyData.id}</p>
-              <p><strong>Company Code:</strong> <code>{companyData.company_code}</code></p>
             </div>
           )}
 

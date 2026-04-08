@@ -90,7 +90,6 @@ function Register({ setToken, setUser, setCompanyId }) {
       if (!response.ok)
         throw new Error(data.error || "Registration failed");
 
-      localStorage.removeItem("token");
       localStorage.setItem("user",      JSON.stringify(data.user));
       localStorage.setItem("companyId", data.user.companyId || "");
 

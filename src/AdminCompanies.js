@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "./tableControls";
+import { authHeaders } from "./authHeaders";
 import "./AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -44,7 +45,7 @@ function AdminCompanies() {
   const fetchCompanies = async () => {
     try {
       const r = await fetch(`${API}/api/admin/companies`,
-        { headers: { Authorization: "Bearer cookie-session" } });
+        { headers: { ...authHeaders() } });
       if (!r.ok) throw new Error("Failed to fetch companies");
       setCompanies(await r.json());
     } catch (e) { setError(e.message); }
@@ -57,7 +58,7 @@ function AdminCompanies() {
     try {
       const r = await fetch(`${API}/api/admin/companies`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer cookie-session" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ companyName: newCompanyName }),
       });
       if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Failed to create company"); }
@@ -93,7 +94,7 @@ function AdminCompanies() {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer cookie-session",
+          ...authHeaders(),
         },
         body: JSON.stringify({ password: deletePassword }),
       });
@@ -158,12 +159,6 @@ function AdminCompanies() {
                 <strong className="company-code-result-value">
                   {createdCompany.company_name}
                 </strong>
-              </div>
-              <div className="company-code-result-item">
-                <span className="company-code-result-label">Internal company code</span>
-                <code className="admin-result-code company-code-result-code">
-                  {createdCompany.company_code}
-                </code>
               </div>
             </div>
 

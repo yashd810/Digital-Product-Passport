@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { authHeaders } from "./authHeaders";
 import "./AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -19,7 +20,7 @@ function AdminInvite() {
     (async () => {
       try {
         const r = await fetch(`${API}/api/admin/companies`,
-          { headers: { Authorization: "Bearer cookie-session" } });
+          { headers: authHeaders() });
         const data = await r.json();
         setCompanies(data);
 
@@ -43,7 +44,7 @@ function AdminInvite() {
     try {
       const r = await fetch(`${API}/api/companies/${inviteCompanyId}/invite`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer cookie-session" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ inviteeEmail: inviteEmail.trim() }),
       });
       const data = await r.json();

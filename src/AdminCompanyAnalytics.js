@@ -338,11 +338,11 @@ function AdminCompanyAnalytics() {
             legendItems: statusChartItems,
             emptyText: "No status data yet",
           },
-          {
+          ...(typeChartData.length > 2 ? [{
             title: "Passports by type",
-            svg: typeChartData.length ? renderBarChartSvg(typeChartData, { height: 180 }) : "",
+            svg: renderBarChartSvg(typeChartData, { height: 180 }),
             emptyText: "No type data yet",
-          },
+          }] : []),
           {
             title: "Total passports over time by product category",
             svg: trendSeries.length && (data.trend?.labels || []).length
@@ -521,14 +521,12 @@ function AdminCompanyAnalytics() {
                   )}
                 </div>
                 <div className="overview-chart-row">
-                  <div className="chart-card chart-card-compact">
-                    <div className="chart-title">Passports by type</div>
-                    {typeChartData.length > 0 ? (
+                  {typeChartData.length > 2 && (
+                    <div className="chart-card chart-card-compact">
+                      <div className="chart-title">Passports by type</div>
                       <BarChart data={typeChartData} height={70} />
-                    ) : (
-                      <div className="overview-empty-chart">No type data yet</div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div className="chart-card chart-card-wide">
                     <div className="chart-title">Total passports over time · by product category</div>
                     {trendChartData.length > 0 && (data.trend?.labels || []).length > 0 ? (

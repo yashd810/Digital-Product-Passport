@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { authHeaders } from "./authHeaders";
 import "./Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -39,7 +40,7 @@ function NotificationsPanel({ user }) {
     setLoading(true);
     try {
       const r = await fetch(`${API}/api/users/me/notifications?limit=25`, {
-        headers: { Authorization: "Bearer cookie-session" },
+        headers: { ...authHeaders() },
       });
       if (r.ok) {
         const data = await r.json();
@@ -72,7 +73,7 @@ function NotificationsPanel({ user }) {
     try {
       await fetch(`${API}/api/users/me/notifications/read-all`, {
         method: "PATCH",
-        headers: { Authorization: "Bearer cookie-session" },
+        headers: { ...authHeaders() },
       });
       setNotifs(prev => prev.map(n => ({ ...n, read: true })));
       setUnread(0);
@@ -83,7 +84,7 @@ function NotificationsPanel({ user }) {
     try {
       await fetch(`${API}/api/users/me/notifications/${id}/read`, {
         method: "PATCH",
-        headers: { Authorization: "Bearer cookie-session" },
+        headers: { ...authHeaders() },
       });
       setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
       setUnread(prev => Math.max(0, prev - 1));
@@ -93,8 +94,11 @@ function NotificationsPanel({ user }) {
   const handleClick = (n) => {
     markRead(n.id);
     setOpen(false);
+    if (n.passport_guid) {
+      window.open(`${window.location.origin}/p/${n.passport_guid}`, "_blank", "noopener,noreferrer");
+      return;
+    }
     if (n.action_url) navigate(n.action_url);
-    else if (n.passport_guid) navigate(`/passport/${n.passport_guid}/introduction`);
   };
 
   return (
@@ -122,6 +126,11 @@ function NotificationsPanel({ user }) {
             )}
           </div>
 
+          <div className="notif-panel-view-all">
+            <button className="notif-view-all-btn" onClick={() => { setOpen(false); navigate("/dashboard/notifications"); }}>
+              View all &amp; workflow history →
+            </button>
+          </div>
           <div className="notif-list">
             {loading && notifs.length === 0 ? (
               <div className="notif-empty">Loading…</div>

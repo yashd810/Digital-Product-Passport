@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { authHeaders } from "./authHeaders";
+import { formatPassportStatus } from "./passportStatus";
 import "./Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -37,7 +39,7 @@ function VersionDiff({ companyId }) {
       .catch(() => setTypeDef(null));
 
     fetch(`${API}/api/companies/${companyId}/passports/${guid}/diff?passportType=${pt}`, {
-      headers: { Authorization: "Bearer cookie-session" },
+      headers: { ...authHeaders() },
     })
     .then(r => r.ok ? r.json() : Promise.reject("Failed to load"))
     .then(d => {
@@ -68,9 +70,7 @@ function VersionDiff({ companyId }) {
   const changes   = allFields.map(f => ({ ...f, a:vA?.[f.key], b:vB?.[f.key], changed: norm(vA?.[f.key]) !== norm(vB?.[f.key]) }));
   const changed   = changes.filter(c => c.changed);
   const unchanged = changes.filter(c => !c.changed && (c.a || c.b));
-  const formatStatus = (status) => ["in_revision", "revised"].includes(status)
-    ? "In Revision"
-    : String(status || "").split("_").map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+  const formatStatus = (status) => formatPassportStatus(status);
 
   const fmtVal = (v, type) => {
     if (v === null || v === undefined || v === "") return <span style={{ color:"var(--steel)", fontStyle:"italic" }}>—</span>;

@@ -17,6 +17,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const passportType = typeProp || typeParam ||
     new URLSearchParams(location.search).get("passportType");
+  const templateId = new URLSearchParams(location.search).get("templateId");
 
   // Support both static PASSPORT_SECTIONS_MAP and dynamic type definitions from DB
   const [dynamicSections, setDynamicSections] = useState(null);
@@ -29,6 +30,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const [modelName,      setModelName]      = useState("");
   const [productId,      setProductId]      = useState("");
   const [formData,       setFormData]       = useState({});
+  const [modelDataKeys,  setModelDataKeys]  = useState(new Set()); // fields locked from template
+  const [templateName,   setTemplateName]   = useState("");
   const [fileSelections, setFileSelections] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
   const [repoPicker,     setRepoPicker]     = useState(null);  // field.key being picked, or null
@@ -111,6 +114,26 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     }
   }, [sectionKeys.join(",")]);
 
+  // Load template pre-fill on create mode
+  useEffect(() => {
+    if (mode !== "create" || !templateId || !companyId) return;
+    fetch(`${API}/api/companies/${companyId}/templates/${templateId}`, { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(tmpl => {
+        if (!tmpl) return;
+        setTemplateName(tmpl.name || "");
+        const vals = {};
+        const modelKeys = new Set();
+        for (const f of tmpl.fields || []) {
+          if (f.field_value) vals[f.field_key] = f.field_value;
+          if (f.is_model_data) modelKeys.add(f.field_key);
+        }
+        setFormData(vals);
+        setModelDataKeys(modelKeys);
+      })
+      .catch(() => {});
+  }, [mode, templateId, companyId]);
+
   useEffect(() => {
     if (mode !== "edit" || !guid || !passportType) return;
     (async () => {
@@ -172,7 +195,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         .filter(([k]) => !NON_SCHEMA.has(k))
         .map(([k, v]) => [k, Array.isArray(v) ? JSON.stringify(v) : v])
     );
-    return { passportType, model_name: modelName || null, product_id: productId || null, ...cleanData };
+    return {
+      passportType,
+      model_name: modelName.trim() || null,
+      product_id: productId.trim() || null,
+      ...cleanData,
+    };
   };
 
   const refreshEditPresence = async (method = "GET") => {
@@ -320,14 +348,20 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
     try {
       let passportGuid = guid;
+      const trimmedProductId = productId.trim();
 
       if (mode === "create") {
+        if (!trimmedProductId) {
+          throw new Error("Serial Number is required");
+        }
         const serializedData = Object.fromEntries(
           Object.entries(formData).map(([k, v]) => [k, Array.isArray(v) ? JSON.stringify(v) : v])
         );
         const body = {
-          passport_type: passportType, model_name: modelName,
-          product_id: productId || null, ...serializedData,
+          passport_type: passportType,
+          model_name: modelName.trim() || null,
+          product_id: trimmedProductId,
+          ...serializedData,
         };
         const r = await fetch(`${API}/api/companies/${companyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
@@ -364,7 +398,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const renderField = (field) => {
     const val      = formData[field.key] ?? "";
-    const disabled = isSaving || (mode==="edit" && isLoading);
+    const isLocked = mode === "create" && modelDataKeys.has(field.key);
+    const disabled = isSaving || (mode==="edit" && isLoading) || isLocked;
 
     if (field.type === "boolean") {
       return (
@@ -440,7 +475,10 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       if (typeof val === "string" && val.startsWith("[")) {
         try { parsed = JSON.parse(val); } catch { parsed = null; }
       }
-      const rows = Array.isArray(parsed) && parsed.length ? parsed : [Array(cols).fill("")];
+      const defaultRows = Array.isArray(field.table_default_rows) && field.table_default_rows.length
+        ? field.table_default_rows.map(r => Array.from({ length: cols }, (_, i) => r[i] ?? ""))
+        : [Array(cols).fill("")];
+      const rows = Array.isArray(parsed) && parsed.length ? parsed : defaultRows;
 
       const updateCell = (ri, ci, v) => {
         const next = rows.map(r => [...r]);
@@ -563,18 +601,19 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           {/* Identity row */}
           <div className="passport-identity-row">
             <div className="passport-field-group">
+              <label htmlFor="productId">Serial Number</label>
+              <input id="productId" type="text" value={productId}
+                className="passport-model-input"
+                placeholder="Enter serial number"
+                onChange={e => { markDirty(); setProductId(e.target.value); }} disabled={isSaving}
+                required />
+            </div>
+            <div className="passport-field-group">
               <label htmlFor="modelName">Model Name</label>
               <input id="modelName" type="text" value={modelName}
                 className="passport-model-input"
                 placeholder="Enter model name (optional)"
-                onChange={e => { setModelName(e.target.value); dirtyRef.current = true; }} />
-            </div>
-            <div className="passport-field-group">
-              <label htmlFor="productId">Product ID</label>
-              <input id="productId" type="text" value={productId}
-                className="passport-model-input"
-                placeholder="Enter product ID (optional)"
-                onChange={e => { markDirty(); setProductId(e.target.value); }} disabled={isSaving} />
+                onChange={e => { markDirty(); setModelName(e.target.value); }} />
             </div>
             <div className="passport-field-group">
               <label>Passport Type</label>
@@ -584,6 +623,15 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
             </div>
           </div>
 
+          {templateName && (
+            <div className="pf-template-banner">
+              <span className="pf-template-banner-icon">📋</span>
+              <span>
+                Creating from template <strong>{templateName}</strong>.
+                Fields marked <strong>📌 Model data</strong> are pre-filled and locked.
+              </span>
+            </div>
+          )}
           {error   && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 
@@ -604,15 +652,21 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                         </p>
                       )}
                       <div className="form-grid">
-                        {section.fields.map(f => (
-                          <div key={f.key}
-                            className={`form-group${f.type==="textarea"||f.type==="file"?" full-width":""}`}>
-                            {f.type !== "boolean" && (
-                              <label htmlFor={f.type==="file" ? `f-${f.key}` : f.key}>{f.label}</label>
-                            )}
-                            {renderField(f)}
-                          </div>
-                        ))}
+                        {section.fields.map(f => {
+                          const isLocked = mode === "create" && modelDataKeys.has(f.key);
+                          return (
+                            <div key={f.key}
+                              className={`form-group${f.type==="textarea"||f.type==="file"?" full-width":""}${isLocked?" form-group-locked":""}`}>
+                              {f.type !== "boolean" && (
+                                <label htmlFor={f.type==="file" ? `f-${f.key}` : f.key}>
+                                  {f.label}
+                                  {isLocked && <span className="pf-model-badge">📌 Model data</span>}
+                                </label>
+                              )}
+                              {renderField(f)}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

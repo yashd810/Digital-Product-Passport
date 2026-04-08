@@ -18,6 +18,7 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 // Restrict CORS to known origins; defaults to localhost for development
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "http://localhost:3000")
@@ -61,8 +62,17 @@ const COOKIE_SECURE          = process.env.COOKIE_SECURE === "true";
 const COOKIE_SAME_SITE       = process.env.COOKIE_SAME_SITE || "lax";
 const COOKIE_DOMAIN          = process.env.COOKIE_DOMAIN || "";
 
-if (!process.env.JWT_SECRET) console.warn("[SECURITY] JWT_SECRET is not set — using insecure default. Set it in .env before deploying.");
-if (!process.env.PEPPER_V1)  console.warn("[SECURITY] PEPPER_V1 is not set — using insecure default. Set it in .env before deploying.");
+if (IS_PRODUCTION) {
+  const missingSecrets = [];
+  if (!process.env.JWT_SECRET) missingSecrets.push("JWT_SECRET");
+  if (!process.env.PEPPER_V1) missingSecrets.push("PEPPER_V1");
+  if (missingSecrets.length) {
+    throw new Error(`[SECURITY] Missing required production secrets: ${missingSecrets.join(", ")}`);
+  }
+} else {
+  if (!process.env.JWT_SECRET) console.warn("[SECURITY] JWT_SECRET is not set — using insecure default. Set it in .env before deploying.");
+  if (!process.env.PEPPER_V1)  console.warn("[SECURITY] PEPPER_V1 is not set — using insecure default. Set it in .env before deploying.");
+}
 
 const applyPepper    = (pw) => crypto.createHmac("sha256", PEPPER).update(pw).digest("hex");
 const hashPassword   = async (pt) => ({ hash: await bcrypt.hash(applyPepper(pt), 12), pepperVersion: CURRENT_PEPPER_VERSION });
@@ -76,20 +86,47 @@ const envInt = (name, fallback) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const rateLimitBuckets = new Map();
-const rateLimit = ({ key, limit, windowMs, message }) => (req, res, next) => {
+const rateLimit = ({ key, limit, windowMs, message }) => async (req, res, next) => {
   const now = Date.now();
-  const bucketKey = key(req);
-  const existing = rateLimitBuckets.get(bucketKey);
-  if (!existing || existing.resetAt <= now) {
-    rateLimitBuckets.set(bucketKey, { count: 1, resetAt: now + windowMs });
-    return next();
+  const bucketKey = String(key(req) || "").slice(0, 255);
+  if (!bucketKey) return next();
+
+  const resetAt = new Date(now + windowMs);
+  const nowDate = new Date(now);
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO request_rate_limits (bucket_key, count, reset_at, updated_at)
+       VALUES ($1, 1, $2, NOW())
+       ON CONFLICT (bucket_key) DO UPDATE
+       SET count = CASE
+             WHEN request_rate_limits.reset_at <= $3 THEN 1
+             ELSE request_rate_limits.count + 1
+           END,
+           reset_at = CASE
+             WHEN request_rate_limits.reset_at <= $3 THEN $2
+             ELSE request_rate_limits.reset_at
+           END,
+           updated_at = NOW()
+       RETURNING count, reset_at`,
+      [bucketKey, resetAt, nowDate]
+    );
+
+    const row = result.rows[0];
+    if ((row?.count || 0) > limit) {
+      return res.status(429).json({ error: message });
+    }
+    next();
+  } catch (err) {
+    console.error("[rateLimit] falling back after DB error:", err.message);
+    next();
   }
-  if (existing.count >= limit) {
-    return res.status(429).json({ error: message });
-  }
-  existing.count += 1;
-  next();
+};
+
+const isPathInsideBase = (targetPath, baseDir) => {
+  const normalizedBase = path.resolve(baseDir);
+  const normalizedTarget = path.resolve(targetPath);
+  return normalizedTarget === normalizedBase || normalizedTarget.startsWith(`${normalizedBase}${path.sep}`);
 };
 
 const authRateLimit = rateLimit({
@@ -136,6 +173,11 @@ const publicUnlockRateLimit = rateLimit({
 
 const EDIT_SESSION_TIMEOUT_HOURS = 12;
 const EDIT_SESSION_TIMEOUT_SQL = `${EDIT_SESSION_TIMEOUT_HOURS} hours`;
+const IN_REVISION_STATUS = "in_revision";
+const LEGACY_IN_REVISION_STATUS = "revised";
+const IN_REVISION_STATUSES_SQL = `('${IN_REVISION_STATUS}','${LEGACY_IN_REVISION_STATUS}')`;
+const EDITABLE_RELEASE_STATUSES_SQL = `('draft','${IN_REVISION_STATUS}','${LEGACY_IN_REVISION_STATUS}')`;
+const REVISION_BLOCKING_STATUSES_SQL = `('draft','${IN_REVISION_STATUS}','${LEGACY_IN_REVISION_STATUS}','in_review')`;
 
 const publicScanRateLimit = rateLimit({
   key: (req) => `public-scan:${req.ip}:${String(req.params?.guid || "")}`,
@@ -212,6 +254,333 @@ const getTable = (typeName) => {
   return `${safe}_passports`;
 };
 
+const normalizeReleaseStatus = (status) =>
+  status === LEGACY_IN_REVISION_STATUS ? IN_REVISION_STATUS : status;
+
+const normalizePassportRow = (row) =>
+  row ? { ...row, release_status: normalizeReleaseStatus(row.release_status) } : row;
+
+const toStoredPassportValue = (value) =>
+  (Array.isArray(value) || (typeof value === "object" && value !== null))
+    ? JSON.stringify(value)
+    : value;
+
+const SYSTEM_PASSPORT_FIELDS = new Set([
+  "id",
+  "guid",
+  "company_id",
+  "created_by",
+  "created_at",
+  "passport_type",
+  "version_number",
+  "release_status",
+  "deleted_at",
+  "qr_code",
+  "created_by_email",
+  "first_name",
+  "last_name",
+  "updated_by",
+  "updated_at",
+]);
+
+async function getPassportTypeSchema(typeName) {
+  const normalizedInput = String(typeName || "").trim();
+  if (!normalizedInput) return null;
+  const typeRes = await pool.query(
+    `SELECT type_name, display_name, fields_json
+     FROM passport_types
+     WHERE type_name = $1 OR LOWER(display_name) = LOWER($1)
+     LIMIT 1`,
+    [normalizedInput]
+  );
+  if (!typeRes.rows.length) return null;
+  const sections = typeRes.rows[0]?.fields_json?.sections || [];
+  const schemaFields = sections.flatMap(section => section.fields || []);
+  return {
+    typeName: typeRes.rows[0].type_name,
+    displayName: typeRes.rows[0].display_name,
+    schemaFields,
+    allowedKeys: new Set(schemaFields.map(field => field.key).filter(Boolean)),
+  };
+}
+
+function normalizePassportRequestBody(body = {}) {
+  const normalized = { ...body };
+  if (normalized.passport_type === undefined && normalized.passportType !== undefined) {
+    normalized.passport_type = normalized.passportType;
+  }
+  if (normalized.model_name === undefined && normalized.modelName !== undefined) {
+    normalized.model_name = normalized.modelName;
+  }
+  if (normalized.product_id === undefined && normalized.productId !== undefined) {
+    normalized.product_id = normalized.productId;
+  }
+  delete normalized.passportType;
+  delete normalized.modelName;
+  delete normalized.productId;
+  return normalized;
+}
+
+const EDITABLE_PASSPORT_STATUSES = new Set(["draft", IN_REVISION_STATUS]);
+
+const normalizeProductIdValue = (value) =>
+  typeof value === "string" ? value.trim() : "";
+
+const generateProductIdValue = (guid) =>
+  `PID-${String(guid || "").slice(0, 8)}`;
+
+const isEditablePassportStatus = (status) =>
+  EDITABLE_PASSPORT_STATUSES.has(normalizeReleaseStatus(status));
+
+const getWritablePassportColumns = (data, excluded = SYSTEM_PASSPORT_FIELDS) =>
+  Object.keys(data).filter((key) =>
+    data[key] !== undefined &&
+    !excluded.has(key) &&
+    /^[a-z][a-z0-9_]+$/.test(key)
+  );
+
+const getStoredPassportValues = (keys, data) =>
+  keys.map((key) => toStoredPassportValue(data[key]));
+
+async function findExistingPassportByProductId({ tableName, companyId, productId, excludeGuid = null }) {
+  if (!productId) return null;
+  const params = [companyId, productId];
+  let exclusionSql = "";
+  if (excludeGuid) {
+    params.push(excludeGuid);
+    exclusionSql = ` AND guid <> $${params.length}`;
+  }
+  const existing = await pool.query(
+    `SELECT id, guid, product_id, release_status, version_number
+     FROM ${tableName}
+     WHERE company_id = $1
+       AND product_id = $2
+       AND deleted_at IS NULL${exclusionSql}
+     ORDER BY version_number DESC, updated_at DESC, id DESC
+     LIMIT 1`,
+    params
+  );
+  return existing.rows[0] || null;
+}
+
+async function updatePassportRowById({ tableName, rowId, userId, data, excluded = SYSTEM_PASSPORT_FIELDS }) {
+  const updateCols = getWritablePassportColumns(data, excluded);
+  if (!updateCols.length) return [];
+
+  const vals = getStoredPassportValues(updateCols, data);
+  const sets = updateCols.map((col, i) => `${col} = $${i + 1}`).join(", ");
+  await pool.query(
+    `UPDATE ${tableName}
+     SET ${sets}, updated_by = $${vals.length + 1}, updated_at = NOW()
+     WHERE id = $${vals.length + 2}`,
+    [...vals, userId, rowId]
+  );
+  return updateCols;
+}
+
+const coerceBulkFieldValue = (fieldDef, rawValue) => {
+  if (rawValue === null || rawValue === undefined) return rawValue;
+
+  if (fieldDef?.type === "boolean") {
+    if (typeof rawValue === "boolean") return rawValue;
+    const normalized = String(rawValue).trim().toLowerCase();
+    if (["true", "1", "yes"].includes(normalized)) return true;
+    if (["false", "0", "no"].includes(normalized)) return false;
+  }
+
+  if (fieldDef?.type === "table" && typeof rawValue === "string") {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return rawValue;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return rawValue;
+    }
+  }
+
+  return rawValue;
+};
+
+const getHistoryFieldDefs = (typeRow) => {
+  const baseFields = [
+    { key: "model_name", label: "Model Name", type: "text" },
+    { key: "product_id", label: "Serial Number", type: "text" },
+  ];
+  const schemaFields = (typeRow?.fields_json?.sections || [])
+    .flatMap((section) => section.fields || [])
+    .filter((field) => field?.key);
+  const seen = new Set();
+  return [...baseFields, ...schemaFields].filter((field) => {
+    if (seen.has(field.key)) return false;
+    seen.add(field.key);
+    return true;
+  });
+};
+
+const formatHistoryFieldValue = (fieldDef, rawValue) => {
+  if (rawValue === null || rawValue === undefined || rawValue === "") return "—";
+
+  if (fieldDef?.type === "boolean") return rawValue ? "Yes" : "No";
+  if (fieldDef?.type === "file") return "File uploaded";
+  if (fieldDef?.type === "symbol") return "Symbol updated";
+
+  if (fieldDef?.type === "table") {
+    let rows = rawValue;
+    if (typeof rawValue === "string") {
+      try { rows = JSON.parse(rawValue); } catch { rows = rawValue; }
+    }
+    if (Array.isArray(rows)) {
+      const formatted = rows
+        .map((row) => Array.isArray(row) ? row.filter(Boolean).join(" | ") : String(row || ""))
+        .filter(Boolean)
+        .join(" ; ");
+      return formatted.length > 180 ? `${formatted.slice(0, 177)}...` : formatted || "—";
+    }
+  }
+
+  if (typeof rawValue === "object") {
+    const json = JSON.stringify(rawValue);
+    return json.length > 180 ? `${json.slice(0, 177)}...` : json;
+  }
+
+  const text = String(rawValue);
+  return text.length > 180 ? `${text.slice(0, 177)}...` : text;
+};
+
+const comparableHistoryFieldValue = (fieldDef, rawValue) => {
+  if (rawValue === null || rawValue === undefined || rawValue === "") return "";
+  if (fieldDef?.type === "boolean") return rawValue ? "true" : "false";
+
+  if (fieldDef?.type === "table") {
+    let rows = rawValue;
+    if (typeof rawValue === "string") {
+      try { rows = JSON.parse(rawValue); } catch { rows = rawValue; }
+    }
+    return Array.isArray(rows) || (typeof rows === "object" && rows !== null)
+      ? JSON.stringify(rows)
+      : String(rows);
+  }
+
+  return (Array.isArray(rawValue) || (typeof rawValue === "object" && rawValue !== null))
+    ? JSON.stringify(rawValue)
+    : String(rawValue).trim();
+};
+
+const buildPassportVersionHistory = async ({
+  guid,
+  passportType,
+  companyId = null,
+  publicOnly = false,
+}) => {
+  const tableName = getTable(passportType);
+  const typeRes = await pool.query(
+    "SELECT display_name, fields_json FROM passport_types WHERE type_name = $1",
+    [passportType]
+  );
+  const typeRow = typeRes.rows[0] || null;
+  const fieldDefs = getHistoryFieldDefs(typeRow);
+
+  const versionParams = [guid];
+  let companyFilter = "";
+  if (companyId !== null && companyId !== undefined) {
+    versionParams.push(companyId);
+    companyFilter = ` AND company_id = $${versionParams.length}`;
+  }
+
+  const versionRes = await pool.query(
+    `SELECT * FROM ${tableName}
+     WHERE guid = $1
+       ${companyFilter}
+       AND deleted_at IS NULL
+     ORDER BY version_number DESC`,
+    versionParams
+  );
+  const versions = versionRes.rows.map(normalizePassportRow);
+
+  const creatorIds = [...new Set(versions.map((row) => row.created_by).filter(Boolean))];
+  const creatorMap = new Map();
+  if (creatorIds.length) {
+    const userRes = await pool.query(
+      "SELECT id, first_name, last_name, email FROM users WHERE id = ANY($1::int[])",
+      [creatorIds]
+    );
+    userRes.rows.forEach((row) => {
+      creatorMap.set(
+        row.id,
+        `${row.first_name || ""} ${row.last_name || ""}`.trim() || row.email || `User #${row.id}`
+      );
+    });
+  }
+
+  const visibilityRes = await pool.query(
+    `SELECT version_number, is_public
+     FROM passport_history_visibility
+     WHERE passport_guid = $1`,
+    [guid]
+  );
+  const visibilityMap = new Map(
+    visibilityRes.rows.map((row) => [Number(row.version_number), !!row.is_public])
+  );
+
+  const ascending = [...versions].sort((a, b) => Number(a.version_number) - Number(b.version_number));
+  const previousByVersion = new Map();
+  ascending.forEach((version, index) => {
+    previousByVersion.set(Number(version.version_number), index > 0 ? ascending[index - 1] : null);
+  });
+
+  const latestVersionNumber = versions[0]?.version_number ?? null;
+  const history = versions
+    .map((version) => {
+      const versionNumber = Number(version.version_number);
+      const previous = previousByVersion.get(versionNumber) || null;
+      const normalizedStatus = normalizeReleaseStatus(version.release_status);
+      const defaultPublic = normalizedStatus === "released";
+      const isPublic = visibilityMap.has(versionNumber)
+        ? visibilityMap.get(versionNumber)
+        : defaultPublic;
+
+      if (publicOnly && (!defaultPublic || !isPublic)) return null;
+
+      const changedFields = previous
+        ? fieldDefs.flatMap((field) => {
+            const beforeComparable = comparableHistoryFieldValue(field, previous[field.key]);
+            const afterComparable = comparableHistoryFieldValue(field, version[field.key]);
+            if (beforeComparable === afterComparable) return [];
+            return [{
+              key: field.key,
+              label: field.label || field.key,
+              before: formatHistoryFieldValue(field, previous[field.key]),
+              after: formatHistoryFieldValue(field, version[field.key]),
+            }];
+          })
+        : [];
+
+      return {
+        version_number: versionNumber,
+        release_status: normalizedStatus,
+        created_at: version.created_at,
+        updated_at: version.updated_at,
+        created_by_name: creatorMap.get(version.created_by) || null,
+        is_public: isPublic,
+        changed_fields: changedFields,
+        change_count: changedFields.length,
+        summary: previous
+          ? (changedFields.length
+              ? `${changedFields.length} field${changedFields.length === 1 ? "" : "s"} changed from v${previous.version_number}.`
+              : `No field changes detected from v${previous.version_number}.`)
+          : "Initial version.",
+        is_current: versionNumber === Number(latestVersionNumber),
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    passportType,
+    displayName: typeRow?.display_name || passportType,
+    history,
+  };
+};
+
 /**
  * Creates the shared passport table for a passport type.
  * Called once when a superadmin creates a new passport type.
@@ -243,8 +612,8 @@ const createPassportTable = async (typeName) => {
       id             SERIAL       PRIMARY KEY,
       guid           UUID         NOT NULL DEFAULT gen_random_uuid(),
       company_id     INTEGER      NOT NULL,
-      model_name     VARCHAR(255) NOT NULL,
-      product_id     VARCHAR(255),
+      model_name     VARCHAR(255),
+      product_id     VARCHAR(255) NOT NULL,
       release_status VARCHAR(50)  NOT NULL DEFAULT 'draft',
       version_number INTEGER      NOT NULL DEFAULT 1,
       qr_code        TEXT,
@@ -300,7 +669,7 @@ const queryTableStats = async (typeName, companyId = null) => {
       COUNT(*)                                              AS total,
       COUNT(CASE WHEN release_status = 'draft'     THEN 1 END) AS draft,
       COUNT(CASE WHEN release_status = 'released'  THEN 1 END) AS released,
-      COUNT(CASE WHEN release_status IN ('revised', 'in_revision') THEN 1 END) AS revised,
+      COUNT(CASE WHEN release_status IN ${IN_REVISION_STATUSES_SQL} THEN 1 END) AS revised,
       COUNT(CASE WHEN release_status = 'in_review' THEN 1 END) AS in_review
     FROM ${tableName}
     WHERE deleted_at IS NULL${companyFilter}
@@ -317,6 +686,86 @@ const queryTableStats = async (typeName, companyId = null) => {
 
 // ─── DATABASE INIT ──────────────────────────────────────────────────────────
 async function initDb() {
+  // Core user and company management tables
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id               SERIAL PRIMARY KEY,
+      email            VARCHAR(255) NOT NULL UNIQUE,
+      password_hash    VARCHAR(255) NOT NULL,
+      first_name       VARCHAR(100),
+      last_name        VARCHAR(100),
+      company_id       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      role             VARCHAR(50) NOT NULL DEFAULT 'viewer',
+      is_active        BOOLEAN NOT NULL DEFAULT true,
+      otp_code         VARCHAR(6),
+      otp_expires_at   TIMESTAMPTZ,
+      two_factor_enabled BOOLEAN NOT NULL DEFAULT false,
+      last_login_at    TIMESTAMPTZ,
+      pepper_version   INTEGER NOT NULL DEFAULT 1,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  /* Add missing columns to existing users table (for migrations) */
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS companies (
+      id               SERIAL PRIMARY KEY,
+      company_name     VARCHAR(255) NOT NULL UNIQUE,
+      is_active        BOOLEAN NOT NULL DEFAULT true,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_types (
+      id               SERIAL PRIMARY KEY,
+      type_name        VARCHAR(100) NOT NULL UNIQUE,
+      display_name     VARCHAR(255) NOT NULL,
+      umbrella_category VARCHAR(100),
+      umbrella_icon    VARCHAR(10) DEFAULT '📋',
+      fields_json      JSONB NOT NULL DEFAULT '{"sections":[]}',
+      is_active        BOOLEAN NOT NULL DEFAULT true,
+      created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id               SERIAL PRIMARY KEY,
+      company_id       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      user_id          INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      action           VARCHAR(100) NOT NULL,
+      table_name       VARCHAR(100),
+      record_id        VARCHAR(100),
+      old_values       JSONB,
+      new_values       JSONB,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invite_tokens (
+      id               SERIAL PRIMARY KEY,
+      token            VARCHAR(36) NOT NULL UNIQUE,
+      email            VARCHAR(255) NOT NULL,
+      company_id       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      invited_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      role_to_assign   VARCHAR(50) NOT NULL DEFAULT 'editor',
+      used             BOOLEAN NOT NULL DEFAULT false,
+      expires_at       TIMESTAMPTZ NOT NULL,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_registry (
       guid           UUID        PRIMARY KEY,
@@ -417,6 +866,23 @@ async function initDb() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash    ON api_keys(key_hash)`);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS request_rate_limits (
+      bucket_key VARCHAR(255) PRIMARY KEY,
+      count      INTEGER NOT NULL DEFAULT 0,
+      reset_at   TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_request_rate_limits_reset_at
+      ON request_rate_limits(reset_at)
+  `);
+  await pool.query(`
+    DELETE FROM request_rate_limits
+    WHERE reset_at <= NOW()
+  `);
+
   // Company-managed branding for public passport viewer and consumer pages
   await pool.query(`
     ALTER TABLE companies
@@ -499,6 +965,88 @@ async function initDb() {
       ON passport_edit_sessions(user_id)
   `);
 
+  // Notifications table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id               SERIAL      PRIMARY KEY,
+      user_id          INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type             VARCHAR(50) NOT NULL,
+      title            VARCHAR(255) NOT NULL,
+      message          TEXT,
+      passport_guid    UUID,
+      action_url       VARCHAR(500),
+      read             BOOLEAN     DEFAULT false,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+      ON notifications(user_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_notifications_read
+      ON notifications(user_id, read)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_revision_batches (
+      id                SERIAL PRIMARY KEY,
+      company_id        INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      passport_type     VARCHAR(100),
+      requested_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      scope_type        VARCHAR(50) NOT NULL DEFAULT 'selected',
+      scope_meta        JSONB NOT NULL DEFAULT '{}'::jsonb,
+      revision_note     TEXT,
+      changes_json      JSONB NOT NULL DEFAULT '{}'::jsonb,
+      submit_to_workflow BOOLEAN NOT NULL DEFAULT false,
+      reviewer_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      approver_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      total_targeted    INTEGER NOT NULL DEFAULT 0,
+      revised_count     INTEGER NOT NULL DEFAULT 0,
+      skipped_count     INTEGER NOT NULL DEFAULT 0,
+      failed_count      INTEGER NOT NULL DEFAULT 0,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_revision_batches_company_created
+      ON passport_revision_batches(company_id, created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_revision_batch_items (
+      id                    SERIAL PRIMARY KEY,
+      batch_id              INTEGER NOT NULL REFERENCES passport_revision_batches(id) ON DELETE CASCADE,
+      passport_guid         UUID NOT NULL,
+      passport_type         VARCHAR(100) NOT NULL,
+      source_version_number INTEGER,
+      new_version_number    INTEGER,
+      status                VARCHAR(30) NOT NULL,
+      message               TEXT,
+      created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_revision_batch_items_batch
+      ON passport_revision_batch_items(batch_id, created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_history_visibility (
+      passport_guid   UUID NOT NULL,
+      version_number  INTEGER NOT NULL,
+      is_public       BOOLEAN NOT NULL DEFAULT true,
+      updated_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (passport_guid, version_number)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_history_visibility_guid
+      ON passport_history_visibility(passport_guid, version_number DESC)
+  `);
 
   // Ensure shared passport tables exist for all passport types.
   // Idempotent — uses CREATE TABLE IF NOT EXISTS.
@@ -508,6 +1056,56 @@ async function initDb() {
       console.warn(`[initDb] Could not create table for ${type_name}:`, e.message)
     );
   }
+
+  for (const { type_name } of ptRows.rows) {
+    const tableName = getTable(type_name);
+    try {
+      await pool.query(
+        `UPDATE ${tableName}
+         SET release_status = $1
+         WHERE release_status = $2`,
+        [IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS]
+      );
+    } catch (e) {
+      console.warn(`[initDb] Could not normalize revision status for ${type_name}:`, e.message);
+    }
+  }
+
+  try {
+    const legacyDinSpecCol = await pool.query(`
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'din_spec_99100_passports'
+        AND column_name = 'carbon_footprint_performance_class'
+      LIMIT 1
+    `);
+
+    if (legacyDinSpecCol.rows.length) {
+      await pool.query(`
+        UPDATE din_spec_99100_passports
+        SET carbon_footprint_label_and_performance_class =
+          COALESCE(NULLIF(TRIM(carbon_footprint_label_and_performance_class), ''), NULLIF(TRIM(carbon_footprint_performance_class), ''))
+        WHERE carbon_footprint_performance_class IS NOT NULL
+      `);
+
+      await pool.query(`
+        ALTER TABLE din_spec_99100_passports
+        DROP COLUMN IF EXISTS carbon_footprint_performance_class
+      `);
+    }
+  } catch (e) {
+    console.warn("[initDb] Could not finalize DIN SPEC carbon footprint label/performance-class migration:", e.message);
+  }
+
+  await pool.query(
+    `UPDATE passport_workflow
+     SET previous_release_status = $1
+     WHERE previous_release_status = $2`,
+    [IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS]
+  ).catch((e) => {
+    console.warn("[initDb] Could not normalize workflow revision status:", e.message);
+  });
 }
 
 async function clearExpiredEditSessions() {
@@ -1089,7 +1687,7 @@ async function verifyPassportSignature(guid, versionNumber) {
 const logAudit = async (companyId, userId, action, tableName, passportGuid, oldData, newData) => {
   try {
     await pool.query(
-      `INSERT INTO audit_logs (company_id,user_id,action,table_name,passport_guid,old_values,new_values)
+      `INSERT INTO audit_logs (company_id,user_id,action,table_name,record_id,old_values,new_values)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
       [companyId || null, userId || null, action, tableName, passportGuid || null,
        oldData ? JSON.stringify(oldData) : null,
@@ -1107,6 +1705,120 @@ const createNotification = async (userId, type, title, message, passportGuid, ac
       [userId, type, title, message || null, passportGuid || null, actionUrl || null]
     );
   } catch (e) { console.error("Notification error (non-fatal):", e.message); }
+};
+
+const submitPassportToWorkflow = async ({
+  companyId,
+  guid,
+  passportType,
+  userId,
+  reviewerId,
+  approverId,
+}) => {
+  const tableName = getTable(passportType);
+  const resolvedReviewerId = reviewerId ? parseInt(reviewerId, 10) : null;
+  const resolvedApproverId = approverId ? parseInt(approverId, 10) : null;
+
+  if (!resolvedReviewerId && !resolvedApproverId) {
+    throw new Error("At least one reviewer or approver is required to submit a revision to workflow.");
+  }
+
+  const pRes = await pool.query(
+    `SELECT id, model_name, product_id, version_number, release_status FROM ${tableName}
+     WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+     ORDER BY version_number DESC LIMIT 1`,
+    [guid]
+  );
+  if (!pRes.rows.length) throw new Error("Editable passport not found");
+  const passport = normalizePassportRow(pRes.rows[0]);
+
+  await pool.query(
+    `UPDATE ${tableName} SET release_status = 'in_review', updated_at = NOW()
+     WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
+    [guid]
+  );
+
+  const wfRes = await pool.query(
+    `INSERT INTO passport_workflow
+       (passport_guid, passport_type, company_id, submitted_by, reviewer_id, approver_id,
+        review_status, approval_status, overall_status, previous_release_status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'in_progress',$9)
+     RETURNING id`,
+    [
+      guid,
+      passportType,
+      companyId,
+      userId,
+      resolvedReviewerId,
+      resolvedApproverId,
+      resolvedReviewerId ? "pending" : "skipped",
+      resolvedApproverId ? "pending" : "skipped",
+      normalizeReleaseStatus(passport.release_status) || IN_REVISION_STATUS,
+    ]
+  );
+
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
+
+  if (resolvedReviewerId) {
+    await createNotification(
+      resolvedReviewerId,
+      "workflow_review",
+      `Review requested: ${passport.product_id}`,
+      `v${passport.version_number} needs your review`,
+      guid,
+      "/dashboard/workflow"
+    );
+    try {
+      const reviewer = await pool.query("SELECT email, first_name FROM users WHERE id = $1", [resolvedReviewerId]);
+      const submitter = await pool.query("SELECT first_name, last_name, email FROM users WHERE id = $1", [userId]);
+      if (reviewer.rows.length) {
+        const reviewerName = reviewer.rows[0].first_name || "Reviewer";
+        const submitterName =
+          `${submitter.rows[0]?.first_name || ""} ${submitter.rows[0]?.last_name || ""}`.trim() ||
+          submitter.rows[0]?.email ||
+          "A colleague";
+        await createTransporter().sendMail({
+          from: process.env.EMAIL_FROM || "noreply@example.com",
+          to: reviewer.rows[0].email,
+          subject: `[DPP] Review requested — ${passport.product_id}`,
+          html: brandedEmail({
+            preheader: `${submitterName} submitted a passport for your review`,
+            bodyHtml: `
+              <p>Hi <strong>${reviewerName}</strong>,</p>
+              <p><strong>${submitterName}</strong> has submitted a passport for your review.</p>
+              <div class="info-box">
+                <div class="info-row"><span class="info-label">Serial Number</span><span class="info-value">${passport.product_id}</span></div>
+                ${passport.model_name ? `<div class="info-row"><span class="info-label">Model</span><span class="info-value">${passport.model_name}</span></div>` : ""}
+                <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.version_number}</span></div>
+                <div class="info-row"><span class="info-label">Type</span><span class="info-value">${passportType}</span></div>
+              </div>
+              <div class="cta-wrap"><a href="${appUrl}/dashboard/workflow" class="cta-btn">🔍 Review Now →</a></div>`,
+          }),
+        });
+      }
+    } catch (e) {
+      console.error("Review email error:", e.message);
+    }
+  }
+
+  if (resolvedApproverId && !resolvedReviewerId) {
+    await createNotification(
+      resolvedApproverId,
+      "workflow_approval",
+      `Approval requested: ${passport.product_id}`,
+      `v${passport.version_number} needs your approval`,
+      guid,
+      "/dashboard/workflow"
+    );
+  }
+
+  await logAudit(companyId, userId, "SUBMIT_REVIEW", tableName, guid, null, {
+    reviewerId: resolvedReviewerId,
+    approverId: resolvedApproverId,
+    status: "in_review",
+  });
+
+  return { workflowId: wfRes.rows[0].id };
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1136,11 +1848,12 @@ app.post("/api/auth/register", authRateLimit, async (req, res) => {
 
     const { hash, pepperVersion } = await hashPassword(password);
     const role = invite.role_to_assign || "editor";
+    const assignedCompanyId = role === "super_admin" ? null : invite.company_id;
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, first_name, last_name, company_id, role, pepper_version)
        VALUES ($1,$2,$3,$4,$5,$6,$7)
        RETURNING id, email, company_id, role, first_name, last_name`,
-      [invite.email, hash, firstName, lastName, invite.company_id, role, pepperVersion]
+      [invite.email, hash, firstName, lastName, assignedCompanyId, role, pepperVersion]
     );
     await pool.query("UPDATE invite_tokens SET used = true WHERE token = $1", [token]);
 
@@ -1440,8 +2153,8 @@ app.post("/api/companies/:companyId/invite", authenticateToken, checkCompanyAcce
           <div class="info-row"><span class="info-label">Company</span><span class="info-value">${company_name}</span></div>
           <div class="info-row"><span class="info-label">Role</span><span class="info-value">${finalRole}</span></div>
         </div>
-        <div style="background:#fef3c7;border:1px solid #f5d76e;border-radius:6px;padding:10px 14px;margin:16px 0;font-size:13px;color:#3d2e00">
-          ⏰ This invitation expires in <strong>48 hours</strong> and can only be used <strong>once</strong>.
+        <div style="background:rgba(245,183,50,0.12);border:1px solid rgba(245,183,50,0.4);border-radius:6px;padding:10px 14px;margin:16px 0;font-size:13px;color:#f5c842">
+          ⏰ This invitation expires in <strong style="color:#fde68a">48 hours</strong> and can only be used <strong style="color:#fde68a">once</strong>.
         </div>
         <div class="cta-wrap"><a href="${registerUrl}" class="cta-btn">Accept Invitation →</a></div>` }),
     });
@@ -1470,6 +2183,21 @@ app.get("/api/users/me", authenticateToken, async (req, res) => {
     if (!r.rows.length) return res.status(404).json({ error: "Not found" });
     res.json(r.rows[0]);
   } catch { res.status(500).json({ error: "Failed" }); }
+});
+
+app.post("/api/users/me/token", authenticateToken, async (req, res) => {
+  try {
+    const freshToken = generateToken(
+      req.user.userId,
+      req.user.email,
+      req.user.companyId,
+      req.user.role
+    );
+    setAuthCookie(res, freshToken);
+    res.json({ token: freshToken });
+  } catch {
+    res.status(500).json({ error: "Failed to issue bearer token" });
+  }
 });
 
 app.patch("/api/users/me", authenticateToken, async (req, res) => {
@@ -1527,7 +2255,8 @@ app.get("/api/companies/:companyId/users", authenticateToken, checkCompanyAccess
   try {
     const r = await pool.query(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.job_title, u.avatar_url,
-              u.is_active, u.created_at
+              u.is_active, u.created_at,
+              (SELECT COUNT(*) FROM passport_registry pr WHERE pr.company_id = u.company_id AND pr.passport_type IS NOT NULL) AS passport_count
        FROM users u
        WHERE u.company_id = $1 AND u.role != 'super_admin'
        ORDER BY u.role, u.first_name`,
@@ -1739,9 +2468,9 @@ app.post("/api/admin/passport-types", authenticateToken, isSuperAdmin, async (re
       return res.status(400).json({ error: "type_name, display_name, umbrella_category, and sections are required" });
 
     // type_name is used directly in table names — must be safe
-    if (!/^[a-z][a-z0-9_]{1,29}$/.test(type_name))
+    if (!/^[a-z][a-z0-9_]{1,99}$/.test(type_name))
       return res.status(400).json({
-        error: "type_name must be lowercase letters/numbers/underscores, 2–30 chars, start with a letter"
+        error: "type_name must be lowercase letters/numbers/underscores, 2–100 chars, start with a letter"
       });
 
     if (!Array.isArray(sections) || sections.length === 0)
@@ -1751,12 +2480,12 @@ app.post("/api/admin/passport-types", authenticateToken, isSuperAdmin, async (re
     for (const section of sections) {
       if (!section.key || !section.label || !Array.isArray(section.fields))
         return res.status(400).json({ error: "Each section must have key, label, and fields array" });
-      if (!/^[a-z][a-z0-9_]{0,79}$/.test(section.key))
+      if (!/^[a-z][a-z0-9_]{0,199}$/.test(section.key))
         return res.status(400).json({ error: `Invalid section key: ${section.key}` });
       for (const field of section.fields) {
         if (!field.key || !field.label || !field.type)
           return res.status(400).json({ error: "Each field must have key, label, and type" });
-        if (!/^[a-z][a-z0-9_]{0,49}$/.test(field.key))
+        if (!/^[a-z][a-z0-9_]{0,199}$/.test(field.key))
           return res.status(400).json({ error: `Invalid field key: ${field.key}` });
         if (!["text","textarea","boolean","file","table","url","date","symbol"].includes(field.type))
           return res.status(400).json({ error: `Invalid field type: ${field.type}` });
@@ -1954,11 +2683,9 @@ app.post("/api/admin/companies", authenticateToken, isSuperAdmin, async (req, re
   try {
     const { companyName } = req.body;
     if (!companyName) return res.status(400).json({ error: "Company name required" });
-    const slug = companyName.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const code = `${slug}dpp${Math.floor(100000 + Math.random() * 900000)}`;
     const r = await pool.query(
-      "INSERT INTO companies (company_name, company_code) VALUES ($1, $2) RETURNING *",
-      [companyName, code]
+      "INSERT INTO companies (company_name) VALUES ($1) RETURNING *",
+      [companyName]
     );
     res.status(201).json({ success: true, company: r.rows[0] });
   } catch (e) { res.status(500).json({ error: "Failed to create company" }); }
@@ -2019,24 +2746,13 @@ app.post("/api/admin/super-admins/invite", authenticateToken, isSuperAdmin, asyn
     const inviterName = inviter.rows.length
       ? `${inviter.rows[0].first_name || ""} ${inviter.rows[0].last_name || ""}`.trim() || inviter.rows[0].email
       : "A colleague";
-    let inviterCompanyId = inviter.rows[0]?.company_id || req.user.companyId || null;
-    if (!inviterCompanyId) {
-      const fallbackCompany = await pool.query(
-        "SELECT id FROM companies ORDER BY created_at ASC, id ASC LIMIT 1"
-      );
-      inviterCompanyId = fallbackCompany.rows[0]?.id || null;
-    }
-    if (!inviterCompanyId) {
-      return res.status(400).json({ error: "No company exists yet to attach this invite token to. Create a company first, then try again." });
-    }
-
     const tokenValue = uuidv4();
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     await pool.query(
       `INSERT INTO invite_tokens (token, email, company_id, invited_by, expires_at, role_to_assign)
-       VALUES ($1, $2, $3, $4, $5, 'super_admin')`,
-      [tokenValue, inviteeEmail, inviterCompanyId, req.user.userId, expiresAt]
+       VALUES ($1, $2, NULL, $3, $4, 'super_admin')`,
+      [tokenValue, inviteeEmail, req.user.userId, expiresAt]
     );
 
     const appUrl = process.env.APP_URL || "http://localhost:3000";
@@ -2150,7 +2866,7 @@ app.delete("/api/admin/companies/:companyId", authenticateToken, isSuperAdmin, a
     await client.query("BEGIN");
 
     const companyRes = await client.query(
-      "SELECT id, company_name, company_code FROM companies WHERE id = $1",
+      "SELECT id, company_name FROM companies WHERE id = $1",
       [companyId]
     );
     if (!companyRes.rows.length) {
@@ -2547,42 +3263,55 @@ app.get("/api/companies/:companyId/passport-types", authenticateToken, checkComp
 app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
   try {
     const { companyId }              = req.params;
-    const { passport_type, model_name, product_id, ...fields } = req.body;
+    const normalizedBody = normalizePassportRequestBody(req.body);
+    const { passport_type, model_name, product_id, ...fields } = normalizedBody;
     const userId = req.user.userId;
 
     if (!passport_type)
       return res.status(400).json({ error: "passport_type is required" });
 
-    const tableName = getTable(passport_type);
-    const guid = uuidv4();
-    const normalizedModelName = (typeof model_name === "string" ? model_name.trim() : "")
-      || `Untitled Passport ${guid.slice(0, 8)}`;
-
-    const dup = await pool.query(
-      `SELECT id FROM ${tableName}
-       WHERE model_name = $1 AND release_status = 'draft' AND deleted_at IS NULL`,
-      [normalizedModelName]
-    );
-    if (dup.rows.length)
-      return res.status(409).json({ error: `A draft "${normalizedModelName}" already exists.` });
-
-    const systemFields = new Set(["id","guid","company_id","created_by","created_at","passport_type",
-                          "version_number","release_status","deleted_at","qr_code",
-                          "created_by_email","first_name","last_name","updated_by","updated_at"]);
-    const dataFields = Object.keys(fields).filter(k => !systemFields.has(k));
-
-    // Convert array/table fields to JSON strings
-    const processedFields = {};
-    for (const key of dataFields) {
-      const value = fields[key];
-      // If value is array/object, convert to JSON string; otherwise keep as is
-      processedFields[key] = (Array.isArray(value) || (typeof value === "object" && value !== null)) 
-        ? JSON.stringify(value) 
-        : value;
+    const typeSchema = await getPassportTypeSchema(passport_type);
+    if (!typeSchema) {
+      return res.status(404).json({ error: "Passport type not found" });
     }
 
+    const resolvedPassportType = typeSchema.typeName;
+    const tableName = getTable(resolvedPassportType);
+    const guid = uuidv4();
+    const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
+    const existingByProductId = await findExistingPassportByProductId({
+      tableName,
+      companyId,
+      productId: normalizedProductId,
+    });
+    if (existingByProductId) {
+      return res.status(409).json({
+        error: `A passport with Serial Number "${normalizedProductId}" already exists.`,
+        existing_guid: existingByProductId.guid,
+        release_status: normalizeReleaseStatus(existingByProductId.release_status),
+      });
+    }
+
+    const incomingFieldKeys = Object.keys(fields);
+    const invalidFieldKeys = incomingFieldKeys.filter(key =>
+      !SYSTEM_PASSPORT_FIELDS.has(key) &&
+      !typeSchema.allowedKeys.has(key)
+    );
+    if (invalidFieldKeys.length) {
+      return res.status(400).json({
+        error: "Unknown passport field(s) in request body",
+        fields: invalidFieldKeys,
+      });
+    }
+    const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
+
+    // Convert array/table fields to JSON strings
+    const processedFields = Object.fromEntries(
+      dataFields.map((key) => [key, toStoredPassportValue(fields[key])])
+    );
+
     const allCols = ["guid","company_id","model_name","product_id","created_by", ...dataFields];
-    const allVals = [guid, companyId, normalizedModelName, product_id || null, userId, ...dataFields.map(k => processedFields[k])];
+    const allVals = [guid, companyId, model_name || null, normalizedProductId, userId, ...dataFields.map(k => processedFields[k])];
     const places  = allCols.map((_, i) => `$${i + 1}`).join(", ");
 
     const result = await pool.query(
@@ -2593,13 +3322,13 @@ app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyA
     await pool.query(
       `INSERT INTO passport_registry (guid, company_id, passport_type)
        VALUES ($1, $2, $3) ON CONFLICT (guid) DO NOTHING`,
-      [guid, companyId, passport_type]
+      [guid, companyId, resolvedPassportType]
     );
 
     await logAudit(companyId, userId, "CREATE", tableName, guid, null, {
-      model_name: normalizedModelName,
-      passport_type,
-      product_id,
+      product_id: normalizedProductId,
+      passport_type: resolvedPassportType,
+      model_name,
     });
     res.status(201).json({ success: true, passport: result.rows[0] });
   } catch (e) {
@@ -2615,7 +3344,8 @@ app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyA
 app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
   try {
     const { companyId } = req.params;
-    const { passport_type, passports } = req.body;
+    const normalizedBody = normalizePassportRequestBody(req.body);
+    const { passport_type, passports } = normalizedBody;
     const userId = req.user.userId;
 
     if (!passport_type)           return res.status(400).json({ error: "passport_type is required" });
@@ -2623,47 +3353,64 @@ app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCom
       return res.status(400).json({ error: "passports must be a non-empty array" });
     if (passports.length > 500)   return res.status(400).json({ error: "Maximum 500 passports per bulk request" });
 
-    const tableName = getTable(passport_type);
+    const typeSchema = await getPassportTypeSchema(passport_type);
+    if (!typeSchema) {
+      return res.status(404).json({ error: "Passport type not found" });
+    }
 
-    const systemFields = new Set(["id","guid","company_id","created_by","created_at","passport_type",
-      "version_number","release_status","deleted_at","qr_code",
-      "created_by_email","first_name","last_name","updated_by","updated_at"]);
+    const resolvedPassportType = typeSchema.typeName;
+    const tableName = getTable(resolvedPassportType);
 
     const results  = [];
     let created = 0, skipped = 0, failed = 0;
 
     for (let i = 0; i < passports.length; i++) {
-      const item = passports[i];
+      const item = normalizePassportRequestBody(passports[i] || {});
       const { model_name, product_id, ...fields } = item;
       const guid = uuidv4();
-      const normalizedModelName = (typeof model_name === "string" ? model_name.trim() : "")
-        || `Untitled Passport ${guid.slice(0, 8)}`;
+      const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
 
       try {
-        // Duplicate check (existing draft with same model_name)
-        const dup = await pool.query(
-          `SELECT id FROM ${tableName} WHERE model_name = $1 AND release_status = 'draft' AND deleted_at IS NULL`,
-          [normalizedModelName]
-        );
-        if (dup.rows.length) {
-          results.push({ index: i, model_name: normalizedModelName, success: false, error: `A draft "${normalizedModelName}" already exists — skipped` });
+        const existingByProductId = await findExistingPassportByProductId({
+          tableName,
+          companyId,
+          productId: normalizedProductId,
+        });
+        if (existingByProductId) {
+          results.push({
+            index: i,
+            product_id: normalizedProductId,
+            success: false,
+            error: `A passport with Serial Number "${normalizedProductId}" already exists — skipped`,
+          });
           skipped++;
           continue;
         }
 
-        const dataFields = Object.keys(fields).filter(k => !systemFields.has(k) && /^[a-z][a-z0-9_]+$/.test(k));
-        
-        // Convert array/table fields to JSON strings
-        const processedFields = {};
-        for (const key of dataFields) {
-          const value = fields[key];
-          processedFields[key] = (Array.isArray(value) || (typeof value === "object" && value !== null)) 
-            ? JSON.stringify(value) 
-            : value;
+        const invalidFieldKeys = Object.keys(fields).filter(key =>
+          !SYSTEM_PASSPORT_FIELDS.has(key) &&
+          !typeSchema.allowedKeys.has(key)
+        );
+        if (invalidFieldKeys.length) {
+          results.push({
+            index: i,
+            product_id: normalizedProductId,
+            success: false,
+            error: `Unknown passport field(s): ${invalidFieldKeys.join(", ")}`
+          });
+          failed++;
+          continue;
         }
 
+        const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
+
+        // Convert array/table fields to JSON strings
+        const processedFields = Object.fromEntries(
+          dataFields.map((key) => [key, toStoredPassportValue(fields[key])])
+        );
+
         const allCols  = ["guid","company_id","model_name","product_id","created_by", ...dataFields];
-        const allVals  = [guid, companyId, normalizedModelName, product_id || null, userId, ...dataFields.map(k => processedFields[k])];
+        const allVals  = [guid, companyId, model_name || null, normalizedProductId, userId, ...dataFields.map(k => processedFields[k])];
         const places   = allCols.map((_, idx) => `$${idx + 1}`).join(", ");
 
         const r = await pool.query(
@@ -2672,19 +3419,19 @@ app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCom
         );
         await pool.query(
           `INSERT INTO passport_registry (guid, company_id, passport_type) VALUES ($1,$2,$3) ON CONFLICT (guid) DO NOTHING`,
-          [guid, companyId, passport_type]
+          [guid, companyId, resolvedPassportType]
         );
         await logAudit(companyId, userId, "CREATE", tableName, guid, null, {
-          model_name: normalizedModelName,
-          passport_type,
-          product_id,
+          product_id: normalizedProductId,
+          passport_type: resolvedPassportType,
+          model_name,
           bulk: true,
         });
 
-        results.push({ index: i, success: true, guid, model_name: normalizedModelName, product_id: product_id || null });
+        results.push({ index: i, success: true, guid, product_id: normalizedProductId, model_name: model_name || null });
         created++;
       } catch (e) {
-        results.push({ index: i, model_name: normalizedModelName, success: false, error: e.message });
+        results.push({ index: i, product_id: normalizedProductId, success: false, error: e.message });
         failed++;
       }
     }
@@ -2834,13 +3581,162 @@ app.get("/api/companies/:companyId/passports", authenticateToken, checkCompanyAc
              WHERE p.deleted_at IS NULL AND p.company_id = $1`;
     const params = [companyId]; let i = 2;
 
-    if (status)  { q += ` AND p.release_status = $${i++}`; params.push(status); }
+    if (status)  {
+      const normalizedStatus = normalizeReleaseStatus(status);
+      if (normalizedStatus === IN_REVISION_STATUS) {
+        q += ` AND p.release_status IN ${IN_REVISION_STATUSES_SQL}`;
+      } else {
+        q += ` AND p.release_status = $${i++}`;
+        params.push(normalizedStatus);
+      }
+    }
     if (search)  { q += ` AND (p.model_name ILIKE $${i} OR p.product_id ILIKE $${i})`; params.push(`%${search}%`); i++; }
     q += " ORDER BY p.created_at DESC";
 
     const r = await pool.query(q, params);
-    res.json(r.rows.map(row => ({ ...row, passport_type: passportType })));
+    res.json(r.rows.map(row => ({ ...normalizePassportRow(row), passport_type: passportType })));
   } catch (e) { res.status(500).json({ error: "Failed to fetch passports" }); }
+});
+
+// BULK FETCH (retrieve multiple passports by product_id or guid — POST because GET can't have a body)
+app.post("/api/companies/:companyId/passports/bulk-fetch", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+
+    let passport_type, identifiers;
+    if (Array.isArray(req.body)) {
+      identifiers = req.body;
+      passport_type = identifiers[0]?.passport_type || identifiers[0]?.passportType;
+    } else {
+      const normalizedBody = normalizePassportRequestBody(req.body);
+      passport_type = normalizedBody.passport_type;
+      identifiers = normalizedBody.passports || normalizedBody.identifiers;
+    }
+    if (!passport_type) return res.status(400).json({ error: "passport_type required" });
+    if (!Array.isArray(identifiers) || !identifiers.length) return res.status(400).json({ error: "passports or identifiers array required" });
+    if (identifiers.length > 500) return res.status(400).json({ error: "Max 500 per request" });
+
+    const typeSchema = await getPassportTypeSchema(passport_type);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const tableName = getTable(typeSchema.typeName);
+
+    const results = [];
+
+    for (const item of identifiers) {
+      const raw = typeof item === "string" ? { product_id: item } : (item || {});
+      const guid = raw.guid;
+      const productId = normalizeProductIdValue(raw.product_id || raw.productId);
+
+      try {
+        let row = null;
+        if (guid) {
+          const r = await pool.query(
+            `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
+             FROM ${tableName} p LEFT JOIN users u ON u.id = p.created_by
+             WHERE p.guid = $1 AND p.company_id = $2 AND p.deleted_at IS NULL
+             ORDER BY p.version_number DESC LIMIT 1`,
+            [guid, companyId]
+          );
+          row = r.rows[0];
+        }
+        if (!row && productId) {
+          const r = await pool.query(
+            `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
+             FROM ${tableName} p LEFT JOIN users u ON u.id = p.created_by
+             WHERE p.product_id = $1 AND p.company_id = $2 AND p.deleted_at IS NULL
+             ORDER BY p.version_number DESC LIMIT 1`,
+            [productId, companyId]
+          );
+          row = r.rows[0];
+        }
+        if (row) {
+          results.push({ ...normalizePassportRow(row), passport_type: typeSchema.typeName, _status: "found" });
+        } else {
+          results.push({ guid: guid || undefined, product_id: productId || undefined, _status: "not_found" });
+        }
+      } catch (e) {
+        results.push({ guid: guid || undefined, product_id: productId || undefined, _status: "error", error: e.message });
+      }
+    }
+
+    res.json({ total: identifiers.length, found: results.filter(r => r._status === "found").length, results });
+  } catch (e) {
+    console.error("Bulk fetch error:", e.message);
+    res.status(500).json({ error: "Bulk fetch failed" });
+  }
+});
+
+// ── Export passports as CSV/JSON by passport type ───────
+// Query params: passportType (required), format=csv|json, status=draft|released|in_revision|all (default: draft)
+app.get("/api/companies/:companyId/passports/export-drafts", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const passportType = req.query.passportType;
+    const fmt = (req.query.format || "csv").toLowerCase();
+    const statusFilter = (req.query.status || "draft").toLowerCase();
+
+    if (!passportType) return res.status(400).json({ error: "passportType is required" });
+
+    const typeRes = await pool.query(
+      "SELECT fields_json FROM passport_types WHERE type_name=$1",
+      [passportType]
+    );
+    if (!typeRes.rows.length) return res.status(404).json({ error: "Passport type not found" });
+
+    const sections = typeRes.rows[0]?.fields_json?.sections || [];
+    const schemaFields = sections.flatMap(s => s.fields || []);
+
+    const tableName = getTable(passportType);
+    const cols = ["guid", "model_name", "product_id", "release_status", ...schemaFields.map(f => f.key)];
+    const safeColsSql = cols.map(c => /^[a-z][a-z0-9_]*$/.test(c) ? c : null).filter(Boolean);
+
+    let statusSql;
+    if (statusFilter === "all") {
+      statusSql = "";
+    } else if (statusFilter === "released") {
+      statusSql = ` AND release_status = 'released'`;
+    } else if (statusFilter === "in_revision" || statusFilter === "revised") {
+      statusSql = ` AND release_status IN ${IN_REVISION_STATUSES_SQL}`;
+    } else {
+      statusSql = ` AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
+    }
+
+    const passRes = await pool.query(
+      `SELECT ${safeColsSql.join(", ")} FROM ${tableName}
+       WHERE company_id=$1${statusSql} AND deleted_at IS NULL
+       ORDER BY created_at DESC`,
+      [companyId]
+    );
+    const rows = passRes.rows;
+
+    if (fmt === "json") {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${passportType}_export.json"`);
+      return res.json(rows);
+    }
+
+    const escCell = (v) => {
+      const str = (Array.isArray(v) || (typeof v === "object" && v !== null))
+        ? JSON.stringify(v) : String(v ?? "");
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+    const fieldRows = [
+      ["guid",           ...rows.map(r => r.guid)],
+      ["model_name",     ...rows.map(r => r.model_name || "")],
+      ["product_id",     ...rows.map(r => r.product_id || "")],
+      ["release_status", ...rows.map(r => r.release_status || "")],
+      ...schemaFields.map(f => [f.label || f.key, ...rows.map(r => r[f.key] ?? "")]),
+    ];
+    const headerRow = ["Field Name", ...rows.map((_, i) => `Passport ${i + 1}`)];
+    const csvLines = [headerRow, ...fieldRows].map(row => row.map(escCell).join(","));
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${passportType}_export.csv"`);
+    res.send(csvLines.join("\n"));
+  } catch (e) {
+    console.error("Export by type error:", e.message);
+    res.status(500).json({ error: "Export failed" });
+  }
 });
 
 // GET SINGLE — company-scoped (for dashboard)
@@ -2861,7 +3757,7 @@ app.get("/api/companies/:companyId/passports/:guid", authenticateToken, checkCom
       [guid, companyId]
     );
     if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-    res.json({ ...r.rows[0], passport_type: passportType });
+    res.json({ ...normalizePassportRow(r.rows[0]), passport_type: passportType });
   } catch (e) { res.status(500).json({ error: "Failed to fetch passport" }); }
 });
 
@@ -2944,7 +3840,7 @@ app.get("/api/passports/:guid", publicReadRateLimit, async (req, res) => {
       [guid]
     );
     if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-    const passport = { ...r.rows[0], passport_type };
+    const passport = { ...normalizePassportRow(r.rows[0]), passport_type };
 
     // Strip any fields whose access level is not "public"
     // (fetch type definition to know which fields are restricted)
@@ -2968,6 +3864,28 @@ app.get("/api/passports/:guid", publicReadRateLimit, async (req, res) => {
 
     res.json(passport);
   } catch (e) { res.status(500).json({ error: "Failed to fetch passport" }); }
+});
+
+app.get("/api/passports/:guid/history", publicReadRateLimit, async (req, res) => {
+  try {
+    const { guid } = req.params;
+    const reg = await pool.query(
+      "SELECT passport_type FROM passport_registry WHERE guid = $1",
+      [guid]
+    );
+    if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+    const passportType = reg.rows[0].passport_type;
+    const historyPayload = await buildPassportVersionHistory({
+      guid,
+      passportType,
+      publicOnly: true,
+    });
+
+    res.json(historyPayload);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch passport history" });
+  }
 });
 
 // ── AAS export — public (released passports only) ────────────────────────────
@@ -3187,7 +4105,7 @@ app.post("/api/passports/:guid/unlock", publicUnlockRateLimit, async (req, res) 
     );
     if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-    res.json({ success: true, passport: { ...r.rows[0], passport_type } });
+    res.json({ success: true, passport: { ...normalizePassportRow(r.rows[0]), passport_type } });
   } catch (e) { res.status(500).json({ error: "Failed to unlock passport" }); }
 });
 
@@ -3205,19 +4123,145 @@ app.get("/api/companies/:companyId/passports/:guid/access-key",
   }
 );
 
+// BULK UPDATE ALL — update every matching passport with the same field values
+// Body: { passport_type, filter: { status }, update: { field: value, ... } }
+app.patch("/api/companies/:companyId/passports/bulk-update-all", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.userId;
+    const { passport_type, passportType, filter, update } = normalizePassportRequestBody(req.body);
+
+    const requestedType = passport_type || passportType;
+    if (!requestedType) return res.status(400).json({ error: "passport_type required" });
+    if (!update || typeof update !== "object" || !Object.keys(update).length)
+      return res.status(400).json({ error: "update object with at least one field is required" });
+
+    const typeSchema = await getPassportTypeSchema(requestedType);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const tableName = getTable(typeSchema.typeName);
+
+    // Validate update fields against schema
+    const invalidKeys = Object.keys(update).filter((key) =>
+      !typeSchema.allowedKeys.has(key) && key !== "model_name" && key !== "product_id"
+    );
+    if (invalidKeys.length)
+      return res.status(400).json({ error: `Unknown field(s): ${invalidKeys.join(", ")}` });
+
+    // Cannot bulk-set product_id (it must be unique per passport)
+    if (update.product_id !== undefined)
+      return res.status(400).json({ error: "Cannot bulk-update product_id — it must be unique per passport. Use PATCH /passports instead." });
+
+    // Build WHERE clause from filter
+    const params = [companyId];
+    let filterSql = "";
+    const filterObj = filter || {};
+
+    // Status filter — default to editable statuses only
+    const statusFilter = (filterObj.status || "editable").toLowerCase();
+    if (statusFilter === "all_editable" || statusFilter === "editable" || statusFilter === "draft") {
+      filterSql += ` AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
+    } else if (statusFilter === "draft_only") {
+      filterSql += ` AND release_status = 'draft'`;
+    } else if (statusFilter === "in_revision") {
+      filterSql += ` AND release_status IN ${IN_REVISION_STATUSES_SQL}`;
+    } else {
+      return res.status(400).json({ error: `Invalid status filter "${statusFilter}". Use: editable, draft_only, in_revision` });
+    }
+
+    // Optional product_id pattern filter (ILIKE)
+    if (filterObj.product_id_like) {
+      params.push(`%${filterObj.product_id_like}%`);
+      filterSql += ` AND product_id ILIKE $${params.length}`;
+    }
+
+    // Optional model_name pattern filter
+    if (filterObj.model_name_like) {
+      params.push(`%${filterObj.model_name_like}%`);
+      filterSql += ` AND model_name ILIKE $${params.length}`;
+    }
+
+    // Optional created_after / created_before date filters
+    if (filterObj.created_after) {
+      params.push(filterObj.created_after);
+      filterSql += ` AND created_at >= $${params.length}`;
+    }
+    if (filterObj.created_before) {
+      params.push(filterObj.created_before);
+      filterSql += ` AND created_at <= $${params.length}`;
+    }
+
+    // First, count how many will be affected (dry run safety check)
+    const countRes = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM ${tableName} WHERE company_id = $1${filterSql} AND deleted_at IS NULL`,
+      params
+    );
+    const matchCount = parseInt(countRes.rows[0].cnt, 10);
+
+    if (matchCount === 0)
+      return res.json({ summary: { matched: 0, updated: 0 }, message: "No passports matched the filter" });
+
+    // Safety: if more than 1000, require explicit confirmation
+    if (matchCount > 1000 && !req.body.confirm_large_update)
+      return res.status(400).json({
+        error: `This will update ${matchCount} passports. Send confirm_large_update: true to proceed.`,
+        matched: matchCount,
+      });
+
+    // Build SET clause from update fields
+    const updateKeys = getWritablePassportColumns(update);
+    if (!updateKeys.length)
+      return res.status(400).json({ error: "No valid fields to update" });
+
+    const updateVals = getStoredPassportValues(updateKeys, update);
+    const setOffset = params.length;
+    const sets = updateKeys.map((col, i) => `${col} = $${setOffset + i + 1}`).join(", ");
+    const allParams = [...params, ...updateVals, userId];
+    const updatedByIdx = allParams.length;
+
+    const updateRes = await pool.query(
+      `UPDATE ${tableName}
+       SET ${sets}, updated_by = $${updatedByIdx}, updated_at = NOW()
+       WHERE company_id = $1${filterSql} AND deleted_at IS NULL
+       RETURNING guid`,
+      allParams
+    );
+
+    const updatedGuids = updateRes.rows.map(r => r.guid);
+
+    // Audit log for bulk operation
+    await logAudit(companyId, userId, "BULK_UPDATE_ALL", tableName, null, null, {
+      filter: filterObj,
+      fields_updated: updateKeys,
+      count: updatedGuids.length,
+    });
+
+    res.json({
+      summary: { matched: matchCount, updated: updatedGuids.length, fields_updated: updateKeys },
+      guids: updatedGuids,
+    });
+  } catch (e) {
+    console.error("Bulk update all error:", e.message, e.stack);
+    res.status(500).json({ error: "Bulk update all failed", detail: e.message });
+  }
+});
+
 // UPDATE (draft / in revision only)
 app.patch("/api/companies/:companyId/passports/:guid", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
   try {
     const { companyId, guid } = req.params;
-    const { passportType, ...fields } = req.body;
+    const normalizedBody = normalizePassportRequestBody(req.body);
+    const { passport_type, passportType, ...fields } = normalizedBody;
     const userId = req.user.userId;
 
-    if (!passportType) return res.status(400).json({ error: "passportType is required in body" });
-    const tableName = getTable(passportType);
+    const requestedPassportType = passport_type || passportType;
+    if (!requestedPassportType) return res.status(400).json({ error: "passportType is required in body" });
+    const typeSchema = await getPassportTypeSchema(requestedPassportType);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const tableName = getTable(typeSchema.typeName);
 
     const current = await pool.query(
-      `SELECT id FROM ${tableName}
-       WHERE guid = $1 AND release_status IN ('draft', 'revised') AND deleted_at IS NULL
+      `SELECT id, product_id FROM ${tableName}
+       WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
        ORDER BY version_number DESC LIMIT 1`,
       [guid]
     );
@@ -3225,31 +4269,142 @@ app.patch("/api/companies/:companyId/passports/:guid", authenticateToken, checkC
       return res.status(404).json({ error: "Passport not found or not editable." });
     const rowId = current.rows[0].id;
 
-    const excluded = new Set(["id","guid","company_id","created_by","created_at","passport_type",
-      "version_number","release_status","deleted_at","qr_code",
-      "created_by_email","first_name","last_name","updated_by","updated_at"]);
-    // Only allow safe column names (lowercase, alphanumeric + underscore) to prevent SQL injection
-    const updateFields = Object.keys(fields).filter(k => !excluded.has(k) && /^[a-z][a-z0-9_]+$/.test(k));
+    if (fields.product_id !== undefined) {
+      const normalizedProductId = normalizeProductIdValue(fields.product_id);
+      if (!normalizedProductId) {
+        return res.status(400).json({ error: "product_id cannot be blank" });
+      }
+      const existingByProductId = await findExistingPassportByProductId({
+        tableName,
+        companyId,
+        productId: normalizedProductId,
+        excludeGuid: guid,
+      });
+      if (existingByProductId) {
+        return res.status(409).json({
+          error: `A passport with Serial Number "${normalizedProductId}" already exists.`,
+          existing_guid: existingByProductId.guid,
+          release_status: normalizeReleaseStatus(existingByProductId.release_status),
+        });
+      }
+      fields.product_id = normalizedProductId;
+    }
+
+    const updateFields = await updatePassportRowById({ tableName, rowId, userId, data: fields });
     if (!updateFields.length) return res.status(400).json({ error: "No fields to update" });
-
-    // Convert array/table fields to JSON strings
-    const processedVals = updateFields.map(k => {
-      const value = fields[k];
-      return (Array.isArray(value) || (typeof value === "object" && value !== null)) 
-        ? JSON.stringify(value) 
-        : value;
-    });
-
-    const sets = updateFields.map((col, i) => `${col} = $${i + 1}`).join(", ");
-    await pool.query(
-      `UPDATE ${tableName} SET ${sets}, updated_by = $${processedVals.length + 1}, updated_at = NOW()
-       WHERE id = $${processedVals.length + 2}`,
-      [...processedVals, userId, rowId]
-    );
 
     await logAudit(companyId, userId, "UPDATE", tableName, guid, null, { fields_updated: updateFields });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: "Failed to update passport" }); }
+  } catch (e) {
+    console.error("PATCH /passports/:guid error:", e.message, e.stack);
+    res.status(500).json({ error: "Failed to update passport", detail: e.message });
+  }
+});
+
+// BULK UPDATE (update-only, no creates — match by product_id or guid in body)
+app.patch("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.userId;
+
+    let passport_type, passports;
+    if (Array.isArray(req.body)) {
+      passports = req.body;
+      passport_type = passports[0]?.passport_type || passports[0]?.passportType;
+    } else {
+      const normalizedBody = normalizePassportRequestBody(req.body);
+      passport_type = normalizedBody.passport_type;
+      passports = normalizedBody.passports;
+    }
+    if (!passport_type) return res.status(400).json({ error: "passport_type required" });
+    if (!Array.isArray(passports) || !passports.length) return res.status(400).json({ error: "passports array required" });
+    if (passports.length > 500) return res.status(400).json({ error: "Max 500 per request" });
+
+    const typeSchema = await getPassportTypeSchema(passport_type);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const tableName = getTable(typeSchema.typeName);
+
+    let updated = 0, skipped = 0, failed = 0;
+    const details = [];
+
+    for (const item of passports) {
+      const normalizedItem = normalizePassportRequestBody(item || {});
+      const { guid: incomingGuid, passport_type: _pt, passportType: _pt2, ...fields } = normalizedItem;
+      const normalizedProductId = normalizeProductIdValue(fields.product_id);
+
+      try {
+        // Must have at least one identifier
+        if (!incomingGuid && !normalizedProductId) {
+          details.push({ status: "failed", error: "Each item needs a guid or product_id to match against" });
+          failed++; continue;
+        }
+
+        // Validate field names against schema
+        const builtInCols = new Set(["product_id", "model_name"]);
+        const invalidKeys = Object.keys(fields).filter((key) =>
+          !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key) && !builtInCols.has(key)
+        );
+        if (invalidKeys.length) {
+          details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: `Unknown field(s): ${invalidKeys.join(", ")}` });
+          failed++; continue;
+        }
+
+        // Find existing passport — by guid first, then by product_id
+        let rowId, matchedGuid;
+        if (incomingGuid) {
+          const byGuid = await pool.query(
+            `SELECT id, guid FROM ${tableName} WHERE guid=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
+            [incomingGuid, companyId]
+          );
+          if (byGuid.rows.length) { rowId = byGuid.rows[0].id; matchedGuid = byGuid.rows[0].guid; }
+        }
+        if (!rowId && normalizedProductId) {
+          const byProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
+          if (byProductId && isEditablePassportStatus(normalizeReleaseStatus(byProductId.release_status))) {
+            rowId = byProductId.id; matchedGuid = byProductId.guid;
+          }
+        }
+
+        if (!rowId) {
+          details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "No matching editable passport found" });
+          skipped++; continue;
+        }
+
+        // product_id uniqueness check if changing it
+        if (fields.product_id !== undefined) {
+          if (!normalizedProductId) {
+            details.push({ guid: matchedGuid, status: "failed", error: "product_id cannot be blank" });
+            failed++; continue;
+          }
+          const dup = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId, excludeGuid: matchedGuid });
+          if (dup) {
+            details.push({ guid: matchedGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
+            failed++; continue;
+          }
+          fields.product_id = normalizedProductId;
+        }
+
+        const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: fields });
+        if (!updateCols.length) {
+          details.push({ guid: matchedGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "No changes detected" });
+          skipped++; continue;
+        }
+
+        await logAudit(companyId, userId, "UPDATE", tableName, matchedGuid, null, { source: "bulk_patch", fields_updated: updateCols });
+        details.push({ guid: matchedGuid, product_id: normalizedProductId || undefined, status: "updated", fields_updated: updateCols });
+        updated++;
+      } catch (e) {
+        console.error("Bulk PATCH item error:", e.message);
+        details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: e.message });
+        failed++;
+      }
+    }
+
+    res.json({ summary: { updated, skipped, failed, total: passports.length }, details });
+  } catch (e) {
+    console.error("Bulk PATCH error:", e.message, e.stack);
+    res.status(500).json({ error: "Bulk update failed", detail: e.message });
+  }
 });
 
 // RELEASE
@@ -3263,7 +4418,7 @@ app.patch("/api/companies/:companyId/passports/:guid/release", authenticateToken
     const r = await pool.query(
       `UPDATE ${tableName}
        SET release_status = 'released', updated_at = NOW()
-       WHERE guid = $1 AND release_status IN ('draft', 'revised')
+       WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}
        RETURNING *`,
       [guid]
     );
@@ -3282,8 +4437,8 @@ app.patch("/api/companies/:companyId/passports/:guid/release", authenticateToken
     }
 
     await logAudit(companyId, req.user.userId, "RELEASE", tableName, guid,
-      { release_status: "draft_or_revised" }, { release_status: "released" });
-    res.json({ success: true, passport: released });
+      { release_status: "draft_or_in_revision" }, { release_status: "released" });
+    res.json({ success: true, passport: normalizePassportRow(released) });
   } catch (e) { res.status(500).json({ error: "Failed to release passport" }); }
 });
 
@@ -3306,7 +4461,7 @@ app.post("/api/companies/:companyId/passports/:guid/revise", authenticateToken, 
     if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 
     const dup = await pool.query(
-      `SELECT id FROM ${tableName} WHERE guid = $1 AND release_status IN ('draft', 'revised') AND deleted_at IS NULL`,
+      `SELECT id FROM ${tableName} WHERE guid = $1 AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL} AND deleted_at IS NULL`,
       [guid]
     );
     if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
@@ -3317,7 +4472,7 @@ app.post("/api/companies/:companyId/passports/:guid/revise", authenticateToken, 
     const cols       = Object.keys(src).filter(k => !excluded.has(k));
     const vals       = cols.map(k => {
       if (k === "version_number") return newVersion;
-      if (k === "release_status") return "revised";
+      if (k === "release_status") return IN_REVISION_STATUS;
       if (k === "created_by")     return userId;
       if (k === "deleted_at")     return null;
       return src[k];
@@ -3330,8 +4485,310 @@ app.post("/api/companies/:companyId/passports/:guid/revise", authenticateToken, 
 
     await logAudit(companyId, userId, "REVISE", tableName, guid,
       { version_number: src.version_number }, { version_number: newVersion });
-    res.json({ success: true, newVersion });
+    res.json({ success: true, newVersion, release_status: IN_REVISION_STATUS });
   } catch (e) { res.status(500).json({ error: "Failed to revise passport" }); }
+});
+
+// BULK REVISE
+app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.userId;
+    const {
+      items,
+      changes,
+      revisionNote = "",
+      submitToWorkflow = false,
+      reviewerId = null,
+      approverId = null,
+      scopeType = "selected",
+      scopeMeta = {},
+    } = req.body || {};
+
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: "items must be a non-empty array" });
+    }
+    if (items.length > 500) {
+      return res.status(400).json({ error: "Maximum 500 passports per bulk revise request" });
+    }
+    if (!changes || typeof changes !== "object" || Array.isArray(changes) || Object.keys(changes).length === 0) {
+      return res.status(400).json({ error: "changes must be a non-empty object" });
+    }
+    if (submitToWorkflow && !reviewerId && !approverId) {
+      return res.status(400).json({ error: "Select at least one reviewer or approver to auto-submit revisions to workflow." });
+    }
+    if (reviewerId && approverId && String(reviewerId) === String(approverId)) {
+      return res.status(400).json({ error: "Reviewer and approver must be different users." });
+    }
+
+    const uniqueGuids = [...new Set(items.map(item => String(item?.guid || "").trim()).filter(Boolean))];
+    if (!uniqueGuids.length) {
+      return res.status(400).json({ error: "No valid passport GUIDs were provided." });
+    }
+
+    const registryRes = await pool.query(
+      `SELECT guid, passport_type
+       FROM passport_registry
+       WHERE company_id = $1 AND guid = ANY($2::uuid[])`,
+      [companyId, uniqueGuids]
+    );
+
+    const registryByGuid = new Map(registryRes.rows.map(row => [row.guid, row.passport_type]));
+    const resolvedItems = uniqueGuids
+      .map(guid => ({ guid, passport_type: registryByGuid.get(guid) || null }))
+      .filter(item => item.passport_type);
+
+    if (!resolvedItems.length) {
+      return res.status(404).json({ error: "No matching passports were found for this company." });
+    }
+
+    const passportTypes = [...new Set(resolvedItems.map(item => item.passport_type))];
+    const batchPassportType = passportTypes.length === 1 ? passportTypes[0] : null;
+
+    const batchRes = await pool.query(
+      `INSERT INTO passport_revision_batches
+         (company_id, passport_type, requested_by, scope_type, scope_meta, revision_note, changes_json,
+          submit_to_workflow, reviewer_id, approver_id, total_targeted)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING id, created_at`,
+      [
+        companyId,
+        batchPassportType,
+        userId,
+        scopeType,
+        JSON.stringify(scopeMeta || {}),
+        revisionNote || null,
+        JSON.stringify(changes),
+        !!submitToWorkflow,
+        reviewerId ? parseInt(reviewerId, 10) : null,
+        approverId ? parseInt(approverId, 10) : null,
+        resolvedItems.length,
+      ]
+    );
+    const batch = batchRes.rows[0];
+
+    const details = [];
+    let revised = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    const groupedItems = resolvedItems.reduce((acc, item) => {
+      if (!acc[item.passport_type]) acc[item.passport_type] = [];
+      acc[item.passport_type].push(item.guid);
+      return acc;
+    }, {});
+
+    for (const [passportType, guids] of Object.entries(groupedItems)) {
+      const tableName = getTable(passportType);
+      const typeRes = await pool.query(
+        "SELECT fields_json, display_name FROM passport_types WHERE type_name = $1",
+        [passportType]
+      );
+      const sections = typeRes.rows[0]?.fields_json?.sections || [];
+      const fieldMap = new Map(
+        sections.flatMap(section => section.fields || []).map(field => [field.key, field])
+      );
+      fieldMap.set("model_name", { key: "model_name", label: "Model Name", type: "text" });
+      fieldMap.set("product_id", { key: "product_id", label: "Serial Number", type: "text" });
+
+      const applicableChanges = Object.entries(changes).filter(([key]) =>
+        fieldMap.has(key) && /^[a-z][a-z0-9_]+$/.test(key)
+      );
+
+      const releasedRes = await pool.query(
+        `SELECT DISTINCT ON (guid) *
+         FROM ${tableName}
+         WHERE company_id = $1
+           AND guid = ANY($2::uuid[])
+           AND release_status = 'released'
+           AND deleted_at IS NULL
+         ORDER BY guid, version_number DESC`,
+        [companyId, guids]
+      );
+      const releasedByGuid = new Map(releasedRes.rows.map(row => [row.guid, row]));
+
+      const blockingRes = await pool.query(
+        `SELECT DISTINCT ON (guid) guid, version_number, release_status
+         FROM ${tableName}
+         WHERE company_id = $1
+           AND guid = ANY($2::uuid[])
+           AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL}
+           AND deleted_at IS NULL
+         ORDER BY guid, version_number DESC`,
+        [companyId, guids]
+      );
+      const blockingByGuid = new Map(blockingRes.rows.map(row => [row.guid, row]));
+
+      for (const guid of guids) {
+        const insertBatchItem = async (status, message, sourceVersion = null, newVersion = null) => {
+          await pool.query(
+            `INSERT INTO passport_revision_batch_items
+               (batch_id, passport_guid, passport_type, source_version_number, new_version_number, status, message)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [batch.id, guid, passportType, sourceVersion, newVersion, status, message || null]
+          );
+        };
+
+        const source = releasedByGuid.get(guid);
+        const blocker = blockingByGuid.get(guid);
+
+        if (!source) {
+          const message = "No released passport version was found for this GUID.";
+          details.push({ guid, passport_type: passportType, status: "skipped", message });
+          skipped++;
+          await insertBatchItem("skipped", message);
+          continue;
+        }
+
+        if (blocker) {
+          const blockerStatus = normalizeReleaseStatus(blocker.release_status);
+          const message = blockerStatus === "in_review"
+            ? "A revision is already in workflow for this passport."
+            : "An editable revision already exists for this passport.";
+          details.push({
+            guid,
+            passport_type: passportType,
+            status: "skipped",
+            source_version_number: source.version_number,
+            message,
+          });
+          skipped++;
+          await insertBatchItem("skipped", message, source.version_number, blocker.version_number || null);
+          continue;
+        }
+
+        if (!applicableChanges.length) {
+          const message = "None of the requested change fields apply to this passport type.";
+          details.push({
+            guid,
+            passport_type: passportType,
+            status: "skipped",
+            source_version_number: source.version_number,
+            message,
+          });
+          skipped++;
+          await insertBatchItem("skipped", message, source.version_number, null);
+          continue;
+        }
+
+        try {
+          const sourceVersion = parseInt(source.version_number, 10) || 1;
+          const newVersion = sourceVersion + 1;
+          const excluded = new Set(["id", "guid", "created_at", "updated_at", "updated_by", "qr_code"]);
+          const columns = Object.keys(source).filter(key => !excluded.has(key));
+          const mappedChanges = Object.fromEntries(
+            applicableChanges.map(([key, value]) => [key, coerceBulkFieldValue(fieldMap.get(key), value)])
+          );
+
+          const values = columns.map((key) => {
+            if (key === "version_number") return newVersion;
+            if (key === "release_status") return IN_REVISION_STATUS;
+            if (key === "created_by") return userId;
+            if (key === "deleted_at") return null;
+            if (Object.prototype.hasOwnProperty.call(mappedChanges, key)) {
+              return toStoredPassportValue(mappedChanges[key]);
+            }
+            return source[key];
+          });
+
+          const allColumns = ["guid", ...columns];
+          const allValues = [guid, ...values];
+          const placeholders = allColumns.map((_, index) => `$${index + 1}`).join(", ");
+          await pool.query(
+            `INSERT INTO ${tableName} (${allColumns.join(", ")}) VALUES (${placeholders})`,
+            allValues
+          );
+
+          let detailStatus = submitToWorkflow ? "submitted" : "revised";
+          let detailMessage = revisionNote || null;
+
+          if (submitToWorkflow) {
+            try {
+              await submitPassportToWorkflow({
+                companyId,
+                guid,
+                passportType,
+                userId,
+                reviewerId,
+                approverId,
+              });
+              detailMessage = detailMessage
+                ? `${detailMessage} Submitted to workflow.`
+                : "Revision created and submitted to workflow.";
+            } catch (workflowError) {
+              detailStatus = "revised";
+              detailMessage = detailMessage
+                ? `${detailMessage} Workflow submission failed: ${workflowError.message}`
+                : `Revision created, but workflow submission failed: ${workflowError.message}`;
+            }
+          }
+
+          await logAudit(companyId, userId, "BULK_REVISE", tableName, guid,
+            { version_number: sourceVersion, release_status: source.release_status },
+            {
+              version_number: newVersion,
+              release_status: submitToWorkflow ? "in_review" : IN_REVISION_STATUS,
+              batch_id: batch.id,
+              revision_note: revisionNote || null,
+              fields_updated: Object.keys(mappedChanges),
+            }
+          );
+
+          details.push({
+            guid,
+            passport_type: passportType,
+            status: detailStatus,
+            source_version_number: sourceVersion,
+            new_version_number: newVersion,
+            message: detailMessage,
+          });
+          revised++;
+          await insertBatchItem(detailStatus, detailMessage, sourceVersion, newVersion);
+        } catch (e) {
+          const message = e.message || "Bulk revise failed for this passport.";
+          details.push({
+            guid,
+            passport_type: passportType,
+            status: "failed",
+            source_version_number: source.version_number || null,
+            message,
+          });
+          failed++;
+          await insertBatchItem("failed", message, source.version_number || null, null);
+        }
+      }
+    }
+
+    await pool.query(
+      `UPDATE passport_revision_batches
+       SET revised_count = $1,
+           skipped_count = $2,
+           failed_count = $3,
+           updated_at = NOW()
+       WHERE id = $4`,
+      [revised, skipped, failed, batch.id]
+    );
+
+    res.json({
+      success: true,
+      batch: {
+        id: batch.id,
+        created_at: batch.created_at,
+        passport_type: batchPassportType,
+        scope_type: scopeType,
+      },
+      summary: {
+        targeted: resolvedItems.length,
+        revised,
+        skipped,
+        failed,
+      },
+      details,
+    });
+  } catch (e) {
+    console.error("Bulk revise error:", e.message);
+    res.status(500).json({ error: "Bulk revise failed" });
+  }
 });
 
 // DELETE (soft)
@@ -3344,7 +4801,7 @@ app.delete("/api/companies/:companyId/passports/:guid", authenticateToken, check
     const tableName = getTable(passportType);
     const r = await pool.query(
       `UPDATE ${tableName} SET deleted_at = NOW()
-       WHERE guid = $1 AND release_status IN ('draft', 'revised') AND deleted_at IS NULL
+       WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
        RETURNING guid`,
       [guid]
     );
@@ -3352,6 +4809,90 @@ app.delete("/api/companies/:companyId/passports/:guid", authenticateToken, check
     await logAudit(companyId, req.user.userId, "DELETE", tableName, guid, { guid }, null);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: "Failed to delete passport" }); }
+});
+
+// BULK DELETE (soft-delete multiple passports by product_id or guid)
+app.delete("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.userId;
+
+    let passport_type, identifiers;
+    if (Array.isArray(req.body)) {
+      identifiers = req.body;
+      passport_type = identifiers[0]?.passport_type || identifiers[0]?.passportType;
+    } else {
+      const normalizedBody = normalizePassportRequestBody(req.body);
+      passport_type = normalizedBody.passport_type;
+      identifiers = normalizedBody.passports || normalizedBody.identifiers;
+    }
+    if (!passport_type) return res.status(400).json({ error: "passport_type required" });
+    if (!Array.isArray(identifiers) || !identifiers.length) return res.status(400).json({ error: "passports or identifiers array required" });
+    if (identifiers.length > 500) return res.status(400).json({ error: "Max 500 per request" });
+
+    const typeSchema = await getPassportTypeSchema(passport_type);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const tableName = getTable(typeSchema.typeName);
+
+    let deleted = 0, skipped = 0, failed = 0;
+    const details = [];
+
+    for (const item of identifiers) {
+      const raw = typeof item === "string" ? { product_id: item } : (item || {});
+      const guid = raw.guid;
+      const productId = normalizeProductIdValue(raw.product_id || raw.productId);
+
+      try {
+        if (!guid && !productId) {
+          details.push({ status: "failed", error: "Each item needs a guid or product_id" });
+          failed++; continue;
+        }
+
+        let matchedGuid = null;
+
+        if (guid) {
+          const r = await pool.query(
+            `UPDATE ${tableName} SET deleted_at = NOW()
+             WHERE guid = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+             RETURNING guid`,
+            [guid, companyId]
+          );
+          if (r.rows.length) matchedGuid = r.rows[0].guid;
+        }
+
+        if (!matchedGuid && productId) {
+          const existing = await findExistingPassportByProductId({ tableName, companyId, productId });
+          if (existing && isEditablePassportStatus(normalizeReleaseStatus(existing.release_status))) {
+            const r = await pool.query(
+              `UPDATE ${tableName} SET deleted_at = NOW()
+               WHERE id = $1 AND deleted_at IS NULL
+               RETURNING guid`,
+              [existing.id]
+            );
+            if (r.rows.length) matchedGuid = r.rows[0].guid;
+          }
+        }
+
+        if (!matchedGuid) {
+          details.push({ guid: guid || undefined, product_id: productId || undefined, status: "skipped", reason: "Not found or not deletable (released passports cannot be deleted)" });
+          skipped++; continue;
+        }
+
+        await logAudit(companyId, userId, "DELETE", tableName, matchedGuid, { guid: matchedGuid }, null);
+        details.push({ guid: matchedGuid, product_id: productId || undefined, status: "deleted" });
+        deleted++;
+      } catch (e) {
+        console.error("Bulk DELETE item error:", e.message);
+        details.push({ guid: guid || undefined, product_id: productId || undefined, status: "failed", error: e.message });
+        failed++;
+      }
+    }
+
+    res.json({ summary: { deleted, skipped, failed, total: identifiers.length }, details });
+  } catch (e) {
+    console.error("Bulk DELETE error:", e.message, e.stack);
+    res.status(500).json({ error: "Bulk delete failed", detail: e.message });
+  }
 });
 
 // VERSION DIFF
@@ -3369,8 +4910,103 @@ app.get("/api/companies/:companyId/passports/:guid/diff", authenticateToken, che
        ORDER BY version_number ASC`,
       [guid]
     );
-    res.json({ versions: r.rows, passportType });
+    res.json({ versions: r.rows.map(normalizePassportRow), passportType });
   } catch (e) { res.status(500).json({ error: "Failed" }); }
+});
+
+app.get("/api/companies/:companyId/passports/:guid/history", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId, guid } = req.params;
+    const reg = await pool.query(
+      `SELECT passport_type
+       FROM passport_registry
+       WHERE guid = $1 AND company_id = $2`,
+      [guid, companyId]
+    );
+    if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+    const passportType = reg.rows[0].passport_type;
+    const historyPayload = await buildPassportVersionHistory({
+      guid,
+      passportType,
+      companyId,
+      publicOnly: false,
+    });
+
+    res.json(historyPayload);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to fetch passport history" });
+  }
+});
+
+app.patch("/api/companies/:companyId/passports/:guid/history/:versionNumber", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId, guid, versionNumber } = req.params;
+    const { isPublic } = req.body || {};
+    const parsedVersion = parseInt(versionNumber, 10);
+
+    if (!Number.isFinite(parsedVersion) || parsedVersion < 1) {
+      return res.status(400).json({ error: "A valid version number is required." });
+    }
+    if (typeof isPublic !== "boolean") {
+      return res.status(400).json({ error: "isPublic must be true or false." });
+    }
+
+    const reg = await pool.query(
+      `SELECT passport_type
+       FROM passport_registry
+       WHERE guid = $1 AND company_id = $2`,
+      [guid, companyId]
+    );
+    if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+    const passportType = reg.rows[0].passport_type;
+    const tableName = getTable(passportType);
+    const versionRes = await pool.query(
+      `SELECT version_number, release_status
+       FROM ${tableName}
+       WHERE guid = $1 AND company_id = $2 AND version_number = $3 AND deleted_at IS NULL
+       LIMIT 1`,
+      [guid, companyId, parsedVersion]
+    );
+    if (!versionRes.rows.length) return res.status(404).json({ error: "Passport version not found" });
+
+    const versionRow = normalizePassportRow(versionRes.rows[0]);
+    if (versionRow.release_status !== "released" && isPublic) {
+      return res.status(400).json({ error: "Only released versions can be shown publicly." });
+    }
+
+    const existingVisibilityRes = await pool.query(
+      `SELECT is_public
+       FROM passport_history_visibility
+       WHERE passport_guid = $1 AND version_number = $2`,
+      [guid, parsedVersion]
+    );
+    const previousVisibility = existingVisibilityRes.rows.length
+      ? !!existingVisibilityRes.rows[0].is_public
+      : versionRow.release_status === "released";
+
+    await pool.query(
+      `INSERT INTO passport_history_visibility
+         (passport_guid, version_number, is_public, updated_by, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,NOW(),NOW())
+       ON CONFLICT (passport_guid, version_number)
+       DO UPDATE SET
+         is_public = EXCLUDED.is_public,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = NOW()`,
+      [guid, parsedVersion, isPublic, req.user.userId]
+    );
+
+    await logAudit(companyId, req.user.userId, "UPDATE_HISTORY_VISIBILITY", tableName, guid,
+      { version_number: parsedVersion, is_public: previousVisibility },
+      { version_number: parsedVersion, is_public: isPublic }
+    );
+
+    res.json({ success: true, version_number: parsedVersion, is_public: isPublic });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to update history visibility" });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3400,7 +5036,7 @@ app.post(
 
       const row = await pool.query(
         `SELECT id FROM ${tableName}
-         WHERE guid = $1 AND release_status IN ('draft', 'revised') AND deleted_at IS NULL
+         WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
          ORDER BY version_number DESC LIMIT 1`,
         [guid]
       );
@@ -3829,7 +5465,7 @@ app.get("/api/companies/:companyId/profile", publicReadRateLimit, async (req, re
   } catch { res.status(500).json({ error: "Failed to fetch company profile" }); }
 });
 
-app.post("/api/companies/:companyId/profile", authenticateToken, checkCompanyAccess, async (req, res) => {
+app.post("/api/companies/:companyId/profile", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
   try {
     const { company_logo, introduction_text, branding_json } = req.body;
     await pool.query(
@@ -3977,8 +5613,12 @@ app.delete("/api/companies/:companyId/repository/:itemId", authenticateToken, ch
       );
       if (children.rows.length) return res.status(409).json({ error: "Folder must be empty before deleting" });
     } else if (row.file_path && fs.existsSync(row.file_path)) {
-      // Only delete from disk if it's an actual uploaded file (has file_path)
-      try { fs.unlinkSync(row.file_path); } catch {}
+      const safeFilePath = path.resolve(row.file_path);
+      if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR)) {
+        console.error("[repository-delete] Refusing to delete file outside repository root:", safeFilePath);
+        return res.status(400).json({ error: "Stored file path is invalid" });
+      }
+      try { fs.unlinkSync(safeFilePath); } catch {}
     }
 
     await pool.query("DELETE FROM company_repository WHERE id = $1", [row.id]);
@@ -4075,6 +5715,49 @@ app.get("/api/users/me/notifications", authenticateToken, async (req, res) => {
   } catch { res.status(500).json({ error: "Failed" }); }
 });
 
+// Full notifications page — joins workflow details (comments, reviewer/approver names, timestamps)
+app.get("/api/users/me/notifications/full", authenticateToken, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 200);
+    const r = await pool.query(
+      `SELECT
+         n.*,
+         pw.reviewer_id,
+         pw.approver_id,
+         pw.review_status,
+         pw.approval_status,
+         pw.overall_status,
+         pw.reviewer_comment,
+         pw.approver_comment,
+         pw.reviewed_at,
+         pw.approved_at,
+         pw.rejected_at,
+         pw.created_at  AS workflow_submitted_at,
+         CONCAT(ur.first_name, ' ', ur.last_name) AS reviewer_name,
+         ur.email                                  AS reviewer_email,
+         CONCAT(ua.first_name, ' ', ua.last_name) AS approver_name,
+         ua.email                                  AS approver_email,
+         CONCAT(us.first_name, ' ', us.last_name) AS submitter_name,
+         us.email                                  AS submitter_email
+       FROM notifications n
+       LEFT JOIN passport_workflow pw
+         ON pw.passport_guid = n.passport_guid
+         AND pw.created_at = (
+           SELECT MAX(pw2.created_at) FROM passport_workflow pw2
+           WHERE pw2.passport_guid = n.passport_guid
+         )
+       LEFT JOIN users ur ON ur.id = pw.reviewer_id
+       LEFT JOIN users ua ON ua.id = pw.approver_id
+       LEFT JOIN users us ON us.id = pw.submitted_by
+       WHERE n.user_id = $1
+       ORDER BY n.created_at DESC
+       LIMIT $2`,
+      [req.user.userId, limit]
+    );
+    res.json(r.rows);
+  } catch (e) { console.error("Full notifications error:", e.message); res.status(500).json({ error: "Failed" }); }
+});
+
 app.patch("/api/users/me/notifications/read-all", authenticateToken, async (req, res) => {
   try {
     await pool.query("UPDATE notifications SET read = true WHERE user_id = $1", [req.user.userId]);
@@ -4093,6 +5776,735 @@ app.patch("/api/users/me/notifications/:id/read", authenticateToken, async (req,
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  PASSPORT TEMPLATES
+// ═══════════════════════════════════════════════════════════════════════════
+
+pool.query(`
+  CREATE TABLE IF NOT EXISTS passport_templates (
+    id            SERIAL PRIMARY KEY,
+    company_id    INTEGER NOT NULL,
+    passport_type VARCHAR(100) NOT NULL,
+    name          VARCHAR(200) NOT NULL,
+    description   TEXT,
+    created_by    INTEGER,
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS passport_template_fields (
+    id           SERIAL PRIMARY KEY,
+    template_id  INTEGER NOT NULL REFERENCES passport_templates(id) ON DELETE CASCADE,
+    field_key    VARCHAR(200) NOT NULL,
+    field_value  TEXT,
+    is_model_data BOOLEAN DEFAULT FALSE,
+    UNIQUE(template_id, field_key)
+  );
+`).catch(e => console.error("Template table init error:", e.message));
+
+// List templates for a company (optionally filter by passport_type)
+app.get("/api/companies/:companyId/templates", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { passport_type } = req.query;
+    let q = `SELECT t.*, u.first_name, u.last_name,
+               (SELECT COUNT(*) FROM passport_template_fields WHERE template_id = t.id AND is_model_data = true) AS model_field_count
+             FROM passport_templates t
+             LEFT JOIN users u ON u.id = t.created_by
+             WHERE t.company_id = $1`;
+    const params = [companyId];
+    if (passport_type) { q += ` AND t.passport_type = $2`; params.push(passport_type); }
+    q += ` ORDER BY t.passport_type, t.name`;
+    const r = await pool.query(q, params);
+    res.json(r.rows);
+  } catch (e) { console.error(e); res.status(500).json({ error: "Failed" }); }
+});
+
+// Get a single template with all fields
+app.get("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId, id } = req.params;
+    const t = await pool.query(
+      "SELECT * FROM passport_templates WHERE id=$1 AND company_id=$2",
+      [id, companyId]
+    );
+    if (!t.rows.length) return res.status(404).json({ error: "Not found" });
+    const fields = await pool.query(
+      "SELECT field_key, field_value, is_model_data FROM passport_template_fields WHERE template_id=$1",
+      [id]
+    );
+    res.json({ ...t.rows[0], fields: fields.rows });
+  } catch (e) { res.status(500).json({ error: "Failed" }); }
+});
+
+// Create template
+app.post("/api/companies/:companyId/templates", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { passport_type, name, description, fields } = req.body;
+    if (!passport_type || !name?.trim()) return res.status(400).json({ error: "passport_type and name required" });
+
+    const t = await pool.query(
+      `INSERT INTO passport_templates (company_id, passport_type, name, description, created_by)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [companyId, passport_type, name.trim(), description || null, req.user.userId]
+    );
+    const tmplId = t.rows[0].id;
+
+    if (Array.isArray(fields) && fields.length) {
+      for (const f of fields) {
+        if (!f.field_key) continue;
+        await pool.query(
+          `INSERT INTO passport_template_fields (template_id, field_key, field_value, is_model_data)
+           VALUES ($1,$2,$3,$4) ON CONFLICT (template_id, field_key) DO UPDATE
+           SET field_value=$3, is_model_data=$4`,
+          [tmplId, f.field_key, f.field_value ?? null, !!f.is_model_data]
+        );
+      }
+    }
+    res.json(t.rows[0]);
+  } catch (e) { console.error(e); res.status(500).json({ error: "Failed" }); }
+});
+
+// Update template
+app.put("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId, id } = req.params;
+    const { name, description, fields } = req.body;
+
+    const existing = await pool.query(
+      "SELECT id FROM passport_templates WHERE id=$1 AND company_id=$2", [id, companyId]
+    );
+    if (!existing.rows.length) return res.status(404).json({ error: "Not found" });
+
+    await pool.query(
+      `UPDATE passport_templates SET name=$1, description=$2, updated_at=NOW() WHERE id=$3`,
+      [name?.trim() || "Untitled", description || null, id]
+    );
+
+    if (Array.isArray(fields)) {
+      await pool.query("DELETE FROM passport_template_fields WHERE template_id=$1", [id]);
+      for (const f of fields) {
+        if (!f.field_key) continue;
+        await pool.query(
+          `INSERT INTO passport_template_fields (template_id, field_key, field_value, is_model_data)
+           VALUES ($1,$2,$3,$4)`,
+          [id, f.field_key, f.field_value ?? null, !!f.is_model_data]
+        );
+      }
+    }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: "Failed" }); }
+});
+
+// Delete template
+app.delete("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId, id } = req.params;
+    await pool.query("DELETE FROM passport_templates WHERE id=$1 AND company_id=$2", [id, companyId]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: "Failed" }); }
+});
+
+// ── Export drafts as CSV/JSON for a template ────────────────────────────────
+// Returns all draft/in-revision passports of this template's type, with GUID +
+// all schema fields so the user can fill them in a spreadsheet then re-import.
+app.get("/api/companies/:companyId/templates/:templateId/export-drafts", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId, templateId } = req.params;
+    const fmt = (req.query.format || "csv").toLowerCase(); // "csv" | "json"
+
+    // Get template
+    const tmplRes = await pool.query(
+      "SELECT * FROM passport_templates WHERE id=$1 AND company_id=$2",
+      [templateId, companyId]
+    );
+    if (!tmplRes.rows.length) return res.status(404).json({ error: "Template not found" });
+    const tmpl = tmplRes.rows[0];
+
+    const fieldRes = await pool.query(
+      "SELECT field_key, field_value, is_model_data FROM passport_template_fields WHERE template_id=$1",
+      [templateId]
+    );
+    const templateFields = Object.fromEntries(fieldRes.rows.map(f => [f.field_key, f.field_value]));
+
+    // Get passport type schema
+    const typeRes = await pool.query(
+      "SELECT fields_json FROM passport_types WHERE type_name=$1",
+      [tmpl.passport_type]
+    );
+    const sections = typeRes.rows[0]?.fields_json?.sections || [];
+    const schemaFields = sections.flatMap(s => s.fields || [])
+      .filter(f => f.type !== "file" && f.type !== "table");
+
+    // Get all draft/in-revision passports of this type for the company
+    const tableName = getTable(tmpl.passport_type);
+    const cols = ["guid", "model_name", "product_id", ...schemaFields.map(f => f.key)];
+    const safeColsSql = cols.map(c => /^[a-z][a-z0-9_]*$/.test(c) ? c : null).filter(Boolean);
+
+    const passRes = await pool.query(
+      `SELECT ${safeColsSql.join(", ")} FROM ${tableName}
+       WHERE company_id=$1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+       ORDER BY created_at DESC`,
+      [companyId]
+    );
+    const rows = passRes.rows;
+
+    if (fmt === "json") {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passport_type}_drafts.json"`);
+      return res.json(rows);
+    }
+
+    // CSV: column-oriented (Field Name | Passport 1 | Passport 2 …)
+    // Row 0: header
+    // Row 1: guid
+    // Row 2: model_name
+    // Row 3..N: schema fields
+    const escCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+    const fieldRows = [
+      ["guid",       ...rows.map(r => r.guid)],
+      ["model_name", ...rows.map(r => r.model_name || "")],
+      ["product_id", ...rows.map(r => r.product_id || "")],
+      ...schemaFields.map(f => [
+        f.label,
+        ...rows.map(r => r[f.key] ?? templateFields[f.key] ?? ""),
+      ]),
+    ];
+    const headerRow = ["Field Name", ...rows.map((_, i) => `Passport ${i + 1}`)];
+    const csvLines = [headerRow, ...fieldRows].map(row => row.map(escCell).join(","));
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passport_type}_drafts.csv"`);
+    res.send(csvLines.join("\n"));
+  } catch (e) {
+    console.error("Export drafts error:", e.message);
+    res.status(500).json({ error: "Export failed" });
+  }
+});
+
+// ── Upsert passports via CSV (GUID → PATCH existing, no GUID → POST new) ───
+app.post("/api/companies/:companyId/passports/upsert-csv", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const normalizedBody = normalizePassportRequestBody(req.body);
+    const { passport_type, csv } = normalizedBody;
+    if (!passport_type || !csv) return res.status(400).json({ error: "passport_type and csv required" });
+
+    const typeSchema = await getPassportTypeSchema(passport_type);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const resolvedPassportType = typeSchema.typeName;
+
+    // Fetch schema for label→key mapping
+    const allFields = typeSchema.schemaFields;
+
+    // Parse column-oriented CSV
+    const parseRow = (line) => {
+      line = line.replace(/\r$/, "");
+      const cells = []; let cur = ""; let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') { if (inQ && line[i+1]==='"') { cur+='"'; i++; } else inQ=!inQ; }
+        else if (c===',' && !inQ) { cells.push(cur); cur=""; }
+        else cur+=c;
+      }
+      cells.push(cur);
+      return cells;
+    };
+    const rows = csv.split("\n").map(l => l.trim()).filter(Boolean).map(parseRow);
+    if (rows.length < 2) return res.status(400).json({ error: "CSV too short" });
+
+    const numPassports = rows[0].length - 1;
+    const fieldRows = rows.slice(1); // skip header row
+
+    const tableName = getTable(resolvedPassportType);
+    const userId = req.user.userId;
+    const excluded = new Set(["id","guid","company_id","created_by","created_at","passport_type",
+      "version_number","release_status","deleted_at","qr_code",
+      "created_by_email","first_name","last_name","updated_by","updated_at"]);
+
+    let created=0, updated=0, skipped=0, failed=0;
+    const details = [];
+
+    for (let colIdx = 1; colIdx <= numPassports; colIdx++) {
+      const passport = {};
+      fieldRows.forEach(row => {
+        const rawLabel = (row[0] || "").trim();
+        if (!rawLabel) return;
+        const normalized = rawLabel.toLowerCase();
+        const value = (row[colIdx] || "").trim();
+
+        const field =
+          allFields.find(f => f.label?.trim().toLowerCase() === normalized) ||
+          allFields.find(f => f.key?.toLowerCase() === normalized) ||
+          (normalized === "model_name" ? { key: "model_name" } : null) ||
+          (normalized === "product_id" ? { key: "product_id" } : null) ||
+          (normalized === "guid"       ? { key: "guid" }       : null);
+
+        if (field && value) {
+          passport[field.key] = field.type === "boolean"
+            ? (value.toLowerCase() === "true" || value === "1")
+            : value;
+        }
+      });
+
+      const { guid: incomingGuid, model_name, product_id, ...fields } = passport;
+      const normalizedProductId = normalizeProductIdValue(product_id);
+
+      try {
+        if (incomingGuid) {
+          // PATCH existing
+          const existing = await pool.query(
+            `SELECT id FROM ${tableName} WHERE guid=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
+            [incomingGuid, companyId]
+          );
+          if (!existing.rows.length) {
+            details.push({ guid: incomingGuid, status: "skipped", reason: "not found or not editable" });
+            skipped++; continue;
+          }
+          const rowId = existing.rows[0].id;
+          if (product_id !== undefined) {
+            if (!normalizedProductId) {
+              details.push({ guid: incomingGuid, status: "failed", error: "product_id cannot be blank" });
+              failed++; continue;
+            }
+            const existingByProductId = await findExistingPassportByProductId({
+              tableName,
+              companyId,
+              productId: normalizedProductId,
+              excludeGuid: incomingGuid,
+            });
+            if (existingByProductId) {
+              details.push({ guid: incomingGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
+              failed++; continue;
+            }
+          }
+          const updateData = { model_name, ...fields };
+          if (product_id !== undefined) updateData.product_id = normalizedProductId;
+          const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: updateData, excluded });
+          if (!updateCols.length) { skipped++; continue; }
+          await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "csv_upsert" });
+          details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "updated" });
+          updated++;
+        } else {
+          if (!normalizedProductId) {
+            details.push({ status: "skipped", reason: "Serial Number is required to create a new passport" });
+            skipped++; continue;
+          }
+          const existingByProductId = await findExistingPassportByProductId({
+            tableName,
+            companyId,
+            productId: normalizedProductId,
+          });
+          if (existingByProductId) {
+            const existingStatus = normalizeReleaseStatus(existingByProductId.release_status);
+            if (isEditablePassportStatus(existingStatus)) {
+              const updateData = { model_name, product_id: normalizedProductId, ...fields };
+              const updateCols = await updatePassportRowById({
+                tableName,
+                rowId: existingByProductId.id,
+                userId,
+                data: updateData,
+                excluded,
+              });
+              if (!updateCols.length) {
+                details.push({ guid: existingByProductId.guid, product_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
+                skipped++; continue;
+              }
+              await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.guid, null, { source: "csv_upsert", matched_by: "product_id" });
+              details.push({ guid: existingByProductId.guid, product_id: normalizedProductId, status: "updated" });
+              updated++; continue;
+            }
+            details.push({
+              guid: existingByProductId.guid,
+              product_id: normalizedProductId,
+              status: "skipped",
+              reason: existingStatus === "in_review"
+                ? "matching passport is in review and cannot be edited"
+                : "matching passport already exists; revise it before importing changes",
+            });
+            skipped++; continue;
+          }
+
+          const newGuid = uuidv4();
+          const dataFields = getWritablePassportColumns(fields, excluded);
+          const allCols = ["guid","company_id","model_name","product_id","created_by", ...dataFields];
+          const allVals = [newGuid, companyId, model_name || null, normalizedProductId, userId, ...getStoredPassportValues(dataFields, fields)];
+          await pool.query(
+            `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_,i)=>`$${i+1}`).join(",")})`,
+            allVals
+          );
+          await pool.query(
+            `INSERT INTO passport_registry (guid,company_id,passport_type) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+            [newGuid, companyId, resolvedPassportType]
+          );
+          details.push({ guid: newGuid, product_id: normalizedProductId, model_name, status: "created" });
+          created++;
+        }
+      } catch (e) {
+        console.error("Upsert CSV row error:", e.message);
+        details.push({ status: "failed", error: e.message });
+        failed++;
+      }
+    }
+
+    res.json({ summary: { created, updated, skipped, failed }, details });
+  } catch (e) {
+    console.error("Upsert CSV error:", e.message);
+    res.status(500).json({ error: "Import failed" });
+  }
+});
+
+// ── Upsert passports via JSON array (GUID → PATCH, no GUID → POST new) ──────
+app.post("/api/companies/:companyId/passports/upsert-json", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    // Accept either: { passport_type, passports: [...] }
+    // or a raw array: [{ passport_type, ... }, ...]
+    let passport_type, passports;
+    if (Array.isArray(req.body)) {
+      passports = req.body;
+      passport_type = passports[0]?.passport_type || passports[0]?.passportType;
+    } else {
+      const normalizedBody = normalizePassportRequestBody(req.body);
+      passport_type = normalizedBody.passport_type;
+      passports = normalizedBody.passports;
+    }
+    if (!passport_type) return res.status(400).json({ error: "passport_type required" });
+    if (!Array.isArray(passports) || !passports.length) return res.status(400).json({ error: "passports array required" });
+    if (passports.length > 500) return res.status(400).json({ error: "Max 500 per request" });
+
+    const typeSchema = await getPassportTypeSchema(passport_type);
+    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const resolvedPassportType = typeSchema.typeName;
+    const tableName = getTable(resolvedPassportType);
+    const userId = req.user.userId;
+    const excluded = new Set(["id","company_id","created_by","created_at","passport_type",
+      "version_number","release_status","deleted_at","qr_code",
+      "created_by_email","first_name","last_name","updated_by","updated_at"]);
+
+    let created=0, updated=0, skipped=0, failed=0;
+    const details = [];
+
+    for (const item of passports) {
+      const normalizedItem = normalizePassportRequestBody(item || {});
+      const { guid: incomingGuid, model_name, product_id, ...fields } = normalizedItem;
+      const normalizedProductId = normalizeProductIdValue(product_id);
+      const invalidFieldKeys = Object.keys(fields).filter((key) =>
+        !SYSTEM_PASSPORT_FIELDS.has(key) &&
+        !typeSchema.allowedKeys.has(key)
+      );
+      try {
+        if (invalidFieldKeys.length) {
+          details.push({
+            guid: incomingGuid || undefined,
+            product_id: normalizedProductId || undefined,
+            status: "failed",
+            error: `Unknown passport field(s): ${invalidFieldKeys.join(", ")}`,
+          });
+          failed++;
+          continue;
+        }
+        if (incomingGuid) {
+          const existing = await pool.query(
+            `SELECT id FROM ${tableName} WHERE guid=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
+            [incomingGuid, companyId]
+          );
+          if (!existing.rows.length) {
+            details.push({ guid: incomingGuid, status: "skipped", reason: "not found or not editable" });
+            skipped++; continue;
+          }
+          const rowId = existing.rows[0].id;
+          if (product_id !== undefined) {
+            if (!normalizedProductId) {
+              details.push({ guid: incomingGuid, status: "failed", error: "product_id cannot be blank" });
+              failed++; continue;
+            }
+            const existingByProductId = await findExistingPassportByProductId({
+              tableName,
+              companyId,
+              productId: normalizedProductId,
+              excludeGuid: incomingGuid,
+            });
+            if (existingByProductId) {
+              details.push({ guid: incomingGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
+              failed++; continue;
+            }
+          }
+          const allData = { model_name, ...fields };
+          if (product_id !== undefined) allData.product_id = normalizedProductId;
+          const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: allData, excluded });
+          if (!updateCols.length) { skipped++; continue; }
+          await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "json_upsert" });
+          details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "updated" });
+          updated++;
+        } else {
+          if (!normalizedProductId) {
+            details.push({ status: "skipped", reason: "Serial Number is required to create a new passport" });
+            skipped++; continue;
+          }
+          const existingByProductId = await findExistingPassportByProductId({
+            tableName,
+            companyId,
+            productId: normalizedProductId,
+          });
+          if (existingByProductId) {
+            const existingStatus = normalizeReleaseStatus(existingByProductId.release_status);
+            if (isEditablePassportStatus(existingStatus)) {
+              const allData = { model_name, product_id: normalizedProductId, ...fields };
+              const updateCols = await updatePassportRowById({
+                tableName,
+                rowId: existingByProductId.id,
+                userId,
+                data: allData,
+                excluded,
+              });
+              if (!updateCols.length) {
+                details.push({ guid: existingByProductId.guid, product_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
+                skipped++; continue;
+              }
+              await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.guid, null, { source: "json_upsert", matched_by: "product_id" });
+              details.push({ guid: existingByProductId.guid, product_id: normalizedProductId, status: "updated" });
+              updated++; continue;
+            }
+            details.push({
+              guid: existingByProductId.guid,
+              product_id: normalizedProductId,
+              status: "skipped",
+              reason: existingStatus === "in_review"
+                ? "matching passport is in review and cannot be edited"
+                : "matching passport already exists; revise it before importing changes",
+            });
+            skipped++; continue;
+          }
+          const newGuid = uuidv4();
+          const dataFields = getWritablePassportColumns(fields, excluded);
+          const allCols = ["guid","company_id","model_name","product_id","created_by",...dataFields];
+          const allVals = [newGuid, companyId, model_name || null, normalizedProductId, userId, ...getStoredPassportValues(dataFields, fields)];
+          await pool.query(
+            `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_,i)=>`$${i+1}`).join(",")})`,
+            allVals
+          );
+          await pool.query(
+            `INSERT INTO passport_registry (guid,company_id,passport_type) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+            [newGuid, companyId, resolvedPassportType]
+          );
+          details.push({ guid: newGuid, product_id: normalizedProductId, model_name, status: "created" });
+          created++;
+        }
+      } catch (e) {
+        console.error("Upsert JSON item error:", e.message);
+        details.push({ guid: incomingGuid, status: "failed", error: e.message });
+        failed++;
+      }
+    }
+
+    res.json({ summary: { created, updated, skipped, failed }, details });
+  } catch (e) {
+    console.error("Upsert JSON error:", e.message);
+    res.status(500).json({ error: "Import failed" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  MESSAGING
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Ensure tables exist on startup
+pool.query(`
+  CREATE TABLE IF NOT EXISTS conversations (
+    id          SERIAL PRIMARY KEY,
+    company_id  INTEGER NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+  );
+  CREATE TABLE IF NOT EXISTS conversation_members (
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    user_id         INTEGER NOT NULL,
+    last_read_at    TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (conversation_id, user_id)
+  );
+  CREATE TABLE IF NOT EXISTS messages (
+    id              SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    sender_id       INTEGER NOT NULL,
+    body            TEXT NOT NULL,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+  );
+`).catch(e => console.error("Messaging table init error:", e.message));
+
+// List conversations for current user (with last message + unread count)
+app.get("/api/messaging/conversations", authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        c.id,
+        c.company_id,
+        -- other participant info
+        u.id       AS other_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        -- last message
+        lm.body    AS last_message,
+        lm.created_at AS last_message_at,
+        ls.sender_id  AS last_sender_id,
+        -- unread count
+        (SELECT COUNT(*) FROM messages m2
+         WHERE m2.conversation_id = c.id
+           AND m2.created_at > COALESCE(cm_me.last_read_at, '1970-01-01')
+           AND m2.sender_id != $1
+        ) AS unread
+      FROM conversations c
+      JOIN conversation_members cm_me  ON cm_me.conversation_id = c.id AND cm_me.user_id = $1
+      JOIN conversation_members cm_other ON cm_other.conversation_id = c.id AND cm_other.user_id != $1
+      JOIN users u ON u.id = cm_other.user_id
+      LEFT JOIN LATERAL (
+        SELECT m.body, m.created_at, m.sender_id FROM messages m
+        WHERE m.conversation_id = c.id
+        ORDER BY m.created_at DESC LIMIT 1
+      ) lm ON true
+      LEFT JOIN messages ls ON ls.id = (
+        SELECT id FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1
+      )
+      WHERE c.company_id = (SELECT company_id FROM users WHERE id = $1)
+      ORDER BY COALESCE(lm.created_at, c.created_at) DESC
+    `, [req.user.userId]);
+    res.json(r.rows);
+  } catch (e) { console.error("List conversations error:", e.message); res.status(500).json({ error: "Failed" }); }
+});
+
+// Get or create a direct conversation with another user
+app.post("/api/messaging/conversations", authenticateToken, async (req, res) => {
+  try {
+    const { otherUserId } = req.body;
+    if (!otherUserId) return res.status(400).json({ error: "otherUserId required" });
+    const meId = req.user.userId;
+    if (parseInt(otherUserId) === meId) return res.status(400).json({ error: "Cannot message yourself" });
+
+    // Check same company
+    const meRes = await pool.query("SELECT company_id FROM users WHERE id = $1", [meId]);
+    const otherRes = await pool.query("SELECT company_id, first_name, last_name, email FROM users WHERE id = $1", [otherUserId]);
+    if (!otherRes.rows.length) return res.status(404).json({ error: "User not found" });
+    if (meRes.rows[0].company_id !== otherRes.rows[0].company_id) return res.status(403).json({ error: "Different company" });
+
+    // Find existing 1:1 conversation
+    const existing = await pool.query(`
+      SELECT c.id FROM conversations c
+      JOIN conversation_members cm1 ON cm1.conversation_id = c.id AND cm1.user_id = $1
+      JOIN conversation_members cm2 ON cm2.conversation_id = c.id AND cm2.user_id = $2
+      WHERE c.company_id = $3 LIMIT 1
+    `, [meId, otherUserId, meRes.rows[0].company_id]);
+
+    let convId;
+    if (existing.rows.length) {
+      convId = existing.rows[0].id;
+    } else {
+      const newConv = await pool.query(
+        "INSERT INTO conversations (company_id) VALUES ($1) RETURNING id",
+        [meRes.rows[0].company_id]
+      );
+      convId = newConv.rows[0].id;
+      await pool.query(
+        "INSERT INTO conversation_members (conversation_id, user_id) VALUES ($1,$2),($1,$3)",
+        [convId, meId, otherUserId]
+      );
+    }
+    res.json({ id: convId });
+  } catch (e) { console.error("Create conversation error:", e.message); res.status(500).json({ error: "Failed" }); }
+});
+
+// Get messages in a conversation
+app.get("/api/messaging/conversations/:convId/messages", authenticateToken, async (req, res) => {
+  try {
+    const convId = parseInt(req.params.convId);
+    // Check membership
+    const mem = await pool.query(
+      "SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2",
+      [convId, req.user.userId]
+    );
+    if (!mem.rows.length) return res.status(403).json({ error: "Forbidden" });
+
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const before = req.query.before; // cursor-based pagination
+    let q, params;
+    if (before) {
+      q = `SELECT m.id, m.body, m.created_at, m.sender_id,
+                  u.first_name, u.last_name, u.email
+           FROM messages m JOIN users u ON u.id = m.sender_id
+           WHERE m.conversation_id=$1 AND m.id < $2
+           ORDER BY m.id DESC LIMIT $3`;
+      params = [convId, before, limit];
+    } else {
+      q = `SELECT m.id, m.body, m.created_at, m.sender_id,
+                  u.first_name, u.last_name, u.email
+           FROM messages m JOIN users u ON u.id = m.sender_id
+           WHERE m.conversation_id=$1
+           ORDER BY m.id DESC LIMIT $2`;
+      params = [convId, limit];
+    }
+    const r = await pool.query(q, params);
+    // Mark as read
+    await pool.query(
+      "UPDATE conversation_members SET last_read_at=NOW() WHERE conversation_id=$1 AND user_id=$2",
+      [convId, req.user.userId]
+    );
+    res.json(r.rows.reverse());
+  } catch (e) { console.error("Get messages error:", e.message); res.status(500).json({ error: "Failed" }); }
+});
+
+// Send a message
+app.post("/api/messaging/conversations/:convId/messages", authenticateToken, async (req, res) => {
+  try {
+    const convId = parseInt(req.params.convId);
+    const { body } = req.body;
+    if (!body?.trim()) return res.status(400).json({ error: "Message body required" });
+
+    const mem = await pool.query(
+      "SELECT 1 FROM conversation_members WHERE conversation_id=$1 AND user_id=$2",
+      [convId, req.user.userId]
+    );
+    if (!mem.rows.length) return res.status(403).json({ error: "Forbidden" });
+
+    const r = await pool.query(
+      "INSERT INTO messages (conversation_id, sender_id, body) VALUES ($1,$2,$3) RETURNING *",
+      [convId, req.user.userId, body.trim()]
+    );
+    // Update sender's last_read_at too
+    await pool.query(
+      "UPDATE conversation_members SET last_read_at=NOW() WHERE conversation_id=$1 AND user_id=$2",
+      [convId, req.user.userId]
+    );
+    res.json(r.rows[0]);
+  } catch (e) { console.error("Send message error:", e.message); res.status(500).json({ error: "Failed" }); }
+});
+
+// List company users to start new conversations with
+app.get("/api/messaging/users", authenticateToken, async (req, res) => {
+  try {
+    const meRes = await pool.query("SELECT company_id FROM users WHERE id=$1", [req.user.userId]);
+    const companyId = meRes.rows[0]?.company_id;
+    if (!companyId) return res.json([]);
+    const r = await pool.query(
+      `SELECT id, first_name, last_name, email, role FROM users
+       WHERE company_id=$1 AND id != $2 AND is_active=true ORDER BY first_name, last_name`,
+      [companyId, req.user.userId]
+    );
+    res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: "Failed" }); }
+});
+
+// Unread message count (for badge)
+app.get("/api/messaging/unread", authenticateToken, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT COUNT(*) AS count FROM messages m
+      JOIN conversation_members cm ON cm.conversation_id = m.conversation_id AND cm.user_id = $1
+      WHERE m.sender_id != $1 AND m.created_at > COALESCE(cm.last_read_at, '1970-01-01')
+    `, [req.user.userId]);
+    res.json({ count: parseInt(r.rows[0].count) });
+  } catch (e) { res.status(500).json({ error: "Failed" }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  WORKFLOW
 // ═══════════════════════════════════════════════════════════════════════════
 app.post("/api/companies/:companyId/passports/:guid/submit-review", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -4100,79 +6512,19 @@ app.post("/api/companies/:companyId/passports/:guid/submit-review", authenticate
     const { companyId, guid }              = req.params;
     const { passportType, reviewerId, approverId } = req.body;
     if (!passportType) return res.status(400).json({ error: "passportType required" });
-
-    const tableName = getTable(passportType);
-    const pRes = await pool.query(
-      `SELECT id, model_name, version_number, release_status FROM ${tableName}
-       WHERE guid = $1 AND release_status IN ('draft', 'revised') AND deleted_at IS NULL
-       ORDER BY version_number DESC LIMIT 1`,
-      [guid]
-    );
-    if (!pRes.rows.length) return res.status(404).json({ error: "Editable passport not found" });
-    const passport = pRes.rows[0];
-
-    const newStatus = reviewerId ? "in_review" : "released";
-    await pool.query(
-      `UPDATE ${tableName} SET release_status = $1, updated_at = NOW()
-       WHERE guid = $2 AND release_status IN ('draft', 'revised')`,
-      [newStatus, guid]
-    );
-
-    const wfRes = await pool.query(
-      `INSERT INTO passport_workflow
-         (passport_guid, passport_type, company_id, submitted_by, reviewer_id, approver_id,
-          review_status, approval_status, overall_status, previous_release_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'in_progress',$9) RETURNING id`,
-      [guid, passportType, companyId, req.user.userId,
-       reviewerId || null, approverId || null,
-       reviewerId ? "pending" : "skipped", approverId ? "pending" : "skipped",
-       passport.release_status]
-    );
-
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
-
-    if (reviewerId) {
-      await createNotification(reviewerId, "workflow_review",
-        `Review requested: ${passport.model_name}`,
-        `v${passport.version_number} needs your review`, guid, "/dashboard/workflow");
-      try {
-        const reviewer  = await pool.query("SELECT email, first_name FROM users WHERE id = $1", [reviewerId]);
-        const submitter = await pool.query("SELECT first_name, last_name, email FROM users WHERE id = $1", [req.user.userId]);
-        if (reviewer.rows.length) {
-          const rName = reviewer.rows[0].first_name || "Reviewer";
-          const sName = `${submitter.rows[0]?.first_name || ""} ${submitter.rows[0]?.last_name || ""}`.trim() || submitter.rows[0]?.email || "A colleague";
-          await createTransporter().sendMail({
-            from: process.env.EMAIL_FROM || "noreply@example.com", to: reviewer.rows[0].email,
-            subject: `[DPP] Review requested — ${passport.model_name}`,
-            html: brandedEmail({ preheader: `${sName} submitted a passport for your review`, bodyHtml: `
-              <p>Hi <strong>${rName}</strong>,</p>
-              <p><strong>${sName}</strong> has submitted a passport for your review.</p>
-              <div class="info-box">
-                <div class="info-row"><span class="info-label">Passport</span><span class="info-value">${passport.model_name}</span></div>
-                <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.version_number}</span></div>
-                <div class="info-row"><span class="info-label">Type</span><span class="info-value">${passportType}</span></div>
-              </div>
-              <div class="cta-wrap"><a href="${appUrl}/dashboard/workflow" class="cta-btn">🔍 Review Now →</a></div>` }),
-          });
-        }
-      } catch (e) { console.error("Review email error:", e.message); }
-    }
-
-    if (approverId && !reviewerId) {
-      await createNotification(approverId, "workflow_approval",
-        `Approval requested: ${passport.model_name}`,
-        `v${passport.version_number} needs your approval`, guid, "/dashboard/workflow");
-    }
-
     if (!reviewerId && !approverId) {
-      await createNotification(req.user.userId, "passport_released",
-        `${passport.model_name} released!`,
-        `v${passport.version_number} is now live`, guid, `/passport/${guid}/introduction`);
+      return res.status(400).json({ error: "Select at least one reviewer or approver for workflow submission." });
     }
 
-    await logAudit(companyId, req.user.userId, "SUBMIT_REVIEW", tableName, guid, null,
-      { reviewerId, approverId, status: newStatus });
-    res.json({ success: true, workflowId: wfRes.rows[0].id });
+    const result = await submitPassportToWorkflow({
+      companyId,
+      guid,
+      passportType,
+      userId: req.user.userId,
+      reviewerId,
+      approverId,
+    });
+    res.json({ success: true, workflowId: result.workflowId });
   } catch (e) { console.error("Submit review error:", e.message); res.status(500).json({ error: "Failed" }); }
 });
 
@@ -4229,10 +6581,10 @@ app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req,
     if (!["approve","reject"].includes(action)) return res.status(400).json({ error: "Invalid action" });
 
     const wfRes = await pool.query(
-      "SELECT * FROM passport_workflow WHERE passport_guid = $1 ORDER BY created_at DESC LIMIT 1",
+      "SELECT * FROM passport_workflow WHERE passport_guid = $1 AND overall_status = 'in_progress' ORDER BY created_at DESC LIMIT 1",
       [guid]
     );
-    if (!wfRes.rows.length) return res.status(404).json({ error: "No workflow found" });
+    if (!wfRes.rows.length) return res.status(404).json({ error: "No active workflow found for this passport" });
     const wf = wfRes.rows[0];
 
     const regRes = await pool.query(
@@ -4251,8 +6603,9 @@ app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req,
       return res.status(400).json({ error: "passportType required" });
     }
 
-    const isReviewer = wf.reviewer_id === userId && wf.review_status === "pending";
-    const isApprover = wf.approver_id === userId && wf.approval_status === "pending" && wf.review_status !== "pending";
+    const uid = parseInt(userId, 10);
+    const isReviewer = parseInt(wf.reviewer_id, 10) === uid && wf.review_status === "pending";
+    const isApprover = parseInt(wf.approver_id, 10) === uid && wf.approval_status === "pending" && wf.review_status !== "pending";
     if (!isReviewer && !isApprover)
       return res.status(403).json({ error: "You are not the reviewer or approver for this passport" });
 
@@ -4277,7 +6630,7 @@ app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req,
          WHERE guid=$1 AND release_status='in_review'`,
         [
           guid,
-          pInfo.version_number > 1 ? "revised" : "draft",
+          pInfo.version_number > 1 ? IN_REVISION_STATUS : "draft",
         ]
       );
       if (wf.submitted_by) {
@@ -4312,6 +6665,8 @@ app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req,
               [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
           }
+          await logAudit(wf.company_id, userId, "RELEASE", tableName, guid,
+            { release_status: "in_review" }, { release_status: "released", via: "workflow_review" });
         }
         await pool.query("UPDATE passport_workflow SET overall_status='approved', updated_at=NOW() WHERE id=$1", [wf.id]);
         if (wf.submitted_by) {
@@ -4342,6 +6697,8 @@ app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req,
             [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
           );
         }
+        await logAudit(wf.company_id, userId, "RELEASE", tableName, guid,
+          { release_status: "in_review" }, { release_status: "released", via: "workflow_approval" });
       }
       if (wf.submitted_by) {
         await createNotification(wf.submitted_by, "workflow_approved",

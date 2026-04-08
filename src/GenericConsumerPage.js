@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { getConsumerTheme } from "./ThemeContext";
 import { translateFieldValue, translateSchemaLabel } from "./i18n";
+import { formatPassportStatus } from "./passportStatus";
 import "./PassportViewer.css";
 
 function formatFieldValue(field, raw) {
@@ -23,10 +24,7 @@ function GenericConsumerPage({ passport, company, typeDef, dynamicValues }) {
   const pType = passport.passport_type || "generic";
   const theme = getConsumerTheme(pType, company?.branding_json);
 
-  const statusLabel = ["in_revision", "revised"].includes(passport.release_status)
-    ? "In Revision"
-    : String(passport.release_status || "").split("_")
-        .map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+  const statusLabel = formatPassportStatus(passport.release_status);
 
   const sections = (typeDef?.fields_json?.sections || typeDef?.sections || [])
     .map((section, index) => {
@@ -64,7 +62,7 @@ function GenericConsumerPage({ passport, company, typeDef, dynamicValues }) {
           <div className="cp-hero-icon">{theme.icon}</div>
           <div className="cp-hero-type">{theme.headline}</div>
           <h1 className="cp-product-name">{passport.model_name}</h1>
-          {passport.product_id && <div className="cp-pid">Product ID: {passport.product_id}</div>}
+          {passport.product_id && <div className="cp-pid">Serial Number: {passport.product_id}</div>}
           {passport.release_status === "released" && (
             <div className="cp-verified"><span>✅</span> Verified Product Passport</div>
           )}
@@ -123,7 +121,7 @@ function GenericConsumerPage({ passport, company, typeDef, dynamicValues }) {
         ))}
 
         <div className="cp-cta">
-          <a href={`/passport/${passport.guid}/introduction`} className="cp-cta-btn">
+          <a href={`/passport/${passport.guid}`} className="cp-cta-btn">
             View Full Technical Passport →
           </a>
         </div>

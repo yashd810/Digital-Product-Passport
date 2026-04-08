@@ -9,7 +9,7 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 export const generateQRCode = async (guid) => {
   try {
     if (!guid) return null;
-    const passportLink = `${window.location.origin}/passport/${guid}`;
+    const passportLink = `${window.location.origin}/p/${guid}`;
     return await QRCode.toDataURL(passportLink, {
       errorCorrectionLevel: "H",
       type: "image/png",

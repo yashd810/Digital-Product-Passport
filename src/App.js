@@ -21,11 +21,18 @@ const Overview = lazy(() => import("./Overview"));
 const AuditLogs = lazy(() => import("./AuditLogs"));
 const UserProfile = lazy(() => import("./UserProfile"));
 const CompanyProfile = lazy(() => import("./CompanyProfile"));
+const SecurityCenter = lazy(() => import("./SecurityCenter"));
 const ManageTeam = lazy(() => import("./ManageTeam"));
 const CompanyRepository = lazy(() => import("./CompanyRepository"));
 const WorkflowDashboard = lazy(() => import("./WorkflowDashboard"));
 
 const ConsumerPage = lazy(() => import("./ConsumerPage"));
+const CSVImportGuide = lazy(() => import("./CSVImportGuide"));
+const NotificationsPage = lazy(() => import("./NotificationsPage"));
+const MessagingPage = lazy(() => import("./MessagingPage"));
+const TemplatesPage = lazy(() => import("./TemplatesPage"));
+const ManualCenter = lazy(() => import("./ManualCenter"));
+const CreateHub    = lazy(() => import("./CreateHub"));
 
 const AdminLayout = lazy(() => import("./AdminLayout"));
 const AdminAnalytics = lazy(() => import("./AdminAnalytics"));
@@ -100,7 +107,6 @@ function App() {
         setToken(true);
         setUser(normalizedUser);
         setCompanyId(sessionUser.company_id || "");
-        localStorage.removeItem("token");
         localStorage.setItem("user", JSON.stringify(normalizedUser));
         localStorage.setItem("companyId", sessionUser.company_id || "");
       } catch {
@@ -108,7 +114,6 @@ function App() {
         setToken(false);
         setUser(null);
         setCompanyId("");
-        localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("companyId");
       } finally {
@@ -130,7 +135,6 @@ function App() {
     setToken(false);
     setUser(null);
     setCompanyId("");
-    localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("companyId");
   };
@@ -159,6 +163,13 @@ function App() {
           </ProtectedRoute>
         } />
 
+        {/* CSV Import */}
+        <Route path="/csv-import/:passportType" element={
+          <ProtectedRoute token={token} authReady={authReady}>
+            <CSVImportGuide user={user} companyId={companyId} />
+          </ProtectedRoute>
+        } />
+
         {/* Dashboard */}
         <Route path="/dashboard" element={
           <ProtectedRoute token={token} authReady={authReady}>
@@ -171,12 +182,18 @@ function App() {
           <Route path="passports/product/:productKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="passports/umbrella/:umbrellaKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
+          <Route path="notifications"   element={<NotificationsPage user={user} />} />
+          <Route path="messages"        element={<MessagingPage user={user} />} />
+          <Route path="templates"       element={<TemplatesPage user={user} companyId={companyId} />} />
+          <Route path="create"          element={<CreateHub user={user} companyId={companyId} />} />
           <Route path="audit-logs"      element={<AuditLogs companyId={companyId} />} />
           <Route path="workflow"        element={<WorkflowDashboard user={user} companyId={companyId} />} />
           <Route path="profile"         element={<UserProfile user={user} companyId={companyId} onUserUpdate={handleUserUpdate} />} />
+          <Route path="security"        element={<SecurityCenter user={user} companyId={companyId} />} />
           <Route path="company-profile" element={<CompanyProfile user={user} companyId={companyId} />} />
           <Route path="team"            element={<ManageTeam user={user} companyId={companyId} />} />
           <Route path="repository"      element={<CompanyRepository user={user} companyId={companyId} />} />
+          <Route path="manual"          element={<ManualCenter mode="user" user={user} companyId={companyId} />} />
         </Route>
 
         {/* Admin */}
@@ -194,6 +211,7 @@ function App() {
           <Route path="invite"                       element={<AdminInvite />} />
           <Route path="admin-management"             element={<AdminSecurity user={user} />} />
           <Route path="profile"                      element={<UserProfile user={user} companyId={companyId} onUserUpdate={handleUserUpdate} showWorkflowDefaults={false} showLanguageSelector={false} profileTitle="My Profile" profileSubtitle={user?.email} />} />
+          <Route path="manual"                       element={<ManualCenter mode="admin" user={user} companyId={companyId} />} />
           <Route path="security"                     element={<Navigate to="/admin/admin-management" replace />} />
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
           <Route path="company/:companyId/analytics" element={<AdminCompanyAnalytics />} />

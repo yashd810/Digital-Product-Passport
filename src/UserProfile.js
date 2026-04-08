@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useI18n } from "./i18n";
+import { authHeaders } from "./authHeaders";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -29,8 +30,6 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
   const [teamUsers,  setTeamUsers]  = useState([]);
   const [defReviewer,setDefReviewer]= useState("");
   const [defApprover,setDefApprover]= useState("");
-  const [showToken,  setShowToken]  = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState("");
 
   useEffect(() => {
     fetchProfile();
@@ -40,7 +39,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
   const fetchProfile = async () => {
     try {
       const r = await fetch(`${API}/api/users/me`, {
-        headers: { Authorization: "Bearer cookie-session" },
+        headers: { ...authHeaders() },
       });
       if (!r.ok) throw new Error();
       const d = await r.json();
@@ -61,34 +60,13 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
     if (!companyId) return;
     try {
       const r = await fetch(`${API}/api/companies/${companyId}/users`, {
-        headers: { Authorization: "Bearer cookie-session" },
+        headers: { ...authHeaders() },
       });
       if (r.ok) {
         const d = await r.json();
         setTeamUsers(d.filter(u => u.role === "editor" || u.role === "company_admin"));
       }
     } catch { }
-  };
-
-  const getApiToken = () => {
-    return localStorage.getItem("token") || "";
-  };
-
-  const copyTokenToClipboard = async () => {
-    const token = getApiToken();
-    if (!token) {
-      setCopyFeedback("error");
-      setTimeout(() => setCopyFeedback(""), 3000);
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(token);
-      setCopyFeedback("success");
-      setTimeout(() => setCopyFeedback(""), 3000);
-    } catch (err) {
-      setCopyFeedback("error");
-      setTimeout(() => setCopyFeedback(""), 3000);
-    }
   };
 
   const flash = (type, text) => {
@@ -114,7 +92,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
       };
       const r = await fetch(`${API}/api/users/me`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer cookie-session" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error("Failed to save");
@@ -140,7 +118,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
     try {
       const r = await fetch(`${API}/api/users/me/password`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer cookie-session" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ currentPassword: curPw, newPassword: newPw }),
       });
       const d = await r.json();
@@ -165,7 +143,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
     try {
       const response = await fetch(`${API}/api/users/me/2fa`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer cookie-session" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ enable: !twoFaEnabled, currentPassword: twoFaPassword }),
       });
       const data = await response.json();
@@ -368,60 +346,6 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
                   <strong>{new Date(profile.last_login_at).toLocaleString()}</strong>
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* API Token for Programmatic Access */}
-          <div className="profile-card">
-            <h4 className="card-section-title">🔑 API Token (Bearer)</h4>
-            <p className="profile-helper-text">
-              Use this token to create and manage passports programmatically via API. Use it as a Bearer token in the Authorization header.
-            </p>
-            <div className="token-section">
-              <div className="token-input-group">
-                <input 
-                  type={showToken ? "text" : "password"} 
-                  value={getApiToken()} 
-                  readOnly 
-                  className="token-input"
-                  placeholder="No token available"
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowToken(!showToken)}
-                  className="btn-token-toggle"
-                  title={showToken ? "Hide token" : "Show token"}
-                >
-                  {showToken ? "Hide" : "Show"}
-                </button>
-              </div>
-              <button 
-                type="button" 
-                onClick={copyTokenToClipboard}
-                className={`btn-copy-token ${copyFeedback === "success" ? "btn-copy-success" : copyFeedback === "error" ? "btn-copy-error" : ""}`}
-              >
-                {copyFeedback === "success" ? "✓ Copied!" : copyFeedback === "error" ? "Failed to copy" : "Copy Token"}
-              </button>
-            </div>
-
-            <div className="token-usage-guide">
-              <h5>Usage Example (cURL):</h5>
-              <code className="code-block">
-{`curl -X POST http://localhost:3001/api/companies/2/passports \\
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \\
-  -H "Content-Type: application/json" \\
-  -d @din-spec-99100-passport.json`}
-              </code>
-
-              <h5 style={{marginTop: "1rem"}}>Usage Example (Postman):</h5>
-              <ol className="guide-list">
-                <li>Open Postman and create a new POST request</li>
-                <li>Set URL to: <code>http://localhost:3001/api/companies/2/passports</code></li>
-                <li>Go to "Authorization" tab → Type: "Bearer Token"</li>
-                <li>Paste your token in the "Token" field</li>
-                <li>Go to "Body" tab → Select "raw" → Choose "JSON"</li>
-                <li>Paste your passport JSON and click "Send"</li>
-              </ol>
             </div>
           </div>
       </div>

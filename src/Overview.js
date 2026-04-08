@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PieChart } from "./PieChart";
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "./analyticsPrintExport";
+import { authHeaders } from "./authHeaders";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const OVERVIEW_BAR_COLORS = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e"];
@@ -231,13 +232,13 @@ function Overview({ companyId }) {
 
   const fetchAnalytics = async () => {
     try {
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/analytics`,{ headers:{ Authorization:"Bearer cookie-session" } });
+      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/analytics`,{ headers:{ ...authHeaders() } });
       if(r.ok) setAnalytics(await r.json());
     } catch {}
   };
   const fetchActivity = async () => {
     try {
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/activity?limit=5`,{ headers:{ Authorization:"Bearer cookie-session" } });
+      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/activity?limit=5`,{ headers:{ ...authHeaders() } });
       if(r.ok) {
         const data = await r.json();
         setActivity(Array.isArray(data) ? data.slice(0, 5) : []);
@@ -293,11 +294,11 @@ function Overview({ companyId }) {
             legendItems: statusChartItems,
             emptyText: "No status data yet",
           },
-          {
+          ...(typeChartData.length > 2 ? [{
             title: "Passports by type",
-            svg: typeChartData.length ? renderBarChartSvg(typeChartData, { height: 180 }) : "",
+            svg: renderBarChartSvg(typeChartData, { height: 180 }),
             emptyText: "No type data yet",
-          },
+          }] : []),
           {
             title: "Total passports over time by product category",
             svg: trendSeries.length && (analytics?.trend?.labels || []).length
@@ -403,21 +404,13 @@ function Overview({ companyId }) {
           </h3>
           {analytics&&analytics.analytics?.length>0?(
             <>
-              <div className="chart-card">
-                <div className="chart-title">Status breakdown</div>
-                {statusChartItems.length > 0 ? (
-                  <PieChart items={statusChartItems} displayMode="value" showTotalNote={false} />
-                ) : (
-                  <div className="overview-empty-chart">No status data yet</div>
-                )}
-              </div>
               <div className="overview-chart-row">
-                <div className="chart-card chart-card-compact">
-                  <div className="chart-title">Passports by type</div>
-                  {typeChartData.length > 0 ? (
-                    <BarChart data={typeChartData} height={70}/>
+                <div className="chart-card">
+                  <div className="chart-title">Status breakdown</div>
+                  {statusChartItems.length > 0 ? (
+                    <PieChart items={statusChartItems} displayMode="value" showTotalNote={false} />
                   ) : (
-                    <div className="overview-empty-chart">No type data yet</div>
+                    <div className="overview-empty-chart">No status data yet</div>
                   )}
                 </div>
                 <div className="chart-card chart-card-wide">
@@ -429,6 +422,14 @@ function Overview({ companyId }) {
                   )}
                 </div>
               </div>
+              {typeChartData.length > 2 && (
+                <div className="overview-chart-row overview-chart-row-center">
+                  <div className="chart-card chart-card-compact">
+                    <div className="chart-title">Passports by type</div>
+                    <BarChart data={typeChartData} height={70}/>
+                  </div>
+                </div>
+              )}
               <div className="analytics-cards">
                 {analytics.analytics.map(stat=>(
                   <div key={stat.passport_type} className="type-stat-card">
@@ -469,7 +470,7 @@ function Overview({ companyId }) {
                     </div>
                     <div className="activity-row-bottom">
                       <span className="activity-copy">passport activity recorded</span>
-                      {a.passport_guid&&<span className="activity-pass">{a.passport_guid.substring(0,8)}…</span>}
+                      {a.record_id&&<span className="activity-pass">{a.record_id.substring(0,8)}…</span>}
                     </div>
                   </div>
                   <span className="activity-time">{timeAgo(a.created_at)}</span>

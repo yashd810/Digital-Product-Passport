@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PieChart } from "./PieChart";
 import { openAnalyticsPrintReport, renderClusteredBarChartSvg, renderPieChartSvg } from "./analyticsPrintExport";
+import { authHeaders } from "./authHeaders";
 import "./AdminDashboard.css";
 import "./Dashboard.css";
 
@@ -149,7 +150,7 @@ function AdminAnalytics() {
       try {
         setLoading(true);
         const response = await fetch(`${API}/api/admin/analytics`, {
-          headers: { Authorization: "Bearer cookie-session" },
+          headers: authHeaders(),
         });
         if (!response.ok) throw new Error("Failed to fetch analytics");
         setAnalytics(await response.json());

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Routes, Route, useParams, useNavigate, useLocation } from "react-router-dom";
-import { LANGUAGES, translateFieldValue, translateSchemaLabel, translateText } from "./i18n";
-import { generateQRCode, fetchQRCodeFromDatabase, saveQRCodeToDatabase } from "./QRcode";
+import { Routes, Route, useParams, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { LANGUAGES, translateFieldValue, translateSchemaLabel } from "./i18n";
+import { generateQRCode, saveQRCodeToDatabase } from "./QRcode";
 import { getViewerBrandTheme } from "./ThemeContext";
+import { formatPassportStatus } from "./passportStatus";
+import { authHeaders } from "./authHeaders";
+import PassportHistoryModal from "./PassportHistoryModal";
 // PassportIntro merged inline — no separate file needed
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
@@ -18,41 +21,238 @@ const ACCESS_LABEL_MAP = {
   legitimate_interest: "Person with Legitimate Interest",
 };
 
-// ─── Passport intro card (merged from PassportIntro.js) ──────
-function PassportIntro({ passport, companyData }) {
-  if (!passport) return null;
+function formatReleaseStatus(status) {
+  return formatPassportStatus(status);
+}
 
-  const statusLabel = ["in_revision", "revised"].includes(passport.release_status)
-    ? "In Revision"
-    : String(passport.release_status || "").split("_")
-        .map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+function renderTextBlock(raw, className = "") {
+  return (
+    <div className={className}>
+      {String(raw)
+        .split(/\n+/)
+        .filter(Boolean)
+        .map((line, index) => (
+          <p key={index}>{line}</p>
+        ))}
+    </div>
+  );
+}
+
+function isHeroSummaryField(field, fieldLabel = "") {
+  const key = String(field?.key || "").toLowerCase();
+  const label = String(fieldLabel || field?.label || "").toLowerCase();
+
+  if ([
+    "guid",
+    "product_id",
+    "passport_identifier",
+    "unique_passport_identifier",
+    "manufactured_date",
+    "manufacture_date",
+    "manufacturing_date",
+    "date_of_manufacture",
+    "battery_identifier",
+    "unique_battery_identifier",
+    "battery_mass",
+    "battery_weight",
+    "weight",
+    "serial_number",
+    "battery_serial_number",
+    "carbon_footprint_label_and_performance_class",
+    "battery_chemistry",
+    "manufacturer",
+    "manufactured_by",
+  ].includes(key)) {
+    return true;
+  }
 
   return (
-    <div className="intro-content">
-      <div className="intro-info">
-        <h1>{passport.model_name}</h1>
+    label === "guid" ||
+    label.includes("passport identifier") ||
+    label.includes("manufactured date") ||
+    label.includes("manufacturing date") ||
+    label.includes("manufacture date") ||
+    label.includes("date of manufacture") ||
+    label.includes("battery identifier") ||
+    label.includes("battery mass") ||
+    label.includes("battery weight") ||
+    label === "weight" ||
+    label.includes("product id") ||
+    label.includes("battery serial") ||
+    label.includes("serial number") ||
+    label.includes("carbon footprint label and performance class") ||
+    label.includes("battery chemistry") ||
+    label.includes("manufacturer") ||
+    label.includes("manufactured by")
+  );
+}
+
+function toInlineText(value) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatLinkLabel(value) {
+  const href = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  try {
+    return new URL(href).hostname.replace(/^www\./i, "");
+  } catch {
+    return value;
+  }
+}
+
+function getFieldPresentation(field, raw, isLocked, pieItems) {
+  if (isLocked) return { tone: "restricted", eyebrow: "Protected data" };
+  if (field.type === "file") return { tone: "document", eyebrow: "Evidence file" };
+  if (field.type === "table") return { tone: "table", eyebrow: "Structured data" };
+  if (pieItems) return { tone: "composition", eyebrow: "Composition" };
+  if (field.dynamic) return { tone: "live", eyebrow: "Live metric" };
+  if (field.type === "url") return { tone: "link", eyebrow: "Reference link" };
+  if (field.type === "symbol") return { tone: "symbol", eyebrow: "Visual marker" };
+  if (field.type === "boolean") return { tone: "status", eyebrow: "Status" };
+  if (typeof raw === "string" && (raw.includes("\n") || raw.length > 120)) {
+    return { tone: "narrative", eyebrow: "Detailed information" };
+  }
+  return { tone: "data", eyebrow: "" };
+}
+
+function getSummaryValue(field, raw, isLocked, lang) {
+  if (isLocked) return "Restricted";
+  if (field.type === "boolean") return translateFieldValue(lang, !!raw, "boolean");
+  if (field.type === "file") return raw ? "Document available" : "No file";
+  if (field.type === "table") {
+    const rowCount = Array.isArray(raw) ? raw.length : null;
+    return rowCount ? `${rowCount} rows` : "Table data";
+  }
+  if (field.type === "url" && raw) return formatLinkLabel(raw);
+  if (raw === 0) return "0";
+  if (!raw) return "Not provided";
+  const text = toInlineText(raw);
+  return text.length > 58 ? `${text.slice(0, 58).trim()}…` : text;
+}
+
+function shouldFeatureInSummary(field, raw, isLocked, pieItems) {
+  if (field.type === "file" || field.type === "table" || field.type === "symbol" || pieItems) {
+    return false;
+  }
+  if (isLocked) return true;
+  if (raw === 0) return true;
+  if (!raw) return false;
+  if (field.type === "boolean" || field.type === "url" || field.dynamic) return true;
+  const text = toInlineText(raw);
+  return !!text && text.length <= 72;
+}
+
+function getSummaryHint(field, isLocked, isDynamic, tone) {
+  if (isLocked) return "Unlock with an access key to view this value.";
+  if (isDynamic) return "This value refreshes from live field updates.";
+  if (field.type === "url") return "Reference link available for this field.";
+  if (field.type === "boolean") return "Quick compliance-style status indicator.";
+  if (tone === "narrative") return "Expanded context is available in the detail card below.";
+  return "Highlighted here for faster scanning.";
+}
+
+// ─── Passport intro card (merged from PassportIntro.js) ──────
+function PassportIntro({ passport, companyData, displayName, qrCode, qrLoading, onPrint, onOpenHistory }) {
+  if (!passport) return null;
+  const manufacturingDate =
+    passport.manufactured_date ||
+    passport.manufacture_date ||
+    passport.manufacturing_date ||
+    passport.date_of_manufacture ||
+    "—";
+  const uniqueBatteryIdentifier =
+    passport.unique_battery_identifier ||
+    passport.battery_identifier ||
+    passport.product_id ||
+    "—";
+  const batteryMass =
+    passport.battery_mass ||
+    passport.battery_weight ||
+    passport.weight ||
+    "—";
+  const serialNumber =
+    passport.product_id ||
+    passport.serial_number ||
+    passport.serial ||
+    passport.battery_serial_number ||
+    "—";
+  const manufacturerInfo =
+    companyData?.company_name ||
+    passport.manufacturer ||
+    passport.manufactured_by ||
+    "—";
+  const carbonFootprintRaw = passport.carbon_footprint_label_and_performance_class || "";
+  const carbonFootprintIsUrl = /^(https?:)?\/\//i.test(String(carbonFootprintRaw)) || String(carbonFootprintRaw).startsWith("/");
+  const carbonFootprintLabelAndClass = carbonFootprintRaw
+    ? (carbonFootprintIsUrl
+        ? <img src={carbonFootprintRaw} alt="Carbon Footprint Label" className="pv-hero-stat-symbol" />
+        : carbonFootprintRaw)
+    : "—";
+  const batteryChemistry =
+    passport.battery_chemistry ||
+    passport.chemistry ||
+    "—";
+  const summaryStats = [
+    { label: "Unique Passport Identifier", value: passport.guid || "—" },
+    { label: "Manufacturing Date", value: manufacturingDate },
+    { label: "Unique Battery Identifier", value: uniqueBatteryIdentifier },
+    { label: "Serial Number", value: serialNumber },
+    { label: "Carbon Footprint Label and Performance Class", value: carbonFootprintLabelAndClass },
+    { label: "Battery Chemistry", value: batteryChemistry },
+    { label: "Battery Mass", value: batteryMass },
+    { label: "Manufacturer Information", value: manufacturerInfo },
+  ];
+
+  return (
+    <section className="pv-hero">
+      <div className="pv-hero-main">
+        <div className="pv-hero-brandline">
+          <div>
+            <p className="pv-hero-kicker">{displayName || passport.passport_type}</p>
+            <h1>{passport.model_name}</h1>
+          </div>
+        </div>
+
+        <div className="pv-hero-stat-grid">
+          {summaryStats.map(item => (
+            <article key={item.label} className="pv-hero-stat">
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <aside className="pv-hero-side">
+        <div className="pv-hero-actions">
+          <button type="button" className="pv-secondary-btn" onClick={onOpenHistory}>
+            Version History
+          </button>
+          <button type="button" className="pv-primary-btn" onClick={onPrint}>
+            Print PDF
+          </button>
+        </div>
 
         {companyData?.company_logo && (
-          <div className="intro-header-logo-box">
-            <img src={companyData.company_logo} alt="Company Logo" className="intro-header-logo" />
+          <div className="pv-company-card">
+            <img src={companyData.company_logo} alt="Company Logo" className="pv-company-logo" />
           </div>
         )}
 
-        <div className="intro-info-list">
-          <p><strong>Product ID:</strong> {passport.product_id || "—"}</p>
-          <p><strong>Type:</strong> {passport.passport_type}</p>
-          <p><strong>GUID:</strong> {passport.guid}</p>
-          <p><strong>Version:</strong> v{passport.version_number}</p>
-          <p><strong>Status:</strong> {statusLabel}</p>
-          <p><strong>Consumer page:</strong>{" "}
-            <a href={`/p/${passport.guid}`} target="_blank" rel="noopener noreferrer"
-              className="intro-consumer-link">
-              /p/{passport.guid.substring(0, 8)}…
-            </a>
-          </p>
+        <div className="pv-qr-card">
+          <span className="pv-qr-label">Passport QR</span>
+          {qrLoading ? (
+            <div className="pv-qr-placeholder">Generating QR…</div>
+          ) : qrCode ? (
+            <img src={qrCode} alt="Passport QR" className="pv-qr-image" />
+          ) : (
+            <div className="pv-qr-placeholder">QR unavailable</div>
+          )}
         </div>
-      </div>
-    </div>
+      </aside>
+    </section>
   );
 }
 
@@ -61,7 +261,7 @@ function Header({ displayName, lang, setLang, guid, companyData, brandTheme }) {
     <header className="viewer-header">
       <div className="viewer-header-inner viewer-header-shell">
         <div>
-          <h1>{brandTheme?.title || "🌍 Digital Product Passport"}</h1>
+          <h1>{brandTheme?.title || "Digital Product Passport"}</h1>
           <p>{companyData?.company_name ? `${companyData.company_name} · ${displayName}` : displayName}</p>
           {brandTheme?.companyWebsite && (
             <a href={brandTheme.companyWebsite} target="_blank" rel="noopener noreferrer" className="viewer-header-website">
@@ -82,11 +282,13 @@ function Header({ displayName, lang, setLang, guid, companyData, brandTheme }) {
 }
 
 function Footer({ brandTheme }) {
+  const supportHref = brandTheme?.supportLink || "mailto:digitalproductpass@gmail.com";
+  const supportLabel = supportHref.startsWith("mailto:") ? "Contact information" : "Support";
   return (
     <footer className="viewer-footer">
-      <p className="viewer-footer-provider">Powered by ClarosDPP, digital passport provider via software as a service.</p>
+      <p className="viewer-footer-provider">{brandTheme?.footerText || "Powered by ClarosDPP, digital passport provider via software as a service."}</p>
       <p className="viewer-footer-subtle">
-        <a href="mailto:digitalproductpass@gmail.com" className="viewer-footer-link">Contact information</a>
+        <a href={supportHref} className="viewer-footer-link">{supportLabel}</a>
       </p>
     </footer>
   );
@@ -100,8 +302,8 @@ function LockedFieldCell({ field, onUnlock }) {
     .map(a => ACCESS_LABEL_MAP[a] || a)
     .join(", ");
   return (
-    <button className="locked-field-btn" onClick={onUnlock}>
-      🔒 Provide Access Key
+    <button type="button" className="locked-field-btn" onClick={onUnlock}>
+      Unlock field
       {who && <span className="locked-field-who"> ({who})</span>}
     </button>
   );
@@ -160,164 +362,212 @@ function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, 
 
   if (!sectionDef || !passport) return null;
   const isFileUrl = v => typeof v === "string" && v.startsWith("http");
+  const sectionTitle = translateSchemaLabel(lang, sectionDef);
+  const visibleFields = (sectionDef.fields || []).filter(field => !isHeroSummaryField(field, translateSchemaLabel(lang, field)));
+  const fieldEntries = visibleFields.map(f => {
+    const access = f.access || ["public"];
+    const isPublic = access.includes("public");
+    const fieldLabel = translateSchemaLabel(lang, f);
+    const isDynamic = !!f.dynamic;
+    const dynEntry = isDynamic ? dynamicValues?.[f.key] : null;
+    const src = unlockedPassport || passport;
+    const raw = isPublic || unlockedPassport
+      ? (isDynamic ? (dynEntry?.value ?? null) : src[f.key])
+      : null;
+    const isLocked = !isPublic && !unlockedPassport;
 
+    let display = "—";
+    if (isLocked) {
+      display = (
+        <div className="pv-locked-state">
+          <p className="pv-locked-copy">This value is available to authorised parties only.</p>
+          <LockedFieldCell field={f} onUnlock={onRequestUnlock} />
+        </div>
+      );
+    } else if (f.type === "boolean") {
+      display = <div className="pv-field-value-strong">{translateFieldValue(lang, !!raw, "boolean")}</div>;
+    } else if (f.type === "file" && isFileUrl(raw)) {
+      display = <FileCell url={raw} label={`${passport.model_name}_${f.key}`} />;
+    } else if (f.type === "table") {
+      let tableData = null;
+      if (Array.isArray(raw)) tableData = raw;
+      else {
+        try { tableData = raw ? JSON.parse(raw) : null; } catch {}
+      }
+      if (Array.isArray(tableData) && tableData.length > 0) {
+        const cols = f.table_columns || [];
+        display = (
+          <div className="pv-field-table-wrap">
+            <table className="field-table-display">
+              {cols.length > 0 && (
+                <thead>
+                  <tr>{cols.map((col, index) => <th key={index}>{translateSchemaLabel(lang, { label: col })}</th>)}</tr>
+                </thead>
+              )}
+              <tbody>
+                {tableData.map((row, rowIndex) => (
+                  <tr key={rowIndex}>
+                    {(Array.isArray(row) ? row : []).map((cell, cellIndex) => (
+                      <td key={cellIndex}>{cell || "—"}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+    } else if (f.type === "symbol" && raw) {
+      display = (
+        <div className="pv-field-symbol-wrap">
+          <img src={raw} alt={f.label} className="field-symbol-img pv-field-symbol" />
+        </div>
+      );
+    } else if (f.type === "url" && raw) {
+      const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+      display = (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="field-url-link">
+          {raw}
+        </a>
+      );
+    } else if (typeof raw === "string" && raw.includes("\n")) {
+      display = renderTextBlock(raw, "pv-field-text-block");
+    } else if (raw || raw === 0) {
+      display = <div className="pv-field-value">{String(raw)}</div>;
+    }
+
+    let pieItems = null;
+    if (f.composition && raw) {
+      pieItems = f.type === "table" ? parseCompositionFromTable(raw) : parseCompositionFromText(raw);
+    }
+
+    const isExpanded = isDynamic && expandedKey === f.key;
+    const chartType = chartTypes[f.key] || "line";
+    const longText =
+      typeof raw === "string" &&
+      (raw.includes("\n") || raw.length > 120) &&
+      f.type !== "table" &&
+      f.type !== "file" &&
+      !pieItems;
+    const presentation = getFieldPresentation(f, raw, isLocked, pieItems);
+    const fullWidth = false;
+    const twoColumn = false;
+    const tags = [];
+    if (!isPublic) tags.push("Restricted");
+    if (unlockedPassport && !isPublic) tags.push("Authorised view");
+    if (f.composition) tags.push("Breakdown");
+    if (f.type === "table") tags.push("Dataset");
+    if (f.type === "url") tags.push("External link");
+
+    return {
+      field: f,
+      fieldLabel,
+      isPublic,
+      isDynamic,
+      dynEntry,
+      isLocked,
+      display,
+      pieItems,
+      isExpanded,
+      chartType,
+      fullWidth,
+      twoColumn,
+      tags,
+      summaryValue: getSummaryValue(f, raw, isLocked, lang),
+      summaryCandidate: shouldFeatureInSummary(f, raw, isLocked, pieItems),
+      summaryHint: getSummaryHint(f, isLocked, isDynamic, presentation.tone),
+      presentation,
+    };
+  });
   return (
-    <div className="section-view">
-      <table className="battery-table">
-        <tbody>
-          {sectionDef.fields.map(f => {
-            const access   = f.access || ["public"];
-            const isPublic = access.includes("public");
-            const fieldLabel = translateSchemaLabel(lang, f);
+    <section className="pv-section-card">
+      <div className="pv-section-head">
+        <div>
+          <h3>{sectionTitle}</h3>
+        </div>
+        <div className="pv-section-count">{fieldEntries.length} items</div>
+      </div>
 
-            // Restricted field and user hasn't unlocked yet → show lock button
-            if (!isPublic && !unlockedPassport) {
-              return (
-                <tr key={f.key}>
-                  <th>{fieldLabel}</th>
-                  <td><LockedFieldCell field={f} onUnlock={onRequestUnlock} /></td>
-                </tr>
-              );
-            }
-
-            // Use unlocked passport data if available (it has restricted fields), otherwise public data
-            const src = unlockedPassport || passport;
-            // Dynamic fields: value comes from live data, not the passport record
-            const isDynamic = !!f.dynamic;
-            const dynEntry  = isDynamic ? dynamicValues?.[f.key] : null;
-            const raw = isDynamic ? (dynEntry?.value ?? null) : src[f.key];
-            let display;
-
-            if (f.type === "boolean") {
-              display = translateFieldValue(lang, !!raw, "boolean");
-            } else if (f.type === "file" && isFileUrl(raw)) {
-              display = <FileCell url={raw} label={`${passport.model_name}_${f.key}`} />;
-            } else if (f.type === "table") {
-              let tableData = null;
-              try { tableData = raw ? JSON.parse(raw) : null; } catch {}
-              if (Array.isArray(tableData) && tableData.length > 0) {
-                const cols = f.table_columns || [];
-                display = (
-                  <table className="field-table-display">
-                    {cols.length > 0 && (
-                      <thead>
-                        <tr>{cols.map((col, i) => <th key={i}>{translateSchemaLabel(lang, { label: col })}</th>)}</tr>
-                      </thead>
-                    )}
-                    <tbody>
-                      {tableData.map((row, ri) => (
-                        <tr key={ri}>
-                          {(Array.isArray(row) ? row : []).map((cell, ci) => (
-                            <td key={ci}>{cell || "—"}</td>
-                          ))}
-                        </tr>
+      <div className="pv-field-grid">
+        {fieldEntries.map(entry => {
+          return (
+            <article
+              key={entry.field.key}
+              className={`pv-field-card pv-field-card-tone-${entry.presentation.tone}${entry.fullWidth ? " pv-field-card-wide" : ""}${entry.twoColumn ? " pv-field-card-two-col" : ""}`}
+            >
+              <div className="pv-field-head">
+                <div>
+                  <p className="pv-field-kicker">{entry.fieldLabel}</p>
+                  {entry.tags.length > 0 && (
+                    <div className="pv-field-tags">
+                      {entry.tags.map(tag => (
+                        <span key={tag} className="pv-field-tag">{tag}</span>
                       ))}
-                    </tbody>
-                  </table>
-                );
-              } else {
-                display = "—";
-              }
-            } else if (f.type === "symbol" && raw) {
-              display = (
-                <img
-                  src={raw}
-                  alt={f.label}
-                  className="field-symbol-img"
-                />
-              );
-            } else if (f.type === "url" && raw) {
-              const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-              display = (
-                <a href={href} target="_blank" rel="noopener noreferrer" className="field-url-link">
-                  {raw}
-                </a>
-              );
-            } else {
-              display = raw || "—";
-            }
-            // ── Composition pie chart ──────────────────────────────
-            let pieItems = null;
-            if (f.composition && raw) {
-              if (f.type === "table") {
-                pieItems = parseCompositionFromTable(raw);
-              } else {
-                pieItems = parseCompositionFromText(raw);
-              }
-            }
+                    </div>
+                  )}
+                </div>
+                {entry.isDynamic && <LiveBadge updatedAt={entry.dynEntry?.updatedAt} />}
+              </div>
 
-            const isExpanded = isDynamic && expandedKey === f.key;
-            const cType = chartTypes[f.key] || "line";
+              <div className="pv-field-body">
+                <div className="pv-field-body-surface">
+                  {entry.display}
+                </div>
+              </div>
 
-            return (
-              <React.Fragment key={f.key}>
-                <tr className={isDynamic ? "dynamic-field-row" : ""}>
-                  <th>
-                    {fieldLabel}
-                    {isDynamic && <LiveBadge updatedAt={dynEntry?.updatedAt} />}
-                    {isDynamic && (
+              {entry.isDynamic && (entry.isPublic || unlockedPassport) && (
+                <div className="pv-field-actions">
+                  <button
+                    type="button"
+                    className={`dyn-expand-btn${entry.isExpanded ? " open" : ""}`}
+                    onClick={() => toggleChart(entry.field.key)}
+                    title={entry.isExpanded ? "Hide chart" : "Show history chart"}
+                  >
+                    {entry.isExpanded ? "Hide history" : "View history"}
+                  </button>
+                </div>
+              )}
+
+              {entry.isExpanded && (
+                <div className="pv-chart-wrap">
+                  <div className="dyn-chart-panel">
+                    <div className="dyn-chart-toggle">
+                      <span className="dyn-chart-toggle-label">Chart</span>
                       <button
-                        className={`dyn-expand-btn${isExpanded ? " open" : ""}`}
-                        onClick={() => toggleChart(f.key)}
-                        title={isExpanded ? "Hide chart" : "Show history chart"}
+                        type="button"
+                        className={`dyn-toggle-btn${entry.chartType === "line" ? " active" : ""}`}
+                        onClick={() => setChartType(entry.field.key, "line")}
                       >
-                        {isExpanded ? "▲ Hide" : "📈 Chart"}
+                        Line
                       </button>
+                      <button
+                        type="button"
+                        className={`dyn-toggle-btn${entry.chartType === "histogram" ? " active" : ""}`}
+                        onClick={() => setChartType(entry.field.key, "histogram")}
+                      >
+                        Histogram
+                      </button>
+                    </div>
+
+                    {history[entry.field.key]?.loading ? (
+                      <div className="dyn-chart-loading">Loading history…</div>
+                    ) : (
+                      <DynamicChart data={history[entry.field.key]?.data || []} chartType={entry.chartType} />
                     )}
-                  </th>
-                  <td>{display ?? "—"}</td>
-                </tr>
+                  </div>
+                </div>
+              )}
 
-                {/* Inline chart panel */}
-                {isExpanded && (
-                  <tr className="dyn-chart-row">
-                    <td colSpan={2} className="dyn-chart-cell">
-                      <div className="dyn-chart-panel">
-                        <div className="dyn-chart-toggle">
-                          <span className="dyn-chart-toggle-label">Chart</span>
-                          <button
-                            className={`dyn-toggle-btn${cType === "line" ? " active" : ""}`}
-                            onClick={() => setChartType(f.key, "line")}
-                          >
-                            Line
-                          </button>
-                          <button
-                            className={`dyn-toggle-btn${cType === "histogram" ? " active" : ""}`}
-                            onClick={() => setChartType(f.key, "histogram")}
-                          >
-                            Histogram
-                          </button>
-                        </div>
-
-                        {history[f.key]?.loading ? (
-                          <div className="dyn-chart-loading">Loading history…</div>
-                        ) : (
-                          <DynamicChart
-                            data={history[f.key]?.data || []}
-                            chartType={cType}
-                          />
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-
-                {/* Composition pie chart — always visible when field has composition flag */}
-                {pieItems && (
-                  <tr className="composition-chart-row">
-                    <td colSpan={2}>
-                      <div className="composition-chart-cell">
-                        <PieChart items={pieItems} title={fieldLabel} />
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+              {entry.pieItems && (
+                <div className="pv-chart-wrap">
+                  <PieChart items={entry.pieItems} />
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -352,9 +602,9 @@ function FileCell({ url, label }) {
     <div className="pdf-cell">
       <div className="pdf-cell-actions">
         <a href={url} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
-          📄 Open PDF
+          Open document
         </a>
-        <button className="pdf-preview-btn" onClick={handleToggle} disabled={loading}>
+        <button type="button" className="pdf-preview-btn" onClick={handleToggle} disabled={loading}>
           {loading ? "Loading…" : open ? "▲ Hide preview" : "▼ Show preview"}
         </button>
       </div>
@@ -366,37 +616,33 @@ function FileCell({ url, label }) {
   );
 }
 
-// ─── Passport sidebar tabs ────────────────────────────────────
-function PassportNavBar({ tabs, guid, isLoggedIn, onBack, onPrint, qrCode, qrLoading }) {
+// ─── Passport section tabs ────────────────────────────────────
+function PassportTabRail({ tabs, guid }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const isActive = p => location.pathname.endsWith(p);
+  const basePath = `/passport/${guid}`;
+  const pathName = location.pathname.replace(/\/+$/, "");
+
+  const isActive = (path) => {
+    if (path === "/introduction") {
+      return pathName === basePath || pathName === `${basePath}/introduction`;
+    }
+    return pathName.endsWith(path);
+  };
+
   return (
-    <aside className="viewer-sidebar">
-      <div className="viewer-sidebar-nav-top">
-        {isLoggedIn && (
-          <button className="sidebar-action-btn" onClick={onBack}>← Back to Dashboard</button>
-        )}
-        <button className="sidebar-action-btn" onClick={onPrint}>🖨 Print PDF</button>
-        <div className="sidebar-qr-box">
-          {qrLoading ? (
-            <div>Generating QR…</div>
-          ) : qrCode ? (
-            <img src={qrCode} alt="Passport QR" className="sidebar-qr-img" />
-          ) : (
-            <div>QR unavailable</div>
-          )}
-        </div>
-      </div>
-      <div className="viewer-sidebar-inner">
-        {tabs.map(t => (
-          <button key={t.path} className={`sidebar-tab${isActive(t.path) ? " active" : ""}`}
-            onClick={() => navigate(`/passport/${guid}${t.path}`)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-    </aside>
+    <nav className="pv-tab-rail" aria-label="Passport sections">
+      {tabs.map(tab => (
+        <button
+          key={tab.path}
+          type="button"
+          className={`pv-tab-btn${isActive(tab.path) ? " active" : ""}`}
+          onClick={() => navigate(`/passport/${guid}${tab.path}`)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -455,30 +701,23 @@ function ScanBadge({ guid }) {
   );
 }
 
-// ─── Introduction section (company branding) ──────────────────
-function IntroductionSection({ passport }) {
-  const [companyData, setCompanyData] = useState(null);
-  useEffect(() => {
-    if (!passport?.company_id) return;
-    fetch(`${API}/api/companies/${passport.company_id}/profile`)
-      .then(r => r.ok ? r.json() : null).then(setCompanyData).catch(() => {});
-  }, [passport?.company_id]);
+// ─── Empty state ──────────────────────────────────────────────
+function EmptySectionsState() {
   return (
-    <div className="introduction-layout">
-      <div className="intro-text-col">
-        <h2>About This Product</h2>
-        <div className="intro-text-body">{companyData?.introduction_text || "No introduction provided."}</div>
+    <section className="pv-section-card pv-section-card-intro">
+      <div className="pv-section-head">
+        <div>
+          <h3>No passport sections available</h3>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
 
 // ─── Print view ───────────────────────────────────────────────
 function PrintView({ passport, companyData, sections }) {
   const isFileUrl = v => typeof v === "string" && v.startsWith("http");
-  const statusLabel = ["in_revision", "revised"].includes(passport.release_status)
-    ? "In Revision"
-    : String(passport.release_status || "").split("_").map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+  const statusLabel = formatPassportStatus(passport.release_status);
   return (
     <div className="print-view">
       <div className="print-header">
@@ -490,7 +729,7 @@ function PrintView({ passport, companyData, sections }) {
             <span><strong>Type:</strong> {passport.passport_type}</span>
             <span><strong>Version:</strong> v{passport.version_number}</span>
             <span><strong>Status:</strong> {statusLabel}</span>
-            {passport.product_id && <span><strong>Product ID:</strong> {passport.product_id}</span>}
+            {passport.product_id && <span><strong>Serial Number:</strong> {passport.product_id}</span>}
             <span><strong>GUID:</strong> {passport.guid}</span>
           </div>
         </div>
@@ -593,6 +832,7 @@ function PassportViewer() {
   const [unlocking,         setUnlocking]         = useState(false);
   const [passportAccessKey, setPassportAccessKey] = useState(null);   // key shown to logged-in users
   const [keyCopied,         setKeyCopied]         = useState(false);
+  const [showHistoryModal,  setShowHistoryModal]  = useState(false);
 
   useEffect(() => {
     if (!guid) return;
@@ -629,7 +869,7 @@ function PassportViewer() {
 
   useEffect(() => {
     fetch(`${API}/api/users/me`, {
-      headers: { Authorization: "Bearer cookie-session" },
+      headers: authHeaders(),
     })
       .then(r => setIsLoggedIn(r.ok))
       .catch(() => setIsLoggedIn(false));
@@ -640,15 +880,12 @@ function PassportViewer() {
     (async () => {
       setQrLoading(true);
       try {
-        const existing = await fetchQRCodeFromDatabase(passport.guid);
-        if (existing) {
-          setQrCode(existing);
-          return;
-        }
         const generated = await generateQRCode(passport.guid);
         if (generated) {
-          await saveQRCodeToDatabase(passport.guid, generated, passport.passport_type);
           setQrCode(generated);
+          try {
+            await saveQRCodeToDatabase(passport.guid, generated, passport.passport_type);
+          } catch {}
         }
       } catch (e) {
         setQrCode(null);
@@ -684,7 +921,7 @@ function PassportViewer() {
   useEffect(() => {
     if (!isLoggedIn || !passport?.guid || !passport?.company_id) return;
     fetch(`${API}/api/companies/${passport.company_id}/passports/${passport.guid}/access-key`, {
-      headers: { Authorization: "Bearer cookie-session" },
+      headers: authHeaders(),
     })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.accessKey) setPassportAccessKey(d.accessKey); })
@@ -718,16 +955,12 @@ function PassportViewer() {
   if (!passport) return null;
 
   const sections = typeDef?.fields_json?.sections || typeDef?.sections || [];
+  const firstSectionKey = sections[0]?.key || null;
 
-  // Build tabs: Introduction + one per section
-  const tabs = [
-    { path: "/introduction", label: translateText(lang, "introduction") },
-    ...sections.map(s => ({ path: `/${s.key}`, label: translateSchemaLabel(lang, s) })),
-  ];
+  const tabs = sections.map(s => ({ path: `/${s.key}`, label: translateSchemaLabel(lang, s) }));
 
   const passportType = passport.passport_type;
   const displayName  = typeDef?.display_name || passportType;
-  const dashboardBackPath = `/dashboard/passports/${passportType}`;
   const brandTheme = getViewerBrandTheme(companyData?.branding_json);
 
   return (
@@ -739,21 +972,12 @@ function PassportViewer() {
       <div className="no-print">
         <Header displayName={displayName} lang={lang} setLang={setLang} guid={guid} companyData={companyData} brandTheme={brandTheme} />
 
-        <div className="viewer-layout">
-          <PassportNavBar
-            tabs={tabs}
-            guid={guid}
-            isLoggedIn={isLoggedIn}
-            onBack={() => navigate(dashboardBackPath)}
-            onPrint={() => { setTimeout(() => window.print(), 300); }}
-            qrCode={qrCode}
-            qrLoading={qrLoading}
-          />
-
-          <div className="viewer-content">
+        <div className="viewer-content">
+          <div className="viewer-shell">
             <div className="viewer-topbar">
               <div className="viewer-title">
                 <h2>{typeDef?.umbrella_icon || ""} {displayName}</h2>
+                <p className="viewer-subtitle">Public passport viewer</p>
               </div>
               <SignatureBadge verification={sigVerification} />
             </div>
@@ -795,25 +1019,41 @@ function PassportViewer() {
             <PassportIntro
               passport={passport}
               companyData={companyData}
+              displayName={displayName}
+              qrCode={qrCode}
+              qrLoading={qrLoading}
+              onOpenHistory={() => setShowHistoryModal(true)}
+              onPrint={() => { setTimeout(() => window.print(), 300); }}
             />
 
-            <Routes>
-              <Route path="/introduction" element={<IntroductionSection passport={passport} />} />
-              {sections.map(section => (
-                <Route key={section.key} path={`/${section.key}`}
-                  element={
-                    <SectionView
-                      sectionDef={section}
-                      passport={passport}
-                      unlockedPassport={unlockedPassport}
-                      onRequestUnlock={() => setShowAccessForm(true)}
-                      dynamicValues={dynamicValues}
-                      lang={lang}
-                    />
-                  }
-                />
-              ))}
-            </Routes>
+            <PassportTabRail tabs={tabs} guid={guid} />
+
+            <div className="viewer-route-panel">
+              <Routes>
+                {firstSectionKey ? (
+                  <>
+                    <Route index element={<Navigate to={`/passport/${guid}/${firstSectionKey}`} replace />} />
+                    <Route path="introduction" element={<Navigate to={`/passport/${guid}/${firstSectionKey}`} replace />} />
+                  </>
+                ) : (
+                  <Route index element={<EmptySectionsState />} />
+                )}
+                {sections.map(section => (
+                  <Route key={section.key} path={section.key}
+                    element={
+                      <SectionView
+                        sectionDef={section}
+                        passport={passport}
+                        unlockedPassport={unlockedPassport}
+                        onRequestUnlock={() => setShowAccessForm(true)}
+                        dynamicValues={dynamicValues}
+                        lang={lang}
+                      />
+                    }
+                  />
+                ))}
+              </Routes>
+            </div>
           </div>
         </div>
 
@@ -854,6 +1094,15 @@ function PassportViewer() {
             </div>
           </div>
         </div>
+      )}
+
+      {showHistoryModal && (
+        <PassportHistoryModal
+          guid={guid}
+          passportType={passport.passport_type}
+          mode="public"
+          onClose={() => setShowHistoryModal(false)}
+        />
       )}
     </div>
   );

@@ -35,10 +35,7 @@ function Login({ setToken, setUser, setCompanyId }) {
   };
 
   const finishLogin = (data) => {
-    // Save JWT token, user info, and company ID
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-    }
+    // Save user info and company ID; authenticated browser requests use the httpOnly session cookie
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("companyId", data.user.companyId || data.user.company_id || "");
     setToken(true);
@@ -56,6 +53,7 @@ function Login({ setToken, setUser, setCompanyId }) {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
@@ -84,6 +82,7 @@ function Login({ setToken, setUser, setCompanyId }) {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ pre_auth_token: preAuthToken, otp }),
       });
       const data = await response.json();
@@ -103,6 +102,7 @@ function Login({ setToken, setUser, setCompanyId }) {
       const response = await fetch(`${API_BASE_URL}/api/auth/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ pre_auth_token: preAuthToken }),
       });
       const data = await response.json();
