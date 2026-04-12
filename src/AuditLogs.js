@@ -52,7 +52,10 @@ function AuditLogs({ companyId }) {
     const toTs   = filterDateTo   ? new Date(filterDateTo + "T23:59:59").getTime() : null;
 
     return logs.filter(log => {
-      if (userQ   && !(log.user_email || "").toLowerCase().includes(userQ)) return false;
+      if (userQ) {
+        const nameStr = `${log.user_first_name || ""} ${log.user_last_name || ""} ${log.user_email || ""}`.toLowerCase();
+        if (!nameStr.includes(userQ)) return false;
+      }
       if (filterAction && log.action !== filterAction) return false;
       const ts = new Date(log.created_at).getTime();
       if (fromTs && ts < fromTs) return false;
@@ -78,7 +81,7 @@ function AuditLogs({ companyId }) {
       const headers = ["Timestamp", "User", "Action", "Table", "Record ID"];
       const rows = filteredLogs.map(l => [
         new Date(l.created_at).toLocaleString(),
-        l.user_email || "System",
+        l.user_first_name || l.user_last_name ? `${l.user_first_name || ""} ${l.user_last_name || ""}`.trim() : (l.user_email || "System"),
         l.action,
         l.table_name || "",
         l.record_id || "",
@@ -120,6 +123,13 @@ function AuditLogs({ companyId }) {
     return "📋";
   };
 
+  const formatUserName = (log) => {
+    if (log.user_first_name || log.user_last_name) {
+      return `${log.user_first_name || ""} ${log.user_last_name || ""}`.trim();
+    }
+    return log.user_email || "System";
+  };
+
   const toggleExpanded = (id) => setExpandedLog(expandedLog === id ? null : id);
 
   return (
@@ -141,7 +151,7 @@ function AuditLogs({ companyId }) {
               <input
                 type="text"
                 className="audit-filter-input"
-                placeholder="Search by email…"
+                placeholder="Search by name or email…"
                 value={filterUser}
                 onChange={e => setFilterUser(e.target.value)}
               />
@@ -243,7 +253,7 @@ function AuditLogs({ companyId }) {
                     </div>
 
                     <div className="log-meta">
-                      <span className="log-user">{log.user_email || "System"}</span>
+                      <span className="log-user">{formatUserName(log)}</span>
                       <span className="log-time">{new Date(log.created_at).toLocaleString()}</span>
                     </div>
 
@@ -257,7 +267,7 @@ function AuditLogs({ companyId }) {
                         <div className="detail-grid">
                           <div className="detail-item">
                             <span className="detail-label">User</span>
-                            <span className="detail-value">{log.user_email || "System"}</span>
+                            <span className="detail-value">{formatUserName(log)}{log.user_email ? ` (${log.user_email})` : ""}</span>
                           </div>
                           <div className="detail-item">
                             <span className="detail-label">Action</span>

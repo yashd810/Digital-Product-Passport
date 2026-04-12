@@ -94,11 +94,14 @@ function NotificationsPanel({ user }) {
   const handleClick = (n) => {
     markRead(n.id);
     setOpen(false);
-    if (n.passport_guid) {
-      window.open(`${window.location.origin}/p/${n.passport_guid}`, "_blank", "noopener,noreferrer");
+    if (n.action_url) {
+      navigate(n.action_url);
       return;
     }
-    if (n.action_url) navigate(n.action_url);
+    if (n.passport_guid) {
+      window.open(`${window.location.origin}/passport/preview/${encodeURIComponent(n.passport_guid)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
   };
 
   return (

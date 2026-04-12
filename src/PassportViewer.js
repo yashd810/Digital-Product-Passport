@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Routes, Route, useParams, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { LANGUAGES, translateFieldValue, translateSchemaLabel } from "./i18n";
 import { generateQRCode, saveQRCodeToDatabase } from "./QRcode";
 import { getViewerBrandTheme } from "./ThemeContext";
 import { formatPassportStatus } from "./passportStatus";
 import { authHeaders } from "./authHeaders";
 import PassportHistoryModal from "./PassportHistoryModal";
+import {
+  buildInactivePassportPath,
+  buildInactiveTechnicalPassportPath,
+  buildPreviewPassportPath,
+  buildPreviewTechnicalPassportPath,
+  buildPublicPassportPath,
+  buildTechnicalPassportPath,
+} from "./passportRoutes";
 // PassportIntro merged inline — no separate file needed
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
@@ -250,6 +258,14 @@ function PassportIntro({ passport, companyData, displayName, qrCode, qrLoading, 
           ) : (
             <div className="pv-qr-placeholder">QR unavailable</div>
           )}
+          <div className={`pv-dpp-status ${
+            passport.archived ? "pv-dpp-status-archived"
+            : passport.release_status === "obsolete" ? "pv-dpp-status-obsolete"
+            : "pv-dpp-status-active"
+          }`}>
+            <span className="pv-dpp-status-dot" />
+            {passport.archived ? "Archived" : passport.release_status === "obsolete" ? "Obsolete" : "Active"}
+          </div>
         </div>
       </aside>
     </section>
@@ -337,7 +353,7 @@ function LiveBadge({ updatedAt }) {
 // unlockedPassport: full passport data returned after a valid access key (null = not unlocked)
 // onRequestUnlock: callback to open the unlock form
 // dynamicValues: { fieldKey: { value, updatedAt } }
-function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang }) {
+function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, sectionId = "" }) {
   const [expandedKey, setExpandedKey] = useState(null);   // which dynamic field is open
   const [chartTypes,  setChartTypes]  = useState({});     // { [fieldKey]: "line"|"histogram" }
   const [history,     setHistory]     = useState({});     // { [fieldKey]: { data, loading } }
@@ -480,7 +496,7 @@ function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, 
     };
   });
   return (
-    <section className="pv-section-card">
+    <section className="pv-section-card" id={sectionId || undefined}>
       <div className="pv-section-head">
         <div>
           <h3>{sectionTitle}</h3>
@@ -617,27 +633,15 @@ function FileCell({ url, label }) {
 }
 
 // ─── Passport section tabs ────────────────────────────────────
-function PassportTabRail({ tabs, guid }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const basePath = `/passport/${guid}`;
-  const pathName = location.pathname.replace(/\/+$/, "");
-
-  const isActive = (path) => {
-    if (path === "/introduction") {
-      return pathName === basePath || pathName === `${basePath}/introduction`;
-    }
-    return pathName.endsWith(path);
-  };
-
+function PassportTabRail({ tabs, activeSectionKey, onSelect }) {
   return (
     <nav className="pv-tab-rail" aria-label="Passport sections">
       {tabs.map(tab => (
         <button
-          key={tab.path}
+          key={tab.sectionKey}
           type="button"
-          className={`pv-tab-btn${isActive(tab.path) ? " active" : ""}`}
-          onClick={() => navigate(`/passport/${guid}${tab.path}`)}
+          className={`pv-tab-btn${activeSectionKey === tab.sectionKey ? " active" : ""}`}
+          onClick={() => onSelect(tab.sectionKey)}
         >
           {tab.label}
         </button>
@@ -696,7 +700,7 @@ function ScanBadge({ guid }) {
   if (!count) return null;
   return (
     <div className="viewer-scan-badge">
-      📊 {count} scan{count !== 1 ? "s" : ""}
+      📊 {count} unique scan{count !== 1 ? "s" : ""}
     </div>
   );
 }
@@ -803,9 +807,10 @@ function PrintView({ passport, companyData, sections }) {
 }
 
 // ─── Main viewer ──────────────────────────────────────────────
-function PassportViewer() {
-  const { guid }   = useParams();
+function PassportViewer({ previewMode = false, previewCompanyId = null }) {
+  const { productId, versionNumber, previewId } = useParams();
   const navigate   = useNavigate();
+  const location   = useLocation();
   const printRef   = useRef(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -833,13 +838,26 @@ function PassportViewer() {
   const [passportAccessKey, setPassportAccessKey] = useState(null);   // key shown to logged-in users
   const [keyCopied,         setKeyCopied]         = useState(false);
   const [showHistoryModal,  setShowHistoryModal]  = useState(false);
+  const [activeSectionKey,  setActiveSectionKey]  = useState("");
+  const encodedProductId = encodeURIComponent(productId || "");
+  const encodedPreviewId = encodeURIComponent(previewId || "");
+  const isPreviewMode = !!previewMode && !!previewId;
+  const isInactiveView = !!versionNumber;
 
   useEffect(() => {
-    if (!guid) return;
+    if (isPreviewMode && (!previewId || !previewCompanyId)) return;
+    if (!isPreviewMode && !productId) return;
     (async () => {
+      setLoading(true);
+      setError("");
       try {
         // 1. Fetch the passport record
-        const r = await fetch(`${API}/api/passports/${guid}`);
+        const endpoint = isPreviewMode
+          ? `${API}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
+          : versionNumber
+            ? `${API}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
+            : `${API}/api/passports/by-product/${encodedProductId}`;
+        const r = await fetch(endpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
         if (!r.ok) throw new Error("Passport not found");
         const data = await r.json();
         setPassport(data);
@@ -865,7 +883,7 @@ function PassportViewer() {
         setLoading(false);
       }
     })();
-  }, [guid]);
+  }, [encodedPreviewId, encodedProductId, isPreviewMode, previewCompanyId, previewId, productId, versionNumber]);
 
   useEffect(() => {
     fetch(`${API}/api/users/me`, {
@@ -876,11 +894,17 @@ function PassportViewer() {
   }, []);
 
   useEffect(() => {
-    if (!passport?.guid) return;
+    if (!passport?.guid || !passport?.product_id) return;
     (async () => {
       setQrLoading(true);
       try {
-        const generated = await generateQRCode(passport.guid);
+        const generated = await generateQRCode({
+          productId: passport.product_id,
+          companyName: companyData?.company_name,
+          manufacturerName: passport.manufacturer,
+          manufacturedBy: passport.manufactured_by,
+          modelName: passport.model_name,
+        });
         if (generated) {
           setQrCode(generated);
           try {
@@ -893,11 +917,11 @@ function PassportViewer() {
         setQrLoading(false);
       }
     })();
-  }, [passport?.guid, passport?.passport_type]);
+  }, [companyData?.company_name, passport?.guid, passport?.manufactured_by, passport?.manufacturer, passport?.model_name, passport?.passport_type, passport?.product_id]);
 
   // Fetch + poll dynamic field values every 30 s
   useEffect(() => {
-    if (!passport?.guid) return;
+    if (!passport?.guid || isInactiveView) return;
     const fetchDynamic = () =>
       fetch(`${API}/api/passports/${passport.guid}/dynamic-values`)
         .then(r => r.ok ? r.json() : null)
@@ -906,7 +930,7 @@ function PassportViewer() {
     fetchDynamic();
     const timer = setInterval(fetchDynamic, 30000);
     return () => clearInterval(timer);
-  }, [passport?.guid]);
+  }, [passport?.guid, isInactiveView]);
 
   // Fetch signature verification for released passports
   useEffect(() => {
@@ -933,7 +957,7 @@ function PassportViewer() {
     setUnlocking(true);
     setAccessError("");
     try {
-      const r = await fetch(`${API}/api/passports/${guid}/unlock`, {
+      const r = await fetch(`${API}/api/passports/${passport.guid}/unlock`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ accessKey: accessKeyInput.trim() }),
@@ -950,18 +974,93 @@ function PassportViewer() {
     }
   };
 
+  const sections = typeDef?.fields_json?.sections || typeDef?.sections || [];
+  const tabs = sections.map((section) => ({
+    sectionKey: section.key,
+    label: translateSchemaLabel(lang, section),
+  }));
+  const activeSection =
+    sections.find((section) => section.key === activeSectionKey) ||
+    sections[0] ||
+    null;
+  const passportType = passport?.passport_type;
+  const displayName  = typeDef?.display_name || passportType;
+  const brandTheme = getViewerBrandTheme(companyData?.branding_json);
+  const canonicalPublicPath = buildPublicPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+  });
+  const canonicalTechnicalPath = buildTechnicalPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+  });
+  const canonicalInactivePath = buildInactivePassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+    versionNumber,
+  });
+  const canonicalInactiveTechnicalPath = buildInactiveTechnicalPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+    versionNumber,
+  });
+  const canonicalPreviewPath = buildPreviewPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+    previewId: passport?.guid,
+  });
+  const canonicalPreviewTechnicalPath = buildPreviewTechnicalPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+    previewId: passport?.guid,
+  });
+
+  useEffect(() => {
+    const targetPath = isPreviewMode
+      ? canonicalPreviewTechnicalPath
+      : isInactiveView
+        ? canonicalInactiveTechnicalPath
+        : canonicalTechnicalPath;
+    if (!targetPath) return;
+
+    const currentPath = location.pathname.replace(/\/+$/, "");
+    const normalizedTargetPath = targetPath.replace(/\/+$/, "");
+    if (currentPath !== normalizedTargetPath) {
+      navigate(normalizedTargetPath, { replace: true });
+    }
+  }, [canonicalInactiveTechnicalPath, canonicalPreviewTechnicalPath, canonicalTechnicalPath, isInactiveView, isPreviewMode, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (!sections.length) {
+      setActiveSectionKey("");
+      return;
+    }
+    if (!sections.some((section) => section.key === activeSectionKey)) {
+      setActiveSectionKey(sections[0].key);
+    }
+  }, [activeSectionKey, sections]);
+
   if (loading) return <div className="loading">Loading passport…</div>;
   if (error)   return <div className="alert alert-error">{error}</div>;
   if (!passport) return null;
-
-  const sections = typeDef?.fields_json?.sections || typeDef?.sections || [];
-  const firstSectionKey = sections[0]?.key || null;
-
-  const tabs = sections.map(s => ({ path: `/${s.key}`, label: translateSchemaLabel(lang, s) }));
-
-  const passportType = passport.passport_type;
-  const displayName  = typeDef?.display_name || passportType;
-  const brandTheme = getViewerBrandTheme(companyData?.branding_json);
 
   return (
     <div
@@ -970,17 +1069,50 @@ function PassportViewer() {
       style={brandTheme.style}
     >
       <div className="no-print">
-        <Header displayName={displayName} lang={lang} setLang={setLang} guid={guid} companyData={companyData} brandTheme={brandTheme} />
+        <Header displayName={displayName} lang={lang} setLang={setLang} guid={passport.guid} companyData={companyData} brandTheme={brandTheme} />
 
         <div className="viewer-content">
           <div className="viewer-shell">
             <div className="viewer-topbar">
               <div className="viewer-title">
+                <button
+                  type="button"
+                  className="pv-secondary-btn viewer-back-btn"
+                  onClick={() => {
+                    const landingPath = isPreviewMode
+                      ? canonicalPreviewPath
+                      : isInactiveView
+                        ? canonicalInactivePath
+                        : canonicalPublicPath;
+                    if (landingPath) navigate(landingPath);
+                  }}
+                  disabled={!(isPreviewMode
+                    ? canonicalPreviewPath
+                    : isInactiveView
+                      ? canonicalInactivePath
+                      : canonicalPublicPath)}
+                >
+                  ← Back to landing page
+                </button>
                 <h2>{typeDef?.umbrella_icon || ""} {displayName}</h2>
-                <p className="viewer-subtitle">Public passport viewer</p>
+                <p className="viewer-subtitle">{isPreviewMode ? "Draft preview of the public passport viewer" : "Public passport viewer"}</p>
               </div>
               <SignatureBadge verification={sigVerification} />
             </div>
+
+            {isPreviewMode && (
+              <div className="access-unlocked-bar preview-status-bar">
+                <div className="preview-status-copy">
+                  <strong>Preview mode</strong>
+                  <span>Previewing how this passport will look in the public viewer before release.</span>
+                </div>
+                {canonicalPublicPath && (
+                  <code className="preview-status-url" title={canonicalPublicPath}>
+                    Future public URL: {canonicalPublicPath}
+                  </code>
+                )}
+              </div>
+            )}
 
             {/* Access key info bar — only visible to logged-in company users */}
             {isLoggedIn && passportAccessKey && (
@@ -1016,6 +1148,21 @@ function PassportViewer() {
               </div>
             )}
 
+            {isInactiveView && (
+              <div className="access-unlocked-bar">
+                Viewing inactive released snapshot v{passport.version_number}.
+                <button className="access-relock-btn" onClick={() => { if (canonicalPublicPath) navigate(canonicalPublicPath); }}>
+                  Open current passport
+                </button>
+              </div>
+            )}
+
+            {passport.release_status === "obsolete" && (
+              <div className="pv-obsolete-banner">
+                This is not the latest version of this passport. A newer version has been released.
+              </div>
+            )}
+
             <PassportIntro
               passport={passport}
               companyData={companyData}
@@ -1026,33 +1173,27 @@ function PassportViewer() {
               onPrint={() => { setTimeout(() => window.print(), 300); }}
             />
 
-            <PassportTabRail tabs={tabs} guid={guid} />
-
             <div className="viewer-route-panel">
-              <Routes>
-                {firstSectionKey ? (
-                  <>
-                    <Route index element={<Navigate to={`/passport/${guid}/${firstSectionKey}`} replace />} />
-                    <Route path="introduction" element={<Navigate to={`/passport/${guid}/${firstSectionKey}`} replace />} />
-                  </>
-                ) : (
-                  <Route index element={<EmptySectionsState />} />
-                )}
-                {sections.map(section => (
-                  <Route key={section.key} path={section.key}
-                    element={
-                      <SectionView
-                        sectionDef={section}
-                        passport={passport}
-                        unlockedPassport={unlockedPassport}
-                        onRequestUnlock={() => setShowAccessForm(true)}
-                        dynamicValues={dynamicValues}
-                        lang={lang}
-                      />
-                    }
-                  />
-                ))}
-              </Routes>
+              {sections.length > 0 && (
+                <PassportTabRail
+                  tabs={tabs}
+                  activeSectionKey={activeSection?.key || ""}
+                  onSelect={setActiveSectionKey}
+                />
+              )}
+              {sections.length === 0 && <EmptySectionsState />}
+              {activeSection && (
+                <SectionView
+                  key={activeSection.key}
+                  sectionId={`section-${activeSection.key}`}
+                  sectionDef={activeSection}
+                  passport={passport}
+                  unlockedPassport={unlockedPassport}
+                  onRequestUnlock={() => setShowAccessForm(true)}
+                  dynamicValues={dynamicValues}
+                  lang={lang}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1098,9 +1239,11 @@ function PassportViewer() {
 
       {showHistoryModal && (
         <PassportHistoryModal
-          guid={guid}
+          guid={passport.guid}
+          productId={passport.product_id}
           passportType={passport.passport_type}
-          mode="public"
+          companyId={isPreviewMode ? previewCompanyId : null}
+          mode={isPreviewMode ? "company" : "public"}
           onClose={() => setShowHistoryModal(false)}
         />
       )}

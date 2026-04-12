@@ -113,6 +113,10 @@
   color: #f0f6fa;
 }
 
+.viewer-back-btn {
+  margin-bottom: 10px;
+}
+
 [data-theme="light"] .viewer-title h2 {
   color: #0b1826;
 }
@@ -2608,7 +2612,7 @@
 .pv-qr-label {
   display: block;
   margin-bottom: 12px;
-  font-size: 11px;
+  font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-weight: 700;
@@ -2630,6 +2634,49 @@
   box-shadow: none;
   color: #456177;
   font-size: 13px;
+}
+
+/* ── DPP Status badge below QR code ── */
+.pv-dpp-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.pv-dpp-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.pv-dpp-status-active {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+.pv-dpp-status-active .pv-dpp-status-dot {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+.pv-dpp-status-archived {
+  background: rgba(107, 114, 128, 0.12);
+  color: #6b7280;
+}
+.pv-dpp-status-archived .pv-dpp-status-dot {
+  background: #6b7280;
+}
+.pv-dpp-status-obsolete {
+  background: rgba(234, 179, 8, 0.12);
+  color: #a16207;
+}
+.pv-dpp-status-obsolete .pv-dpp-status-dot {
+  background: #eab308;
 }
 
 .pv-tab-rail {
@@ -2967,6 +3014,57 @@
   font-weight: 700;
 }
 
+.preview-status-bar {
+  align-items: flex-start;
+}
+
+.preview-status-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.preview-status-copy strong {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.preview-status-copy span {
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.preview-status-url {
+  display: inline-block;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(11, 107, 79, 0.12);
+  color: #0b6b4f;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.pv-obsolete-banner {
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: var(--status-obsolete-bg, rgba(107, 114, 128, 0.12));
+  border: 1px solid var(--status-obsolete-border, rgba(107, 114, 128, 0.3));
+  color: var(--status-obsolete-text, #6b7280);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .access-relock-btn {
   border: none;
   background: rgba(255, 255, 255, 0.68);
@@ -3259,6 +3357,10 @@
   .access-unlocked-bar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .preview-status-url {
+    margin-left: 0;
   }
 }
 
@@ -3697,6 +3799,16 @@
   color: #17304a;
   font-size: 0.98rem;
   line-height: 1.55;
+}
+
+.pv-history-open-link {
+  color: #0b5fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pv-history-open-link:hover {
+  text-decoration: underline;
 }
 
 .pv-history-changes {

@@ -419,7 +419,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           {linkedUrl ? (
             <div className="file-existing">
               <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
-                📄 {fileName}
+                📄 {decodeURIComponent(fileName || "Document")}
               </a>
               <button type="button" className="file-clear-btn" disabled={disabled}
                 onClick={() => handleField(field.key, "")}>✕ Remove</button>
@@ -436,6 +436,30 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
               <span className="file-placeholder">↺ Change</span>
             </button>
           )}
+          <div className="file-link-paste">
+            <input
+              type="text"
+              className="file-link-input"
+              placeholder="Or paste a repository link here…"
+              disabled={disabled}
+              value={linkedUrl && document.activeElement?.dataset?.fieldKey !== field.key ? "" : undefined}
+              data-field-key={field.key}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text").trim();
+                if (text.startsWith("http")) { e.preventDefault(); handleField(field.key, text); }
+              }}
+              onBlur={(e) => {
+                const text = e.target.value.trim();
+                if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const text = e.target.value.trim();
+                  if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+                }
+              }}
+            />
+          </div>
         </div>
       );
     }
@@ -464,6 +488,29 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
               <span className="file-placeholder">↺ Change</span>
             </button>
           )}
+          <div className="file-link-paste">
+            <input
+              type="text"
+              className="file-link-input"
+              placeholder="Or paste a repository link here…"
+              disabled={disabled}
+              data-field-key={field.key}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text").trim();
+                if (text.startsWith("http")) { e.preventDefault(); handleField(field.key, text); }
+              }}
+              onBlur={(e) => {
+                const text = e.target.value.trim();
+                if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const text = e.target.value.trim();
+                  if (text.startsWith("http")) { handleField(field.key, text); e.target.value = ""; }
+                }
+              }}
+            />
+          </div>
         </div>
       );
     }

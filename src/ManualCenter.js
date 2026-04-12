@@ -70,12 +70,12 @@ const CORE_DATABASE_TABLES = [
       {
         name: "passport_registry",
         purpose: "Maps every passport GUID to its company, type, public access key, and device API key.",
-        columns: ["guid", "company_id", "passport_type", "access_key", "device_api_key", "created_at"],
+        columns: ["guid", "lineage_id", "company_id", "passport_type", "access_key", "device_api_key", "created_at"],
       },
       {
         name: "din_spec_99100_passports",
         purpose: "Example generated passport table currently present in the database. Every active passport type gets its own `<type>_passports` table with these lifecycle columns plus one column per configured field.",
-        columns: ["id", "guid", "company_id", "model_name", "product_id", "release_status", "version_number", "qr_code", "created_by", "updated_by", "created_at", "updated_at", "deleted_at", "...dynamic field columns from the passport type schema"],
+        columns: ["id", "guid", "lineage_id", "company_id", "model_name", "product_id", "release_status", "version_number", "qr_code", "created_by", "updated_by", "created_at", "updated_at", "deleted_at", "...dynamic field columns from the passport type schema"],
       },
       {
         name: "passport_edit_sessions",
@@ -86,6 +86,11 @@ const CORE_DATABASE_TABLES = [
         name: "passport_dynamic_values",
         purpose: "Latest dynamic field values pushed by devices or saved manually.",
         columns: ["id", "passport_guid", "field_key", "value", "updated_at"],
+      },
+      {
+        name: "passport_archives",
+        purpose: "Stores full passport row data when a passport is archived. Each version is stored as a separate row with the complete row_data JSONB. Unarchiving restores the soft-deleted rows in the passport table and removes the archive entries.",
+        columns: ["id", "guid", "lineage_id", "company_id", "passport_type", "version_number", "model_name", "product_id", "release_status", "row_data", "archived_by", "archived_at"],
       },
     ],
   },
@@ -179,17 +184,17 @@ const BACKEND_API_FAMILIES = [
     name: "Authentication and account recovery",
     route: "/api/auth/*",
     details: [
-      "Handles login, OTP verification, logout, forgot-password, reset-password, and OTP resend.",
-      "Pairs with invite validation so users can only register through valid invite links.",
-      "Feeds the profile page features for password updates and 2FA toggling.",
+      "Handles login, 2FA verification, logout, password reset, and OTP resend in one place.",
+      "This is the starting point for bearer-token access to protected company and admin APIs.",
+      "Use these endpoints first whenever a human user needs to sign in before calling the rest of the backend.",
     ],
   },
   {
     name: "Users, profile, and company team",
     route: "/api/users/* and /api/companies/:companyId/users*",
     details: [
-      "Returns the current signed-in user, updates password and 2FA, and persists workflow defaults.",
-      "Drives the team page for listing members, changing roles, and deactivating users.",
+      "Returns the signed-in user profile, refreshes bearer tokens, and updates password, 2FA, and workflow defaults.",
+      "Drives the Manage Team page for listing members, changing roles, and deactivating users.",
       "Supports invite-based onboarding for both company members and super admins.",
     ],
   },
@@ -199,25 +204,26 @@ const BACKEND_API_FAMILIES = [
     details: [
       "Creates and lists companies, passport types, product categories, company analytics, and super admins.",
       "Stores draft passport-type builder state and exposes activate, deactivate, clone, metadata edit, and delete actions.",
-      "Manages company access grants by passport type and supports cross-company profile access.",
+      "Also handles company type grants and the company-level Asset Management enable or disable toggle.",
     ],
   },
   {
     name: "Passport creation and lifecycle",
-    route: "/api/passports/*",
+    route: "/api/companies/:companyId/passports*",
     details: [
-      "Creates single passports and bulk passports, lists records, fetches individual passports, and updates draft data.",
-      "Handles release, revise, compare-version, delete, CSV updates, QR storage, audit history, and analytics activity.",
-      "Supports edit-session locking so active editors can see when another person is already inside a passport.",
+      "Creates one passport or many, lists company records, fetches single passports, and updates draft or revision data.",
+      "Handles release, revise, compare-version, delete, bulk update, CSV import, JSON upsert, AAS export, and version history.",
+      "Supports bulk release, bulk workflow submission, single and bulk archive with restore, and edit-session locking.",
+      "Archived passports are stored separately and excluded from analytics. They can be viewed, exported, and restored from the Archived page.",
     ],
   },
   {
     name: "Public viewer and restricted access",
-    route: "/api/public-passports/* and /api/passports/:guid/unlock",
+    route: "/api/passports/:guid*, /api/signing-key, /.well-known/did.json",
     details: [
-      "Returns the public passport payload with only public fields by default.",
+      "Returns the public passport payload with public fields only by default.",
       "Unlocks restricted field groups when a valid passport access key is provided.",
-      "Serves scan logging, signatures, signing-key metadata, and DID-style public verification endpoints.",
+      "Also serves AAS export, signatures, signing-key metadata, DID verification, scan logging, and public dynamic-value endpoints.",
     ],
   },
   {
@@ -244,7 +250,7 @@ const BACKEND_API_FAMILIES = [
     details: [
       "Stores company branding, introduction content, public-page styling, and logo assets.",
       "Creates revocable company API keys from the dashboard Security page for the read-only external `/api/v1/passports` surface.",
-      "Separates company API keys from user bearer authentication and passport/device keys.",
+      "Separates company API keys from user bearer authentication, device keys, passport access keys, and asset-management launch credentials.",
     ],
   },
   {
@@ -254,6 +260,15 @@ const BACKEND_API_FAMILIES = [
       "Returns live dynamic values and their history for charting inside the public viewer.",
       "Accepts device pushes authenticated by `x-device-key` and supports manual overrides from the dashboard.",
       "Can regenerate a passport-level device key without touching the company-wide API keys.",
+    ],
+  },
+  {
+    name: "Asset Management operational layer",
+    route: "/api/companies/:companyId/asset-management/launch and /api/asset-management/*",
+    details: [
+      "Launches the separate Asset Management workspace for bulk updates on already existing passports.",
+      "Supports staged CSV, JSON, and ERP/API ingestion, then validates rows before pushing updates into the backend.",
+      "Includes its own launch token, optional shared-secret header, saved jobs, recent runs, and scheduled server-side fetch-and-push flows.",
     ],
   },
 ];
@@ -280,7 +295,7 @@ const BACKEND_OPERATION_FLOWS = [
   {
     title: "Public-view and restricted-field flow",
     steps: [
-      "A QR code or copied link opens the single public `/p/:guid` route, which then loads the correct consumer-facing viewer for that passport type.",
+      "A QR code or copied link opens the public `/p/:productId` route, which then loads the correct consumer-facing viewer for that passport type.",
       "The viewer shows public fields immediately and tracks scan events.",
       "Restricted sections stay hidden until a valid passport access key is entered.",
       "Signature, VC payload, and signing-key endpoints provide verification material for released versions.",
@@ -296,6 +311,17 @@ const BACKEND_OPERATION_FLOWS = [
     ],
   },
   {
+    title: "Passport archiving flow",
+    steps: [
+      "Any passport can be archived from the kebab menu on its row, or multiple passports can be archived at once using the bulk actions bar in selection mode.",
+      "Archiving copies all versions into the passport_archives table, then soft-deletes the rows from the active passport table.",
+      "Archived passports disappear from the main passport list, analytics counts, and trend charts.",
+      "The Archived page in the sidebar shows all archived passports with search, filter, sort, selection, export, and QR download.",
+      "Restoring a passport reverses the process: the soft-deleted rows are undeleted and the archive entries are removed.",
+      "Archiving is available for passports in any status, including released passports.",
+    ],
+  },
+  {
     title: "Governance and cleanup flow",
     steps: [
       "Workflow actions generate notifications and keep review status visible in backlog/history tabs.",
@@ -304,7 +330,228 @@ const BACKEND_OPERATION_FLOWS = [
       "Deleting a company removes tenant data and related filesystem content inside a single backend cleanup path.",
     ],
   },
+  {
+    title: "Asset Management bulk-update flow",
+    steps: [
+      "A company editor launches Asset Management from the dashboard, which issues a short-lived asset platform token and optional extra asset key.",
+      "The tool loads the company's allowed passport types and current passports for the selected type.",
+      "Users stage changes by CSV, JSON, blank rows, or ERP/API fetch, then preview the package before anything is written.",
+      "Preview checks matching by guid or product_id, rejects unknown columns, and shows row-by-row validation results.",
+      "Push writes the prepared changes into the normal passport backend, while Schedule saves a server-side job that can fetch from an external source later.",
+    ],
+  },
 ];
+
+const SECURITY_KEY_TABLE = {
+  title: "Credential types and where each one belongs",
+  columns: ["Credential", "How you get it", "How you send it", "What it can do", "Do not use it for"],
+  rows: [
+    [
+      "Bearer token",
+      "Log in with /api/auth/login, complete /api/auth/verify-otp if 2FA is enabled, or refresh from /api/users/me/token / Dashboard > Security",
+      "Authorization header: Bearer <token>",
+      "Protected company and super-admin APIs such as create, update, workflow, templates, repository, analytics, and admin routes",
+      "External read-only sharing with partners or device pushes",
+    ],
+    [
+      "Company API key",
+      "Dashboard > Security or POST /api/companies/:companyId/api-keys by a company admin",
+      "X-API-Key header",
+      "Read-only external API on /api/v1/passports and /api/v1/passports/:guid",
+      "Creating, editing, deleting, releasing, or scheduling changes",
+    ],
+    [
+      "Device API key",
+      "Passport row > Device Integration, GET /api/companies/:companyId/passports/:guid/device-key, or regenerate endpoint",
+      "x-device-key header",
+      "POST /api/passports/:guid/dynamic-values for live measurements such as temperature, mass, or battery data",
+      "Listing all passports, editing normal passport fields, or calling company admin endpoints",
+    ],
+    [
+      "Passport access key",
+      "Public sharing workflow or GET /api/companies/:companyId/passports/:guid/access-key",
+      "JSON body on POST /api/passports/:guid/unlock as { accessKey: \"...\" }",
+      "Unlocking restricted fields in the public viewer for one passport",
+      "General API authentication, company APIs, or device integrations",
+    ],
+    [
+      "Asset Management launch token",
+      "Created automatically when an editor launches Asset Management from the dashboard",
+      "x-asset-platform-token header",
+      "Calling /api/asset-management/* after the tool is launched",
+      "Normal company APIs such as /api/companies/:companyId/passports",
+    ],
+    [
+      "Asset Management shared secret",
+      "Environment configuration handled by platform operators, not by normal users",
+      "x-asset-key header when the server says it is required",
+      "Adds an extra protection layer to Asset Management",
+      "General dashboard login or external partner access",
+    ],
+  ],
+};
+
+const ASSET_MANAGEMENT_TERMS_TABLE = {
+  title: "Asset Management in simple words",
+  columns: ["Part of the tool", "What it does", "What to remember"],
+  rows: [
+    ["Workspace", "Auto-connects to the company and loads the selected passport type.", "You do not need to type the company or token manually after a normal dashboard launch."],
+    ["Ingest", "Accepts JSON paste, CSV import, or ERP/API fetch.", "The tool is for updating existing passports, not for bypassing the main passport schema."],
+    ["Asset Grid", "Shows staged rows in a spreadsheet-like table.", "Keep guid when possible. If guid is missing, product_id is the main fallback match key."],
+    ["Export CSV", "Downloads current rows, blank templates, filtered rows, filtered columns, or editable-only rows.", "Filtered columns still keep guid and product_id so the file can be re-imported safely."],
+    ["Preview & Build JSON", "Runs a dry check and creates the exact JSON package that would be pushed.", "No passport is changed at preview time."],
+    ["Validation Details", "Explains row by row whether each line is ready, skipped, or failed.", "Use this list before pushing so you understand exactly which rows will change."],
+    ["Push to Backend", "Writes the prepared changes into your real passport records.", "This is the moment when the update becomes real."],
+    ["Schedule", "Saves a server-side job that can run later on a schedule.", "Scheduled jobs fetch data later and then push it into your backend. They do not ask your ERP to store passports."],
+  ],
+};
+
+const API_GETTING_STARTED_FLOWS = [
+  {
+    title: "How a normal company user gets a bearer token",
+    steps: [
+      "Send POST /api/auth/login with email and password.",
+      "If the response says requires_2fa: true, send POST /api/auth/verify-otp with the pre_auth_token and the 6-digit code from email.",
+      "Use the returned token in the Authorization header as Bearer <token> on later requests.",
+      "If you need a fresh copy while already logged in, call POST /api/users/me/token.",
+    ],
+  },
+  {
+    title: "How a company gives read-only access to an external partner",
+    steps: [
+      "A company admin creates a company API key from Dashboard > Security or by calling POST /api/companies/:companyId/api-keys.",
+      "The raw key is shown only once, so copy it immediately and store it securely.",
+      "The external partner then uses that key in the X-API-Key header on /api/v1/passports endpoints.",
+      "If access should stop, revoke the key with DELETE /api/companies/:companyId/api-keys/:keyId.",
+    ],
+  },
+  {
+    title: "How a device or machine pushes live values",
+    steps: [
+      "A company user opens Device Integration for the passport and copies the device key, or regenerates it if needed.",
+      "The device sends POST /api/passports/:guid/dynamic-values with the x-device-key header.",
+      "The body is a simple object such as { temperature: 22.4, mass: 18.1 }.",
+      "Public viewers and dashboards can then read the latest values and history from the dynamic-value endpoints.",
+    ],
+  },
+  {
+    title: "How Asset Management authentication works",
+    steps: [
+      "A logged-in editor or company admin launches Asset Management from the normal dashboard.",
+      "The backend issues an asset launch token and, if enabled, also requires the extra x-asset-key header.",
+      "The Asset Management page stores those launch credentials privately and uses them for /api/asset-management/* calls.",
+      "Normal users should not copy these values into unrelated scripts unless their process really needs the asset layer.",
+    ],
+  },
+];
+
+const COMPANY_WRITE_API_TABLE = {
+  title: "Company write APIs for create, update, release, revise, and bulk work",
+  columns: ["Action", "Endpoint", "Authentication", "What you send", "What happens"],
+  rows: [
+    ["Create one passport", "POST /api/companies/:companyId/passports", "Bearer token, company access, editor or company admin", "{ passport_type, model_name, product_id, ...fieldKeys }", "Creates one new draft passport. product_id must be unique."],
+    ["Bulk create many passports", "POST /api/companies/:companyId/passports/bulk", "Bearer token, company access, editor or company admin", "{ passport_type, passports: [ {...}, {...} ] } up to 500 rows", "Creates many passports and returns a per-row summary instead of failing the whole batch."],
+    ["Update one editable passport", "PATCH /api/companies/:companyId/passports/:guid", "Bearer token, company access, editor or company admin", "{ passportType or passport_type, ...fieldsToChange }", "Updates one draft or in-revision passport."],
+    ["Bulk update matched passports", "PATCH /api/companies/:companyId/passports", "Bearer token, company access, editor or company admin", "{ passport_type, passports: [ { guid or product_id, ...fields }, ... ] } up to 500 rows", "Updates many existing editable passports. It does not create new ones."],
+    ["Bulk update many records with the same value", "PATCH /api/companies/:companyId/passports/bulk-update-all", "Bearer token, company access, editor or company admin", "{ passport_type, filter, update }", "Applies one update object to every matching editable passport. product_id cannot be bulk-set."],
+    ["Upsert from CSV text", "POST /api/companies/:companyId/passports/upsert-csv", "Bearer token, company access, editor or company admin", "{ passport_type, csv: \"...csv text...\" }", "Creates new passports when no guid is present, or updates matching editable passports when guid or product_id matches."],
+    ["Upsert from JSON", "POST /api/companies/:companyId/passports/upsert-json", "Bearer token, company access, editor or company admin", "{ passport_type, passports: [ {...}, {...} ] } or a raw array", "Creates new passports without guid, or updates editable ones when guid or product_id matches."],
+    ["Release one passport", "PATCH /api/companies/:companyId/passports/:guid/release", "Bearer token, company access, editor or company admin", "{ passportType }", "Moves an editable passport to released and stores a signature record."],
+    ["Revise one released passport", "POST /api/companies/:companyId/passports/:guid/revise", "Bearer token, company access, editor or company admin", "{ passportType }", "Creates the next editable version from the latest released version."],
+    ["Bulk revise passports", "POST /api/companies/:companyId/passports/bulk-revise", "Bearer token, company access, editor or company admin", "{ items, changes, submitToWorkflow, reviewerId, approverId, ... }", "Creates revised copies for many released passports and can optionally move them toward workflow."],
+    ["Submit into workflow", "POST /api/companies/:companyId/passports/:guid/submit-review", "Bearer token, company access, editor or company admin", "{ passportType, reviewerId, approverId }", "Places the passport into reviewer and or approver workflow."],
+    ["Bulk release passports", "POST /api/companies/:companyId/passports/bulk-release", "Bearer token, company access, editor or company admin", "{ items: [ { guid, passportType } ] } up to 500", "Releases many draft or in-revision passports at once, signing each one. Skips already-released rows."],
+    ["Bulk submit to workflow", "POST /api/companies/:companyId/passports/bulk-workflow", "Bearer token, company access, editor or company admin", "{ items: [ { guid, passportType } ], reviewerId, approverId }", "Submits many editable passports into the review and approval workflow in one request."],
+    ["Archive one passport", "POST /api/companies/:companyId/passports/:guid/archive", "Bearer token, company access, editor or company admin", "{ passportType }", "Copies all versions to the passport_archives table, then soft-deletes from the passport table. The passport disappears from the active list and analytics."],
+    ["Bulk archive passports", "POST /api/companies/:companyId/passports/bulk-archive", "Bearer token, company access, editor or company admin", "{ items: [ { guid, passportType } ] } up to 500", "Archives many passports at once and reports how many were archived or skipped."],
+    ["Unarchive one passport", "POST /api/companies/:companyId/passports/:guid/unarchive", "Bearer token, company access, editor or company admin", "No body", "Restores all soft-deleted versions and removes the archive entries. The passport reappears in the active list."],
+    ["Bulk unarchive passports", "POST /api/companies/:companyId/passports/bulk-unarchive", "Bearer token, company access, editor or company admin", "{ guids: [ \"uuid\", ... ] } up to 500", "Restores many archived passports and reports how many were restored or skipped."],
+    ["Delete one editable passport", "DELETE /api/companies/:companyId/passports/:guid", "Bearer token, company access, editor or company admin", "{ passportType }", "Soft-deletes one draft or in-revision passport. Released passports cannot be deleted."],
+    ["Bulk delete editable passports", "DELETE /api/companies/:companyId/passports", "Bearer token, company access, editor or company admin", "{ passport_type, identifiers: [ { guid }, { product_id } ] }", "Soft-deletes many editable passports and reports deleted, skipped, and failed rows."],
+  ],
+};
+
+const READ_EXPORT_API_TABLE = {
+  title: "Read, search, compare, and export APIs",
+  columns: ["Action", "Endpoint", "Authentication", "What you send", "What comes back"],
+  rows: [
+    ["List company passports", "GET /api/companies/:companyId/passports", "Bearer token and company access", "Query params: passportType required, search optional, status optional", "Current active company passports for that type. Archived passports are excluded."],
+    ["List archived passports", "GET /api/companies/:companyId/passports/archived", "Bearer token and company access", "Query params: passportType optional, search optional", "Returns the latest version per GUID from the passport_archives table, with archived-by user details."],
+    ["Fetch many by guid or product_id", "POST /api/companies/:companyId/passports/bulk-fetch", "Bearer token and company access", "{ passport_type, identifiers: [ { guid }, { product_id } ] }", "A found or not_found result for each requested identifier."],
+    ["Export drafts or released rows", "GET /api/companies/:companyId/passports/export-drafts", "Bearer token and company access", "Query params: passportType required, format csv or json, status draft released in_revision or all", "A downloadable CSV or JSON export."],
+    ["Fetch one company passport", "GET /api/companies/:companyId/passports/:guid", "Bearer token and company access", "No body", "The latest company-visible version of that passport."],
+    ["See version diff input", "GET /api/companies/:companyId/passports/:guid/diff", "Bearer token and company access", "Query param: passportType", "All versions needed for compare views."],
+    ["See passport history", "GET /api/companies/:companyId/passports/:guid/history", "Bearer token and company access", "No body", "Version history including non-public data for authorized company users."],
+    ["Change whether one history version is public", "PATCH /api/companies/:companyId/passports/:guid/history/:versionNumber", "Bearer token, company access, editor or company admin", "{ isPublic: true or false }", "Updates public-history visibility for that version."],
+    ["Read passport access key", "GET /api/companies/:companyId/passports/:guid/access-key", "Bearer token and company access", "No body", "The current unlock key used by the public restricted-fields flow."],
+    ["Export one passport as AAS", "GET /api/companies/:companyId/passports/:guid/export/aas", "Bearer token and company access", "No body", "A JSON file for Asset Administration Shell style usage."],
+    ["Get current edit lock", "GET /api/companies/:companyId/passports/:guid/edit-session", "Bearer token and company access", "No body", "Shows whether another user is actively editing."],
+    ["Start or refresh edit lock", "POST /api/companies/:companyId/passports/:guid/edit-session", "Bearer token, company access, editor or company admin", "No body", "Marks the current user as the active editor."],
+    ["Clear edit lock", "DELETE /api/companies/:companyId/passports/:guid/edit-session", "Bearer token and company access", "No body", "Ends the current edit session."],
+  ],
+};
+
+const PUBLIC_AND_LIVE_API_TABLE = {
+  title: "Public, external read, unlock, verification, and live-data APIs",
+  columns: ["Action", "Endpoint", "Authentication", "What you send", "What it returns or does"],
+  rows: [
+    ["External read-only list", "GET /api/v1/passports", "X-API-Key header", "Query params: type required, status optional, search optional, limit optional, offset optional", "A read-only list of passports for that company and passport type."],
+    ["External read-only single passport", "GET /api/v1/passports/:guid", "X-API-Key header", "No body", "One passport resolved through the company's registry access."],
+    ["Public passport view", "GET /api/passports/by-product/:productId", "No auth", "Optional query param: version", "The latest released public-safe passport view for a product, with restricted fields removed."],
+    ["Public passport history", "GET /api/passports/by-product/:productId/history", "No auth", "No body", "Public version history only."],
+    ["Public AAS export", "GET /api/passports/:guid/export/aas", "No auth", "No body", "AAS JSON for released passports only."],
+    ["Unlock restricted fields", "POST /api/passports/:guid/unlock", "Passport access key in body, not a header", "{ accessKey: \"...\" }", "The full passport including restricted fields when the key is correct."],
+    ["Verify signature", "GET /api/passports/:guid/signature", "No auth", "Optional query param: version", "Signature status and, when available, the stored Verifiable Credential payload."],
+    ["Get current signing key", "GET /api/signing-key", "No auth", "No body", "The active public signing key metadata."],
+    ["Get DID document", "GET /.well-known/did.json", "No auth", "No body", "A DID document that helps outside verifiers validate released passport signatures."],
+    ["Read latest live values", "GET /api/passports/:guid/dynamic-values", "No auth", "No body", "The most recent live value per dynamic field."],
+    ["Read one live field history", "GET /api/passports/:guid/dynamic-values/:fieldKey/history", "No auth", "Optional query param: limit", "Time-series history for one dynamic field."],
+    ["Push live device values", "POST /api/passports/:guid/dynamic-values", "x-device-key header", "{ fieldKey: value, anotherField: value }", "Stores a new live reading per field."],
+    ["Read device key", "GET /api/companies/:companyId/passports/:guid/device-key", "Bearer token and company access", "No body", "Returns the current device key for that passport."],
+    ["Regenerate device key", "POST /api/companies/:companyId/passports/:guid/device-key/regenerate", "Bearer token, company access, editor or company admin", "No body", "Replaces the old device key with a new one."],
+    ["Manual live-value override", "PATCH /api/companies/:companyId/passports/:guid/dynamic-values", "Bearer token, company access, editor or company admin", "{ fieldKey: value }", "Lets a user save manual live values without a physical device push."],
+  ],
+};
+
+const ASSET_MANAGEMENT_API_TABLE = {
+  title: "Asset Management APIs",
+  columns: ["Action", "Endpoint", "Authentication", "What you send", "What it does"],
+  rows: [
+    ["Launch the tool", "POST /api/companies/:companyId/asset-management/launch", "Bearer token, company access, editor or company admin", "No body", "Returns an asset launch token and the asset URL for the separate Asset Management page."],
+    ["Load bootstrap data", "GET /api/asset-management/bootstrap", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Returns company info, allowed passport types, ERP presets, and security hints."],
+    ["Load current passports", "GET /api/asset-management/passports", "x-asset-platform-token and, if enabled, x-asset-key", "Query param: passportType", "Returns the current passports and editable summary for the selected type."],
+    ["Fetch ERP or API rows", "POST /api/asset-management/source/fetch", "x-asset-platform-token and, if enabled, x-asset-key", "{ sourceConfig } with url, method, headers, body, recordPath, fieldMap", "Fetches external rows and maps them into asset rows."],
+    ["Preview staged changes", "POST /api/asset-management/preview", "x-asset-platform-token and, if enabled, x-asset-key", "{ passport_type, records }", "Validates matching and field rules, then builds the JSON package without changing any passports."],
+    ["Push staged changes", "POST /api/asset-management/push", "x-asset-platform-token and, if enabled, x-asset-key", "{ generated_payload } or { passport_type, records }", "Writes the prepared changes into the normal backend passport records."],
+    ["List saved jobs", "GET /api/asset-management/jobs", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Returns saved schedules for the current company."],
+    ["Create a job", "POST /api/asset-management/jobs", "x-asset-platform-token and, if enabled, x-asset-key", "{ passport_type, name, records, sourceKind, sourceConfig, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server."],
+    ["Update a job", "PATCH /api/asset-management/jobs/:jobId", "x-asset-platform-token and, if enabled, x-asset-key", "Name, schedule, source, records, and active state fields", "Edits an existing saved job."],
+    ["Run one job immediately", "POST /api/asset-management/jobs/:jobId/run", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Executes the saved job immediately instead of waiting for its next schedule."],
+    ["See recent runs", "GET /api/asset-management/runs", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Shows recent manual pushes and scheduled job runs."],
+  ],
+};
+
+const ADMIN_PLATFORM_API_TABLE = {
+  title: "Super-admin API operations that shape the platform",
+  columns: ["Action", "Endpoint", "Authentication", "What you send", "What it controls"],
+  rows: [
+    ["List categories", "GET /api/admin/umbrella-categories", "Bearer token and super-admin role", "No body", "Reads the current umbrella product categories."],
+    ["Create a category", "POST /api/admin/umbrella-categories", "Bearer token and super-admin role", "{ name, icon }", "Adds a new umbrella category for the catalog tree."],
+    ["Delete a category", "DELETE /api/admin/umbrella-categories/:id", "Bearer token and super-admin role", "{ password }", "Deletes a category if no passport type is still using it."],
+    ["List passport types", "GET /api/admin/passport-types", "Bearer token and super-admin role", "No body", "Shows the published type catalog and metadata."],
+    ["Create a passport type", "POST /api/admin/passport-types", "Bearer token and super-admin role", "Type metadata plus fields_json schema", "Creates a new type and its runtime table."],
+    ["Update a passport type", "PATCH /api/admin/passport-types/:id", "Bearer token and super-admin role", "Updated metadata and or fields_json", "Changes an existing type definition."],
+    ["Activate or deactivate a type", "PATCH /api/admin/passport-types/:id/activate or /deactivate", "Bearer token and super-admin role", "No body", "Turns company-side usage on or off."],
+    ["Delete a passport type", "DELETE /api/admin/passport-types/:typeId", "Bearer token and super-admin role", "No body", "Removes an obsolete type definition."],
+    ["Save or read builder draft", "GET, PUT, DELETE /api/admin/passport-type-draft", "Bearer token and super-admin role", "Draft JSON body for PUT", "Stores unfinished builder work separately from published types."],
+    ["Create and list companies", "POST /api/admin/companies and GET /api/admin/companies", "Bearer token and super-admin role", "{ companyName } for POST", "Creates tenants and reads the current tenant list."],
+    ["Enable or disable Asset Management for a company", "PATCH /api/admin/companies/:companyId/asset-management", "Bearer token and super-admin role", "{ enabled: true or false }", "Turns the company's Asset Management access on or off."],
+    ["Grant or revoke company type access", "POST /api/admin/company-access and DELETE /api/admin/company-access/:companyId/:typeId", "Bearer token and super-admin role", "{ companyId, passportTypeId } for POST", "Controls which companies can use which passport types."],
+    ["List system analytics", "GET /api/admin/analytics", "Bearer token and super-admin role", "No body", "Reads system-wide company and passport metrics."],
+    ["Read company analytics", "GET /api/admin/companies/:companyId/analytics", "Bearer token and super-admin role", "No body", "Reads one tenant's analytics and user distribution."],
+    ["Manage super admins", "GET /api/admin/super-admins, POST /api/admin/super-admins/invite, PATCH /api/admin/super-admins/:userId/access", "Bearer token and super-admin role", "Invite details or access state", "Adds, revokes, or restores platform operators."],
+  ],
+};
 
 function prettifyName(value) {
   if (!value) return "";
@@ -767,15 +1014,15 @@ function buildUserSections({ user, companyId, passportTypes }) {
     {
       id: "branding-and-keys",
       icon: "🔐",
-      category: "Integrations",
+      category: "Security",
       audience: "Company admins primarily, with bearer-token access available to all logged-in users",
-      title: "Understand branding, API keys, device keys, and access keys",
-      summary: "The app uses different keys for different jobs. Keeping them separate is essential: company API keys are for external read access, device keys are for dynamic-value pushes, bearer auth is for logged-in protected APIs, and passport access keys are only for restricted public-view content.",
+      title: "Understand security, tokens, API keys, and who should use each one",
+      summary: "The product uses several different credentials because each one has a different purpose. Keeping them separate is part of the security model: bearer tokens are for logged-in users, company API keys are for read-only external integrations, device keys are for live sensor pushes, passport access keys are for restricted public fields, and Asset Management has its own launch credentials.",
       facts: [
         { label: "Company branding", value: "Managed in Company Profile with public viewer, introduction, and single consumer-route presentation controls" },
-        { label: "Company API keys", value: "Created and revoked in Dashboard > Security" },
-        { label: "Device API keys", value: "Managed per passport in the Device Integration modal" },
-        { label: "Bearer auth", value: "Dashboard > Security issues and refreshes your bearer token for protected endpoints" },
+        { label: "Bearer token", value: "Returned by login or refreshed from Dashboard > Security for protected company APIs" },
+        { label: "Company API keys", value: "Created and revoked in Dashboard > Security for read-only external access" },
+        { label: "Device and access keys", value: "Managed per passport for live pushes and restricted public unlocking" },
       ],
       journeys: [
         {
@@ -787,41 +1034,35 @@ function buildUserSections({ user, companyId, passportTypes }) {
           ],
         },
         {
-          title: "Generate and manage company API keys",
+          title: "Get a bearer token in the normal user flow",
           items: [
-            "Open Security from the dashboard sidebar.",
+            "Log in through the app as normal. Under the hood, the backend uses `POST /api/auth/login`.",
+            "If your account has two-factor authentication enabled, the backend returns a short-lived `pre_auth_token`. You then complete `POST /api/auth/verify-otp` with the email code.",
+            "After login, the returned bearer token is what protected APIs expect in the `Authorization: Bearer <token>` header.",
+            "If you are already signed in and simply need a fresh token for testing or integration work, the Security page uses `POST /api/users/me/token` to issue a new one.",
+          ],
+        },
+        {
+          title: "Generate and manage company API keys for outside readers",
+          items: [
+            "Open Security from the dashboard sidebar. Only company admins can create or revoke company API keys.",
             "Create a named key for each external integration so revocation stays targeted.",
             "Copy the key immediately after creation because the full value is shown only once.",
             "Use it only with `/api/v1/passports` endpoints and send it in the `X-API-Key` header.",
+            "If an external partner such as a regulator, customer, or auditor only needs read access, this is the right credential. There is no separate special 'EU Commission API key' route in the backend today.",
           ],
         },
         {
-          title: "Use bearer authentication from one place",
-          items: [
-            "Open Security to reveal, copy, or refresh your bearer token without leaving the user dashboard.",
-            "Use that token only for protected company APIs that expect `Authorization: Bearer <token>`.",
-            "Keep bearer tokens internal to logged-in users and do not send them to read-only external partners.",
-          ],
-        },
-        {
-          title: "Use device keys and access keys correctly",
+          title: "Use device keys, passport access keys, and asset credentials correctly",
           items: [
             "Use the passport-specific device key only for live dynamic-value updates tied to one passport.",
             "Regenerate a device key if the integration endpoint has been shared too broadly or a device is replaced.",
             "Use the passport access key only in the public viewer unlock flow when restricted field groups must be revealed to an allowed audience.",
+            "Use Asset Management launch credentials only inside the Asset Management tool or tightly controlled automation around that tool. They are not general-purpose API credentials.",
           ],
         },
       ],
-      table: {
-        title: "Which key is used where",
-        columns: ["Key type", "Where you get it", "Used for", "Header or UI entry", "Do not use it for"],
-        rows: [
-          ["Company API key", "Dashboard > Security", "Read-only external passport retrieval on `/api/v1/passports`", "`X-API-Key` header", "Editing passports, device pushes, or public-view unlocks"],
-          ["Device API key", "Passport list > row menu > Device Integration", "Pushing dynamic values into one passport", "`x-device-key` header", "Listing all company passports or general API access"],
-          ["Bearer auth token", "Dashboard > Security", "Authenticated internal/company APIs and testing protected routes", "`Authorization: Bearer <token>`", "Sharing with external read-only partners"],
-          ["Passport access key", "Public passport viewer unlock flow / company user access controls", "Unlocking restricted fields for a public passport", "Entered in the unlock UI", "General API authentication or device integrations"],
-        ],
-      },
+      table: SECURITY_KEY_TABLE,
       links: [
         { label: "Open Security", route: "/dashboard/security", description: "Manage bearer tokens and company API keys in one place." },
         { label: "Open Company Profile", route: "/dashboard/company-profile", description: "Update branding, introduction copy, and public experience settings." },
@@ -848,7 +1089,195 @@ function buildUserSections({ user, companyId, passportTypes }) {
         ),
       ],
       warnings: [
-        "Do not share company API keys in places where only a public passport link or access key is needed. They are different security layers.",
+        "Do not share company API keys when someone only needs a public link or passport access key. Those are different security layers.",
+        "Do not hand bearer tokens to external read-only partners. Use company API keys for that case.",
+      ],
+    },
+    {
+      id: "asset-management-tool",
+      icon: "📋",
+      category: "Operations",
+      audience: "Editors and company admins using high-volume update flows",
+      title: "Use Asset Management for safe bulk updates on existing passports",
+      summary: "Asset Management is a separate operational layer for editing many already existing passports at once. It is best when you need to stage updates from CSV, JSON, or an ERP/API source, check the result before writing anything, and then push or schedule the changes in a controlled way.",
+      facts: [
+        { label: "Best use case", value: "Bulk updates on existing passports, especially when rows already have guid or product_id" },
+        { label: "Launch path", value: "Open from the company dashboard. The tool authenticates automatically from the dashboard launch." },
+        { label: "Matching rule", value: "guid is safest. product_id works as the fallback match key for ERP and spreadsheet updates." },
+        { label: "Safety rule", value: "Unknown columns are rejected. Nothing changes until Push to Backend is used." },
+      ],
+      journeys: [
+        {
+          title: "Understand what the tool is for",
+          items: [
+            "Asset Management is not a second passport builder. It is a bulk-update surface for passports that already exist in your backend.",
+            "If you need to create brand new passports from scratch, the normal Create Passport hub is still the better starting point.",
+            "If you already have many passports and just need to change fields such as mass, capacity, or model data at scale, Asset Management is usually much faster.",
+          ],
+        },
+        {
+          title: "Bring data in",
+          items: [
+            "Use JSON Paste when another system already gives you a ready array of objects or a `{ records: [...] }` payload.",
+            "Use CSV Import when your team works in Excel or Google Sheets.",
+            "Use ERP / API Feed when the data lives in another system and can be fetched over HTTP.",
+            "The selected passport type loads current company passports automatically, so you start from real data instead of an empty page.",
+          ],
+        },
+        {
+          title: "Work in the Asset Grid",
+          items: [
+            "The grid behaves like a simple spreadsheet. Row, Passport GUID, and Serial Number stay visible while you scroll.",
+            "Use Add Blank Row when you want to stage a new row manually before previewing it.",
+            "Use Export CSV to create a safe base file. Filtered columns export still keeps `guid` and `product_id` so the file can be matched on import.",
+            "Keep `guid` whenever possible. If your incoming data does not have `guid`, make sure `product_id` is present and stable.",
+          ],
+        },
+        {
+          title: "Preview first, then push or schedule",
+          items: [
+            "Select Validate & Build JSON to run a dry check. This creates the generated JSON package but does not change passports yet.",
+            "Read Validation Details carefully. Rows are marked ready, skipped, or failed so you can see exactly what will happen.",
+            "Use Push to Backend only when the preview looks right.",
+            "Use Save Scheduled Job when the same source should run automatically later. Scheduled runs fetch later on the server and then push the results into your backend.",
+          ],
+        },
+      ],
+      table: ASSET_MANAGEMENT_TERMS_TABLE,
+      tips: [
+        "If your ERP does not store guid, map a stable ERP field to `product_id` so the tool can find the right passport.",
+        "Export a template first when non-technical users need to edit a spreadsheet safely.",
+      ],
+      warnings: [
+        "Asset Management writes into the same backend passport records used by the main dashboard. Treat it as a production update tool.",
+        "Rows without guid and without product_id cannot be matched to an existing passport.",
+      ],
+    },
+    {
+      id: "api-processes",
+      icon: "🔌",
+      category: "API",
+      audience: "Company admins, editors, and non-technical users preparing integrations",
+      title: "Understand the API process step by step before calling any endpoint",
+      summary: "If you are not from an IT background, think of the API as a structured door into the same product you see in the dashboard. The key questions are always the same: who is calling, what credential do they use, what data do they send, and what should happen next. This section explains those flows in plain language first so the endpoint tables later feel much easier to use.",
+      facts: [
+        { label: "Human users", value: "Use bearer tokens after login" },
+        { label: "External read-only systems", value: "Use company API keys with the /api/v1 endpoints" },
+        { label: "Devices and sensors", value: "Use the passport's own device key" },
+        { label: "Public viewers", value: "Usually need no authentication unless restricted fields must be unlocked" },
+      ],
+      flowCards: API_GETTING_STARTED_FLOWS,
+      tips: [
+        "Start by deciding whether the caller is a person, an outside read-only partner, a live device, or the Asset Management tool. That choice decides the right credential.",
+      ],
+      warnings: [
+        "The safest integrations are the ones that use the smallest permission needed. Read-only partners should not receive write-capable bearer tokens.",
+      ],
+    },
+    {
+      id: "api-company-write",
+      icon: "🧱",
+      category: "API",
+      audience: "Company admins and editors performing protected write operations",
+      title: "Use the company write APIs for create, update, release, revise, and bulk handling",
+      summary: "These are the main protected endpoints for changing passport data from scripts, tools, or controlled internal integrations. Every endpoint in this section needs a bearer token plus company access, and most of them also require an editor or company-admin role.",
+      facts: [
+        { label: "Main header", value: "Authorization: Bearer <token>" },
+        { label: "Company scope", value: "The :companyId in the URL must match the company the token is allowed to access" },
+        { label: "Bulk limit", value: "The bulk create, bulk fetch, bulk patch, delete, and upsert endpoints cap requests at 500 rows" },
+        { label: "Schema rule", value: "Unknown passport field keys are rejected instead of silently stored" },
+      ],
+      journeys: [
+        {
+          title: "Simple create or update pattern",
+          items: [
+            "For one new record, send `passport_type` plus the normal field keys to `POST /api/companies/:companyId/passports`.",
+            "For one existing editable record, send the same fields to `PATCH /api/companies/:companyId/passports/:guid` and include `passportType` or `passport_type` in the body.",
+            "For many existing editable records, use `PATCH /api/companies/:companyId/passports` and give each row a `guid` or `product_id` so the backend can match it safely.",
+          ],
+        },
+        {
+          title: "Use upsert when you do not know in advance which rows already exist",
+          items: [
+            "Use `POST /api/companies/:companyId/passports/upsert-json` when you already have a JSON array.",
+            "Use `POST /api/companies/:companyId/passports/upsert-csv` when the source is a spreadsheet and you want the backend to create or update row by row.",
+            "In both cases, rows with a matching editable passport are updated. Rows without a match can create a new passport when `product_id` is present.",
+          ],
+        },
+      ],
+      table: COMPANY_WRITE_API_TABLE,
+      warnings: [
+        "Released passports are not normal editable rows. Use revise first if you need a new editable version.",
+        "product_id must stay unique. The backend blocks duplicates.",
+      ],
+    },
+    {
+      id: "api-read-and-export",
+      icon: "📤",
+      category: "API",
+      audience: "Company users and integration teams that need controlled reads or exports",
+      title: "Read, compare, and export passport data with the company APIs",
+      summary: "Not every integration is a write integration. Many teams simply need to read what already exists, fetch many passports by known IDs, export CSV or JSON, inspect version history, or retrieve one passport's access key or device key. These endpoints stay inside the normal company security boundary and therefore still use bearer authentication.",
+      facts: [
+        { label: "Read auth", value: "Bearer token with company access" },
+        { label: "Best use case", value: "Internal tools, controlled exports, compare/history pages, and support diagnostics" },
+        { label: "Export formats", value: "CSV and JSON from the draft export endpoint, plus authenticated AAS export" },
+        { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by guid or product_id in one request" },
+      ],
+      table: READ_EXPORT_API_TABLE,
+      tips: [
+        "Use the export endpoint when non-technical teams need a file. Use the list and bulk-fetch endpoints when another application needs structured data directly.",
+      ],
+    },
+    {
+      id: "api-public-live-and-readonly",
+      icon: "🌐",
+      category: "API",
+      audience: "External readers, public-view implementers, and live-data integrations",
+      title: "Use the public, external read-only, verification, and live-data endpoints correctly",
+      summary: "This group covers the endpoints that people outside the normal dashboard may use. Some are fully public, some use company API keys, some use passport access keys, and some use device keys. The important point is that each route is designed for a narrow purpose instead of broad admin access.",
+      facts: [
+        { label: "Read-only external partner path", value: "/api/v1/passports with X-API-Key" },
+        { label: "Public passport path", value: "/api/passports/by-product/:productId without login" },
+        { label: "Restricted-field path", value: "POST /api/passports/:guid/unlock with an access key in the body" },
+        { label: "Live device path", value: "POST /api/passports/:guid/dynamic-values with x-device-key" },
+      ],
+      journeys: [
+        {
+          title: "Choose the right external path",
+          items: [
+            "Use `/api/v1/passports` when an outside organization needs a company-approved read-only API with its own revocable key.",
+            "Use `/api/passports/by-product/:productId` when you simply need the public passport view that a QR code or public link would show.",
+            "Use `/api/passports/:guid/unlock` only when the viewer should see restricted fields and has the correct passport access key.",
+            "Use the dynamic-value endpoints when the problem is live measurements rather than normal passport authoring.",
+          ],
+        },
+      ],
+      table: PUBLIC_AND_LIVE_API_TABLE,
+      warnings: [
+        "Public viewer access and API-key access are not the same thing. A public link does not grant company-wide API access.",
+      ],
+    },
+    {
+      id: "api-asset-management",
+      icon: "⚙️",
+      category: "API",
+      audience: "Teams automating Asset Management or documenting it for operators",
+      title: "Asset Management APIs, scheduling, and security rules",
+      summary: "Asset Management has its own API surface because it is a separate operational layer. It uses its own launch token, can have an extra shared-secret header, and supports source fetch, preview, push, saved jobs, and recent run history. Think of it as a controlled staging service in front of the normal passport APIs.",
+      facts: [
+        { label: "Primary auth header", value: "x-asset-platform-token" },
+        { label: "Optional extra header", value: "x-asset-key when the platform operator has enabled the shared secret" },
+        { label: "Preview behavior", value: "Preview is a dry run. Push is the write action." },
+        { label: "Schedule behavior", value: "Scheduled jobs run later on the server and can fetch from an external ERP or API source first" },
+      ],
+      table: ASSET_MANAGEMENT_API_TABLE,
+      tips: [
+        "If you only need normal create or update APIs, use the company passport endpoints. Use Asset Management when the workflow is specifically staging, previewing, and batch-pushing changes.",
+      ],
+      warnings: [
+        "Asset Management is not direct database access. It still goes through the backend and its validation rules.",
+        "If the platform operator has enabled the shared asset key, both required headers must be present or the request will be rejected.",
       ],
     },
     {
@@ -921,7 +1350,7 @@ function buildUserSections({ user, companyId, passportTypes }) {
       title: "Know what the public viewer and consumer experience can do",
       summary: "Released passports become much more than rows in a table. Their public viewer can show introduction content, translations, charts, signatures, PDF previews, restricted-field unlocking, scan indicators, and printable output for external audiences.",
       facts: [
-        { label: "Public entry points", value: "Copied link or QR code into the public `/p/:guid` route" },
+        { label: "Public entry points", value: "Copied link or QR code into the public `/p/:productId` route" },
         { label: "Viewer features", value: "Introduction tabs, translated sections, charts, composition visuals, PDF previews, QR display, print, and signature badges" },
         { label: "Restricted access", value: "Non-public field groups stay hidden until unlocked with a passport access key" },
         { label: "Sharing options", value: "Public link, QR labels, print PDF, AAS JSON export, CSV exports, and analytics PDF exports" },
@@ -951,6 +1380,15 @@ function buildUserSections({ user, companyId, passportTypes }) {
             "Use CSV exports when teams need spreadsheet-based reporting or downstream batch handling.",
           ],
         },
+        {
+          title: "Understand the W3C DID and Verifiable Credential layer",
+          items: [
+            "When a passport is released, the platform stores a cryptographic signature for that exact released version.",
+            "The public verification endpoints can also expose a Verifiable Credential style payload, which is a standard W3C way to package claims plus proof.",
+            "The DID document at `/.well-known/did.json` publishes verification details that outside systems can use to check that a released passport really came from this platform.",
+            "In simple terms: the visible passport data, the stored signature, the Verifiable Credential payload, and the DID document all work together to help verifiers confirm authenticity and detect tampering.",
+          ],
+        },
       ],
       links: [
         { label: "Open Company Profile", route: "/dashboard/company-profile", description: "Set the public introduction and public-view styling." },
@@ -958,6 +1396,7 @@ function buildUserSections({ user, companyId, passportTypes }) {
       ],
       tips: [
         "Treat the public viewer as the final external presentation layer. Company introduction text and release quality matter as much as raw field completeness.",
+        "Users do not need to manually manage DIDs or Verifiable Credentials in normal workflow. They are there to support external trust and verification.",
       ],
     },
   ];
@@ -1333,6 +1772,99 @@ function buildAdminSections({ user, companies, adminPassportTypes, categories })
       ],
     },
     {
+      id: "admin-security-and-api",
+      icon: "🔐",
+      category: "Security",
+      audience: "Super admins who need to explain or support integrations",
+      title: "Understand the platform's credential model before supporting any integration",
+      summary: "Super admins are often asked the same operational questions: which token should a human user use, which key should an outside reader use, how do device pushes work, and how is Asset Management protected. This section gives the simple answer: every credential has a narrow purpose, and mixing them is both confusing and unsafe.",
+      facts: [
+        { label: "Super-admin perspective", value: "You usually explain or govern these credentials rather than using all of them personally" },
+        { label: "Read-only external access", value: "Uses company API keys, not bearer tokens" },
+        { label: "Asset Management protection", value: "Uses a launch token and can require an additional shared secret" },
+        { label: "Public-view restriction", value: "Restricted fields unlock with a passport access key, not with a company API key" },
+      ],
+      journeys: [
+        {
+          title: "Explain the credential model clearly",
+          items: [
+            "Tell dashboard users to use bearer tokens only for protected internal APIs.",
+            "Tell external read-only partners to use company API keys only on `/api/v1/passports`.",
+            "Tell device or IoT teams to use the passport's own device key on the dynamic-value push endpoint.",
+            "Tell public-view stakeholders that restricted fields are unlocked with a passport access key, not by sharing a company API key.",
+          ],
+        },
+        {
+          title: "Support without weakening security",
+          items: [
+            "If a tenant wants recurring bulk updates, decide whether they really need Asset Management or whether normal company APIs are enough.",
+            "If a tenant wants outside read access, encourage one named company API key per external integration so revocation is simple later.",
+            "If Asset Management is enabled with a shared secret, make sure support teams understand that missing `x-asset-key` causes authorization failures even when the asset launch token is valid.",
+          ],
+        },
+      ],
+      table: SECURITY_KEY_TABLE,
+      warnings: [
+        "There is no separate special backend key just for audiences such as the EU Commission in the current code. External read access is handled with company API keys and the public viewer model.",
+      ],
+    },
+    {
+      id: "admin-asset-management",
+      icon: "🏗️",
+      category: "Operations",
+      audience: "Super admins enabling or troubleshooting Asset Management",
+      title: "Enable Asset Management carefully and understand the job scheduler behind it",
+      summary: "Asset Management is not just another page. It is a separate operational layer with launch credentials, source fetching, preview validation, push execution, saved jobs, and scheduled runs. Super admins control whether a company can use it at all, and that decision matters because the tool can update many passports quickly.",
+      facts: [
+        { label: "Company switch", value: "PATCH /api/admin/companies/:companyId/asset-management with { enabled: true or false }" },
+        { label: "Who can launch", value: "Company users still need editor or company-admin permissions even if the company is enabled" },
+        { label: "Source risk model", value: "ERP/API fetches run server-side and are protected by asset-management security checks" },
+        { label: "Disable behavior", value: "Disabling Asset Management also deactivates that company's saved jobs" },
+      ],
+      journeys: [
+        {
+          title: "Enable a company in the right order",
+          items: [
+            "First make sure the company already has the passport types it should actually work with.",
+            "Then enable Asset Management for that company from the admin side.",
+            "Only after that should the company begin using CSV, JSON, or ERP/API-driven bulk-update flows in the separate asset tool.",
+          ],
+        },
+        {
+          title: "Know what scheduled jobs really do",
+          items: [
+            "A saved job stores the source configuration, records, schedule, and active state in the backend.",
+            "At run time, the server fetches from the external source if needed, prepares the payload, then pushes the result into normal passport records.",
+            "This is scheduled fetching from an outside source followed by scheduled pushing into your backend. It is not scheduling a write back into the external ERP.",
+          ],
+        },
+      ],
+      table: ASSET_MANAGEMENT_API_TABLE,
+      warnings: [
+        "Asset Management should only be enabled for companies that actually need high-volume operational updates.",
+        "Because this layer can update many passports in one run, support teams should ask companies to preview first and use stable match keys such as guid or product_id.",
+      ],
+    },
+    {
+      id: "admin-api-operations",
+      icon: "🧩",
+      category: "Backend",
+      audience: "Super admins who need a practical endpoint map",
+      title: "Admin-side API map for platform setup, support, and governance",
+      summary: "This section focuses on the APIs that super admins are most likely to explain, test, or monitor while operating the platform. It is not limited to one screen. Instead, it groups the endpoints that shape tenants, categories, passport types, super-admin access, and Asset Management availability.",
+      facts: [
+        { label: "Auth model", value: "All admin endpoints use bearer authentication plus the super-admin role" },
+        { label: "Tenant controls", value: "Company creation, access grants, analytics, and Asset Management enablement" },
+        { label: "Catalog controls", value: "Categories, type CRUD, activation, drafts, and builder operations" },
+        { label: "Operator controls", value: "Super-admin invitations, revocation, and restoration" },
+      ],
+      table: ADMIN_PLATFORM_API_TABLE,
+      flowCards: API_GETTING_STARTED_FLOWS,
+      tips: [
+        "When documenting the platform for customers, separate the operator endpoints in this section from the company-facing endpoints in the user manual.",
+      ],
+    },
+    {
       id: "backend-picture",
       icon: "🗄️",
       category: "Backend",
@@ -1624,6 +2156,10 @@ function ManualCenter({ mode = "user", user, companyId }) {
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState("");
   const deferredSearch = useDeferredValue(searchValue);
+  const [activeSectionId, setActiveSectionId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return decodeURIComponent(window.location.hash.replace(/^#/, ""));
+  });
   const [contextLoading, setContextLoading] = useState(mode === "admin" || Boolean(companyId));
   const [passportTypes, setPassportTypes] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -1707,6 +2243,31 @@ function ManualCenter({ mode = "user", user, companyId }) {
     return sections.filter((section) => !normalizedSearch || collectSearchTerms(section).includes(normalizedSearch));
   }, [sections, deferredSearch]);
 
+  useEffect(() => {
+    if (!filteredSections.length) {
+      if (activeSectionId) setActiveSectionId("");
+      return;
+    }
+
+    const stillValid = filteredSections.some((section) => section.id === activeSectionId);
+    if (!stillValid) {
+      setActiveSectionId(filteredSections[0].id);
+    }
+  }, [filteredSections, activeSectionId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !activeSectionId) return;
+    const nextHash = `#${encodeURIComponent(activeSectionId)}`;
+    if (window.location.hash !== nextHash) {
+      window.history.replaceState(null, "", nextHash);
+    }
+  }, [activeSectionId]);
+
+  const activeSection = useMemo(
+    () => filteredSections.find((section) => section.id === activeSectionId) || filteredSections[0] || null,
+    [filteredSections, activeSectionId]
+  );
+
   const heroStats = useMemo(() => {
     if (mode === "admin") {
       return [
@@ -1727,12 +2288,12 @@ function ManualCenter({ mode = "user", user, companyId }) {
   const manualTitle = mode === "admin" ? "Super Admin Manual" : "Workspace Manual";
   const manualSubtitle =
     mode === "admin"
-      ? "A guided map of the super-admin UI plus a deep backend picture for platform operators."
-      : "A detailed, UI-focused guide to the company dashboard so users can understand the product without external training.";
+      ? "A guided map of the super-admin UI plus deep backend, security, asset-management, and API guidance for platform operators."
+      : "A detailed guide to the company workspace, Asset Management tool, security model, and practical API usage in plain language.";
   const scopeNote =
     mode === "admin"
       ? "This manual includes the requested backend operations section because super admins often need the full platform picture."
-      : "This manual stays intentionally focused on screens, actions, and outputs that normal dashboard users interact with.";
+      : "This manual still focuses on normal company work, but it now also explains the API and security flows that company teams commonly ask about.";
 
   return (
     <div className={`manual-center manual-center-${mode}`}>
@@ -1794,27 +2355,30 @@ function ManualCenter({ mode = "user", user, companyId }) {
             </div>
             <div className="manual-toc-links">
               {filteredSections.map((section) => (
-                <a key={`toc-${section.id}`} href={`#${section.id}`} className="manual-toc-link">
+                <button
+                  key={`toc-${section.id}`}
+                  type="button"
+                  className={`manual-toc-link${activeSection?.id === section.id ? " manual-toc-link-active" : ""}`}
+                  onClick={() => setActiveSectionId(section.id)}
+                >
                   <span>{section.icon}</span>
                   <span>{section.title}</span>
-                </a>
+                </button>
               ))}
             </div>
           </div>
         </aside>
 
         <main className="manual-content">
-          {filteredSections.length ? (
-            filteredSections.map((section) => (
-              <ManualSection key={section.id} section={section} />
-            ))
+          {activeSection ? (
+            <ManualSection key={activeSection.id} section={activeSection} />
           ) : (
             <section className="manual-section">
               <div className="manual-section-header">
                 <div className="manual-section-icon">🔎</div>
                 <div className="manual-section-heading">
                   <h3>No sections matched that search</h3>
-                  <p>Try a broader keyword or switch the category filter back to "All".</p>
+                  <p>Try a broader keyword and then choose a section from the map on the left.</p>
                 </div>
               </div>
             </section>

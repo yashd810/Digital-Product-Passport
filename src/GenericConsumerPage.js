@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { getConsumerTheme } from "./ThemeContext";
 import { translateFieldValue, translateSchemaLabel } from "./i18n";
 import { formatPassportStatus } from "./passportStatus";
+import { buildPreviewTechnicalPassportPath, buildTechnicalPassportPath } from "./passportRoutes";
 import "./PassportViewer.css";
 
 function formatFieldValue(field, raw) {
@@ -20,6 +21,22 @@ function formatFieldValue(field, raw) {
 
 function GenericConsumerPage({ passport, company, typeDef, dynamicValues }) {
   const [expanded, setExpanded] = useState(null);
+  const technicalPassportPath = passport?.preview_mode
+    ? buildPreviewTechnicalPassportPath({
+        companyName: company?.company_name,
+        manufacturerName: passport?.manufacturer,
+        manufacturedBy: passport?.manufactured_by,
+        modelName: passport?.model_name,
+        productId: passport?.product_id,
+        previewId: passport?.guid,
+      })
+    : buildTechnicalPassportPath({
+        companyName: company?.company_name,
+        manufacturerName: passport?.manufacturer,
+        manufacturedBy: passport?.manufactured_by,
+        modelName: passport?.model_name,
+        productId: passport?.product_id,
+      });
 
   const pType = passport.passport_type || "generic";
   const theme = getConsumerTheme(pType, company?.branding_json);
@@ -121,14 +138,14 @@ function GenericConsumerPage({ passport, company, typeDef, dynamicValues }) {
         ))}
 
         <div className="cp-cta">
-          <a href={`/passport/${passport.guid}`} className="cp-cta-btn">
+          <a href={technicalPassportPath || "#"} className="cp-cta-btn">
             View Full Technical Passport →
           </a>
         </div>
 
         <div className="cp-footer">
           <div className="cp-footer-brand">🌍 Digital Product Passport System</div>
-          <div className="cp-footer-guid">GUID: {passport.guid.substring(0, 8)}…</div>
+          <div className="cp-footer-guid">Product ID: {passport.product_id || "—"}</div>
           {theme.companyWebsite && (
             <a className="cp-footer-company-link" href={theme.companyWebsite} target="_blank" rel="noopener noreferrer">
               Visit company website

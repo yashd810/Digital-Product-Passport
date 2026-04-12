@@ -1,15 +1,23 @@
 import QRCode from "qrcode";
+import { buildPublicPassportPath } from "./passportRoutes";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 /**
- * Generate QR code image from passport GUID.
+ * Generate QR code image from the canonical public passport path.
  * Returns base64 encoded PNG data URL.
  */
-export const generateQRCode = async (guid) => {
+export const generateQRCode = async ({ productId, companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "" }) => {
   try {
-    if (!guid) return null;
-    const passportLink = `${window.location.origin}/p/${guid}`;
+    const passportPath = buildPublicPassportPath({
+      companyName,
+      manufacturerName,
+      manufacturedBy,
+      modelName,
+      productId,
+    });
+    if (!passportPath) return null;
+    const passportLink = `${window.location.origin}${passportPath}`;
     return await QRCode.toDataURL(passportLink, {
       errorCorrectionLevel: "H",
       type: "image/png",

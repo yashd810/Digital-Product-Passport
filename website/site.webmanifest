@@ -4,8 +4,8 @@
   "description": "Digital Product Passport & EU Compliance Intelligence",
   "start_url": "/",
   "display": "browser",
-  "background_color": "#0b1826",
-  "theme_color": "#0db5b0",
+  "background_color": "#f5f8fb",
+  "theme_color": "#f5f8fb",
   "icons": [
     { "src": "favicon-16x16.png",  "sizes": "16x16",   "type": "image/png" },
     { "src": "favicon-32x32.png",  "sizes": "32x32",   "type": "image/png" },

@@ -742,6 +742,35 @@
   padding: 7px 14px !important;
 }
 
+/* ── Paste-link input for file/symbol fields ── */
+.file-link-paste {
+  margin-top: 6px;
+}
+.file-link-input {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: border-color 0.15s, background 0.15s;
+}
+.file-link-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+.file-link-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  border-style: solid;
+  background: rgba(13,181,176,0.04);
+  color: var(--text-primary);
+}
+[data-theme="light"] .file-link-input:focus {
+  background: rgba(13,181,176,0.06);
+}
+
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }

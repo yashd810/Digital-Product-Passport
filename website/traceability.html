@@ -7,7 +7,7 @@
   <meta name="robots"      content="index, follow" />
   <meta name="author"      content="ClarosDPP" />
   <meta name="keywords"    content="material traceability DPP, product carbon footprint ISO 14067, circularity scoring, lifecycle assessment LCA, Scope 1 2 3 emissions, EPR compliance, circular economy DPP, material origin tracking" />
-  <meta name="theme-color" content="#0b1826" />
+  <meta name="theme-color" content="#f5f8fb" />
   <link rel="canonical"    href="https://clarosdpp.com/traceability.html" />
   <!-- Favicon: inline SVG — no files needed in dev. Before launch replace with real favicon.ico + site.webmanifest -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
@@ -106,13 +106,14 @@
       display: flex; align-items: center; justify-content: center; font-size: 1rem;
       box-shadow: 0 4px 14px rgba(0,0,0,0.4);
     }
+    [data-theme="light"] .ring-node { box-shadow: 0 8px 18px rgba(16,36,58,0.12); }
 
     /* Carbon bars */
     .carbon-bar-row {
       display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;
     }
     .cb-label { font-size: 0.82rem; color: var(--lgray); width: 150px; flex-shrink: 0; }
-    .cb-track { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .cb-track { flex: 1; height: 8px; border-radius: 4px; background: rgba(16,36,58,0.08); overflow: hidden; }
     .cb-fill {
       height: 100%; border-radius: 4px;
       background: linear-gradient(90deg, var(--teal), var(--teal2));

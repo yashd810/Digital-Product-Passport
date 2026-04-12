@@ -45,6 +45,9 @@
   --status-revised-bg: rgba(56, 189, 248, 0.16);
   --status-revised-border: transparent;
   --status-revised-text: #67d4ff;
+  --status-obsolete-bg: rgba(107, 114, 128, 0.16);
+  --status-obsolete-border: rgba(107, 114, 128, 0.3);
+  --status-obsolete-text: #9ca3af;
   --status-danger-bg: rgba(239, 68, 68, 0.16);
   --status-danger-border: rgba(239, 68, 68, 0.3);
   --status-danger-text: #ff8f8f;
@@ -98,6 +101,9 @@
   --status-revised-bg: #dff4ff;
   --status-revised-border: transparent;
   --status-revised-text: #0f7496;
+  --status-obsolete-bg: #f3f4f6;
+  --status-obsolete-border: #d1d5db;
+  --status-obsolete-text: #6b7280;
   --status-danger-bg: #fee2e2;
   --status-danger-border: #fca5a5;
   --status-danger-text: #b42318;
@@ -229,6 +235,16 @@ code {
   background: var(--status-revised-bg);
   color: var(--status-revised-text);
   border-color: var(--status-revised-border);
+}
+
+.status-tone.obsolete,
+.status-badge.obsolete,
+.mini-badge.obsolete,
+.diff-status.obsolete,
+.intro-status-badge.obsolete {
+  background: var(--status-obsolete-bg);
+  color: var(--status-obsolete-text);
+  border-color: var(--status-obsolete-border);
 }
 
 .status-tone.rejected {

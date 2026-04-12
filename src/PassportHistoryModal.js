@@ -6,6 +6,10 @@ import "./PassportViewer.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+function isPublicHistoryStatus(status) {
+  return status === "released" || status === "obsolete";
+}
+
 function formatHistoryDate(value) {
   if (!value) return "Unknown date";
   try {
@@ -17,6 +21,7 @@ function formatHistoryDate(value) {
 
 function PassportHistoryModal({
   guid,
+  productId = "",
   passportType,
   companyId = null,
   mode = "public",
@@ -37,7 +42,7 @@ function PassportHistoryModal({
       try {
         const endpoint = isCompanyMode
           ? `${API}/api/companies/${companyId}/passports/${guid}/history`
-          : `${API}/api/passports/${guid}/history`;
+          : `${API}/api/passports/by-product/${encodeURIComponent(productId)}/history`;
         const response = await fetch(endpoint, isCompanyMode ? { headers: authHeaders() } : undefined);
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Failed to load passport history");
@@ -51,10 +56,10 @@ function PassportHistoryModal({
 
     loadHistory();
     return () => { active = false; };
-  }, [companyId, guid, isCompanyMode]);
+  }, [companyId, guid, isCompanyMode, productId]);
 
   const toggleVisibility = async (entry) => {
-    if (!isCompanyMode || entry.release_status !== "released") return;
+    if (!isCompanyMode || !isPublicHistoryStatus(entry.release_status)) return;
     setSavingVersion(entry.version_number);
     setError("");
     try {
@@ -85,8 +90,8 @@ function PassportHistoryModal({
 
   const title = isCompanyMode ? "Update History" : "Version History";
   const subtitle = isCompanyMode
-    ? "Review every passport version and control which released updates appear publicly."
-    : "Review the released versions and the field changes made over time.";
+    ? "Review every passport version and control which published updates appear publicly."
+    : "Review the published versions and the field changes made over time.";
 
   return createPortal(
     <div className="pv-history-overlay" onClick={(event) => { if (event.target === event.currentTarget && !savingVersion) onClose(); }}>
@@ -128,8 +133,8 @@ function PassportHistoryModal({
                         type="button"
                         className={`pv-history-visibility-btn${entry.is_public ? " public" : ""}`}
                         onClick={() => toggleVisibility(entry)}
-                        disabled={savingVersion === entry.version_number || entry.release_status !== "released"}
-                        title={entry.release_status !== "released" ? "Only released versions can be public." : ""}
+                        disabled={savingVersion === entry.version_number || !isPublicHistoryStatus(entry.release_status)}
+                        title={!isPublicHistoryStatus(entry.release_status) ? "Only released or obsolete versions can be public." : ""}
                       >
                         {savingVersion === entry.version_number
                           ? "Saving…"
@@ -146,6 +151,19 @@ function PassportHistoryModal({
                   </div>
 
                   <p className="pv-history-summary">{entry.summary}</p>
+
+                  {(entry.public_path || entry.inactive_path) && (
+                    <div className="pv-history-meta">
+                      <a
+                        href={entry.is_current ? entry.public_path : entry.inactive_path}
+                        className="pv-history-open-link"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {entry.is_current ? "Open current passport" : `Open v${entry.version_number} snapshot`}
+                      </a>
+                    </div>
+                  )}
 
                   {visibleChanges.length > 0 && (
                     <div className="pv-history-changes">

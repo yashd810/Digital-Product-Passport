@@ -47,25 +47,25 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 [data-theme="light"] {
-  --navy:      #f0f6fa;
-  --navy2:     #e8f3f9;
-  --navy3:     #dfeaf4;
-  --navy4:     #d6dff5;
+  --navy:      #f5f8fb;
+  --navy2:     #edf3f8;
+  --navy3:     #e2ebf3;
+  --navy4:     #d6e3ef;
   --teal:      #0db5b0;
   --teal2:     #0891b2;
   --teal-dim:  rgba(13,181,176,0.12);
-  --teal-bdr:  rgba(13,181,176,0.25);
+  --teal-bdr:  rgba(13,181,176,0.26);
   --green:     #0f9a6b;
   --gold:      #c98300;
   --gold-dim:  rgba(201,131,0,0.12);
   --red:       #dc2626;
-  --white:     #0b1826;
-  --white2:    #456177;
-  --gray:      #5f7991;
-  --lgray:     #7a94a8;
-  --divider:   rgba(23,48,74,0.12);
+  --white:     #10243a;
+  --white2:    #3d5870;
+  --gray:      #657f96;
+  --lgray:     #516b82;
+  --divider:   rgba(23,48,74,0.11);
   --card-bg:   rgba(255,255,255,0.98);
-  --card-bdr:  rgba(13,181,176,0.18);
+  --card-bdr:  rgba(23,48,74,0.08);
 }
 
 /* ── SCROLLBAR ── */
@@ -233,6 +233,9 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .btn-outline:hover { border-color: var(--teal); color: var(--teal); }
+[data-theme="light"] .btn-outline:hover {
+  background: rgba(13, 181, 176, 0.08);
+}
 .btn-ghost { background: var(--teal-dim); color: var(--teal); border: 1px solid var(--teal-bdr); }
 .btn-ghost:hover { background: rgba(13,181,176,0.25); }
 .btn-sm { padding: 0.5rem 1.2rem; font-size: 1.12rem; }
@@ -269,6 +272,7 @@ button, input, select, textarea { font-family: inherit; }
 .badge-green  { background: rgba(16,185,129,0.15); color: var(--green); }
 .badge-red    { background: rgba(239,68,68,0.12); color: var(--red); }
 .badge-blue   { background: rgba(6,182,212,0.15); color: #22d3ee; }
+[data-theme="light"] .badge-blue { background: rgba(3,105,161,0.1); color: #0369a1; }
 
 /* ── LIVE DOT ── */
 .live-dot {
@@ -396,7 +400,7 @@ footer {
 .form-group input,
 .form-group select,
 .form-group textarea {
-  background: rgba(255,255,255,0.05); border: 1px solid var(--card-bdr);
+  background: rgba(255,255,255,0.8); border: 1px solid var(--card-bdr);
   border-radius: 10px; padding: 0.7rem 1rem;
   color: var(--white); font-size: 14px; outline: none;
   transition: border-color 0.2s, background 0.2s;
@@ -412,6 +416,21 @@ footer {
 .form-group select option { background: var(--navy2); }
 .form-group textarea { resize: vertical; min-height: 115px; }
 .form-group .hint { font-size: 15px; color: var(--gray); margin-top: 0.2rem; }
+[data-theme="light"] .form-group label {
+  color: #385269;
+}
+[data-theme="light"] .form-group input,
+[data-theme="light"] .form-group select,
+[data-theme="light"] .form-group textarea {
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
+}
+[data-theme="light"] .form-group input:focus,
+[data-theme="light"] .form-group select:focus,
+[data-theme="light"] .form-group textarea:focus {
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(13,181,176,0.12);
+}
 .btn-submit {
   width: 100%; padding: 0.95rem;
   background: var(--teal); color: var(--navy);

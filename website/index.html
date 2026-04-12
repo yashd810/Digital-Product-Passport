@@ -7,7 +7,7 @@
   <meta name="robots"      content="index, follow" />
   <meta name="author"      content="ClarosDPP" />
   <meta name="keywords"    content="digital product passport, DPP, ESPR compliance, EU battery regulation 2027, toys safety regulation DPP, construction products regulation CPR, detergents regulation, circular economy, REACH RoHS, carbon footprint ISO 14067, CSDDD" />
-  <meta name="theme-color" content="#0b1826" />
+  <meta name="theme-color" content="#f5f8fb" />
   <link rel="canonical"    href="https://clarosdpp.com/" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
   <meta property="og:type"         content="website" />
@@ -49,9 +49,9 @@
     .hero-bg {
       position: absolute; inset: 0; z-index: 0;
       background:
-        radial-gradient(ellipse 65% 55% at 70% 55%, rgba(13,181,176,0.11) 0%, transparent 55%),
-        radial-gradient(ellipse 45% 35% at 20% 25%, rgba(6,214,208,0.07) 0%, transparent 50%),
-        linear-gradient(165deg, #0b1826 0%, #0d2035 100%);
+        radial-gradient(ellipse 65% 55% at 72% 52%, rgba(13,181,176,0.12) 0%, transparent 56%),
+        radial-gradient(ellipse 45% 35% at 18% 22%, rgba(8,145,178,0.08) 0%, transparent 48%),
+        linear-gradient(165deg, #f7fbff 0%, #eaf3f8 100%);
     }
     .hero-grid-overlay {
       position: absolute; inset: 0; z-index: 0;
@@ -80,7 +80,7 @@
       margin-bottom: 1.4rem;
     }
     .hero h1 .hl { color: var(--teal); }
-    .hero p { font-size: 1.08rem; color: var(--lgray); line-height: 1.82; max-width: 510px; margin-bottom: 2rem; }
+    .hero p { font-size: 1.08rem; color: #4d667b; line-height: 1.82; max-width: 510px; margin-bottom: 2rem; }
     .hero-btn-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2.5rem; }
     .hero-stats { display: flex; gap: 2.5rem; padding-top: 2rem; border-top: 1px solid var(--divider); }
     .hero-stat strong { display: block; font-family: var(--serif); font-size: 2rem; color: var(--teal); font-weight: 700; line-height: 1; }
@@ -90,22 +90,22 @@
     .passport-wrap { display: flex; justify-content: center; align-items: center; position: relative; }
     .passport-card {
       width: 320px;
-      background: linear-gradient(140deg, #132840 0%, #1a3a58 100%);
-      border: 1px solid rgba(13,181,176,0.28);
+      background: linear-gradient(145deg, #ffffff 0%, #f1f7fb 100%);
+      border: 1px solid rgba(16, 36, 58, 0.08);
       border-radius: 22px; padding: 1.8rem;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(13,181,176,0.08);
+      box-shadow: 0 28px 70px rgba(16, 36, 58, 0.12), 0 0 0 1px rgba(13,181,176,0.06);
       animation: floatPassport 6s ease-in-out infinite;
     }
     @keyframes floatPassport { 0%,100%{ transform: translateY(0) rotate(-1.5deg); } 50%{ transform: translateY(-20px) rotate(1deg); } }
     .pc-toprow { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
     .pc-brand { font-family: var(--serif); font-size: 0.9rem; font-weight: 700; color: var(--teal); }
     .pc-chip { width: 36px; height: 28px; border-radius: 5px; background: linear-gradient(135deg, #b8941e, #e8c84a); display: flex; align-items: center; justify-content: center; }
-    .pc-id { font-family: var(--mono); font-size: 0.65rem; color: var(--gray); letter-spacing: 2px; margin-bottom: 1rem; }
+    .pc-id { font-family: var(--mono); font-size: 0.65rem; color: #6b8498; letter-spacing: 2px; margin-bottom: 1rem; }
     .pc-product-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.2rem; }
     .pc-category { font-size: 0.72rem; color: var(--teal); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 1.3rem; }
     .pc-data-row { display: flex; justify-content: space-between; font-size: 0.76rem; margin-bottom: 0.55rem; }
-    .pc-data-row .label { color: var(--gray); }
-    .pc-data-row .value { color: var(--white); font-weight: 500; }
+    .pc-data-row .label { color: #6b8498; }
+    .pc-data-row .value { color: #10243a; font-weight: 600; }
     .pc-bar { display: flex; gap: 0.25rem; margin: 1.2rem 0; }
     .pc-seg { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.1); }
     .pc-seg.t { background: var(--teal); } .pc-seg.g { background: var(--gold); }
@@ -113,8 +113,8 @@
     .pc-status { display: flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: var(--green); font-weight: 600; }
     .pc-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
     .pc-qr-block { width: 40px; height: 40px; background: var(--white); border-radius: 4px; display: grid; grid-template-columns: repeat(5,1fr); gap: 1.5px; padding: 4px; }
-    .qr-cell { border-radius: 1px; } .qr-cell.b { background: #0b1826; } .qr-cell.w { background: transparent; }
-    .badge-float { position: absolute; background: var(--navy3); border: 1px solid var(--teal-bdr); border-radius: 10px; padding: 0.6rem 0.9rem; font-size: 0.75rem; font-weight: 600; color: var(--white); box-shadow: 0 8px 30px rgba(0,0,0,0.4); white-space: nowrap; }
+    .qr-cell { border-radius: 1px; } .qr-cell.b { background: #10243a; } .qr-cell.w { background: transparent; }
+    .badge-float { position: absolute; background: rgba(255,255,255,0.92); border: 1px solid rgba(16,36,58,0.08); border-radius: 10px; padding: 0.6rem 0.9rem; font-size: 0.75rem; font-weight: 700; color: #17304a; box-shadow: 0 12px 28px rgba(16,36,58,0.12); white-space: nowrap; }
     .bf-1 { top: 0; right: -20px; animation: floatBadge 4s ease-in-out infinite; }
     .bf-2 { bottom: 40px; left: -30px; animation: floatBadge 5s ease-in-out infinite 1s; }
     @keyframes floatBadge { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
@@ -122,8 +122,8 @@
 
     /* ── BATTERY COMING SOON ── */
     .bcs-strip {
-      background: linear-gradient(135deg, #0c1f36 0%, #0f2a48 50%, #0c1e35 100%);
-      border-top: 1px solid rgba(240,165,0,0.18);
+      background: linear-gradient(135deg, #fffaf0 0%, #eef7fb 52%, #f7fbff 100%);
+      border-top: 1px solid rgba(240,165,0,0.2);
       border-bottom: 1px solid rgba(13,181,176,0.15);
       padding: 3.5rem 5%; position: relative; overflow: hidden;
     }
@@ -148,53 +148,53 @@
     .bcs-headline {
       font-family: var(--serif); font-size: clamp(2rem, 3.5vw, 3rem);
       font-weight: 800; line-height: 1.1; letter-spacing: -0.5px; margin-bottom: 1rem;
-      background: linear-gradient(135deg, #f0f6fa 30%, #f0a500 100%);
+      background: linear-gradient(135deg, #17304a 20%, #c98300 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
-    .bcs-body { font-size: 0.93rem; color: var(--lgray); line-height: 1.82; margin-bottom: 1.2rem; }
-    .bcs-body strong { color: var(--white); }
+    .bcs-body { font-size: 0.93rem; color: #4d667b; line-height: 1.82; margin-bottom: 1.2rem; }
+    .bcs-body strong { color: #17304a; }
     .bcs-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.4rem; }
     .bcs-tag { font-size: 0.72rem; font-weight: 600; background: rgba(13,181,176,0.1); border: 1px solid rgba(13,181,176,0.2); color: var(--teal); padding: 0.25rem 0.7rem; border-radius: 50px; }
     .bcs-passport-card {
-      background: linear-gradient(140deg, #0f2640 0%, #1c3d5e 100%);
-      border: 1px solid rgba(13,181,176,0.4); border-radius: 20px; padding: 1.6rem;
-      box-shadow: 0 28px 70px rgba(0,0,0,0.55), 0 0 50px rgba(13,181,176,0.07);
+      background: linear-gradient(145deg, #ffffff 0%, #f1f7fb 100%);
+      border: 1px solid rgba(16,36,58,0.08); border-radius: 20px; padding: 1.6rem;
+      box-shadow: 0 28px 70px rgba(16,36,58,0.12), 0 0 50px rgba(13,181,176,0.06);
       position: relative;
     }
-    .bcs-pc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.2rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .bcs-pc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.2rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(16,36,58,0.08); }
     .bcs-pc-type { font-size: 0.68rem; color: var(--teal); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 0.3rem; }
     .bcs-pc-name { font-size: 0.95rem; font-weight: 700; }
     .bcs-glow-badge { font-size: 0.58rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; background: rgba(240,165,0,0.15); border: 1px solid rgba(240,165,0,0.45); color: #f0a500; padding: 0.25rem 0.65rem; border-radius: 6px; white-space: nowrap; animation: glowPulse 2s ease-in-out infinite; }
     @keyframes glowPulse { 0%,100%{ box-shadow: 0 0 8px rgba(240,165,0,0.2); } 50%{ box-shadow: 0 0 20px rgba(240,165,0,0.5); } }
     .bcs-pc-fields { display: flex; flex-direction: column; gap: 0.48rem; margin-bottom: 1rem; }
     .bcs-pc-field { display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; padding: 0.32rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .bcs-pc-field span:first-child { color: var(--gray); }
-    .bcs-pc-field span:last-child { color: var(--white); font-weight: 500; }
+    .bcs-pc-field span:first-child { color: #6b8498; }
+    .bcs-pc-field span:last-child { color: #17304a; font-weight: 600; }
     .bcs-val-teal { color: var(--teal) !important; font-weight: 700 !important; }
     .bcs-val-green { color: var(--green) !important; font-weight: 700 !important; }
     .bcs-pc-footer { display: flex; justify-content: space-between; align-items: center; }
     .bcs-pc-status { display: flex; align-items: center; gap: 0.4rem; font-size: 0.68rem; color: var(--green); font-weight: 600; }
     .bcs-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: blink 1.6s ease-in-out infinite; }
     .bcs-pc-qr { width: 42px; height: 42px; background: var(--white); border-radius: 4px; display: grid; grid-template-columns: repeat(5,1fr); gap: 1.5px; padding: 4px; }
-    .bcs-qr-b { border-radius: 1px; background: #0b1826; }
+    .bcs-qr-b { border-radius: 1px; background: #10243a; }
     .bcs-deadline-badge { position: absolute; bottom: -18px; right: 24px; background: linear-gradient(135deg, var(--navy3), var(--navy4)); border: 1px solid var(--teal-bdr); border-radius: 12px; padding: 0.65rem 1.1rem; text-align: center; box-shadow: 0 8px 28px rgba(0,0,0,0.45); }
     .bcs-dl-label { font-size: 0.6rem; color: var(--gray); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
     .bcs-dl-date { font-family: var(--serif); font-size: 1.05rem; color: var(--gold); font-weight: 700; }
 
     /* ── PLATFORM SCREENSHOTS ── */
     .platform-screens { display: grid; grid-template-columns: 1fr 1fr; gap: 1.3rem; margin-top: 3rem; }
-    .ps-card { background: #0e1f30; border: 1px solid rgba(255,255,255,0.09); border-radius: 14px; overflow: hidden; transition: border-color 0.25s; }
+    .ps-card { background: #ffffff; border: 1px solid rgba(16,36,58,0.08); border-radius: 14px; overflow: hidden; transition: border-color 0.25s, box-shadow 0.25s; box-shadow: 0 18px 45px rgba(16,36,58,0.08); }
     .ps-card:hover { border-color: var(--teal-bdr); }
-    .ps-card-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .ps-card-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(13,181,176,0.04); border-bottom: 1px solid rgba(16,36,58,0.07); }
     .ps-card-title { font-size: 0.7rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--teal); }
     .ps-live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: blink 1.6s ease-in-out infinite; }
     .ps-body { padding: 1rem; }
     /* dashboard mockup rows */
     .ps-stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.6rem; margin-bottom: 0.9rem; }
-    .ps-stat-box { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.7rem; text-align: center; }
+    .ps-stat-box { background: #f4f9fc; border-radius: 8px; padding: 0.7rem; text-align: center; border: 1px solid rgba(16,36,58,0.06); }
     .ps-stat-num { font-family: var(--serif); font-size: 1.4rem; font-weight: 700; }
     .ps-stat-lbl { font-size: 0.62rem; color: var(--gray); margin-top: 0.15rem; }
-    .ps-row { display: flex; justify-content: space-between; align-items: center; padding: 0.42rem 0.65rem; border-radius: 6px; font-size: 0.73rem; margin-bottom: 0.35rem; background: rgba(255,255,255,0.03); }
+    .ps-row { display: flex; justify-content: space-between; align-items: center; padding: 0.42rem 0.65rem; border-radius: 6px; font-size: 0.73rem; margin-bottom: 0.35rem; background: #f6fafc; border: 1px solid rgba(16,36,58,0.05); }
     .ps-badge { font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
     .ps-badge-green { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.25); }
     .ps-badge-gold  { background: rgba(240,165,0,0.12); color: var(--gold); border: 1px solid rgba(240,165,0,0.25); }
@@ -205,13 +205,13 @@
     .ps-tab.active { background: var(--teal-dim); color: var(--teal); border-color: var(--teal-bdr); }
     .ps-field-row { display: flex; justify-content: space-between; font-size: 0.73rem; padding: 0.38rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
     .ps-field-row .pf-label { color: var(--gray); }
-    .ps-field-row .pf-value { color: var(--white); font-weight: 500; max-width: 55%; text-align: right; }
+    .ps-field-row .pf-value { color: #10243a; font-weight: 600; max-width: 55%; text-align: right; }
     /* analytics mockup */
     .ps-chart { display: flex; align-items: flex-end; gap: 4px; height: 70px; margin-bottom: 0.8rem; }
     .ps-bar-c { flex: 1; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, var(--teal) 0%, rgba(13,181,176,0.4) 100%); transition: opacity 0.2s; min-width: 8px; }
     .ps-bar-c:hover { opacity: 0.8; }
     /* audit log mockup */
-    .ps-log-row { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.7rem; }
+    .ps-log-row { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.5rem 0; border-bottom: 1px solid rgba(16,36,58,0.06); font-size: 0.7rem; }
     .ps-log-time { color: var(--gray); font-family: var(--mono); font-size: 0.62rem; flex-shrink: 0; width: 70px; }
     .ps-log-action { font-weight: 700; font-size: 0.68rem; }
     .ps-log-user { color: var(--lgray); font-size: 0.65rem; }
@@ -249,11 +249,134 @@
     .hs-link { font-size: 0.8rem; color: var(--teal); font-weight: 600; display: inline-flex; align-items: center; gap: 0.2rem; }
 
     /* ── STATS BAND ── */
-    .stats-band { background: var(--navy3); border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider); padding: 3rem 5%; }
+    .stats-band { background: linear-gradient(180deg, #edf4f9 0%, #f7fbfe 100%); border-top: 1px solid var(--divider); border-bottom: 1px solid var(--divider); padding: 3rem 5%; }
     .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 2rem; max-width: 1200px; margin: 0 auto; }
     .stat-box { text-align: center; }
     .stat-box strong { display: block; font-family: var(--serif); font-size: 2.5rem; color: var(--teal); font-weight: 700; }
     .stat-box p { font-size: 0.85rem; color: var(--lgray); margin-top: 0.4rem; }
+
+    /* ── ARCHITECTURE ── */
+    .architecture-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.8fr);
+      gap: 1.4rem;
+      margin-bottom: 1.35rem;
+      align-items: stretch;
+    }
+    .architecture-copy {
+      background: var(--card-bg);
+      border: 1px solid var(--card-bdr);
+      border-radius: 24px;
+      padding: 1.7rem;
+    }
+    .architecture-copy .section-lead {
+      max-width: 100%;
+      margin-bottom: 1.4rem;
+    }
+    .architecture-bullets {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.9rem;
+    }
+    .architecture-bullet {
+      position: relative;
+      overflow: hidden;
+      border-radius: 18px;
+      padding: 1rem 1rem 1rem 1.1rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .architecture-bullet::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(13,181,176,0.62));
+    }
+    .architecture-bullet strong {
+      display: block;
+      margin-bottom: 0.45rem;
+      color: var(--white);
+      font-size: 0.95rem;
+    }
+    .architecture-bullet p {
+      color: var(--lgray);
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+    .architecture-sample {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
+      border: 1px solid var(--card-bdr);
+      border-radius: 24px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      justify-content: space-between;
+    }
+    .architecture-sample h3 {
+      font-family: var(--serif);
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+    }
+    .architecture-sample p {
+      color: var(--lgray);
+      font-size: 0.9rem;
+      line-height: 1.8;
+    }
+    .sample-qr-link {
+      display: block;
+      width: min(100%, 220px);
+      margin: 0 auto;
+      padding: 0.75rem;
+      border-radius: 26px;
+      background: #ffffff;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 18px 34px rgba(4,12,24,0.22);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .sample-qr-link:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 22px 44px rgba(4,12,24,0.28);
+    }
+    .sample-qr-image {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 18px;
+    }
+    .architecture-sample-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      justify-content: center;
+    }
+    .architecture-sample-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 0.9rem;
+      border-radius: 999px;
+      background: var(--teal-dim);
+      border: 1px solid var(--teal-bdr);
+      color: var(--teal);
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .architecture-diagram-card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
+      border: 1px solid var(--card-bdr);
+      border-radius: 30px;
+      padding: 1rem;
+      box-shadow: 0 24px 54px rgba(4,12,24,0.18);
+    }
+    .architecture-diagram {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 24px;
+      overflow: hidden;
+    }
 
     @media (max-width: 900px) {
       .hero-inner { grid-template-columns: 1fr; }
@@ -265,11 +388,14 @@
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .platform-screens { grid-template-columns: 1fr; }
       .reg-cat-grid { grid-template-columns: 1fr 1fr; }
+      .architecture-shell { grid-template-columns: 1fr; }
+      .architecture-bullets { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 520px) {
       .hiw-grid { grid-template-columns: 1fr; }
       .home-services { grid-template-columns: 1fr; }
       .reg-cat-grid { grid-template-columns: 1fr 1fr; }
+      .architecture-bullets { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -449,13 +575,65 @@
     </div>
   </div>
 
+  <!-- ─── ARCHITECTURE OVERVIEW ─── -->
+  <section class="section section-alt" aria-labelledby="architecture-title">
+    <div class="container">
+      <div class="architecture-shell">
+        <div class="architecture-copy reveal">
+          <span class="section-eyebrow">Reference Architecture</span>
+          <h2 class="section-title" id="architecture-title">How ClarosDPP turns fragmented product data into a <span class="hl">scan-ready passport experience</span></h2>
+          <p class="section-lead">This is a formal software architecture view of the actual product scope. It maps the live application structure in this repository: internal interfaces, public passport views, Express API services, workflow and trust features, PostgreSQL-backed records, repository storage, and the QR-driven outputs.</p>
+          <div class="architecture-bullets">
+            <article class="architecture-bullet">
+              <strong>Clear separation of layers</strong>
+              <p>Actors and inputs, presentation, application services, data storage, and public outputs are shown as distinct architectural blocks.</p>
+            </article>
+            <article class="architecture-bullet">
+              <strong>Based on the actual app wiring</strong>
+              <p>The diagram reflects the current implementation: admin interfaces, public passport views, Express backend routes, workflow, QR delivery, analytics, exports, and repository storage.</p>
+            </article>
+            <article class="architecture-bullet">
+              <strong>Formal software notation style</strong>
+              <p>It now uses clearer architectural containers, routed connectors, service blocks, and storage blocks so the relationships stay readable.</p>
+            </article>
+            <article class="architecture-bullet">
+              <strong>Customer-readable but technically correct</strong>
+              <p>It still stays simple enough for prospects, while showing the real operational backbone behind creation, release, viewing, and auditability.</p>
+            </article>
+          </div>
+        </div>
+
+        <aside class="architecture-sample reveal reveal-d1" aria-label="Sample passport QR callout">
+          <div>
+            <span class="section-eyebrow">Scan The Demo</span>
+            <h3>See a static passport open from a real QR code</h3>
+            <p>The QR below opens a customer-safe sample passport with dummy data only. It mirrors the product experience without connecting to any live record or customer account.</p>
+          </div>
+          <a href="sample-passport.html" class="sample-qr-link" aria-label="Open the sample passport page">
+            <img src="assets/sample-passport-qr.svg" alt="QR code linking to the static sample passport page" class="sample-qr-image" />
+          </a>
+          <div class="architecture-sample-meta">
+            <span class="architecture-sample-tag">Static demo</span>
+            <span class="architecture-sample-tag">Dummy data only</span>
+            <span class="architecture-sample-tag">Sales safe</span>
+          </div>
+          <a href="sample-passport.html" class="btn btn-primary">Open Sample Passport →</a>
+        </aside>
+      </div>
+
+      <div class="architecture-diagram-card reveal reveal-d2">
+        <img src="assets/architecture-diagram.svg" alt="Architecture drawing showing ClarosDPP inputs, application platform, data stores, and public outputs" class="architecture-diagram" />
+      </div>
+    </div>
+  </section>
+
   <!-- ─── PLATFORM IN ACTION ─── -->
   <section class="section section-dark" aria-labelledby="platform-screen-title">
     <div class="container">
       <div class="reveal">
-        <span class="section-eyebrow">Live Platform · Real Screens</span>
+        <span class="section-eyebrow">Current Platform · Live Modules</span>
         <h2 class="section-title" id="platform-screen-title">A Fully Compliant <span class="hl">Platform in Action</span></h2>
-        <p class="section-lead">Every step of the DPP lifecycle is built in — from issuing passports and managing compliance status, to consumer-facing public views, QR scan analytics, and a tamper-proof audit trail accessible to regulators.</p>
+        <p class="section-lead">The current ClarosDPP platform covers the full operating layer: passport creation, release workflow, branded landing pages, technical viewer delivery, unique scan analytics, signatures, version history, and Asset Management for ERP and legacy-data ingestion.</p>
       </div>
 
       <div class="platform-screens">
@@ -463,21 +641,21 @@
         <!-- 1. Company Dashboard -->
         <div class="ps-card reveal reveal-d1">
           <div class="ps-card-header">
-            <span class="ps-card-title">📊 Company Dashboard</span>
+            <span class="ps-card-title">🧭 Passport Workspace</span>
             <span class="ps-live"></span>
           </div>
           <div class="ps-body">
             <div class="ps-stat-row">
-              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--teal)">247</div><div class="ps-stat-lbl">Total Passports</div></div>
-              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--green)">189</div><div class="ps-stat-lbl">Released</div></div>
-              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--gold)">23</div><div class="ps-stat-lbl">In Review</div></div>
+              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--teal)">1,247</div><div class="ps-stat-lbl">Active passports</div></div>
+              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--green)">94%</div><div class="ps-stat-lbl">Released to market</div></div>
+              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--gold)">31</div><div class="ps-stat-lbl">Awaiting review</div></div>
             </div>
-            <div class="ps-row"><span style="color:var(--lgray)">BT-Industrial-Cell-2024-v1</span><span class="ps-badge ps-badge-green">Released</span></div>
-            <div class="ps-row"><span style="color:var(--lgray)">TX-JacketFabric-WM-EU-Q3</span><span class="ps-badge ps-badge-green">Released</span></div>
-            <div class="ps-row"><span style="color:var(--lgray)">ST-StructuralBeam-Grade355</span><span class="ps-badge ps-badge-gold">In Review</span></div>
-            <div class="ps-row"><span style="color:var(--lgray)">EL-Laptop-Pro-14-2025</span><span class="ps-badge ps-badge-blue">Draft</span></div>
-            <div style="margin-top:0.8rem;padding-top:0.7rem;border-top:1px solid rgba(255,255,255,0.06);font-size:0.7rem;color:var(--gray);">
-              ⚡ Battery Passport · 🧵 Textile DPP · 🏗️ Construction · 🎮 Toys
+            <div class="ps-row"><span style="color:var(--lgray)">Battery lineup · release workflow</span><span class="ps-badge ps-badge-green">Approved</span></div>
+            <div class="ps-row"><span style="color:var(--lgray)">Public landing pages + technical views</span><span class="ps-badge ps-badge-blue">Live</span></div>
+            <div class="ps-row"><span style="color:var(--lgray)">History visibility + archive restore</span><span class="ps-badge ps-badge-green">Tracked</span></div>
+            <div class="ps-row"><span style="color:var(--lgray)">Notifications, audit logs, team workflow</span><span class="ps-badge ps-badge-gold">Active</span></div>
+            <div style="margin-top:0.8rem;padding-top:0.7rem;border-top:1px solid rgba(16,36,58,0.06);font-size:0.7rem;color:var(--gray);">
+              Release workflow · public viewer · history controls · QR export · signatures
             </div>
           </div>
         </div>
@@ -485,48 +663,68 @@
         <!-- 2. Public Passport Viewer -->
         <div class="ps-card reveal reveal-d2">
           <div class="ps-card-header">
-            <span class="ps-card-title">🪪 Public Passport Viewer</span>
-            <span style="font-size:0.63rem;color:var(--green);font-weight:600;">Consumer View</span>
+            <span class="ps-card-title">🪪 Public Landing + Technical Viewer</span>
+            <span style="font-size:0.63rem;color:var(--green);font-weight:700;">Released flow</span>
           </div>
           <div class="ps-body">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
               <div>
-                <div style="font-size:0.8rem;font-weight:700;">Industrial Battery Module</div>
-                <div style="font-size:0.63rem;color:var(--teal);margin-top:2px;">⚡ EU Battery Regulation · ESPR</div>
+                <div style="font-size:0.8rem;font-weight:700;">Branded consumer landing page</div>
+                <div style="font-size:0.63rem;color:var(--teal);margin-top:2px;">Introduction first, technical passport on demand</div>
               </div>
               <div style="width:34px;height:34px;background:var(--white);border-radius:4px;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;padding:3px;">
-                <div style="background:#0b1826;border-radius:1px"></div><div style="background:#0b1826;border-radius:1px"></div><div style="border-radius:1px"></div><div style="background:#0b1826;border-radius:1px"></div>
-                <div style="background:#0b1826;border-radius:1px"></div><div style="border-radius:1px"></div><div style="background:#0b1826;border-radius:1px"></div><div style="border-radius:1px"></div>
-                <div style="border-radius:1px"></div><div style="background:#0b1826;border-radius:1px"></div><div style="border-radius:1px"></div><div style="background:#0b1826;border-radius:1px"></div>
-                <div style="background:#0b1826;border-radius:1px"></div><div style="background:#0b1826;border-radius:1px"></div><div style="border-radius:1px"></div><div style="background:#0b1826;border-radius:1px"></div>
+                <div style="background:#10243a;border-radius:1px"></div><div style="background:#10243a;border-radius:1px"></div><div style="border-radius:1px"></div><div style="background:#10243a;border-radius:1px"></div>
+                <div style="background:#10243a;border-radius:1px"></div><div style="border-radius:1px"></div><div style="background:#10243a;border-radius:1px"></div><div style="border-radius:1px"></div>
+                <div style="border-radius:1px"></div><div style="background:#10243a;border-radius:1px"></div><div style="border-radius:1px"></div><div style="background:#10243a;border-radius:1px"></div>
+                <div style="background:#10243a;border-radius:1px"></div><div style="background:#10243a;border-radius:1px"></div><div style="border-radius:1px"></div><div style="background:#10243a;border-radius:1px"></div>
               </div>
             </div>
             <div class="ps-tabs">
-              <span class="ps-tab active">General</span>
-              <span class="ps-tab">Material</span>
-              <span class="ps-tab">Performance</span>
-              <span class="ps-tab">Compliance</span>
+              <span class="ps-tab active">Introduction</span>
+              <span class="ps-tab">Technical</span>
+              <span class="ps-tab">History</span>
+              <span class="ps-tab">Unlock</span>
             </div>
-            <div class="ps-field-row"><span class="pf-label">Manufacturer</span><span class="pf-value">🇩🇪 Voltix GmbH</span></div>
-            <div class="ps-field-row"><span class="pf-label">Carbon Footprint</span><span class="pf-value" style="color:var(--teal)">72.4 kg CO₂e/kWh</span></div>
-            <div class="ps-field-row"><span class="pf-label">Battery Chemistry</span><span class="pf-value">Li-NMC 811</span></div>
-            <div class="ps-field-row"><span class="pf-label">Recycled Cobalt</span><span class="pf-value" style="color:var(--green)">18.4% ✓</span></div>
+            <div class="ps-field-row"><span class="pf-label">Landing page</span><span class="pf-value">Branded intro + product summary</span></div>
+            <div class="ps-field-row"><span class="pf-label">Technical viewer</span><span class="pf-value" style="color:var(--teal)">Single-route section navbar</span></div>
+            <div class="ps-field-row"><span class="pf-label">Trust layer</span><span class="pf-value">Signature badge + DID / VC verification</span></div>
+            <div class="ps-field-row"><span class="pf-label">Restricted data</span><span class="pf-value" style="color:var(--green)">Access-key unlock supported</span></div>
             <div style="margin-top:0.7rem;display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;color:var(--green);">
               <span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span>
-              Released · Compliant · 📊 1,247 scans
+              Released landing page · technical viewer · print · version history
             </div>
           </div>
         </div>
 
-        <!-- 3. QR Scan Analytics -->
-        <div class="ps-card reveal reveal-d1">
+        <div class="ps-card reveal reveal-d3">
           <div class="ps-card-header">
-            <span class="ps-card-title">📈 QR Scan Analytics</span>
+            <span class="ps-card-title">🗂️ Asset Management + ERP Ingestion</span>
+            <span style="font-size:0.63rem;color:var(--teal);font-weight:700;">Connector layer</span>
+          </div>
+          <div class="ps-body">
+            <div class="ps-stat-row">
+              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--teal)">REST</div><div class="ps-stat-lbl">ERP / PLM APIs</div></div>
+              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--green)">CSV</div><div class="ps-stat-lbl">Bulk file import</div></div>
+              <div class="ps-stat-box"><div class="ps-stat-num" style="color:var(--gold)">Jobs</div><div class="ps-stat-lbl">Saved sync runs</div></div>
+            </div>
+            <div class="ps-row"><span style="color:var(--lgray)">SAP, Oracle, Teamcenter, custom REST feeds</span><span class="ps-badge ps-badge-blue">Compatible</span></div>
+            <div class="ps-row"><span style="color:var(--lgray)">Legacy exports mapped into passport fields</span><span class="ps-badge ps-badge-green">Ingested</span></div>
+            <div class="ps-row"><span style="color:var(--lgray)">Preview before push to live passports</span><span class="ps-badge ps-badge-gold">Controlled</span></div>
+            <div class="ps-row"><span style="color:var(--lgray)">Repeatable jobs and audit-backed runs</span><span class="ps-badge ps-badge-green">Tracked</span></div>
+            <div style="margin-top:0.8rem;padding-top:0.7rem;border-top:1px solid rgba(16,36,58,0.06);font-size:0.68rem;color:var(--gray);">
+              Built to make ingestion easy even when source data still lives in legacy ERP spreadsheets, exports, or mixed APIs.
+            </div>
+          </div>
+        </div>
+
+        <div class="ps-card reveal reveal-d4">
+          <div class="ps-card-header">
+            <span class="ps-card-title">📈 Unique QR Analytics</span>
             <span class="ps-live"></span>
           </div>
           <div class="ps-body">
             <div style="display:flex;justify-content:space-between;margin-bottom:0.9rem;">
-              <div><div style="font-family:var(--serif);font-size:1.8rem;color:var(--teal);font-weight:700;line-height:1">1,247</div><div style="font-size:0.65rem;color:var(--gray)">Total QR scans — released passports only</div></div>
+              <div><div style="font-family:var(--serif);font-size:1.8rem;color:var(--teal);font-weight:700;line-height:1">1,247</div><div style="font-size:0.65rem;color:var(--gray)">Unique viewer scans on released passports</div></div>
               <div style="text-align:right"><div style="font-size:0.75rem;font-weight:700;color:var(--green)">+18%</div><div style="font-size:0.62rem;color:var(--gray)">vs last month</div></div>
             </div>
             <div class="ps-chart" aria-label="Daily scan chart">
@@ -545,48 +743,47 @@
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--gray);margin-bottom:0.7rem;"><span>30 days ago</span><span>Today</span></div>
             <div style="background:rgba(13,181,176,0.07);border:1px solid var(--teal-bdr);border-radius:8px;padding:0.6rem 0.8rem;font-size:0.7rem;color:var(--lgray);">
-              <span style="color:var(--teal);font-weight:700;">Only released passports tracked.</span> Draft and in-review passports are excluded from analytics.
+              <span style="color:var(--teal);font-weight:700;">Unique scans only.</span> Repeated scans from the same viewer do not inflate the counter.
             </div>
           </div>
         </div>
 
-        <!-- 4. Compliance Audit Trail -->
         <div class="ps-card reveal reveal-d2">
           <div class="ps-card-header">
-            <span class="ps-card-title">🔍 Compliance Audit Trail</span>
-            <span style="font-size:0.63rem;color:var(--teal);font-weight:600;">Regulator Access</span>
+            <span class="ps-card-title">🔍 Audit Trail + Release Trust</span>
+            <span style="font-size:0.63rem;color:var(--teal);font-weight:700;">Verification-ready</span>
           </div>
           <div class="ps-body">
             <div class="ps-log-row">
               <span class="ps-log-time">14:32 today</span>
               <div>
                 <div class="ps-log-action" style="color:var(--green)">PASSPORT_RELEASED</div>
-                <div class="ps-log-user">BT-Industrial-Cell-2024-v1 · m.weber@voltix.de</div>
+                <div class="ps-log-user">Battery passport signed and published with DID / VC verification material</div>
               </div>
             </div>
             <div class="ps-log-row">
               <span class="ps-log-time">11:18 today</span>
               <div>
-                <div class="ps-log-action" style="color:var(--teal)">PASSPORT_UPDATED</div>
-                <div class="ps-log-user">Carbon footprint revised · ISO 14067 study v2</div>
+                <div class="ps-log-action" style="color:var(--teal)">ASSET_SYNC_PREVIEWED</div>
+                <div class="ps-log-user">ERP payload validated before updating live passports</div>
               </div>
             </div>
             <div class="ps-log-row">
               <span class="ps-log-time">09:05 today</span>
               <div>
-                <div class="ps-log-action" style="color:var(--gold)">COMPLIANCE_CHECK</div>
-                <div class="ps-log-user">Regulation schema validated · EU 2023/1542</div>
+                <div class="ps-log-action" style="color:var(--gold)">WORKFLOW_APPROVED</div>
+                <div class="ps-log-user">Reviewer and approver completed release workflow</div>
               </div>
             </div>
             <div class="ps-log-row">
               <span class="ps-log-time">Yesterday</span>
               <div>
-                <div class="ps-log-action" style="color:var(--teal)">PASSPORT_CREATED</div>
-                <div class="ps-log-user">TX-JacketFabric-WM-EU-Q3 · admin</div>
+                <div class="ps-log-action" style="color:var(--teal)">ARCHIVE_RESTORED</div>
+                <div class="ps-log-user">Inactive public version reopened with landing page preserved</div>
               </div>
             </div>
-            <div style="margin-top:0.8rem;padding-top:0.7rem;border-top:1px solid rgba(255,255,255,0.06);font-size:0.68rem;color:var(--gray);">
-              Every create, update, release, and access event logged. Immutable. Available to market surveillance authorities on request.
+            <div style="margin-top:0.8rem;padding-top:0.7rem;border-top:1px solid rgba(16,36,58,0.06);font-size:0.68rem;color:var(--gray);">
+              Create, update, workflow, archive, release, signature, and public access events are logged for operational traceability.
             </div>
           </div>
         </div>
@@ -613,8 +810,8 @@
         <div class="hiw-card reveal reveal-d2">
           <div class="hiw-num">2</div>
           <div class="hiw-icon">🗂️</div>
-          <h3>Product Data Collection</h3>
-          <p>We structure and collect the product-level data required by each regulation — material composition, carbon footprint, substance information, recycled content, and performance data — via our secure platform portal.</p>
+          <h3>Data Ingestion &amp; Mapping</h3>
+          <p>We ingest product data from CSV files, spreadsheet exports, PLM systems, ERP APIs, and legacy databases, then map it into regulation-ready passport fields without forcing a rip-and-replace of your existing systems.</p>
         </div>
         <div class="hiw-card reveal reveal-d3">
           <div class="hiw-num">3</div>
@@ -626,7 +823,7 @@
           <div class="hiw-num">4</div>
           <div class="hiw-icon">🪪</div>
           <h3>Passport Issuance &amp; Governance</h3>
-          <p>Compliant DPPs are issued with unique QR codes, hosted on EU-based servers, and continuously updated as regulations evolve — so you stay compliant without manual effort as delegated acts are published.</p>
+          <p>Compliant DPPs are issued with unique QR codes, branded landing pages, technical viewer flows, version history, and continuously updated governance so your public and regulator-facing data stays current as delegated acts evolve.</p>
         </div>
       </div>
     </div>
@@ -709,7 +906,7 @@
         <div class="hs-card reveal reveal-d1">
           <div class="hs-icon">🪪</div>
           <h3>DPP Platform</h3>
-          <p>Issue and manage regulation-ready passports for every SKU across all applicable EU mandates — Battery, ESPR, Toys, Construction, Detergents. Auto-updated as rules change.</p>
+          <p>Issue and manage regulation-ready passports for every SKU, with release workflow, public landing pages, technical viewers, signatures, analytics, and archive-safe history built in.</p>
           <a href="services.html#platform" class="hs-link">Learn more →</a>
         </div>
         <div class="hs-card reveal reveal-d2">

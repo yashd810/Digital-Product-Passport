@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, NavLink } from "react-router-dom";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "./tableControls";
 import { authHeaders } from "./authHeaders";
+import { normalizePassportStatus } from "./passportStatus";
+import { buildPreviewPassportPath, buildPublicPassportPath } from "./passportRoutes";
 import "./AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -220,9 +222,9 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
 }
 
 // ── Main WorkflowDashboard ─────────────────────────────────────
-function WorkflowDashboard({ user, companyId }) {
+function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   const navigate  = useNavigate();
-  const [tab,     setTab]     = useState("inprogress");
+  const tab = activeTab;
   const [data,    setData]    = useState({ inProgress:[], backlog:[], history:[] });
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState(null); // {wf, action}
@@ -290,9 +292,23 @@ function WorkflowDashboard({ user, companyId }) {
     { id:"backlog",    label:"My Backlog",    count: data.backlog.length },
     { id:"history",    label:"History",       count: data.history.length },
   ];
-  const openPublicPassport = (guid) => {
-    if (!guid) return;
-    window.open(`${window.location.origin}/p/${guid}`, "_blank", "noopener,noreferrer");
+  const openPassportViewer = (wf) => {
+    if (!wf?.passport_guid) return;
+    const normalizedStatus = normalizePassportStatus(wf.release_status);
+    const path = normalizedStatus === "released" && wf.product_id
+      ? buildPublicPassportPath({
+          companyName: user?.company_name,
+          modelName: wf.model_name,
+          productId: wf.product_id,
+        })
+      : buildPreviewPassportPath({
+          companyName: user?.company_name,
+          modelName: wf.model_name,
+          productId: wf.product_id,
+          previewId: wf.passport_guid,
+        });
+    if (!path) return;
+    window.open(`${window.location.origin}${path}`, "_blank", "noopener,noreferrer");
   };
 
   const renderRow = (wf, showActions) => {
@@ -302,7 +318,7 @@ function WorkflowDashboard({ user, companyId }) {
       <tr key={wf.id}>
         <td>
           <button className="model-link-btn"
-            onClick={() => openPublicPassport(wf.passport_guid)}>
+            onClick={() => openPassportViewer(wf)}>
             {wf.model_name}
           </button>
           <div className="workflow-meta-copy">
@@ -391,11 +407,12 @@ function WorkflowDashboard({ user, companyId }) {
 
       <div className="wf-tabs">
         {tabs.map(t => (
-          <button key={t.id} className={`wf-tab${tab === t.id ? " active" : ""}`}
-            onClick={() => setTab(t.id)}>
+          <NavLink key={t.id}
+            to={`/dashboard/workflow/${t.id}`}
+            className={({ isActive }) => `wf-tab${isActive ? " active" : ""}`}>
             {t.label}
             {t.count > 0 && <span className="wf-count">{t.count}</span>}
-          </button>
+          </NavLink>
         ))}
       </div>
 

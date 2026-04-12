@@ -213,6 +213,7 @@
   color: var(--text-secondary);
   transition: color 0.15s, border-color 0.15s;
   border-radius: 6px 6px 0 0;
+  text-decoration: none;
 }
 .repo-tab:hover  { color: var(--text-primary); background: var(--bg-soft); }
 .repo-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
@@ -331,10 +332,18 @@
   text-overflow: ellipsis;
   max-width: 100%;
 }
-.sym-tile-delete {
+.sym-tile-actions {
   position: absolute;
   top: 5px;
   right: 6px;
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.sym-tile:hover .sym-tile-actions { opacity: 1; }
+.sym-tile-copy,
+.sym-tile-delete {
   background: none;
   border: none;
   font-size: 12px;
@@ -342,10 +351,9 @@
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.12s, background 0.12s;
+  transition: background 0.12s, color 0.12s;
 }
-.sym-tile:hover .sym-tile-delete { opacity: 1; }
+.sym-tile-copy:hover { background: rgba(13,181,176,0.15); color: var(--accent); }
 .sym-tile-delete:hover { background: var(--status-danger-bg); color: var(--status-danger-text); }
 
 /* Responsive */

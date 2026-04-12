@@ -33,6 +33,7 @@ const MessagingPage = lazy(() => import("./MessagingPage"));
 const TemplatesPage = lazy(() => import("./TemplatesPage"));
 const ManualCenter = lazy(() => import("./ManualCenter"));
 const CreateHub    = lazy(() => import("./CreateHub"));
+const ArchivedPassports = lazy(() => import("./ArchivedPassports"));
 
 const AdminLayout = lazy(() => import("./AdminLayout"));
 const AdminAnalytics = lazy(() => import("./AdminAnalytics"));
@@ -76,6 +77,16 @@ function CreatePassportRoute({ user, companyId }) {
 function EditPassportRoute({ user, companyId }) {
   if (user?.role === "viewer") return <Navigate to="/dashboard" replace />;
   return <PassportForm mode="edit" user={user} companyId={companyId} />;
+}
+
+function TemplateEditRoute({ user, companyId }) {
+  const { templateId } = useParams();
+  return <TemplatesPage user={user} companyId={companyId} view="edit" editTemplateId={templateId} />;
+}
+
+function CSVImportTabRoute({ user, companyId }) {
+  const { tab } = useParams();
+  return <CSVImportGuide user={user} companyId={companyId} activeTab={tab || "create"} />;
 }
 
 function App() {
@@ -151,10 +162,40 @@ function App() {
         <Route path="/reset-password"  element={<ResetPassword />} />
 
         {/* Consumer QR landing page */}
-        <Route path="/p/:guid" element={<ConsumerPage />} />
+        <Route path="/p/:productId" element={<ConsumerPage />} />
+        <Route path="/p/inactive/:productId/:versionNumber" element={<ConsumerPage />} />
 
         {/* Passport viewer — public */}
-        <Route path="/passport/:guid/*" element={<PassportViewer />} />
+        <Route path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId/technical/*" element={
+          <ProtectedRoute token={token} authReady={authReady}>
+            <PassportViewer previewMode={true} previewCompanyId={companyId} />
+          </ProtectedRoute>
+        } />
+        <Route path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId" element={
+          <ProtectedRoute token={token} authReady={authReady}>
+            <ConsumerPage previewMode={true} previewCompanyId={companyId} />
+          </ProtectedRoute>
+        } />
+        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber/technical/*" element={<PassportViewer />} />
+        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber" element={<ConsumerPage />} />
+        <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId/technical/*" element={<PassportViewer />} />
+        <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId" element={<ConsumerPage />} />
+
+        {/* Legacy passport viewer aliases */}
+        <Route path="/passport/preview/:previewId/technical/*" element={
+          <ProtectedRoute token={token} authReady={authReady}>
+            <PassportViewer previewMode={true} previewCompanyId={companyId} />
+          </ProtectedRoute>
+        } />
+        <Route path="/passport/preview/:previewId" element={
+          <ProtectedRoute token={token} authReady={authReady}>
+            <ConsumerPage previewMode={true} previewCompanyId={companyId} />
+          </ProtectedRoute>
+        } />
+        <Route path="/passport/inactive/:productId/:versionNumber/technical/*" element={<PassportViewer />} />
+        <Route path="/passport/inactive/:productId/:versionNumber" element={<ConsumerPage />} />
+        <Route path="/passport/:productId/technical/*" element={<PassportViewer />} />
+        <Route path="/passport/:productId" element={<ConsumerPage />} />
 
         {/* Version diff — needs token for API */}
         <Route path="/passport/:guid/diff" element={
@@ -166,7 +207,12 @@ function App() {
         {/* CSV Import */}
         <Route path="/csv-import/:passportType" element={
           <ProtectedRoute token={token} authReady={authReady}>
-            <CSVImportGuide user={user} companyId={companyId} />
+            <Navigate to="create" replace />
+          </ProtectedRoute>
+        } />
+        <Route path="/csv-import/:passportType/:tab" element={
+          <ProtectedRoute token={token} authReady={authReady}>
+            <CSVImportTabRoute user={user} companyId={companyId} />
           </ProtectedRoute>
         } />
 
@@ -184,15 +230,23 @@ function App() {
           <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="notifications"   element={<NotificationsPage user={user} />} />
           <Route path="messages"        element={<MessagingPage user={user} />} />
-          <Route path="templates"       element={<TemplatesPage user={user} companyId={companyId} />} />
+          <Route path="templates"       element={<TemplatesPage user={user} companyId={companyId} view="list" />} />
+          <Route path="templates/new"   element={<TemplatesPage user={user} companyId={companyId} view="create" />} />
+          <Route path="templates/:templateId/edit" element={<TemplateEditRoute user={user} companyId={companyId} />} />
           <Route path="create"          element={<CreateHub user={user} companyId={companyId} />} />
           <Route path="audit-logs"      element={<AuditLogs companyId={companyId} />} />
-          <Route path="workflow"        element={<WorkflowDashboard user={user} companyId={companyId} />} />
+          <Route path="workflow"          element={<Navigate to="workflow/inprogress" replace />} />
+          <Route path="workflow/inprogress" element={<WorkflowDashboard user={user} companyId={companyId} activeTab="inprogress" />} />
+          <Route path="workflow/backlog"    element={<WorkflowDashboard user={user} companyId={companyId} activeTab="backlog" />} />
+          <Route path="workflow/history"    element={<WorkflowDashboard user={user} companyId={companyId} activeTab="history" />} />
           <Route path="profile"         element={<UserProfile user={user} companyId={companyId} onUserUpdate={handleUserUpdate} />} />
           <Route path="security"        element={<SecurityCenter user={user} companyId={companyId} />} />
           <Route path="company-profile" element={<CompanyProfile user={user} companyId={companyId} />} />
           <Route path="team"            element={<ManageTeam user={user} companyId={companyId} />} />
-          <Route path="repository"      element={<CompanyRepository user={user} companyId={companyId} />} />
+          <Route path="repository"          element={<Navigate to="repository/files" replace />} />
+          <Route path="repository/files"   element={<CompanyRepository user={user} companyId={companyId} activeTab="files" />} />
+          <Route path="repository/symbols" element={<CompanyRepository user={user} companyId={companyId} activeTab="symbols" />} />
+          <Route path="archived"        element={<ArchivedPassports user={user} companyId={companyId} />} />
           <Route path="manual"          element={<ManualCenter mode="user" user={user} companyId={companyId} />} />
         </Route>
 

@@ -1,12 +1,27 @@
 import React from "react";
 import { getConsumerTheme } from "./ThemeContext";
+import { buildPreviewTechnicalPassportPath, buildTechnicalPassportPath } from "./passportRoutes";
 import "./PassportViewer.css";
 
 function BatteryConsumerPage({ passport, company, typeDef, dynamicValues = {} }) {
   const pType = passport.passport_type || "battery";
   const theme = getConsumerTheme(pType, company?.branding_json);
-  const guid  = passport.guid;
-
+  const technicalPassportPath = passport?.preview_mode
+    ? buildPreviewTechnicalPassportPath({
+        companyName: company?.company_name,
+        manufacturerName: passport?.manufacturer,
+        manufacturedBy: passport?.manufactured_by,
+        modelName: passport?.model_name,
+        productId: passport?.product_id,
+        previewId: passport?.guid,
+      })
+    : buildTechnicalPassportPath({
+        companyName: company?.company_name,
+        manufacturerName: passport?.manufacturer,
+        manufacturedBy: passport?.manufactured_by,
+        modelName: passport?.model_name,
+        productId: passport?.product_id,
+      });
   // Helper: search typeDef sections for a field by key or label pattern
   const getFieldVal = (keyPatterns) => {
     const sections = typeDef?.fields_json?.sections || typeDef?.sections || [];
@@ -155,14 +170,14 @@ function BatteryConsumerPage({ passport, company, typeDef, dynamicValues = {} })
         </div>
 
         <div className="cp-cta">
-          <a href={`/passport/${guid}`} className="cp-cta-btn">
+          <a href={technicalPassportPath || "#"} className="cp-cta-btn">
             View Full Technical Passport →
           </a>
         </div>
 
         <div className="cp-footer">
           <div className="cp-footer-brand">🌍 Digital Product Passport System</div>
-          <div className="cp-footer-guid">GUID: {guid.substring(0, 8)}…</div>
+          <div className="cp-footer-guid">Product ID: {passport.product_id || "—"}</div>
           {theme.companyWebsite && (
             <a className="cp-footer-company-link" href={theme.companyWebsite} target="_blank" rel="noopener noreferrer">
               Visit company website

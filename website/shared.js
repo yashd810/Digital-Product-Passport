@@ -16,6 +16,10 @@
 ═══════════════════════════════════════════════ */
 
 (function () {
+  document.documentElement.setAttribute('data-theme', 'light');
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute('content', '#f5f8fb');
+
   /* ── APP URL — update this for production deployment ──
      Development: React app runs at http://localhost:3000
      Production:  Set to your app domain, e.g. https://app.clarosdpp.com
@@ -117,7 +121,7 @@
         <div class="footer-col">
           <h5>Company</h5>
           <ul>
-            <li><a href="about.html">About the Team</a></li>
+            <li><a href="about.html">About ClarosDPP</a></li>
             <li><a href="contact.html">Contact Us</a></li>
             <li><a href="contact.html">Request a Demo</a></li>
             <li><a href="contact.html">Get a Quote</a></li>

@@ -1,328 +1,479 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Meet the ClarosDPP team — a global group of regulatory experts, product engineers, and software architects building EU Digital Product Passport infrastructure." />
-  <!-- ══ SEO ══ update https://clarosdpp.com to your domain before deployment ══ -->
-  <meta name="robots"      content="index, follow" />
-  <meta name="author"      content="ClarosDPP" />
-  <meta name="keywords"    content="ClarosDPP team, digital product passport company, EU compliance experts, DPP software engineers, regulatory consulting team, sustainability technology" />
-  <meta name="theme-color" content="#0b1826" />
-  <link rel="canonical"    href="https://clarosdpp.com/about.html" />
-  <!-- Favicon: inline SVG — no files needed in dev. Before launch replace with real favicon.ico + site.webmanifest -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Learn ClarosDPP's mission, expertise, industry impact, implementation approach, and the Digital Product Passport basics customers ask most often." />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="ClarosDPP" />
+  <meta name="keywords" content="about digital product passport platform, DPP mission, DPP expertise, DPP FAQ, battery passport, ESPR passport, product traceability platform" />
+  <meta name="theme-color" content="#f5f8fb" />
+  <link rel="canonical" href="https://clarosdpp.com/about.html" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
-  <meta property="og:type"         content="website" />
-  <meta property="og:site_name"    content="ClarosDPP" />
-  <meta property="og:title"        content="About the Team — ClarosDPP" />
-  <meta property="og:description"  content="A global group of regulatory experts, product engineers, and software architects building EU Digital Product Passport infrastructure." />
-  <meta property="og:url"          content="https://clarosdpp.com/about.html" />
-  <meta property="og:image"        content="https://clarosdpp.com/og-image.jpg" />
-  <meta property="og:image:width"  content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:locale"       content="en_US" />
-  <meta name="twitter:card"        content="summary_large_image" />
-  <meta name="twitter:site"        content="@ClarosDPP" />
-  <meta name="twitter:title"       content="About the Team — ClarosDPP" />
-  <meta name="twitter:description" content="A global group of regulatory experts, product engineers, and software architects building EU Digital Product Passport infrastructure." />
-  <meta name="twitter:image"       content="https://clarosdpp.com/og-image.jpg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ClarosDPP" />
+  <meta property="og:title" content="About ClarosDPP - Mission, Expertise, and DPP FAQ" />
+  <meta property="og:description" content="See what ClarosDPP stands for, where we help customers most, and get straightforward answers to the most common Digital Product Passport questions." />
+  <meta property="og:url" content="https://clarosdpp.com/about.html" />
+  <meta property="og:image" content="https://clarosdpp.com/og-image.jpg" />
+  <meta property="og:locale" content="en_US" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="About ClarosDPP - Mission, Expertise, and DPP FAQ" />
+  <meta name="twitter:description" content="Mission, expertise, industry impact, approach, and practical DPP basics in one place." />
+  <meta name="twitter:image" content="https://clarosdpp.com/og-image.jpg" />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "AboutPage",
     "@id": "https://clarosdpp.com/about.html",
     "url": "https://clarosdpp.com/about.html",
-    "name": "About the Team — ClarosDPP",
-    "description": "Meet the ClarosDPP team — regulatory experts, product engineers, and software architects building EU Digital Product Passport infrastructure.",
+    "name": "About ClarosDPP",
+    "description": "Mission, expertise, industry impact, approach, and Digital Product Passport FAQ for ClarosDPP.",
     "publisher": { "@type": "Organization", "name": "ClarosDPP", "url": "https://clarosdpp.com" },
     "breadcrumb": {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": "Home",  "item": "https://clarosdpp.com/" },
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://clarosdpp.com/" },
         { "@type": "ListItem", "position": 2, "name": "About", "item": "https://clarosdpp.com/about.html" }
       ]
     }
   }
   </script>
-  <title>About the Team — ClarosDPP</title>
+  <title>About ClarosDPP - Mission, Expertise, and DPP FAQ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <style>
-    /* Team cards */
-    .team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-    .team-card {
-      background: var(--card-bg); border: 1px solid var(--card-bdr);
-      border-radius: 18px; padding: 2rem 1.6rem; text-align: center;
-      transition: transform 0.3s, border-color 0.3s;
-      position: relative; overflow: hidden;
-    }
-    .team-card::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      background: linear-gradient(90deg, transparent, var(--teal), transparent);
-      transform: scaleX(0); transform-origin: center; transition: transform 0.3s;
-    }
-    .team-card:hover { transform: translateY(-6px); border-color: var(--teal-bdr); }
-    .team-card:hover::before { transform: scaleX(1); }
-    .avatar {
-      width: 76px; height: 76px; border-radius: 50%; margin: 0 auto 1.1rem;
-      display: flex; align-items: center; justify-content: center;
-      font-family: var(--serif); font-size: 1.65rem; font-weight: 700;
-      border: 2px solid rgba(13,181,176,0.35); color: var(--white);
-    }
-    .av-1 { background: linear-gradient(135deg, #0f3d5e, #1a6091); }
-    .av-2 { background: linear-gradient(135deg, #1a4731, #2e7a52); }
-    .av-3 { background: linear-gradient(135deg, #3d1942, #7a3079); }
-    .av-4 { background: linear-gradient(135deg, #4a1e0a, #9a5420); }
-    .av-5 { background: linear-gradient(135deg, #142050, #1f3a8a); }
-    .av-6 { background: linear-gradient(135deg, #3a1010, #8a2020); }
-    .team-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .team-card .tc-role { font-size: 0.78rem; color: var(--teal); font-weight: 600; margin-bottom: 0.3rem; }
-    .team-card .tc-loc  { font-size: 0.75rem; color: var(--gray); margin-bottom: 0.9rem; }
-    .team-card .tc-bio  { font-size: 0.8rem; color: var(--lgray); line-height: 1.7; text-align: left; }
-    .tc-domains { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; justify-content: center; }
-    .tc-tag {
-      font-size: 0.68rem; font-weight: 600; letter-spacing: 0.5px;
-      background: var(--teal-dim); color: var(--teal); padding: 0.18rem 0.55rem; border-radius: 50px;
+    .about-hero {
+      padding: 5rem 5% 4rem;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(13,181,176,0.12), transparent 24%),
+        radial-gradient(circle at 16% 22%, rgba(8,145,178,0.08), transparent 24%),
+        linear-gradient(180deg, #f6fbfe 0%, #edf5fa 100%);
+      position: relative;
+      overflow: hidden;
     }
 
-    /* Values */
-    .value-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
-    .value-card {
-      background: var(--card-bg); border: 1px solid var(--card-bdr); border-radius: 14px; padding: 1.5rem;
-      transition: border-color 0.2s;
+    .about-hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px);
+      background-size: 68px 68px;
+      pointer-events: none;
     }
-    .value-card:hover { border-color: var(--teal-bdr); }
-    .value-card .vc-icon { font-size: 1.5rem; margin-bottom: 0.7rem; }
-    .value-card h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 0.4rem; }
-    .value-card p  { font-size: 0.82rem; color: var(--lgray); line-height: 1.7; }
 
-    /* Global map placeholder */
-    .globe-banner {
-      background: var(--navy3); border: 1px solid var(--divider); border-radius: 18px;
-      padding: 2.5rem; text-align: center; position: relative; overflow: hidden;
+    .about-hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
+      gap: 2rem;
+      align-items: center;
     }
-    .globe-banner::before {
-      content: ''; position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
-      width: 360px; height: 360px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(13,181,176,0.12) 0%, transparent 65%);
-    }
-    .globe-dots { display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; margin-top: 2rem; }
-    .globe-dot { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
-    .gd-flag { font-size: 1.8rem; }
-    .gd-city { font-size: 0.78rem; color: var(--lgray); font-weight: 600; }
-    .gd-role { font-size: 0.7rem; color: var(--gray); }
 
-    @media (max-width: 900px) { .team-grid, .value-grid { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 520px)  { .team-grid, .value-grid { grid-template-columns: 1fr; } }
+    .about-hero h1 {
+      margin: 0 0 1rem;
+      font-family: var(--serif);
+      font-size: clamp(2.5rem, 4.8vw, 4.5rem);
+      line-height: 1.03;
+      letter-spacing: -0.05em;
+      color: #10243a;
+      max-width: 760px;
+    }
+
+    .about-hero p {
+      color: #4d667b;
+      font-size: 1.03rem;
+      line-height: 1.85;
+      max-width: 760px;
+    }
+
+    .about-hero-card,
+    .mission-card,
+    .expertise-card,
+    .impact-card,
+    .approach-card,
+    .faq-item {
+      background: #ffffff;
+      border: 1px solid rgba(23,48,74,0.1);
+      box-shadow: 0 18px 36px rgba(17,44,72,0.08);
+    }
+
+    .about-hero-card {
+      border-radius: 30px;
+      padding: 1.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .about-hero-metric {
+      padding: 1rem 1rem 1.05rem;
+      border-radius: 22px;
+      background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+      border: 1px solid rgba(23,48,74,0.08);
+    }
+
+    .about-hero-metric span {
+      display: block;
+      margin-bottom: 0.45rem;
+      color: #5f7991;
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .about-hero-metric strong {
+      color: #10243a;
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .mission-grid,
+    .expertise-grid,
+    .impact-grid,
+    .approach-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .mission-grid {
+      grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+    }
+
+    .expertise-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .impact-grid,
+    .approach-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .mission-card,
+    .expertise-card,
+    .impact-card,
+    .approach-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 28px;
+      padding: 1.5rem;
+      background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    }
+
+    .mission-card::before,
+    .expertise-card::before,
+    .impact-card::before,
+    .approach-card::before,
+    .faq-item::before,
+    .about-hero-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(23,48,74,0.12), rgba(13,181,176,0.62));
+    }
+
+    .mission-card h3,
+    .expertise-card h3,
+    .impact-card h3,
+    .approach-card h3 {
+      margin: 0 0 0.7rem;
+      color: #10243a;
+      font-size: 1.02rem;
+      font-weight: 800;
+    }
+
+    .mission-card p,
+    .expertise-card p,
+    .impact-card p,
+    .approach-card p {
+      margin: 0;
+      color: #4d667b;
+      line-height: 1.75;
+      font-size: 0.95rem;
+    }
+
+    .impact-card strong,
+    .approach-step {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 42px;
+      min-height: 42px;
+      margin-bottom: 0.85rem;
+      border-radius: 14px;
+      background: rgba(13,181,176,0.12);
+      color: #0db5b0;
+      font-size: 0.95rem;
+      font-weight: 800;
+    }
+
+    .faq-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .faq-item {
+      position: relative;
+      overflow: hidden;
+      border-radius: 24px;
+      padding: 1.2rem 1.25rem;
+      background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    }
+
+    .faq-item summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      color: #10243a;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    .faq-item summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .faq-item summary::after {
+      content: "+";
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(13,181,176,0.12);
+      color: #0db5b0;
+      font-size: 1.2rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .faq-item[open] summary::after {
+      content: "-";
+    }
+
+    .faq-answer {
+      margin-top: 0.95rem;
+      color: #4d667b;
+      font-size: 0.95rem;
+      line-height: 1.82;
+      max-width: 860px;
+    }
+
+    .about-cta {
+      margin-top: 2.2rem;
+    }
+
+    @media (max-width: 980px) {
+      .about-hero-inner,
+      .mission-grid,
+      .impact-grid,
+      .approach-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .expertise-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .expertise-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body class="page-body">
-
-  <div class="page-hero">
-    <div class="container">
+  <section class="about-hero" aria-labelledby="about-title">
+    <div class="about-hero-inner">
       <div class="reveal">
-        <span class="section-eyebrow">Who We Are</span>
-        <h1>A Global Team Built for <span class="hl">Regulatory Complexity</span></h1>
-        <p>We are the people who live and breathe compliance — so you don't have to. Meet the team behind ClarosDPP.</p>
+        <span class="section-eyebrow">About ClarosDPP</span>
+        <h1 id="about-title">A practical Digital Product Passport partner for companies building what comes next.</h1>
+        <p>ClarosDPP exists to make Digital Product Passports understandable, operational, and commercially useful. We help companies move from fragmented product data and regulatory uncertainty to a passport model that is ready for compliance, customer transparency, and long-term circularity strategy.</p>
       </div>
-    </div>
-  </div>
 
-  <!-- ABOUT TEXT -->
-  <section class="section section-dark" aria-labelledby="about-title">
-    <div class="container">
-      <div class="two-col center">
-        <div class="reveal">
-          <span class="section-eyebrow">Our Story</span>
-          <h2 class="section-title" id="about-title">Built at the <span class="hl">Intersection</span> of Three Worlds</h2>
+      <aside class="about-hero-card reveal reveal-d1" aria-label="ClarosDPP focus areas">
+        <div class="about-hero-metric">
+          <span>Mission focus</span>
+          <strong>Turn complex product, material, and compliance data into one trusted passport experience.</strong>
         </div>
-        <div class="reveal reveal-d2" style="padding-top:0.5rem;">
-          <p style="font-size:0.95rem;color:var(--lgray);line-height:1.9;margin-bottom:1rem;">
-            ClarosDPP was founded at the intersection of three worlds that rarely speak the same language: deep regulatory expertise, world-class product engineering, and enterprise software development. Our team brings together specialists who have spent careers navigating the most complex compliance environments in Europe and beyond — from the corridors of EU policy to the factory floors of global manufacturers.
-          </p>
-          <p style="font-size:0.95rem;color:var(--lgray);line-height:1.9;margin-bottom:1rem;">
-            We are a deliberately diverse group, spanning twelve countries and six time zones. Our compliance and regulatory specialists have advised Fortune 500 companies, EU government bodies, and international standards organisations on sustainability regulation, REACH compliance, and ecodesign policy — giving us first-hand insight into the regulatory requirements we help you meet. Our product development veterans have launched physical products in regulated markets including medical devices, automotive components, and consumer electronics, understanding the relentless pressure of real-world regulatory deadlines.
-          </p>
-          <p style="font-size:0.95rem;color:var(--lgray);line-height:1.9;margin-bottom:1rem;">
-            Our software engineers have built enterprise-grade data platforms, integration layers, and evidence-backed product data systems for some of the world's largest brands. We don't just understand the regulation — we've built the technology infrastructure that makes compliance scalable, auditable, and future-proof. We write code that handles the complexity of product, material, and circularity data, not consultants who then hand a brief to a development team who don't understand the regulatory context.
-          </p>
-          <p style="font-size:0.95rem;color:var(--lgray);line-height:1.9;">
-            What unites us is a conviction that the circular economy transition, while genuinely complex, is a strategic opportunity for companies that act intelligently and act early. The companies that invest in proper DPP infrastructure today are building a data asset, a compliance moat, and a supply chain intelligence capability that will compound in value over the next decade. At ClarosDPP, we are not simply a compliance vendor — we are a strategic partner in building products that are transparent, trustworthy, and built for tomorrow's regulatory reality.
-          </p>
+        <div class="about-hero-metric">
+          <span>Where we help most</span>
+          <strong>Readiness planning, architecture, integration, passport design, and rollout communication.</strong>
         </div>
-      </div>
+        <div class="about-hero-metric">
+          <span>Customer outcome</span>
+          <strong>Clearer implementation decisions, faster internal alignment, and a stronger public-facing DPP journey.</strong>
+        </div>
+      </aside>
     </div>
   </section>
 
-  <!-- TEAM -->
-  <section class="section section-alt" aria-labelledby="team-title">
-    <div class="container">
-      <div class="reveal" style="margin-bottom:2.5rem;">
-        <span class="section-eyebrow">Leadership Team</span>
-        <h2 class="section-title" id="team-title">The People <span class="hl">Behind ClarosDPP</span></h2>
-      </div>
-      <div class="team-grid">
-        <div class="team-card reveal reveal-d1">
-          <div class="avatar av-1">AK</div>
-          <h3>Dr. Anna Köhler</h3>
-          <div class="tc-role">Co-Founder & CEO</div>
-          <div class="tc-loc">📍 Brussels, Belgium</div>
-          <p class="tc-bio">Former regulatory affairs director at a leading EU sustainability consultancy, Anna spent 12 years advising on REACH, RoHS, and Ecodesign compliance for major industrial manufacturers. She holds a PhD in Environmental Law from KU Leuven and has served as a technical expert for the European Commission's ESPR working group. She founded ClarosDPP with a vision to industrialise compliance — making it fast, verifiable, and scalable.</p>
-          <div class="tc-domains">
-            <span class="tc-tag">ESPR Policy</span>
-            <span class="tc-tag">REACH</span>
-            <span class="tc-tag">EU Regulatory Strategy</span>
-          </div>
-        </div>
-        <div class="team-card reveal reveal-d2">
-          <div class="avatar av-2">MR</div>
-          <h3>Marco Rossi</h3>
-          <div class="tc-role">Co-Founder & CTO</div>
-          <div class="tc-loc">📍 Milan, Italy</div>
-          <p class="tc-bio">Marco brings 15 years of enterprise software architecture experience, having led platform teams at a Fortune 100 manufacturer and two high-growth industrial SaaS companies. He has built data-exchange platforms processing billions of product records annually and was an early architect of auditable product-data systems for regulated industries. At ClarosDPP, he leads all technology, infrastructure, and platform engineering.</p>
-          <div class="tc-domains">
-            <span class="tc-tag">Platform Architecture</span>
-            <span class="tc-tag">Supply Chain Tech</span>
-            <span class="tc-tag">APIs</span>
-          </div>
-        </div>
-        <div class="team-card reveal reveal-d3">
-          <div class="avatar av-3">PS</div>
-          <h3>Priya Sharma</h3>
-          <div class="tc-role">Head of Compliance · ESPR & REACH</div>
-          <div class="tc-loc">📍 Amsterdam, Netherlands</div>
-          <p class="tc-bio">Priya is a chemical regulatory specialist with deep expertise in REACH substance management, SCIP database obligations, and restricted substances compliance for complex manufactured goods. Previously she managed global regulatory compliance for a leading consumer electronics brand across 40+ jurisdictions. At ClarosDPP, she leads our compliance governance practice and substance disclosure services.</p>
-          <div class="tc-domains">
-            <span class="tc-tag">REACH SVHCs</span>
-            <span class="tc-tag">RoHS</span>
-            <span class="tc-tag">Chemical Compliance</span>
-          </div>
-        </div>
-        <div class="team-card reveal reveal-d1">
-          <div class="avatar av-4">TK</div>
-          <h3>Tanaka Kenji</h3>
-          <div class="tc-role">Head of Circularity &amp; Material Data</div>
-          <div class="tc-loc">📍 Tokyo, Japan</div>
-          <p class="tc-bio">With 18 years in global manufacturing operations across automotive, electronics, and industrial sectors in Asia-Pacific, Europe, and North America, Kenji understands how complex product data environments actually work — and where compliance evidence breaks down. He has led material transparency and circularity programmes for several of Japan's largest manufacturers and brings a practitioner's understanding of operational change at scale.</p>
-          <div class="tc-domains">
-            <span class="tc-tag">Supply Chain Ops</span>
-            <span class="tc-tag">APAC Suppliers</span>
-            <span class="tc-tag">CSDDD</span>
-          </div>
-        </div>
-        <div class="team-card reveal reveal-d2">
-          <div class="avatar av-5">EW</div>
-          <h3>Elena Wójcik</h3>
-          <div class="tc-role">Carbon & Lifecycle Assessment Lead</div>
-          <div class="tc-loc">📍 Warsaw, Poland</div>
-          <p class="tc-bio">Elena is a certified Life Cycle Assessment practitioner with a background in industrial ecology and environmental engineering. She has completed over 120 product carbon footprint studies across the battery, chemicals, packaging, and textiles sectors following ISO 14067, PEF, and GHG Protocol methodologies. She is a registered practitioner with the International EPD System and has led LCA methodology development for new product categories under ESPR's PEF programme.</p>
-          <div class="tc-domains">
-            <span class="tc-tag">ISO 14067 LCA</span>
-            <span class="tc-tag">PEF Methodology</span>
-            <span class="tc-tag">Carbon Footprint</span>
-          </div>
-        </div>
-        <div class="team-card reveal reveal-d3">
-          <div class="avatar av-6">JA</div>
-          <h3>James Adewale</h3>
-          <div class="tc-role">Head of Product Engineering</div>
-          <div class="tc-loc">📍 London, United Kingdom</div>
-          <p class="tc-bio">James has 14 years of product management and engineering experience across regulated hardware products, having taken three physical products from concept to CE-marked EU market launch in medical devices and industrial electronics. He bridges the gap between regulatory requirements and practical product development — and leads our consulting engagements with companies building products who need regulatory requirements integrated into their development process from day one.</p>
-          <div class="tc-domains">
-            <span class="tc-tag">Product Development</span>
-            <span class="tc-tag">CE Marking</span>
-            <span class="tc-tag">Hardware Regulation</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Domain expertise banner -->
-      <div style="margin-top:3.5rem;" class="reveal">
-        <h3 style="font-family:var(--serif);font-size:1.3rem;font-weight:700;margin-bottom:1.2rem;">Our Domain Expertise</h3>
-        <div style="display:flex;flex-wrap:wrap;gap:0.7rem;">
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">EU Regulatory Policy</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">ESPR &amp; REACH Compliance</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">LCA &amp; Carbon Accounting</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">Supply Chain Engineering</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">Enterprise Software</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">Blockchain &amp; Data Trust</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">Circular Economy Design</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">IoT &amp; Product Intelligence</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">Sustainability Reporting</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">ERP &amp; PLM Integration</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">CSRD &amp; ESG Disclosure</span>
-          <span class="badge badge-teal" style="font-size:0.78rem;padding:0.35rem 0.9rem;">Battery Technology</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- GLOBAL PRESENCE -->
-  <section class="section section-dark" aria-labelledby="global-title">
+  <section class="section section-dark" aria-labelledby="mission-title">
     <div class="container">
       <div class="reveal" style="margin-bottom:2rem;">
-        <span class="section-eyebrow">Where We Work</span>
-        <h2 class="section-title" id="global-title">Global Team, <span class="hl">Local Expertise</span></h2>
-        <p class="section-lead">Regulation is inherently local in its implementation. Our international team gives you expertise in how EU mandates are interpreted and enforced across different member states — and how they interact with supply chains from Asia to the Americas.</p>
+        <span class="section-eyebrow">Mission</span>
+        <h2 class="section-title" id="mission-title">Build DPP programs that are <span class="hl">clear enough to trust</span> and structured enough to scale.</h2>
       </div>
-      <div class="globe-banner reveal">
-        <h3 style="font-family:var(--serif);font-size:1.3rem;font-weight:700;position:relative;z-index:1;">Presence Across 5 Countries · 6 Time Zones</h3>
-        <p style="font-size:0.85rem;color:var(--lgray);margin-top:0.5rem;position:relative;z-index:1;">Our offices and team members are positioned at the heart of the key regulatory and manufacturing hubs that matter most for DPP compliance.</p>
-        <div class="globe-dots">
-          <div class="globe-dot"><div class="gd-flag">🇧🇪</div><div class="gd-city">Brussels</div><div class="gd-role">Regulatory HQ</div></div>
-          <div class="globe-dot"><div class="gd-flag">🇮🇹</div><div class="gd-city">Milan</div><div class="gd-role">Technology HQ</div></div>
-          <div class="globe-dot"><div class="gd-flag">🇳🇱</div><div class="gd-city">Amsterdam</div><div class="gd-role">Compliance Practice</div></div>
-          <div class="globe-dot"><div class="gd-flag">🇬🇧</div><div class="gd-city">London</div><div class="gd-role">Product Engineering</div></div>
-          <div class="globe-dot"><div class="gd-flag">🇯🇵</div><div class="gd-city">Tokyo</div><div class="gd-role">APAC Supply Chain</div></div>
-          <div class="globe-dot"><div class="gd-flag">🇵🇱</div><div class="gd-city">Warsaw</div><div class="gd-role">LCA &amp; Carbon</div></div>
-        </div>
+      <div class="mission-grid">
+        <article class="mission-card reveal">
+          <h3>Why we exist</h3>
+          <p>Digital Product Passports are often discussed as a future compliance requirement, but companies need something much more immediate: a way to map data sources, coordinate suppliers, define ownership, and publish a passport experience that customers and auditors can actually use. ClarosDPP is built around that operational reality. We focus on making the transition practical, not abstract.</p>
+        </article>
+        <article class="mission-card reveal reveal-d1">
+          <h3>What success looks like</h3>
+          <p>Success is not just launching a QR code. It is creating a repeatable system where product data can be collected, validated, versioned, and presented with confidence across internal teams, supply chain partners, and the people who ultimately scan the passport.</p>
+        </article>
       </div>
     </div>
   </section>
 
-  <!-- VALUES -->
-  <section class="section section-alt" aria-labelledby="values-title">
+  <section class="section section-alt" aria-labelledby="expertise-title">
     <div class="container">
       <div class="reveal" style="margin-bottom:2rem;">
-        <span class="section-eyebrow">How We Work</span>
-        <h2 class="section-title" id="values-title">Our <span class="hl">Values</span></h2>
+        <span class="section-eyebrow">Expertise</span>
+        <h2 class="section-title" id="expertise-title">The work sits at the intersection of <span class="hl">regulation, data, and product delivery</span>.</h2>
       </div>
-      <div class="value-grid">
-        <div class="value-card reveal reveal-d1">
-          <div class="vc-icon">🔬</div>
-          <h4>Technical Depth First</h4>
-          <p>We never oversimplify compliance. Our advice is grounded in primary regulatory text, methodology standards, and practical implementation experience — not marketing summaries of regulations.</p>
-        </div>
-        <div class="value-card reveal reveal-d2">
-          <div class="vc-icon">🤝</div>
-          <h4>Partnership, Not Vendor</h4>
-          <p>We embed with your teams, understand your products and supply chains, and build solutions that grow with your organisation — not one-size templates that create friction.</p>
-        </div>
-        <div class="value-card reveal reveal-d3">
-          <div class="vc-icon">🌐</div>
-          <h4>Global Perspective</h4>
-          <p>Regulations are global in their reach. We understand how EU mandates interact with supply chains from Southeast Asia, the Americas, and Africa — and how national implementation varies across member states.</p>
-        </div>
-        <div class="value-card reveal reveal-d1">
-          <div class="vc-icon">⏩</div>
-          <h4>Speed Without Cutting Corners</h4>
-          <p>We know your deadlines are not negotiable. Our processes are engineered to deliver regulatory-grade outputs at the pace your compliance calendar demands.</p>
-        </div>
-        <div class="value-card reveal reveal-d2">
-          <div class="vc-icon">♻️</div>
-          <h4>Genuine Circular Economy Belief</h4>
-          <p>We're not here just to sell compliance software. We believe that transparent, circular, sustainable product systems create better outcomes for companies, consumers, and the planet.</p>
-        </div>
-        <div class="value-card reveal reveal-d3">
-          <div class="vc-icon">🔒</div>
-          <h4>Data Integrity Above All</h4>
-          <p>Your DPP data must be defensible under regulator scrutiny. We never approve data that isn't traceable, verifiable, and documented to the standards required by EU market surveillance.</p>
-        </div>
+      <div class="expertise-grid">
+        <article class="expertise-card reveal reveal-d1">
+          <h3>Regulatory interpretation</h3>
+          <p>We translate evolving DPP-related requirements into implementation choices that teams can act on, instead of leaving regulation trapped in policy summaries or slide decks.</p>
+        </article>
+        <article class="expertise-card reveal reveal-d2">
+          <h3>Architecture and data design</h3>
+          <p>We help shape the operating model behind the passport: data sources, validation logic, evidence structure, access layers, and how QR journeys connect to real product records.</p>
+        </article>
+        <article class="expertise-card reveal reveal-d1">
+          <h3>Supplier and evidence readiness</h3>
+          <p>Many passport programs succeed or fail at the supplier boundary. We focus on practical collection patterns for declarations, recycled content, traceability inputs, and supporting documentation.</p>
+        </article>
+        <article class="expertise-card reveal reveal-d2">
+          <h3>Customer-facing passport experience</h3>
+          <p>A strong DPP is not only compliant. It is understandable. We design the landing page, technical summary, and communication flow so the value of the passport is obvious at first scan.</p>
+        </article>
       </div>
-      <div class="cta-strip reveal" style="margin-top:2.5rem;">
-        <p>Want to work with us? <span>For more details and to start a conversation, reach out to our team here!</span></p>
-        <a href="contact.html" class="btn btn-primary btn-sm">Get in Touch →</a>
+    </div>
+  </section>
+
+  <section class="section section-dark" aria-labelledby="impact-title">
+    <div class="container">
+      <div class="reveal" style="margin-bottom:2rem;">
+        <span class="section-eyebrow">Impact Across Industries</span>
+        <h2 class="section-title" id="impact-title">Different sectors face different data problems, but the core DPP challenge is the same: <span class="hl">turn scattered evidence into one trusted record</span>.</h2>
+      </div>
+      <div class="impact-grid">
+        <article class="impact-card reveal">
+          <strong>01</strong>
+          <h3>Batteries and energy storage</h3>
+          <p>High traceability pressure, chemistry data, carbon footprint, recycled content, and lifecycle documentation make this one of the most immediate passport categories.</p>
+        </article>
+        <article class="impact-card reveal reveal-d1">
+          <strong>02</strong>
+          <h3>Consumer products and electronics</h3>
+          <p>These programs often need a careful balance between repairability, material transparency, service information, and a polished public experience.</p>
+        </article>
+        <article class="impact-card reveal reveal-d2">
+          <strong>03</strong>
+          <h3>Industrial and construction products</h3>
+          <p>Complex product structures, long lifecycles, and evidence-heavy compliance models benefit from a passport architecture that can carry documentation without becoming unmanageable.</p>
+        </article>
+        <article class="impact-card reveal reveal-d3">
+          <strong>04</strong>
+          <h3>Textiles and circular product categories</h3>
+          <p>These sectors often care deeply about provenance, composition, care, and end-of-life guidance, which makes clear public-facing passport design especially important.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt" aria-labelledby="approach-title">
+    <div class="container">
+      <div class="reveal" style="margin-bottom:2rem;">
+        <span class="section-eyebrow">Approach</span>
+        <h2 class="section-title" id="approach-title">We keep the process simple: <span class="hl">understand the product, map the data, shape the passport, and publish with confidence</span>.</h2>
+      </div>
+      <div class="approach-grid">
+        <article class="approach-card reveal">
+          <div class="approach-step">1</div>
+          <h3>Assess readiness</h3>
+          <p>Start with product scope, regulation exposure, data availability, and current system ownership so the project starts from reality rather than assumptions.</p>
+        </article>
+        <article class="approach-card reveal reveal-d1">
+          <div class="approach-step">2</div>
+          <h3>Design the flow</h3>
+          <p>Define how ERP, PLM, supplier inputs, compliance evidence, and approval logic should come together into one DPP operating model.</p>
+        </article>
+        <article class="approach-card reveal reveal-d2">
+          <div class="approach-step">3</div>
+          <h3>Build the experience</h3>
+          <p>Create the public and technical passport layers so the final result works both as a compliance record and as a useful customer-facing digital experience.</p>
+        </article>
+        <article class="approach-card reveal reveal-d3">
+          <div class="approach-step">4</div>
+          <h3>Scale and refine</h3>
+          <p>Once the first passport works, expand through repeatable templates, validation rules, supplier onboarding, and version-controlled publication.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-dark" aria-labelledby="faq-title">
+    <div class="container">
+      <div class="reveal" style="margin-bottom:2rem;">
+        <span class="section-eyebrow">FAQ</span>
+        <h2 class="section-title" id="faq-title">Digital Product Passport basics, <span class="hl">answered plainly</span>.</h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item reveal" open>
+          <summary>What is a Digital Product Passport?</summary>
+          <div class="faq-answer">A Digital Product Passport is a digital record linked to a product, usually through a QR code or another data carrier. It brings together information such as product identity, materials, compliance evidence, circularity information, service guidance, and end-of-life instructions in one accessible place.</div>
+        </details>
+        <details class="faq-item reveal reveal-d1">
+          <summary>Why are companies investing in DPPs now?</summary>
+          <div class="faq-answer">Because DPPs are becoming a practical requirement across more regulated product categories, and they also help companies improve traceability, customer transparency, service readiness, and internal control over product data. Waiting until a deadline is close usually creates unnecessary data and supplier pressure.</div>
+        </details>
+        <details class="faq-item reveal reveal-d2">
+          <summary>Who needs a DPP?</summary>
+          <div class="faq-answer">The exact obligation depends on the product category and regulation, but manufacturers, importers, brand owners, and other actors placing regulated products on the market are the ones most likely to need a passport strategy. Even companies not yet under a direct mandate often prepare early so their supply chain and data foundations are ready.</div>
+        </details>
+        <details class="faq-item reveal reveal-d3">
+          <summary>What kind of information goes into a passport?</summary>
+          <div class="faq-answer">Typical passport content includes product identifiers, model and batch details, material or chemistry information, recycled content, declarations, carbon or circularity indicators, maintenance instructions, and supporting compliance evidence. The exact fields depend on the regulation and the product.</div>
+        </details>
+        <details class="faq-item reveal">
+          <summary>Where does a customer or auditor find the passport?</summary>
+          <div class="faq-answer">Most often through a QR code placed on the product, packaging, or accompanying documentation. That scan opens a digital page where the public-facing summary can be shown first, with more technical or restricted layers available when needed.</div>
+        </details>
+        <details class="faq-item reveal reveal-d1">
+          <summary>When should a company begin preparing?</summary>
+          <div class="faq-answer">Much earlier than the final compliance date. Teams usually need time to map products, gather supplier data, define ownership, create validation rules, and decide what the final passport experience should look like. Early preparation reduces rushed decisions later.</div>
+        </details>
+        <details class="faq-item reveal reveal-d2">
+          <summary>How is a DPP different from a PDF data sheet or brochure?</summary>
+          <div class="faq-answer">A PDF is static. A passport is structured, traceable, and designed to be updated over time. It can support versioning, access control, evidence linkage, QR delivery, and a more useful experience for customers, service teams, and regulators.</div>
+        </details>
+        <details class="faq-item reveal reveal-d3">
+          <summary>How does ClarosDPP help?</summary>
+          <div class="faq-answer">ClarosDPP helps companies shape the architecture behind the passport, prepare the data model, build the customer-facing journey, and create a delivery approach that is easier to explain internally and externally. The goal is not just to launch a page, but to launch a system that holds up over time.</div>
+        </details>
+      </div>
+
+      <div class="cta-strip reveal about-cta">
+        <p>Want to see how your own products could be presented? <span>We can walk you through the operating model, the QR journey, and the passport layout.</span></p>
+        <a href="contact.html" class="btn btn-primary btn-sm">Talk to Us →</a>
       </div>
     </div>
   </section>
