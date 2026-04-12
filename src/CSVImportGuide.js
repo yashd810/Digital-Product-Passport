@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, NavLink } from "react-router-dom";
 import { authHeaders } from "./authHeaders";
 import "./Dashboard.css";
 
@@ -64,14 +64,11 @@ function ResultSummary({ summary, details, onDone }) {
   );
 }
 
-function CSVImportGuide({ user, companyId }) {
+function CSVImportGuide({ user, companyId, activeTab }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const { passportType } = useParams();
 
-  // mode=update comes from template card "Import CSV / JSON" button
-  const isUpdateMode = new URLSearchParams(location.search).get("mode") === "update";
-  const [tab, setTab] = useState(isUpdateMode ? "update-csv" : "create");
+  const tab = activeTab || "create";
 
   // ── Create tab state ──
   const createFileRef = useRef(null);
@@ -248,15 +245,18 @@ function CSVImportGuide({ user, companyId }) {
 
         {/* Tab switcher */}
         <div className="upsert-tabs">
-          <button className={`upsert-tab${tab === "create" ? " active" : ""}`} onClick={() => setTab("create")}>
+          <NavLink to={`/csv-import/${passportType}/create`}
+            className={({ isActive }) => `upsert-tab${isActive ? " active" : ""}`}>
             ✨ Create new passports
-          </button>
-          <button className={`upsert-tab${tab === "update-csv" ? " active" : ""}`} onClick={() => setTab("update-csv")}>
+          </NavLink>
+          <NavLink to={`/csv-import/${passportType}/update-csv`}
+            className={({ isActive }) => `upsert-tab${isActive ? " active" : ""}`}>
             📝 Update existing (CSV)
-          </button>
-          <button className={`upsert-tab${tab === "update-json" ? " active" : ""}`} onClick={() => setTab("update-json")}>
+          </NavLink>
+          <NavLink to={`/csv-import/${passportType}/update-json`}
+            className={({ isActive }) => `upsert-tab${isActive ? " active" : ""}`}>
             🔧 Update existing (JSON)
-          </button>
+          </NavLink>
         </div>
 
         {/* ── CREATE TAB ── */}

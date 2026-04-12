@@ -371,12 +371,11 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
 }
 
 // ── Main templates page ──
-export default function TemplatesPage({ user, companyId }) {
+export default function TemplatesPage({ user, companyId, view = "list", editTemplateId = null }) {
   const navigate = useNavigate();
   const [templates,     setTemplates]     = useState([]);
   const [passportTypes, setPassportTypes] = useState([]);
   const [loading,       setLoading]       = useState(true);
-  const [view,          setView]          = useState("list"); // "list" | "create" | "edit"
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [search,        setSearch]        = useState("");
   const [filterType,    setFilterType]    = useState("all");
@@ -400,11 +399,19 @@ export default function TemplatesPage({ user, companyId }) {
       .catch(() => {});
   }, [companyId]);
 
-  const openEdit = async (tmpl) => {
-    try {
-      const r = await fetch(`${API}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
-      if (r.ok) { setEditingTemplate(await r.json()); setView("edit"); }
-    } catch {}
+  // Load template for editing when routed to edit view
+  useEffect(() => {
+    if (view === "edit" && editTemplateId && !editingTemplate) {
+      fetch(`${API}/api/companies/${companyId}/templates/${editTemplateId}`, { headers: authHeaders() })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setEditingTemplate(data); else navigate("/dashboard/templates"); })
+        .catch(() => navigate("/dashboard/templates"));
+    }
+    if (view !== "edit") setEditingTemplate(null);
+  }, [view, editTemplateId, companyId]);
+
+  const openEdit = (tmpl) => {
+    navigate(`/dashboard/templates/${tmpl.id}/edit`);
   };
 
   const openBulk = async (tmpl) => {
@@ -427,14 +434,14 @@ export default function TemplatesPage({ user, companyId }) {
   };
 
   const handleSaved = () => {
-    setView("list");
     setEditingTemplate(null);
     fetchTemplates();
+    navigate("/dashboard/templates");
   };
 
   const handleCancel = () => {
-    setView("list");
     setEditingTemplate(null);
+    navigate("/dashboard/templates");
   };
 
   // Group templates by passport type
@@ -477,7 +484,7 @@ export default function TemplatesPage({ user, companyId }) {
             Mark fields as <strong>model data</strong> to pre-fill and lock them on every new passport.
           </p>
         </div>
-        <button className="tmpl-new-btn" onClick={() => setView("create")}>
+        <button className="tmpl-new-btn" onClick={() => navigate("/dashboard/templates/new")}>
           + New Template
         </button>
       </div>
@@ -511,7 +518,7 @@ export default function TemplatesPage({ user, companyId }) {
           <div style={{ fontSize: 44, marginBottom: 10 }}>📋</div>
           <h3>No templates yet</h3>
           <p>Create your first template to start pre-filling passport fields for a specific model.</p>
-          <button className="tmpl-new-btn" style={{ marginTop: 8 }} onClick={() => setView("create")}>
+          <button className="tmpl-new-btn" style={{ marginTop: 8 }} onClick={() => navigate("/dashboard/templates/new")}>
             + Create your first template
           </button>
         </div>

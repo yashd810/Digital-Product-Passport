@@ -3,6 +3,14 @@
    Replaces native <select> with themed dropdowns
    ═══════════════════════════════════════════════ */
 
+(function applyInitialThemePreference() {
+  const saved = localStorage.getItem("theme");
+  if (saved === "light") document.documentElement.setAttribute("data-theme", "light");
+  else if (!saved && window.matchMedia("(prefers-color-scheme: light)").matches) {
+    document.documentElement.setAttribute("data-theme", "light");
+  }
+})();
+
 class CustomSelect {
   static instances = new Set();
 
@@ -98,23 +106,31 @@ const state = {
   selectedType: "",
   fields: [],
   rows: [],
+  baselineRows: [],
   preview: null,
   jobs: [],
   runs: [],
   sourceContext: { sourceKind: "manual", sourceConfig: {} },
   gridFilters: { search: "", status: "", fields: [], fieldValue: "" },
+  csvMode: "current",
+  importSummary: "",
+  changedRows: new Set(),
+  changedCells: new Set(),
 };
 
-const metaKeys = new Set(["id","company_id","release_status","version_number","is_editable","created_at","updated_at","deleted_at"]);
+const ASSET_LAUNCH_TOKEN_STORAGE_KEY = "asset-management-launch-token";
+
+const metaKeys = new Set(["id","company_id","release_status","version_number","is_editable","created_at","updated_at","updated_by","deleted_at","qr_code","created_by","field_label","created_by_email","first_name","last_name"]);
+const assetMatchKeys = new Set(["guid", "match_guid", "product_id", "match_product_id", "next_product_id"]);
 
 const els = {
   companyName: document.getElementById("company-name"),
   companyNameInput: document.getElementById("company-name-input"),
-  assetKey: document.getElementById("asset-key"),
   connectCompany: document.getElementById("connect-company"),
-  loadPassports: document.getElementById("load-passports"),
   addRow: document.getElementById("add-row"),
   exportCsv: document.getElementById("export-csv"),
+  csvWorkflowSummary: document.getElementById("csv-workflow-summary"),
+  csvImportSummary: document.getElementById("csv-import-summary"),
   downloadJson: document.getElementById("download-json"),
   workspaceSummary: document.getElementById("workspace-summary"),
   csvFile: document.getElementById("csv-file"),
@@ -157,6 +173,8 @@ const csPassportType = new CustomSelect(document.getElementById("passport-type")
   state.selectedType = val;
   state.preview = null;
   renderPreview();
+  if (!state.companyId || !state.selectedType) return;
+  loadPassports().catch(e => showToast(e.message, "error"));
 });
 
 const csErpPreset = new CustomSelect(document.getElementById("erp-preset"), () => applyPresetToForm());
@@ -183,6 +201,19 @@ csGridStatus.setOptions([
   { value: "in_review", label: "In review" },
 ]);
 
+const csExportMode = new CustomSelect(document.getElementById("export-mode"), (val) => {
+  state.csvMode = val || "current";
+  renderCsvWorkflowSummary();
+});
+csExportMode.setOptions([
+  { value: "current", label: "Current rows" },
+  { value: "template", label: "Blank template" },
+  { value: "filtered", label: "Filtered rows" },
+  { value: "filtered-columns", label: "Filtered columns" },
+  { value: "editable", label: "Editable only" },
+]);
+csExportMode.select("current");
+
 /* ═══════════════════════════════════════════════
    Helpers
    ═══════════════════════════════════════════════ */
@@ -203,6 +234,9 @@ async function fetchJson(url, options = {}) {
   if (state.launchToken) headers.set("x-asset-platform-token", state.launchToken);
   const response = await fetch(url, { ...options, headers });
   const payload = await response.json().catch(() => ({}));
+  if ((response.status === 401 || response.status === 403) && typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem(ASSET_LAUNCH_TOKEN_STORAGE_KEY);
+  }
   if (!response.ok) throw new Error(payload.error || "Request failed");
   return payload;
 }
@@ -235,6 +269,31 @@ function sanitizeRows(rows) {
     Object.entries(row || {}).forEach(([key, value]) => { next[key] = serializeCellValue(value); });
     return next;
   });
+}
+
+function getRowMatchKey(row) {
+  if (!row) return "";
+  const guid = String(row.guid || row.match_guid || "").trim();
+  if (guid) return "guid:" + guid;
+  const productId = String(row.product_id || row.match_product_id || "").trim();
+  if (productId) return "product:" + productId.toLowerCase();
+  return "";
+}
+
+function compareRowValue(a, b) {
+  return String(a ?? "") === String(b ?? "");
+}
+
+function getAllowedImportKeys() {
+  const allowed = new Set(Array.from(assetMatchKeys));
+  buildFieldList().forEach(field => allowed.add(field.key));
+  return allowed;
+}
+
+function resetImportDiff() {
+  state.importSummary = "";
+  state.changedRows = new Set();
+  state.changedCells = new Set();
 }
 
 function getSerializableRows() {
@@ -338,6 +397,24 @@ function renderStats(target, stats = []) {
   });
 }
 
+function renderCsvWorkflowSummary() {
+  const labels = {
+    template: "Blank template exports the correct headers only, so users can fill in updates safely.",
+    current: "Current rows exports all staged rows with their values, ready for spreadsheet edits and reimport.",
+    filtered: "Filtered rows exports only the rows currently shown in the grid, useful after search or field filters.",
+    "filtered-columns": "Filtered columns exports only the columns currently selected in the grid field filter.",
+    editable: "Editable only exports just passports that can still be updated directly.",
+  };
+  if (els.csvWorkflowSummary) {
+    els.csvWorkflowSummary.textContent = labels[state.csvMode] || labels.current;
+  }
+}
+
+function renderCsvImportSummary() {
+  if (!els.csvImportSummary) return;
+  els.csvImportSummary.textContent = state.importSummary || "Export a template first if you want the right columns and current values prefilled.";
+}
+
 /* ═══════════════════════════════════════════════
    Grid Filtering & Rendering
    ═══════════════════════════════════════════════ */
@@ -391,6 +468,7 @@ function renderWorkspaceSummary() {
     { label: "Editable Targets", value: editableCount },
     { label: "Source", value: state.sourceContext.sourceKind || "manual" },
   ]);
+  renderCsvImportSummary();
 }
 
 function renderPreview() {
@@ -426,6 +504,7 @@ function renderPreview() {
 
 function updateCell(rowIndex, key, value) {
   state.rows[rowIndex] = { ...state.rows[rowIndex], [key]: value };
+  markDiffsAgainstBaseline();
   state.preview = null;
   renderGrid();
   renderWorkspaceSummary();
@@ -434,13 +513,59 @@ function updateCell(rowIndex, key, value) {
 
 function removeRow(rowIndex) {
   state.rows.splice(rowIndex, 1);
+  markDiffsAgainstBaseline();
   state.preview = null;
   renderGrid();
   renderWorkspaceSummary();
   renderPreview();
 }
 
+function captureGridViewport() {
+  const snapshot = {
+    scrollLeft: els.gridWrap.scrollLeft || 0,
+    scrollTop: els.gridWrap.scrollTop || 0,
+    focus: null,
+  };
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement && els.gridWrap.contains(active)) {
+    snapshot.focus = {
+      rowIndex: active.dataset.gridRowIndex || "",
+      fieldKey: active.dataset.gridFieldKey || "",
+      selectionStart: active.selectionStart,
+      selectionEnd: active.selectionEnd,
+    };
+  }
+  return snapshot;
+}
+
+function restoreGridViewport(snapshot) {
+  if (!snapshot) return;
+  const applyScroll = () => {
+    els.gridWrap.scrollLeft = snapshot.scrollLeft || 0;
+    els.gridWrap.scrollTop = snapshot.scrollTop || 0;
+  };
+  applyScroll();
+
+  if (snapshot.focus?.rowIndex && snapshot.focus?.fieldKey) {
+    const selector = '[data-grid-row-index="' + snapshot.focus.rowIndex + '"][data-grid-field-key="' + snapshot.focus.fieldKey + '"]';
+    const input = els.gridWrap.querySelector(selector);
+    if (input instanceof HTMLInputElement) {
+      input.focus({ preventScroll: true });
+      if (
+        typeof snapshot.focus.selectionStart === "number" &&
+        typeof snapshot.focus.selectionEnd === "number" &&
+        typeof input.setSelectionRange === "function"
+      ) {
+        input.setSelectionRange(snapshot.focus.selectionStart, snapshot.focus.selectionEnd);
+      }
+    }
+  }
+
+  requestAnimationFrame(applyScroll);
+}
+
 function renderGrid() {
+  const viewportSnapshot = captureGridViewport();
   renderGridFieldOptions();
   const allFields = buildFieldList();
   const fields = getVisibleFields();
@@ -449,14 +574,17 @@ function renderGrid() {
 
   if (!allFields.length && !state.rows.length) {
     els.gridWrap.innerHTML = '<div class="empty-state">Load a passport type to start editing.</div>';
+    restoreGridViewport(viewportSnapshot);
     return;
   }
   if (!fields.length) {
     els.gridWrap.innerHTML = '<div class="empty-state">No columns match the current field filter.</div>';
+    restoreGridViewport(viewportSnapshot);
     return;
   }
   if (!filteredRows.length) {
     els.gridWrap.innerHTML = '<div class="empty-state">No rows match the current filters.</div>';
+    restoreGridViewport(viewportSnapshot);
     return;
   }
 
@@ -465,9 +593,11 @@ function renderGrid() {
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
-  headRow.innerHTML = "<th>Row</th>";
+  headRow.innerHTML = '<th class="sticky-col sticky-col-row">Row</th>';
   fields.forEach(field => {
     const th = document.createElement("th");
+    if (field.key === "guid") th.className = "sticky-col sticky-col-guid";
+    if (field.key === "product_id") th.className = "sticky-col sticky-col-product";
     th.textContent = field.label || field.key;
     headRow.appendChild(th);
   });
@@ -478,8 +608,10 @@ function renderGrid() {
   const tbody = document.createElement("tbody");
   filteredRows.forEach(({ row, index: rowIndex }) => {
     const tr = document.createElement("tr");
+    const rowKey = getRowMatchKey(row);
+    tr.classList.toggle("changed-row", !!rowKey && state.changedRows.has(rowKey));
     const metaCell = document.createElement("td");
-    metaCell.className = "row-meta";
+    metaCell.className = "row-meta sticky-col sticky-col-row";
     const editable = row.is_editable === true || row.is_editable === "true";
     const statusLabel = row.release_status || (editable ? "editable" : "new");
     metaCell.innerHTML = '<span class="row-chip' + (editable ? "" : " locked") + '">#' + (rowIndex + 1) + ' &middot; ' + statusLabel + '</span>';
@@ -487,6 +619,10 @@ function renderGrid() {
 
     fields.forEach(field => {
       const td = document.createElement("td");
+      if (field.key === "guid") td.classList.add("sticky-col", "sticky-col-guid");
+      if (field.key === "product_id") td.classList.add("sticky-col", "sticky-col-product");
+      const cellKey = rowKey ? rowKey + "::" + field.key : "";
+      td.classList.toggle("changed-cell", !!cellKey && state.changedCells.has(cellKey));
       const currentValue = row[field.key] ?? "";
 
       if (field.type === "boolean") {
@@ -500,17 +636,13 @@ function renderGrid() {
         ]);
         if (String(currentValue)) cs.select(String(currentValue));
         td.appendChild(wrap);
-      } else if (field.type === "textarea" || field.type === "table") {
-        const textarea = document.createElement("textarea");
-        textarea.value = currentValue;
-        textarea.rows = field.type === "table" ? 4 : 3;
-        textarea.placeholder = field.type === "table" ? '[["col1","col2"]]' : "";
-        textarea.addEventListener("input", e => updateCell(rowIndex, field.key, e.target.value));
-        td.appendChild(textarea);
       } else {
         const input = document.createElement("input");
         input.type = field.type === "date" ? "date" : "text";
         input.value = currentValue;
+        input.dataset.gridRowIndex = String(rowIndex);
+        input.dataset.gridFieldKey = field.key;
+        if (field.type === "table") input.placeholder = '[["col1","col2"]]';
         input.addEventListener("input", e => updateCell(rowIndex, field.key, e.target.value));
         td.appendChild(input);
       }
@@ -532,6 +664,7 @@ function renderGrid() {
   table.appendChild(tbody);
   els.gridWrap.innerHTML = "";
   els.gridWrap.appendChild(table);
+  restoreGridViewport(viewportSnapshot);
 }
 
 /* ═══════════════════════════════════════════════
@@ -542,6 +675,7 @@ function createBlankRow() {
   const row = { guid: "", product_id: "", model_name: "" };
   buildFieldList().forEach(f => { if (!(f.key in row)) row[f.key] = ""; });
   state.rows.push(row);
+  markDiffsAgainstBaseline();
   state.preview = null;
   renderGrid(); renderWorkspaceSummary(); renderPreview();
 }
@@ -560,21 +694,138 @@ function parseCsv(text) {
   if (current.some(cell => String(cell).trim())) rows.push(current);
   if (!rows.length) return [];
   const headers = rows[0].map(cell => String(cell || "").trim());
-  return rows.slice(1).map(row => headers.reduce((acc, h, i) => { if (h) acc[h] = row[i] ?? ""; return acc; }, {}));
+  return rows.slice(1)
+    .filter(row => row.some(cell => String(cell || "").trim()))
+    .map(row => headers.reduce((acc, h, i) => { if (h) acc[h] = row[i] ?? ""; return acc; }, {}));
+}
+
+function getCsvExportFields(mode = state.csvMode) {
+  const allFields = buildFieldList();
+  let sourceFields = mode === "filtered-columns" ? getVisibleFields() : allFields;
+  if (mode === "filtered-columns") {
+    const requiredKeys = new Set(["guid", "product_id"]);
+    const requiredFields = allFields.filter(field => requiredKeys.has(field.key));
+    const filteredSet = new Set(sourceFields.map(field => field.key));
+    requiredFields.forEach(field => {
+      if (!filteredSet.has(field.key)) sourceFields = [field, ...sourceFields];
+    });
+  }
+  const fieldMap = new Map(sourceFields.map(field => [field.key, field]));
+  const preferred = ["guid", "product_id", "model_name"];
+  const ordered = preferred.filter(key => fieldMap.has(key)).map(key => fieldMap.get(key));
+  sourceFields.forEach(field => {
+    if (!preferred.includes(field.key)) ordered.push(field);
+  });
+  return ordered;
+}
+
+function getRowsForCsvMode() {
+  const mode = state.csvMode || "current";
+  if (mode === "template") return [];
+  if (mode === "filtered") return getFilteredRowEntries().map(entry => entry.row);
+  if (mode === "editable") {
+    return state.rows.filter(row => row.is_editable === true || row.is_editable === "true");
+  }
+  return state.rows;
 }
 
 function exportCsv() {
-  const fields = buildFieldList();
-  if (!fields.length || !state.rows.length) { showToast("Nothing to export.", "error"); return; }
+  const fields = getCsvExportFields();
+  if (!fields.length) { showToast("Load a passport type first.", "error"); return; }
+  const rows = getRowsForCsvMode();
+  if (state.csvMode !== "template" && !rows.length) { showToast("Nothing to export for this CSV mode.", "error"); return; }
   const headers = fields.map(f => f.key);
   const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
-  const lines = [headers.map(esc).join(","), ...state.rows.map(r => headers.map(k => esc(r[k] ?? "")).join(","))];
+  const lines = [headers.map(esc).join(",")];
+  if (state.csvMode === "template") {
+    lines.push(headers.map(key => {
+      if (key === "guid") return esc("required match key");
+      if (key === "product_id") return esc("optional match key or updated serial");
+      const field = fields.find(item => item.key === key);
+      return esc((field?.label || key) + (field?.type ? " (" + field.type + ")" : ""));
+    }).join(","));
+  } else {
+    rows.forEach(row => {
+      lines.push(headers.map(key => esc(row[key] ?? "")).join(","));
+    });
+  }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = (state.selectedType || "asset-management") + ".csv";
+  link.download = (state.selectedType || "asset-management") + "-" + state.csvMode + ".csv";
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+function markDiffsAgainstBaseline() {
+  const baselineMap = new Map((state.baselineRows || []).map(row => [getRowMatchKey(row), row]));
+  const changedRows = new Set();
+  const changedCells = new Set();
+  const fields = getCsvExportFields();
+  state.rows.forEach(row => {
+    const rowKey = getRowMatchKey(row);
+    if (!rowKey) return;
+    const baseline = baselineMap.get(rowKey);
+    if (!baseline) {
+      changedRows.add(rowKey);
+      fields.forEach(field => changedCells.add(rowKey + "::" + field.key));
+      return;
+    }
+    let rowChanged = false;
+    fields.forEach(field => {
+      if (!compareRowValue(row[field.key], baseline[field.key])) {
+        changedCells.add(rowKey + "::" + field.key);
+        rowChanged = true;
+      }
+    });
+    if (rowChanged) changedRows.add(rowKey);
+  });
+  state.changedRows = changedRows;
+  state.changedCells = changedCells;
+}
+
+function getImportDifferenceSummary(nextRows) {
+  const baselineMap = new Map((state.baselineRows || []).map(row => [getRowMatchKey(row), row]));
+  let changedRows = 0;
+  let changedCells = 0;
+  let newRows = 0;
+  const fields = getCsvExportFields();
+  nextRows.forEach(row => {
+    const rowKey = getRowMatchKey(row);
+    const baseline = rowKey ? baselineMap.get(rowKey) : null;
+    let rowChanged = false;
+    if (!baseline) {
+      newRows += 1;
+      changedRows += 1;
+      changedCells += fields.length;
+      return;
+    }
+    fields.forEach(field => {
+      if (!compareRowValue(row[field.key], baseline[field.key])) {
+        changedCells += 1;
+        rowChanged = true;
+      }
+    });
+    if (rowChanged) changedRows += 1;
+  });
+  return { changedRows, changedCells, newRows };
+}
+
+function validateImportedRows(rows) {
+  const allowed = getAllowedImportKeys();
+  const unknownColumns = [];
+  const headers = new Set();
+  rows.forEach(row => {
+    Object.keys(row || {}).forEach(key => {
+      if (!headers.has(key)) {
+        headers.add(key);
+        if (!allowed.has(key)) unknownColumns.push(key);
+      }
+    });
+  });
+  if (unknownColumns.length) {
+    throw new Error("Unknown CSV columns: " + unknownColumns.join(", "));
+  }
 }
 
 function downloadGeneratedJson() {
@@ -588,7 +839,6 @@ function downloadGeneratedJson() {
 }
 
 async function connectCompany() {
-  state.assetKey = String(els.assetKey.value || "").trim();
   if (!state.launchToken) { showToast("Open Asset Management from a company dashboard.", "error"); return; }
   const bootstrap = await fetchJson("/api/asset-management/bootstrap");
   state.companyId = String(bootstrap.company.id || "");
@@ -612,7 +862,9 @@ async function loadPassports() {
   const payload = await fetchJson("/api/asset-management/passports?passportType=" + encodeURIComponent(state.selectedType));
   state.fields = payload.fields || [];
   state.rows = sanitizeRows(payload.passports || []);
+  state.baselineRows = sanitizeRows(payload.passports || []);
   state.sourceContext = { sourceKind: "manual", sourceConfig: {} };
+  resetImportDiff();
   state.preview = null;
   if (!els.jobName.value) els.jobName.value = (payload.display_name || payload.passport_type) + " asset sync";
   renderGrid(); renderWorkspaceSummary(); renderPreview();
@@ -714,8 +966,15 @@ async function applyJsonPaste() {
   const parsed = parseJsonText(els.jsonPaste.value, null);
   const rows = Array.isArray(parsed) ? parsed : parsed?.records;
   if (!Array.isArray(rows)) { showToast("JSON must be an array or { records: [...] }.", "error"); return; }
-  state.rows = sanitizeRows(rows);
+  const nextRows = sanitizeRows(rows);
+  validateImportedRows(nextRows);
+  state.rows = nextRows;
   state.sourceContext = { sourceKind: "manual", sourceConfig: {} };
+  const diff = getImportDifferenceSummary(nextRows);
+  state.importSummary = diff.changedRows
+    ? "JSON import updated " + diff.changedRows + " rows and " + diff.changedCells + " cells" + (diff.newRows ? " (" + diff.newRows + " new)." : ".")
+    : "JSON import matched the current loaded values with no detected changes.";
+  markDiffsAgainstBaseline();
   state.preview = null;
   renderGrid(); renderWorkspaceSummary(); renderPreview();
   showToast("Applied " + rows.length + " rows.", "success");
@@ -735,8 +994,12 @@ async function fetchApiRows() {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sourceConfig }),
   });
-  state.rows = sanitizeRows(payload.records || []);
+  const nextRows = sanitizeRows(payload.records || []);
+  validateImportedRows(nextRows);
+  state.rows = nextRows;
   state.sourceContext = { sourceKind: "api", sourceConfig };
+  state.importSummary = "ERP/API import loaded " + payload.count + " rows into the grid.";
+  markDiffsAgainstBaseline();
   state.preview = null;
   renderGrid(); renderWorkspaceSummary(); renderPreview();
   showToast("Fetched " + payload.count + " ERP/API rows.", "success");
@@ -748,11 +1011,28 @@ async function fetchApiRows() {
 
 function initializeFromQuery() {
   const params = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(String(window.location.hash || "").replace(/^#/, ""));
+  const storedLaunchToken = typeof sessionStorage !== "undefined"
+    ? sessionStorage.getItem(ASSET_LAUNCH_TOKEN_STORAGE_KEY)
+    : "";
   if (params.get("companyId")) state.companyId = params.get("companyId");
-  if (params.get("assetKey")) { state.assetKey = params.get("assetKey"); els.assetKey.value = params.get("assetKey"); }
   if (params.get("companyName")) { state.companyName = params.get("companyName"); els.companyName.textContent = params.get("companyName"); els.companyNameInput.value = params.get("companyName"); }
-  if (params.get("launchToken")) state.launchToken = params.get("launchToken");
   if (params.get("passportType")) state.selectedType = params.get("passportType");
+  const assetKey = hashParams.get("assetKey") || params.get("assetKey") || "";
+  if (assetKey) state.assetKey = assetKey;
+  state.launchToken = hashParams.get("launchToken") || params.get("launchToken") || storedLaunchToken || "";
+  if (state.launchToken && typeof sessionStorage !== "undefined") {
+    sessionStorage.setItem(ASSET_LAUNCH_TOKEN_STORAGE_KEY, state.launchToken);
+  }
+  if (hashParams.has("launchToken") || hashParams.has("assetKey") || params.has("launchToken") || params.has("assetKey")) {
+    hashParams.delete("launchToken");
+    hashParams.delete("assetKey");
+    params.delete("launchToken");
+    params.delete("assetKey");
+    const nextSearch = params.toString();
+    const nextHash = hashParams.toString();
+    history.replaceState({}, document.title, window.location.pathname + (nextSearch ? "?" + nextSearch : "") + (nextHash ? "#" + nextHash : ""));
+  }
 }
 
 function initThemeToggle() {
@@ -777,9 +1057,7 @@ function initThemeToggle() {
 function bindEvents() {
   const wrap = fn => (...args) => fn(...args).catch(e => showToast(e.message, "error"));
   els.connectCompany.addEventListener("click", wrap(connectCompany));
-  els.assetKey.addEventListener("input", e => { state.assetKey = String(e.target.value || "").trim(); });
   els.applyPreset.addEventListener("click", applyPresetToForm);
-  els.loadPassports.addEventListener("click", wrap(loadPassports));
   els.addRow.addEventListener("click", createBlankRow);
   els.exportCsv.addEventListener("click", exportCsv);
   els.downloadJson.addEventListener("click", downloadGeneratedJson);
@@ -812,12 +1090,19 @@ function bindEvents() {
   els.csvFile.addEventListener("change", async e => {
     const [file] = e.target.files || [];
     if (!file) return;
-    const rows = parseCsv(await file.text());
-    state.rows = sanitizeRows(rows);
+    const rows = sanitizeRows(parseCsv(await file.text()));
+    validateImportedRows(rows);
+    state.rows = rows;
     state.sourceContext = { sourceKind: "manual", sourceConfig: {} };
+    const diff = getImportDifferenceSummary(rows);
+    state.importSummary = diff.changedRows
+      ? "CSV import updated " + diff.changedRows + " rows and " + diff.changedCells + " cells" + (diff.newRows ? " (" + diff.newRows + " new)." : ".")
+      : "CSV import matched the current loaded values with no detected changes.";
+    markDiffsAgainstBaseline();
     state.preview = null;
     renderGrid(); renderWorkspaceSummary(); renderPreview();
     showToast("Imported " + rows.length + " CSV rows.", "success");
+    e.target.value = "";
   });
   els.jobsList.addEventListener("click", e => {
     const runId = e.target.getAttribute("data-run-job");
@@ -833,6 +1118,8 @@ async function init() {
   bindEvents();
   renderWorkspaceSummary();
   renderPreview();
+  renderCsvWorkflowSummary();
+  renderCsvImportSummary();
   renderJobs();
   renderRuns();
   if (state.launchToken) await connectCompany();

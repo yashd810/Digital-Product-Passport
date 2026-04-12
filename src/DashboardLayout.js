@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import NotificationsPanel from "./NotificationsPanel";
 import { applyTheme, getStoredTheme } from "./ThemeContext";
 import { useI18n } from "./i18n";
@@ -8,12 +8,21 @@ import "./Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+function formatPassportTypeLabel(passportType) {
+  if (!passportType) return "Passport Type";
+  return String(passportType)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function DashboardLayout({ user, companyId, onLogout }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, lang, setLang } = useI18n();
   const [passportTypes, setPassportTypes] = useState([]);
   const [currentTheme,  setCurrentTheme]  = useState(() => getStoredTheme(user?.id));
   const [msgUnread, setMsgUnread] = useState(0);
+  const [openingAssetManagement, setOpeningAssetManagement] = useState(false);
 
   useEffect(() => {
     // Apply stored theme on mount
@@ -63,10 +72,30 @@ function DashboardLayout({ user, companyId, onLogout }) {
     { code: "de", label: "DE" },
   ];
   const roleLabel = (user?.role || "editor").replace(/_/g, " ");
+  const handleOpenAssetManagement = async () => {
+    if (!companyId || openingAssetManagement) return;
+    try {
+      setOpeningAssetManagement(true);
+      const response = await fetch(`${API}/api/companies/${companyId}/asset-management/launch`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to open Asset Management");
+      const assetUrl = data.assetUrl?.startsWith("http")
+        ? data.assetUrl
+        : `${API}${data.assetUrl}`;
+      window.open(assetUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      window.alert(error.message || "Failed to open Asset Management");
+    } finally {
+      setOpeningAssetManagement(false);
+    }
+  };
 
   // Group passport types by product category if available
   const groupedTypes = passportTypes.reduce((acc, pt) => {
-    const productCategory = pt.umbrella_category || pt.display_name || pt.type_name;
+    const productCategory = pt.umbrella_category || pt.display_name || formatPassportTypeLabel(pt.type_name);
     if (!acc[productCategory]) acc[productCategory] = [];
     acc[productCategory].push(pt);
     return acc;
@@ -136,21 +165,53 @@ function DashboardLayout({ user, companyId, onLogout }) {
                   + Create Passport
                 </NavLink>
               )}
+              {isEditor && user?.asset_management_enabled && (
+                <button
+                  type="button"
+                  className="sidebar-link sidebar-asset-btn"
+                  onClick={handleOpenAssetManagement}
+                  disabled={openingAssetManagement}
+                >
+                  {openingAssetManagement ? "Opening Asset Platform..." : "↗ Asset Management"}
+                </button>
+              )}
 
-              <p className="sidebar-section-label">Analytics</p>
+              <p className="sidebar-section-label sidebar-section-label-spaced">Start Here</p>
               <NavLink to="/dashboard/overview" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
               </NavLink>
               <NavLink to="/dashboard/my-passports" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 ✓ {t("myPassports")}
               </NavLink>
-              <NavLink to="/dashboard/workflow" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+
+              <p className="sidebar-section-label sidebar-section-label-spaced">Approvals & Updates</p>
+              <NavLink to="/dashboard/workflow/inprogress" end={false}
+                className={() => `sidebar-link${location.pathname.startsWith("/dashboard/workflow") ? " active" : ""}`}>
                 ⚙️ {t("workflow")}
+              </NavLink>
+              <NavLink to="/dashboard/notifications" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                🔔 Notifications
+              </NavLink>
+              <NavLink to="/dashboard/messages" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  💬 Messages
+                  {msgUnread > 0 && (
+                    <span style={{
+                      background: "var(--mint)", color: "#0b1826", fontSize: 10,
+                      fontWeight: 700, borderRadius: 10, padding: "1px 6px", minWidth: 16, textAlign: "center"
+                    }}>{msgUnread}</span>
+                  )}
+                </span>
+              </NavLink>
+
+              <NavLink to="/dashboard/archived" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                📦 Archived
               </NavLink>
 
               {/* Passport Types — grouped by product category */}
               {passportTypes.length > 0 && (
                 <>
+                  <p className="sidebar-section-label sidebar-section-label-spaced">Passport Library</p>
                   {Object.entries(groupedTypes).map(([productCategory, types]) => (
                     <React.Fragment key={productCategory}>
                       <NavLink
@@ -166,7 +227,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                           to={`/dashboard/passports/${pt.type_name}`}
                           className={({isActive})=>`sidebar-link${isActive?" active":""}`}
                         >
-                          {pt.display_name || pt.type_name.charAt(0).toUpperCase() + pt.type_name.slice(1)}
+                          {pt.display_name || formatPassportTypeLabel(pt.type_name)}
                         </NavLink>
                       ))}
                     </React.Fragment>
@@ -174,13 +235,17 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 </>
               )}
 
-              <p className="sidebar-section-label sidebar-section-label-spaced">Account</p>
-              <NavLink to="/dashboard/profile" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                {t("myProfile")}
+              <p className="sidebar-section-label sidebar-section-label-spaced">Reusable Content</p>
+              <NavLink to="/dashboard/repository/files" end={false}
+                className={() => `sidebar-link${location.pathname.startsWith("/dashboard/repository") ? " active" : ""}`}>
+                🗂️ Repository
               </NavLink>
-              <NavLink to="/dashboard/security" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🔐 Security
+              <NavLink to="/dashboard/templates" end={false}
+                className={() => `sidebar-link${location.pathname.startsWith("/dashboard/templates") ? " active" : ""}`}>
+                📋 Templates
               </NavLink>
+
+              <p className="sidebar-section-label sidebar-section-label-spaced">Workspace Settings</p>
               <NavLink to="/dashboard/company-profile" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 🏢 Company Profile
               </NavLink>
@@ -189,35 +254,17 @@ function DashboardLayout({ user, companyId, onLogout }) {
                   👥 {t("manageTeam")}
                 </NavLink>
               )}
-
-              <NavLink to="/dashboard/repository" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🗂️ Repository
+              <NavLink to="/dashboard/security" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                🔐 Security
               </NavLink>
-              <NavLink to="/dashboard/templates" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                📋 Templates
-              </NavLink>
-
-              <NavLink to="/dashboard/messages" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  💬 Messages
-                  {msgUnread > 0 && (
-                    <span style={{
-                      background: "var(--mint)", color: "#0b1826", fontSize: 10,
-                      fontWeight: 700, borderRadius: 10, padding: "1px 6px", minWidth: 16, textAlign: "center"
-                    }}>{msgUnread}</span>
-                  )}
-                </span>
+              <NavLink to="/dashboard/profile" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                {t("myProfile")}
               </NavLink>
 
-              <p className="sidebar-section-label sidebar-section-label-spaced">Audit</p>
-              <NavLink to="/dashboard/notifications" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🔔 Notifications
-              </NavLink>
+              <p className="sidebar-section-label sidebar-section-label-spaced">Logs & Support</p>
               <NavLink to="/dashboard/audit-logs" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📋 {t("auditLogs")}
               </NavLink>
-
-              <p className="sidebar-section-label sidebar-section-label-spaced">Help</p>
               <NavLink to="/dashboard/manual" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📘 Manual
               </NavLink>

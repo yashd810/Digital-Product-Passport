@@ -12,6 +12,7 @@ export const isEditablePassportStatus = (status) => {
 export const formatPassportStatus = (status) => {
   const normalized = normalizePassportStatus(status);
   if (normalized === "in_revision") return "In Revision";
+  if (normalized === "obsolete") return "Obsolete";
   return normalized
     .split("_")
     .filter(Boolean)

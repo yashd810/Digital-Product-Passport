@@ -14,6 +14,7 @@ function AdminCompanies() {
   const [createdCompany, setCreatedCompany] = useState(null);
   const [isLoading,      setIsLoading]      = useState(false);
   const [isDeletingId,   setIsDeletingId]   = useState(null);
+  const [isTogglingAssetId, setIsTogglingAssetId] = useState(null);
   const [error,          setError]          = useState("");
   const [successMsg,     setSuccessMsg]     = useState("");
   const [deleteTarget,   setDeleteTarget]   = useState(null);
@@ -27,6 +28,7 @@ function AdminCompanies() {
     { key: "id", type: "number", getValue: (company) => company.id },
     { key: "company_name", type: "string", getValue: (company) => company.company_name || "" },
     { key: "granted_type_names", type: "string", getValue: (company) => (company.granted_type_names || []).join(" ") },
+    { key: "asset_management_enabled", type: "string", getValue: (company) => company.asset_management_enabled ? "enabled" : "disabled" },
     { key: "created_at", type: "date", getValue: (company) => company.created_at },
   ]), []);
 
@@ -119,6 +121,32 @@ function AdminCompanies() {
     }
   };
 
+  const handleToggleAssetManagement = async (company) => {
+    try {
+      setError("");
+      setSuccessMsg("");
+      setIsTogglingAssetId(company.id);
+      const nextEnabled = !company.asset_management_enabled;
+      const r = await fetch(`${API}/api/admin/companies/${company.id}/asset-management`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Failed to update Asset Management access");
+      setSuccessMsg(
+        nextEnabled
+          ? `Asset Management enabled for ${company.company_name}`
+          : `Asset Management revoked for ${company.company_name}`
+      );
+      await fetchCompanies();
+    } catch (e) {
+      setError(e.message || "Failed to update Asset Management access");
+    } finally {
+      setIsTogglingAssetId(null);
+    }
+  };
+
   return (
     <div className="companies-section">
       <h2>Company Management</h2>
@@ -187,6 +215,7 @@ function AdminCompanies() {
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("id")}>ID{sortIndicator(sortConfig, "id") && ` ${sortIndicator(sortConfig, "id")}`}</button></th>
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("company_name")}>Company Name{sortIndicator(sortConfig, "company_name") && ` ${sortIndicator(sortConfig, "company_name")}`}</button></th>
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("granted_type_names")}>Access{sortIndicator(sortConfig, "granted_type_names") && ` ${sortIndicator(sortConfig, "granted_type_names")}`}</button></th>
+              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("asset_management_enabled")}>Asset Platform{sortIndicator(sortConfig, "asset_management_enabled") && ` ${sortIndicator(sortConfig, "asset_management_enabled")}`}</button></th>
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("created_at")}>Created{sortIndicator(sortConfig, "created_at") && ` ${sortIndicator(sortConfig, "created_at")}`}</button></th>
               <th>Actions</th>
             </tr>
@@ -194,6 +223,7 @@ function AdminCompanies() {
               <th><input className="table-filter-input" value={columnFilters.id || ""} onChange={e => setColumnFilters(prev => ({ ...prev, id: e.target.value }))} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.company_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, company_name: e.target.value }))} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.granted_type_names || ""} onChange={e => setColumnFilters(prev => ({ ...prev, granted_type_names: e.target.value }))} placeholder="Filter" /></th>
+              <th><input className="table-filter-input" value={columnFilters.asset_management_enabled || ""} onChange={e => setColumnFilters(prev => ({ ...prev, asset_management_enabled: e.target.value }))} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.created_at || ""} onChange={e => setColumnFilters(prev => ({ ...prev, created_at: e.target.value }))} placeholder="Filter" /></th>
               <th></th>
             </tr>}
@@ -214,8 +244,24 @@ function AdminCompanies() {
                     )}
                   </div>
                 </td>
+                <td>
+                  <span className={`company-access-pill ${company.asset_management_enabled ? "asset-pill-enabled" : "asset-pill-disabled"}`}>
+                    {company.asset_management_enabled ? "Enabled" : "Disabled"}
+                  </span>
+                </td>
                 <td className="date-cell">{new Date(company.created_at).toLocaleDateString()}</td>
                 <td className="actions-cell">
+                  <button
+                    className="manage-btn manage-btn-analytics"
+                    onClick={() => handleToggleAssetManagement(company)}
+                    disabled={isTogglingAssetId === company.id}
+                  >
+                    {isTogglingAssetId === company.id
+                      ? "Updating..."
+                      : company.asset_management_enabled
+                        ? "⛔ Revoke Asset"
+                        : "💼 Enable Asset"}
+                  </button>
                   <button
                     className="manage-btn manage-btn-access"
                     onClick={() => navigate(`/admin/company/${company.id}/access`)}

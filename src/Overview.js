@@ -258,12 +258,15 @@ function Overview({ companyId }) {
       const totalReleased = sumField("released_count");
       const totalInRevision = sumField("revised_count");
       const totalInReview = sumField("in_review_count");
+      const totalObsolete = sumField("obsolete_count");
       const summaryStats = [
         { label: "Total Passports", value: analytics?.totalPassports || 0, tone: "default" },
         { label: "Draft", value: totalDraft, tone: "draft" },
         { label: "In Review", value: totalInReview, tone: "review" },
         { label: "Released", value: totalReleased, tone: "released" },
         { label: "In Revision", value: totalInRevision, tone: "revised" },
+        ...(totalObsolete > 0 ? [{ label: "Obsolete", value: totalObsolete, tone: "obsolete" }] : []),
+        ...(analytics?.archivedCount > 0 ? [{ label: "Archived", value: analytics.archivedCount, tone: "archived" }] : []),
         { label: "QR Scans", value: analytics?.scanStats || 0, tone: "scans" },
       ];
       const statusChartItems = [
@@ -343,7 +346,9 @@ function Overview({ companyId }) {
   const totalReleased = sumField("released_count");
   const totalInRevision  = sumField("revised_count");
   const totalInReview = sumField("in_review_count");
+  const totalObsolete = sumField("obsolete_count");
   const scanStats     = analytics?.scanStats||0;
+  const archivedCount = analytics?.archivedCount||0;
 
   const statusChartItems=[
     { label:"Draft",     value:totalDraft,    color:"#f59e0b" },
@@ -392,6 +397,8 @@ function Overview({ companyId }) {
           {totalInReview>0&&<div className="ov-stat stat-review"><div className="ov-stat-num">{totalInReview}</div><div className="ov-stat-label">🔍 In Review</div></div>}
           <div className="ov-stat stat-released"><div className="ov-stat-num">{totalReleased}</div><div className="ov-stat-label">✅ Released</div></div>
           <div className="ov-stat stat-revised"><div className="ov-stat-num">{totalInRevision}</div><div className="ov-stat-label">📝 In Revision</div></div>
+          {totalObsolete>0&&<div className="ov-stat stat-obsolete"><div className="ov-stat-num">{totalObsolete}</div><div className="ov-stat-label">⚪ Obsolete</div></div>}
+          {archivedCount>0&&<div className="ov-stat stat-archived"><div className="ov-stat-num">{archivedCount}</div><div className="ov-stat-label">📦 Archived</div></div>}
           {scanStats>0&&<div className="ov-stat stat-scans"><div className="ov-stat-num">{scanStats}</div><div className="ov-stat-label">📊 QR Scans</div></div>}
         </div>
       )}
@@ -465,7 +472,7 @@ function Overview({ companyId }) {
                   </span>
                   <div className="activity-body">
                     <div className="activity-row-top">
-                      <span className="activity-user">{a.user_email?.split("@")[0]||"System"}</span>
+                      <span className="activity-user">{a.user_first_name ? `${a.user_first_name} ${a.user_last_name || ""}`.trim() : (a.user_email?.split("@")[0]||"System")}</span>
                       <span className={`activity-badge ${(a.action||"").toLowerCase()}`}>{(a.action||"").replaceAll("_", " ")}</span>
                     </div>
                     <div className="activity-row-bottom">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import { useParams } from "react-router-dom";
+import { authHeaders } from "./authHeaders";
 import "./PassportViewer.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -9,9 +10,18 @@ const PAGE_MAP = {
   battery: lazy(() => import("./BatteryConsumerPage")),
 };
 const GenericConsumerPage = lazy(() => import("./GenericConsumerPage"));
+const getViewerUserId = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    const parsedUserId = Number.parseInt(user?.id, 10);
+    return Number.isInteger(parsedUserId) && parsedUserId > 0 ? parsedUserId : null;
+  } catch {
+    return null;
+  }
+};
 
-function ConsumerPage() {
-  const { guid } = useParams();
+function ConsumerPage({ previewMode = false, previewCompanyId = null }) {
+  const { productId, versionNumber, previewId } = useParams();
   const [passport,      setPassport]      = useState(null);
   const [company,       setCompany]       = useState(null);
   const [typeDef,       setTypeDef]       = useState(null);
@@ -20,20 +30,39 @@ function ConsumerPage() {
   const [error,         setError]         = useState("");
 
   useEffect(() => {
-    fetch(`${API}/api/passports/${guid}/scan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ referrer: document.referrer, userAgent: navigator.userAgent }),
-    }).catch(() => {});
+    const encodedProductId = encodeURIComponent(productId || "");
+    const encodedPreviewId = encodeURIComponent(previewId || "");
+    const endpoint = previewMode
+      ? `${API}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
+      : versionNumber
+        ? `${API}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
+        : `${API}/api/passports/by-product/${encodedProductId}`;
+    const requestInit = previewMode ? { headers: authHeaders() } : undefined;
 
-    fetch(`${API}/api/passports/${guid}`)
+    setLoading(true);
+    setError("");
+    fetch(endpoint, requestInit)
       .then(r => r.ok ? r.json() : Promise.reject("not found"))
       .then(async data => {
         setPassport(data);
+        if (data?.guid && !previewMode) {
+          const viewerUserId = getViewerUserId();
+          fetch(`${API}/api/passports/${data.guid}/scan`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: viewerUserId,
+              referrer: document.referrer,
+              userAgent: navigator.userAgent,
+            }),
+          }).catch(() => {});
+        }
         const [companyRes, typeRes, dynamicRes] = await Promise.all([
           data.company_id   ? fetch(`${API}/api/companies/${data.company_id}/profile`)     : Promise.resolve(null),
           data.passport_type ? fetch(`${API}/api/passport-types/${data.passport_type}`)    : Promise.resolve(null),
-          fetch(`${API}/api/passports/${guid}/dynamic-values`),
+          data.inactive_public_version || !data.guid
+            ? Promise.resolve(null)
+            : fetch(`${API}/api/passports/${data.guid}/dynamic-values`),
         ]);
         if (companyRes?.ok)  setCompany(await companyRes.json());
         if (typeRes?.ok)     setTypeDef(await typeRes.json());
@@ -44,7 +73,7 @@ function ConsumerPage() {
       })
       .catch(() => setError("Passport not found"))
       .finally(() => setLoading(false));
-  }, [guid]);
+  }, [previewCompanyId, previewId, previewMode, productId, versionNumber]);
 
   if (loading) return (
     <div className="cp-state-screen cp-state-screen-loading">Loading passport…</div>

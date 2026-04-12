@@ -55,6 +55,10 @@
   --radius-xs: 10px;
   --control-height: 48px;
   --panel-gap: 18px;
+  --asset-row-col-width: 152px;
+  --asset-guid-col-width: 228px;
+  --asset-product-col-width: 228px;
+  --asset-standard-col-width: 190px;
 }
 
 [data-theme="light"] {
@@ -175,12 +179,15 @@ code {
 }
 
 .hero-content {
-  max-width: 960px;
+  position: relative;
+  width: 100%;
+  max-width: none;
+  padding-right: 84px;
 }
 
 .hero-top-bar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   width: 100%;
   margin-bottom: 8px;
@@ -212,6 +219,9 @@ code {
 
 /* ── Theme Toggle ── */
 .theme-toggle-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -436,6 +446,12 @@ textarea {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
+input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  min-height: 0;
+}
+
 .cs-trigger::after {
   content: "";
   position: absolute;
@@ -620,6 +636,25 @@ input[type="file"]::file-selector-button:hover {
   margin: 0;
 }
 
+.toolbar-group {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.compact-select {
+  min-width: 180px;
+  flex: 0 1 200px;
+}
+
+.compact-select .cs-trigger {
+  min-height: 42px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
 .controls-panel > .toolbar,
 .preview-panel > .toolbar {
   margin: 18px 0 0;
@@ -631,6 +666,23 @@ input[type="file"]::file-selector-button:hover {
 
 .grid-panel .panel-head .toolbar {
   justify-content: flex-end;
+}
+
+.grid-toolbar {
+  gap: 10px 12px;
+}
+
+.preview-panel .panel-head .toolbar {
+  justify-content: flex-end;
+}
+
+.preview-toolbar {
+  margin: 0;
+}
+
+.grid-panel > .inline-note {
+  margin-top: 0;
+  margin-bottom: 16px;
 }
 
 /* ── Grid Filter Bar ── */
@@ -841,6 +893,13 @@ input[type="file"]::file-selector-button:hover {
   font-weight: 600;
 }
 
+.inline-note {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
 /* ── Buttons ── */
 .primary-btn,
 .ghost-btn,
@@ -903,20 +962,21 @@ button:disabled {
 .checkbox-field {
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  min-height: var(--control-height);
-  padding-top: 30px;
+  gap: 10px;
+  min-height: 0;
+  padding-top: 22px;
   cursor: pointer;
 }
 
 .checkbox-field input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
   margin: 0;
   padding: 0;
-  border-radius: 5px;
-  border: 2px solid var(--border);
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
   background: var(--bg-soft);
   -webkit-appearance: none;
   appearance: none;
@@ -934,10 +994,10 @@ button:disabled {
 .checkbox-field input[type="checkbox"]:checked::after {
   content: "";
   position: absolute;
-  top: 2px;
-  left: 5px;
-  width: 5px;
-  height: 9px;
+  top: 1px;
+  left: 4px;
+  width: 4px;
+  height: 8px;
   border: solid var(--onyx);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
@@ -959,7 +1019,7 @@ button:disabled {
 /* ── Ingest Grid ── */
 .ingest-grid {
   display: grid;
-  grid-template-columns: 1.05fr 1fr 1.55fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
   gap: var(--panel-gap);
 }
 
@@ -968,6 +1028,7 @@ button:disabled {
 .job-card,
 .run-card {
   height: 100%;
+  min-width: 0;
   padding: 20px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -978,6 +1039,33 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.manual-ingest-card {
+  display: flex;
+}
+
+.manual-ingest-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  width: 100%;
+}
+
+.ingest-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ingest-subsection + .ingest-subsection {
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.ingest-subsection .inline-note {
+  margin-top: 0;
 }
 
 .api-row {
@@ -1000,6 +1088,7 @@ button:disabled {
   width: 100%;
   min-width: 1080px;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .asset-table th,
@@ -1007,6 +1096,77 @@ button:disabled {
   border-bottom: 1px solid var(--border);
   padding: 12px;
   vertical-align: top;
+  width: var(--asset-standard-col-width);
+  min-width: var(--asset-standard-col-width);
+  max-width: var(--asset-standard-col-width);
+}
+
+.asset-table .sticky-col {
+  position: sticky;
+  background: var(--bg-elevated);
+}
+
+.asset-table td.sticky-col {
+  z-index: 2;
+}
+
+.asset-table th.sticky-col {
+  z-index: 4;
+  background: var(--bg-panel);
+}
+
+.asset-table .sticky-col-row {
+  left: 0;
+  min-width: var(--asset-row-col-width);
+  width: var(--asset-row-col-width);
+  max-width: var(--asset-row-col-width);
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.asset-table .sticky-col-guid {
+  left: var(--asset-row-col-width);
+  min-width: var(--asset-guid-col-width);
+  width: var(--asset-guid-col-width);
+  max-width: var(--asset-guid-col-width);
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.asset-table .sticky-col-product {
+  left: calc(var(--asset-row-col-width) + var(--asset-guid-col-width));
+  min-width: var(--asset-product-col-width);
+  width: var(--asset-product-col-width);
+  max-width: var(--asset-product-col-width);
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.asset-table tbody tr.changed-row {
+  background: rgba(13, 181, 176, 0.04);
+}
+
+.asset-table td.changed-cell {
+  background: rgba(13, 181, 176, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(13, 181, 176, 0.18);
+}
+
+.asset-table td.changed-cell.sticky-col-row,
+.asset-table td.changed-cell.sticky-col-guid,
+.asset-table td.changed-cell.sticky-col-product {
+  box-shadow: inset 0 0 0 1px rgba(13, 181, 176, 0.18), 1px 0 0 var(--border);
+}
+
+[data-theme="light"] .asset-table tbody tr.changed-row {
+  background: rgba(11, 143, 151, 0.04);
+}
+
+[data-theme="light"] .asset-table td.changed-cell {
+  background: rgba(11, 143, 151, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(11, 143, 151, 0.15);
+}
+
+[data-theme="light"] .asset-table td.changed-cell.sticky-col-row,
+[data-theme="light"] .asset-table td.changed-cell.sticky-col-guid,
+[data-theme="light"] .asset-table td.changed-cell.sticky-col-product {
+  box-shadow: inset 0 0 0 1px rgba(11, 143, 151, 0.15), 1px 0 0 var(--border);
 }
 
 .asset-table th {
@@ -1028,9 +1188,10 @@ button:disabled {
 .asset-table td input,
 .asset-table td textarea,
 .asset-table td select {
+  width: 100%;
   padding: 9px 10px;
   border-radius: var(--radius-xs);
-  min-width: 160px;
+  min-width: 0;
   background: var(--bg-card);
   border-color: var(--border);
   color: var(--text-primary);
@@ -1151,16 +1312,40 @@ button:disabled {
   margin-top: 16px;
 }
 
+.preview-columns > *,
+.preview-grid > * {
+  min-width: 0;
+}
+
+.preview-box-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.preview-box-head h3 {
+  margin: 0;
+}
+
 #preview-json {
+  width: 100%;
+  max-width: 100%;
   min-height: 280px;
   max-height: 520px;
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   margin: 0;
   padding: 16px;
   border-radius: var(--radius-sm);
   background: #0a1520;
   color: var(--accent-strong);
   border: 1px solid var(--border);
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 [data-theme="light"] #preview-json {
@@ -1276,6 +1461,15 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.job-result,
+.run-result,
+.job-type,
+.run-date {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 /* ── Empty State ── */
 .empty-state {
   padding: 32px;
@@ -1344,6 +1538,7 @@ button:disabled {
   .runs-panel {
     grid-column: span 12;
   }
+
 }
 
 @media (max-width: 720px) {
@@ -1361,15 +1556,38 @@ button:disabled {
     flex-direction: column;
   }
 
+  .toolbar-group {
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+  }
+
   .hero-top-bar {
-    flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
   }
 
   .toolbar > button,
   .job-actions > button,
   .inline-field > button {
     width: 100%;
+  }
+
+  .toolbar-group > button {
+    width: auto;
+  }
+
+  .preview-box-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero-content {
+    padding-right: 0;
+  }
+
+  .theme-toggle-btn {
+    position: static;
+    align-self: flex-end;
+    margin-bottom: 12px;
   }
 }

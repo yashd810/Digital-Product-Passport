@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { NavLink } from "react-router-dom";
 import "./CompanyRepository.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -138,13 +139,23 @@ function SymbolsTab({ token, companyId }) {
                 <img src={sym.file_url} alt={sym.name} className="sym-tile-img" loading="lazy" />
               </div>
               <div className="sym-tile-name" title={sym.name}>{sym.name}</div>
-              <button
-                className="sym-tile-delete"
-                onClick={() => handleDelete(sym)}
-                disabled={deletingId === sym.id}
-                title="Remove">
-                {deletingId === sym.id ? "…" : "✕"}
-              </button>
+              <div className="sym-tile-actions">
+                <button
+                  className="sym-tile-copy"
+                  onClick={() => {
+                    navigator.clipboard.writeText(sym.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
+                  }}
+                  title="Copy link">
+                  🔗
+                </button>
+                <button
+                  className="sym-tile-delete"
+                  onClick={() => handleDelete(sym)}
+                  disabled={deletingId === sym.id}
+                  title="Remove">
+                  {deletingId === sym.id ? "…" : "✕"}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -372,6 +383,11 @@ function FilesTab({ token, companyId }) {
                       <a href={item.file_url} download={item.name}
                         className="repo-action-btn download" title="Download">⬇</a>
                     )}
+                    {item.type === "file" && item.file_url && (
+                      <button className="repo-action-btn copy" onClick={() => {
+                        navigator.clipboard.writeText(item.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
+                      }} title="Copy link">🔗</button>
+                    )}
                     <button className="repo-action-btn rename" onClick={() => startRename(item)} title="Rename">✏️</button>
                     <button className="repo-action-btn delete" onClick={() => handleDelete(item)} title="Delete">🗑️</button>
                   </>
@@ -386,9 +402,7 @@ function FilesTab({ token, companyId }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-function CompanyRepository({ token, companyId }) {
-  const [activeTab, setActiveTab] = useState("files");
-
+function CompanyRepository({ token, companyId, activeTab = "files" }) {
   return (
     <div className="repo-page">
       <div className="repo-header">
@@ -401,16 +415,14 @@ function CompanyRepository({ token, companyId }) {
       </div>
 
       <div className="repo-tabs">
-        <button
-          className={`repo-tab${activeTab === "files" ? " active" : ""}`}
-          onClick={() => setActiveTab("files")}>
+        <NavLink to="/dashboard/repository/files"
+          className={({ isActive }) => `repo-tab${isActive ? " active" : ""}`}>
           📄 Files
-        </button>
-        <button
-          className={`repo-tab${activeTab === "symbols" ? " active" : ""}`}
-          onClick={() => setActiveTab("symbols")}>
+        </NavLink>
+        <NavLink to="/dashboard/repository/symbols"
+          className={({ isActive }) => `repo-tab${isActive ? " active" : ""}`}>
           🔣 Symbols
-        </button>
+        </NavLink>
       </div>
 
       <div className="repo-tab-body">
@@ -421,4 +433,5 @@ function CompanyRepository({ token, companyId }) {
   );
 }
 
+export { SymbolsTab, FilesTab };
 export default CompanyRepository;

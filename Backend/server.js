@@ -11,6 +11,9 @@ const multer         = require("multer");
 const nodemailer     = require("nodemailer");
 const fs             = require("fs");
 const path           = require("path");
+const dns            = require("dns").promises;
+const net            = require("net");
+const canonicalize   = require("canonicalize"); // RFC 8785 JSON Canonicalization Scheme
 
 const emailStyles = fs.readFileSync(path.join(__dirname, "../src/email-styles.css"), "utf8");
 const ASSET_MANAGEMENT_DIR = path.join(__dirname, "asset-management");
@@ -54,7 +57,22 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads/symbols", express.static(path.join(__dirname, "uploads", "symbols")));
-app.use("/asset-management", express.static(ASSET_MANAGEMENT_DIR));
+app.use("/asset-management", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Security-Policy", [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+  ].join("; "));
+  next();
+}, express.static(ASSET_MANAGEMENT_DIR));
 
 const pool = new Pool({
   user:     process.env.DB_USER,
@@ -74,6 +92,12 @@ const COOKIE_SECURE          = process.env.COOKIE_SECURE === "true";
 const COOKIE_SAME_SITE       = process.env.COOKIE_SAME_SITE || "lax";
 const COOKIE_DOMAIN          = process.env.COOKIE_DOMAIN || "";
 const ASSET_SHARED_SECRET    = process.env.ASSET_MANAGEMENT_SHARED_SECRET || "";
+const ASSET_SOURCE_ALLOWED_HOSTS = new Set(
+  String(process.env.ASSET_SOURCE_ALLOWED_HOSTS || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 if (IS_PRODUCTION) {
   const missingSecrets = [];
@@ -184,6 +208,20 @@ const publicUnlockRateLimit = rateLimit({
   message: "Too many unlock attempts. Please wait before trying again.",
 });
 
+const assetWriteRateLimit = rateLimit({
+  key: (req) => `asset-write:${req.ip}:${req.assetContext?.companyId || ""}:${req.assetContext?.userId || ""}:${req.path}`,
+  limit: envInt("RATE_LIMIT_ASSET_WRITE_MAX", 90),
+  windowMs: envInt("RATE_LIMIT_ASSET_WRITE_WINDOW_MS", 60 * 1000),
+  message: "Too many Asset Management requests. Please slow down and try again shortly.",
+});
+
+const assetSourceFetchRateLimit = rateLimit({
+  key: (req) => `asset-source:${req.ip}:${req.assetContext?.companyId || ""}:${req.assetContext?.userId || ""}`,
+  limit: envInt("RATE_LIMIT_ASSET_SOURCE_FETCH_MAX", 20),
+  windowMs: envInt("RATE_LIMIT_ASSET_SOURCE_FETCH_WINDOW_MS", 5 * 60 * 1000),
+  message: "Too many ERP/API fetch requests. Please wait a few minutes and try again.",
+});
+
 const EDIT_SESSION_TIMEOUT_HOURS = 12;
 const EDIT_SESSION_TIMEOUT_SQL = `${EDIT_SESSION_TIMEOUT_HOURS} hours`;
 const IN_REVISION_STATUS = "in_revision";
@@ -192,6 +230,11 @@ const IN_REVISION_STATUSES_SQL = `('${IN_REVISION_STATUS}','${LEGACY_IN_REVISION
 const EDITABLE_RELEASE_STATUSES_SQL = `('draft','${IN_REVISION_STATUS}','${LEGACY_IN_REVISION_STATUS}')`;
 const REVISION_BLOCKING_STATUSES_SQL = `('draft','${IN_REVISION_STATUS}','${LEGACY_IN_REVISION_STATUS}','in_review')`;
 const ASSET_MATCH_FIELDS = new Set(["guid", "match_guid", "product_id", "match_product_id", "next_product_id"]);
+const ASSET_IGNORED_SYSTEM_COLUMNS = new Set([
+  "id", "company_id", "qr_code", "created_by", "created_at", "updated_at", "updated_by",
+  "deleted_at", "release_status", "version_number", "is_editable", "field_label",
+  "created_by_email", "first_name", "last_name",
+]);
 const ASSET_SCHEDULER_INTERVAL_MS = 60 * 1000;
 const ASSET_ERP_PRESETS = [
   {
@@ -253,6 +296,20 @@ const ASSET_ERP_PRESETS = [
       },
     },
   },
+  {
+    key: "siemens_teamcenter_items",
+    label: "Siemens Teamcenter Items",
+    description: "Teamcenter item feed with product ID matching and optional GUID mapping.",
+    sourceConfig: {
+      method: "GET",
+      recordPath: "items",
+      fieldMap: {
+        item_id: "product_id",
+        uid: "guid",
+        object_name: "model_name",
+      },
+    },
+  },
 ];
 
 const publicScanRateLimit = rateLimit({
@@ -309,7 +366,7 @@ const authCookieOptions = {
 
 const requireAssetManagementKey = (req, res, next) => {
   if (!ASSET_SHARED_SECRET) return next();
-  const submitted = String(req.headers["x-asset-key"] || req.query.assetKey || "");
+  const submitted = String(req.headers["x-asset-key"] || "");
   if (!submitted) return res.status(401).json({ error: "x-asset-key header required" });
 
   const expectedBuf = Buffer.from(String(ASSET_SHARED_SECRET));
@@ -352,19 +409,76 @@ async function assertAssetManagementEnabled(companyId) {
   return company;
 }
 
+async function getCurrentAssetSessionUser(userId) {
+  if (!userId) return null;
+  const result = await pool.query(
+    `SELECT id, company_id, role, is_active
+     FROM users
+     WHERE id = $1`,
+    [userId]
+  );
+  return result.rows[0] || null;
+}
+
+async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
+  const normalizedType = String(passportType || "").trim();
+  if (!normalizedType) {
+    const error = new Error("passport_type is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const result = await pool.query(
+    `SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.fields_json, pt.is_active
+     FROM passport_types pt
+     JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
+     WHERE cpa.company_id = $1
+       AND cpa.access_revoked = false
+       AND pt.is_active = true
+       AND pt.type_name = $2
+     LIMIT 1`,
+    [companyId, normalizedType]
+  );
+
+  if (!result.rows.length) {
+    const error = new Error("Passport type is not enabled for this company");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const sections = result.rows[0]?.fields_json?.sections || [];
+  const schemaFields = sections.flatMap((section) => section.fields || []);
+  return {
+    typeName: result.rows[0].type_name,
+    displayName: result.rows[0].display_name,
+    schemaFields,
+    allowedKeys: new Set(schemaFields.map((field) => field.key).filter(Boolean)),
+  };
+}
+
 const authenticateAssetPlatform = async (req, res, next) => {
   try {
-    const token = String(req.headers["x-asset-platform-token"] || req.query.launchToken || "");
+    const token = String(req.headers["x-asset-platform-token"] || "");
     if (!token) return res.status(401).json({ error: "x-asset-platform-token header required" });
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded?.scope !== "asset_management" || !decoded.companyId) {
+    if (decoded?.scope !== "asset_management" || !decoded.companyId || !decoded.userId) {
       return res.status(403).json({ error: "Invalid asset platform token" });
     }
     await assertAssetManagementEnabled(decoded.companyId);
+    const currentUser = await getCurrentAssetSessionUser(decoded.userId);
+    if (!currentUser || !currentUser.is_active) {
+      return res.status(403).json({ error: "Asset platform user is no longer active" });
+    }
+    if (currentUser.role !== "super_admin" && String(currentUser.company_id) !== String(decoded.companyId)) {
+      return res.status(403).json({ error: "Asset platform session no longer matches this company" });
+    }
+    if (currentUser.role === "viewer") {
+      return res.status(403).json({ error: "Viewers do not have permission to access Asset Management." });
+    }
     req.assetContext = {
       companyId: String(decoded.companyId),
-      userId: decoded.userId || null,
-      role: decoded.role || null,
+      userId: currentUser.id,
+      role: currentUser.role,
     };
     next();
   } catch (error) {
@@ -377,6 +491,90 @@ const authenticateAssetPlatform = async (req, res, next) => {
     return res.status(403).json({ error: "Invalid asset platform token" });
   }
 };
+
+const requireAssetEditor = (req, res, next) => {
+  if (!req.assetContext?.userId || req.assetContext.role === "viewer") {
+    return res.status(403).json({ error: "Editor access is required for Asset Management." });
+  }
+  next();
+};
+
+const isLocalHostname = (hostname) => {
+  const normalized = String(hostname || "").trim().toLowerCase().replace(/\.$/, "");
+  return normalized === "localhost"
+    || normalized === "localhost.localdomain"
+    || normalized.endsWith(".localhost")
+    || normalized.endsWith(".local");
+};
+
+const isPrivateIpAddress = (address) => {
+  if (!address) return true;
+  const normalized = String(address).trim().toLowerCase();
+  const family = net.isIP(normalized);
+
+  if (family === 4) {
+    const octets = normalized.split(".").map((part) => Number.parseInt(part, 10));
+    const [a, b] = octets;
+    return a === 10
+      || a === 127
+      || a === 0
+      || (a === 100 && b >= 64 && b <= 127)
+      || (a === 169 && b === 254)
+      || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168)
+      || (a === 198 && (b === 18 || b === 19));
+  }
+
+  if (family === 6) {
+    return normalized === "::1"
+      || normalized.startsWith("fc")
+      || normalized.startsWith("fd")
+      || normalized.startsWith("fe8")
+      || normalized.startsWith("fe9")
+      || normalized.startsWith("fea")
+      || normalized.startsWith("feb")
+      || normalized.startsWith("::ffff:127.")
+      || normalized.startsWith("::ffff:10.")
+      || normalized.startsWith("::ffff:192.168.")
+      || /^::ffff:172\.(1[6-9]|2\d|3[0-1])\./.test(normalized);
+  }
+
+  return true;
+};
+
+async function assertSafeAssetSourceUrl(urlString) {
+  const parsedUrl = new URL(urlString);
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Only HTTP(S) ERP/API endpoints are supported");
+  }
+
+  const hostname = String(parsedUrl.hostname || "").trim().toLowerCase().replace(/\.$/, "");
+  if (!hostname) throw new Error("Source URL hostname is required");
+  if (isLocalHostname(hostname)) {
+    throw new Error("Local ERP/API hostnames are not allowed");
+  }
+
+  if (ASSET_SOURCE_ALLOWED_HOSTS.size > 0 && !ASSET_SOURCE_ALLOWED_HOSTS.has(hostname)) {
+    throw new Error("ERP/API hostname is not in the allowed list");
+  }
+
+  if (net.isIP(hostname)) {
+    if (isPrivateIpAddress(hostname)) {
+      throw new Error("Private ERP/API IP addresses are not allowed");
+    }
+    return parsedUrl;
+  }
+
+  const resolvedAddresses = await dns.lookup(hostname, { all: true });
+  if (!resolvedAddresses.length) {
+    throw new Error("Unable to resolve ERP/API hostname");
+  }
+  if (resolvedAddresses.some((entry) => isPrivateIpAddress(entry.address))) {
+    throw new Error("ERP/API hostname resolves to a private network address");
+  }
+
+  return parsedUrl;
+}
 
 const setAuthCookie = (res, token) => {
   res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE_NAME, token, authCookieOptions));
@@ -404,6 +602,11 @@ const getTable = (typeName) => {
 const normalizeReleaseStatus = (status) =>
   status === LEGACY_IN_REVISION_STATUS ? IN_REVISION_STATUS : status;
 
+const isPublicHistoryStatus = (status) => {
+  const normalized = normalizeReleaseStatus(status);
+  return normalized === "released" || normalized === "obsolete";
+};
+
 const normalizePassportRow = (row) =>
   row ? { ...row, release_status: normalizeReleaseStatus(row.release_status) } : row;
 
@@ -415,6 +618,7 @@ const toStoredPassportValue = (value) =>
 const SYSTEM_PASSPORT_FIELDS = new Set([
   "id",
   "guid",
+  "lineage_id",
   "company_id",
   "created_by",
   "created_at",
@@ -489,16 +693,26 @@ const getWritablePassportColumns = (data, excluded = SYSTEM_PASSPORT_FIELDS) =>
 const getStoredPassportValues = (keys, data) =>
   keys.map((key) => toStoredPassportValue(data[key]));
 
-async function findExistingPassportByProductId({ tableName, companyId, productId, excludeGuid = null }) {
+async function findExistingPassportByProductId({
+  tableName,
+  companyId,
+  productId,
+  excludeGuid = null,
+  excludeLineageId = null,
+}) {
   if (!productId) return null;
   const params = [companyId, productId];
   let exclusionSql = "";
   if (excludeGuid) {
     params.push(excludeGuid);
-    exclusionSql = ` AND guid <> $${params.length}`;
+    exclusionSql += ` AND guid <> $${params.length}`;
+  }
+  if (excludeLineageId) {
+    params.push(excludeLineageId);
+    exclusionSql += ` AND lineage_id <> $${params.length}`;
   }
   const existing = await pool.query(
-    `SELECT id, guid, product_id, release_status, version_number
+    `SELECT id, guid, lineage_id, product_id, release_status, version_number
      FROM ${tableName}
      WHERE company_id = $1
        AND product_id = $2
@@ -508,6 +722,480 @@ async function findExistingPassportByProductId({ tableName, companyId, productId
     params
   );
   return existing.rows[0] || null;
+}
+
+async function getPassportLineageContext({ guid, passportType, companyId = null }) {
+  const tableName = getTable(passportType);
+  const liveParams = [guid];
+  let liveCompanyFilter = "";
+  if (companyId !== null && companyId !== undefined) {
+    liveParams.push(companyId);
+    liveCompanyFilter = ` AND company_id = $${liveParams.length}`;
+  }
+
+  const liveRes = await pool.query(
+    `SELECT guid, lineage_id, product_id
+     FROM ${tableName}
+     WHERE guid = $1${liveCompanyFilter}
+     ORDER BY version_number DESC
+     LIMIT 1`,
+    liveParams
+  );
+  if (liveRes.rows.length) return liveRes.rows[0];
+
+  const archiveParams = [guid, passportType];
+  let archiveCompanyFilter = "";
+  if (companyId !== null && companyId !== undefined) {
+    archiveParams.push(companyId);
+    archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
+  }
+  const archiveRes = await pool.query(
+    `SELECT guid, lineage_id, product_id
+     FROM passport_archives
+     WHERE guid = $1
+       AND passport_type = $2${archiveCompanyFilter}
+     ORDER BY version_number DESC
+     LIMIT 1`,
+    archiveParams
+  );
+  return archiveRes.rows[0] || null;
+}
+
+async function getPassportVersionsByLineage({ lineageId, passportType, companyId = null }) {
+  const tableName = getTable(passportType);
+  const liveParams = [lineageId];
+  let liveCompanyFilter = "";
+  if (companyId !== null && companyId !== undefined) {
+    liveParams.push(companyId);
+    liveCompanyFilter = ` AND company_id = $${liveParams.length}`;
+  }
+  const liveRes = await pool.query(
+    `SELECT *
+     FROM ${tableName}
+     WHERE lineage_id = $1
+       AND deleted_at IS NULL${liveCompanyFilter}
+     ORDER BY version_number DESC, updated_at DESC`,
+    liveParams
+  );
+
+  const archiveParams = [lineageId, passportType];
+  let archiveCompanyFilter = "";
+  if (companyId !== null && companyId !== undefined) {
+    archiveParams.push(companyId);
+    archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
+  }
+  const archiveRes = await pool.query(
+    `SELECT guid, lineage_id, company_id, passport_type, version_number, model_name, product_id, release_status, archived_at, row_data
+     FROM passport_archives
+     WHERE lineage_id = $1
+       AND passport_type = $2${archiveCompanyFilter}
+     ORDER BY version_number DESC, archived_at DESC`,
+    archiveParams
+  );
+
+  const liveVersions = liveRes.rows.map(normalizePassportRow);
+  const seenGuids = new Set(liveVersions.map((row) => row.guid));
+  const archiveVersions = archiveRes.rows
+    .map((row) => {
+      const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
+      return {
+        ...rowData,
+        guid: row.guid || rowData?.guid,
+        lineage_id: row.lineage_id || rowData?.lineage_id,
+        company_id: row.company_id || rowData?.company_id,
+        passport_type: row.passport_type || rowData?.passport_type,
+        version_number: row.version_number ?? rowData?.version_number,
+        model_name: row.model_name || rowData?.model_name,
+        product_id: row.product_id || rowData?.product_id,
+        release_status: row.release_status || rowData?.release_status,
+        archived: true,
+        archived_at: row.archived_at,
+      };
+    })
+    .map(normalizePassportRow)
+    .filter((row) => row?.guid && !seenGuids.has(row.guid));
+
+  return [...liveVersions, ...archiveVersions]
+    .sort((a, b) => Number(b.version_number || 0) - Number(a.version_number || 0));
+}
+
+function slugifyRouteSegment(value, fallback = "item") {
+  const normalized = String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const slug = normalized
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
+  return slug || fallback;
+}
+
+function buildCurrentPublicPassportPath({
+  companyName = "",
+  manufacturerName = "",
+  manufacturedBy = "",
+  modelName = "",
+  productId = "",
+}) {
+  const resolvedProductId = normalizeProductIdValue(productId);
+  if (!resolvedProductId) return null;
+  const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
+  const modelSlug = slugifyRouteSegment(modelName || resolvedProductId, "product");
+  return `/dpp/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(resolvedProductId)}`;
+}
+
+function buildInactivePublicPassportPath({
+  companyName = "",
+  manufacturerName = "",
+  manufacturedBy = "",
+  modelName = "",
+  productId = "",
+  versionNumber,
+}) {
+  const resolvedProductId = normalizeProductIdValue(productId);
+  if (!resolvedProductId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
+  const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
+  const modelSlug = slugifyRouteSegment(modelName || resolvedProductId, "product");
+  return `/dpp/inactive/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(resolvedProductId)}/${encodeURIComponent(versionNumber)}`;
+}
+
+function buildPreviewPassportPath({
+  companyName = "",
+  manufacturerName = "",
+  manufacturedBy = "",
+  modelName = "",
+  productId = "",
+  fallbackGuid = "",
+}) {
+  const routeKey = normalizeProductIdValue(productId) || String(fallbackGuid || "").trim();
+  if (!routeKey) return null;
+  const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
+  const modelSlug = slugifyRouteSegment(modelName || routeKey, "product");
+  return `/dpp/preview/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(routeKey)}`;
+}
+
+async function getCompanyNameMap(companyIds) {
+  const uniqueCompanyIds = [...new Set((companyIds || []).filter(Boolean).map((value) => String(value)))];
+  if (!uniqueCompanyIds.length) return new Map();
+
+  const result = await pool.query(
+    "SELECT id, company_name FROM companies WHERE id = ANY($1::int[])",
+    [uniqueCompanyIds.map((value) => Number.parseInt(value, 10)).filter(Number.isFinite)]
+  );
+  return new Map(result.rows.map((row) => [String(row.id), row.company_name || ""]));
+}
+
+async function stripRestrictedFieldsForPublicView(passport, passportType) {
+  if (!passport || !passportType) return passport;
+
+  const sanitized = { ...passport };
+  try {
+    const typeRes = await pool.query(
+      "SELECT fields_json FROM passport_types WHERE type_name = $1",
+      [passportType]
+    );
+    if (!typeRes.rows.length) return sanitized;
+
+    const sections = typeRes.rows[0].fields_json?.sections || [];
+    for (const section of sections) {
+      for (const field of (section.fields || [])) {
+        const access = field.access || ["public"];
+        if (!access.includes("public")) delete sanitized[field.key];
+      }
+    }
+  } catch {
+    return sanitized;
+  }
+
+  return sanitized;
+}
+
+async function fetchCompanyPassportRecord({ companyId, guid, passportType = null }) {
+  let resolvedPassportType = passportType || null;
+
+  if (!resolvedPassportType) {
+    const regRes = await pool.query(
+      "SELECT passport_type FROM passport_registry WHERE guid = $1 AND company_id = $2",
+      [guid, companyId]
+    );
+    if (regRes.rows.length) resolvedPassportType = regRes.rows[0].passport_type;
+  }
+
+  if (!resolvedPassportType) {
+    const archiveTypeRes = await pool.query(
+      `SELECT passport_type
+       FROM passport_archives
+       WHERE guid = $1 AND company_id = $2
+       ORDER BY version_number DESC, archived_at DESC
+       LIMIT 1`,
+      [guid, companyId]
+    );
+    if (archiveTypeRes.rows.length) resolvedPassportType = archiveTypeRes.rows[0].passport_type;
+  }
+
+  if (!resolvedPassportType) return null;
+
+  const tableName = getTable(resolvedPassportType);
+  const liveRes = await pool.query(
+    `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
+     FROM ${tableName} p
+     LEFT JOIN users u ON u.id = p.created_by
+     WHERE p.guid = $1 AND p.company_id = $2 AND p.deleted_at IS NULL
+     LIMIT 1`,
+    [guid, companyId]
+  );
+  if (liveRes.rows.length) {
+    return {
+      passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: resolvedPassportType },
+      archived: false,
+    };
+  }
+
+  const archiveRes = await pool.query(
+    `SELECT pa.row_data
+     FROM passport_archives pa
+     WHERE pa.guid = $1 AND pa.company_id = $2 AND pa.passport_type = $3
+     ORDER BY pa.version_number DESC, pa.archived_at DESC
+     LIMIT 1`,
+    [guid, companyId, resolvedPassportType]
+  );
+  if (!archiveRes.rows.length) return null;
+
+  const rowData = typeof archiveRes.rows[0].row_data === "string"
+    ? JSON.parse(archiveRes.rows[0].row_data)
+    : archiveRes.rows[0].row_data;
+
+  return {
+    passport: { ...normalizePassportRow(rowData), passport_type: resolvedPassportType, archived: true },
+    archived: true,
+  };
+}
+
+async function resolveReleasedPassportByProductId(productId, { versionNumber = null } = {}) {
+  const normalizedProductId = normalizeProductIdValue(productId);
+  if (!normalizedProductId) return { passport: null, archived: false };
+
+  const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
+  const matches = [];
+
+  for (const { type_name } of ptRows.rows) {
+    const tableName = getTable(type_name);
+    const liveParams = [normalizedProductId];
+    let versionSql = "";
+    if (versionNumber !== null && versionNumber !== undefined) {
+      liveParams.push(versionNumber);
+      versionSql = ` AND version_number = $${liveParams.length}`;
+    }
+
+    const liveRes = await pool.query(
+      `SELECT *
+       FROM ${tableName}
+       WHERE product_id = $1
+         AND ${
+           versionNumber !== null && versionNumber !== undefined
+             ? "release_status IN ('released', 'obsolete')"
+             : "release_status = 'released'"
+         }
+         AND deleted_at IS NULL${versionSql}
+       ORDER BY version_number DESC, updated_at DESC
+       LIMIT 1`,
+      liveParams
+    );
+    if (liveRes.rows.length) {
+      matches.push({
+        passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: type_name },
+        archived: false,
+      });
+      continue;
+    }
+
+    const archiveParams = versionNumber !== null && versionNumber !== undefined
+      ? [normalizedProductId, type_name, versionNumber]
+      : [normalizedProductId, type_name];
+    const archiveRes = await pool.query(
+      `SELECT row_data
+       FROM passport_archives
+       WHERE product_id = $1
+         AND passport_type = $2
+         AND ${
+           versionNumber !== null && versionNumber !== undefined
+             ? "release_status IN ('released', 'obsolete')"
+             : "release_status = 'released'"
+         }${versionNumber !== null && versionNumber !== undefined ? " AND version_number = $3" : ""}
+       ORDER BY version_number DESC, archived_at DESC
+       LIMIT 1`,
+      archiveParams
+    );
+    if (archiveRes.rows.length) {
+      const rowData = typeof archiveRes.rows[0].row_data === "string"
+        ? JSON.parse(archiveRes.rows[0].row_data)
+        : archiveRes.rows[0].row_data;
+      matches.push({
+        passport: { ...normalizePassportRow(rowData), passport_type: type_name, archived: true },
+        archived: true,
+      });
+    }
+  }
+
+  if (!matches.length) return { passport: null, archived: false };
+  if (matches.length > 1) {
+    const error = new Error(`Multiple released passports share product_id "${normalizedProductId}".`);
+    error.code = "AMBIGUOUS_PRODUCT_ID";
+    throw error;
+  }
+  return matches[0];
+}
+
+async function resolvePublicPassportByGuid(guid, { versionNumber = null } = {}) {
+  const normalizedGuid = String(guid || "").trim();
+  if (!normalizedGuid) return { passport: null, archived: false };
+
+  const reg = await pool.query(
+    "SELECT passport_type FROM passport_registry WHERE guid = $1 LIMIT 1",
+    [normalizedGuid]
+  );
+  if (!reg.rows.length) return { passport: null, archived: false };
+
+  const passportType = reg.rows[0].passport_type;
+  const tableName = getTable(passportType);
+
+  if (versionNumber !== null && versionNumber !== undefined) {
+    const lineageContext = await getPassportLineageContext({ guid: normalizedGuid, passportType });
+    if (!lineageContext?.lineage_id) return { passport: null, archived: false };
+
+    const liveRes = await pool.query(
+      `SELECT *
+       FROM ${tableName}
+       WHERE lineage_id = $1
+         AND version_number = $2
+         AND release_status IN ('released', 'obsolete')
+         AND deleted_at IS NULL
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      [lineageContext.lineage_id, versionNumber]
+    );
+    if (liveRes.rows.length) {
+      const passport = { ...normalizePassportRow(liveRes.rows[0]), passport_type: passportType };
+      const visibilityRes = await pool.query(
+        `SELECT is_public
+         FROM passport_history_visibility
+         WHERE passport_guid = $1 AND version_number = $2
+         LIMIT 1`,
+        [passport.guid, versionNumber]
+      );
+      const isVisible = visibilityRes.rows.length
+        ? !!visibilityRes.rows[0].is_public
+        : isPublicHistoryStatus(passport.release_status);
+      return isVisible ? { passport, archived: false } : { passport: null, archived: false };
+    }
+
+    const archiveRes = await pool.query(
+      `SELECT row_data
+       FROM passport_archives
+       WHERE lineage_id = $1
+         AND passport_type = $2
+         AND version_number = $3
+         AND release_status IN ('released', 'obsolete')
+       ORDER BY archived_at DESC
+       LIMIT 1`,
+      [lineageContext.lineage_id, passportType, versionNumber]
+    );
+    if (!archiveRes.rows.length) return { passport: null, archived: false };
+
+    const rowData = typeof archiveRes.rows[0].row_data === "string"
+      ? JSON.parse(archiveRes.rows[0].row_data)
+      : archiveRes.rows[0].row_data;
+    const passport = { ...normalizePassportRow(rowData), passport_type: passportType, archived: true };
+    const visibilityRes = await pool.query(
+      `SELECT is_public
+       FROM passport_history_visibility
+       WHERE passport_guid = $1 AND version_number = $2
+       LIMIT 1`,
+      [passport.guid, versionNumber]
+    );
+    const isVisible = visibilityRes.rows.length
+      ? !!visibilityRes.rows[0].is_public
+      : isPublicHistoryStatus(passport.release_status);
+    return isVisible ? { passport, archived: true } : { passport: null, archived: false };
+  }
+
+  return resolveReleasedPassportByGuid(normalizedGuid);
+}
+
+async function resolveCompanyPreviewPassportByProductId(companyId, productId) {
+  const normalizedProductId = normalizeProductIdValue(productId);
+  if (!companyId || !normalizedProductId) return { passport: null, archived: false };
+
+  const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
+  const liveMatches = [];
+
+  for (const { type_name } of ptRows.rows) {
+    const tableName = getTable(type_name);
+    const liveRes = await pool.query(
+      `SELECT *
+       FROM ${tableName}
+       WHERE company_id = $1
+         AND product_id = $2
+         AND deleted_at IS NULL
+       ORDER BY version_number DESC, updated_at DESC, id DESC
+       LIMIT 1`,
+      [companyId, normalizedProductId]
+    );
+    if (liveRes.rows.length) {
+      liveMatches.push({
+        passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: type_name },
+        archived: false,
+      });
+    }
+  }
+
+  if (liveMatches.length > 1) {
+    const error = new Error(`Multiple passports in company "${companyId}" share product_id "${normalizedProductId}".`);
+    error.code = "AMBIGUOUS_PRODUCT_ID";
+    throw error;
+  }
+  if (liveMatches.length === 1) return liveMatches[0];
+
+  const archiveMatches = [];
+  for (const { type_name } of ptRows.rows) {
+    const archiveRes = await pool.query(
+      `SELECT row_data
+       FROM passport_archives
+       WHERE company_id = $1
+         AND passport_type = $2
+         AND product_id = $3
+       ORDER BY version_number DESC, archived_at DESC
+       LIMIT 1`,
+      [companyId, type_name, normalizedProductId]
+    );
+    if (archiveRes.rows.length) {
+      const rowData = typeof archiveRes.rows[0].row_data === "string"
+        ? JSON.parse(archiveRes.rows[0].row_data)
+        : archiveRes.rows[0].row_data;
+      archiveMatches.push({
+        passport: { ...normalizePassportRow(rowData), passport_type: type_name, archived: true },
+        archived: true,
+      });
+    }
+  }
+
+  if (archiveMatches.length > 1) {
+    const error = new Error(`Multiple archived passports in company "${companyId}" share product_id "${normalizedProductId}".`);
+    error.code = "AMBIGUOUS_PRODUCT_ID";
+    throw error;
+  }
+  return archiveMatches[0] || { passport: null, archived: false };
+}
+
+async function resolveCompanyPreviewPassport({ companyId, passportKey }) {
+  const normalizedPassportKey = normalizeProductIdValue(passportKey);
+  if (normalizedPassportKey) {
+    const productMatch = await resolveCompanyPreviewPassportByProductId(companyId, normalizedPassportKey);
+    if (productMatch?.passport) return productMatch;
+  }
+  return fetchCompanyPassportRecord({ companyId, guid: passportKey });
 }
 
 async function updatePassportRowById({ tableName, rowId, userId, data, excluded = SYSTEM_PASSPORT_FIELDS }) {
@@ -619,7 +1307,6 @@ const buildPassportVersionHistory = async ({
   companyId = null,
   publicOnly = false,
 }) => {
-  const tableName = getTable(passportType);
   const typeRes = await pool.query(
     "SELECT display_name, fields_json FROM passport_types WHERE type_name = $1",
     [passportType]
@@ -627,25 +1314,24 @@ const buildPassportVersionHistory = async ({
   const typeRow = typeRes.rows[0] || null;
   const fieldDefs = getHistoryFieldDefs(typeRow);
 
-  const versionParams = [guid];
-  let companyFilter = "";
-  if (companyId !== null && companyId !== undefined) {
-    versionParams.push(companyId);
-    companyFilter = ` AND company_id = $${versionParams.length}`;
+  const lineageContext = await getPassportLineageContext({ guid, passportType, companyId });
+  if (!lineageContext?.lineage_id) {
+    return {
+      passportType,
+      displayName: typeRow?.display_name || passportType,
+      history: [],
+    };
   }
 
-  const versionRes = await pool.query(
-    `SELECT * FROM ${tableName}
-     WHERE guid = $1
-       ${companyFilter}
-       AND deleted_at IS NULL
-     ORDER BY version_number DESC`,
-    versionParams
-  );
-  const versions = versionRes.rows.map(normalizePassportRow);
+  const versions = await getPassportVersionsByLineage({
+    lineageId: lineageContext.lineage_id,
+    passportType,
+    companyId,
+  });
 
   const creatorIds = [...new Set(versions.map((row) => row.created_by).filter(Boolean))];
   const creatorMap = new Map();
+  const companyNameMap = await getCompanyNameMap(versions.map((row) => row.company_id).filter(Boolean));
   if (creatorIds.length) {
     const userRes = await pool.query(
       "SELECT id, first_name, last_name, email FROM users WHERE id = ANY($1::int[])",
@@ -659,14 +1345,17 @@ const buildPassportVersionHistory = async ({
     });
   }
 
-  const visibilityRes = await pool.query(
-    `SELECT version_number, is_public
-     FROM passport_history_visibility
-     WHERE passport_guid = $1`,
-    [guid]
-  );
+  const versionGuids = versions.map((row) => row.guid).filter(Boolean);
+  const visibilityRes = versionGuids.length
+    ? await pool.query(
+        `SELECT passport_guid, version_number, is_public
+         FROM passport_history_visibility
+         WHERE passport_guid = ANY($1::uuid[])`,
+        [versionGuids]
+      )
+    : { rows: [] };
   const visibilityMap = new Map(
-    visibilityRes.rows.map((row) => [Number(row.version_number), !!row.is_public])
+    visibilityRes.rows.map((row) => [`${row.passport_guid}:${Number(row.version_number)}`, !!row.is_public])
   );
 
   const ascending = [...versions].sort((a, b) => Number(a.version_number) - Number(b.version_number));
@@ -676,14 +1365,18 @@ const buildPassportVersionHistory = async ({
   });
 
   const latestVersionNumber = versions[0]?.version_number ?? null;
+  const latestReleasedVersionNumber = versions
+    .filter((row) => isPublicHistoryStatus(row.release_status))
+    .reduce((max, row) => Math.max(max, Number(row.version_number || 0)), 0);
   const history = versions
     .map((version) => {
       const versionNumber = Number(version.version_number);
       const previous = previousByVersion.get(versionNumber) || null;
       const normalizedStatus = normalizeReleaseStatus(version.release_status);
-      const defaultPublic = normalizedStatus === "released";
-      const isPublic = visibilityMap.has(versionNumber)
-        ? visibilityMap.get(versionNumber)
+      const defaultPublic = isPublicHistoryStatus(normalizedStatus);
+      const visibilityKey = `${version.guid}:${versionNumber}`;
+      const isPublic = visibilityMap.has(visibilityKey)
+        ? visibilityMap.get(visibilityKey)
         : defaultPublic;
 
       if (publicOnly && (!defaultPublic || !isPublic)) return null;
@@ -709,6 +1402,22 @@ const buildPassportVersionHistory = async ({
         updated_at: version.updated_at,
         created_by_name: creatorMap.get(version.created_by) || null,
         is_public: isPublic,
+        guid: version.guid,
+        public_path: buildCurrentPublicPassportPath({
+          companyName: companyNameMap.get(String(version.company_id)) || "",
+          manufacturerName: version.manufacturer,
+          manufacturedBy: version.manufactured_by,
+          modelName: version.model_name,
+          productId: version.product_id,
+        }),
+        inactive_path: buildInactivePublicPassportPath({
+          companyName: companyNameMap.get(String(version.company_id)) || "",
+          manufacturerName: version.manufacturer,
+          manufacturedBy: version.manufactured_by,
+          modelName: version.model_name,
+          productId: version.product_id,
+          versionNumber,
+        }),
         changed_fields: changedFields,
         change_count: changedFields.length,
         summary: previous
@@ -716,7 +1425,9 @@ const buildPassportVersionHistory = async ({
               ? `${changedFields.length} field${changedFields.length === 1 ? "" : "s"} changed from v${previous.version_number}.`
               : `No field changes detected from v${previous.version_number}.`)
           : "Initial version.",
-        is_current: versionNumber === Number(latestVersionNumber),
+        is_current: publicOnly
+          ? versionNumber === Number(latestReleasedVersionNumber || latestVersionNumber)
+          : versionNumber === Number(latestVersionNumber),
       };
     })
     .filter(Boolean);
@@ -758,6 +1469,7 @@ const createPassportTable = async (typeName) => {
     CREATE TABLE IF NOT EXISTS ${tableName} (
       id             SERIAL       PRIMARY KEY,
       guid           UUID         NOT NULL DEFAULT gen_random_uuid(),
+      lineage_id     UUID         NOT NULL DEFAULT gen_random_uuid(),
       company_id     INTEGER      NOT NULL,
       model_name     VARCHAR(255),
       product_id     VARCHAR(255) NOT NULL,
@@ -793,6 +1505,10 @@ const createPassportTable = async (typeName) => {
       ON ${tableName}(guid) WHERE deleted_at IS NULL
   `);
   await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_${tableName}_lineage
+      ON ${tableName}(lineage_id) WHERE deleted_at IS NULL
+  `);
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_${tableName}_status
       ON ${tableName}(release_status) WHERE deleted_at IS NULL
   `);
@@ -817,7 +1533,8 @@ const queryTableStats = async (typeName, companyId = null) => {
       COUNT(CASE WHEN release_status = 'draft'     THEN 1 END) AS draft,
       COUNT(CASE WHEN release_status = 'released'  THEN 1 END) AS released,
       COUNT(CASE WHEN release_status IN ${IN_REVISION_STATUSES_SQL} THEN 1 END) AS revised,
-      COUNT(CASE WHEN release_status = 'in_review' THEN 1 END) AS in_review
+      COUNT(CASE WHEN release_status = 'in_review' THEN 1 END) AS in_review,
+      COUNT(CASE WHEN release_status = 'obsolete'  THEN 1 END) AS obsolete
     FROM ${tableName}
     WHERE deleted_at IS NULL${companyFilter}
   `, params);
@@ -828,6 +1545,7 @@ const queryTableStats = async (typeName, companyId = null) => {
     released:  parseInt(row.released),
     revised:   parseInt(row.revised),
     in_review: parseInt(row.in_review),
+    obsolete:  parseInt(row.obsolete),
   };
 };
 
@@ -926,6 +1644,7 @@ async function initDb() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_registry (
       guid           UUID        PRIMARY KEY,
+      lineage_id     UUID        NOT NULL DEFAULT gen_random_uuid(),
       company_id     INTEGER     NOT NULL,
       passport_type  VARCHAR(50) NOT NULL,
       access_key     VARCHAR(36) NOT NULL DEFAULT gen_random_uuid()::text,
@@ -934,8 +1653,25 @@ async function initDb() {
     )
   `);
   await pool.query(`
+    ALTER TABLE passport_registry
+    ADD COLUMN IF NOT EXISTS lineage_id UUID
+  `);
+  await pool.query(`
+    ALTER TABLE passport_registry
+    ALTER COLUMN lineage_id SET DEFAULT gen_random_uuid()
+  `).catch(() => {});
+  await pool.query(`
+    UPDATE passport_registry
+    SET lineage_id = guid
+    WHERE lineage_id IS NULL
+  `);
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_registry_company
       ON passport_registry(company_id)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_registry_lineage
+      ON passport_registry(lineage_id)
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_umbrella ON passport_types(umbrella_category)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_active   ON passport_types(is_active)`);
@@ -1038,6 +1774,34 @@ async function initDb() {
   await pool.query(`
     DELETE FROM request_rate_limits
     WHERE reset_at <= NOW()
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_scan_events (
+      id             SERIAL PRIMARY KEY,
+      passport_guid  UUID NOT NULL REFERENCES passport_registry(guid) ON DELETE CASCADE,
+      viewer_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      user_agent     TEXT,
+      referrer       TEXT,
+      scanned_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    ALTER TABLE passport_scan_events
+    ADD COLUMN IF NOT EXISTS viewer_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_scan_events_passport
+      ON passport_scan_events(passport_guid, scanned_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_scan_events_viewer
+      ON passport_scan_events(viewer_user_id)
+      WHERE viewer_user_id IS NOT NULL
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_passport_scan_events_unique_viewer
+      ON passport_scan_events(passport_guid, viewer_user_id)
+      WHERE viewer_user_id IS NOT NULL
   `);
 
   // Company-managed branding for public passport viewer and consumer pages
@@ -1254,6 +2018,35 @@ async function initDb() {
       ON passport_history_visibility(passport_guid, version_number DESC)
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_archives (
+      id               SERIAL PRIMARY KEY,
+      guid             UUID NOT NULL,
+      lineage_id       UUID,
+      company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      passport_type    VARCHAR(100) NOT NULL,
+      version_number   INTEGER NOT NULL DEFAULT 1,
+      model_name       VARCHAR(255),
+      product_id       VARCHAR(255),
+      release_status   VARCHAR(50),
+      row_data         JSONB NOT NULL,
+      archived_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      archived_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    ALTER TABLE passport_archives
+    ADD COLUMN IF NOT EXISTS lineage_id UUID
+  `);
+  await pool.query(`
+    UPDATE passport_archives
+    SET lineage_id = guid
+    WHERE lineage_id IS NULL
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_company ON passport_archives(company_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_guid    ON passport_archives(guid)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_lineage ON passport_archives(lineage_id)`);
+
   // Ensure shared passport tables exist for all passport types.
   // Idempotent — uses CREATE TABLE IF NOT EXISTS.
   const ptRows = await pool.query("SELECT type_name FROM passport_types");
@@ -1266,6 +2059,19 @@ async function initDb() {
   for (const { type_name } of ptRows.rows) {
     const tableName = getTable(type_name);
     try {
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS lineage_id UUID
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ALTER COLUMN lineage_id SET DEFAULT gen_random_uuid()
+      `);
+      await pool.query(`
+        UPDATE ${tableName}
+        SET lineage_id = guid
+        WHERE lineage_id IS NULL
+      `);
       await pool.query(
         `UPDATE ${tableName}
          SET release_status = $1
@@ -1450,6 +2256,29 @@ const brandedEmail = ({ preheader, bodyHtml }) => `
     <p>You received this because you are part of a DPP workflow.</p>
   </div>
 </div></body></html>`;
+
+// Mark older released versions as "obsolete" when a newer version is released.
+// Only affects rows in the same lineage with a lower version_number.
+const markOlderVersionsObsolete = async (tableName, guid, newVersionNumber) => {
+  try {
+    const lineageRes = await pool.query(
+      `SELECT lineage_id FROM ${tableName} WHERE guid = $1 LIMIT 1`, [guid]
+    );
+    if (!lineageRes.rows.length) return;
+    const lineageId = lineageRes.rows[0].lineage_id;
+    await pool.query(
+      `UPDATE ${tableName}
+       SET release_status = 'obsolete', updated_at = NOW()
+       WHERE lineage_id = $1
+         AND version_number < $2
+         AND release_status = 'released'
+         AND deleted_at IS NULL`,
+      [lineageId, newVersionNumber]
+    );
+  } catch (e) {
+    console.error("Mark obsolete error (non-fatal):", e.message);
+  }
+};
 
 // ─── FILE STORAGE ───────────────────────────────────────────────────────────
 const FILES_BASE_DIR = process.env.FILES_DIR || path.join(__dirname, "passport-files");
@@ -1738,13 +2567,11 @@ async function loadOrGenerateSigningKey() {
   ).catch(() => {});
 }
 
-// Canonical, deterministic JSON — alphabetically sorted keys at all levels
+// Deterministic JSON serialization per RFC 8785 (JSON Canonicalization Scheme).
+// Handles number serialization (IEEE 754), Unicode escaping, and key ordering
+// correctly — required by JsonWebSignature2020 / VC Data Integrity specs.
 function canonicalJSON(val) {
-  if (val === null || val === undefined) return "null";
-  if (typeof val !== "object") return JSON.stringify(val);
-  if (Array.isArray(val)) return "[" + val.map(canonicalJSON).join(",") + "]";
-  const keys = Object.keys(val).sort();
-  return "{" + keys.map(k => JSON.stringify(k) + ":" + canonicalJSON(val[k])).join(",") + "}";
+  return canonicalize(val);
 }
 
 // Derives the issuer DID from APP_URL env var
@@ -1771,6 +2598,7 @@ function buildVC(passport, typeDef, releasedAt) {
     "@context": [
       "https://www.w3.org/2018/credentials/v1",
       "https://w3id.org/security/suites/jws-2020/v1",
+      `${appUrl}/contexts/dpp/v1`,
     ],
     id:           `${appUrl}/passport/${passport.guid}/credential/v${passport.version_number}`,
     type:         ["VerifiableCredential", "DigitalProductPassport"],
@@ -1788,16 +2616,18 @@ function buildVC(passport, typeDef, releasedAt) {
   };
 }
 
-// Creates a compact JWS (RS256) over canonical JSON of the VC (without proof).
-// Returns { header, sigB64url } so callers can reassemble the JWS string.
+// Creates a detached-payload JWS (RS256) per the JsonWebSignature2020 specification.
+// Uses b64:false (RFC 7797) so the payload is raw bytes, not base64url-encoded.
+// Returns detached JWS: header..signature (empty payload section).
 function createJws(vcWithoutProof, privateKeyPem) {
-  const header   = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
-  const payload  = Buffer.from(canonicalJSON(vcWithoutProof)).toString("base64url");
-  const signer   = crypto.createSign("SHA256");
-  signer.update(`${header}.${payload}`);
+  const headerObj = { alg: "RS256", b64: false, crit: ["b64"] };
+  const headerB64 = Buffer.from(JSON.stringify(headerObj)).toString("base64url");
+  const payload   = canonicalJSON(vcWithoutProof); // raw canonical JSON, not base64url
+  const signer    = crypto.createSign("SHA256");
+  signer.update(`${headerB64}.${payload}`);
   signer.end();
   const sigB64url = signer.sign(privateKeyPem, "base64url");
-  return `${header}.${payload}.${sigB64url}`;
+  return `${headerB64}..${sigB64url}`; // detached payload — empty middle section
 }
 
 async function signPassport(passport, typeDef) {
@@ -1857,13 +2687,24 @@ async function verifyPassportSignature(guid, versionNumber) {
         return { status: "tampered", signedAt: sig.signed_at, keyId: sig.signing_key_id, releasedAt: sig.released_at };
       }
 
-      // 2. Verify JWS: reconstruct sigInput from stored VC and check signature
+      // 2. Verify JWS — supports both detached (b64:false) and legacy (embedded payload)
       const jwsParts = proof.jws.split(".");
       if (jwsParts.length !== 3) return { status: "invalid", signedAt: sig.signed_at, keyId: sig.signing_key_id };
-      const [jwsHeader, jwsPayload, jwsSig] = jwsParts;
+      const [jwsHeader, jwsPayloadSection, jwsSig] = jwsParts;
+
+      // Decode header to detect format
+      const headerObj = JSON.parse(Buffer.from(jwsHeader, "base64url").toString());
+      let signingInput;
+      if (headerObj.b64 === false) {
+        // Detached payload (JsonWebSignature2020 spec): raw canonical JSON as payload
+        signingInput = `${jwsHeader}.${canonicalJSON(vcWithoutProof)}`;
+      } else {
+        // Legacy format: base64url-encoded payload was embedded in the JWS
+        signingInput = `${jwsHeader}.${jwsPayloadSection}`;
+      }
 
       const verifier = crypto.createVerify("SHA256");
-      verifier.update(`${jwsHeader}.${jwsPayload}`);
+      verifier.update(signingInput);
       verifier.end();
       const valid = verifier.verify(publicKeyPem, Buffer.from(jwsSig, "base64url"));
 
@@ -2009,11 +2850,11 @@ const toDynamicStoredValue = (value) => {
 async function getLatestCompanyPassports({ companyId, passportType }) {
   const tableName = getTable(passportType);
   const result = await pool.query(
-    `SELECT DISTINCT ON (guid) *
+    `SELECT DISTINCT ON (lineage_id) *
      FROM ${tableName}
      WHERE company_id = $1
        AND deleted_at IS NULL
-     ORDER BY guid, version_number DESC, updated_at DESC`,
+     ORDER BY lineage_id, version_number DESC, updated_at DESC`,
     [companyId]
   );
   return result.rows.map((row) => {
@@ -2029,10 +2870,7 @@ async function fetchAssetSourceRecords(sourceConfig = {}) {
   const url = String(sourceConfig.url || "").trim();
   if (!url) throw new Error("Source URL is required");
 
-  const parsedUrl = new URL(url);
-  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-    throw new Error("Only HTTP(S) ERP/API endpoints are supported");
-  }
+  const parsedUrl = await assertSafeAssetSourceUrl(url);
 
   const method = String(sourceConfig.method || "GET").trim().toUpperCase();
   const headers = normalizeAssetHeaders(sourceConfig.headers);
@@ -2044,6 +2882,7 @@ async function fetchAssetSourceRecords(sourceConfig = {}) {
       method,
       headers,
       signal: controller.signal,
+      redirect: "error",
     };
 
     if (!["GET", "HEAD"].includes(method) && sourceConfig.body !== undefined && sourceConfig.body !== "") {
@@ -2111,8 +2950,7 @@ async function prepareAssetPayload({ companyId, passportType, records, options =
   if (!Array.isArray(records) || !records.length) throw new Error("records array is required");
   if (records.length > 1000) throw new Error("Max 1000 asset rows per request");
 
-  const typeSchema = await getPassportTypeSchema(passportType);
-  if (!typeSchema) throw new Error("Passport type not found");
+  const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, passportType);
 
   const fieldMap = getAssetFieldMap(typeSchema);
   const currentRows = await getLatestCompanyPassports({
@@ -2197,15 +3035,31 @@ async function prepareAssetPayload({ companyId, passportType, records, options =
 
     Object.entries(rawRecord).forEach(([key, value]) => {
       if (ASSET_MATCH_FIELDS.has(key)) return;
+      if (ASSET_IGNORED_SYSTEM_COLUMNS.has(key)) return;
 
-      if (fieldMap.has(key)) {
-        if (key === "product_id" && !matchGuid && !nextProductIdProvided) return;
-        const coerced = coerceAssetFieldValue(fieldMap.get(key), value);
+      // Try direct match first
+      let resolvedKey = key;
+      let fieldDef = fieldMap.get(key);
+
+      // PostgreSQL truncates column names to 63 chars — try matching truncated keys
+      if (!fieldDef && key.length >= 63) {
+        for (const [fk, fd] of fieldMap) {
+          if (fk.length > 63 && fk.substring(0, 63) === key.substring(0, 63)) {
+            resolvedKey = fk;
+            fieldDef = fd;
+            break;
+          }
+        }
+      }
+
+      if (fieldDef) {
+        if (resolvedKey === "product_id" && !matchGuid && !nextProductIdProvided) return;
+        const coerced = coerceAssetFieldValue(fieldDef, value);
         if (!coerced.ok) {
           errors.push(coerced.error);
           return;
         }
-        passportUpdate[key] = coerced.value;
+        passportUpdate[resolvedKey] = coerced.value;
         return;
       }
 
@@ -2326,7 +3180,7 @@ async function prepareAssetPayload({ companyId, passportType, records, options =
   };
 }
 
-async function executeAssetPush({ companyId, generatedPayload, source = "asset_management" }) {
+async function executeAssetPush({ companyId, generatedPayload, source = "asset_management", userId = null }) {
   const passportType = generatedPayload?.passport_type;
   const records = Array.isArray(generatedPayload?.records) ? generatedPayload.records : [];
   if (!passportType) throw new Error("generated payload is missing passport_type");
@@ -2392,14 +3246,14 @@ async function executeAssetPush({ companyId, generatedPayload, source = "asset_m
           updatedFields = await updatePassportRowById({
             tableName,
             rowId: editable.rows[0].id,
-            userId: null,
+            userId,
             data: passportUpdate,
           });
 
           if (updatedFields.length) {
             await logAudit(
               companyId,
-              null,
+              userId,
               "ASSET_UPDATE",
               tableName,
               matchedGuid,
@@ -2429,7 +3283,7 @@ async function executeAssetPush({ companyId, generatedPayload, source = "asset_m
         }
         await logAudit(
           companyId,
-          null,
+          userId,
           "ASSET_DYNAMIC_PUSH",
           "passport_dynamic_values",
           matchedGuid,
@@ -2533,7 +3387,7 @@ async function resolveAssetJobRecords(job) {
 let assetSchedulerHandle = null;
 let assetSchedulerBusy = false;
 
-async function runAssetManagementJob(job, triggerType = "manual") {
+async function runAssetManagementJob(job, triggerType = "manual", userId = null) {
   const options = isPlainObject(job.options_json) ? job.options_json : {};
   try {
     await assertAssetManagementEnabled(job.company_id);
@@ -2548,6 +3402,7 @@ async function runAssetManagementJob(job, triggerType = "manual") {
       companyId: job.company_id,
       generatedPayload: prepared.generated_payload,
       source: `asset_job:${job.id || "manual"}`,
+      userId,
     });
 
     const status = pushResult.summary.failed
@@ -3180,15 +4035,16 @@ app.post("/api/companies/:companyId/asset-management/launch", authenticateToken,
     const launchToken = generateAssetLaunchToken({
       companyId,
       userId: req.user.userId,
-      role: req.user.role,
     });
+    const assetFragment = new URLSearchParams({ launchToken });
+    if (ASSET_SHARED_SECRET) assetFragment.set("assetKey", ASSET_SHARED_SECRET);
     res.json({
       launchToken,
       company: {
         id: company.id,
         company_name: company.company_name,
       },
-      assetUrl: `/asset-management?launchToken=${encodeURIComponent(launchToken)}`,
+      assetUrl: `/asset-management#${assetFragment.toString()}`,
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message || "Failed to open Asset Management" });
@@ -3373,7 +4229,10 @@ app.get("/api/passport-types/:typeName", publicReadRateLimit, async (req, res) =
 //  ASSET MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.use("/api/asset-management", requireAssetManagementKey, authenticateAssetPlatform);
+app.use("/api/asset-management", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+}, requireAssetManagementKey, authenticateAssetPlatform);
 
 app.get("/api/asset-management/bootstrap", publicReadRateLimit, async (req, res) => {
   try {
@@ -3385,6 +4244,7 @@ app.get("/api/asset-management/bootstrap", publicReadRateLimit, async (req, res)
        FROM passport_types pt
        JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
        WHERE cpa.company_id = $1
+         AND cpa.access_revoked = false
          AND pt.is_active = true
        ORDER BY pt.umbrella_category NULLS FIRST, pt.display_name ASC`,
       [companyId]
@@ -3417,25 +4277,46 @@ app.get("/api/asset-management/passports", publicReadRateLimit, async (req, res)
       return res.status(400).json({ error: "passportType query param is required" });
     }
 
-    const typeSchema = await getPassportTypeSchema(requestedType);
-    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, requestedType);
 
     const rows = await getLatestCompanyPassports({
       companyId,
       passportType: typeSchema.typeName,
     });
 
-    const fields = Array.from(getAssetFieldMap(typeSchema).values());
+    const assetFieldMap = getAssetFieldMap(typeSchema);
+    const fields = Array.from(assetFieldMap.values());
+    const allowedKeys = new Set([...assetFieldMap.keys(), ...ASSET_MATCH_FIELDS, "is_editable", "release_status", "version_number"]);
+
+    // Strip system/internal columns so only schema fields + match keys reach the grid
+    const cleanRows = rows.map(row => {
+      const clean = {};
+      Object.entries(row).forEach(([key, value]) => {
+        if (allowedKeys.has(key)) {
+          clean[key] = value;
+        } else if (key.length >= 63) {
+          // PostgreSQL truncates column names — try matching to a full schema key
+          for (const fk of assetFieldMap.keys()) {
+            if (fk.length > 63 && fk.substring(0, 63) === key.substring(0, 63)) {
+              clean[fk] = value;
+              break;
+            }
+          }
+        }
+      });
+      return clean;
+    });
+
     res.json({
       company_id: companyId,
       passport_type: typeSchema.typeName,
       display_name: typeSchema.displayName,
       fields,
-      passports: rows,
+      passports: cleanRows,
       summary: {
-        total: rows.length,
-        editable: rows.filter((row) => row.is_editable).length,
-        released_or_locked: rows.filter((row) => !row.is_editable).length,
+        total: cleanRows.length,
+        editable: cleanRows.filter((row) => row.is_editable).length,
+        released_or_locked: cleanRows.filter((row) => !row.is_editable).length,
       },
     });
   } catch (error) {
@@ -3444,7 +4325,7 @@ app.get("/api/asset-management/passports", publicReadRateLimit, async (req, res)
   }
 });
 
-app.post("/api/asset-management/source/fetch", async (req, res) => {
+app.post("/api/asset-management/source/fetch", assetSourceFetchRateLimit, requireAssetEditor, async (req, res) => {
   try {
     const sourceConfig = isPlainObject(req.body?.sourceConfig) ? req.body.sourceConfig : {};
     const fetched = await fetchAssetSourceRecords(sourceConfig);
@@ -3455,7 +4336,7 @@ app.post("/api/asset-management/source/fetch", async (req, res) => {
   }
 });
 
-app.post("/api/asset-management/preview", async (req, res) => {
+app.post("/api/asset-management/preview", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
   try {
     const normalizedBody = normalizePassportRequestBody(req.body || {});
     const payload = await prepareAssetPayload({
@@ -3471,7 +4352,7 @@ app.post("/api/asset-management/preview", async (req, res) => {
   }
 });
 
-app.post("/api/asset-management/push", async (req, res) => {
+app.post("/api/asset-management/push", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
   try {
     const normalizedBody = normalizePassportRequestBody(req.body || {});
     const companyId = Number.parseInt(req.assetContext.companyId, 10);
@@ -3493,6 +4374,7 @@ app.post("/api/asset-management/push", async (req, res) => {
     const pushResult = await executeAssetPush({
       companyId,
       generatedPayload: preview.generated_payload,
+      userId: req.assetContext.userId,
     });
     const status = pushResult.summary.failed
       ? (pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed")
@@ -3543,7 +4425,7 @@ app.get("/api/asset-management/jobs", publicReadRateLimit, async (req, res) => {
   }
 });
 
-app.post("/api/asset-management/jobs", async (req, res) => {
+app.post("/api/asset-management/jobs", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
   try {
     const normalizedBody = normalizePassportRequestBody(req.body || {});
     const companyId = Number.parseInt(req.assetContext.companyId, 10);
@@ -3563,8 +4445,7 @@ app.post("/api/asset-management/jobs", async (req, res) => {
       return res.status(400).json({ error: "passport_type and name are required" });
     }
 
-    const typeSchema = await getPassportTypeSchema(passportType);
-    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, passportType);
 
     if (sourceKind !== "api" && !records.length) {
       return res.status(400).json({ error: "records are required for non-API asset jobs" });
@@ -3617,7 +4498,7 @@ app.post("/api/asset-management/jobs", async (req, res) => {
   }
 });
 
-app.patch("/api/asset-management/jobs/:jobId", async (req, res) => {
+app.patch("/api/asset-management/jobs/:jobId", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
   try {
     const jobId = Number.parseInt(req.params.jobId, 10);
     const companyId = Number.parseInt(req.assetContext.companyId, 10);
@@ -3629,8 +4510,7 @@ app.patch("/api/asset-management/jobs/:jobId", async (req, res) => {
     const current = existing.rows[0];
     const normalizedBody = normalizePassportRequestBody(req.body || {});
     const passportType = normalizedBody.passport_type || current.passport_type;
-    const typeSchema = await getPassportTypeSchema(passportType);
-    if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+    const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, passportType);
 
     const sourceKind = normalizedBody.sourceKind || current.source_kind;
     const sourceConfig = normalizedBody.sourceConfig !== undefined
@@ -3713,7 +4593,7 @@ app.patch("/api/asset-management/jobs/:jobId", async (req, res) => {
   }
 });
 
-app.post("/api/asset-management/jobs/:jobId/run", async (req, res) => {
+app.post("/api/asset-management/jobs/:jobId/run", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
   try {
     const jobId = Number.parseInt(req.params.jobId, 10);
     const companyId = Number.parseInt(req.assetContext.companyId, 10);
@@ -3722,7 +4602,7 @@ app.post("/api/asset-management/jobs/:jobId/run", async (req, res) => {
     const job = await pool.query("SELECT * FROM asset_management_jobs WHERE id = $1 AND company_id = $2", [jobId, companyId]);
     if (!job.rows.length) return res.status(404).json({ error: "Asset job not found" });
 
-    const result = await runAssetManagementJob(job.rows[0], "manual_job_run");
+    const result = await runAssetManagementJob(job.rows[0], "manual_job_run", req.assetContext.userId);
     if (result.error) {
       return res.status(400).json({ error: result.error.message, run: result.run });
     }
@@ -4514,6 +5394,7 @@ app.get("/api/admin/companies/:companyId/analytics", authenticateToken, isSuperA
           released_count:   stats.released,
           revised_count:    stats.revised,
           in_review_count:  stats.in_review,
+          obsolete_count:   stats.obsolete,
         });
 
         const tableName = getTable(type_name);
@@ -4553,9 +5434,10 @@ app.get("/api/admin/companies/:companyId/analytics", authenticateToken, isSuperA
     }
 
     const scanRes = await pool.query(
-      `SELECT COUNT(*) FROM passport_scan_events pse
+      `SELECT COUNT(DISTINCT (pse.passport_guid, pse.viewer_user_id)) FROM passport_scan_events pse
        JOIN passport_registry pr ON pr.guid = pse.passport_guid
-       WHERE pr.company_id = $1`,
+       WHERE pr.company_id = $1
+         AND pse.viewer_user_id IS NOT NULL`,
       [companyId]
     );
     const scanStats = parseInt(scanRes.rows[0]?.count || 0, 10) || 0;
@@ -4706,6 +5588,7 @@ app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyA
     const resolvedPassportType = typeSchema.typeName;
     const tableName = getTable(resolvedPassportType);
     const guid = uuidv4();
+    const lineageId = guid;
     const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
     const existingByProductId = await findExistingPassportByProductId({
       tableName,
@@ -4738,8 +5621,8 @@ app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyA
       dataFields.map((key) => [key, toStoredPassportValue(fields[key])])
     );
 
-    const allCols = ["guid","company_id","model_name","product_id","created_by", ...dataFields];
-    const allVals = [guid, companyId, model_name || null, normalizedProductId, userId, ...dataFields.map(k => processedFields[k])];
+    const allCols = ["guid","lineage_id","company_id","model_name","product_id","created_by", ...dataFields];
+    const allVals = [guid, lineageId, companyId, model_name || null, normalizedProductId, userId, ...dataFields.map(k => processedFields[k])];
     const places  = allCols.map((_, i) => `$${i + 1}`).join(", ");
 
     const result = await pool.query(
@@ -4748,9 +5631,9 @@ app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyA
     );
 
     await pool.query(
-      `INSERT INTO passport_registry (guid, company_id, passport_type)
-       VALUES ($1, $2, $3) ON CONFLICT (guid) DO NOTHING`,
-      [guid, companyId, resolvedPassportType]
+      `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type)
+       VALUES ($1, $2, $3, $4) ON CONFLICT (guid) DO NOTHING`,
+      [guid, lineageId, companyId, resolvedPassportType]
     );
 
     await logAudit(companyId, userId, "CREATE", tableName, guid, null, {
@@ -4796,6 +5679,7 @@ app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCom
       const item = normalizePassportRequestBody(passports[i] || {});
       const { model_name, product_id, ...fields } = item;
       const guid = uuidv4();
+      const lineageId = guid;
       const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
 
       try {
@@ -4837,8 +5721,8 @@ app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCom
           dataFields.map((key) => [key, toStoredPassportValue(fields[key])])
         );
 
-        const allCols  = ["guid","company_id","model_name","product_id","created_by", ...dataFields];
-        const allVals  = [guid, companyId, model_name || null, normalizedProductId, userId, ...dataFields.map(k => processedFields[k])];
+        const allCols  = ["guid","lineage_id","company_id","model_name","product_id","created_by", ...dataFields];
+        const allVals  = [guid, lineageId, companyId, model_name || null, normalizedProductId, userId, ...dataFields.map(k => processedFields[k])];
         const places   = allCols.map((_, idx) => `$${idx + 1}`).join(", ");
 
         const r = await pool.query(
@@ -4846,8 +5730,8 @@ app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCom
           allVals
         );
         await pool.query(
-          `INSERT INTO passport_registry (guid, company_id, passport_type) VALUES ($1,$2,$3) ON CONFLICT (guid) DO NOTHING`,
-          [guid, companyId, resolvedPassportType]
+          `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type) VALUES ($1,$2,$3,$4) ON CONFLICT (guid) DO NOTHING`,
+          [guid, lineageId, companyId, resolvedPassportType]
         );
         await logAudit(companyId, userId, "CREATE", tableName, guid, null, {
           product_id: normalizedProductId,
@@ -4952,7 +5836,15 @@ app.get("/api/v1/passports", authenticateApiKey, apiKeyReadRateLimit, async (req
     const cap = Math.min(parseInt(limit) || 100, 500);
     const off = Math.max(parseInt(offset) || 0, 0);
 
-    let q = `SELECT * FROM ${tableName} WHERE deleted_at IS NULL AND company_id = $1`;
+    let q = `
+      WITH latest AS (
+        SELECT DISTINCT ON (lineage_id) *
+        FROM ${tableName}
+        WHERE deleted_at IS NULL AND company_id = $1
+        ORDER BY lineage_id, version_number DESC, updated_at DESC
+      )
+      SELECT * FROM latest WHERE 1=1
+    `;
     const params = [companyId];
     let i = 2;
     if (status) { q += ` AND release_status = $${i++}`; params.push(status); }
@@ -4986,7 +5878,7 @@ app.get("/api/v1/passports/:guid", authenticateApiKey, apiKeyReadRateLimit, asyn
 
     const tableName = getTable(reg.rows[0].passport_type);
     const r = await pool.query(
-      `SELECT * FROM ${tableName} WHERE guid = $1 AND deleted_at IS NULL ORDER BY version_number DESC LIMIT 1`,
+      `SELECT * FROM ${tableName} WHERE guid = $1 AND deleted_at IS NULL LIMIT 1`,
       [guid]
     );
     if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
@@ -5019,7 +5911,7 @@ app.get("/api/companies/:companyId/passports", authenticateToken, checkCompanyAc
       }
     }
     if (search)  { q += ` AND (p.model_name ILIKE $${i} OR p.product_id ILIKE $${i})`; params.push(`%${search}%`); i++; }
-    q += " ORDER BY p.created_at DESC";
+    q += " ORDER BY p.lineage_id, p.version_number DESC";
 
     const r = await pool.query(q, params);
     res.json(r.rows.map(row => ({ ...normalizePassportRow(row), passport_type: passportType })));
@@ -5058,21 +5950,28 @@ app.post("/api/companies/:companyId/passports/bulk-fetch", authenticateToken, ch
       try {
         let row = null;
         if (guid) {
-          const r = await pool.query(
+        const r = await pool.query(
             `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
              FROM ${tableName} p LEFT JOIN users u ON u.id = p.created_by
              WHERE p.guid = $1 AND p.company_id = $2 AND p.deleted_at IS NULL
-             ORDER BY p.version_number DESC LIMIT 1`,
+             LIMIT 1`,
             [guid, companyId]
           );
           row = r.rows[0];
         }
         if (!row && productId) {
           const r = await pool.query(
-            `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
-             FROM ${tableName} p LEFT JOIN users u ON u.id = p.created_by
-             WHERE p.product_id = $1 AND p.company_id = $2 AND p.deleted_at IS NULL
-             ORDER BY p.version_number DESC LIMIT 1`,
+            `WITH latest AS (
+               SELECT DISTINCT ON (lineage_id) *
+               FROM ${tableName}
+               WHERE product_id = $1 AND company_id = $2 AND deleted_at IS NULL
+               ORDER BY lineage_id, version_number DESC, updated_at DESC
+             )
+             SELECT latest.*, u.email AS created_by_email, u.first_name, u.last_name
+             FROM latest
+             LEFT JOIN users u ON u.id = latest.created_by
+             ORDER BY latest.version_number DESC
+             LIMIT 1`,
             [productId, companyId]
           );
           row = r.rows[0];
@@ -5167,6 +6066,55 @@ app.get("/api/companies/:companyId/passports/export-drafts", authenticateToken, 
   }
 });
 
+// List archived passports (MUST be before :guid routes)
+app.get("/api/companies/:companyId/passports/archived", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { search, passportType } = req.query;
+
+    let q = `SELECT pa.*, u.email AS archived_by_email, u.first_name AS archived_by_first_name, u.last_name AS archived_by_last_name
+             FROM passport_archives pa
+             LEFT JOIN users u ON u.id = pa.archived_by
+             WHERE pa.company_id = $1`;
+    const params = [companyId];
+    let i = 2;
+
+    if (passportType) { q += ` AND pa.passport_type = $${i++}`; params.push(passportType); }
+    if (search) { q += ` AND (pa.model_name ILIKE $${i} OR pa.product_id ILIKE $${i} OR pa.guid::text ILIKE $${i})`; params.push(`%${search}%`); i++; }
+
+    q = `
+      SELECT
+        sub.*,
+        COALESCE(phv.is_public, sub.release_status IN ('released', 'obsolete')) AS is_public,
+        public_version.version_number AS public_version_number
+      FROM (${q}) sub
+      LEFT JOIN passport_history_visibility phv
+        ON phv.passport_guid = sub.guid
+       AND phv.version_number = sub.version_number
+      LEFT JOIN LATERAL (
+        SELECT pa_public.version_number
+        FROM passport_archives pa_public
+        LEFT JOIN passport_history_visibility phv_public
+          ON phv_public.passport_guid = pa_public.guid
+         AND phv_public.version_number = pa_public.version_number
+        WHERE pa_public.lineage_id = sub.lineage_id
+          AND pa_public.company_id = sub.company_id
+          AND pa_public.release_status IN ('released', 'obsolete')
+          AND COALESCE(phv_public.is_public, true) = true
+        ORDER BY pa_public.version_number DESC, pa_public.archived_at DESC
+        LIMIT 1
+      ) public_version ON true
+      ORDER BY sub.lineage_id, sub.version_number DESC, sub.archived_at DESC
+    `;
+
+    const r = await pool.query(q, params);
+    res.json(r.rows);
+  } catch (e) {
+    console.error("Archived list error:", e.message);
+    res.status(500).json({ error: "Failed to fetch archived passports" });
+  }
+});
+
 // GET SINGLE — company-scoped (for dashboard)
 app.get("/api/companies/:companyId/passports/:guid", authenticateToken, checkCompanyAccess, async (req, res) => {
   try {
@@ -5174,19 +6122,56 @@ app.get("/api/companies/:companyId/passports/:guid", authenticateToken, checkCom
     const { passportType }    = req.query;
     if (!passportType) return res.status(400).json({ error: "passportType query param required" });
 
-    const tableName = getTable(passportType);
+    const resolved = await fetchCompanyPassportRecord({ companyId, guid, passportType });
+    if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
-    const r = await pool.query(
-      `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
-       FROM ${tableName} p
-       LEFT JOIN users u ON u.id = p.created_by
-       WHERE p.guid = $1 AND p.company_id = $2 AND p.deleted_at IS NULL
-       ORDER BY p.version_number DESC LIMIT 1`,
-      [guid, companyId]
-    );
-    if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-    res.json({ ...normalizePassportRow(r.rows[0]), passport_type: passportType });
+    res.json(resolved.passport);
   } catch (e) { res.status(500).json({ error: "Failed to fetch passport" }); }
+});
+
+app.get("/api/companies/:companyId/passports/:passportKey/preview", authenticateToken, checkCompanyAccess, async (req, res) => {
+  try {
+    const { companyId, passportKey } = req.params;
+    const resolved = await resolveCompanyPreviewPassport({ companyId, passportKey });
+    if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+
+    const passport = await stripRestrictedFieldsForPublicView(resolved.passport, resolved.passport.passport_type);
+    const companyNameMap = await getCompanyNameMap([passport.company_id]);
+    const companyName = companyNameMap.get(String(passport.company_id)) || "";
+
+    res.json({
+      ...passport,
+      preview_mode: true,
+      preview_path: buildPreviewPassportPath({
+        companyName,
+        manufacturerName: passport.manufacturer,
+        manufacturedBy: passport.manufactured_by,
+        modelName: passport.model_name,
+        productId: passport.product_id,
+        fallbackGuid: passport.guid,
+      }),
+      public_path: buildCurrentPublicPassportPath({
+        companyName,
+        manufacturerName: passport.manufacturer,
+        manufacturedBy: passport.manufactured_by,
+        modelName: passport.model_name,
+        productId: passport.product_id,
+      }),
+      inactive_path: buildInactivePublicPassportPath({
+        companyName,
+        manufacturerName: passport.manufacturer,
+        manufacturedBy: passport.manufactured_by,
+        modelName: passport.model_name,
+        productId: passport.product_id,
+        versionNumber: passport.version_number,
+      }),
+    });
+  } catch (e) {
+    if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+      return res.status(409).json({ error: e.message });
+    }
+    res.status(500).json({ error: "Failed to fetch passport preview" });
+  }
 });
 
 app.get("/api/companies/:companyId/passports/:guid/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -5246,7 +6231,78 @@ app.delete("/api/companies/:companyId/passports/:guid/edit-session", authenticat
   }
 });
 
-// GET SINGLE — public viewer (uses registry to find the right table)
+// GET SINGLE — public viewer by product_id
+// Non-public fields are stripped from the response; use the /unlock endpoint to access them.
+app.get("/api/passports/by-product/:productId", publicReadRateLimit, async (req, res) => {
+  try {
+    const productId = normalizeProductIdValue(req.params.productId);
+    const version = req.query.version ? parseInt(req.query.version, 10) : null;
+    if (!productId) return res.status(400).json({ error: "productId is required" });
+    if (req.query.version && !Number.isFinite(version)) {
+      return res.status(400).json({ error: "version must be a valid integer" });
+    }
+
+    let { passport } = await resolveReleasedPassportByProductId(productId, { versionNumber: version });
+    if (!passport) {
+      ({ passport } = await resolvePublicPassportByGuid(req.params.productId, { versionNumber: version }));
+    }
+    if (!passport) return res.status(404).json({ error: "Passport not found" });
+
+    const sanitizedPassport = await stripRestrictedFieldsForPublicView(passport, passport.passport_type);
+    const companyNameMap = await getCompanyNameMap([sanitizedPassport.company_id]);
+    const companyName = companyNameMap.get(String(sanitizedPassport.company_id)) || "";
+
+    res.json({
+      ...sanitizedPassport,
+      public_path: buildCurrentPublicPassportPath({
+        companyName,
+        manufacturerName: sanitizedPassport.manufacturer,
+        manufacturedBy: sanitizedPassport.manufactured_by,
+        modelName: sanitizedPassport.model_name,
+        productId: sanitizedPassport.product_id,
+      }),
+      inactive_path: buildInactivePublicPassportPath({
+        companyName,
+        manufacturerName: sanitizedPassport.manufacturer,
+        manufacturedBy: sanitizedPassport.manufactured_by,
+        modelName: sanitizedPassport.model_name,
+        productId: sanitizedPassport.product_id,
+        versionNumber: sanitizedPassport.version_number,
+      }),
+      inactive_public_version: version !== null && Number(version) === Number(sanitizedPassport.version_number),
+    });
+  } catch (e) {
+    if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+      return res.status(409).json({ error: e.message });
+    }
+    res.status(500).json({ error: "Failed to fetch passport" });
+  }
+});
+
+app.get("/api/passports/by-product/:productId/history", publicReadRateLimit, async (req, res) => {
+  try {
+    const productId = normalizeProductIdValue(req.params.productId);
+    if (!productId) return res.status(400).json({ error: "productId is required" });
+
+    const { passport } = await resolveReleasedPassportByProductId(productId);
+    if (!passport) return res.status(404).json({ error: "Passport not found" });
+
+    const historyPayload = await buildPassportVersionHistory({
+      guid: passport.guid,
+      passportType: passport.passport_type,
+      publicOnly: true,
+    });
+
+    res.json(historyPayload);
+  } catch (e) {
+    if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+      return res.status(409).json({ error: e.message });
+    }
+    res.status(500).json({ error: "Failed to fetch passport history" });
+  }
+});
+
+// GET SINGLE — legacy public lookup by guid
 // Non-public fields are stripped from the response; use the /unlock endpoint to access them.
 app.get("/api/passports/:guid", publicReadRateLimit, async (req, res) => {
   try {
@@ -5263,34 +6319,33 @@ app.get("/api/passports/:guid", publicReadRateLimit, async (req, res) => {
 
     const r = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE guid = $1 AND deleted_at IS NULL
-       ORDER BY version_number DESC LIMIT 1`,
+       WHERE guid = $1
+         AND deleted_at IS NULL
+         AND release_status = 'released'
+       LIMIT 1`,
       [guid]
     );
-    if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-    const passport = { ...normalizePassportRow(r.rows[0]), passport_type };
 
-    // Strip any fields whose access level is not "public"
-    // (fetch type definition to know which fields are restricted)
-    try {
-      const typeRes = await pool.query(
-        "SELECT fields_json FROM passport_types WHERE type_name = $1",
-        [passport_type]
+    let passport;
+    if (r.rows.length) {
+      passport = { ...normalizePassportRow(r.rows[0]), passport_type };
+    } else {
+      // Fall back to archived data
+      const archRes = await pool.query(
+        `SELECT row_data, passport_type FROM passport_archives
+         WHERE guid = $1 AND release_status = 'released'
+         ORDER BY version_number DESC LIMIT 1`,
+        [guid]
       );
-      if (typeRes.rows.length) {
-        const sections = typeRes.rows[0].fields_json?.sections || [];
-        for (const section of sections) {
-          for (const field of (section.fields || [])) {
-            const access = field.access || ["public"];
-            if (!access.includes("public")) {
-              delete passport[field.key]; // remove restricted field value
-            }
-          }
-        }
-      }
-    } catch { /* non-fatal — serve whatever we have */ }
+      if (!archRes.rows.length) return res.status(404).json({ error: "Passport not found" });
+      const rowData = typeof archRes.rows[0].row_data === "string"
+        ? JSON.parse(archRes.rows[0].row_data)
+        : archRes.rows[0].row_data;
+      passport = { ...normalizePassportRow(rowData), passport_type, archived: true };
+    }
 
-    res.json(passport);
+    const sanitizedPassport = await stripRestrictedFieldsForPublicView(passport, passport_type);
+    res.json(sanitizedPassport);
   } catch (e) { res.status(500).json({ error: "Failed to fetch passport" }); }
 });
 
@@ -5327,10 +6382,22 @@ app.get("/api/passports/:guid/export/aas", publicHeavyRateLimit, async (req, res
     const { company_id, passport_type } = reg.rows[0];
     const tbl = getTable(passport_type);
 
-    const r = await pool.query(
+    let r = await pool.query(
       `SELECT * FROM ${tbl} WHERE guid = $1 AND deleted_at IS NULL AND release_status = 'released'
        ORDER BY version_number DESC LIMIT 1`, [guid]
     );
+    if (!r.rows.length) {
+      // Fall back to archived data
+      const archRes = await pool.query(
+        `SELECT row_data FROM passport_archives
+         WHERE guid = $1 AND release_status = 'released'
+         ORDER BY version_number DESC LIMIT 1`, [guid]
+      );
+      if (archRes.rows.length) {
+        const rowData = typeof archRes.rows[0].row_data === "string" ? JSON.parse(archRes.rows[0].row_data) : archRes.rows[0].row_data;
+        r = { rows: [rowData] };
+      }
+    }
     if (!r.rows.length) return res.status(404).json({ error: "Passport not found or not released" });
 
     const [typeRes, companyRes, dynRes] = await Promise.all([
@@ -5373,10 +6440,19 @@ app.get("/api/companies/:companyId/passports/:guid/export/aas",
     const { passport_type } = reg.rows[0];
     const tbl = getTable(passport_type);
 
-    const r = await pool.query(
+    let r = await pool.query(
       `SELECT * FROM ${tbl} WHERE guid = $1 AND deleted_at IS NULL
        ORDER BY version_number DESC LIMIT 1`, [guid]
     );
+    if (!r.rows.length) {
+      const archRes = await pool.query(
+        `SELECT row_data FROM passport_archives WHERE guid = $1 ORDER BY version_number DESC LIMIT 1`, [guid]
+      );
+      if (archRes.rows.length) {
+        const rowData = typeof archRes.rows[0].row_data === "string" ? JSON.parse(archRes.rows[0].row_data) : archRes.rows[0].row_data;
+        r = { rows: [rowData] };
+      }
+    }
     if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
 
     const [typeRes, companyRes, dynRes] = await Promise.all([
@@ -5425,7 +6501,16 @@ app.get("/api/passports/:guid/signature", publicReadRateLimit, async (req, res) 
           `SELECT version_number FROM ${tbl} WHERE guid = $1 AND release_status = 'released'
            ORDER BY version_number DESC LIMIT 1`, [guid]
         );
-        version = vRes.rows[0]?.version_number || 1;
+        if (vRes.rows.length) {
+          version = vRes.rows[0].version_number;
+        } else {
+          // Check archived data
+          const archVer = await pool.query(
+            `SELECT version_number FROM passport_archives WHERE guid = $1 AND release_status = 'released'
+             ORDER BY version_number DESC LIMIT 1`, [guid]
+          );
+          version = archVer.rows[0]?.version_number || 1;
+        }
       }
       version = version || 1;
     }
@@ -5501,6 +6586,26 @@ app.get("/.well-known/did.json", async (_req, res) => {
   }
 });
 
+// JSON-LD CONTEXT — defines the DigitalProductPassport type and credential subject vocabulary.
+// External verifiers dereference this URL from the VC's @context to understand custom terms.
+// When CEN-CENELEC JTC 24 publishes an official context, this can be replaced with that URI.
+app.get("/contexts/dpp/v1", (_req, res) => {
+  const appUrl = process.env.APP_URL || "http://localhost:3001";
+  res.setHeader("Content-Type", "application/ld+json");
+  res.json({
+    "@context": {
+      "@version": 1.1,
+      "dpp":              `${appUrl}/ns/dpp/v1#`,
+      "DigitalProductPassport": "dpp:DigitalProductPassport",
+      "passportType":     "dpp:passportType",
+      "modelName":        "dpp:modelName",
+      "productId":        "dpp:productId",
+      "companyId":        "dpp:companyId",
+      "versionNumber":    { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+    },
+  });
+});
+
 // UNLOCK — validate access key and return full passport data including restricted fields
 app.post("/api/passports/:guid/unlock", publicUnlockRateLimit, async (req, res) => {
   try {
@@ -5525,15 +6630,24 @@ app.post("/api/passports/:guid/unlock", publicUnlockRateLimit, async (req, res) 
     const { passport_type } = reg.rows[0];
     const tableName = getTable(passport_type);
 
-    const r = await pool.query(
+    let r = await pool.query(
       `SELECT * FROM ${tableName}
        WHERE guid = $1 AND deleted_at IS NULL
        ORDER BY version_number DESC LIMIT 1`,
       [guid]
     );
+    if (!r.rows.length) {
+      const archRes = await pool.query(
+        `SELECT row_data FROM passport_archives WHERE guid = $1 ORDER BY version_number DESC LIMIT 1`, [guid]
+      );
+      if (archRes.rows.length) {
+        const rowData = typeof archRes.rows[0].row_data === "string" ? JSON.parse(archRes.rows[0].row_data) : archRes.rows[0].row_data;
+        r = { rows: [rowData] };
+      }
+    }
     if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-    res.json({ success: true, passport: { ...normalizePassportRow(r.rows[0]), passport_type } });
+    res.json({ success: true, passport: { ...normalizePassportRow(r.rows[0]), passport_type, archived: !!r.rows[0]?.archived } });
   } catch (e) { res.status(500).json({ error: "Failed to unlock passport" }); }
 });
 
@@ -5688,9 +6802,9 @@ app.patch("/api/companies/:companyId/passports/:guid", authenticateToken, checkC
     const tableName = getTable(typeSchema.typeName);
 
     const current = await pool.query(
-      `SELECT id, product_id FROM ${tableName}
+      `SELECT id, lineage_id, product_id FROM ${tableName}
        WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
-       ORDER BY version_number DESC LIMIT 1`,
+       LIMIT 1`,
       [guid]
     );
     if (!current.rows.length)
@@ -5707,6 +6821,7 @@ app.patch("/api/companies/:companyId/passports/:guid", authenticateToken, checkC
         companyId,
         productId: normalizedProductId,
         excludeGuid: guid,
+        excludeLineageId: current.rows[0].lineage_id,
       });
       if (existingByProductId) {
         return res.status(409).json({
@@ -5778,18 +6893,24 @@ app.patch("/api/companies/:companyId/passports", authenticateToken, checkCompany
         }
 
         // Find existing passport — by guid first, then by product_id
-        let rowId, matchedGuid;
+        let rowId, matchedGuid, matchedLineageId = null;
         if (incomingGuid) {
           const byGuid = await pool.query(
-            `SELECT id, guid FROM ${tableName} WHERE guid=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
+            `SELECT id, guid, lineage_id FROM ${tableName} WHERE guid=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
             [incomingGuid, companyId]
           );
-          if (byGuid.rows.length) { rowId = byGuid.rows[0].id; matchedGuid = byGuid.rows[0].guid; }
+          if (byGuid.rows.length) {
+            rowId = byGuid.rows[0].id;
+            matchedGuid = byGuid.rows[0].guid;
+            matchedLineageId = byGuid.rows[0].lineage_id;
+          }
         }
         if (!rowId && normalizedProductId) {
           const byProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
           if (byProductId && isEditablePassportStatus(normalizeReleaseStatus(byProductId.release_status))) {
-            rowId = byProductId.id; matchedGuid = byProductId.guid;
+            rowId = byProductId.id;
+            matchedGuid = byProductId.guid;
+            matchedLineageId = byProductId.lineage_id;
           }
         }
 
@@ -5804,7 +6925,13 @@ app.patch("/api/companies/:companyId/passports", authenticateToken, checkCompany
             details.push({ guid: matchedGuid, status: "failed", error: "product_id cannot be blank" });
             failed++; continue;
           }
-          const dup = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId, excludeGuid: matchedGuid });
+          const dup = await findExistingPassportByProductId({
+            tableName,
+            companyId,
+            productId: normalizedProductId,
+            excludeGuid: matchedGuid,
+            excludeLineageId: matchedLineageId,
+          });
           if (dup) {
             details.push({ guid: matchedGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
             failed++; continue;
@@ -5864,6 +6991,7 @@ app.patch("/api/companies/:companyId/passports/:guid/release", authenticateToken
       );
     }
 
+    await markOlderVersionsObsolete(tableName, guid, released.version_number);
     await logAudit(companyId, req.user.userId, "RELEASE", tableName, guid,
       { release_status: "draft_or_in_revision" }, { release_status: "released" });
     res.json({ success: true, passport: normalizePassportRow(released) });
@@ -5883,20 +7011,25 @@ app.post("/api/companies/:companyId/passports/:guid/revise", authenticateToken, 
     const current = await pool.query(
       `SELECT * FROM ${tableName}
        WHERE guid = $1 AND release_status = 'released'
-       ORDER BY version_number DESC LIMIT 1`,
+       LIMIT 1`,
       [guid]
     );
     if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 
+    const src        = current.rows[0];
     const dup = await pool.query(
-      `SELECT id FROM ${tableName} WHERE guid = $1 AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL} AND deleted_at IS NULL`,
-      [guid]
+      `SELECT id
+       FROM ${tableName}
+       WHERE lineage_id = $1
+         AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL}
+         AND deleted_at IS NULL`,
+      [src.lineage_id]
     );
     if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
 
-    const src        = current.rows[0];
+    const newGuid    = uuidv4();
     const newVersion = src.version_number + 1;
-    const excluded   = new Set(["id","guid","created_at","updated_at","updated_by","qr_code"]);
+    const excluded   = new Set(["id","guid","created_at","updated_at","updated_by","qr_code","lineage_id"]);
     const cols       = Object.keys(src).filter(k => !excluded.has(k));
     const vals       = cols.map(k => {
       if (k === "version_number") return newVersion;
@@ -5906,14 +7039,29 @@ app.post("/api/companies/:companyId/passports/:guid/revise", authenticateToken, 
       return src[k];
     });
 
-    const allCols = ["guid", ...cols];
-    const allVals = [guid, ...vals];
+    const allCols = ["guid", "lineage_id", ...cols];
+    const allVals = [newGuid, src.lineage_id, ...vals];
     const places  = allCols.map((_, i) => `$${i + 1}`).join(", ");
     await pool.query(`INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places})`, allVals);
 
-    await logAudit(companyId, userId, "REVISE", tableName, guid,
+    const sourceRegistry = await pool.query(
+      `SELECT access_key, device_api_key
+       FROM passport_registry
+       WHERE guid = $1 AND company_id = $2
+       LIMIT 1`,
+      [guid, companyId]
+    );
+    const sourceKeys = sourceRegistry.rows[0] || {};
+    await pool.query(
+      `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type, access_key, device_api_key)
+       VALUES ($1, $2, $3, $4, COALESCE($5, gen_random_uuid()::text), COALESCE($6, replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')))
+       ON CONFLICT (guid) DO NOTHING`,
+      [newGuid, src.lineage_id, companyId, passportType, sourceKeys.access_key || null, sourceKeys.device_api_key || null]
+    );
+
+    await logAudit(companyId, userId, "REVISE", tableName, newGuid,
       { version_number: src.version_number }, { version_number: newVersion });
-    res.json({ success: true, newVersion, release_status: IN_REVISION_STATUS });
+    res.json({ success: true, guid: newGuid, newVersion, release_status: IN_REVISION_STATUS });
   } catch (e) { res.status(500).json({ error: "Failed to revise passport" }); }
 });
 
@@ -6024,28 +7172,15 @@ app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, c
       );
 
       const releasedRes = await pool.query(
-        `SELECT DISTINCT ON (guid) *
+        `SELECT *
          FROM ${tableName}
          WHERE company_id = $1
            AND guid = ANY($2::uuid[])
            AND release_status = 'released'
-           AND deleted_at IS NULL
-         ORDER BY guid, version_number DESC`,
+           AND deleted_at IS NULL`,
         [companyId, guids]
       );
       const releasedByGuid = new Map(releasedRes.rows.map(row => [row.guid, row]));
-
-      const blockingRes = await pool.query(
-        `SELECT DISTINCT ON (guid) guid, version_number, release_status
-         FROM ${tableName}
-         WHERE company_id = $1
-           AND guid = ANY($2::uuid[])
-           AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL}
-           AND deleted_at IS NULL
-         ORDER BY guid, version_number DESC`,
-        [companyId, guids]
-      );
-      const blockingByGuid = new Map(blockingRes.rows.map(row => [row.guid, row]));
 
       for (const guid of guids) {
         const insertBatchItem = async (status, message, sourceVersion = null, newVersion = null) => {
@@ -6058,8 +7193,6 @@ app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, c
         };
 
         const source = releasedByGuid.get(guid);
-        const blocker = blockingByGuid.get(guid);
-
         if (!source) {
           const message = "No released passport version was found for this GUID.";
           details.push({ guid, passport_type: passportType, status: "skipped", message });
@@ -6068,6 +7201,18 @@ app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, c
           continue;
         }
 
+        const blockerRes = await pool.query(
+          `SELECT guid, version_number, release_status
+           FROM ${tableName}
+           WHERE company_id = $1
+             AND lineage_id = $2
+             AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL}
+             AND deleted_at IS NULL
+           ORDER BY version_number DESC
+           LIMIT 1`,
+          [companyId, source.lineage_id]
+        );
+        const blocker = blockerRes.rows[0];
         if (blocker) {
           const blockerStatus = normalizeReleaseStatus(blocker.release_status);
           const message = blockerStatus === "in_review"
@@ -6102,7 +7247,8 @@ app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, c
         try {
           const sourceVersion = parseInt(source.version_number, 10) || 1;
           const newVersion = sourceVersion + 1;
-          const excluded = new Set(["id", "guid", "created_at", "updated_at", "updated_by", "qr_code"]);
+          const newGuid = uuidv4();
+          const excluded = new Set(["id", "guid", "created_at", "updated_at", "updated_by", "qr_code", "lineage_id"]);
           const columns = Object.keys(source).filter(key => !excluded.has(key));
           const mappedChanges = Object.fromEntries(
             applicableChanges.map(([key, value]) => [key, coerceBulkFieldValue(fieldMap.get(key), value)])
@@ -6119,12 +7265,27 @@ app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, c
             return source[key];
           });
 
-          const allColumns = ["guid", ...columns];
-          const allValues = [guid, ...values];
+          const allColumns = ["guid", "lineage_id", ...columns];
+          const allValues = [newGuid, source.lineage_id, ...values];
           const placeholders = allColumns.map((_, index) => `$${index + 1}`).join(", ");
           await pool.query(
             `INSERT INTO ${tableName} (${allColumns.join(", ")}) VALUES (${placeholders})`,
             allValues
+          );
+
+          const sourceRegistry = await pool.query(
+            `SELECT access_key, device_api_key
+             FROM passport_registry
+             WHERE guid = $1 AND company_id = $2
+             LIMIT 1`,
+            [guid, companyId]
+          );
+          const sourceKeys = sourceRegistry.rows[0] || {};
+          await pool.query(
+            `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type, access_key, device_api_key)
+             VALUES ($1, $2, $3, $4, COALESCE($5, gen_random_uuid()::text), COALESCE($6, replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')))
+             ON CONFLICT (guid) DO NOTHING`,
+            [newGuid, source.lineage_id, companyId, passportType, sourceKeys.access_key || null, sourceKeys.device_api_key || null]
           );
 
           let detailStatus = submitToWorkflow ? "submitted" : "revised";
@@ -6134,7 +7295,7 @@ app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, c
             try {
               await submitPassportToWorkflow({
                 companyId,
-                guid,
+                guid: newGuid,
                 passportType,
                 userId,
                 reviewerId,
@@ -6151,7 +7312,7 @@ app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, c
             }
           }
 
-          await logAudit(companyId, userId, "BULK_REVISE", tableName, guid,
+          await logAudit(companyId, userId, "BULK_REVISE", tableName, newGuid,
             { version_number: sourceVersion, release_status: source.release_status },
             {
               version_number: newVersion,
@@ -6163,7 +7324,7 @@ app.post("/api/companies/:companyId/passports/bulk-revise", authenticateToken, c
           );
 
           details.push({
-            guid,
+            guid: newGuid,
             passport_type: passportType,
             status: detailStatus,
             source_version_number: sourceVersion,
@@ -6323,6 +7484,317 @@ app.delete("/api/companies/:companyId/passports", authenticateToken, checkCompan
   }
 });
 
+// BULK RELEASE (release multiple draft/in_revision passports at once)
+app.post("/api/companies/:companyId/passports/bulk-release", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.userId;
+    const { items } = req.body || {};
+
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: "items must be a non-empty array of { guid, passportType }" });
+    }
+    if (items.length > 500) {
+      return res.status(400).json({ error: "Maximum 500 passports per bulk release request" });
+    }
+
+    let released = 0, skipped = 0, failed = 0;
+    const details = [];
+
+    for (const item of items) {
+      const guid = item?.guid;
+      const passportType = item?.passportType || item?.passport_type;
+      if (!guid || !passportType) {
+        details.push({ guid, status: "failed", message: "Missing guid or passportType" });
+        failed++; continue;
+      }
+      try {
+        const tableName = getTable(passportType);
+        const r = await pool.query(
+          `UPDATE ${tableName}
+           SET release_status = 'released', updated_at = NOW()
+           WHERE guid = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+           RETURNING *`,
+          [guid, companyId]
+        );
+        if (!r.rows.length) {
+          details.push({ guid, status: "skipped", message: "Not found or already released" });
+          skipped++; continue;
+        }
+        const releasedRow = r.rows[0];
+
+        // Sign the released passport
+        const typeRes = await pool.query("SELECT * FROM passport_types WHERE type_name = $1", [passportType]);
+        const sigData = await signPassport({ ...releasedRow, passport_type: passportType }, typeRes.rows[0] || null);
+        if (sigData) {
+          await pool.query(
+            `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, signing_key_id, released_at, vc_json)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
+            [guid, releasedRow.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+          );
+        }
+
+        await markOlderVersionsObsolete(tableName, guid, releasedRow.version_number);
+        await logAudit(companyId, userId, "RELEASE", tableName, guid,
+          { release_status: "draft_or_in_revision" }, { release_status: "released" });
+        details.push({ guid, status: "released", version: releasedRow.version_number });
+        released++;
+      } catch (e) {
+        details.push({ guid, status: "failed", message: e.message });
+        failed++;
+      }
+    }
+
+    res.json({ summary: { released, skipped, failed, total: items.length }, details });
+  } catch (e) {
+    console.error("Bulk release error:", e.message, e.stack);
+    res.status(500).json({ error: "Bulk release failed", detail: e.message });
+  }
+});
+
+// BULK WORKFLOW SUBMIT (submit multiple draft/in_revision passports to workflow)
+app.post("/api/companies/:companyId/passports/bulk-workflow", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.userId;
+    const { items, reviewerId, approverId } = req.body || {};
+
+    if (!Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: "items must be a non-empty array of { guid, passportType }" });
+    }
+    if (items.length > 500) {
+      return res.status(400).json({ error: "Maximum 500 passports per bulk workflow request" });
+    }
+    if (!reviewerId && !approverId) {
+      return res.status(400).json({ error: "Select at least one reviewer or approver." });
+    }
+
+    let submitted = 0, skipped = 0, failed = 0;
+    const details = [];
+
+    for (const item of items) {
+      const guid = item?.guid;
+      const passportType = item?.passportType || item?.passport_type;
+      if (!guid || !passportType) {
+        details.push({ guid, status: "failed", message: "Missing guid or passportType" });
+        failed++; continue;
+      }
+      try {
+        await submitPassportToWorkflow({ companyId, guid, passportType, userId, reviewerId, approverId });
+        details.push({ guid, status: "submitted" });
+        submitted++;
+      } catch (e) {
+        details.push({ guid, status: "skipped", message: e.message });
+        skipped++;
+      }
+    }
+
+    res.json({ summary: { submitted, skipped, failed, total: items.length }, details });
+  } catch (e) {
+    console.error("Bulk workflow error:", e.message, e.stack);
+    res.status(500).json({ error: "Bulk workflow submit failed", detail: e.message });
+  }
+});
+
+// ── PASSPORT ARCHIVING ──────────────────────────────────────────────────────
+
+// Archive a single passport (moves all versions from type table to archive table)
+app.post("/api/companies/:companyId/passports/:guid/archive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId, guid } = req.params;
+    const { passportType } = req.body;
+    const userId = req.user.userId;
+    if (!passportType) return res.status(400).json({ error: "passportType required" });
+
+    const tableName = getTable(passportType);
+    const lineageContext = await getPassportLineageContext({ guid, passportType, companyId });
+    if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
+    const rows = await pool.query(
+      `SELECT * FROM ${tableName} WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+      [lineageContext.lineage_id, companyId]
+    );
+    if (!rows.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+    // Insert all versions into archive
+    for (const row of rows.rows) {
+      const { id, deleted_at, ...rowData } = row;
+      await pool.query(
+        `INSERT INTO passport_archives (guid, lineage_id, company_id, passport_type, version_number, model_name, product_id, release_status, row_data, archived_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [row.guid, row.lineage_id, companyId, passportType, row.version_number, row.model_name, row.product_id, row.release_status, JSON.stringify(rowData), userId]
+      );
+    }
+
+    // Soft-delete from the passport table
+    await pool.query(
+      `UPDATE ${tableName} SET deleted_at = NOW() WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+      [lineageContext.lineage_id, companyId]
+    );
+
+    await logAudit(companyId, userId, "ARCHIVE", tableName, guid, null, { versions_archived: rows.rows.length });
+    res.json({ success: true, versions_archived: rows.rows.length });
+  } catch (e) {
+    console.error("Archive error:", e.message);
+    res.status(500).json({ error: "Failed to archive passport" });
+  }
+});
+
+// Bulk archive
+app.post("/api/companies/:companyId/passports/bulk-archive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.userId;
+    const { items } = req.body || {};
+    if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items required" });
+    if (items.length > 500) return res.status(400).json({ error: "Max 500 per request" });
+
+    let archived = 0, skipped = 0;
+    for (const item of items) {
+        const guid = item?.guid;
+        const passportType = item?.passportType || item?.passport_type;
+        if (!guid || !passportType) { skipped++; continue; }
+      try {
+        const tableName = getTable(passportType);
+        const lineageContext = await getPassportLineageContext({ guid, passportType, companyId });
+        if (!lineageContext?.lineage_id) { skipped++; continue; }
+        const rows = await pool.query(
+          `SELECT * FROM ${tableName} WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+          [lineageContext.lineage_id, companyId]
+        );
+        if (!rows.rows.length) { skipped++; continue; }
+        for (const row of rows.rows) {
+          const { id, deleted_at, ...rowData } = row;
+          await pool.query(
+            `INSERT INTO passport_archives (guid, lineage_id, company_id, passport_type, version_number, model_name, product_id, release_status, row_data, archived_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [row.guid, row.lineage_id, companyId, passportType, row.version_number, row.model_name, row.product_id, row.release_status, JSON.stringify(rowData), userId]
+          );
+        }
+        await pool.query(
+          `UPDATE ${tableName} SET deleted_at = NOW() WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
+          [lineageContext.lineage_id, companyId]
+        );
+        await logAudit(companyId, userId, "ARCHIVE", getTable(passportType), guid, null, { versions_archived: rows.rows.length });
+        archived++;
+      } catch { skipped++; }
+    }
+    res.json({ summary: { archived, skipped, total: items.length } });
+  } catch (e) {
+    console.error("Bulk archive error:", e.message);
+    res.status(500).json({ error: "Bulk archive failed" });
+  }
+});
+
+// Unarchive (restore from archive back to passport table)
+app.post("/api/companies/:companyId/passports/:guid/unarchive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId, guid } = req.params;
+    const userId = req.user.userId;
+
+    const archiveContext = await pool.query(
+      `SELECT lineage_id
+       FROM passport_archives
+       WHERE (guid = $1 OR lineage_id = $1)
+         AND company_id = $2
+       ORDER BY version_number DESC
+       LIMIT 1`,
+      [guid, companyId]
+    );
+    if (!archiveContext.rows.length) return res.status(404).json({ error: "Archived passport not found" });
+
+    const archiveRows = await pool.query(
+      `SELECT * FROM passport_archives WHERE lineage_id = $1 AND company_id = $2 ORDER BY version_number ASC`,
+      [archiveContext.rows[0].lineage_id, companyId]
+    );
+    if (!archiveRows.rows.length) return res.status(404).json({ error: "Archived passport not found" });
+
+    const passportType = archiveRows.rows[0].passport_type;
+    const tableName = getTable(passportType);
+
+    for (const ar of archiveRows.rows) {
+      const rowData = typeof ar.row_data === "string" ? JSON.parse(ar.row_data) : ar.row_data;
+      // Remove system keys that would conflict on re-insert
+      const { id, deleted_at, ...insertData } = rowData;
+
+      // Check if the row already exists (e.g. soft-deleted version still present)
+      const existing = await pool.query(
+        `SELECT id FROM ${tableName} WHERE guid = $1 AND version_number = $2`,
+        [ar.guid, ar.version_number]
+      );
+      if (existing.rows.length) {
+        // Un-soft-delete the existing row
+        await pool.query(
+          `UPDATE ${tableName} SET deleted_at = NULL WHERE guid = $1 AND version_number = $2`,
+          [ar.guid, ar.version_number]
+        );
+      }
+      // If it was truly deleted from table (not just soft-deleted), we'd need to re-insert.
+      // But archive is built on soft-delete so the row should still be there.
+    }
+
+    // Also un-soft-delete any remaining rows for this guid
+    await pool.query(
+      `UPDATE ${tableName} SET deleted_at = NULL WHERE lineage_id = $1 AND company_id = $2`,
+      [archiveRows.rows[0].lineage_id, companyId]
+    );
+
+    // Remove from archive
+    await pool.query(`DELETE FROM passport_archives WHERE lineage_id = $1 AND company_id = $2`, [archiveRows.rows[0].lineage_id, companyId]);
+
+    await logAudit(companyId, userId, "UNARCHIVE", tableName, guid, null, { versions_restored: archiveRows.rows.length });
+    res.json({ success: true, versions_restored: archiveRows.rows.length });
+  } catch (e) {
+    console.error("Unarchive error:", e.message);
+    res.status(500).json({ error: "Failed to unarchive passport" });
+  }
+});
+
+// Bulk unarchive
+app.post("/api/companies/:companyId/passports/bulk-unarchive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const userId = req.user.userId;
+    const { guids } = req.body || {};
+    if (!Array.isArray(guids) || !guids.length) return res.status(400).json({ error: "guids required" });
+    if (guids.length > 500) return res.status(400).json({ error: "Max 500 per request" });
+
+    let restored = 0, skipped = 0;
+    for (const guid of guids) {
+      try {
+        const contextRes = await pool.query(
+          `SELECT lineage_id, passport_type
+           FROM passport_archives
+           WHERE (guid = $1 OR lineage_id = $1)
+             AND company_id = $2
+           ORDER BY version_number DESC
+           LIMIT 1`,
+          [guid, companyId]
+        );
+        if (!contextRes.rows.length) { skipped++; continue; }
+        const lineageId = contextRes.rows[0].lineage_id;
+        const archiveRows = await pool.query(
+          `SELECT * FROM passport_archives WHERE lineage_id = $1 AND company_id = $2`,
+          [lineageId, companyId]
+        );
+        if (!archiveRows.rows.length) { skipped++; continue; }
+        const passportType = archiveRows.rows[0].passport_type;
+        const tableName = getTable(passportType);
+        await pool.query(
+          `UPDATE ${tableName} SET deleted_at = NULL WHERE lineage_id = $1 AND company_id = $2`,
+          [lineageId, companyId]
+        );
+        await pool.query(`DELETE FROM passport_archives WHERE lineage_id = $1 AND company_id = $2`, [lineageId, companyId]);
+        await logAudit(companyId, userId, "UNARCHIVE", tableName, guid, null, { versions_restored: archiveRows.rows.length });
+        restored++;
+      } catch { skipped++; }
+    }
+    res.json({ summary: { restored, skipped, total: guids.length } });
+  } catch (e) {
+    console.error("Bulk unarchive error:", e.message);
+    res.status(500).json({ error: "Bulk unarchive failed" });
+  }
+});
+
 // VERSION DIFF
 app.get("/api/companies/:companyId/passports/:guid/diff", authenticateToken, checkCompanyAccess, async (req, res) => {
   try {
@@ -6330,15 +7802,14 @@ app.get("/api/companies/:companyId/passports/:guid/diff", authenticateToken, che
     const { passportType } = req.query;
     if (!passportType) return res.status(400).json({ error: "passportType required" });
 
-    const tableName = getTable(passportType);
-
-    const r = await pool.query(
-      `SELECT * FROM ${tableName}
-       WHERE guid = $1 AND deleted_at IS NULL
-       ORDER BY version_number ASC`,
-      [guid]
-    );
-    res.json({ versions: r.rows.map(normalizePassportRow), passportType });
+    const lineageContext = await getPassportLineageContext({ guid, passportType, companyId: req.params.companyId });
+    if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
+    const versions = await getPassportVersionsByLineage({
+      lineageId: lineageContext.lineage_id,
+      passportType,
+      companyId: req.params.companyId,
+    });
+    res.json({ versions: [...versions].sort((a, b) => Number(a.version_number || 0) - Number(b.version_number || 0)), passportType });
   } catch (e) { res.status(500).json({ error: "Failed" }); }
 });
 
@@ -6389,30 +7860,33 @@ app.patch("/api/companies/:companyId/passports/:guid/history/:versionNumber", au
     if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
     const passportType = reg.rows[0].passport_type;
+    const lineageContext = await getPassportLineageContext({ guid, passportType, companyId });
+    if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
+
     const tableName = getTable(passportType);
     const versionRes = await pool.query(
-      `SELECT version_number, release_status
+      `SELECT guid, version_number, release_status
        FROM ${tableName}
-       WHERE guid = $1 AND company_id = $2 AND version_number = $3 AND deleted_at IS NULL
+       WHERE lineage_id = $1 AND company_id = $2 AND version_number = $3 AND deleted_at IS NULL
        LIMIT 1`,
-      [guid, companyId, parsedVersion]
+      [lineageContext.lineage_id, companyId, parsedVersion]
     );
     if (!versionRes.rows.length) return res.status(404).json({ error: "Passport version not found" });
 
     const versionRow = normalizePassportRow(versionRes.rows[0]);
-    if (versionRow.release_status !== "released" && isPublic) {
-      return res.status(400).json({ error: "Only released versions can be shown publicly." });
+    if (!isPublicHistoryStatus(versionRow.release_status) && isPublic) {
+      return res.status(400).json({ error: "Only released or obsolete versions can be shown publicly." });
     }
 
     const existingVisibilityRes = await pool.query(
       `SELECT is_public
        FROM passport_history_visibility
        WHERE passport_guid = $1 AND version_number = $2`,
-      [guid, parsedVersion]
+      [versionRow.guid, parsedVersion]
     );
     const previousVisibility = existingVisibilityRes.rows.length
       ? !!existingVisibilityRes.rows[0].is_public
-      : versionRow.release_status === "released";
+      : isPublicHistoryStatus(versionRow.release_status);
 
     await pool.query(
       `INSERT INTO passport_history_visibility
@@ -6423,7 +7897,7 @@ app.patch("/api/companies/:companyId/passports/:guid/history/:versionNumber", au
          is_public = EXCLUDED.is_public,
          updated_by = EXCLUDED.updated_by,
          updated_at = NOW()`,
-      [guid, parsedVersion, isPublic, req.user.userId]
+      [versionRow.guid, parsedVersion, isPublic, req.user.userId]
     );
 
     await logAudit(companyId, req.user.userId, "UPDATE_HISTORY_VISIBILITY", tableName, guid,
@@ -6528,6 +8002,7 @@ app.get("/api/companies/:companyId/analytics", authenticateToken, checkCompanyAc
           released_count:   stats.released,
           revised_count:    stats.revised,
           in_review_count:  stats.in_review,
+          obsolete_count:   stats.obsolete,
         });
 
         const tableName = getTable(type_name);
@@ -6567,12 +8042,19 @@ app.get("/api/companies/:companyId/analytics", authenticateToken, checkCompanyAc
     }
 
     const scanRes = await pool.query(
-      `SELECT COUNT(*) FROM passport_scan_events pse
+      `SELECT COUNT(DISTINCT (pse.passport_guid, pse.viewer_user_id)) FROM passport_scan_events pse
        JOIN passport_registry pr ON pr.guid = pse.passport_guid
-       WHERE pr.company_id = $1`,
+       WHERE pr.company_id = $1
+         AND pse.viewer_user_id IS NOT NULL`,
       [companyId]
     );
     const scanStats = parseInt(scanRes.rows[0].count) || 0;
+
+    const archivedRes = await pool.query(
+      `SELECT COUNT(DISTINCT guid) FROM passport_archives WHERE company_id = $1`,
+      [companyId]
+    );
+    const archivedCount = parseInt(archivedRes.rows[0].count) || 0;
     const trend = {
       labels: trendMonths.map((month) =>
         month.toLocaleString("en-US", { month: "short" })
@@ -6591,7 +8073,7 @@ app.get("/api/companies/:companyId/analytics", authenticateToken, checkCompanyAc
       }),
     };
 
-    res.json({ totalPassports, analytics, scanStats, trend });
+    res.json({ totalPassports, analytics, scanStats, archivedCount, trend });
   } catch (e) { res.status(500).json({ error: "Failed to fetch analytics" }); }
 });
 
@@ -6600,7 +8082,7 @@ app.get("/api/companies/:companyId/activity", authenticateToken, checkCompanyAcc
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
     const r = await pool.query(
-      `SELECT al.*, u.email AS user_email FROM audit_logs al
+      `SELECT al.*, u.email AS user_email, u.first_name AS user_first_name, u.last_name AS user_last_name FROM audit_logs al
        LEFT JOIN users u ON al.user_id = u.id
        WHERE al.company_id = $1
        ORDER BY al.created_at DESC LIMIT $2`,
@@ -6618,7 +8100,7 @@ app.get("/api/companies/:companyId/audit-logs", authenticateToken, checkCompanyA
     const limit  = Math.min(Math.max(parseInt(req.query.limit)  || 200, 1), 500);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
     const r = await pool.query(
-      `SELECT al.*, u.email AS user_email FROM audit_logs al
+      `SELECT al.*, u.email AS user_email, u.first_name AS user_first_name, u.last_name AS user_last_name FROM audit_logs al
        LEFT JOIN users u ON al.user_id = u.id
        WHERE al.company_id = $1
        ORDER BY al.created_at DESC LIMIT $2 OFFSET $3`,
@@ -6674,7 +8156,7 @@ app.get("/api/passports/:guid/qrcode", publicReadRateLimit, async (req, res) => 
 app.post("/api/passports/:guid/scan", publicScanRateLimit, async (req, res) => {
   try {
     const { guid } = req.params;
-    const { userAgent, referrer } = req.body;
+    const { userAgent, referrer, userId } = req.body || {};
 
     // Only record scans for released passports
     const reg = await pool.query(
@@ -6690,9 +8172,16 @@ app.post("/api/passports/:guid/scan", publicScanRateLimit, async (req, res) => {
     );
     if (!check.rows.length) return res.json({ success: true });
 
+    const parsedUserId = Number.parseInt(userId, 10);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) {
+      return res.json({ success: true });
+    }
+
     await pool.query(
-      "INSERT INTO passport_scan_events (passport_guid, user_agent, referrer) VALUES ($1,$2,$3)",
-      [guid, userAgent || null, referrer || null]
+      `INSERT INTO passport_scan_events (passport_guid, viewer_user_id, user_agent, referrer)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (passport_guid, viewer_user_id) WHERE viewer_user_id IS NOT NULL DO NOTHING`,
+      [guid, parsedUserId, userAgent || null, referrer || null]
     );
     res.json({ success: true });
   } catch { res.json({ success: true }); }
@@ -6702,11 +8191,17 @@ app.get("/api/passports/:guid/scan-stats", publicReadRateLimit, async (req, res)
   try {
     const { guid } = req.params;
     const total = await pool.query(
-      "SELECT COUNT(*) FROM passport_scan_events WHERE passport_guid = $1", [guid]
+      `SELECT COUNT(DISTINCT viewer_user_id)
+       FROM passport_scan_events
+       WHERE passport_guid = $1
+         AND viewer_user_id IS NOT NULL`,
+      [guid]
     );
     const byDay = await pool.query(
-      `SELECT DATE(scanned_at) AS day, COUNT(*) AS count
-       FROM passport_scan_events WHERE passport_guid = $1
+      `SELECT DATE(scanned_at) AS day, COUNT(DISTINCT viewer_user_id) AS count
+       FROM passport_scan_events
+       WHERE passport_guid = $1
+         AND viewer_user_id IS NOT NULL
        GROUP BY DATE(scanned_at) ORDER BY day DESC LIMIT 30`,
       [guid]
     );
@@ -7554,16 +9049,17 @@ app.post("/api/companies/:companyId/passports/upsert-csv", authenticateToken, ch
           }
 
           const newGuid = uuidv4();
+          const lineageId = newGuid;
           const dataFields = getWritablePassportColumns(fields, excluded);
-          const allCols = ["guid","company_id","model_name","product_id","created_by", ...dataFields];
-          const allVals = [newGuid, companyId, model_name || null, normalizedProductId, userId, ...getStoredPassportValues(dataFields, fields)];
+          const allCols = ["guid","lineage_id","company_id","model_name","product_id","created_by", ...dataFields];
+          const allVals = [newGuid, lineageId, companyId, model_name || null, normalizedProductId, userId, ...getStoredPassportValues(dataFields, fields)];
           await pool.query(
             `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_,i)=>`$${i+1}`).join(",")})`,
             allVals
           );
           await pool.query(
-            `INSERT INTO passport_registry (guid,company_id,passport_type) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-            [newGuid, companyId, resolvedPassportType]
+            `INSERT INTO passport_registry (guid,lineage_id,company_id,passport_type) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+            [newGuid, lineageId, companyId, resolvedPassportType]
           );
           details.push({ guid: newGuid, product_id: normalizedProductId, model_name, status: "created" });
           created++;
@@ -7705,16 +9201,17 @@ app.post("/api/companies/:companyId/passports/upsert-json", authenticateToken, c
             skipped++; continue;
           }
           const newGuid = uuidv4();
+          const lineageId = newGuid;
           const dataFields = getWritablePassportColumns(fields, excluded);
-          const allCols = ["guid","company_id","model_name","product_id","created_by",...dataFields];
-          const allVals = [newGuid, companyId, model_name || null, normalizedProductId, userId, ...getStoredPassportValues(dataFields, fields)];
+          const allCols = ["guid","lineage_id","company_id","model_name","product_id","created_by",...dataFields];
+          const allVals = [newGuid, lineageId, companyId, model_name || null, normalizedProductId, userId, ...getStoredPassportValues(dataFields, fields)];
           await pool.query(
             `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_,i)=>`$${i+1}`).join(",")})`,
             allVals
           );
           await pool.query(
-            `INSERT INTO passport_registry (guid,company_id,passport_type) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-            [newGuid, companyId, resolvedPassportType]
+            `INSERT INTO passport_registry (guid,lineage_id,company_id,passport_type) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+            [newGuid, lineageId, companyId, resolvedPassportType]
           );
           details.push({ guid: newGuid, product_id: normalizedProductId, model_name, status: "created" });
           created++;
@@ -8039,10 +9536,15 @@ app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req,
 
     const tableName = getTable(resolvedPassportType);
     const pRes = await pool.query(
-      `SELECT model_name, version_number FROM ${tableName} WHERE guid = $1 ORDER BY version_number DESC LIMIT 1`,
+      `SELECT p.model_name, p.product_id, p.version_number, c.company_name
+       FROM ${tableName} p
+       LEFT JOIN companies c ON c.id = p.company_id
+       WHERE p.guid = $1
+       ORDER BY p.version_number DESC
+       LIMIT 1`,
       [guid]
     );
-    const pInfo = pRes.rows[0] || { model_name: guid.substring(0, 8), version_number: 1 };
+    const pInfo = pRes.rows[0] || { model_name: guid.substring(0, 8), product_id: null, version_number: 1, company_name: "" };
     const appUrl = process.env.APP_URL || "http://localhost:3000";
 
     if (action === "reject") {
@@ -8093,13 +9595,19 @@ app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req,
               [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
           }
+          await markOlderVersionsObsolete(tableName, guid, released.version_number);
           await logAudit(wf.company_id, userId, "RELEASE", tableName, guid,
             { release_status: "in_review" }, { release_status: "released", via: "workflow_review" });
         }
         await pool.query("UPDATE passport_workflow SET overall_status='approved', updated_at=NOW() WHERE id=$1", [wf.id]);
         if (wf.submitted_by) {
+          const releasePath = buildCurrentPublicPassportPath({
+            companyName: pInfo.company_name,
+            modelName: pInfo.model_name,
+            productId: pInfo.product_id || guid,
+          });
           await createNotification(wf.submitted_by, "workflow_approved",
-            `✅ ${pInfo.model_name} reviewed and released!`, null, guid, `/passport/${guid}/introduction`);
+            `✅ ${pInfo.model_name} reviewed and released!`, null, guid, releasePath);
         }
       } else {
         await createNotification(wf.approver_id, "workflow_approval",
@@ -8125,12 +9633,18 @@ app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req,
             [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
           );
         }
+        await markOlderVersionsObsolete(tableName, guid, released.version_number);
         await logAudit(wf.company_id, userId, "RELEASE", tableName, guid,
           { release_status: "in_review" }, { release_status: "released", via: "workflow_approval" });
       }
       if (wf.submitted_by) {
+        const releasePath = buildCurrentPublicPassportPath({
+          companyName: pInfo.company_name,
+          modelName: pInfo.model_name,
+          productId: pInfo.product_id || guid,
+        });
         await createNotification(wf.submitted_by, "workflow_approved",
-          `🚀 ${pInfo.model_name} approved and released!`, null, guid, `/passport/${guid}/introduction`);
+          `🚀 ${pInfo.model_name} approved and released!`, null, guid, releasePath);
       }
     }
 
@@ -8169,7 +9683,12 @@ app.get("/api/companies/:companyId/workflow", authenticateToken, checkCompanyAcc
     const enrichRows = async (rows) => {
       const out = [];
       for (const row of rows) {
-        let info = { model_name: row.passport_guid?.substring(0, 8) || "?", version_number: 1 };
+        let info = {
+          model_name: row.passport_guid?.substring(0, 8) || "?",
+          version_number: 1,
+          product_id: null,
+          release_status: null,
+        };
         try {
           // Use passport_registry as authoritative type source
           const regRow = await pool.query(
@@ -8179,7 +9698,11 @@ app.get("/api/companies/:companyId/workflow", authenticateToken, checkCompanyAcc
           const actualType = regRow.rows[0]?.passport_type || row.passport_type;
           const t = getTable(actualType);
           const r = await pool.query(
-            `SELECT model_name, version_number FROM ${t} WHERE guid = $1 ORDER BY version_number DESC LIMIT 1`,
+            `SELECT model_name, version_number, product_id, release_status
+             FROM ${t}
+             WHERE guid = $1
+             ORDER BY version_number DESC
+             LIMIT 1`,
             [row.passport_guid]
           );
           if (r.rows.length) info = r.rows[0];
@@ -8214,7 +9737,12 @@ app.get("/api/users/me/backlog", authenticateToken, async (req, res) => {
 
     const enriched = [];
     for (const row of r.rows) {
-      let info = { model_name: row.passport_guid?.substring(0, 8) || "?", version_number: 1 };
+      let info = {
+        model_name: row.passport_guid?.substring(0, 8) || "?",
+        version_number: 1,
+        product_id: null,
+        release_status: null,
+      };
       try {
         const regRow = await pool.query(
           "SELECT passport_type FROM passport_registry WHERE guid = $1 LIMIT 1",
@@ -8223,7 +9751,11 @@ app.get("/api/users/me/backlog", authenticateToken, async (req, res) => {
         const actualType = regRow.rows[0]?.passport_type || row.passport_type;
         const t = getTable(actualType);
         const p = await pool.query(
-          `SELECT model_name, version_number FROM ${t} WHERE guid = $1 ORDER BY version_number DESC LIMIT 1`,
+          `SELECT model_name, version_number, product_id, release_status
+           FROM ${t}
+           WHERE guid = $1
+           ORDER BY version_number DESC
+           LIMIT 1`,
           [row.passport_guid]
         );
         if (p.rows.length) info = p.rows[0];

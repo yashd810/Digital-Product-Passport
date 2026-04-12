@@ -8,9 +8,29 @@ import { applyTableControls, getNextSortDirection, sortIndicator } from "./table
 import { authHeaders } from "./authHeaders";
 import { formatPassportStatus, isEditablePassportStatus, normalizePassportStatus } from "./passportStatus";
 import PassportHistoryModal from "./PassportHistoryModal";
+import { buildPreviewPassportPath, buildPublicPassportPath } from "./passportRoutes";
 import "./Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+function formatPassportTypeLabel(passportType) {
+  if (!passportType) return "Passport";
+  return String(passportType)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function sortPassportsByVersionDesc(a, b) {
+  const versionDiff = Number(b?.version_number || 0) - Number(a?.version_number || 0);
+  if (versionDiff !== 0) return versionDiff;
+  return new Date(b?.updated_at || b?.created_at || 0).getTime() - new Date(a?.updated_at || a?.created_at || 0).getTime();
+}
+
+function getPassportGroupKey(passport) {
+  if (passport?.lineage_id) return `lineage:${passport.lineage_id}`;
+  if (passport?.product_id) return `product:${passport.passport_type || "passport"}:${passport.product_id}`;
+  return `guid:${passport?.guid || ""}`;
+}
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
 function parseCsvRow(line) {
@@ -51,7 +71,7 @@ function CsvUpdateModal({ passport, passportType, companyId, onClose, onDone }) 
       .then(r => r.json())
       .then(d => {
         const sections = d.fields_json?.sections || [];
-        setAllFields(sections.flatMap(s => s.fields || []).filter(f => f.type !== "file" && f.type !== "table"));
+        setAllFields(sections.flatMap(s => s.fields || []).filter(f => f.type !== "table"));
         setPhase("upload");
       })
       .catch(() => { setErr("Failed to load passport type definition"); setPhase("upload"); });
@@ -277,15 +297,16 @@ function calcCompleteness(passport, typeDefinitions = []) {
 }
 
 function dedupeLatestReleasedPassports(passports = []) {
-  const latestByGuid = new Map();
+  const latestByLineage = new Map();
   passports.forEach((passport) => {
     if (!passport?.guid || normalizePassportStatus(passport.release_status) !== "released") return;
-    const current = latestByGuid.get(passport.guid);
+    const key = passport.lineage_id || passport.guid;
+    const current = latestByLineage.get(key);
     if (!current || Number(passport.version_number || 0) > Number(current.version_number || 0)) {
-      latestByGuid.set(passport.guid, passport);
+      latestByLineage.set(key, passport);
     }
   });
-  return [...latestByGuid.values()];
+  return [...latestByLineage.values()];
 }
 
 function CompletenessBar({ pct }) {
@@ -462,7 +483,7 @@ function ExportModal({ passports, filteredPassports, pagePassports, selectedPass
       ["model_name", ...list.map(p => p.model_name || "")],
       ["product_id", ...list.map(p => p.product_id || "")],
       ...allFields
-        .filter(f => f.type !== "file" && f.type !== "table")
+        .filter(f => f.type !== "table")
         .map(f => [f.label, ...list.map(p => f.type === "boolean" ? (p[f.key] ? "true" : "false") : (p[f.key] || ""))]),
     ];
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -481,7 +502,7 @@ function ExportModal({ passports, filteredPassports, pagePassports, selectedPass
     const allFields = (data.fields_json?.sections || []).flatMap(s => s.fields || []);
     const output = list.map(p => {
       const obj = { guid: p.guid, model_name: p.model_name, product_id: p.product_id, release_status: p.release_status, version_number: p.version_number };
-      allFields.forEach(f => { if (f.type !== "file") obj[f.key] = p[f.key] ?? null; });
+      allFields.forEach(f => { obj[f.key] = p[f.key] ?? null; });
       return obj;
     });
     const blob = new Blob([JSON.stringify(output, null, 2)], { type: "application/json" });
@@ -679,7 +700,7 @@ function BulkReviseModal({
     ];
     const schemaFields = (typeDef?.fields_json?.sections || [])
       .flatMap(section => section.fields || [])
-      .filter(field => field?.key && field.type !== "file");
+      .filter(field => field?.key && field.type !== "table");
 
     const seen = new Set();
     return [...baseFields, ...schemaFields].filter(field => {
@@ -1163,6 +1184,32 @@ function PrintQrModal({ selectedCount, onClose, onConfirm, isExporting }) {
   );
 }
 
+function ArchiveConfirmModal({ title, message, confirmLabel = "Archive", onClose, onConfirm, isSubmitting }) {
+  return createPortal(
+    <div className="dashboard-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) onClose(); }}>
+      <div className="dashboard-modal-card dashboard-modal-card-compact">
+        <h3 className="dashboard-modal-title">Archive Passport</h3>
+        <p className="dashboard-modal-subtitle">{title}</p>
+        <div className="dashboard-warning-panel">
+          <div className="dashboard-warning-item">
+            <strong className="dashboard-warning-label">What happens next</strong>
+            <div className="dashboard-warning-copy">{message}</div>
+          </div>
+        </div>
+        <div className="dashboard-modal-actions dashboard-modal-actions-end">
+          <button type="button" className="dashboard-btn dashboard-btn-ghost" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </button>
+          <button type="button" className="dashboard-btn dashboard-btn-primary" onClick={onConfirm} disabled={isSubmitting}>
+            {isSubmitting ? "Archiving..." : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Device Integration Modal ──────────────────────────────────────────────────
 function DeviceIntegrationModal({ passport, passportType, companyId, onClose }) {
   const [deviceKey,    setDeviceKey]    = useState(null);
@@ -1344,6 +1391,87 @@ function DeviceIntegrationModal({ passport, passportType, companyId, onClose }) 
   );
 }
 
+function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDone }) {
+  const [teamUsers,  setTeamUsers]  = useState([]);
+  const [reviewerId, setReviewerId] = useState("");
+  const [approverId, setApproverId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error,      setError]      = useState("");
+
+  useEffect(() => {
+    fetch(`${API}/api/companies/${companyId}/users`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(data => {
+        setTeamUsers(data.filter(u => (u.role === "editor" || u.role === "company_admin") && u.id !== user?.id));
+      }).catch(() => {});
+    fetch(`${API}/api/users/me`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (d.default_reviewer_id) setReviewerId(String(d.default_reviewer_id));
+        if (d.default_approver_id) setApproverId(String(d.default_approver_id));
+      }).catch(() => {});
+  }, [companyId, user?.id]);
+
+  const handleSubmit = async () => {
+    if (!reviewerId && !approverId) { setError("Select at least one reviewer or approver."); return; }
+    setSubmitting(true); setError("");
+    try {
+      const items = selectedList.map(p => ({ guid: p.guid, passportType: p.passport_type || p.passportType }));
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/bulk-workflow`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ items, reviewerId: reviewerId ? parseInt(reviewerId) : null, approverId: approverId ? parseInt(approverId) : null }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Failed");
+      onDone(`Workflow: ${d.summary?.submitted || 0} submitted, ${d.summary?.skipped || 0} skipped`);
+    } catch (e) { setError(e.message); setSubmitting(false); }
+  };
+
+  const editableCount = selectedList.filter(p => {
+    const s = normalizePassportStatus(p.release_status);
+    return s === "draft" || s === "in_revision";
+  }).length;
+
+  return createPortal(
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        <div className="modal-header">
+          <h3>Send {editableCount} Passport{editableCount !== 1 ? "s" : ""} to Workflow</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <p className="modal-hint">
+            Only draft and in-revision passports will be submitted. Released passports will be skipped.
+          </p>
+          {error && <div className="alert alert-error dashboard-alert-inline">{error}</div>}
+          <div className="wf-select-group">
+            <label>Reviewer <span className="wf-opt">(optional if approver selected)</span></label>
+            <select value={reviewerId} onChange={e => setReviewerId(e.target.value)} disabled={submitting}>
+              <option value="">— Skip review —</option>
+              {teamUsers.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} — {u.role}</option>)}
+            </select>
+          </div>
+          <div className="wf-select-group">
+            <label>Approver <span className="wf-opt">(optional if reviewer selected)</span></label>
+            <select value={approverId} onChange={e => setApproverId(e.target.value)} disabled={submitting}>
+              <option value="">— Skip approval —</option>
+              {teamUsers.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name} — {u.role}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="submit-btn" disabled={submitting || (!reviewerId && !approverId)} onClick={handleSubmit}>
+            {submitting ? "Submitting…" : `Submit ${editableCount} to Workflow`}
+          </button>
+          <button className="cancel-btn" onClick={onClose} disabled={submitting}>Cancel</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
   const navigate = useNavigate();
   const { passportType, productKey, umbrellaKey } = useParams();
@@ -1366,7 +1494,11 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
   const [bulkCreateOpen,  setBulkCreateOpen]  = useState(false);
   const [bulkReviseOpen,  setBulkReviseOpen]  = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [bulkWorkflowOpen, setBulkWorkflowOpen] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [archiveConfirm, setArchiveConfirm] = useState(null); // { mode, guid?, pType?, count? }
   const [selectedPassports, setSelectedPassports] = useState(new Set());
+  const [expandedPassportGroups, setExpandedPassportGroups] = useState(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "created_at", direction: "desc" });
@@ -1384,9 +1516,28 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
   // Current type's access_granted flag (false = revoked)
   const activeTypeData = allPassportTypes.find(t => t.type_name === activeType);
   const accessGranted = activeTypeData ? activeTypeData.access_granted : true;
-  const openPublicPassport = (guid) => {
-    if (!guid) return;
-    window.open(`${window.location.origin}/p/${guid}`, "_blank", "noopener,noreferrer");
+  const getViewerPath = (passport, { forcePreview = false } = {}) => {
+    if (!passport?.guid) return null;
+    const normalizedStatus = normalizePassportStatus(passport.release_status);
+    if (!forcePreview && normalizedStatus === "released" && passport.product_id) {
+      return buildPublicPassportPath({
+        companyName: user?.company_name,
+        modelName: passport.model_name,
+        productId: passport.product_id,
+      });
+    }
+    return buildPreviewPassportPath({
+      companyName: user?.company_name,
+      modelName: passport.model_name,
+      productId: passport.product_id,
+      previewId: passport.guid,
+    });
+  };
+
+  const openPassportViewer = (passport, options = {}) => {
+    const path = getViewerPath(passport, options);
+    if (!path) return;
+    window.open(`${window.location.origin}${path}`, "_blank", "noopener,noreferrer");
   };
 
   // ── Per-user pinned passports (localStorage) ──────────────
@@ -1419,6 +1570,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
     setOpenMenuId(null);
     setSelectionMode(false);
     setSelectedPassports(new Set());
+    setExpandedPassportGroups(new Set());
     setShowFilters(false);
     setSortConfig({ key: "created_at", direction: "desc" });
     setColumnFilters({});
@@ -1563,6 +1715,10 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
     else { const d = await r.json().catch(() => ({})); showError(d.error || "Delete failed"); }
   };
 
+  const handleArchive = async (guid, pType) => {
+    setArchiveConfirm({ mode: "single", guid, pType });
+  };
+
   const openMenu = (e, menuId) => {
     e.stopPropagation();
     e.preventDefault();
@@ -1586,7 +1742,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
 
   const pageTitle = filterByUser ? "My Passports"
     : activeProductCategory ? `${activeProductCategory}`
-    : activeType ? `${activeType.charAt(0).toUpperCase() + activeType.slice(1)} Passports`
+    : activeType ? `${activeTypeData?.display_name || formatPassportTypeLabel(activeType)} Passports`
     : "Passports";
 
   // Pinned passports float to the top; order within each group is preserved
@@ -1596,24 +1752,52 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
     return ap - bp;
   });
 
+  const groupedPassports = useMemo(() => {
+    const groups = [];
+    const groupsByKey = new Map();
+
+    displayedPassports.forEach((passport) => {
+      const groupKey = getPassportGroupKey(passport);
+      if (!groupsByKey.has(groupKey)) {
+        const group = { key: groupKey, guid: passport.guid, versions: [] };
+        groupsByKey.set(groupKey, group);
+        groups.push(group);
+      }
+      groupsByKey.get(groupKey).versions.push(passport);
+    });
+
+    return groups.map((group) => {
+      const versions = [...group.versions].sort(sortPassportsByVersionDesc);
+      return {
+        ...group,
+        versions,
+        latest: versions[0],
+        olderVersions: versions.slice(1),
+      };
+    });
+  }, [displayedPassports]);
+
   const tableColumns = useMemo(() => {
     const base = [
-      { key: "version_number", type: "number", getValue: (p) => p.version_number },
-      { key: "product_id", type: "string", getValue: (p) => p.product_id || "" },
-      { key: "model_name", type: "string", getValue: (p) => p.model_name || "" },
-      { key: "guid", type: "string", getValue: (p) => p.guid || "" },
-      { key: "created_at", type: "date", getValue: (p) => p.created_at },
-      { key: "release_status", type: "string", getValue: (p) => p.release_status || "" },
-      { key: "completeness", type: "number", getValue: (p) => calcCompleteness(p, allPassportTypes) ?? -1 },
+      { key: "version_number", type: "number", getValue: (group) => group.latest?.version_number },
+      { key: "product_id", type: "string", getValue: (group) => group.latest?.product_id || "" },
+      { key: "model_name", type: "string", getValue: (group) => group.latest?.model_name || "" },
+      { key: "created_at", type: "date", getValue: (group) => group.latest?.created_at },
+      { key: "release_status", type: "string", getValue: (group) => group.latest?.release_status || "" },
+      { key: "completeness", type: "number", getValue: (group) => calcCompleteness(group.latest, allPassportTypes) ?? -1 },
     ];
 
     if (filterByUser) {
-      base.splice(3, 0, { key: "passport_type", type: "string", getValue: (p) => p.passport_type || activeType || "" });
+      base.splice(3, 0, { key: "passport_type", type: "string", getValue: (group) => group.latest?.passport_type || activeType || "" });
     } else {
       base.push({
         key: "created_by",
         type: "string",
-        getValue: (p) => (p.first_name && p.last_name ? `${p.first_name} ${p.last_name}` : p.created_by_email || ""),
+        getValue: (group) => (
+          group.latest?.first_name && group.latest?.last_name
+            ? `${group.latest.first_name} ${group.latest.last_name}`
+            : group.latest?.created_by_email || ""
+        ),
       });
     }
 
@@ -1621,8 +1805,8 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
   }, [filterByUser, activeType, allPassportTypes]);
 
   const filteredAndSortedPassports = useMemo(
-    () => applyTableControls(displayedPassports, tableColumns, sortConfig, columnFilters),
-    [displayedPassports, tableColumns, sortConfig, columnFilters]
+    () => applyTableControls(groupedPassports, tableColumns, sortConfig, columnFilters),
+    [groupedPassports, tableColumns, sortConfig, columnFilters]
   );
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedPassports.length / rowsPerPage));
   const paginatedPassports = useMemo(() => {
@@ -1688,7 +1872,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
       sections.forEach(section => {
         if (section.fields && Array.isArray(section.fields)) {
           section.fields.forEach(field => {
-            if (field.type !== 'file' && field.type !== 'table') { // Skip file and table fields for CSV
+            if (field.type !== 'table') { // Skip table fields for CSV; file/symbol fields accept repository links
               csvRows.push([field.label, '', '', '']);
             }
           });
@@ -1711,10 +1895,29 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
   const isFiltering = !!(searchText || filterStatus || Object.values(columnFilters).some(Boolean));
 
   const selectedPassportList = passports.filter((p) => selectedPassports.has(`${p.guid}-${p.version_number}`));
-  const releasedPassportsInView = useMemo(
-    () => dedupeLatestReleasedPassports(passports),
-    [passports]
-  );
+
+  const togglePassportGroup = (groupKey) => {
+    setExpandedPassportGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  };
+
+  const getVisiblePassportKeys = useCallback((groups) => {
+    const keys = [];
+    groups.forEach((group) => {
+      if (!group?.latest) return;
+      keys.push(`${group.latest.guid}-${group.latest.version_number}`);
+      if (expandedPassportGroups.has(group.key)) {
+        group.olderVersions.forEach((version) => {
+          keys.push(`${version.guid}-${version.version_number}`);
+        });
+      }
+    });
+    return keys;
+  }, [expandedPassportGroups]);
 
   const downloadQrCodes = async ({ widthMm, heightMm, format, colorMode }) => {
     if (!selectedPassportList.length) {
@@ -1754,7 +1957,13 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
         const qrY = qrTop;
 
         const qrCanvas = document.createElement("canvas");
-        await QRCode.toCanvas(qrCanvas, `${window.location.origin}/p/${passport.guid}`, {
+        const passportPath = buildPublicPassportPath({
+          companyName: user?.company_name,
+          modelName: passport.model_name,
+          productId: passport.product_id,
+        });
+        if (!passportPath) throw new Error("Passport link is unavailable for this QR code");
+        await QRCode.toCanvas(qrCanvas, `${window.location.origin}${passportPath}`, {
           errorCorrectionLevel: "H",
           margin: 1,
           width: qrSize,
@@ -1774,13 +1983,13 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
 
         ctx.font = `600 ${guidFontSize}px monospace`;
         ctx.fillStyle = isBw ? "#000000" : (format === "jpeg" ? "#35586a" : "#b8ccd9");
-        ctx.fillText(passport.guid, widthPx / 2, heightPx - bottomPadding);
+        ctx.fillText(passport.product_id || passport.guid, widthPx / 2, heightPx - bottomPadding);
 
         const dataUrl = canvas.toDataURL(mimeType, format === "jpeg" ? 0.95 : undefined);
         const link = document.createElement("a");
         const safeType = (passport.passport_type || activeType || "passport").replace(/[^a-z0-9-_]+/gi, "_").toLowerCase();
         link.href = dataUrl;
-        link.download = `${safeType}_${passport.guid}.${format}`;
+        link.download = `${safeType}_${passport.product_id || passport.guid}.${format}`;
         link.click();
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
@@ -1796,7 +2005,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
 
 
   const toggleSelectAll = () => {
-    const visibleKeys = paginatedPassports.map(p => `${p.guid}-${p.version_number}`);
+    const visibleKeys = getVisiblePassportKeys(paginatedPassports);
     const allVisibleSelected = visibleKeys.length > 0 && visibleKeys.every(key => selectedPassports.has(key));
     if (allVisibleSelected) {
       const nextSelected = new Set(selectedPassports);
@@ -1818,6 +2027,341 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
       newSelected.add(key);
     }
     setSelectedPassports(newSelected);
+  };
+
+  const renderPassportRow = (passport, {
+    parentGuid = passport.guid,
+    isHistorical = false,
+    hasOlderVersions = false,
+    latestVersionNumber = passport.version_number,
+  } = {}) => {
+    const pType = passport.passport_type || activeType;
+    const menuId = `${passport.guid}-${passport.version_number}`;
+    const isOpen = openMenuId === menuId;
+    const pct = calcCompleteness(passport, allPassportTypes);
+    const isPinned = pinnedGuids.has(passport.guid);
+    const isExpanded = expandedPassportGroups.has(parentGuid);
+    const normalizedStatus = normalizePassportStatus(passport.release_status);
+    const showOlderVersionsToggle = hasOlderVersions && !isHistorical;
+
+    return (
+      <tr
+        key={`${menuId}${isHistorical ? "-history" : ""}`}
+        className={[
+          isPinned ? "passport-row-pinned" : "",
+          "passport-row-clickable",
+          isHistorical ? "passport-row-history" : "",
+        ].filter(Boolean).join(" ")}
+        onClick={() => {
+          if (openMenuId) {
+            setOpenMenuId(null);
+            return;
+          }
+          if (selectionMode) {
+            toggleSelectPassport(passport.guid, passport.version_number);
+          } else {
+            openPassportViewer(passport);
+          }
+        }}
+      >
+        {user?.role !== "viewer" && selectionMode && (
+          <td>
+            <input
+              type="checkbox"
+              checked={selectedPassports.has(menuId)}
+              onChange={() => toggleSelectPassport(passport.guid, passport.version_number)}
+              onClick={e => e.stopPropagation()}
+            />
+          </td>
+        )}
+        <td className="passport-pin-cell" title={isPinned ? "Pinned" : ""}>
+          {!isHistorical && isPinned ? "📌" : ""}
+        </td>
+        <td className="passport-version-col">
+          <div className={`passport-version-cell${isHistorical ? " historical" : ""}`}>
+            <span className="passport-version-toggle-slot" aria-hidden={!showOlderVersionsToggle}>
+              {showOlderVersionsToggle && (
+                <button
+                  type="button"
+                  className="passport-version-toggle"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    togglePassportGroup(parentGuid);
+                  }}
+                  aria-expanded={isExpanded}
+                  aria-label={isExpanded ? "Hide older versions" : "Show older versions"}
+                >
+                  {isExpanded ? "▾" : "▸"}
+                </button>
+              )}
+            </span>
+            <span className="version-badge">v{passport.version_number}</span>
+          </div>
+        </td>
+        <td>{passport.product_id
+          ? <span className="product-id-badge">{passport.product_id}</span>
+          : <span className="no-product-id">—</span>}</td>
+        <td>
+          <button
+            className="model-link-btn"
+            onClick={e => {
+              e.stopPropagation();
+              openPassportViewer(passport);
+            }}
+          >
+            {passport.model_name}
+          </button>
+        </td>
+        {filterByUser && (
+          <td><span className="type-badge passport-type-badge">{pType}</span></td>
+        )}
+        <td>{new Date(passport.created_at).toLocaleDateString()}</td>
+        <td>
+          <div className="passport-status-cell">
+            <span className={`status-badge ${normalizedStatus}`}>
+              {formatPassportStatus(passport.release_status)}
+            </span>
+          </div>
+        </td>
+        <td><CompletenessBar pct={pct} /></td>
+        {!filterByUser && (
+          <td className="small-text">
+            {passport.first_name && passport.last_name
+              ? `${passport.first_name} ${passport.last_name}`
+              : passport.created_by_email || "—"}
+          </td>
+        )}
+        <td className="options-cell" onClick={e => e.stopPropagation()}>
+          {user?.role !== "viewer" && (
+            <div className="kebab-menu-container">
+              <button className="kebab-menu-btn" onClick={e => openMenu(e, menuId)}>⋮</button>
+            </div>
+          )}
+          {isOpen && (
+            <KebabMenu anchorRect={menuAnchorRect} onClose={() => { setOpenMenuId(null); setMenuAnchorRect(null); }}>
+              <button className="menu-item" onClick={() => togglePin(passport.guid)}>
+                {isPinned ? "📌 Unpin" : "📌 Pin to top"}
+              </button>
+              <button
+                className={`menu-item edit-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`}
+                disabled={!isEditablePassportStatus(passport.release_status)}
+                onClick={() => { navigate(`/edit/${passport.guid}?passportType=${pType}`); setOpenMenuId(null); }}
+              >
+                ✏️ Edit
+              </button>
+              <button
+                className={`menu-item release-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`}
+                disabled={!isEditablePassportStatus(passport.release_status)}
+                onClick={() => { setReleaseModal({ ...passport, passport_type: pType }); setOpenMenuId(null); }}
+              >
+                🎯 Release
+              </button>
+              <button className="menu-item" onClick={() => { openPassportViewer(passport, { forcePreview: true }); setOpenMenuId(null); }}>
+                👁 Preview public view
+              </button>
+              <button
+                className={`menu-item revise-item${passport.release_status !== "released" ? " disabled" : ""}`}
+                disabled={passport.release_status !== "released"}
+                onClick={() => { handleRevise(passport.guid, passport.version_number, pType); setOpenMenuId(null); }}
+              >
+                🔄 Revise
+              </button>
+              <button className="menu-item" onClick={() => handleClone(passport, pType)}>
+                🔁 Clone
+              </button>
+              <button
+                className={`menu-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`}
+                disabled={!isEditablePassportStatus(passport.release_status)}
+                onClick={() => { setCsvModal({ passport, pType }); setOpenMenuId(null); }}
+              >
+                📤 Update data via CSV
+              </button>
+              <button className="menu-item" onClick={() => { setHistoryModal({ guid: passport.guid, passportType: pType }); setOpenMenuId(null); }}>
+                🕘 Update history
+              </button>
+              <button className="menu-item" onClick={() => { navigate(`/passport/${passport.guid}/diff?passportType=${pType}`); setOpenMenuId(null); }}>
+                🔀 Compare versions
+              </button>
+              <button className="menu-item" onClick={() => { setDeviceModal({ passport, pType }); setOpenMenuId(null); }}>
+                📡 Device Integration
+              </button>
+              <button
+                className="menu-item"
+                onClick={async () => {
+                  setOpenMenuId(null);
+                  try {
+                    const r = await fetch(
+                      `${API}/api/companies/${companyId}/passports/${passport.guid}/export/aas`,
+                      { headers: authHeaders() }
+                    );
+                    if (!r.ok) throw new Error();
+                    const blob = await r.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `passport-${passport.guid}.aas.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    showError("Failed to export AAS");
+                  }
+                }}
+              >
+                📦 Export AAS (JSON)
+              </button>
+              <button
+                className="menu-item"
+                onClick={() => {
+                  const path = getViewerPath(passport);
+                  if (!path) {
+                    showError("No viewer link is available for this passport");
+                    setOpenMenuId(null);
+                    return;
+                  }
+                  const url = `${window.location.origin}${path}`;
+                  navigator.clipboard.writeText(url).then(() => {
+                    showSuccess(`${normalizePassportStatus(passport.release_status) === "released" ? "Passport" : "Preview"} link copied to clipboard`);
+                  }).catch(() => {
+                    showError("Could not copy link");
+                  });
+                  setOpenMenuId(null);
+                }}
+              >
+                🔗 {normalizePassportStatus(passport.release_status) === "released" ? "Copy passport link" : "Copy preview link"}
+              </button>
+              <button className="menu-item" onClick={() => { handleArchive(passport.guid, pType); setOpenMenuId(null); }}>
+                📦 Archive
+              </button>
+              <button
+                className={`menu-item delete-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`}
+                disabled={!isEditablePassportStatus(passport.release_status)}
+                onClick={() => { handleDelete(passport.guid, pType); setOpenMenuId(null); }}
+              >
+                🗑️ Delete
+              </button>
+            </KebabMenu>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
+  const bulkRelease = async () => {
+    if (!selectedPassportList.length) return;
+    const editable = selectedPassportList.filter(p => isEditablePassportStatus(p.release_status));
+    if (!editable.length) { showError("No draft or in-revision passports selected."); return; }
+    if (!window.confirm(`Release ${editable.length} passport${editable.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+    setBulkActionLoading(true);
+    try {
+      const items = editable.map(p => ({ guid: p.guid, passportType: p.passport_type || activeType }));
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/bulk-release`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ items }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Bulk release failed");
+      showSuccess(`Released ${d.summary?.released || 0}, skipped ${d.summary?.skipped || 0}, failed ${d.summary?.failed || 0}`);
+      setSelectedPassports(new Set());
+      fetchPassports();
+    } catch (e) { showError(e.message); }
+    finally { setBulkActionLoading(false); }
+  };
+
+  const bulkDelete = async () => {
+    if (!selectedPassportList.length) return;
+    const editable = selectedPassportList.filter(p => isEditablePassportStatus(p.release_status));
+    if (!editable.length) { showError("No deletable passports selected. Released passports cannot be deleted."); return; }
+    if (!window.confirm(`Permanently delete ${editable.length} passport${editable.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+    setBulkActionLoading(true);
+    let deleted = 0, failed = 0;
+    try {
+      for (const p of editable) {
+        const pType = p.passport_type || activeType;
+        const r = await fetch(`${API}/api/companies/${companyId}/passports/${p.guid}`, {
+          method: "DELETE",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ passportType: pType }),
+        });
+        if (r.ok) deleted++; else failed++;
+      }
+      showSuccess(`Deleted ${deleted}${failed ? `, ${failed} failed` : ""}`);
+      setSelectedPassports(new Set());
+      fetchPassports();
+    } catch (e) { showError(e.message); }
+    finally { setBulkActionLoading(false); }
+  };
+
+  const bulkExportJson = async () => {
+    if (!selectedPassportList.length) { showError("Select at least one passport."); return; }
+    setBulkActionLoading(true);
+    try {
+      const exported = [];
+      for (const p of selectedPassportList) {
+        const pType = p.passport_type || activeType;
+        const r = await fetch(`${API}/api/companies/${companyId}/passports/${p.guid}?passportType=${pType}`, { headers: authHeaders() });
+        if (r.ok) { const data = await r.json(); exported.push(data); }
+      }
+      if (!exported.length) { showError("Could not fetch any passport data."); return; }
+      const blob = new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `passports-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showSuccess(`Exported ${exported.length} passport${exported.length !== 1 ? "s" : ""} as JSON`);
+    } catch (e) { showError(e.message); }
+    finally { setBulkActionLoading(false); }
+  };
+
+  const bulkArchive = async () => {
+    if (!selectedPassportList.length) return;
+    setArchiveConfirm({ mode: "bulk", count: selectedPassportList.length });
+  };
+
+  const confirmArchive = async () => {
+    if (!archiveConfirm) return;
+
+    if (archiveConfirm.mode === "single") {
+      try {
+        setBulkActionLoading(true);
+        const r = await fetch(`${API}/api/companies/${companyId}/passports/${archiveConfirm.guid}/archive`, {
+          method: "POST",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ passportType: archiveConfirm.pType }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "Archive failed");
+        showSuccess("Passport archived");
+        setArchiveConfirm(null);
+        fetchPassports();
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        setBulkActionLoading(false);
+      }
+      return;
+    }
+
+    try {
+      setBulkActionLoading(true);
+      const items = selectedPassportList.map(p => ({ guid: p.guid, passportType: p.passport_type || activeType }));
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/bulk-archive`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ items }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Bulk archive failed");
+      showSuccess(`Archived ${d.summary?.archived || 0}, skipped ${d.summary?.skipped || 0}`);
+      setSelectedPassports(new Set());
+      setArchiveConfirm(null);
+      fetchPassports();
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      setBulkActionLoading(false);
+    }
   };
 
   return (
@@ -1844,30 +2388,53 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
             >
               {selectionMode ? "Done Selecting" : "Select Passports"}
             </button>
-            {selectionMode && (
-              <button
-                className="csv-btn template-btn"
-                onClick={() => setPrintQrModalOpen(true)}
-                disabled={selectedPassportList.length === 0}
-                title={selectedPassportList.length > 0 ? "Print Passport QR Code" : "Select at least one passport"}
-              >
-                🖨 Print Passport QR Code
-              </button>
-            )}
-            <button
-              className="csv-btn template-btn"
-              onClick={() => setBulkReviseOpen(true)}
-              disabled={releasedPassportsInView.length === 0}
-              title={releasedPassportsInView.length > 0 ? "Bulk revise released passports" : "No released passports available in this view"}
-            >
-              🔄 Bulk Revise
-            </button>
             <button className="csv-btn export-btn" onClick={() => setExportModalOpen(true)} title="Export passports">
               📊 Export
             </button>
           </div>
         )}
       </div>
+
+      {selectionMode && selectedPassportList.length > 0 && (
+        <div className="bulk-actions-bar">
+          <span className="bulk-actions-count">{selectedPassportList.length} selected</span>
+          <div className="bulk-actions-buttons">
+            <button className="bulk-action-btn bulk-action-release" onClick={bulkRelease} disabled={bulkActionLoading}
+              title="Release selected draft/in-revision passports">
+              🎯 Release
+            </button>
+            <button className="bulk-action-btn bulk-action-workflow" onClick={() => setBulkWorkflowOpen(true)} disabled={bulkActionLoading}
+              title="Submit selected passports to review/approval workflow">
+              📋 Send to Workflow
+            </button>
+            <button
+              className="bulk-action-btn bulk-action-revise"
+              onClick={() => setBulkReviseOpen(true)}
+              disabled={bulkActionLoading}
+              title="Open the bulk revise flow for the selected passports"
+            >
+              🔄 Bulk Revise
+            </button>
+            <button className="bulk-action-btn bulk-action-export" onClick={bulkExportJson} disabled={bulkActionLoading}
+              title="Download selected passports as JSON">
+              📦 Export JSON
+            </button>
+            <button className="bulk-action-btn bulk-action-qr" onClick={() => setPrintQrModalOpen(true)} disabled={bulkActionLoading}
+              title="Print QR codes for selected passports">
+              🖨 Print QR
+            </button>
+            <button className="bulk-action-btn bulk-action-archive" onClick={bulkArchive} disabled={bulkActionLoading}
+              title="Archive selected passports">
+              📦 Archive
+            </button>
+            <button className="bulk-action-btn bulk-action-delete" onClick={bulkDelete} disabled={bulkActionLoading}
+              title="Delete selected draft/in-revision passports">
+              🗑️ Delete
+            </button>
+          </div>
+          {bulkActionLoading && <span className="bulk-actions-loading">Processing…</span>}
+        </div>
+      )}
 
       <div className="search-bar">
         <input type="text" placeholder="🔍 Search by serial number or model name…"
@@ -1877,6 +2444,7 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
           <option value="draft">Draft</option>
           <option value="released">Released</option>
           <option value="in_revision">In Revision</option>
+          <option value="obsolete">Obsolete</option>
         </select>
         {(searchText || filterStatus) && (
           <button className="clear-filter-btn" onClick={() => { setSearchText(""); setFilterStatus(""); }}>
@@ -1929,18 +2497,20 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
                       <th className="passport-table-select-col">
                         <input
                           type="checkbox"
-                          checked={paginatedPassports.length > 0 && paginatedPassports.every(p => selectedPassports.has(`${p.guid}-${p.version_number}`))}
+                          checked={(() => {
+                            const visibleKeys = getVisiblePassportKeys(paginatedPassports);
+                            return visibleKeys.length > 0 && visibleKeys.every(key => selectedPassports.has(key));
+                          })()}
                           onChange={toggleSelectAll}
                           title="Select All"
                         />
                       </th>
                     )}
                     <th className="passport-table-pin-col"></th>
-                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("version_number")}>Ver.{sortIndicator(sortConfig, "version_number") && ` ${sortIndicator(sortConfig, "version_number")}`}</button></th>
+                    <th className="passport-version-col"><button type="button" className="table-sort-btn" onClick={() => toggleSort("version_number")}>Ver.{sortIndicator(sortConfig, "version_number") && ` ${sortIndicator(sortConfig, "version_number")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("product_id")}>Serial Number{sortIndicator(sortConfig, "product_id") && ` ${sortIndicator(sortConfig, "product_id")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("model_name")}>Model{sortIndicator(sortConfig, "model_name") && ` ${sortIndicator(sortConfig, "model_name")}`}</button></th>
                     {filterByUser && <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("passport_type")}>Type{sortIndicator(sortConfig, "passport_type") && ` ${sortIndicator(sortConfig, "passport_type")}`}</button></th>}
-                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("guid")}>GUID{sortIndicator(sortConfig, "guid") && ` ${sortIndicator(sortConfig, "guid")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("created_at")}>Date{sortIndicator(sortConfig, "created_at") && ` ${sortIndicator(sortConfig, "created_at")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("release_status")}>Status{sortIndicator(sortConfig, "release_status") && ` ${sortIndicator(sortConfig, "release_status")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("completeness")}>Complete{sortIndicator(sortConfig, "completeness") && ` ${sortIndicator(sortConfig, "completeness")}`}</button></th>
@@ -1954,7 +2524,6 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
                     <th><input className="table-filter-input" value={columnFilters.product_id || ""} onChange={e => updateColumnFilter("product_id", e.target.value)} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.model_name || ""} onChange={e => updateColumnFilter("model_name", e.target.value)} placeholder="Filter" /></th>
                     {filterByUser && <th><input className="table-filter-input" value={columnFilters.passport_type || ""} onChange={e => updateColumnFilter("passport_type", e.target.value)} placeholder="Filter" /></th>}
-                    <th><input className="table-filter-input" value={columnFilters.guid || ""} onChange={e => updateColumnFilter("guid", e.target.value)} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.created_at || ""} onChange={e => updateColumnFilter("created_at", e.target.value)} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.release_status || ""} onChange={e => updateColumnFilter("release_status", e.target.value)} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.completeness || ""} onChange={e => updateColumnFilter("completeness", e.target.value)} placeholder="Filter" /></th>
@@ -1963,161 +2532,22 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
                   </tr>}
                 </thead>
                 <tbody>
-                  {paginatedPassports.map(p => {
-                    const pType   = p.passport_type || activeType;
-                    const menuId  = `${p.guid}-${p.version_number}`;
-                    const isOpen  = openMenuId === menuId;
-                    const pct     = calcCompleteness(p, allPassportTypes);
-                    const isPinned = pinnedGuids.has(p.guid);
-                    return (
-                      <tr
-                        key={menuId}
-                        className={`${isPinned ? "passport-row-pinned " : ""}passport-row-clickable`}
-                        onClick={() => {
-                          if (openMenuId) {
-                            setOpenMenuId(null); // Close the menu without navigating
-                            return;
-                          }
-                          if (selectionMode) {
-                            toggleSelectPassport(p.guid, p.version_number);
-                          } else {
-                            openPublicPassport(p.guid);
-                          }
-                        }}
-                      >
-                        {user?.role !== "viewer" && selectionMode && (
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={selectedPassports.has(menuId)}
-                              onChange={() => toggleSelectPassport(p.guid, p.version_number)}
-                              onClick={e => e.stopPropagation()}
-                            />
-                          </td>
-                        )}
-                        <td className="passport-pin-cell"
-                          title={isPinned ? "Pinned" : ""}>
-                          {isPinned ? "📌" : ""}
-                        </td>
-                        <td><span className="version-badge">v{p.version_number}</span></td>
-                        <td>{p.product_id
-                          ? <span className="product-id-badge">{p.product_id}</span>
-                          : <span className="no-product-id">—</span>}</td>
-                        <td>
-                          <button className="model-link-btn"
-                            onClick={e => {
-                              e.stopPropagation();
-                              openPublicPassport(p.guid);
-                            }}>
-                            {p.model_name}
-                          </button>
-                        </td>
-                        {filterByUser && (
-                          <td><span className="type-badge passport-type-badge">{pType}</span></td>
-                        )}
-                        <td className="guid-cell"><code>{p.guid.substring(0,8)}…</code></td>
-                        <td>{new Date(p.created_at).toLocaleDateString()}</td>
-                        <td><span className={`status-badge ${normalizePassportStatus(p.release_status)}`}>
-                          {formatPassportStatus(p.release_status)}
-                        </span></td>
-                        <td><CompletenessBar pct={pct} /></td>
-                        {!filterByUser && (
-                          <td className="small-text">
-                            {p.first_name && p.last_name
-                              ? `${p.first_name} ${p.last_name}`
-                              : p.created_by_email || "—"}
-                          </td>
-                        )}
-                        <td className="options-cell" onClick={e => e.stopPropagation()}>
-                          {user?.role !== "viewer" && (
-                          <div className="kebab-menu-container">
-                            <button className="kebab-menu-btn" onClick={e => openMenu(e, menuId)}>⋮</button>
-                          </div>)}
-                          {isOpen && (
-                            <KebabMenu anchorRect={menuAnchorRect} onClose={() => { setOpenMenuId(null); setMenuAnchorRect(null); }}>
-                              <button className="menu-item"
-                                onClick={() => togglePin(p.guid)}>
-                                {isPinned ? "📌 Unpin" : "📌 Pin to top"}
-                              </button>
-                              <button className={`menu-item edit-item${!isEditablePassportStatus(p.release_status)?" disabled":""}`}
-                                disabled={!isEditablePassportStatus(p.release_status)}
-                                onClick={() => { navigate(`/edit/${p.guid}?passportType=${pType}`); setOpenMenuId(null); }}>
-                                ✏️ Edit
-                              </button>
-                              <button className={`menu-item release-item${!isEditablePassportStatus(p.release_status)?" disabled":""}`}
-                                disabled={!isEditablePassportStatus(p.release_status)}
-                                onClick={() => { setReleaseModal({...p,passport_type:pType}); setOpenMenuId(null); }}>
-                                🎯 Release
-                              </button>
-                              <button className={`menu-item revise-item${p.release_status!=="released"?" disabled":""}`}
-                                disabled={p.release_status!=="released"}
-                                onClick={() => { handleRevise(p.guid,p.version_number,pType); setOpenMenuId(null); }}>
-                                🔄 Revise
-                              </button>
-                              <button className="menu-item"
-                                onClick={() => handleClone(p, pType)}>
-                                🔁 Clone
-                              </button>
-                              <button className={`menu-item${!isEditablePassportStatus(p.release_status) ? " disabled" : ""}`}
-                                disabled={!isEditablePassportStatus(p.release_status)}
-                                onClick={() => { setCsvModal({ passport: p, pType }); setOpenMenuId(null); }}>
-                                📤 Update data via CSV
-                              </button>
-                              <button className="menu-item"
-                                onClick={() => { setHistoryModal({ guid: p.guid, passportType: pType }); setOpenMenuId(null); }}>
-                                🕘 Update history
-                              </button>
-                              <button className="menu-item"
-                                onClick={() => { navigate(`/passport/${p.guid}/diff?passportType=${pType}`); setOpenMenuId(null); }}>
-                                🔀 Compare versions
-                              </button>
-                              <button className="menu-item"
-                                onClick={() => { setDeviceModal({ passport: p, pType }); setOpenMenuId(null); }}>
-                                📡 Device Integration
-                              </button>
-                              <button className="menu-item"
-                                onClick={async () => {
-                                  setOpenMenuId(null);
-                                  try {
-                                    const r = await fetch(
-                                      `${API}/api/companies/${companyId}/passports/${p.guid}/export/aas`,
-                                      { headers: authHeaders() }
-                                    );
-                                    if (!r.ok) throw new Error();
-                                    const blob = await r.blob();
-                                    const url  = URL.createObjectURL(blob);
-                                    const a    = document.createElement("a");
-                                    a.href     = url;
-                                    a.download = `passport-${p.guid}.aas.json`;
-                                    a.click();
-                                    URL.revokeObjectURL(url);
-                                  } catch { showError("Failed to export AAS"); }
-                                }}>
-                                📦 Export AAS (JSON)
-                              </button>
-                              <button className="menu-item"
-                                onClick={() => {
-                                  const url = `${window.location.origin}/p/${p.guid}`;
-                                  navigator.clipboard.writeText(url).then(() => {
-                                    showSuccess("Passport link copied to clipboard");
-                                  }).catch(() => {
-                                    showError("Could not copy link");
-                                  });
-                                  setOpenMenuId(null);
-                                }}>
-                                🔗 Copy passport link
-                              </button>
-                              <button className={`menu-item delete-item${!isEditablePassportStatus(p.release_status)?" disabled":""}`}
-                                disabled={!isEditablePassportStatus(p.release_status)}
-                                onClick={() => { handleDelete(p.guid,pType); setOpenMenuId(null); }}>
-                                🗑️ Delete
-                              </button>
-                            </KebabMenu>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {paginatedPassports.map((group) => (
+                    <React.Fragment key={group.key}>
+                      {renderPassportRow(group.latest, {
+                        parentGuid: group.key,
+                        hasOlderVersions: group.olderVersions.length > 0,
+                        latestVersionNumber: group.latest.version_number,
+                      })}
+                      {expandedPassportGroups.has(group.key) && group.olderVersions.map((version) =>
+                        renderPassportRow(version, {
+                          parentGuid: group.key,
+                          isHistorical: true,
+                          latestVersionNumber: group.latest.version_number,
+                        })
+                      )}
+                    </React.Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -2170,6 +2600,21 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
         />
       )}
 
+      {archiveConfirm && (
+        <ArchiveConfirmModal
+          title={archiveConfirm.mode === "bulk"
+            ? `Archive ${archiveConfirm.count} passport${archiveConfirm.count !== 1 ? "s" : ""}?`
+            : "Archive this passport?"}
+          message={archiveConfirm.mode === "bulk"
+            ? "The selected passports will be moved to the archive and removed from the active list."
+            : "This passport will be moved to the archive and removed from the active list."}
+          confirmLabel={archiveConfirm.mode === "bulk" ? "Archive Selected" : "Archive Passport"}
+          isSubmitting={bulkActionLoading}
+          onClose={() => { if (!bulkActionLoading) setArchiveConfirm(null); }}
+          onConfirm={confirmArchive}
+        />
+      )}
+
       {csvModal && (
         <CsvUpdateModal
           passport={csvModal.passport}
@@ -2183,8 +2628,8 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
       {exportModalOpen && (
         <ExportModal
           passports={passports}
-          filteredPassports={filteredAndSortedPassports}
-          pagePassports={paginatedPassports}
+          filteredPassports={filteredAndSortedPassports.map(group => group.latest)}
+          pagePassports={paginatedPassports.map(group => group.latest)}
           selectedPassports={selectedPassports}
           activeType={activeType}
           allPassportTypes={allPassportTypes}
@@ -2199,8 +2644,8 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
           user={user}
           allPassportTypes={allPassportTypes}
           passports={passports}
-          filteredPassports={filteredAndSortedPassports}
-          pagePassports={paginatedPassports}
+          filteredPassports={filteredAndSortedPassports.map(group => group.latest)}
+          pagePassports={paginatedPassports.map(group => group.latest)}
           selectedPassports={selectedPassports}
           activeType={activeType}
           onClose={() => setBulkReviseOpen(false)}
@@ -2242,6 +2687,16 @@ function PassportList({ user, companyId, filterByUser, filterByUmbrella }) {
           passportType={deviceModal.pType}
           companyId={companyId}
           onClose={() => setDeviceModal(null)}
+        />
+      )}
+
+      {bulkWorkflowOpen && (
+        <BulkWorkflowModal
+          companyId={companyId}
+          user={user}
+          selectedList={selectedPassportList}
+          onClose={() => setBulkWorkflowOpen(false)}
+          onDone={(msg) => { setBulkWorkflowOpen(false); showSuccess(msg); setSelectedPassports(new Set()); fetchPassports(); }}
         />
       )}
     </div>
