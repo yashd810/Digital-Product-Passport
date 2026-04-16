@@ -2,12 +2,12 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "Digital Product Passport Multi-Tenant System",
-  "main": "server.js",
+  "main": "Server/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "contact": "node contact-server.js",
-    "contact:dev": "nodemon contact-server.js"
+    "start": "node Server/server.js",
+    "dev": "nodemon Server/server.js",
+    "contact": "node \"Website form/contact-server.js\"",
+    "contact:dev": "nodemon \"Website form/contact-server.js\""
   },
   "keywords": [],
   "author": "",

@@ -45,9 +45,9 @@
     </a>
 
     <div class="nav-links" id="nav-desktop">
-      <a href="why-dpp.html"      data-page="why-dpp">Why DPP</a>
+      <a href="index.html"        data-page="index">Home</a>
+      <a href="product.html"      data-page="product">Product</a>
       <a href="services.html"     data-page="services">Services</a>
-      <a href="traceability.html" data-page="traceability">Circularity &amp; Carbon</a>
       <a href="timeline.html"     data-page="timeline">Regulation Timeline</a>
       <a href="about.html"        data-page="about">About</a>
       <a href="contact.html"      data-page="contact" class="nav-cta">Get in Touch</a>
@@ -61,9 +61,9 @@
   </nav>
 
   <div class="nav-mobile-menu" id="nav-mobile" role="dialog" aria-label="Mobile navigation">
-    <a href="why-dpp.html"      data-page="why-dpp">Why DPP</a>
+    <a href="index.html"        data-page="index">Home</a>
+    <a href="product.html"      data-page="product">Product</a>
     <a href="services.html"     data-page="services">Services</a>
-    <a href="traceability.html" data-page="traceability">Circularity &amp; Carbon</a>
     <a href="timeline.html"     data-page="timeline">Regulation Timeline</a>
     <a href="about.html"        data-page="about">About</a>
     <a href="contact.html"      data-page="contact" class="nav-cta">Get in Touch</a>
@@ -87,33 +87,32 @@
             Claros<span class="accent">DPP</span>
           </a>
           <p class="footer-brand-desc">
-            Compliance intelligence for the circular economy. End-to-end Digital Product Passport
-            infrastructure, material traceability and circularity workflows, carbon footprint studies,
-            and regulatory consulting for companies navigating EU sustainability mandates.
+            ClarosDPP combines Digital Product Passport software with compliance governance for ESPR,
+            battery, construction, detergent, toy, and other product-specific rules so teams can move
+            from scattered data to a market-ready passport programme.
           </p>
           <p class="footer-offices">🌍 Brussels · Milan · Amsterdam · Tokyo · London</p>
         </div>
 
         <div class="footer-col">
-          <h5>Services</h5>
+          <h5>Explore</h5>
           <ul>
-            <li><a href="services.html#platform">DPP Platform</a></li>
-            <li><a href="services.html#compliance">Compliance Governance</a></li>
-            <li><a href="traceability.html#carbon">Carbon Footprint</a></li>
-            <li><a href="traceability.html">Circularity &amp; Material Traceability</a></li>
-            <li><a href="services.html#consulting">Regulatory Consulting</a></li>
-            <li><a href="traceability.html#circularity">Lifecycle Assessment</a></li>
+            <li><a href="index.html">DPP Overview</a></li>
+            <li><a href="product.html">Product Platform</a></li>
+            <li><a href="services.html">Compliance Governance</a></li>
+            <li><a href="timeline.html">Regulation Timeline</a></li>
+            <li><a href="sample-passport.html">Sample Passport</a></li>
           </ul>
         </div>
 
         <div class="footer-col">
           <h5>Regulations</h5>
           <ul>
-            <li><a href="timeline.html">ESPR Overview</a></li>
-            <li><a href="timeline.html">EU Battery Regulation</a></li>
-            <li><a href="timeline.html">Textile DPP 2026</a></li>
-            <li><a href="why-dpp.html">REACH &amp; RoHS</a></li>
-            <li><a href="why-dpp.html">CSDDD</a></li>
+            <li><a href="timeline.html#direct-regulations">ESPR Overview</a></li>
+            <li><a href="timeline.html#direct-regulations">EU Battery Regulation</a></li>
+            <li><a href="timeline.html#direct-regulations">Construction Products Regulation</a></li>
+            <li><a href="timeline.html#direct-regulations">Detergents Product Passport</a></li>
+            <li><a href="timeline.html#direct-regulations">Toy Safety DPP Track</a></li>
             <li><a href="timeline.html">Full Timeline</a></li>
           </ul>
         </div>
@@ -123,8 +122,8 @@
           <ul>
             <li><a href="about.html">About ClarosDPP</a></li>
             <li><a href="contact.html">Contact Us</a></li>
-            <li><a href="contact.html">Request a Demo</a></li>
-            <li><a href="contact.html">Get a Quote</a></li>
+            <li><a href="product.html">Request a Demo</a></li>
+            <li><a href="services.html">Get a Quote</a></li>
             <li><a href="#">Privacy Policy</a></li>
             <li><a href="#">Terms of Service</a></li>
           </ul>

@@ -1,0 +1,472 @@
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { translateSchemaLabel } from "../../app/providers/i18n";
+import { generateQRCode, saveQRCodeToDatabase } from "../utils/QRcode";
+import { getViewerBrandTheme } from "../../app/providers/ThemeContext";
+import { isObsoletePassportStatus, isReleasedPassportStatus } from "../../passports/utils/passportStatus";
+import { authHeaders } from "../../shared/api/authHeaders";
+import PassportHistoryModal from "../../passports/history/PassportHistoryModal";
+import {
+  buildInactivePassportPath,
+  buildInactiveTechnicalPassportPath,
+  buildPreviewPassportPath,
+  buildPreviewTechnicalPassportPath,
+  buildPublicPassportPath,
+  buildTechnicalPassportPath,
+} from "../../passports/utils/passportRoutes";
+import { PassportIntro, Header, Footer, PassportTabRail, SignatureBadge, EmptySectionsState, SectionView, PrintView } from "../components/ViewerBlocks";
+import "../styles/PassportViewer.css";
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+function PassportViewer({ previewMode = false, previewCompanyId = null }) {
+  const { productId, versionNumber, previewId } = useParams();
+  const navigate   = useNavigate();
+  const location   = useLocation();
+  const printRef   = useRef(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Viewer state
+  const [lang,             setLang]             = useState(() => localStorage.getItem("dpp_lang") || "en");
+  const [passport,         setPassport]         = useState(null);
+  const [companyData,      setCompanyData]      = useState(null);
+  const [typeDef,          setTypeDef]          = useState(null);
+  const [qrCode,           setQrCode]           = useState(null);
+  const [qrLoading,        setQrLoading]        = useState(true);
+  const [loading,          setLoading]          = useState(true);
+  const [error,            setError]            = useState("");
+
+  // Dynamic field values — live data polled independently
+  const [dynamicValues, setDynamicValues] = useState({});
+
+  // Signature verification
+  const [sigVerification, setSigVerification] = useState(null);
+
+  // Access-control state
+  const [unlockedPassport,  setUnlockedPassport]  = useState(null);   // full data after valid key
+  const [showAccessForm,    setShowAccessForm]    = useState(false);  // unlock modal visible?
+  const [accessKeyInput,    setAccessKeyInput]    = useState("");
+  const [accessError,       setAccessError]       = useState("");
+  const [unlocking,         setUnlocking]         = useState(false);
+  const [passportAccessKey, setPassportAccessKey] = useState(null);   // key shown to logged-in users
+  const [keyCopied,         setKeyCopied]         = useState(false);
+  const [showHistoryModal,  setShowHistoryModal]  = useState(false);
+  const [activeSectionKey,  setActiveSectionKey]  = useState("");
+  const encodedProductId = encodeURIComponent(productId || "");
+  const encodedPreviewId = encodeURIComponent(previewId || "");
+  const isPreviewMode = !!previewMode && !!previewId;
+  const isInactiveView = !!versionNumber;
+
+  // Primary data loading
+  useEffect(() => {
+    if (isPreviewMode && (!previewId || !previewCompanyId)) return;
+    if (!isPreviewMode && !productId) return;
+    (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        // 1. Fetch the passport record
+        const endpoint = isPreviewMode
+          ? `${API}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
+          : versionNumber
+            ? `${API}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
+            : `${API}/api/passports/by-product/${encodedProductId}`;
+        const r = await fetch(endpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
+        if (!r.ok) throw new Error("Passport not found");
+        const data = await r.json();
+        setPassport(data);
+
+        // 2. Fetch company branding in parallel with type definition
+        const [profileRes, typeRes] = await Promise.all([
+          data.company_id
+            ? fetch(`${API}/api/companies/${data.company_id}/profile`)
+            : Promise.resolve(null),
+          fetch(`${API}/api/passport-types/${data.passport_type}`),
+        ]);
+
+        if (profileRes?.ok) setCompanyData(await profileRes.json());
+        if (typeRes.ok) {
+          setTypeDef(await typeRes.json());
+        } else {
+          // Graceful fallback: empty sections
+          setTypeDef({ sections: [] });
+        }
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [encodedPreviewId, encodedProductId, isPreviewMode, previewCompanyId, previewId, productId, versionNumber]);
+
+  useEffect(() => {
+    fetch(`${API}/api/users/me`, {
+      headers: authHeaders(),
+    })
+      .then(r => setIsLoggedIn(r.ok))
+      .catch(() => setIsLoggedIn(false));
+  }, []);
+
+  // Secondary data loading
+  useEffect(() => {
+    if (!passport?.guid || !passport?.product_id) return;
+    (async () => {
+      setQrLoading(true);
+      try {
+        const generated = await generateQRCode({
+          productId: passport.product_id,
+          companyName: companyData?.company_name,
+          manufacturerName: passport.manufacturer,
+          manufacturedBy: passport.manufactured_by,
+          modelName: passport.model_name,
+        });
+        if (generated) {
+          setQrCode(generated);
+          try {
+            await saveQRCodeToDatabase(passport.guid, generated, passport.passport_type);
+          } catch {}
+        }
+      } catch (e) {
+        setQrCode(null);
+      } finally {
+        setQrLoading(false);
+      }
+    })();
+  }, [companyData?.company_name, passport?.guid, passport?.manufactured_by, passport?.manufacturer, passport?.model_name, passport?.passport_type, passport?.product_id]);
+
+  // Fetch + poll dynamic field values every 30 s
+  useEffect(() => {
+    if (!passport?.guid || isInactiveView) return;
+    const fetchDynamic = () =>
+      fetch(`${API}/api/passports/${passport.guid}/dynamic-values`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.values) setDynamicValues(d.values); })
+        .catch(() => {});
+    fetchDynamic();
+    const timer = setInterval(fetchDynamic, 30000);
+    return () => clearInterval(timer);
+  }, [passport?.guid, isInactiveView]);
+
+  // Fetch signature verification for released passports
+  useEffect(() => {
+    if (!passport?.guid || !isReleasedPassportStatus(passport?.release_status)) return;
+    fetch(`${API}/api/passports/${passport.guid}/signature`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setSigVerification(d); })
+      .catch(() => {});
+  }, [passport?.guid, passport?.release_status]);
+
+  // Fetch the access key so logged-in company users can share it with authorised parties
+  useEffect(() => {
+    if (!isLoggedIn || !passport?.guid || !passport?.company_id) return;
+    fetch(`${API}/api/companies/${passport.company_id}/passports/${passport.guid}/access-key`, {
+      headers: authHeaders(),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.accessKey) setPassportAccessKey(d.accessKey); })
+      .catch(() => {});
+  }, [passport?.guid, passport?.company_id, isLoggedIn]);
+
+  // UI event handlers
+  const handleUnlock = async () => {
+    if (!accessKeyInput.trim()) return;
+    setUnlocking(true);
+    setAccessError("");
+    try {
+      const r = await fetch(`${API}/api/passports/${passport.guid}/unlock`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ accessKey: accessKeyInput.trim() }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Invalid access key");
+      setUnlockedPassport(d.passport);
+      setShowAccessForm(false);
+      setAccessKeyInput("");
+    } catch (e) {
+      setAccessError(e.message);
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
+  // Derived viewer data
+  const sections = typeDef?.fields_json?.sections || typeDef?.sections || [];
+  const tabs = sections.map((section) => ({
+    sectionKey: section.key,
+    label: translateSchemaLabel(lang, section),
+  }));
+  const activeSection =
+    sections.find((section) => section.key === activeSectionKey) ||
+    sections[0] ||
+    null;
+  const passportType = passport?.passport_type;
+  const displayName  = typeDef?.display_name || passportType;
+  const brandTheme = getViewerBrandTheme(companyData?.branding_json);
+  const canonicalPublicPath = buildPublicPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+  });
+  const canonicalTechnicalPath = buildTechnicalPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+  });
+  const canonicalInactivePath = buildInactivePassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+    versionNumber,
+  });
+  const canonicalInactiveTechnicalPath = buildInactiveTechnicalPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+    versionNumber,
+  });
+  const canonicalPreviewPath = buildPreviewPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+    previewId: passport?.guid,
+  });
+  const canonicalPreviewTechnicalPath = buildPreviewTechnicalPassportPath({
+    companyName: companyData?.company_name,
+    manufacturerName: passport?.manufacturer,
+    manufacturedBy: passport?.manufactured_by,
+    modelName: passport?.model_name,
+    productId: passport?.product_id,
+    previewId: passport?.guid,
+  });
+
+  // Route normalization
+  useEffect(() => {
+    const targetPath = isPreviewMode
+      ? canonicalPreviewTechnicalPath
+      : isInactiveView
+        ? canonicalInactiveTechnicalPath
+        : canonicalTechnicalPath;
+    if (!targetPath) return;
+
+    const currentPath = location.pathname.replace(/\/+$/, "");
+    const normalizedTargetPath = targetPath.replace(/\/+$/, "");
+    if (currentPath !== normalizedTargetPath) {
+      navigate(normalizedTargetPath, { replace: true });
+    }
+  }, [canonicalInactiveTechnicalPath, canonicalPreviewTechnicalPath, canonicalTechnicalPath, isInactiveView, isPreviewMode, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (!sections.length) {
+      setActiveSectionKey("");
+      return;
+    }
+    if (!sections.some((section) => section.key === activeSectionKey)) {
+      setActiveSectionKey(sections[0].key);
+    }
+  }, [activeSectionKey, sections]);
+
+  if (loading) return <div className="loading">Loading passport…</div>;
+  if (error)   return <div className="alert alert-error">{error}</div>;
+  if (!passport) return null;
+
+  return (
+    <div
+      data-theme="light"
+      className={`viewer-brand-shell viewer-variant-${brandTheme.variant || "classic"}`}
+      style={brandTheme.style}
+    >
+      <div className="no-print">
+        <Header displayName={displayName} lang={lang} setLang={setLang} guid={passport.guid} companyData={companyData} brandTheme={brandTheme} />
+
+        <div className="viewer-content">
+          <div className="viewer-shell">
+            <div className="viewer-topbar">
+              <div className="viewer-title">
+                <button
+                  type="button"
+                  className="pv-secondary-btn viewer-back-btn"
+                  onClick={() => {
+                    const landingPath = isPreviewMode
+                      ? canonicalPreviewPath
+                      : isInactiveView
+                        ? canonicalInactivePath
+                        : canonicalPublicPath;
+                    if (landingPath) navigate(landingPath);
+                  }}
+                  disabled={!(isPreviewMode
+                    ? canonicalPreviewPath
+                    : isInactiveView
+                      ? canonicalInactivePath
+                      : canonicalPublicPath)}
+                >
+                  ← Back to landing page
+                </button>
+                <h2>{typeDef?.umbrella_icon || ""} {displayName}</h2>
+                <p className="viewer-subtitle">{isPreviewMode ? "Draft preview of the public passport viewer" : "Public passport viewer"}</p>
+              </div>
+              <SignatureBadge verification={sigVerification} />
+            </div>
+
+            {isPreviewMode && (
+              <div className="access-unlocked-bar preview-status-bar">
+                <div className="preview-status-copy">
+                  <strong>Preview mode</strong>
+                  <span>Previewing how this passport will look in the public viewer before release.</span>
+                </div>
+                {canonicalPublicPath && (
+                  <code className="preview-status-url" title={canonicalPublicPath}>
+                    Future public URL: {canonicalPublicPath}
+                  </code>
+                )}
+              </div>
+            )}
+
+            {/* Access key info bar — only visible to logged-in company users */}
+            {isLoggedIn && passportAccessKey && (
+              <div className="access-key-bar">
+                <span className="access-key-bar-icon">🔑</span>
+                <div className="access-key-bar-text">
+                  <strong>Passport Access Key</strong>
+                  <span className="access-key-bar-hint">
+                    Share this key with authorised parties (Notified Bodies, EU Commission, etc.) so they can view restricted fields on the public passport page.
+                  </span>
+                </div>
+                <code className="access-key-bar-code">{passportAccessKey}</code>
+                <button
+                  className="access-key-bar-copy"
+                  onClick={() => {
+                    navigator.clipboard.writeText(passportAccessKey);
+                    setKeyCopied(true);
+                    setTimeout(() => setKeyCopied(false), 2000);
+                  }}
+                >
+                  {keyCopied ? "✓ Copied" : "Copy"}
+                </button>
+              </div>
+            )}
+
+            {/* Unlocked banner — shown after successful key entry */}
+            {unlockedPassport && (
+              <div className="access-unlocked-bar">
+                ✅ Restricted fields are now visible. Access granted to authorised view.
+                <button className="access-relock-btn" onClick={() => setUnlockedPassport(null)}>
+                  🔒 Re-lock
+                </button>
+              </div>
+            )}
+
+            {isInactiveView && (
+              <div className="access-unlocked-bar">
+                Viewing inactive released snapshot v{passport.version_number}.
+                <button className="access-relock-btn" onClick={() => { if (canonicalPublicPath) navigate(canonicalPublicPath); }}>
+                  Open current passport
+                </button>
+              </div>
+            )}
+
+            {isObsoletePassportStatus(passport.release_status) && (
+              <div className="pv-obsolete-banner">
+                This is not the latest version of this passport. A newer version has been released.
+              </div>
+            )}
+
+            <PassportIntro
+              passport={passport}
+              companyData={companyData}
+              displayName={displayName}
+              qrCode={qrCode}
+              qrLoading={qrLoading}
+              onOpenHistory={() => setShowHistoryModal(true)}
+              onPrint={() => { setTimeout(() => window.print(), 300); }}
+            />
+
+            <div className="viewer-route-panel">
+              {sections.length > 0 && (
+                <PassportTabRail
+                  tabs={tabs}
+                  activeSectionKey={activeSection?.key || ""}
+                  onSelect={setActiveSectionKey}
+                />
+              )}
+              {sections.length === 0 && <EmptySectionsState />}
+              {activeSection && (
+                <SectionView
+                  key={activeSection.key}
+                  sectionId={`section-${activeSection.key}`}
+                  sectionDef={activeSection}
+                  passport={passport}
+                  unlockedPassport={unlockedPassport}
+                  onRequestUnlock={() => setShowAccessForm(true)}
+                  dynamicValues={dynamicValues}
+                  lang={lang}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <Footer brandTheme={brandTheme} />
+      </div>
+
+      <div className="print-only" ref={printRef}>
+        <PrintView passport={passport} companyData={companyData} sections={sections} />
+      </div>
+
+      {/* ── Access Key Unlock Modal ── */}
+      {showAccessForm && (
+        <div className="access-unlock-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAccessForm(false); }}>
+          <div className="access-unlock-modal">
+            <button className="access-unlock-close" onClick={() => { setShowAccessForm(false); setAccessError(""); setAccessKeyInput(""); }}>✕</button>
+            <div className="access-unlock-icon">🔒</div>
+            <h3 className="access-unlock-title">Restricted Data</h3>
+            <p className="access-unlock-desc">
+              This field is restricted to authorised parties only. Enter the access key provided by the manufacturer to view it.
+            </p>
+            <input
+              type="text"
+              value={accessKeyInput}
+              onChange={e => { setAccessKeyInput(e.target.value); setAccessError(""); }}
+              onKeyDown={e => e.key === "Enter" && handleUnlock()}
+              placeholder="Enter access key"
+              className="access-unlock-input"
+              autoFocus
+            />
+            {accessError && <div className="access-unlock-error">{accessError}</div>}
+            <div className="access-unlock-actions">
+              <button className="access-unlock-btn cancel" onClick={() => { setShowAccessForm(false); setAccessError(""); setAccessKeyInput(""); }}>
+                Cancel
+              </button>
+              <button className="access-unlock-btn submit" onClick={handleUnlock} disabled={unlocking || !accessKeyInput.trim()}>
+                {unlocking ? "Verifying…" : "Unlock"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHistoryModal && (
+        <PassportHistoryModal
+          guid={passport.guid}
+          productId={passport.product_id}
+          passportType={passport.passport_type}
+          companyId={isPreviewMode ? previewCompanyId : null}
+          mode={isPreviewMode ? "company" : "public"}
+          onClose={() => setShowHistoryModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+export default PassportViewer;
