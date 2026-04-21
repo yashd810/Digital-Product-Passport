@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="ClarosDPP helps companies build Digital Product Passports and stay ready for ESPR, the EU Battery Regulation, and other product-specific passport mandates." />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="ClarosDPP" />
+  <meta name="keywords" content="digital product passport, DPP software platform, ESPR compliance, battery passport, construction products regulation, detergents digital passport, compliance governance" />
+  <meta name="theme-color" content="#f5f8fb" />
+  <link rel="canonical" href="https://clarosdpp.com/" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ClarosDPP" />
+  <meta property="og:title" content="ClarosDPP — Digital Product Passport Software & Compliance Governance" />
+  <meta property="og:description" content="Build Digital Product Passports with a platform designed for ESPR, the EU Battery Regulation, and adjacent product-specific rules." />
+  <meta property="og:url" content="https://clarosdpp.com/" />
+  <meta property="og:image" content="https://clarosdpp.com/og-image.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="ClarosDPP platform overview" />
+  <meta property="og:locale" content="en_US" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@ClarosDPP" />
+  <meta name="twitter:title" content="ClarosDPP — Digital Product Passport Software & Compliance Governance" />
+  <meta name="twitter:description" content="Digital Product Passport software, compliance governance, and regulation intelligence for ESPR and product-specific mandates." />
+  <meta name="twitter:image" content="https://clarosdpp.com/og-image.jpg" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://clarosdpp.com/#org",
+        "name": "ClarosDPP",
+        "url": "https://clarosdpp.com",
+        "description": "Digital Product Passport platform and compliance governance partner.",
+        "email": "hello@clarosdpp.com",
+        "areaServed": "EU"
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://clarosdpp.com/#site",
+        "url": "https://clarosdpp.com",
+        "name": "ClarosDPP",
+        "publisher": { "@id": "https://clarosdpp.com/#org" }
+      },
+      {
+        "@type": "WebPage",
+        "@id": "https://clarosdpp.com/#home",
+        "url": "https://clarosdpp.com/",
+        "name": "ClarosDPP — Digital Product Passport Software & Compliance Governance",
+        "isPartOf": { "@id": "https://clarosdpp.com/#site" }
+      }
+    ]
+  }
+  </script>
+  <title>ClarosDPP — Digital Product Passport Software & Compliance Governance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body.page-body {
+      background:
+        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
+        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
+        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
+        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
+      background-size: 64px 64px, 64px 64px, auto, auto, auto;
+      background-attachment: scroll, scroll, scroll, scroll, scroll;
+      color: #10243a;
+    }
+    .hero,
+    .section,
+    .section-alt,
+    .section-dark {
+      background: transparent !important;
+    }
+    .hero {
+      padding: var(--hero-pad-y) 0 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      display: none;
+    }
+    .hero-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--layout-x);
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1.22fr 0.78fr;
+      gap: 3.25rem;
+      align-items: flex-start;
+    }
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.4rem 0.95rem;
+      border-radius: 999px;
+      background: rgba(13,181,176,0.12);
+      border: 1px solid rgba(13,181,176,0.22);
+      color: var(--teal);
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      margin-bottom: 1.35rem;
+    }
+    .hero h1 {
+      font-family: var(--sans);
+      font-size: clamp(1.95rem, 3.5vw, 3.1rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      color: #10243a;
+      margin: 0 0 1rem;
+    }
+    .hero h1 .hl {
+      color: var(--teal);
+    }
+    .hero-copy p {
+      max-width: 620px;
+      font-size: 1.06rem;
+      color: #50697f;
+      line-height: 1.9;
+      text-align: justify;
+      text-justify: inter-word;
+      margin-bottom: 1.8rem;
+    }
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .hero-dpp-blocks {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.7rem;
+    }
+    .hero-dpp-block {
+      background: var(--card-bg);
+      border: 1px solid rgba(16,36,58,0.08);
+      border-radius: 14px;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 6px 20px rgba(16,36,58,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .hero-dpp-block-head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .hero-dpp-block-icon {
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+    .hero-dpp-block-num {
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--teal);
+      letter-spacing: 1px;
+      font-family: var(--mono);
+    }
+    .hero-dpp-block strong {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #10243a;
+      line-height: 1.3;
+    }
+    .hero-dpp-block span {
+      color: #607a90;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .passport-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+    .passport-visual {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 0;
+      width: 100%;
+    }
+    .passport-card {
+      width: min(100%, 320px);
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(16,36,58,0.08);
+      border-radius: 24px;
+      padding: 1.5rem;
+      box-shadow: 0 24px 64px rgba(16,36,58,0.12);
+      animation: floatPassport 6s ease-in-out infinite;
+    }
+    @keyframes floatPassport {
+      0%, 100% { transform: translateY(0) rotate(-1.4deg); }
+      50% { transform: translateY(-18px) rotate(1deg); }
+    }
+    .pc-row,
+    .pc-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pc-brand {
+      font-family: var(--serif);
+      font-size: 0.94rem;
+      font-weight: 700;
+      color: var(--teal);
+    }
+    .pc-chip {
+      width: 36px;
+      height: 28px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #bc9121, #e7c550);
+    }
+    .pc-id {
+      font-family: var(--mono);
+      font-size: 0.64rem;
+      letter-spacing: 2px;
+      color: #6f8798;
+      margin: 1.1rem 0 0.9rem;
+    }
+    .pc-name {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #10243a;
+      margin-bottom: 0.25rem;
+    }
+    .pc-sub {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--teal);
+      font-weight: 700;
+      margin-bottom: 1.15rem;
+    }
+    .pc-data {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      margin-bottom: 1.15rem;
+    }
+    .pc-data div {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: 0.76rem;
+    }
+    .pc-data span:first-child {
+      color: #6f8798;
+    }
+    .pc-data span:last-child {
+      color: #10243a;
+      font-weight: 700;
+      text-align: right;
+    }
+    .pc-bar {
+      display: flex;
+      gap: 0.3rem;
+      margin-bottom: 1rem;
+    }
+    .pc-bar span {
+      flex: 1;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(16,36,58,0.1);
+    }
+    .pc-bar span.active {
+      background: var(--teal);
+    }
+    .pc-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.7rem;
+      color: var(--green);
+      font-weight: 700;
+    }
+    .pc-status::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(16,185,129,0.45);
+    }
+    .pc-qr {
+      width: 42px;
+      height: 42px;
+      padding: 4px;
+      border-radius: 6px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1.5px;
+      background: #ffffff;
+    }
+    .pc-qr div { border-radius: 1px; }
+    .pc-qr .b { background: #10243a; }
+    .float-note {
+      position: absolute;
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(16,36,58,0.08);
+      border-radius: 14px;
+      padding: 0.8rem 0.95rem;
+      box-shadow: 0 20px 40px rgba(16,36,58,0.08);
+      font-size: 0.77rem;
+      color: #17304a;
+      max-width: 210px;
+    }
+    .float-note strong {
+      display: block;
+      color: var(--teal);
+      margin-bottom: 0.25rem;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .float-note.one {
+      top: 16px;
+      right: 0;
+      animation: bob 4s ease-in-out infinite;
+    }
+    .float-note.two {
+      bottom: 46px;
+      left: 0;
+      animation: bob 5s ease-in-out infinite 0.8s;
+    }
+    .hero-demo-card {
+      width: min(100%, 400px);
+      background: var(--card-bg);
+      border: 1px solid rgba(16,36,58,0.08);
+      border-radius: 22px;
+      padding: 1.25rem;
+      box-shadow: 0 16px 40px rgba(16,36,58,0.08);
+    }
+    .hero-demo-card h3 {
+      font-family: var(--serif);
+      font-size: 1.35rem;
+      color: #10243a;
+      margin-bottom: 0.65rem;
+    }
+    .hero-demo-card p {
+      color: #607a90;
+      font-size: 0.88rem;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+      text-align: justify;
+      text-justify: inter-word;
+      text-align-last: left;
+      hyphens: auto;
+      -webkit-hyphens: auto;
+      -ms-hyphens: auto;
+    }
+    .sample-qr-link {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      padding: 1rem;
+      background: #ffffff;
+      border-radius: 18px;
+      margin: 0 0 1rem;
+    }
+    .sample-qr-image {
+      width: 180px;
+      height: 180px;
+      object-fit: contain;
+    }
+    .hero-demo-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .hero-demo-tag {
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(13,181,176,0.1);
+      border: 1px solid rgba(13,181,176,0.18);
+      color: var(--teal);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    #what-is-dpp .section-lead {
+      max-width: 980px;
+      margin-bottom: 0;
+      text-align: justify;
+      text-justify: inter-word;
+      text-align-last: left;
+      hyphens: auto;
+      -webkit-hyphens: auto;
+      -ms-hyphens: auto;
+      display: block;
+    }
+    #why-mandatory .section-lead {
+      max-width: 980px;
+      text-align: justify;
+      text-justify: inter-word;
+      text-align-last: left;
+      hyphens: auto;
+      -webkit-hyphens: auto;
+      -ms-hyphens: auto;
+      display: block;
+    }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .dpp-explainer {
+      display: grid;
+      grid-template-columns: 1.22fr 0.78fr;
+      gap: 3.25rem;
+      align-items: start;
+      margin-top: 0;
+    }
+    .dpp-copy {
+      max-width: 980px;
+    }
+    .dpp-visual-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(16,36,58,0.08);
+      border-radius: 22px;
+      padding: 0.9rem;
+      margin-top: 2rem;
+      overflow: hidden;
+      box-shadow: 0 18px 50px rgba(16,36,58,0.07);
+    }
+    .dpp-visual-link {
+      display: block;
+      cursor: zoom-in;
+    }
+    .dpp-visual-svg,
+    .dpp-visual-image {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0;
+      border-radius: 16px;
+      object-fit: contain;
+    }
+    .image-modal {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background: rgba(11,24,38,0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.22s ease, visibility 0.22s ease;
+      z-index: 1300;
+    }
+    .image-modal.is-open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .image-modal-dialog {
+      position: relative;
+      width: min(92vw, 1180px);
+      max-height: 90vh;
+      padding: 1rem;
+      border-radius: 24px;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(16,36,58,0.08);
+      box-shadow: 0 32px 90px rgba(16,36,58,0.22);
+    }
+    .image-modal-close {
+      position: absolute;
+      top: 0.8rem;
+      right: 0.8rem;
+      width: 42px;
+      height: 42px;
+      border: none;
+      border-radius: 999px;
+      background: rgba(16,36,58,0.08);
+      color: #10243a;
+      font-size: 1.6rem;
+      line-height: 1;
+      cursor: pointer;
+      z-index: 1;
+    }
+    .image-modal-close:hover {
+      background: rgba(16,36,58,0.14);
+    }
+    .image-modal img {
+      width: 100%;
+      max-height: calc(90vh - 2rem);
+      object-fit: contain;
+      border-radius: 18px;
+    }
+
+    .mandate-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    .mandate-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-bdr);
+      border-radius: 18px;
+      padding: 1.6rem;
+      transition: transform 0.25s, border-color 0.25s;
+    }
+    .mandate-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--teal-bdr);
+    }
+    .mandate-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.35rem;
+    }
+    .mandate-card .ref {
+      display: inline-flex;
+      padding: 0.22rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(13,181,176,0.1);
+      color: var(--teal);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+    .mandate-card p {
+      color: var(--lgray);
+      font-size: 0.86rem;
+      line-height: 1.78;
+      text-align: justify;
+      text-justify: inter-word;
+      text-align-last: left;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+
+    .flow-shell {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 2.4rem;
+      align-items: start;
+    }
+    #opportunity .section-title,
+    #opportunity .section-lead {
+      max-width: 980px;
+    }
+    #opportunity .section-lead,
+    #opportunity .flow-step p,
+    #opportunity .loop-copy p {
+      text-align: justify;
+      text-justify: inter-word;
+      text-align-last: left;
+      hyphens: auto;
+      -webkit-hyphens: auto;
+      -ms-hyphens: auto;
+    }
+    #opportunity .flow-step p {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+    }
+    #opportunity .loop-visual-stack {
+      margin-top: 3.5rem;
+    }
+    #opportunity .loop-card {
+      margin-top: 1.75rem;
+    }
+    .flow-steps {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1.2rem;
+    }
+    .flow-step {
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      gap: 1rem;
+      padding: 1rem 1.1rem;
+      background: var(--card-bg);
+      border: 1px solid var(--card-bdr);
+      border-radius: 16px;
+    }
+    .flow-step strong {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.9rem;
+    }
+    .flow-step p {
+      color: var(--lgray);
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+    .flow-num {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: var(--teal-dim);
+      border: 1px solid var(--teal-bdr);
+      color: var(--teal);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+    }
+    .loop-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-bdr);
+      border-radius: 26px;
+      padding: 1.5rem;
+    }
+    .circularity-diagram {
+      position: relative;
+      width: min(100%, 500px);
+      aspect-ratio: 1;
+      margin: 0 auto 1.2rem;
+      overflow: visible;
+    }
+    .loop-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+    .loop-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 28%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #0d9e9a 0%, #12b5b0 50%, #07c6d1 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      box-shadow: 0 10px 40px rgba(18,181,176,0.38), 0 2px 8px rgba(0,0,0,0.08);
+      z-index: 3;
+    }
+    .loop-center-copy {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .loop-center-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 1.8px;
+      line-height: 1.45;
+      text-transform: uppercase;
+    }
+    .loop-center-rule {
+      width: 52px;
+      height: 1px;
+      background: rgba(255,255,255,0.35);
+    }
+    .loop-center-sub {
+      font-size: 0.72rem;
+      opacity: 0.92;
+      line-height: 1.35;
+    }
+    .loop-node {
+      position: absolute;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .loop-node-bubble {
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border: 2.5px solid #12b5b0;
+      box-shadow: 0 4px 18px rgba(18,181,176,0.25), 0 1px 4px rgba(0,0,0,0.08);
+      font-size: 1.5rem;
+      transform: translate(-50%, -50%);
+    }
+    .loop-node-label {
+      position: absolute;
+      width: 170px;
+      color: #52737e;
+      font-size: 0.72rem;
+      line-height: 1.52;
+      text-align: center;
+      pointer-events: none;
+    }
+    .loop-node-label strong {
+      display: block;
+      color: #12b5b0;
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+      line-height: 1.3;
+    }
+    .loop-copy p {
+      color: var(--lgray);
+      font-size: 0.88rem;
+      line-height: 1.86;
+      margin-bottom: 1rem;
+    }
+    .loop-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+    }
+    .loop-tags span {
+      padding: 0.32rem 0.72rem;
+      border-radius: 999px;
+      background: rgba(13,181,176,0.1);
+      border: 1px solid var(--teal-bdr);
+      color: var(--teal);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .reg-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+    .reg-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(16,36,58,0.08);
+      border-radius: 18px;
+      padding: 1.5rem;
+      box-shadow: 0 16px 38px rgba(16,36,58,0.05);
+    }
+    .reg-card h3 {
+      color: #10243a;
+      font-size: 0.98rem;
+      margin-bottom: 0.3rem;
+    }
+    .reg-card p {
+      color: #5b7387;
+      font-size: 0.84rem;
+      line-height: 1.75;
+    }
+    .reg-card .meta {
+      display: inline-flex;
+      margin-bottom: 0.75rem;
+      padding: 0.22rem 0.58rem;
+      border-radius: 999px;
+      background: rgba(13,181,176,0.1);
+      color: var(--teal);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .reg-note {
+      margin-top: 1.6rem;
+      background: rgba(13,181,176,0.07);
+      border: 1px solid var(--teal-bdr);
+      border-radius: 18px;
+      padding: 1.35rem 1.45rem;
+      color: #476175;
+      font-size: 0.84rem;
+      line-height: 1.8;
+    }
+
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .data-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 1.15rem;
+      align-items: start;
+      background: var(--card-bg);
+      border: 1px solid rgba(189, 217, 229, 0.55);
+      border-radius: 18px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 28px rgba(27, 61, 86, 0.06);
+    }
+    .data-card::after {
+      content: "";
+      position: absolute;
+      left: 1.5rem;
+      right: 1.5rem;
+      bottom: 1rem;
+      height: 1px;
+      background: rgba(189, 217, 229, 0.42);
+    }
+    .data-card-copy {
+      min-width: 0;
+    }
+    .data-card-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      margin-bottom: 0.8rem;
+    }
+    .data-index {
+      flex: 0 0 auto;
+      min-width: 2.35rem;
+      height: 2.15rem;
+      padding: 0 0.65rem;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .data-card h3 {
+      font-size: 0.98rem;
+      line-height: 1.25;
+      margin: 0;
+      color: #20344b;
+    }
+    .data-card p {
+      color: #5d738a;
+      font-size: 0.82rem;
+      line-height: 1.8;
+      margin: 0 0 1.25rem;
+    }
+    .data-icon {
+      width: 88px;
+      height: 88px;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);
+    }
+    .data-card .data-icon,
+    .data-card .data-index {
+      background: rgba(13, 181, 176, 0.12);
+      color: #0aa7a1;
+    }
+
+    @media (max-width: 980px) {
+      .hero-inner,
+      .flow-shell,
+      .mandate-grid,
+      .reg-grid {
+        grid-template-columns: 1fr;
+      }
+      .passport-stage {
+        min-height: auto;
+      }
+      .passport-visual {
+        min-height: 0;
+      }
+      .hero-meta,
+      .mini-grid,
+      .data-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .hero-meta-card {
+        min-height: 170px;
+      }
+      .dpp-explainer {
+        grid-template-columns: 1fr;
+      }
+      .data-card {
+        grid-template-columns: 74px 1fr;
+      }
+      .data-icon {
+        width: 74px;
+        height: 74px;
+        border-radius: 20px;
+        font-size: 1.7rem;
+      }
+      .dpp-visual-card {
+        margin-top: 1rem;
+        padding: 0;
+      }
+      .dpp-visual-svg,
+      .dpp-visual-image {
+        width: 100%;
+        margin: 0;
+      }
+      .float-note.one,
+      .float-note.two {
+        position: static;
+        margin-top: 1rem;
+      }
+    }
+    @media (max-width: 640px) {
+      .hero-meta,
+      .mini-grid,
+      .data-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero-meta-card {
+        min-height: auto;
+      }
+      .data-card {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      .data-card-head {
+        margin-bottom: 0.7rem;
+      }
+      .data-icon {
+        width: 72px;
+        height: 72px;
+      }
+      .circularity-diagram {
+        width: min(100%, 400px);
+      }
+      .loop-node-label {
+        width: 138px;
+        font-size: 0.68rem;
+      }
+      .loop-node-label strong {
+        font-size: 0.58rem;
+      }
+    }
+  </style>
+</head>
+<body class="page-body" data-theme="light">
+
+  <!-- Home Hero -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-inner">
+      <div class="hero-copy reveal visible">
+        <h1 id="hero-title">Digital Product Passports, engineered for <span class="hl">ESPR Compliance</span>.</h1>
+        <p>
+          ClarosDPP supports organizations in developing Digital Product Passport solutions by consolidating
+          product, material, sustainability, and regulatory data into a harmonized structure, and delivering it
+          through a passport framework aligned with the Ecodesign for Sustainable Products Regulation (ESPR) and
+          other applicable EU compliance requirements.
+        </p>
+        <div class="hero-actions">
+          <a href="product.html" class="btn btn-primary">Explore Our Digital Passport Platform →</a>
+          <a href="services.html" class="btn btn-outline">See Compliance Services</a>
+        </div>
+        <h3 class="hero-dpp-label">What a DPP must contain</h3>
+        <div class="hero-dpp-blocks">
+          <div class="hero-dpp-block">
+            <div class="hero-dpp-block-head">
+              <span class="hero-dpp-block-icon">🪪</span>
+              <span class="hero-dpp-block-num">01</span>
+            </div>
+            <strong>Product identity</strong>
+            <span>Unique identifiers, model details, manufacturer info, and market placement records.</span>
+          </div>
+          <div class="hero-dpp-block">
+            <div class="hero-dpp-block-head">
+              <span class="hero-dpp-block-icon">⚗️</span>
+              <span class="hero-dpp-block-num">02</span>
+            </div>
+            <strong>Material &amp; substance data</strong>
+            <span>Component breakdown, material origin, hazardous substance declarations, and SCIP alignment.</span>
+          </div>
+          <div class="hero-dpp-block">
+            <div class="hero-dpp-block-head">
+              <span class="hero-dpp-block-icon">🌿</span>
+              <span class="hero-dpp-block-num">03</span>
+            </div>
+            <strong>Environmental evidence</strong>
+            <span>Carbon footprint, recycled content ratios, durability metrics, and lifecycle impact data.</span>
+          </div>
+          <div class="hero-dpp-block">
+            <div class="hero-dpp-block-head">
+              <span class="hero-dpp-block-icon">🔧</span>
+              <span class="hero-dpp-block-num">04</span>
+            </div>
+            <strong>Use, repair &amp; end-of-life</strong>
+            <span>Repair instructions, spare part availability, disassembly guidance, and recycling routes.</span>
+          </div>
+          <div class="hero-dpp-block">
+            <div class="hero-dpp-block-head">
+              <span class="hero-dpp-block-icon">📋</span>
+              <span class="hero-dpp-block-num">05</span>
+            </div>
+            <strong>Compliance documentation</strong>
+            <span>Declarations of conformity, test reports, certifications, and applicable regulation references.</span>
+          </div>
+          <div class="hero-dpp-block">
+            <div class="hero-dpp-block-head">
+              <span class="hero-dpp-block-icon">🔒</span>
+              <span class="hero-dpp-block-num">06</span>
+            </div>
+            <strong>Governance &amp; history</strong>
+            <span>Access control rules, data provenance, version history, and audit trail records.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="passport-stage reveal visible">
+        <div class="passport-visual" aria-hidden="true">
+          <div class="passport-card">
+            <div class="pc-row">
+              <div class="pc-brand">ClarosDPP</div>
+              <div class="pc-chip"></div>
+            </div>
+            <div class="pc-id">DPP-EU-2026-0048-PL</div>
+            <div class="pc-name">Circular Appliance Series A4</div>
+            <div class="pc-sub">Digital Product Passport</div>
+            <div class="pc-data">
+              <div><span>Passport status</span><span>Released</span></div>
+              <div><span>Primary regulation</span><span>ESPR readiness</span></div>
+              <div><span>Material trace</span><span>Batch linked</span></div>
+              <div><span>Carbon dataset</span><span>Connected</span></div>
+              <div><span>End-of-life route</span><span>Recover / recycle</span></div>
+            </div>
+            <div class="pc-bar">
+              <span class="active"></span><span class="active"></span><span class="active"></span><span></span>
+            </div>
+            <div class="pc-foot">
+              <div class="pc-status">Scan ready</div>
+              <div class="pc-qr">
+                <div class="b"></div><div class="b"></div><div></div><div class="b"></div><div class="b"></div>
+                <div class="b"></div><div></div><div class="b"></div><div></div><div class="b"></div>
+                <div></div><div class="b"></div><div></div><div class="b"></div><div></div>
+                <div class="b"></div><div></div><div class="b"></div><div class="b"></div><div class="b"></div>
+                <div class="b"></div><div class="b"></div><div></div><div></div><div class="b"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <aside class="hero-demo-card">
+          <h3>Access a product passport through a real QR code.</h3>
+          <p>This sample version is static and intended for demonstration, but it illustrates the user journey we can tailor for your products.</p>
+          <a href="sample-passport.html" class="sample-qr-link" aria-label="Open sample passport">
+            <img src="assets/sample-passport-qr.svg" alt="QR code linking to a sample passport page" class="sample-qr-image" />
+          </a>
+          <div class="hero-demo-meta">
+            <span class="hero-demo-tag">Static demo</span>
+            <span class="hero-demo-tag">Dummy data</span>
+            <span class="hero-demo-tag">Sales safe</span>
+          </div>
+          <a href="sample-passport.html" class="btn btn-primary">Open Sample Passport →</a>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- What Is DPP -->
+  <section class="section section-alt" id="what-is-dpp" aria-labelledby="what-is-title">
+    <div class="container">
+      <div class="dpp-explainer">
+        <div class="dpp-copy reveal visible">
+          <h2 class="section-title" id="what-is-title">What is a <span class="hl">Digital Product Passport</span>?</h2>
+          <p class="section-lead">
+            In simple terms, a Digital Product Passport (DPP) acts as a digital identity for a product. It connects the
+            physical item to reliable digital information, typically via a QR code or similar data carrier, allowing users
+            to understand what the product is made of, how to use and repair it, how to handle it safely, and how it can
+            be recovered or recycled at the end of its life. It also creates a consistent way to share verified product
+            data across the entire value chain, from manufacturers to regulators and end users. By improving transparency
+            and traceability, a DPP helps companies meet regulatory requirements while enabling more sustainable and
+            circular product practices.
+          </p>
+        </div>
+
+        <div class="dpp-visual-card reveal visible">
+          <a href="assets/DPP image.png" class="dpp-visual-link" data-image-modal-trigger aria-label="Open enlarged Digital Product Passport image">
+            <img src="assets/DPP image.png" alt="Diagram explaining what a Digital Product Passport is" class="dpp-visual-image" />
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Why Mandatory -->
+  <section class="section section-dark" id="why-mandatory" aria-labelledby="mandatory-title">
+    <div class="container">
+      <div class="reveal">
+        <h2 class="section-title" id="mandatory-title">Why DPP Was Made <span class="hl">Mandatory</span></h2>
+        <p class="section-lead">
+          The EU introduced Digital Product Passports because circular economy goals cannot be effectively achieved with
+          fragmented and inconsistent product data. Policymakers require reliable, standardized information to track
+          products across their entire lifecycle-from supply chains and usage to repair and end-of-life handling. By
+          making DPPs mandatory, the EU aims to improve transparency, strengthen regulatory compliance, and enable
+          better decision-making for businesses, authorities, and consumers alike. This ensures products are easier to
+          reuse, repair, and recycle, ultimately reducing waste and environmental impact.
+        </p>
+      </div>
+
+      <div class="mandate-grid">
+        <article class="mandate-card reveal reveal-d1">
+          <h3>To establish a unified product data framework</h3>
+          <span class="ref">ESPR (EU) 2024/1781</span>
+          <p>
+            ESPR establishes the legal basis for DPPs and standardises durability, reparability, and circularity data in a
+            structured, machine-readable format across the EU market and its regulatory systems.
+          </p>
+        </article>
+        <article class="mandate-card reveal reveal-d2">
+          <h3>To enable data-driven market surveillance</h3>
+          <span class="ref">EU market surveillance framework</span>
+          <p>
+            DPPs give authorities direct access to verified product data, improving enforcement efficiency, strengthening
+            oversight, and reducing the circulation of non-compliant products across the internal market.
+          </p>
+        </article>
+        <article class="mandate-card reveal reveal-d3">
+          <h3>To improve traceability across value chains</h3>
+          <span class="ref">REACH, RoHS, waste, due diligence data</span>
+          <p>
+            DPPs keep substances, restricted materials, sourcing, waste, and due diligence data consistently recorded and
+            accessible across the product lifecycle for compliance checks and reporting needs.
+          </p>
+        </article>
+        <article class="mandate-card reveal reveal-d4">
+          <h3>To enable repair, reuse, and recycling</h3>
+          <span class="ref">Circular economy objective</span>
+          <p>
+            DPPs make post-market product information accessible so repairers, refurbishers, and recyclers can handle products
+            correctly, extend product lifetimes, and improve material recovery outcomes over time.
+          </p>
+        </article>
+        <article class="mandate-card reveal reveal-d1">
+          <h3>To improve industrial data interoperability</h3>
+          <span class="ref">Interoperability objective under ESPR</span>
+          <p>
+            DPPs introduce a harmonised data structure that improves interoperability between manufacturers, suppliers,
+            platforms, and regulators across European value chains and connected digital systems.
+          </p>
+        </article>
+        <article class="mandate-card reveal reveal-d2">
+          <h3>To improve waste traceability and compliance</h3>
+          <span class="ref">Waste Framework Directive (2008/98/EC)</span>
+          <p>
+            DPPs support waste policy by providing structured data on material composition, hazardous substances, and
+            disassembly, improving classification accuracy and recycling efficiency in practice.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Opportunity Section -->
+  <section class="section section-alt" id="opportunity" aria-labelledby="opportunity-title">
+    <div class="container">
+      <div class="flow-shell">
+        <div class="reveal">
+          <h2 class="section-title" id="opportunity-title">Turning Compliance into <span class="hl">Competitive Advantage</span></h2>
+          <p class="section-lead">
+            A well-designed Digital Product Passport should extend beyond regulatory compliance. Its real value emerges when it
+            becomes a strategic data infrastructure that helps organisations understand product behaviour in the market, trace
+            lifecycle movement, and see how materials circulate through reuse and recovery systems. When combined with analytics,
+            the passport evolves from a reporting obligation into a source of commercial intelligence.
+          </p>
+
+          <div class="flow-steps">
+            <div class="flow-step reveal reveal-d1">
+              <div class="flow-num">1</div>
+              <div>
+                <strong>Improve product design and engineering feedback loops</strong>
+                <p>Lifecycle and service data can feed R&amp;D and engineering teams directly, improving durability, modularity, repairability, and cost efficiency in future product development.</p>
+              </div>
+            </div>
+            <div class="flow-step reveal reveal-d2">
+              <div class="flow-num">2</div>
+              <div>
+                <strong>Reduce compliance and supply chain risk exposure</strong>
+                <p>A structured and continuously updated passport reduces uncertainty across ESPR, REACH, RoHS, and related obligations by keeping compliance evidence accessible and defensible.</p>
+              </div>
+            </div>
+            <div class="flow-step reveal reveal-d3">
+              <div class="flow-num">3</div>
+              <div>
+                <strong>Increase asset value through lifecycle traceability</strong>
+                <p>Verified histories covering materials, usage, repairs, and end-of-life pathways strengthen resale, leasing, refurbishment, and recovery economics by reducing uncertainty.</p>
+              </div>
+            </div>
+            <div class="flow-step reveal reveal-d4">
+              <div class="flow-num">4</div>
+              <div>
+                <strong>Unify fragmented product and sustainability data</strong>
+                <p>Consolidating ERP systems, supplier declarations, LCA studies, material data, and service records into one passport layer creates the foundation for downstream value creation.</p>
+              </div>
+            </div>
+            <div class="flow-step reveal reveal-d1">
+              <div class="flow-num">5</div>
+              <div>
+                <strong>Enable full lifecycle visibility of products and materials</strong>
+                <p>End-to-end tracking from raw material sourcing through production, use, and recovery improves transparency over product and material flows across the lifecycle.</p>
+              </div>
+            </div>
+            <div class="flow-step reveal reveal-d2">
+              <div class="flow-num">6</div>
+              <div>
+                <strong>Generate actionable internal intelligence through analytics</strong>
+                <p>Structured passport data enables lifecycle modelling, performance tracking, and anomaly detection that turn compliance information into practical decision-support intelligence.</p>
+              </div>
+            </div>
+            <div class="flow-step reveal reveal-d3">
+              <div class="flow-num">7</div>
+              <div>
+                <strong>Strengthen circular strategy and operational efficiency</strong>
+                <p>Reliable lifecycle data helps organisations optimise sourcing, repair, remanufacturing, and recovery planning while improving overall resource efficiency.</p>
+              </div>
+            </div>
+            <div class="flow-step reveal reveal-d4">
+              <div class="flow-num">8</div>
+              <div>
+                <strong>Strengthen customer and downstream partner transparency</strong>
+                <p>Standardised product information improves trust and coordination across customers, procurement teams, recyclers, and service partners throughout the value chain.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="loop-visual-stack">
+          <div class="circularity-diagram reveal reveal-d2" id="dpp-loop-diagram" aria-hidden="true"></div>
+          <div class="loop-card reveal reveal-d2">
+            <div class="loop-copy">
+              <p>
+                The passport acts as a continuous thread across the product lifecycle, linking inputs, manufacturing,
+                in-use performance, and end-of-life recovery into one connected record.
+              </p>
+              <p>
+                This is essential for compliance, but equally valuable for strategy, as it improves visibility into
+                material flows, product performance, service behaviour, and opportunities for reuse and secondary value creation.
+              </p>
+            </div>
+            <div class="loop-tags">
+              <span>Material flow</span>
+              <span>Scan analytics</span>
+              <span>Recovery insight</span>
+              <span>Lifecycle dashboards</span>
+              <span>Telematics-ready patterns</span>
+            </div>
+          </div>
+          <div class="cta-strip reveal">
+            <p>Want to see how this works in the real platform? <span>Explore the product page for the full operating view.</span></p>
+            <a href="product.html" class="btn btn-primary btn-sm">View Product →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- What must contain -->
+
+  <div class="image-modal" id="image-modal" aria-hidden="true">
+    <div class="image-modal-dialog" role="dialog" aria-modal="true" aria-label="Enlarged Digital Product Passport image">
+      <button type="button" class="image-modal-close" id="image-modal-close" aria-label="Close image dialog">×</button>
+      <img src="assets/DPP image.png" alt="Enlarged diagram explaining what a Digital Product Passport is" />
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const trigger = document.querySelector('[data-image-modal-trigger]');
+      const modal = document.getElementById('image-modal');
+      const closeButton = document.getElementById('image-modal-close');
+      const dialog = modal ? modal.querySelector('.image-modal-dialog') : null;
+
+      if (!trigger || !modal || !closeButton || !dialog) return;
+
+      const openModal = (event) => {
+        event.preventDefault();
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        closeButton.focus();
+      };
+
+      const closeModal = () => {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        trigger.focus();
+      };
+
+      trigger.addEventListener('click', openModal);
+      closeButton.addEventListener('click', closeModal);
+
+      modal.addEventListener('click', (event) => {
+        if (!dialog.contains(event.target)) closeModal();
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+          closeModal();
+        }
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      const container = document.getElementById('dpp-loop-diagram');
+      if (!container) return;
+
+      const NODES = [
+        {
+          id: 0,
+          baseAngle: -90,
+          label: "DESIGN BETTER PRODUCTS",
+          desc: "Use real-world data to improve durability, repairability, and future product performance.",
+          icon: "🚛"
+        },
+        {
+          id: 1,
+          baseAngle: -30,
+          label: "REDUCE RISKS",
+          desc: "Stay compliant, reduce supply chain risk, and protect market access.",
+          icon: "🔨"
+        },
+        {
+          id: 2,
+          baseAngle: 30,
+          label: "INCREASE ASSET VALUE",
+          desc: "Build trust with verified product histories that strengthen resale, leasing, and refurbishment value.",
+          icon: "💳"
+        },
+        {
+          id: 3,
+          baseAngle: 90,
+          label: "MAKE SMARTER DECISIONS",
+          desc: "Turn passport data into dashboards, insights, and action.",
+          icon: "📊"
+        },
+        {
+          id: 4,
+          baseAngle: 150,
+          label: "OPERATE MORE CIRCULAR",
+          desc: "Optimize sourcing, repair programmes, recovery, and material efficiency.",
+          icon: "♻️"
+        },
+        {
+          id: 5,
+          baseAngle: 210,
+          label: "SEE THE WHOLE PICTURE",
+          desc: "Track materials and products from raw input to recovery.",
+          icon: "🗺️"
+        }
+      ];
+
+      const PERIOD = 28000;
+      const SVG_NS = "http://www.w3.org/2000/svg";
+
+      const svg = document.createElementNS(SVG_NS, "svg");
+      svg.classList.add("loop-svg");
+      container.appendChild(svg);
+
+      const outerOrbitRing = document.createElementNS(SVG_NS, "circle");
+      const innerOrbitRing = document.createElementNS(SVG_NS, "circle");
+      const centerRing = document.createElementNS(SVG_NS, "circle");
+      outerOrbitRing.setAttribute("fill", "none");
+      innerOrbitRing.setAttribute("fill", "none");
+      centerRing.setAttribute("fill", "none");
+      outerOrbitRing.setAttribute("stroke", "rgba(18,181,176,0.22)");
+      innerOrbitRing.setAttribute("stroke", "rgba(18,181,176,0.28)");
+      centerRing.setAttribute("stroke", "rgba(18,181,176,0.18)");
+      outerOrbitRing.setAttribute("stroke-width", "1.25");
+      innerOrbitRing.setAttribute("stroke-width", "1.5");
+      centerRing.setAttribute("stroke-width", "1");
+      svg.appendChild(outerOrbitRing);
+      svg.appendChild(innerOrbitRing);
+      svg.appendChild(centerRing);
+
+      const spokes = NODES.map(() => {
+        const line = document.createElementNS(SVG_NS, "line");
+        line.setAttribute("stroke", "rgba(18,181,176,0.18)");
+        line.setAttribute("stroke-width", "1");
+        svg.appendChild(line);
+        return line;
+      });
+
+      const center = document.createElement("div");
+      center.className = "loop-center";
+      center.innerHTML = `
+        <div class="loop-center-copy">
+          <div class="loop-center-title">CIRCULAR<br />ECONOMY<br />LOOP</div>
+        </div>
+      `;
+      container.appendChild(center);
+
+      const nodeElements = NODES.map((node) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "loop-node";
+
+        const bubble = document.createElement("div");
+        bubble.className = "loop-node-bubble";
+        bubble.textContent = node.icon;
+
+        const label = document.createElement("div");
+        label.className = "loop-node-label";
+        label.innerHTML = `<strong>${node.label.split(" ").join("<br />")}</strong>`;
+
+        wrapper.appendChild(bubble);
+        wrapper.appendChild(label);
+        container.appendChild(wrapper);
+
+        return { wrapper, bubble, label, node };
+      });
+
+      const toRad = (deg) => (deg * Math.PI) / 180;
+
+      function render(rotationDeg) {
+        const size = container.clientWidth;
+        const cx = size / 2;
+        const cy = size / 2;
+        const innerOrbitR = size * 0.27;
+        const outerOrbitR = size * 0.35;
+        const innerR = size * 0.14;
+        const labelGap = size * 0.15;
+
+        svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+
+        outerOrbitRing.setAttribute("cx", cx);
+        outerOrbitRing.setAttribute("cy", cy);
+        outerOrbitRing.setAttribute("r", outerOrbitR);
+
+        innerOrbitRing.setAttribute("cx", cx);
+        innerOrbitRing.setAttribute("cy", cy);
+        innerOrbitRing.setAttribute("r", innerOrbitR);
+
+        centerRing.setAttribute("cx", cx);
+        centerRing.setAttribute("cy", cy);
+        centerRing.setAttribute("r", innerR);
+
+        nodeElements.forEach((entry, index) => {
+          const angle = toRad(entry.node.baseAngle + rotationDeg);
+          const cosA = Math.cos(angle);
+          const sinA = Math.sin(angle);
+          const nodeOrbitR = index % 2 === 0 ? outerOrbitR : innerOrbitR;
+
+          const nx = cx + cosA * nodeOrbitR;
+          const ny = cy + sinA * nodeOrbitR;
+          const spoke = spokes[index];
+          spoke.setAttribute("x1", cx);
+          spoke.setAttribute("y1", cy);
+          spoke.setAttribute("x2", nx);
+          spoke.setAttribute("y2", ny);
+
+          entry.wrapper.style.left = "0";
+          entry.wrapper.style.top = "0";
+
+          entry.bubble.style.left = `${nx}px`;
+          entry.bubble.style.top = `${ny}px`;
+
+          const labelX = nx + cosA * labelGap;
+          const labelY = ny + sinA * labelGap;
+
+          entry.label.style.left = `${labelX}px`;
+          entry.label.style.top = `${labelY}px`;
+          entry.label.style.transform = "translate(-50%, -50%)";
+          entry.label.style.textAlign = "center";
+        });
+      }
+
+      let startTime = null;
+      let rafId = null;
+
+      function tick(ts) {
+        if (!startTime) startTime = ts;
+        const rotationDeg = ((ts - startTime) / PERIOD) * 360;
+        render(rotationDeg);
+        rafId = requestAnimationFrame(tick);
+      }
+
+      window.addEventListener("resize", () => render(startTime ? ((performance.now() - startTime) / PERIOD) * 360 : 0));
+      render(0);
+      rafId = requestAnimationFrame(tick);
+
+      window.addEventListener("beforeunload", () => {
+        if (rafId) cancelAnimationFrame(rafId);
+      });
+    })();
+  </script>
+  <script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+node_modules
+apps/*/node_modules
+apps/*/dist
+dist
+build
+.git
+.claude
+.DS_Store
+*.log
+npm-debug.log*
+
+.env
+.env.prod
+apps/backend-api/.env
+
+storage/local-storage
+apps/backend-api/backups

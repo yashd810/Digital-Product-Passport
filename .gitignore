@@ -1,25 +1,26 @@
 # Dependencies
 node_modules/
-Backend/node_modules/
+apps/*/node_modules/
 
 # Build output
 dist/
 build/
+apps/*/dist/
 
 # Environment files — contain secrets, never commit these
 .env
+.env.prod
 .env.local
 .env.*.local
-Backend/.env
+apps/backend-api/.env
 
 # Vite cache
 node_modules/.vite/
 node_modules/.cache/
+.vite/
 
 # User-uploaded files (runtime data, not source code)
-Backend/passport-files/
-Backend/uploads/
-Backend/repository-files/
+storage/local-storage/
 
 # macOS
 .DS_Store

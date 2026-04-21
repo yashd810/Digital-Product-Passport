@@ -1,0 +1,79 @@
+services:
+  frontend-app:
+    build:
+      context: .
+      dockerfile: apps/frontend-app/Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL}"
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    restart: unless-stopped
+    depends_on:
+      - backend-api
+
+  backend-api:
+    build:
+      context: .
+      dockerfile: apps/backend-api/Dockerfile
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      LOCAL_STORAGE_DIR: /data
+      FILES_DIR: /data/passport-files
+      REPO_DIR: /data/repository-files
+      UPLOADS_DIR: /data/uploads
+    volumes:
+      - local_storage_data:/data
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - local-storage
+
+  asset-management:
+    build:
+      context: .
+      dockerfile: apps/asset-management/Dockerfile
+    ports:
+      - "${ASSET_MANAGEMENT_PORT:-3003}:80"
+    restart: unless-stopped
+    depends_on:
+      - backend-api
+
+  marketing-site:
+    build:
+      context: .
+      dockerfile: apps/marketing-site/Dockerfile
+    ports:
+      - "${MARKETING_PORT:-8080}:80"
+    restart: unless-stopped
+
+  local-storage:
+    image: alpine:3.20
+    command: sh -c "mkdir -p /data/passport-files /data/repository-files /data/uploads/symbols && tail -f /dev/null"
+    volumes:
+      - local_storage_data:/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18-alpine
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    env_file:
+      - .env.prod
+    environment:
+      POSTGRES_DB: "${DB_NAME}"
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  local_storage_data:
+  postgres_data:
