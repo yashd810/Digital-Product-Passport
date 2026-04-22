@@ -1,0 +1,19 @@
+claros-dpp.online, www.claros-dpp.online {
+	reverse_proxy 127.0.0.1:8080
+}
+
+app.claros-dpp.online {
+	reverse_proxy 127.0.0.1:3000
+}
+
+api.claros-dpp.online {
+	reverse_proxy 127.0.0.1:3001
+}
+
+viewer.claros-dpp.online {
+	reverse_proxy 127.0.0.1:3004
+}
+
+assets.claros-dpp.online {
+	reverse_proxy 127.0.0.1:3003
+}
