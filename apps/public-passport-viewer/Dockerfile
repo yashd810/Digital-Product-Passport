@@ -5,7 +5,7 @@ COPY apps/public-passport-viewer/package.json ./
 RUN npm install
 
 COPY apps/public-passport-viewer/ ./
-COPY apps/frontend-app/src /frontend-app/src
+COPY apps/frontend-app/src ./frontend-app/src
 ARG VITE_API_URL=http://localhost:3001
 ARG VITE_PUBLIC_VIEWER_URL=http://localhost:3004
 ENV VITE_API_URL=${VITE_API_URL}

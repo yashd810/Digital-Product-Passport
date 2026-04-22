@@ -1,8 +1,11 @@
 import path from "path";
+import fs from "fs";
 import { defineConfig, transformWithEsbuild } from "vite";
 import react from "@vitejs/plugin-react";
 
-const frontendSrc = path.resolve(__dirname, "../frontend-app/src");
+const localFrontendSrc = path.resolve(__dirname, "./frontend-app/src");
+const siblingFrontendSrc = path.resolve(__dirname, "../frontend-app/src");
+const frontendSrc = fs.existsSync(localFrontendSrc) ? localFrontendSrc : siblingFrontendSrc;
 
 export default defineConfig({
   plugins: [
@@ -10,7 +13,10 @@ export default defineConfig({
       name: "treat-js-as-jsx",
       enforce: "pre",
       async transform(code, id) {
-        if (!id.match(/\/src\/.*\.js$/) && !id.startsWith(frontendSrc)) return null;
+        const isJsSource =
+          id.match(/\/src\/.*\.[mc]?jsx?$/) ||
+          (id.startsWith(frontendSrc) && id.match(/\.[mc]?jsx?$/));
+        if (!isJsSource) return null;
         return transformWithEsbuild(code, id, { loader: "jsx" });
       },
     },
