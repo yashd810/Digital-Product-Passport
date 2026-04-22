@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 function OAuthCallback({ setToken, setUser, setCompanyId }) {
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "";
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState("");

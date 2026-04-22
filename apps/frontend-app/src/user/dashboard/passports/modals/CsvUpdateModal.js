@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { authHeaders } from "../../../../shared/api/authHeaders";
 import { parseCsvText } from "../utils/passportListHelpers";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 export function CsvUpdateModal({ passport, passportType, companyId, onClose, onDone }) {
   const [phase, setPhase] = useState("loading");

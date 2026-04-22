@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import { authHeaders } from "../../../shared/api/authHeaders";
-import { normalizePassportStatus } from "../../../passports/utils/passportStatus";
-import { buildPreviewPassportPath, buildPublicPassportPath } from "../../../passports/utils/passportRoutes";
+import { isObsoletePassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
+import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import "../../../admin/styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 const STATUS_MAP = {
   submitted_for_review:    { label:"In Review",   icon:"🔍" },
@@ -302,6 +302,13 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
           modelName: wf.model_name,
           productId: wf.product_id,
         })
+      : isObsoletePassportStatus(normalizedStatus) && wf.product_id && wf.version_number != null
+        ? buildInactivePassportPath({
+            companyName: user?.company_name,
+            modelName: wf.model_name,
+            productId: wf.product_id,
+            versionNumber: wf.version_number,
+          })
       : buildPreviewPassportPath({
           companyName: user?.company_name,
           modelName: wf.model_name,
@@ -309,7 +316,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
           previewId: wf.passport_guid,
         });
     if (!path) return;
-    const url = wf.release_status === "released"
+    const url = normalizedStatus === "released" || isObsoletePassportStatus(normalizedStatus)
       ? buildPublicViewerUrl(path)
       : `${window.location.origin}${path}`;
     if (!url) return;

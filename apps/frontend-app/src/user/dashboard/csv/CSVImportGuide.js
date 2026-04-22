@@ -3,7 +3,7 @@ import { useNavigate, useParams, NavLink } from "react-router-dom";
 import { authHeaders } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 // Proper CSV parser — handles quoted values, embedded commas, and escaped quotes
 function parseCsvRow(line) {

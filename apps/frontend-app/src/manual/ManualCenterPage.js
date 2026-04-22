@@ -7,7 +7,7 @@ import { buildAdminSections, buildUserSections, collectSearchTerms, prettifyName
 import { ManualSection } from "./manualComponents";
 import "./styles/ManualCenter.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 function ManualCenter({ mode = "user", user, companyId }) {
   const [searchParams, setSearchParams] = useSearchParams();

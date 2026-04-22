@@ -3,7 +3,7 @@ import { applyTableControls, getNextSortDirection, sortIndicator } from "../../s
 import { authHeaders } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 function AdminSecurity({ user }) {
   const [loading, setLoading] = useState(true);

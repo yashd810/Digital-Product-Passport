@@ -29,7 +29,11 @@ export const isPublishedPassportStatus = (status) =>
   isReleasedPassportStatus(status) || isObsoletePassportStatus(status);
 
 export const getPassportLinkType = (status) =>
-  isReleasedPassportStatus(status) ? "passport" : "preview";
+  isReleasedPassportStatus(status)
+    ? "passport"
+    : isObsoletePassportStatus(status)
+      ? "inactive"
+      : "preview";
 
 export const getPassportActivityState = (passport) => {
   if (passport?.archived) return "archived";

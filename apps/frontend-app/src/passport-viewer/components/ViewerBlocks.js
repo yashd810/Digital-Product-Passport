@@ -5,7 +5,7 @@ import { PieChart, parseCompositionFromTable, parseCompositionFromText } from ".
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
 import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel } from "../utils/viewerHelpers";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Viewer UI Blocks

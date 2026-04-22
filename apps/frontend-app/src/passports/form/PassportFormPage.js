@@ -5,7 +5,7 @@ import { authHeaders } from "../../shared/api/authHeaders";
 import RepositoryPicker from "./components/RepositoryPicker";
 import "../../assets/styles/CreatePass.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 const EDIT_SESSION_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const EDIT_HEARTBEAT_MS = 60 * 1000;
 const AUTOSAVE_DEBOUNCE_MS = 2000;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import { authHeaders } from "../../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 const ROLES = [
   { key: "company_admin", label: "Admin",  desc: "Full access — manage team, all passports",    badge: "role-admin"  },

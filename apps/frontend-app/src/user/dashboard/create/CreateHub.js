@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { authHeaders } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 // ── Inline bulk create modal (reused from PassportList / TemplatesPage) ──
 function BulkModal({ passportType, typeLabel, companyId, templateId, templateName, onClose, onDone }) {

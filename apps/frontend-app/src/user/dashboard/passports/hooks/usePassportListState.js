@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { applyTableControls, getNextSortDirection } from "../../../../shared/table/tableControls";
 import { authHeaders } from "../../../../shared/api/authHeaders";
-import { normalizePassportStatus } from "../../../../passports/utils/passportStatus";
-import { buildPreviewPassportPath, buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
+import { isObsoletePassportStatus, normalizePassportStatus } from "../../../../passports/utils/passportStatus";
+import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
 import {
   calcCompleteness,
@@ -12,7 +12,7 @@ import {
   sortPassportsByVersionDesc,
 } from "../utils/passportListHelpers";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 export function usePassportListState({ user, companyId, filterByUser }) {
   const { passportType, productKey, umbrellaKey } = useParams();
@@ -82,6 +82,15 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       });
     }
 
+    if (!forcePreview && isObsoletePassportStatus(normalizedStatus) && passport.product_id && passport.version_number != null) {
+      return buildInactivePassportPath({
+        companyName: user?.company_name,
+        modelName: passport.model_name,
+        productId: passport.product_id,
+        versionNumber: passport.version_number,
+      });
+    }
+
     return buildPreviewPassportPath({
       companyName: user?.company_name,
       modelName: passport.model_name,
@@ -93,7 +102,9 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const openPassportViewer = useCallback((passport, options = {}) => {
     const path = getViewerPath(passport, options);
     if (!path) return;
-    const url = options.forcePreview ? `${window.location.origin}${path}` : buildPublicViewerUrl(path);
+    const normalizedStatus = normalizePassportStatus(passport?.release_status);
+    const isPublicRoute = !options.forcePreview && (normalizedStatus === "released" || isObsoletePassportStatus(normalizedStatus));
+    const url = isPublicRoute ? buildPublicViewerUrl(path) : `${window.location.origin}${path}`;
     if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
   }, [getViewerPath]);

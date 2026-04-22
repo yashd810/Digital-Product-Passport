@@ -4,7 +4,7 @@ import { authHeaders } from "../../shared/api/authHeaders";
 import { formatPassportStatus } from "../utils/passportStatus";
 import "../../assets/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 const SKIP = new Set([
   "id","company_id","created_at","updated_at","qr_code","deleted_at",

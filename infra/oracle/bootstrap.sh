@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/dpp}"
 REPO_URL="${REPO_URL:-https://github.com/yashd810/Digital-Product-Passport.git}"
 BRANCH="${BRANCH:-main}"
+ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required but not installed."
@@ -19,12 +20,12 @@ else
   git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
 fi
 
-if [ ! -f "$APP_DIR/.env.prod" ]; then
-  echo "Missing $APP_DIR/.env.prod"
-  echo "Copy your production env file to the server first."
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Missing production env file: $ENV_FILE"
+  echo "Store your production env outside the repo, e.g. /etc/dpp/dpp.env"
   exit 1
 fi
 
 cd "$APP_DIR"
-docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d
-docker compose -f docker-compose.prod.yml --env-file .env.prod ps
+DPP_ENV_FILE="$ENV_FILE" docker compose -f docker-compose.prod.yml --env-file "$ENV_FILE" up --build -d
+DPP_ENV_FILE="$ENV_FILE" docker compose -f docker-compose.prod.yml --env-file "$ENV_FILE" ps

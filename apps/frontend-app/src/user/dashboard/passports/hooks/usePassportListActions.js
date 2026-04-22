@@ -9,7 +9,7 @@ import {
 import { buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 export function usePassportListActions({
   activeType,

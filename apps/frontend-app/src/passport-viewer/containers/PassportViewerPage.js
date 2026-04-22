@@ -17,7 +17,7 @@ import {
 import { PassportIntro, Header, Footer, PassportTabRail, SignatureBadge, EmptySectionsState, SectionView, PrintView } from "../components/ViewerBlocks";
 import "../styles/PassportViewer.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const { productId, versionNumber, previewId } = useParams();

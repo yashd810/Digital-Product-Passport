@@ -7,7 +7,7 @@ import { authHeaders } from "../../shared/api/authHeaders";
 import { buildPreviewTechnicalPassportPath, buildTechnicalPassportPath } from "../../passports/utils/passportRoutes";
 import "../styles/PassportViewer.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Viewer Session Helpers

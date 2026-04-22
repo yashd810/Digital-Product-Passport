@@ -7,7 +7,7 @@ import { formatPassportStatus, isPublishedPassportStatus, normalizePassportStatu
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import "../../../assets/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Archived Passport Collection Helpers

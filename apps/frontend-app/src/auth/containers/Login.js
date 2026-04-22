@@ -4,7 +4,7 @@ import "../styles/Landing.css";
 
 function Login({ setToken, setUser, setCompanyId }) {
   const navigate = useNavigate();
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
   // Step 1: credentials
   const [email, setEmail] = useState("");

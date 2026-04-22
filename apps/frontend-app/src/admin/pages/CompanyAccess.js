@@ -6,7 +6,7 @@ import "../styles/AdminDashboard.css";
 function CompanyAccess() {
   const navigate = useNavigate();
   const { companyId } = useParams();
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "";
   const [companyData,    setCompanyData]    = useState(null);
   const [grantedTypeIds, setGrantedTypeIds] = useState([]);
   const [allTypes,       setAllTypes]       = useState([]);   // all active passport types from DB

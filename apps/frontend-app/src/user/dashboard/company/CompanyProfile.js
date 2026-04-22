@@ -5,7 +5,7 @@ import { DEFAULT_COMPANY_BRANDING, normalizeCompanyBranding } from "../../../app
 import { authHeaders } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 function CompanyProfile({ companyId, user }) {
   const { companyId: routeCompanyId } = useParams();

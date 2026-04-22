@@ -2,7 +2,34 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { NavLink } from "react-router-dom";
 import "./CompanyRepository.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
+
+function copyText(value) {
+  const text = String(value || "");
+  if (!text) return Promise.reject(new Error("Nothing to copy"));
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.top = "-9999px";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      if (!ok) throw new Error("Copy command failed");
+      resolve();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
 
 // ─── Symbols Tab ─────────────────────────────────────────────────────────────
 function SymbolsTab({ token, companyId }) {
@@ -179,7 +206,7 @@ function SymbolsTab({ token, companyId }) {
                 ) : (
                   <>
                     <button className="repo-card-btn repo-card-btn-copy" onClick={() => {
-                      navigator.clipboard.writeText(sym.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
+                      copyText(sym.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
                     }}>Copy Link</button>
                     <button className="repo-card-btn repo-card-btn-rename" onClick={() => startRename(sym)}>Rename</button>
                     <button className="repo-card-btn repo-card-btn-remove"
@@ -469,7 +496,7 @@ function FilesTab({ token, companyId }) {
                   <>
                     {item.type === "file" && item.file_url && (
                       <button className="repo-card-btn repo-card-btn-copy" onClick={() => {
-                        navigator.clipboard.writeText(item.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
+                        copyText(item.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
                       }}>Copy Link</button>
                     )}
                     <button className="repo-card-btn repo-card-btn-rename" onClick={() => startRename(item)}>Rename</button>

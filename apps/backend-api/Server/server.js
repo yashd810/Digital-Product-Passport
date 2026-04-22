@@ -407,6 +407,37 @@ const repoSymbolUpload = multer({
   fileFilter: (_, file, cb) => { const allowed = [".svg",".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(new Error("Only SVG, PNG, JPG, WebP files are allowed")); },
 });
 
+if (!storageService.isLocal && storageService.fetchObject) {
+  app.get(/^\/storage\/(.+)$/, async (req, res) => {
+    const storageKey = String(req.params[0] || "").replace(/^\/+/, "");
+    if (!storageKey) return res.status(400).json({ error: "Storage key required" });
+    try {
+      const objectResponse = await storageService.fetchObject(storageKey);
+      const contentType = objectResponse.headers.get("content-type");
+      const contentLength = objectResponse.headers.get("content-length");
+      const cacheControl = objectResponse.headers.get("cache-control");
+      const etag = objectResponse.headers.get("etag");
+
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cross-Origin-Resource-Policy", storageKey.endsWith(".pdf") ? "cross-origin" : "same-site");
+      if (contentType) res.setHeader("Content-Type", contentType);
+      if (contentLength) res.setHeader("Content-Length", contentLength);
+      if (cacheControl) res.setHeader("Cache-Control", cacheControl);
+      if (etag) res.setHeader("ETag", etag);
+      if (storageKey.endsWith(".pdf")) {
+        res.setHeader("Content-Disposition", "inline");
+        res.removeHeader("X-Frame-Options");
+      }
+
+      const buffer = Buffer.from(await objectResponse.arrayBuffer());
+      res.send(buffer);
+    } catch (error) {
+      console.error("[storage] Failed to proxy object:", storageKey, error.message);
+      res.status(404).json({ error: "Stored object not found" });
+    }
+  });
+}
+
 // ─── SIGNING SERVICE ─────────────────────────────────────────────────────────
 const signingService = createSigningService({ pool, crypto, canonicalize });
 const { signPassport, verifyPassportSignature } = signingService;

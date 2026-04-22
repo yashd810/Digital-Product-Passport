@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders } from "../../../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 export function DeviceIntegrationModal({ passport, passportType, companyId, onClose }) {
   const [deviceKey, setDeviceKey] = useState(null);
@@ -13,7 +13,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
   const [manualVals, setManualVals] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
-  const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3001";
+  const apiBase = import.meta.env.VITE_API_URL || "";
 
   useEffect(() => {
     fetch(`${API}/api/companies/${companyId}/passports/${passport.guid}/device-key`, { headers: authHeaders() })

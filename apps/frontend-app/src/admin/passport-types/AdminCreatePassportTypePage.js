@@ -18,7 +18,7 @@ import {
 import { TypeIdentityCard } from "./TypeIdentityCard";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 const SEMANTIC_MODEL_OPTIONS = [
   {
     key: "",

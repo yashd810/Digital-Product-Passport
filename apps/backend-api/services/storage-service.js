@@ -112,6 +112,7 @@ function createS3StorageService(options) {
     secretAccessKey,
     publicBaseUrl,
     forcePathStyle,
+    serverBaseUrl,
   } = options;
 
   if (!endpoint || !bucket || !region || !accessKeyId || !secretAccessKey) {
@@ -119,6 +120,7 @@ function createS3StorageService(options) {
   }
 
   const endpointUrl = new URL(endpoint);
+  const appPublicBase = normalizeBaseUrl(serverBaseUrl);
   const normalizedPublicBase = normalizeBaseUrl(publicBaseUrl)
     || (forcePathStyle
       ? `${endpointUrl.origin}/${bucket}`
@@ -225,22 +227,33 @@ function createS3StorageService(options) {
       await signedFetch("DELETE", storageKey);
     },
     async deleteLegacyPath() {},
+    async fetchObject(storageKey) {
+      return signedFetch("GET", storageKey);
+    },
     getPublicUrl(storageKey) {
-      return joinUrl(normalizedPublicBase, storageKey);
+      return appPublicBase
+        ? joinUrl(appPublicBase, `/storage/${storageKey}`)
+        : joinUrl(normalizedPublicBase, storageKey);
     },
   };
 }
 
 function createStorageService(options) {
   const provider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
-  const serverBaseUrl = normalizeBaseUrl(process.env.SERVER_URL || options.serverBaseUrl || "http://localhost:3001");
+  const serverBaseUrl = normalizeBaseUrl(
+    process.env.PUBLIC_APP_URL
+    || process.env.APP_URL
+    || process.env.SERVER_URL
+    || options.serverBaseUrl
+    || "http://localhost:3001"
+  );
   const localStorageDir = path.resolve(options.localStorageDir);
   const filesBaseDir = path.resolve(options.filesBaseDir);
   const repoBaseDir = path.resolve(options.repoBaseDir);
   const uploadsBaseDir = path.resolve(options.uploadsBaseDir);
 
   const service = provider === "s3"
-    ? createS3StorageService({
+      ? createS3StorageService({
         endpoint: process.env.STORAGE_S3_ENDPOINT,
         region: process.env.STORAGE_S3_REGION,
         bucket: process.env.STORAGE_S3_BUCKET,
@@ -248,6 +261,7 @@ function createStorageService(options) {
         secretAccessKey: process.env.STORAGE_S3_SECRET_ACCESS_KEY,
         publicBaseUrl: process.env.STORAGE_S3_PUBLIC_BASE_URL,
         forcePathStyle: String(process.env.STORAGE_S3_FORCE_PATH_STYLE || "true") !== "false",
+        serverBaseUrl,
       })
     : createLocalStorageService({
         localStorageDir,

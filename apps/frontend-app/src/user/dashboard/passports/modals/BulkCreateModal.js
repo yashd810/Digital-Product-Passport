@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders } from "../../../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
   const [count, setCount] = useState("10");

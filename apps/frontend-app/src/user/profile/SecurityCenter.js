@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { authHeaders } from "../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 function SecurityCenter({ user, companyId }) {
   const resolvedCompanyId = companyId || user?.companyId || user?.company_id || "";

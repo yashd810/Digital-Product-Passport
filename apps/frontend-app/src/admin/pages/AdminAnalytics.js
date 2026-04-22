@@ -7,7 +7,7 @@ import { STATUS_COLORS } from "../../shared/utils/statusColors";
 import "../styles/AdminDashboard.css";
 import "../../assets/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 const slugify = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const ADMIN_BAR_COLORS = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e", "#f97316", "#a855f7"];
 const COMPANY_SERIES = [

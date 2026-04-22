@@ -14,6 +14,8 @@ This keeps the stack very close to your current Docker setup and avoids a larger
   Bootstraps an Ubuntu VM with Docker, Git, and the app folder.
 - [bootstrap.sh](./bootstrap.sh)
   Server-side deployment helper. Run this on the VM after your `.env.prod` is in place.
+- [deploy-prod.sh](./deploy-prod.sh)
+  Rebuild/start helper that reads secrets from an external env file such as `/etc/dpp/dpp.env`.
 - [oci.env.example](./oci.env.example)
   Example production env values tailored for OCI Object Storage.
 
@@ -42,7 +44,7 @@ You will need:
 - `access key`
 - `secret key`
 
-Set these in `.env.prod`:
+Set these in your production env file:
 
 ```env
 STORAGE_PROVIDER=s3
@@ -60,10 +62,11 @@ STORAGE_S3_FORCE_PATH_STYLE=true
 1. Create the VM in OCI.
 2. Use [cloud-init.yaml](./cloud-init.yaml) as the instance initialization script.
 3. SSH into the VM.
-4. Copy your local `.env.prod` to the VM:
+4. Store your production env file outside the repo on the VM:
 
 ```bash
-scp -i <your-key>.pem .env.prod ubuntu@<vm-public-ip>:/opt/dpp/.env.prod
+ssh -i <your-key>.pem ubuntu@<vm-public-ip> "sudo mkdir -p /etc/dpp && sudo chown ubuntu:ubuntu /etc/dpp"
+scp -i <your-key>.pem .env.prod ubuntu@<vm-public-ip>:/etc/dpp/dpp.env
 ```
 
 5. On the VM, run:
@@ -77,8 +80,25 @@ That will:
 
 - install/update Docker tooling if needed
 - clone or update the repo
-- verify `.env.prod` exists
-- start the production stack with `docker compose -f docker-compose.prod.yml --env-file .env.prod up --build -d`
+- verify `/etc/dpp/dpp.env` exists
+- start the production stack with `docker compose -f docker-compose.prod.yml --env-file /etc/dpp/dpp.env up --build -d`
+
+## Secret handling recommendation
+
+Do not keep production secrets inside `/opt/dpp` on the server.
+
+Recommended pattern:
+
+- code in `/opt/dpp`
+- secrets in `/etc/dpp/dpp.env`
+- deployment command:
+
+```bash
+cd /opt/dpp
+DPP_ENV_FILE=/etc/dpp/dpp.env ./infra/oracle/deploy-prod.sh
+```
+
+This keeps the checked-out repo clean while still letting Docker Compose read the same env file for build args and runtime settings.
 
 ## Notes
 

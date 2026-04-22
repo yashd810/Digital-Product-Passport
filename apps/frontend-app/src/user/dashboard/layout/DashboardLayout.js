@@ -6,7 +6,7 @@ import { useI18n } from "../../../app/providers/i18n";
 import { authHeaders } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 function formatPassportTypeLabel(passportType) {
   if (!passportType) return "Passport Type";

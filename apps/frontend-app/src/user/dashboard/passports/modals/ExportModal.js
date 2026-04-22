@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 export function ExportModal({ passports, filteredPassports, pagePassports, selectedPassports, activeType, allPassportTypes, onClose, onDone }) {
   const [scope, setScope] = useState("all");

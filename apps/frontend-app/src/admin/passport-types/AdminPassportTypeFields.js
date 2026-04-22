@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 function getSemanticModelLabel(modelKey) {
   if (modelKey === "battery_pass_din_spec_99100") return "Battery Pass Data Model";

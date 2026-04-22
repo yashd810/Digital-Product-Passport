@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "../../../assets/styles/CreatePass.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 /**
  * Modal to browse the company repository and pick a file.

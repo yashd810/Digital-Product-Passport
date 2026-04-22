@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { authHeaders } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "";
 
 // ── Field renderer (mirrors PassportForm logic, simplified for templates) ──
 function TemplateField({ field, value, isModelData, onValueChange, onModelDataToggle }) {
