@@ -13,6 +13,7 @@ function PassportList({ user, companyId, filterByUser }) {
   const state = usePassportListState({ user, companyId, filterByUser });
   const actions = usePassportListActions({
     activeType: state.activeType,
+    allPassportTypes: state.allPassportTypes,
     archiveConfirm: state.archiveConfirm,
     companyId,
     fetchPassports: state.fetchPassports,

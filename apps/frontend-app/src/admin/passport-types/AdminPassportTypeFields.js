@@ -4,6 +4,11 @@ import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+function getSemanticModelLabel(modelKey) {
+  if (modelKey === "battery_pass_din_spec_99100") return "Battery Pass Data Model";
+  return "No semantic model";
+}
+
 function AdminPassportTypeFields() {
   const navigate = useNavigate();
   const { typeName } = useParams();
@@ -48,6 +53,7 @@ function AdminPassportTypeFields() {
         <div>
           <h2 className="apt-title">Fields for {typeDef.display_name || typeName}</h2>
           <p className="apt-subtitle">{fieldCount} field{fieldCount === 1 ? "" : "s"} in {sections.length} section{sections.length === 1 ? "" : "s"}.</p>
+          <p className="apt-subtitle">Semantic model: {getSemanticModelLabel(typeDef.semantic_model_key)}</p>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import { buildPublicPassportPath } from "../../passports/utils/passportRoutes";
+import { buildPublicViewerUrl } from "../../passports/utils/publicViewerUrl";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -17,7 +18,7 @@ export const generateQRCode = async ({ productId, companyName = "", modelName = 
       productId,
     });
     if (!passportPath) return null;
-    const passportLink = `${window.location.origin}${passportPath}`;
+    const passportLink = buildPublicViewerUrl(passportPath);
     return await QRCode.toDataURL(passportLink, {
       errorCorrectionLevel: "H",
       type: "image/png",

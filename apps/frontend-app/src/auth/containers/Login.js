@@ -19,10 +19,18 @@ function Login({ setToken, setUser, setCompanyId }) {
 
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [ssoProviders, setSsoProviders] = useState([]);
 
   useEffect(() => {
     return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
   }, []);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/auth/sso/providers`, { credentials: "include" })
+      .then((response) => response.json())
+      .then((data) => setSsoProviders(Array.isArray(data.providers) ? data.providers : []))
+      .catch(() => setSsoProviders([]));
+  }, [API_BASE_URL]);
 
   const startCooldown = () => {
     setResendCooldown(60);
@@ -111,6 +119,12 @@ function Login({ setToken, setUser, setCompanyId }) {
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  const startSso = (providerKey) => {
+    const next = new URLSearchParams(window.location.search).get("next") || "";
+    const target = `${API_BASE_URL}/api/auth/sso/${providerKey}/start${next ? `?next=${encodeURIComponent(next)}` : ""}`;
+    window.location.assign(target);
   };
 
   if (step === "otp") {
@@ -229,7 +243,23 @@ function Login({ setToken, setUser, setCompanyId }) {
           </button>
         </form>
 
-        <div className="auth-divider" />
+        {!!ssoProviders.length && (
+          <>
+            <div className="auth-divider" />
+            <div className="auth-form">
+              {ssoProviders.map((provider) => (
+                <button
+                  key={provider.key}
+                  type="button"
+                  className="btn-submit"
+                  onClick={() => startSso(provider.key)}
+                >
+                  Continue with {provider.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="auth-footer">
           <p>

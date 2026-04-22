@@ -4,6 +4,7 @@ import { applyTableControls, getNextSortDirection, sortIndicator } from "../../.
 import { authHeaders } from "../../../shared/api/authHeaders";
 import { buildPassportJsonLdExport } from "../../../shared/utils/batterySemanticExport";
 import { formatPassportStatus, isPublishedPassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
+import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -177,7 +178,10 @@ function ArchivedPassports({ user, companyId }) {
         return { guid: p.guid, passport_type: p.passport_type, model_name: p.model_name, product_id: p.product_id, release_status: p.release_status, version_number: p.version_number, archived_at: p.archived_at, ...rowData };
       });
       const exportType = exported.length === 1 ? exported[0].passport_type : null;
-      const exportPayload = buildPassportJsonLdExport(exported, exportType);
+      const semanticModelKey = exportType
+        ? (passportTypes.find((type) => type.type_name === exportType)?.semantic_model_key || "")
+        : "";
+      const exportPayload = buildPassportJsonLdExport(exported, exportType, { semanticModelKey });
       const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -203,7 +207,9 @@ function ArchivedPassports({ user, companyId }) {
         const canvas = document.createElement("canvas");
         const resolvedPath = await resolveArchivedPassportPath(p);
         if (!resolvedPath) throw new Error("Archived passport link is unavailable for this QR code");
-        await QRCode.toCanvas(canvas, `${window.location.origin}${resolvedPath}`, { width: 300, margin: 2 });
+        const archivedUrl = buildPublicViewerUrl(resolvedPath);
+        if (!archivedUrl) throw new Error("Archived passport link is unavailable for this QR code");
+        await QRCode.toCanvas(canvas, archivedUrl, { width: 300, margin: 2 });
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
         link.download = `archived_${p.product_id || p.guid}_v${getArchivedPublicVersionNumber(p)}.png`;
@@ -315,7 +321,12 @@ function ArchivedPassports({ user, companyId }) {
           showError("Archived passport link is unavailable for this version.");
           return;
         }
-        window.open(`${window.location.origin}${resolvedPath}`, "_blank", "noopener,noreferrer");
+        const archivedUrl = buildPublicViewerUrl(resolvedPath);
+        if (!archivedUrl) {
+          showError("Archived passport link is unavailable for this version.");
+          return;
+        }
+        window.open(archivedUrl, "_blank", "noopener,noreferrer");
       })
       .catch(() => showError("Failed to open archived passport"));
   };

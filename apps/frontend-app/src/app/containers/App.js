@@ -12,6 +12,7 @@ const Register = lazy(() => import("../../auth/containers/Register"));
 const Landing = lazy(() => import("../../auth/containers/Landing"));
 const ForgotPassword = lazy(() => import("../../auth/containers/ForgotPassword").then((m) => ({ default: m.ForgotPassword })));
 const ResetPassword = lazy(() => import("../../auth/containers/ForgotPassword").then((m) => ({ default: m.ResetPassword })));
+const OAuthCallback = lazy(() => import("../../auth/containers/OAuthCallback"));
 
 const PassportForm = lazy(() => import("../../passports/form/PassportFormPage"));
 const PassportViewer = lazy(() => import("../../passport-viewer/containers/PassportViewerPage"));
@@ -104,6 +105,7 @@ function App() {
         <Route path="/register"        element={<Register setToken={setToken} setUser={setUser} setCompanyId={setCompanyId} />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
+        <Route path="/oauth/callback"  element={<OAuthCallback setToken={setToken} setUser={setUser} setCompanyId={setCompanyId} />} />
 
         {/* Consumer QR landing page */}
         <Route path="/p/:productId" element={<ConsumerPage />} />

@@ -179,7 +179,7 @@ module.exports = function registerCompanyRoutes(app, {
       const templateFields = Object.fromEntries(fieldRes.rows.map(f => [f.field_key, f.field_value]));
 
       const typeRes = await pool.query(
-        "SELECT fields_json FROM passport_types WHERE type_name=$1",
+        "SELECT fields_json, semantic_model_key FROM passport_types WHERE type_name=$1",
         [tmpl.passport_type]
       );
       const sections = typeRes.rows[0]?.fields_json?.sections || [];
@@ -201,7 +201,9 @@ module.exports = function registerCompanyRoutes(app, {
       if (fmt === "json" || fmt === "jsonld") {
         res.setHeader("Content-Type", "application/ld+json");
         res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passport_type}_drafts.jsonld"`);
-        return res.json(buildBatteryPassJsonExport(rows, tmpl.passport_type));
+        return res.json(buildBatteryPassJsonExport(rows, tmpl.passport_type, {
+          semanticModelKey: typeRes.rows[0]?.semantic_model_key || null,
+        }));
       }
 
       const escCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;

@@ -14,6 +14,9 @@ const canonicalize   = require("canonicalize");
 
 const { initDb }               = require("../db/init");
 const createSigningService     = require("../services/signing-service");
+const createCacheService       = require("../services/cache-service");
+const createStorageService     = require("../services/storage-service");
+const createOauthService       = require("../services/oauth-service");
 const { createTransporter, brandedEmail, sendOtpEmail } = require("../services/email");
 const createAuthMiddleware     = require("../middleware/auth");
 const { createRateLimiters }   = require("../middleware/rate-limit");
@@ -238,6 +241,19 @@ const authCookieOptions = {
 const setAuthCookie   = (res, token) => res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE_NAME, token, authCookieOptions));
 const clearAuthCookie = (res) => res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE_NAME, "", { ...authCookieOptions, maxAge: 0, expires: new Date(0) }));
 
+// ─── SHARED SERVICES ────────────────────────────────────────────────────────
+const cache = createCacheService();
+const storageService = createStorageService({
+  localStorageDir: LOCAL_STORAGE_DIR,
+  filesBaseDir: FILES_BASE_DIR,
+  repoBaseDir: REPO_BASE_DIR,
+  uploadsBaseDir: UPLOADS_BASE_DIR,
+  serverBaseUrl: process.env.SERVER_URL || `http://localhost:${PORT}`,
+});
+const oauthService = createOauthService({
+  jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache,
+});
+
 // ─── AUTH MIDDLEWARE ─────────────────────────────────────────────────────────
 const {
   authenticateToken, isSuperAdmin, checkCompanyAccess,
@@ -295,7 +311,7 @@ async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
   const normalizedType = String(passportType || "").trim();
   if (!normalizedType) { const e = new Error("passport_type is required"); e.statusCode = 400; throw e; }
   const result = await pool.query(
-    `SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.fields_json, pt.is_active
+    `SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.semantic_model_key, pt.fields_json, pt.is_active
      FROM passport_types pt
      JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
      WHERE cpa.company_id = $1 AND cpa.access_revoked = false AND pt.is_active = true AND pt.type_name = $2
@@ -340,51 +356,56 @@ const requireAssetEditor = (req, res, next) => {
 };
 
 // ─── FILE STORAGE ────────────────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => { const dir = path.join(FILES_BASE_DIR, req.params.guid); fs.mkdirSync(dir, { recursive: true }); cb(null, dir); },
-  filename:    (req, file, cb) => { const key = req.body.fieldKey || "file"; const ext = path.extname(file.originalname) || ".pdf"; cb(null, `${key}-${Date.now()}${ext}`); },
-});
 const upload = multer({
-  storage, limits: { fileSize: 20 * 1024 * 1024 },
+  storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
 });
-app.use("/passport-files", express.static(FILES_BASE_DIR, {
-  setHeaders: (res, fp) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Cross-Origin-Resource-Policy", "same-site");
-    if (fp.endsWith(".pdf")) { res.setHeader("Content-Type", "application/pdf"); res.setHeader("Content-Disposition", "inline"); }
-  },
-}));
+if (storageService.isLocal) {
+  app.use("/storage", express.static(LOCAL_STORAGE_DIR, {
+    setHeaders: (res, fp) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      if (fp.endsWith(".pdf")) {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", "inline");
+        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      } else {
+        res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+      }
+    },
+  }));
+  app.use("/passport-files", express.static(FILES_BASE_DIR, {
+    setHeaders: (res, fp) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cross-Origin-Resource-Policy", fp.endsWith(".pdf") ? "cross-origin" : "same-site");
+      if (fp.endsWith(".pdf")) {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", "inline");
+      }
+    },
+  }));
+  app.use("/repository-files", express.static(REPO_BASE_DIR, {
+    setHeaders: (res, fp) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      if (fp.endsWith(".pdf")) {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", "inline");
+        res.removeHeader("X-Frame-Options");
+        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      } else {
+        res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+      }
+    },
+  }));
+}
 
-const repoStorage = multer.diskStorage({
-  destination: (req, file, cb) => { const dir = path.join(REPO_BASE_DIR, String(req.params.companyId)); fs.mkdirSync(dir, { recursive: true }); cb(null, dir); },
-  filename:    (req, file, cb) => { const ext = path.extname(file.originalname) || ".pdf"; cb(null, `${uuidv4()}${ext}`); },
-});
 const repoUpload = multer({
-  storage: repoStorage, limits: { fileSize: 50 * 1024 * 1024 },
+  storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
-});
-const repoSymbolStorage = multer.diskStorage({
-  destination: (req, file, cb) => { const dir = path.join(REPO_BASE_DIR, String(req.params.companyId), "symbols"); fs.mkdirSync(dir, { recursive: true }); cb(null, dir); },
-  filename:    (req, file, cb) => { const ext = path.extname(file.originalname).toLowerCase(); cb(null, `${uuidv4()}${ext}`); },
 });
 const repoSymbolUpload = multer({
-  storage: repoSymbolStorage, limits: { fileSize: 2 * 1024 * 1024 },
+  storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_, file, cb) => { const allowed = [".svg",".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(new Error("Only SVG, PNG, JPG, WebP files are allowed")); },
 });
-app.use("/repository-files", express.static(REPO_BASE_DIR, {
-  setHeaders: (res, fp) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    if (fp.endsWith(".pdf")) {
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", "inline");
-      res.removeHeader("X-Frame-Options");
-      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    } else {
-      res.setHeader("Cross-Origin-Resource-Policy", "same-site");
-    }
-  },
-}));
 
 // ─── SIGNING SERVICE ─────────────────────────────────────────────────────────
 const signingService = createSigningService({ pool, crypto, canonicalize });
@@ -495,7 +516,7 @@ registerAssetManagementLaunchRoutes(app, {
 
 registerRepositoryRoutes(app, {
   pool, fs, path, authenticateToken, checkCompanyAccess, requireEditor, isSuperAdmin,
-  repoUpload, repoSymbolUpload, REPO_BASE_DIR, isPathInsideBase,
+  repoUpload, repoSymbolUpload, REPO_BASE_DIR, isPathInsideBase, storageService,
 });
 
 registerNotificationRoutes(app, { pool, authenticateToken });
@@ -513,14 +534,14 @@ registerAuthRoutes(app, {
   pool, jwt, JWT_SECRET, hashPassword, verifyPassword, generateToken, hashOpaqueToken,
   setAuthCookie, clearAuthCookie, sendOtpEmail, createTransporter, brandedEmail,
   logAudit, authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
-  authenticateToken, checkCompanyAccess,
+  authenticateToken, checkCompanyAccess, oauthService,
 });
 
 registerAdminRoutes(app, {
   pool, multer, authenticateToken, isSuperAdmin, checkCompanyAccess, verifyPassword,
   logAudit, getTable, createPassportTable, queryTableStats, publicReadRateLimit,
   GLOBAL_SYMBOLS_DIR, REPO_BASE_DIR, FILES_BASE_DIR, IN_REVISION_STATUS, IN_REVISION_STATUSES_SQL,
-  createTransporter, brandedEmail,
+  createTransporter, brandedEmail, storageService,
 });
 
 registerAssetManagementApiRoutes(app, {
@@ -551,7 +572,7 @@ registerPassportRoutes(app, {
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
   stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
   submitPassportToWorkflow, signPassport,
-  buildBatteryPassJsonExport,
+  buildBatteryPassJsonExport, storageService,
 });
 
 registerPassportPublicRoutes(app, {

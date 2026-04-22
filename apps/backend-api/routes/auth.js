@@ -22,6 +22,7 @@ module.exports = function registerAuthRoutes(app, {
   publicReadRateLimit,
   authenticateToken,
   checkCompanyAccess,
+  oauthService,
 }) {
 
   // ─── REGISTER ──────────────────────────────────────────────────────────────
@@ -117,6 +118,9 @@ module.exports = function registerAuthRoutes(app, {
       );
       if (!result.rows.length) return res.status(401).json({ error: "Invalid credentials" });
       const u  = result.rows[0];
+      if (u.sso_only) {
+        return res.status(400).json({ error: "This account uses enterprise SSO. Use the SSO sign-in option instead." });
+      }
       const ok = await verifyPassword(password, u.password_hash);
       if (!ok) {
         // Increment lockout counter
@@ -215,6 +219,36 @@ module.exports = function registerAuthRoutes(app, {
   app.post("/api/auth/logout", (_req, res) => {
     clearAuthCookie(res);
     res.json({ success: true });
+  });
+
+  app.get("/api/auth/sso/providers", publicReadRateLimit, async (_req, res) => {
+    try {
+      res.json({ providers: oauthService?.isEnabled ? oauthService.listProviders() : [] });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to load SSO providers" });
+    }
+  });
+
+  app.get("/api/auth/sso/:providerKey/start", publicReadRateLimit, async (req, res) => {
+    try {
+      if (!oauthService?.isEnabled) return res.status(404).json({ error: "SSO is not configured" });
+      const redirectTo = String(req.query.next || "").trim();
+      const authUrl = await oauthService.beginLogin(req.params.providerKey, req, redirectTo);
+      res.redirect(authUrl);
+    } catch (e) {
+      res.status(400).json({ error: e.message || "Failed to start SSO login" });
+    }
+  });
+
+  app.get("/api/auth/sso/:providerKey/callback", publicReadRateLimit, async (req, res) => {
+    try {
+      if (!oauthService?.isEnabled) return res.status(404).json({ error: "SSO is not configured" });
+      const redirectUrl = await oauthService.handleCallback(req.params.providerKey, req, res);
+      res.redirect(redirectUrl);
+    } catch (e) {
+      const appUrl = String(process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "");
+      res.redirect(`${appUrl}/login?error=${encodeURIComponent(e.message || "SSO login failed")}`);
+    }
   });
 
   // ─── RESEND OTP ─────────────────────────────────────────────────────────────
@@ -370,6 +404,7 @@ module.exports = function registerAuthRoutes(app, {
     try {
       const r = await pool.query(
         `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.company_id, u.avatar_url, u.phone, u.job_title, u.bio,
+                u.auth_source, u.sso_only,
                 u.preferred_language, u.default_reviewer_id, u.default_approver_id, u.created_at, u.last_login_at,
                 u.two_factor_enabled, c.company_name, c.asset_management_enabled
          FROM users u

@@ -5,8 +5,22 @@ services:
       dockerfile: apps/frontend-app/Dockerfile
       args:
         VITE_API_URL: "${VITE_API_URL}"
+        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL}"
     ports:
       - "${FRONTEND_PORT:-3000}:80"
+    restart: unless-stopped
+    depends_on:
+      - backend-api
+
+  public-passport-viewer:
+    build:
+      context: .
+      dockerfile: apps/public-passport-viewer/Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL}"
+        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL}"
+    ports:
+      - "${PUBLIC_VIEWER_PORT:-3004}:80"
     restart: unless-stopped
     depends_on:
       - backend-api

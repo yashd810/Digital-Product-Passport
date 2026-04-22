@@ -19,6 +19,22 @@ import { TypeIdentityCard } from "./TypeIdentityCard";
 import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const SEMANTIC_MODEL_OPTIONS = [
+  {
+    key: "",
+    label: "No semantic model",
+    description: "Do not attach a semantic model to this passport type yet.",
+  },
+  {
+    key: "battery_pass_din_spec_99100",
+    label: "Battery Pass Data Model",
+    description: "Use the Battery Pass semantic model and JSON-LD contexts for DIN SPEC 99100 battery passports.",
+  },
+];
+
+function getSemanticModelLabel(modelKey) {
+  return SEMANTIC_MODEL_OPTIONS.find((option) => option.key === modelKey)?.label || "No semantic model";
+}
 
 function batteryPassWords(value) {
   return String(value || "")
@@ -122,7 +138,14 @@ function resolveBatteryPassFieldDefinition(label, currentKey = "") {
   return batteryPassExactCatalogMatch(currentKey);
 }
 
-function normalizeFieldToBatteryPass(field) {
+function normalizeFieldToBatteryPass(field, semanticModelKey) {
+  if (semanticModelKey !== "battery_pass_din_spec_99100") {
+    return {
+      ...field,
+      key: field.key || toSlug(field.label || ""),
+      semanticId: field.semanticId,
+    };
+  }
   const matched = resolveBatteryPassFieldDefinition(field.label, field.key);
   if (!matched) {
     return {
@@ -138,6 +161,13 @@ function normalizeFieldToBatteryPass(field) {
   };
 }
 
+function resolveSelectedSemanticMatch(field, semanticModelKey) {
+  if (semanticModelKey === "battery_pass_din_spec_99100") {
+    return resolveBatteryPassFieldDefinition(field.label, field.key);
+  }
+  return null;
+}
+
 function AdminCreatePassportType() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -146,6 +176,7 @@ function AdminCreatePassportType() {
   const [displayName,    setDisplayName]    = useState("");
   const [umbrella,       setUmbrella]       = useState("");
   const [umbrellaIcon,   setUmbrellaIcon]   = useState("📋");
+  const [semanticModelKey, setSemanticModelKey] = useState("");
   const [typeName,       setTypeName]       = useState("");
   const [typeNameManual, setTypeNameManual] = useState(false);
   const cloneSourceTypeName = useRef(null); // tracks original type_name when cloning
@@ -190,6 +221,7 @@ function AdminCreatePassportType() {
     setDisplayName(draft.displayName || "");
     setUmbrella(draft.umbrella || "");
     setUmbrellaIcon(draft.umbrellaIcon || "📋");
+    setSemanticModelKey(draft.semanticModelKey || "");
     setTypeName(draft.typeName || "");
     setTypeNameManual(draft.typeNameManual || false);
     const restored = (draft.sections || []).map(sec => rekeySection({
@@ -220,11 +252,11 @@ function AdminCreatePassportType() {
       fetch(DRAFT_API, {
         method: "PUT",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, typeName, typeNameManual, sections } }),
+        body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, semanticModelKey, typeName, typeNameManual, sections } }),
       }).catch(() => {});
     }, 1500);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [draftEnabled, displayName, umbrella, umbrellaIcon, typeName, typeNameManual, sections]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [draftEnabled, displayName, umbrella, umbrellaIcon, semanticModelKey, typeName, typeNameManual, sections]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveDraft = () => {
     if (!draftEnabled) return;
@@ -237,7 +269,7 @@ function AdminCreatePassportType() {
     fetch(DRAFT_API, {
       method: "PUT",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, typeName, typeNameManual, sections } }),
+      body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, semanticModelKey, typeName, typeNameManual, sections } }),
     })
       .then(r => r.ok ? (
         setSuccess("Draft saved successfully!"),
@@ -286,6 +318,7 @@ function AdminCreatePassportType() {
     setDisplayName(ed.display_name || "");
     setUmbrella(ed.umbrella_category || "");
     setUmbrellaIcon(ed.umbrella_icon || "📋");
+    setSemanticModelKey(ed.semantic_model_key || "");
     setTypeName(ed.type_name || "");
     setTypeNameManual(true); // lock type_name, it cannot change
     const editSections = (ed.fields_json?.sections || []).map(sec => rekeySection({
@@ -306,6 +339,7 @@ function AdminCreatePassportType() {
     setDisplayName(`Clone of ${cd.display_name || cd.type_name}`);
     setUmbrella(cd.umbrella_category || "");
     setUmbrellaIcon(cd.umbrella_icon || "📋");
+    setSemanticModelKey(cd.semantic_model_key || "");
     const clonedSections = (cd.fields_json?.sections || []).map(sec => rekeySection({
       ...sec,
       _id:       Math.random().toString(36).slice(2),
@@ -368,9 +402,14 @@ function AdminCreatePassportType() {
           if (f._id !== fieldId) return f;
           const updated = { ...f, ...patch };
           if ("label" in patch && !f._keyManual) {
-            const batteryPassField = resolveBatteryPassFieldDefinition(patch.label, f.key);
-            updated.key = batteryPassField?.key || toSlug(patch.label);
-            updated.semanticId = batteryPassField?.semanticId;
+            if (semanticModelKey === "battery_pass_din_spec_99100") {
+              const batteryPassField = resolveBatteryPassFieldDefinition(patch.label, f.key);
+              updated.key = batteryPassField?.key || toSlug(patch.label);
+              updated.semanticId = batteryPassField?.semanticId;
+            } else {
+              updated.key = toSlug(patch.label);
+              delete updated.semanticId;
+            }
           }
           if ("label" in patch && !patch.label) delete updated.semanticId;
           // Switching TO table: set defaults
@@ -483,7 +522,7 @@ function AdminCreatePassportType() {
         key:    sec.key,
         label:  sec.label,
         fields: sec.fields.map(f => {
-          const normalizedField = normalizeFieldToBatteryPass(f);
+          const normalizedField = normalizeFieldToBatteryPass(f, semanticModelKey);
           const base = {
             key:    normalizedField.key,
             label:  normalizedField.label,
@@ -570,6 +609,7 @@ function AdminCreatePassportType() {
           display_name:      displayName,
           umbrella_category: umbrella,
           umbrella_icon:     umbrellaIcon,
+          semantic_model_key: semanticModelKey || null,
           sections:          cleanSections,
         }),
       });
@@ -585,6 +625,7 @@ function AdminCreatePassportType() {
         setDisplayName("");
         setUmbrella("");
         setUmbrellaIcon("📋");
+        setSemanticModelKey("");
         setTypeName("");
         setTypeNameManual(false);
         setSections([newSection("General")]);
@@ -636,6 +677,9 @@ function AdminCreatePassportType() {
           setUmbrella={setUmbrella}
           umbrellaIcon={umbrellaIcon}
           setUmbrellaIcon={setUmbrellaIcon}
+          semanticModelKey={semanticModelKey}
+          setSemanticModelKey={setSemanticModelKey}
+          semanticModelOptions={SEMANTIC_MODEL_OPTIONS}
           umbrellaOptions={umbrellaOptions}
           typeName={typeName}
           setTypeName={setTypeName}
@@ -716,9 +760,11 @@ function AdminCreatePassportType() {
                     </button>
                   </div>
                   <div className="acpt-section-submodel-row">
-                    <span className="acpt-meta-sub-label">🔋 Battery Pass Mapping</span>
+                    <span className="acpt-meta-sub-label">{semanticModelKey === "battery_pass_din_spec_99100" ? "🔋 Battery Pass Mapping" : "🧩 Semantic Mapping"}</span>
                     <span className="acpt-semantic-hint">
-                      Field keys and semantic IDs are derived automatically from the Battery Pass model.
+                      {semanticModelKey === "battery_pass_din_spec_99100"
+                        ? "Field keys and semantic IDs are derived automatically from the selected Battery Pass model."
+                        : `Selected model: ${getSemanticModelLabel(semanticModelKey)}. Select a semantic model above to enable automatic semantic mapping for this passport type.`}
                     </span>
                   </div>
                   {section._i18nOpen && (
@@ -908,9 +954,11 @@ function AdminCreatePassportType() {
                       {/* Battery Pass Metadata */}
                       <div className="acpt-field-semantic">
                         <div className="acpt-semantic-label">
-                          🔬 Battery Pass Metadata
+                          🔬 Semantic Metadata
                           <span className="acpt-semantic-hint">
-                            Hidden from users. The label is matched against the Battery Pass model and the export uses the official Battery Pass semantic ID.
+                            {semanticModelKey === "battery_pass_din_spec_99100"
+                              ? "Hidden from users. The label is matched against the selected Battery Pass model and the export uses the official semantic ID."
+                              : "Hidden from users. Select a semantic model to enable automatic semantic IDs for this field."}
                           </span>
                         </div>
                         <div className="acpt-meta-fields-row">
@@ -942,18 +990,20 @@ function AdminCreatePassportType() {
                           </div>
                         </div>
                         <div className="acpt-meta-field-group acpt-meta-field-group-full">
-                          <span className="acpt-meta-sub-label">Matched Battery Pass Property</span>
+                          <span className="acpt-meta-sub-label">Matched Semantic ID</span>
                           <div className="acpt-uri-wrap">
                             <div className="acpt-uri-input-row">
                               <input
                                 type="text"
                                 className="acpt-input acpt-mono acpt-input-small acpt-uri-text"
-                                value={resolveBatteryPassFieldDefinition(field.label, field.key)?.key || "No Battery Pass match yet"}
+                                value={resolveSelectedSemanticMatch(field, semanticModelKey)?.semanticId || "No semantic ID match yet"}
                                 readOnly
                               />
                             </div>
                             <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
-                              {resolveBatteryPassFieldDefinition(field.label, field.key)?.semanticId || "Use a Battery Pass field label to map this field automatically."}
+                              {semanticModelKey === "battery_pass_din_spec_99100"
+                                ? (`Matched model key: ${resolveSelectedSemanticMatch(field, semanticModelKey)?.key || "Use a Battery Pass field label to map this field automatically."}`)
+                                : "Choose a semantic model in Type Identity to enable automatic semantic mapping."}
                             </div>
                           </div>
                         </div>

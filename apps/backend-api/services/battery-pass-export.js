@@ -1,6 +1,7 @@
 "use strict";
 
 const batteryPassDinSpec99100 = require("../resources/semantics/battery-pass-din-spec-99100.json");
+const BATTERY_PASS_MODEL_KEY = "battery_pass_din_spec_99100";
 
 const DPP_CONTEXT = {
   "@version": 1.1,
@@ -49,29 +50,21 @@ function isBatteryPassExportType(passportType) {
   return String(passportType || "").trim().toLowerCase() === batteryPassDinSpec99100.passportType;
 }
 
-function collectSemanticIds(passport) {
-  const semanticIds = {};
-  for (const [fieldKey, semanticId] of Object.entries(batteryPassDinSpec99100.fieldSemanticIds || {})) {
-    if (passport[fieldKey] === undefined || passport[fieldKey] === null || passport[fieldKey] === "") continue;
-    semanticIds[fieldKey] = semanticId;
-  }
-  return semanticIds;
+function isBatteryPassSemanticExport(passportType, options = {}) {
+  return (
+    isBatteryPassExportType(passportType) &&
+    String(options.semanticModelKey || "").trim().toLowerCase() === BATTERY_PASS_MODEL_KEY
+  );
 }
 
-function buildInlineContext(passports, passportType) {
+function buildInlineContext(passports, passportType, options = {}) {
   const ctx = {};
 
-  if (isBatteryPassExportType(passportType)) {
-    ctx.batteryPass = batteryPassDinSpec99100.source.repository;
-  }
+  if (!isBatteryPassSemanticExport(passportType, options)) return ctx;
 
-  const seen = new Set();
-  for (const passport of passports) {
-    for (const [fieldKey, semanticId] of Object.entries(collectSemanticIds(passport))) {
-      if (seen.has(fieldKey)) continue;
-      ctx[fieldKey] = { "@id": semanticId };
-      seen.add(fieldKey);
-    }
+  ctx.batteryPass = batteryPassDinSpec99100.source.repository;
+  for (const [fieldKey, semanticId] of Object.entries(SEMANTIC_ID_BY_INTERNAL_KEY)) {
+    ctx[fieldKey] = { "@id": semanticId };
   }
   return ctx;
 }
@@ -94,10 +87,15 @@ function sanitizePassport(passport, passportType) {
 }
 
 function buildPassportJsonLdContext(typeDef, passportType = null) {
+  const options = arguments[2] || {};
   const resolvedType = String(passportType || typeDef?.type_name || "").trim().toLowerCase();
   const contexts = [DPP_CONTEXT];
   const inlineContext = {};
   const sections = typeDef?.fields_json?.sections || [];
+
+  if (!isBatteryPassSemanticExport(resolvedType, options)) {
+    return contexts;
+  }
 
   for (const section of sections) {
     for (const field of (section.fields || [])) {
@@ -108,7 +106,7 @@ function buildPassportJsonLdContext(typeDef, passportType = null) {
     }
   }
 
-  if (isBatteryPassExportType(resolvedType)) {
+  if (isBatteryPassSemanticExport(resolvedType, options)) {
     contexts.push(...batteryPassDinSpec99100.contextUrls);
   }
   if (Object.keys(inlineContext).length > 0) {
@@ -120,13 +118,14 @@ function buildPassportJsonLdContext(typeDef, passportType = null) {
 
 function buildPassportJsonLdExport(passports, passportType) {
   if (!Array.isArray(passports)) return passports;
+  const options = arguments[2] || {};
 
   const resolvedType = String(passportType || passports[0]?.passport_type || "").trim().toLowerCase();
   const graph = passports.map((passport) => sanitizePassport(passport, resolvedType));
-  const inlineContext = buildInlineContext(graph, resolvedType);
+  const inlineContext = buildInlineContext(graph, resolvedType, options);
   const contexts = [DPP_CONTEXT];
 
-  if (isBatteryPassExportType(resolvedType)) {
+  if (isBatteryPassSemanticExport(resolvedType, options)) {
     contexts.push(...batteryPassDinSpec99100.contextUrls);
   }
   if (Object.keys(inlineContext).length) {
@@ -136,7 +135,7 @@ function buildPassportJsonLdExport(passports, passportType) {
   return {
     "@context": contexts,
     "@graph": graph,
-    ...(isBatteryPassExportType(resolvedType)
+    ...(isBatteryPassSemanticExport(resolvedType, options)
       ? {
           passport_type: batteryPassDinSpec99100.passportType,
           semantic_model: batteryPassDinSpec99100.source,

@@ -7,11 +7,13 @@ import {
   isReleasedPassportStatus,
 } from "../../../../passports/utils/passportStatus";
 import { buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
+import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 export function usePassportListActions({
   activeType,
+  allPassportTypes,
   archiveConfirm,
   companyId,
   fetchPassports,
@@ -124,7 +126,9 @@ export function usePassportListActions({
         });
         if (!passportPath) throw new Error("Passport link is unavailable for this QR code");
 
-        await QRCode.toCanvas(qrCanvas, `${window.location.origin}${passportPath}`, {
+        const passportUrl = buildPublicViewerUrl(passportPath);
+        if (!passportUrl) throw new Error("Passport link is unavailable for this QR code");
+        await QRCode.toCanvas(qrCanvas, passportUrl, {
           errorCorrectionLevel: "H",
           margin: 1,
           width: qrSize,
@@ -253,7 +257,8 @@ export function usePassportListActions({
         return;
       }
 
-      const exportPayload = buildPassportJsonLdExport(exported, activeType);
+      const semanticModelKey = allPassportTypes.find((type) => type.type_name === activeType)?.semantic_model_key || "";
+      const exportPayload = buildPassportJsonLdExport(exported, activeType, { semanticModelKey });
       const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
@@ -266,7 +271,7 @@ export function usePassportListActions({
     } finally {
       setBulkActionLoading(false);
     }
-  }, [activeType, companyId, selectedPassportList, setBulkActionLoading, showError, showSuccess]);
+  }, [activeType, allPassportTypes, companyId, selectedPassportList, setBulkActionLoading, showError, showSuccess]);
 
   const bulkArchive = useCallback(() => {
     if (!selectedPassportList.length) return;

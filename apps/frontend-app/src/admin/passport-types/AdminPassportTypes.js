@@ -23,6 +23,11 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const ICON_PRESETS = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🔋","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
 
+function getSemanticModelLabel(modelKey) {
+  if (modelKey === "battery_pass_din_spec_99100") return "Battery Pass Data Model";
+  return "No semantic model";
+}
+
 function AdminPassportTypes() {
   const navigate = useNavigate();
   const [types,      setTypes]      = useState([]);
@@ -427,6 +432,7 @@ function AdminPassportTypes() {
                         {t.fields_json?.sections?.reduce((n, s) => n + (s.fields?.length || 0), 0) || 0} fields
                         across {t.fields_json?.sections?.length || 0} sections
                       </span>
+                      <span className="apt-card-meta-secondary">Semantic model: {getSemanticModelLabel(t.semantic_model_key)}</span>
                       <span className="apt-card-meta-secondary">Created {new Date(t.created_at).toLocaleDateString()}</span>
                     </div>
 

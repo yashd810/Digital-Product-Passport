@@ -60,6 +60,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     const r = await fetch(`${API}/api/passport-types/${type}`);
     if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
     const data = await r.json();
+    const semanticModelKey = data.semantic_model_key || allPassportTypes.find((item) => item.type_name === type)?.semantic_model_key || "";
     const allFields = (data.fields_json?.sections || []).flatMap((section) => section.fields || []);
     const output = list.map((passport) => {
       const obj = {
@@ -72,7 +73,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
       allFields.forEach((field) => { obj[field.key] = passport[field.key] ?? null; });
       return obj;
     });
-    const exportPayload = buildPassportJsonLdExport(output, type);
+    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey });
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

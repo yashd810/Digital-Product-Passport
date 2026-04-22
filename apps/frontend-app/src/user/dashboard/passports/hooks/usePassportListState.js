@@ -4,6 +4,7 @@ import { applyTableControls, getNextSortDirection } from "../../../../shared/tab
 import { authHeaders } from "../../../../shared/api/authHeaders";
 import { normalizePassportStatus } from "../../../../passports/utils/passportStatus";
 import { buildPreviewPassportPath, buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
+import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
 import {
   calcCompleteness,
   formatPassportTypeLabel,
@@ -92,7 +93,9 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const openPassportViewer = useCallback((passport, options = {}) => {
     const path = getViewerPath(passport, options);
     if (!path) return;
-    window.open(`${window.location.origin}${path}`, "_blank", "noopener,noreferrer");
+    const url = options.forcePreview ? `${window.location.origin}${path}` : buildPublicViewerUrl(path);
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
   }, [getViewerPath]);
 
   useEffect(() => {

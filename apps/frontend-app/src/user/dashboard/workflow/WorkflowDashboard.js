@@ -4,6 +4,7 @@ import { applyTableControls, getNextSortDirection, sortIndicator } from "../../.
 import { authHeaders } from "../../../shared/api/authHeaders";
 import { normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildPreviewPassportPath, buildPublicPassportPath } from "../../../passports/utils/passportRoutes";
+import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import "../../../admin/styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -308,7 +309,11 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
           previewId: wf.passport_guid,
         });
     if (!path) return;
-    window.open(`${window.location.origin}${path}`, "_blank", "noopener,noreferrer");
+    const url = wf.release_status === "released"
+      ? buildPublicViewerUrl(path)
+      : `${window.location.origin}${path}`;
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const renderRow = (wf, showActions) => {

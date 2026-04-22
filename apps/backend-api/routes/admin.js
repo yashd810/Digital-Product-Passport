@@ -22,6 +22,7 @@ module.exports = function registerAdminRoutes(app, {
   IN_REVISION_STATUSES_SQL,
   createTransporter,
   brandedEmail,
+  storageService,
 }) {
 
   // ─── UMBRELLA CATEGORIES ───────────────────────────────────────────────────
@@ -75,7 +76,7 @@ module.exports = function registerAdminRoutes(app, {
   app.get("/api/admin/passport-types", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const r = await pool.query(`
-        SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon,
+        SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.semantic_model_key,
                pt.fields_json, pt.is_active, pt.created_at,
                u.email AS created_by_email
         FROM passport_types pt
@@ -90,7 +91,7 @@ module.exports = function registerAdminRoutes(app, {
   app.get("/api/passport-types/:typeName", publicReadRateLimit, async (req, res) => {
     try {
       const r = await pool.query(
-        `SELECT id, type_name, display_name, umbrella_category, umbrella_icon, fields_json
+        `SELECT id, type_name, display_name, umbrella_category, umbrella_icon, semantic_model_key, fields_json
          FROM passport_types WHERE type_name = $1`,
         [req.params.typeName]
       );
@@ -102,7 +103,7 @@ module.exports = function registerAdminRoutes(app, {
   // ─── PASSPORT TYPES (CRUD by super admin) ─────────────────────────────────
   app.patch("/api/admin/passport-types/:id", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const { display_name, umbrella_category, umbrella_icon, sections } = req.body;
+      const { display_name, umbrella_category, umbrella_icon, semantic_model_key, sections } = req.body;
       const { id } = req.params;
 
       const existing = await pool.query("SELECT * FROM passport_types WHERE id = $1", [id]);
@@ -115,6 +116,7 @@ module.exports = function registerAdminRoutes(app, {
       if (display_name !== undefined)      { updates.push(`display_name = $${idx++}`);      vals.push(display_name); }
       if (umbrella_category !== undefined) { updates.push(`umbrella_category = $${idx++}`); vals.push(umbrella_category); }
       if (umbrella_icon !== undefined)     { updates.push(`umbrella_icon = $${idx++}`);     vals.push(umbrella_icon); }
+      if (semantic_model_key !== undefined) { updates.push(`semantic_model_key = $${idx++}`); vals.push(semantic_model_key || null); }
       if (sections !== undefined) {
         const fields_json = { sections };
         updates.push(`fields_json = $${idx++}`);
@@ -176,7 +178,7 @@ module.exports = function registerAdminRoutes(app, {
 
   app.post("/api/admin/passport-types", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const { type_name, display_name, umbrella_category, umbrella_icon, sections } = req.body;
+      const { type_name, display_name, umbrella_category, umbrella_icon, semantic_model_key, sections } = req.body;
 
       if (!type_name || !display_name || !umbrella_category || !sections)
         return res.status(400).json({ error: "type_name, display_name, umbrella_category, and sections are required" });
@@ -207,10 +209,10 @@ module.exports = function registerAdminRoutes(app, {
       const fields_json = { sections };
 
       const r = await pool.query(
-        `INSERT INTO passport_types (type_name, display_name, umbrella_category, umbrella_icon, fields_json, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        `INSERT INTO passport_types (type_name, display_name, umbrella_category, umbrella_icon, semantic_model_key, fields_json, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [type_name, display_name, umbrella_category, umbrella_icon || "📋",
-         JSON.stringify(fields_json), req.user.userId]
+         semantic_model_key || null, JSON.stringify(fields_json), req.user.userId]
       );
 
       await pool.query(
@@ -221,7 +223,7 @@ module.exports = function registerAdminRoutes(app, {
       await createPassportTable(type_name);
 
       await logAudit(null, req.user.userId, "CREATE_PASSPORT_TYPE", "passport_types", null, null,
-        { type_name, display_name, umbrella_category });
+        { type_name, display_name, umbrella_category, semantic_model_key: semantic_model_key || null });
 
       res.status(201).json({ success: true, passportType: r.rows[0] });
     } catch (e) {
@@ -269,18 +271,8 @@ module.exports = function registerAdminRoutes(app, {
   });
 
   // ─── SYMBOLS ───────────────────────────────────────────────────────────────
-  const symbolStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      fs.mkdirSync(GLOBAL_SYMBOLS_DIR, { recursive: true });
-      cb(null, GLOBAL_SYMBOLS_DIR);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `sym_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
-    },
-  });
   const symbolUpload = multer({
-    storage: symbolStorage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
       const allowed = [".svg", ".png", ".jpg", ".jpeg", ".webp"];
@@ -316,12 +308,15 @@ module.exports = function registerAdminRoutes(app, {
       const { name, category = "General" } = req.body;
       if (!name?.trim()) return res.status(400).json({ error: "name is required" });
 
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const fileUrl = `${baseUrl}/uploads/symbols/${req.file.filename}`;
+      const stored = await storageService.saveGlobalSymbol({
+        originalName: req.file.originalname,
+        buffer: req.file.buffer,
+        contentType: req.file.mimetype,
+      });
 
       const r = await pool.query(
-        "INSERT INTO symbols (name, category, file_url, created_by) VALUES ($1,$2,$3,$4) RETURNING *",
-        [name.trim(), category.trim() || "General", fileUrl, req.user.userId]
+        "INSERT INTO symbols (name, category, storage_key, storage_provider, file_url, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
+        [name.trim(), category.trim() || "General", stored.storageKey, stored.provider, stored.url, req.user.userId]
       );
       res.status(201).json(r.rows[0]);
     } catch (e) {
@@ -498,6 +493,10 @@ module.exports = function registerAdminRoutes(app, {
       await client.query("DELETE FROM passport_registry WHERE company_id = $1", [companyId]);
       await client.query("DELETE FROM invite_tokens WHERE company_id = $1", [companyId]);
       await client.query("DELETE FROM api_keys WHERE company_id = $1", [companyId]);
+      const repoFiles = await client.query(
+        "SELECT storage_key, file_path FROM company_repository WHERE company_id = $1 AND (storage_key IS NOT NULL OR file_path IS NOT NULL)",
+        [companyId]
+      );
       await client.query("DELETE FROM company_repository WHERE company_id = $1", [companyId]);
       await client.query("DELETE FROM company_passport_access WHERE company_id = $1", [companyId]);
       await client.query("DELETE FROM passport_workflow WHERE company_id = $1", [companyId]);
@@ -513,6 +512,10 @@ module.exports = function registerAdminRoutes(app, {
 
       await client.query("COMMIT");
 
+      await Promise.all(repoFiles.rows.map((row) => storageService.deleteStoredFile({
+        storageKey: row.storage_key,
+        filePath: row.file_path,
+      }).catch(() => {})));
       const repoDir = path.join(REPO_BASE_DIR, String(companyId));
       fs.rmSync(repoDir, { recursive: true, force: true });
       passportGuids.forEach((guid) => {

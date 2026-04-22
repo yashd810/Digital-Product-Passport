@@ -4,6 +4,7 @@ import {
   isEditablePassportStatus,
   isReleasedPassportStatus,
 } from "../../../../passports/utils/passportStatus";
+import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
 import { KebabMenu } from "./PassportListComponents";
 
 export function PassportListRowMenu({
@@ -69,9 +70,10 @@ export function PassportListRowMenu({
             setOpenMenuId(null);
             return;
           }
-          const url = `${window.location.origin}${path}`;
+          const isPassportLink = getPassportLinkType(passport.release_status) === "passport";
+          const url = isPassportLink ? buildPublicViewerUrl(path) : `${window.location.origin}${path}`;
           navigator.clipboard.writeText(url).then(() => {
-            showSuccess(`${getPassportLinkType(passport.release_status) === "passport" ? "Passport" : "Preview"} link copied to clipboard`);
+            showSuccess(`${isPassportLink ? "Passport" : "Preview"} link copied to clipboard`);
           }).catch(() => {
             showError("Could not copy link");
           });

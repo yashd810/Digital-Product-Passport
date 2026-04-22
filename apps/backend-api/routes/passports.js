@@ -59,6 +59,7 @@ module.exports = function registerPassportRoutes(app, {
   // signing service
   signPassport,
   buildBatteryPassJsonExport,
+  storageService,
 }) {
 
   // ─── API KEY MANAGEMENT ────────────────────────────────────────────────────
@@ -420,7 +421,7 @@ module.exports = function registerPassportRoutes(app, {
 
       if (!passportType) return res.status(400).json({ error: "passportType is required" });
 
-      const typeRes = await pool.query("SELECT fields_json FROM passport_types WHERE type_name=$1", [passportType]);
+      const typeRes = await pool.query("SELECT fields_json, semantic_model_key FROM passport_types WHERE type_name=$1", [passportType]);
       if (!typeRes.rows.length) return res.status(404).json({ error: "Passport type not found" });
 
       const sections = typeRes.rows[0]?.fields_json?.sections || [];
@@ -451,7 +452,9 @@ module.exports = function registerPassportRoutes(app, {
       if (fmt === "json" || fmt === "jsonld") {
         res.setHeader("Content-Type", "application/ld+json");
         res.setHeader("Content-Disposition", `attachment; filename="${passportType}_export.jsonld"`);
-        return res.json(buildBatteryPassJsonExport(rows, passportType));
+        return res.json(buildBatteryPassJsonExport(rows, passportType, {
+          semanticModelKey: typeRes.rows[0]?.semantic_model_key || null,
+        }));
       }
 
       const escCell = (v) => {
@@ -1584,17 +1587,21 @@ module.exports = function registerPassportRoutes(app, {
         const { fieldKey, passportType } = req.body;
         if (!req.file) return res.status(400).json({ error: "No file received" });
         if (!fieldKey || !passportType) {
-          try { fs.unlinkSync(req.file.path); } catch {}
           return res.status(400).json({ error: "fieldKey and passportType required" });
         }
         if (!/^[a-zA-Z][a-zA-Z0-9_]+$/.test(fieldKey)) {
-          try { fs.unlinkSync(req.file.path); } catch {}
           return res.status(400).json({ error: "Invalid fieldKey" });
         }
 
         const tableName  = getTable(passportType);
-        const serverBase = process.env.SERVER_URL || "http://localhost:3001";
-        const fileUrl    = `${serverBase}/passport-files/${guid}/${req.file.filename}`;
+        const stored = await storageService.savePassportFile({
+          guid,
+          fieldKey,
+          originalName: req.file.originalname,
+          buffer: req.file.buffer,
+          contentType: req.file.mimetype,
+        });
+        const fileUrl = stored.url;
 
         const row = await pool.query(
           `SELECT id FROM ${tableName}
@@ -1603,7 +1610,6 @@ module.exports = function registerPassportRoutes(app, {
           [guid]
         );
         if (!row.rows.length) {
-          try { fs.unlinkSync(req.file.path); } catch {}
           return res.status(404).json({ error: "Editable passport not found" });
         }
 
@@ -1927,7 +1933,7 @@ module.exports = function registerPassportRoutes(app, {
   app.get("/api/companies/:companyId/passport-types", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(`
-        SELECT DISTINCT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.fields_json,
+        SELECT DISTINCT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.semantic_model_key, pt.fields_json,
           (NOT cpa.access_revoked) AS access_granted
         FROM passport_types pt
         JOIN company_passport_access cpa ON pt.id = cpa.passport_type_id

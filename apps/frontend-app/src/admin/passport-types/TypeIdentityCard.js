@@ -7,6 +7,9 @@ export function TypeIdentityCard({
   setUmbrella,
   umbrellaIcon,
   setUmbrellaIcon,
+  semanticModelKey,
+  setSemanticModelKey,
+  semanticModelOptions,
   umbrellaOptions,
   typeName,
   setTypeName,
@@ -108,6 +111,28 @@ export function TypeIdentityCard({
               Table will be: <code>{typeName || "…"}_passports</code>
             </div>
           )}
+        </div>
+
+        <div className="acpt-field-group acpt-span2">
+          <label>Semantic Model</label>
+          <select
+            value={semanticModelKey}
+            onChange={e => {
+              setSemanticModelKey(e.target.value);
+              setError("");
+              setInvalidFields([]);
+            }}
+            className="acpt-input"
+          >
+            {semanticModelOptions.map((option) => (
+              <option key={option.key || "none"} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="acpt-hint">
+            {(semanticModelOptions.find((option) => option.key === semanticModelKey) || semanticModelOptions[0])?.description}
+          </span>
         </div>
       </div>
     </div>

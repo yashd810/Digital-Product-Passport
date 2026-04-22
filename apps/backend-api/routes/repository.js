@@ -10,6 +10,7 @@ module.exports = function registerRepositoryRoutes(app, {
   repoSymbolUpload,
   REPO_BASE_DIR,
   isPathInsideBase,
+  storageService,
 }) {
   app.get("/api/companies/:companyId/repository", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
@@ -77,15 +78,30 @@ module.exports = function registerRepositoryRoutes(app, {
         if (!req.file) return res.status(400).json({ error: "No file received" });
         const { parentId, displayName } = req.body;
         const { companyId } = req.params;
-        const serverBase = process.env.SERVER_URL || "http://localhost:3001";
-        const fileUrl = `${serverBase}/repository-files/${companyId}/${req.file.filename}`;
+        const stored = await storageService.saveRepositoryFile({
+          companyId,
+          originalName: req.file.originalname,
+          buffer: req.file.buffer,
+          contentType: req.file.mimetype,
+        });
         const name = displayName?.trim() || req.file.originalname;
 
         const r = await pool.query(
           `INSERT INTO company_repository
-             (company_id, parent_id, name, type, file_path, file_url, mime_type, size_bytes, created_by)
-           VALUES ($1, $2, $3, 'file', $4, $5, $6, $7, $8) RETURNING *`,
-          [companyId, parentId || null, name, req.file.path, fileUrl, req.file.mimetype, req.file.size, req.user.userId]
+             (company_id, parent_id, name, type, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, created_by)
+           VALUES ($1, $2, $3, 'file', $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+          [
+            companyId,
+            parentId || null,
+            name,
+            stored.path,
+            stored.storageKey,
+            stored.provider,
+            stored.url,
+            req.file.mimetype,
+            req.file.size,
+            req.user.userId,
+          ]
         );
         res.status(201).json(r.rows[0]);
       } catch (e) {
@@ -146,15 +162,15 @@ module.exports = function registerRepositoryRoutes(app, {
         if (children.rows.length) {
           return res.status(409).json({ error: "Folder must be empty before deleting" });
         }
-      } else if (row.file_path && fs.existsSync(row.file_path)) {
-        const safeFilePath = path.resolve(row.file_path);
-        if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR)) {
-          console.error("[repository-delete] Refusing to delete file outside repository root:", safeFilePath);
-          return res.status(400).json({ error: "Stored file path is invalid" });
+      } else if (row.storage_key || row.file_path) {
+        if (row.file_path && !row.storage_key) {
+          const safeFilePath = path.resolve(row.file_path);
+          if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR)) {
+            console.error("[repository-delete] Refusing to delete file outside repository root:", safeFilePath);
+            return res.status(400).json({ error: "Stored file path is invalid" });
+          }
         }
-        try {
-          fs.unlinkSync(safeFilePath);
-        } catch {}
+        await storageService.deleteStoredFile({ storageKey: row.storage_key, filePath: row.file_path });
       }
 
       await pool.query("DELETE FROM company_repository WHERE id = $1", [row.id]);
@@ -190,13 +206,27 @@ module.exports = function registerRepositoryRoutes(app, {
         if (!req.file) return res.status(400).json({ error: "No file uploaded" });
         const { companyId } = req.params;
         const displayName = req.body.name?.trim() || req.file.originalname.replace(/\.[^.]+$/, "");
-        const serverBase = process.env.SERVER_URL || "http://localhost:3001";
-        const fileUrl = `${serverBase}/repository-files/${companyId}/symbols/${req.file.filename}`;
+        const stored = await storageService.saveRepositorySymbol({
+          companyId,
+          originalName: req.file.originalname,
+          buffer: req.file.buffer,
+          contentType: req.file.mimetype,
+        });
         const r = await pool.query(
           `INSERT INTO company_repository
-             (company_id, parent_id, name, type, file_path, file_url, mime_type, size_bytes, created_by)
-           VALUES ($1, NULL, $2, 'file', $3, $4, $5, $6, $7) RETURNING *`,
-          [companyId, displayName, req.file.path, fileUrl, req.file.mimetype, req.file.size, req.user.userId]
+             (company_id, parent_id, name, type, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, created_by)
+           VALUES ($1, NULL, $2, 'file', $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+          [
+            companyId,
+            displayName,
+            stored.path,
+            stored.storageKey,
+            stored.provider,
+            stored.url,
+            req.file.mimetype,
+            req.file.size,
+            req.user.userId,
+          ]
         );
         res.status(201).json(r.rows[0]);
       } catch (e) {

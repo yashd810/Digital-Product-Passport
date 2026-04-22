@@ -148,6 +148,34 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS default_approver_id INTEGER REFERENCES users(id) ON DELETE SET NULL
   `);
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS auth_source VARCHAR(100) NOT NULL DEFAULT 'local'
+  `);
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS sso_only BOOLEAN NOT NULL DEFAULT false
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_identities (
+      id               SERIAL PRIMARY KEY,
+      user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider_key     VARCHAR(100) NOT NULL,
+      provider_subject VARCHAR(255) NOT NULL,
+      email            VARCHAR(255),
+      raw_profile      JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_login_at    TIMESTAMPTZ
+    )
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identities_provider_subject
+      ON user_identities(provider_key, provider_subject)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_identities_user
+      ON user_identities(user_id)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_types (
@@ -156,12 +184,17 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       display_name     VARCHAR(255) NOT NULL,
       umbrella_category VARCHAR(100),
       umbrella_icon    VARCHAR(10) DEFAULT '📋',
+      semantic_model_key VARCHAR(100),
       fields_json      JSONB NOT NULL DEFAULT '{"sections":[]}',
       is_active        BOOLEAN NOT NULL DEFAULT true,
       created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE passport_types
+    ADD COLUMN IF NOT EXISTS semantic_model_key VARCHAR(100)
   `);
 
   await pool.query(`
@@ -266,6 +299,8 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       name       VARCHAR(255) NOT NULL,
       type       VARCHAR(10)  NOT NULL DEFAULT 'file',
       file_path  TEXT,
+      storage_key TEXT,
+      storage_provider VARCHAR(50),
       file_url   TEXT,
       mime_type  VARCHAR(100),
       size_bytes BIGINT,
@@ -273,6 +308,14 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE company_repository
+    ADD COLUMN IF NOT EXISTS storage_key TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE company_repository
+    ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(50)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_repo_company_parent
@@ -285,11 +328,21 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       id         SERIAL PRIMARY KEY,
       name       VARCHAR(100) NOT NULL,
       category   VARCHAR(50)  NOT NULL DEFAULT 'General',
+      storage_key TEXT,
+      storage_provider VARCHAR(50),
       file_url   TEXT         NOT NULL,
       created_by INT REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
       is_active  BOOLEAN      NOT NULL DEFAULT true
     )
+  `);
+  await pool.query(`
+    ALTER TABLE symbols
+    ADD COLUMN IF NOT EXISTS storage_key TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE symbols
+    ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(50)
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_symbols_category ON symbols(category)`);
 
