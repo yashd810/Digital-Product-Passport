@@ -20,13 +20,12 @@
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) themeMeta.setAttribute('content', '#f5f8fb');
 
-  /* ── APP URL — update this for production deployment ──
-     Development: React app runs at http://localhost:3000
-     Production:  Set to your app domain, e.g. https://app.clarosdpp.com
+  /* ── APP URL ──
+     Use localhost during local preview and the live app domain elsewhere.
   ── */
   const APP_LOGIN_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:3000/login'
-    : '/login'; // Update to full app URL for production (e.g. https://app.clarosdpp.com/login)
+    : 'https://app.claros-dpp.online/login';
 
   /* ── NAV HTML ── */
   const NAV_HTML = `
