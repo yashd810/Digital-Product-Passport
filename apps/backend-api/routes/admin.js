@@ -3,6 +3,29 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs   = require("fs");
 
+const COMPANY_POLICY_DEFAULTS = {
+  default_granularity: "item",
+  allow_granularity_override: false,
+  mint_model_dids: true,
+  mint_item_dids: true,
+  mint_facility_dids: false,
+  vc_issuance_enabled: true,
+  jsonld_export_enabled: true,
+  claros_battery_dictionary_enabled: true,
+  legacy_semantic_compatibility: false,
+};
+
+const COMPANY_POLICY_BOOL_FIELDS = [
+  "allow_granularity_override",
+  "mint_model_dids",
+  "mint_item_dids",
+  "mint_facility_dids",
+  "vc_issuance_enabled",
+  "jsonld_export_enabled",
+  "claros_battery_dictionary_enabled",
+  "legacy_semantic_compatibility",
+];
+
 module.exports = function registerAdminRoutes(app, {
   pool,
   multer,
@@ -24,6 +47,105 @@ module.exports = function registerAdminRoutes(app, {
   brandedEmail,
   storageService,
 }) {
+  async function ensureCompanyDppPolicy(companyId) {
+    await pool.query(
+      `INSERT INTO company_dpp_policies (
+         company_id,
+         default_granularity,
+         allow_granularity_override,
+         mint_model_dids,
+         mint_item_dids,
+         mint_facility_dids,
+         vc_issuance_enabled,
+         jsonld_export_enabled,
+         claros_battery_dictionary_enabled,
+         legacy_semantic_compatibility
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (company_id) DO NOTHING`,
+      [
+        companyId,
+        COMPANY_POLICY_DEFAULTS.default_granularity,
+        COMPANY_POLICY_DEFAULTS.allow_granularity_override,
+        COMPANY_POLICY_DEFAULTS.mint_model_dids,
+        COMPANY_POLICY_DEFAULTS.mint_item_dids,
+        COMPANY_POLICY_DEFAULTS.mint_facility_dids,
+        COMPANY_POLICY_DEFAULTS.vc_issuance_enabled,
+        COMPANY_POLICY_DEFAULTS.jsonld_export_enabled,
+        COMPANY_POLICY_DEFAULTS.claros_battery_dictionary_enabled,
+        COMPANY_POLICY_DEFAULTS.legacy_semantic_compatibility,
+      ]
+    );
+  }
+
+  async function getCompanyDppPolicy(companyId) {
+    await ensureCompanyDppPolicy(companyId);
+    const result = await pool.query(
+      `SELECT p.*
+       FROM company_dpp_policies p
+       WHERE p.company_id = $1
+       LIMIT 1`,
+      [companyId]
+    );
+    return result.rows[0] || null;
+  }
+
+  function validateCompanyDppPolicyInput(body = {}) {
+    const nextPolicy = {};
+    if (body.default_granularity !== undefined) {
+      if (!["model", "batch", "item"].includes(body.default_granularity)) {
+        throw new Error("default_granularity must be one of: model, batch, item");
+      }
+      nextPolicy.default_granularity = body.default_granularity;
+    }
+
+    COMPANY_POLICY_BOOL_FIELDS.forEach((field) => {
+      if (body[field] === undefined) return;
+      if (typeof body[field] !== "boolean") {
+        throw new Error(`${field} must be a boolean`);
+      }
+      nextPolicy[field] = body[field];
+    });
+
+    return nextPolicy;
+  }
+
+  async function updateCompanyDppPolicy(companyId, updates) {
+    const setClauses = [];
+    const params = [];
+    let idx = 1;
+
+    Object.entries(updates).forEach(([key, value]) => {
+      setClauses.push(`${key} = $${idx++}`);
+      params.push(value);
+    });
+    setClauses.push(`updated_at = NOW()`);
+    params.push(companyId);
+
+    const result = await pool.query(
+      `UPDATE company_dpp_policies
+       SET ${setClauses.join(", ")}
+       WHERE company_id = $${idx}
+       RETURNING *`,
+      params
+    );
+
+    await pool.query(
+      `UPDATE companies
+       SET dpp_granularity = COALESCE($1, dpp_granularity),
+           granularity_locked = COALESCE($2, granularity_locked),
+           updated_at = NOW()
+       WHERE id = $3`,
+      [
+        updates.default_granularity || null,
+        updates.allow_granularity_override === undefined ? null : !updates.allow_granularity_override,
+        companyId,
+      ]
+    ).catch(() => {});
+
+    return result.rows[0] || null;
+  }
+
 
   // ─── UMBRELLA CATEGORIES ───────────────────────────────────────────────────
   app.get("/api/admin/umbrella-categories", authenticateToken, isSuperAdmin, async (req, res) => {
@@ -367,6 +489,7 @@ module.exports = function registerAdminRoutes(app, {
         "INSERT INTO companies (company_name) VALUES ($1) RETURNING *",
         [companyName]
       );
+      await ensureCompanyDppPolicy(r.rows[0].id);
       res.status(201).json({ success: true, company: r.rows[0] });
     } catch (e) { res.status(500).json({ error: "Failed to create company" }); }
   });
@@ -433,61 +556,97 @@ module.exports = function registerAdminRoutes(app, {
   });
 
   // ─── COMPANY DPP POLICY ───────────────────────────────────────────────────
+  app.get("/api/admin/companies/:id/dpp-policy", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const company = await pool.query(
+        `SELECT id, company_name
+         FROM companies
+         WHERE id = $1
+         LIMIT 1`,
+        [companyId]
+      );
+      if (!company.rows.length) return res.status(404).json({ error: "Company not found" });
+
+      const policy = await getCompanyDppPolicy(companyId);
+      res.json({
+        company_id: companyId,
+        company_name: company.rows[0].company_name,
+        ...policy,
+      });
+    } catch (e) {
+      console.error("DPP policy fetch error:", e.message);
+      res.status(500).json({ error: "Failed to fetch DPP policy" });
+    }
+  });
+
+  app.put("/api/admin/companies/:id/dpp-policy", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const company = await pool.query(
+        `SELECT id
+         FROM companies
+         WHERE id = $1
+         LIMIT 1`,
+        [companyId]
+      );
+      if (!company.rows.length) return res.status(404).json({ error: "Company not found" });
+
+      await ensureCompanyDppPolicy(companyId);
+      const updates = validateCompanyDppPolicyInput(req.body || {});
+      if (!Object.keys(updates).length) {
+        return res.status(400).json({ error: "No policy fields supplied" });
+      }
+
+      const updatedPolicy = await updateCompanyDppPolicy(companyId, updates);
+      await logAudit(
+        companyId,
+        req.user.userId,
+        "UPDATE_COMPANY_DPP_POLICY",
+        "company_dpp_policies",
+        String(companyId),
+        null,
+        updates
+      );
+
+      res.json({ success: true, policy: updatedPolicy });
+    } catch (e) {
+      res.status(400).json({ error: e.message || "Failed to update DPP policy" });
+    }
+  });
+
   app.patch("/api/admin/companies/:id/dpp-policy", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const companyId = parseInt(req.params.id, 10);
       if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
 
       const { dpp_granularity, granularity_locked } = req.body || {};
+      const company = await pool.query("SELECT id FROM companies WHERE id = $1 LIMIT 1", [companyId]);
+      if (!company.rows.length) return res.status(404).json({ error: "Company not found" });
+      await ensureCompanyDppPolicy(companyId);
 
-      const validGranularities = ["model", "item", "batch"];
-      if (dpp_granularity !== undefined && !validGranularities.includes(dpp_granularity)) {
-        return res.status(400).json({
-          error: `dpp_granularity must be one of: ${validGranularities.join(", ")}`,
-        });
-      }
-
-      if (granularity_locked !== undefined && typeof granularity_locked !== "boolean") {
-        return res.status(400).json({ error: "granularity_locked must be a boolean" });
-      }
-
-      const setClauses = [];
-      const params = [];
-      let idx = 1;
-
-      if (dpp_granularity !== undefined) {
-        setClauses.push(`dpp_granularity = $${idx++}`);
-        params.push(dpp_granularity);
-      }
-      if (granularity_locked !== undefined) {
-        setClauses.push(`granularity_locked = $${idx++}`);
-        params.push(granularity_locked);
-      }
-
-      if (!setClauses.length) {
+      const updates = {};
+      if (dpp_granularity !== undefined) updates.default_granularity = dpp_granularity;
+      if (granularity_locked !== undefined) updates.allow_granularity_override = !granularity_locked;
+      const validatedUpdates = validateCompanyDppPolicyInput(updates);
+      if (!Object.keys(validatedUpdates).length) {
         return res.status(400).json({ error: "No fields to update. Provide dpp_granularity and/or granularity_locked." });
       }
 
-      setClauses.push(`updated_at = NOW()`);
-      params.push(companyId);
-
-      const r = await pool.query(
-        `UPDATE companies
-         SET ${setClauses.join(", ")}
-         WHERE id = $${idx}
-         RETURNING *`,
-        params
-      );
-      if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
+      const policy = await updateCompanyDppPolicy(companyId, validatedUpdates);
 
       await logAudit(
         companyId, req.user.userId,
-        "UPDATE_DPP_POLICY", "companies", String(companyId),
+        "UPDATE_DPP_POLICY", "company_dpp_policies", String(companyId),
         null,
-        { dpp_granularity, granularity_locked }
+        validatedUpdates
       );
 
-      res.json({ success: true, company: r.rows[0] });
+      res.json({ success: true, policy });
     } catch (e) {
       console.error("DPP policy update error:", e.message);
       res.status(500).json({ error: "Failed to update DPP policy" });

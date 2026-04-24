@@ -3,9 +3,9 @@ require("dotenv").config();
 const express        = require("express");
 const { Pool }       = require("pg");
 const cors           = require("cors");
+const helmet         = require("helmet");
 const { v4: uuidv4 } = require("uuid");
 const crypto         = require("crypto");
-const bcrypt         = require("bcryptjs");
 const jwt            = require("jsonwebtoken");
 const multer         = require("multer");
 const fs             = require("fs");
@@ -14,9 +14,13 @@ const canonicalize   = require("canonicalize");
 
 const { initDb }               = require("../db/init");
 const createSigningService     = require("../services/signing-service");
+const createDidService         = require("../services/did-service");
+const createCanonicalPassportSerializer = require("../services/canonicalPassportSerializer");
 const createCacheService       = require("../services/cache-service");
 const createStorageService     = require("../services/storage-service");
 const createOauthService       = require("../services/oauth-service");
+const createPasswordService    = require("../services/password-service");
+const logger                   = require("../services/logger");
 const { createTransporter, brandedEmail, sendOtpEmail } = require("../services/email");
 const { validatePasswordPolicy, hashSecret, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../services/security-service");
 const createAuthMiddleware     = require("../middleware/auth");
@@ -28,6 +32,8 @@ const createPassportRepresentationService = require("../services/passport-repres
 const dppIdentity                         = require("../services/dpp-identity-service");
 const createBatteryDictionaryService      = require("../services/battery-dictionary-service");
 
+global.console = logger.console;
+
 const {
   IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS,
   SYSTEM_PASSPORT_FIELDS,
@@ -38,6 +44,7 @@ const {
   normalizePassportRequestBody, normalizeProductIdValue, generateProductIdValue,
   getWritablePassportColumns, getStoredPassportValues,
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath, buildPreviewPassportPath,
+  resolvePublicPathToSubjects,
   coerceBulkFieldValue, getHistoryFieldDefs, formatHistoryFieldValue, comparableHistoryFieldValue,
   isPlainObject, getAssetFieldMap, getValueAtPath, normalizeAssetHeaders,
   coerceAssetFieldValue, toDynamicStoredValue,
@@ -120,6 +127,11 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: false,
+}));
+
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
@@ -168,6 +180,9 @@ const pool = new Pool({
   host:     process.env.DB_HOST,
   port:     process.env.DB_PORT || 5432,
   database: process.env.DB_NAME,
+});
+pool.on("error", (err) => {
+  logger.error({ err }, "Unexpected PostgreSQL pool error");
 });
 
 // ─── SECRETS + AUTH CONSTANTS ────────────────────────────────────────────────
@@ -229,14 +244,17 @@ if (IS_PRODUCTION) {
   if (JWT_SECRET === "change-me-in-production") throw new Error("[SECURITY] JWT_SECRET is still the default value. Set a strong secret before deploying.");
   if (PEPPER === "change-this-pepper-in-production") throw new Error("[SECURITY] PEPPER_V1 is still the default value. Set a strong secret before deploying.");
 } else {
-  if (!process.env.JWT_SECRET) console.warn("[SECURITY] JWT_SECRET is not set — using insecure default. Set it in .env before deploying.");
-  if (!process.env.PEPPER_V1)  console.warn("[SECURITY] PEPPER_V1 is not set — using insecure default. Set it in .env before deploying.");
+  if (!process.env.JWT_SECRET) logger.warn("[SECURITY] JWT_SECRET is not set — using insecure default. Set it in .env before deploying.");
+  if (!process.env.PEPPER_V1)  logger.warn("[SECURITY] PEPPER_V1 is not set — using insecure default. Set it in .env before deploying.");
 }
 
 // ─── AUTH HELPERS ────────────────────────────────────────────────────────────
-const applyPepper    = (pw) => crypto.createHmac("sha256", PEPPER).update(pw).digest("hex");
-const hashPassword   = async (pt) => ({ hash: await bcrypt.hash(applyPepper(pt), 12), pepperVersion: CURRENT_PEPPER_VERSION });
-const verifyPassword = (pt, hash) => bcrypt.compare(applyPepper(pt), hash);
+const passwordService = createPasswordService({
+  crypto,
+  pepper: PEPPER,
+  currentPepperVersion: CURRENT_PEPPER_VERSION,
+});
+const { hashPassword, verifyPassword, verifyPasswordAndUpgrade } = passwordService;
 const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1) => {
   const user = typeof userOrId === "object" && userOrId !== null
     ? userOrId
@@ -280,7 +298,7 @@ const storageService = createStorageService({
   serverBaseUrl: process.env.SERVER_URL || `http://localhost:${PORT}`,
 });
 const oauthService = createOauthService({
-  jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache,
+  jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache, hashPassword,
 });
 
 // ─── AUTH MIDDLEWARE ─────────────────────────────────────────────────────────
@@ -471,8 +489,23 @@ if (!storageService.isLocal && storageService.fetchObject) {
   });
 }
 
+// ─── DID + CANONICAL SERIALIZATION SERVICES ─────────────────────────────────
+const didService = createDidService({
+  didDomain: process.env.DID_WEB_DOMAIN || "www.claros-dpp.online",
+  publicOrigin: process.env.PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000",
+  apiOrigin: process.env.SERVER_URL || `http://localhost:${PORT}`,
+});
+const canonicalPassportSerializer = createCanonicalPassportSerializer({ didService });
+const { buildCanonicalPassportPayload } = canonicalPassportSerializer;
+
 // ─── SIGNING SERVICE ─────────────────────────────────────────────────────────
-const signingService = createSigningService({ pool, crypto, canonicalize, dppIdentity });
+const signingService = createSigningService({
+  pool,
+  crypto,
+  canonicalize,
+  didService,
+  buildCanonicalPassportPayload,
+});
 const { signPassport, verifyPassportSignature } = signingService;
 
 // ─── PASSPORT REPRESENTATION SERVICE ────────────────────────────────────────
@@ -577,7 +610,7 @@ const migrateRepositoryFilePaths = async () => {
     await pool.query("UPDATE company_repository SET file_path = $1, updated_at = NOW() WHERE id = $2", [nextPath, row.id]);
     updated += 1;
   }
-  if (updated) console.log(`[storage] Migrated ${updated} company_repository file_path value(s) to ${REPO_BASE_DIR}`);
+  if (updated) logger.info(`[storage] Migrated ${updated} company_repository file_path value(s) to ${REPO_BASE_DIR}`);
 };
 
 const backfillLegacyPassportAttachmentLinks = async () => {
@@ -679,30 +712,29 @@ const backfillLegacyPassportAttachmentLinks = async () => {
         }
       }
     } catch (error) {
-      console.warn(`[storage] Legacy passport file backfill skipped for ${typeRow.type_name}:`, error.message);
+      logger.warn({ err: error, passportType: typeRow.type_name }, "[storage] Legacy passport file backfill skipped");
     }
   }
 
   if (attachmentRowsCreated || passportFieldsRewritten) {
-    console.log(`[storage] Backfilled ${attachmentRowsCreated} passport attachment row(s) and rewrote ${passportFieldsRewritten} passport file link(s)`);
+    logger.info(`[storage] Backfilled ${attachmentRowsCreated} passport attachment row(s) and rewrote ${passportFieldsRewritten} passport file link(s)`);
   }
 };
 
 // ─── STARTUP ─────────────────────────────────────────────────────────────────
-process.on("unhandledRejection", (reason) => console.error("[Unhandled Rejection]", reason));
+process.on("unhandledRejection", (reason) => logger.error({ err: reason }, "[Unhandled Rejection]"));
 
 pool.query("SELECT NOW()")
   .then(async () => {
     await initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS });
-    console.log("[DB] Initialized successfully");
+    logger.info("[DB] Initialized successfully");
     await migrateRepositoryFilePaths();
     await backfillLegacyPassportAttachmentLinks();
     await signingService.loadOrGenerateSigningKey();
     assetService.startAssetManagementScheduler();
   })
   .catch(err => {
-    console.error("[DB] Fatal startup error:", err.message);
-    console.error(err.stack);
+    logger.error({ err }, "[DB] Fatal startup error");
     process.exit(1);
   });
 
@@ -730,7 +762,7 @@ registerWorkflowRoutes(app, {
 });
 
 registerAuthRoutes(app, {
-  pool, jwt, JWT_SECRET, hashPassword, verifyPassword, generateToken, hashOpaqueToken,
+  pool, jwt, JWT_SECRET, hashPassword, verifyPassword, verifyPasswordAndUpgrade, generateToken, hashOpaqueToken,
   validatePasswordPolicy, PASSWORD_MIN_LENGTH,
   SESSION_COOKIE_NAME,
   setAuthCookie, clearAuthCookie, sendOtpEmail, createTransporter, brandedEmail,
@@ -783,7 +815,13 @@ registerPassportPublicRoutes(app, {
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath,
   stripRestrictedFieldsForPublicView, getCompanyNameMap,
   resolveReleasedPassportByProductId, resolvePublicPassportByGuid, buildPassportVersionHistory,
-  verifyPassportSignature, buildJsonLdContext: buildPassportJsonLdContext, signingService,
+  resolvePublicPathToSubjects,
+  verifyPassportSignature,
+  buildJsonLdContext: buildPassportJsonLdContext,
+  buildBatteryPassJsonExport,
+  buildCanonicalPassportPayload,
+  signingService,
+  didService,
 });
 
 registerCompanyRoutes(app, {
@@ -805,6 +843,7 @@ registerDppApiRoutes(app, {
   signingService,
   buildOperationalDppPayload,
   buildPassportJsonLdContext,
+  didService,
   dppIdentity,
 });
 
@@ -925,5 +964,5 @@ app.post("/api/contact", publicReadRateLimit, async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`[Server] Listening on port ${PORT}`);
+  logger.info(`[Server] Listening on port ${PORT}`);
 });

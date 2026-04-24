@@ -196,6 +196,7 @@ function App() {
           <Route path="archived"        element={<ArchivedPassports user={user} companyId={companyId} />} />
           <Route path="manual"          element={<ManualCenter mode="user" user={user} companyId={companyId} />} />
           <Route path="dictionary/battery/v1" element={<BatteryDictionaryBrowserPage />} />
+          <Route path="dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
           <Route path="dictionary/battery/v1/*" element={<BatteryDictionaryBrowserPage />} />
         </Route>
 
@@ -221,6 +222,7 @@ function App() {
           <Route path="analytics/:companySlug"        element={<AdminCompanyAnalytics />} />
           <Route path="company/:companyId/profile"   element={<CompanyProfile user={user} />} />
           <Route path="dictionary/battery/v1"        element={<BatteryDictionaryBrowserPage />} />
+          <Route path="dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
           <Route path="dictionary/battery/v1/*"      element={<BatteryDictionaryBrowserPage />} />
         </Route>
 
@@ -238,6 +240,7 @@ function App() {
 
         {/* Battery Dictionary — public, accessible from both admin and user layouts */}
         <Route path="/dictionary/battery/v1" element={<BatteryDictionaryBrowserPage />} />
+        <Route path="/dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
         <Route path="/dictionary/battery/v1/*" element={<BatteryDictionaryBrowserPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -22,7 +22,7 @@ function sha256Base64Url(value) {
   return crypto.createHash("sha256").update(String(value || "")).digest("base64url");
 }
 
-function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache }) {
+function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache, hashPassword }) {
   const rawProviders = parseJsonEnv("OAUTH_PROVIDERS_JSON", []);
   const providers = Array.isArray(rawProviders)
     ? rawProviders.map((provider) => ({
@@ -195,14 +195,14 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       }
       const firstName = profile.given_name || String(profile.name || "").split(" ").filter(Boolean).slice(0, 1).join(" ") || null;
       const lastName = profile.family_name || String(profile.name || "").split(" ").filter(Boolean).slice(1).join(" ") || null;
-      const randomPasswordHash = await require("bcryptjs").hash(crypto.randomUUID(), 12);
+      const randomPassword = await hashPassword(crypto.randomUUID());
       const insertedUser = await pool.query(
         `INSERT INTO users (email, password_hash, first_name, last_name, company_id, role, pepper_version, auth_source, sso_only)
          VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8)
          RETURNING id, email, company_id, role, first_name, last_name, is_active, session_version`,
         [
           email,
-          randomPasswordHash,
+          randomPassword.hash,
           firstName,
           lastName,
           provider.defaultRole === "super_admin" ? null : provider.defaultCompanyId,

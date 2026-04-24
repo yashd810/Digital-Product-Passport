@@ -16,6 +16,7 @@ module.exports = function registerDppApiRoutes(app, {
   signingService,
   buildOperationalDppPayload,
   buildPassportJsonLdContext,
+  didService,
   dppIdentity, // the dpp-identity-service module
 }) {
 
@@ -152,6 +153,40 @@ module.exports = function registerDppApiRoutes(app, {
     const typeDef = typeRes.rows[0] || null;
 
     return { passport: found, typeDef, companyName };
+  }
+
+  async function loadCompanyById(companyId) {
+    const result = await pool.query(
+      `SELECT c.id,
+              c.company_name,
+              c.did_slug,
+              c.is_active,
+              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS dpp_granularity
+       FROM companies c
+       LEFT JOIN company_dpp_policies p ON p.company_id = c.id
+       WHERE c.id = $1
+       LIMIT 1`,
+      [companyId]
+    );
+    return result.rows[0] || null;
+  }
+
+  async function resolveLegacyPassportDidTarget(companyId, productId, fallbackGranularity = "model") {
+    const result = await dbLookupByCompanyAndProduct(companyId, productId);
+    if (!result?.passport) return null;
+    const stableId = didService.normalizeStableId(result.passport.lineage_id || result.passport.guid);
+    const granularity = String(
+      result.passport.granularity
+      || result.passport.dpp_granularity
+      || result.typeDef?.granularity
+      || result.typeDef?.fields_json?.granularity
+      || fallbackGranularity
+    ).trim().toLowerCase() || fallbackGranularity;
+    return {
+      ...result,
+      stableId,
+      granularity,
+    };
   }
 
   /**
@@ -293,52 +328,26 @@ module.exports = function registerDppApiRoutes(app, {
   });
 
   // ─── GET /did/company/:companyId/did.json ──────────────────────────────────
-  // Company (economic operator) DID document.
+  // Legacy numeric company DID URL. Redirect to subject-level company DID doc.
   app.get("/did/company/:companyId/did.json", async (req, res) => {
     try {
       const companyId = parseInt(req.params.companyId, 10);
       if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
 
-      const r = await pool.query(
-        "SELECT id, company_name FROM companies WHERE id = $1 AND is_active = true",
-        [companyId]
+      const company = await loadCompanyById(companyId);
+      if (!company?.is_active) return res.status(404).json({ error: "Company not found" });
+      const companySlug = didService.normalizeCompanySlug(
+        company.did_slug || company.company_name || `company-${company.id}`
       );
-      if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
-
-      const { company_name } = r.rows[0];
-      const appUrl           = getAppUrl();
-      const cDid             = dppIdentity.companyDid(companyId);
-      const controller       = signingService.issuerDid();
-
-      const didDocument = {
-        "@context": ["https://www.w3.org/ns/did/v1"],
-        id:         cDid,
-        controller,
-        name:       company_name,
-        service: [
-          {
-            id:              `${cDid}#profile`,
-            type:            "LinkedDomains",
-            serviceEndpoint: `${appUrl}/api/companies/${companyId}/profile`,
-          },
-          {
-            id:              `${cDid}#passports`,
-            type:            "DPPRegistry",
-            serviceEndpoint: `${appUrl}/api/v1/passports`,
-          },
-        ],
-      };
-
-      res.setHeader("Content-Type", "application/did+ld+json");
-      res.json(didDocument);
+      return res.redirect(301, `/did/company/${encodeURIComponent(companySlug)}/did.json`);
     } catch (e) {
       console.error("[Company DID]", e.message);
-      res.status(500).json({ error: "Failed to generate DID document" });
+      res.status(500).json({ error: "Failed to resolve DID document" });
     }
   });
 
   // ─── GET /did/battery/model/:companyId/:productId/did.json ─────────────────
-  // Battery/product model DID document.
+  // Legacy model DID URL. Redirect to lineage-based DID doc.
   app.get("/did/battery/model/:companyId/:productId/did.json", async (req, res) => {
     try {
       const companyId = parseInt(req.params.companyId, 10);
@@ -347,31 +356,17 @@ module.exports = function registerDppApiRoutes(app, {
       const productId = decodeURIComponent(req.params.productId);
       if (!productId) return res.status(400).json({ error: "productId is required" });
 
-      const result = await dbLookupByCompanyAndProduct(companyId, productId);
-      if (!result) return res.status(404).json({ error: "Passport not found or not released" });
-
-      const { passport, typeDef, companyName } = result;
-
-      const subjectDid   = dppIdentity.productModelDid(companyId, productId);
-      const controllerDid = dppIdentity.companyDid(companyId);
-
-      const didDocument = {
-        "@context": ["https://www.w3.org/ns/did/v1"],
-        id:         subjectDid,
-        controller: controllerDid,
-        service:    buildPassportServiceEndpoints(subjectDid, passport, typeDef, companyName),
-      };
-
-      res.setHeader("Content-Type", "application/did+ld+json");
-      res.json(didDocument);
+      const target = await resolveLegacyPassportDidTarget(companyId, productId, "model");
+      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
+      return res.redirect(301, `/did/battery/model/${encodeURIComponent(target.stableId)}/did.json`);
     } catch (e) {
       console.error("[Battery Model DID]", e.message);
-      res.status(500).json({ error: "Failed to generate DID document" });
+      res.status(500).json({ error: "Failed to resolve DID document" });
     }
   });
 
   // ─── GET /did/battery/item/:companyId/:productId/did.json ─────────────────
-  // Battery/product item DID document.
+  // Legacy item DID URL. Redirect to lineage-based DID doc.
   app.get("/did/battery/item/:companyId/:productId/did.json", async (req, res) => {
     try {
       const companyId = parseInt(req.params.companyId, 10);
@@ -380,31 +375,17 @@ module.exports = function registerDppApiRoutes(app, {
       const productId = decodeURIComponent(req.params.productId);
       if (!productId) return res.status(400).json({ error: "productId is required" });
 
-      const result = await dbLookupByCompanyAndProduct(companyId, productId);
-      if (!result) return res.status(404).json({ error: "Passport not found or not released" });
-
-      const { passport, typeDef, companyName } = result;
-
-      const subjectDid    = dppIdentity.productItemDid(companyId, productId);
-      const controllerDid = dppIdentity.companyDid(companyId);
-
-      const didDocument = {
-        "@context": ["https://www.w3.org/ns/did/v1"],
-        id:         subjectDid,
-        controller: controllerDid,
-        service:    buildPassportServiceEndpoints(subjectDid, passport, typeDef, companyName),
-      };
-
-      res.setHeader("Content-Type", "application/did+ld+json");
-      res.json(didDocument);
+      const target = await resolveLegacyPassportDidTarget(companyId, productId, "item");
+      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
+      return res.redirect(301, `/did/battery/item/${encodeURIComponent(target.stableId)}/did.json`);
     } catch (e) {
       console.error("[Battery Item DID]", e.message);
-      res.status(500).json({ error: "Failed to generate DID document" });
+      res.status(500).json({ error: "Failed to resolve DID document" });
     }
   });
 
   // ─── GET /did/dpp/:granularity/:companyId/:productId/did.json ─────────────
-  // DPP record DID document.
+  // Legacy DPP DID URL. Redirect to lineage-based DID doc.
   app.get("/did/dpp/:granularity/:companyId/:productId/did.json", async (req, res) => {
     try {
       const { granularity } = req.params;
@@ -419,26 +400,13 @@ module.exports = function registerDppApiRoutes(app, {
       const productId = decodeURIComponent(req.params.productId);
       if (!productId) return res.status(400).json({ error: "productId is required" });
 
-      const result = await dbLookupByCompanyAndProduct(companyId, productId);
-      if (!result) return res.status(404).json({ error: "Passport not found or not released" });
-
-      const { passport, typeDef, companyName } = result;
-
-      const subjectDid    = dppIdentity.dppDid(granularity, companyId, productId);
-      const controllerDid = dppIdentity.companyDid(companyId);
-
-      const didDocument = {
-        "@context": ["https://www.w3.org/ns/did/v1"],
-        id:         subjectDid,
-        controller: controllerDid,
-        service:    buildPassportServiceEndpoints(subjectDid, passport, typeDef, companyName),
-      };
-
-      res.setHeader("Content-Type", "application/did+ld+json");
-      res.json(didDocument);
+      const target = await resolveLegacyPassportDidTarget(companyId, productId, granularity);
+      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
+      const nextGranularity = didService.normalizeGranularity(target.granularity || granularity);
+      return res.redirect(301, `/did/dpp/${encodeURIComponent(nextGranularity)}/${encodeURIComponent(target.stableId)}/did.json`);
     } catch (e) {
       console.error("[DPP DID]", e.message);
-      res.status(500).json({ error: "Failed to generate DID document" });
+      res.status(500).json({ error: "Failed to resolve DID document" });
     }
   });
 
@@ -690,18 +658,22 @@ module.exports = function registerDppApiRoutes(app, {
         const tableName = getTable(passport_type);
 
         const r = await pool.query(
-          `SELECT product_id, company_id FROM ${tableName}
+          `SELECT product_id, company_id, lineage_id FROM ${tableName}
            WHERE guid = $1 AND deleted_at IS NULL AND release_status = 'released'
            LIMIT 1`,
           [guid]
         );
         if (!r.rows.length) return res.status(404).json({ error: "Passport not released" });
 
-        const { product_id } = r.rows[0];
+        const { product_id, lineage_id } = r.rows[0];
 
-        // If the passport has a product_id, redirect to the canonical product DID document
-        if (product_id) {
-          const canonicalUrl = `/did/battery/model/${company_id}/${encodeURIComponent(product_id)}/did.json`;
+        const stableId = didService.normalizeStableId(lineage_id || guid);
+
+        // Redirect any legacy guid DID URL to the lineage-based DPP DID document.
+        if (product_id || lineage_id) {
+          const company = await loadCompanyById(company_id);
+          const granularity = didService.normalizeGranularity(company?.dpp_granularity || "model");
+          const canonicalUrl = `/did/dpp/${encodeURIComponent(granularity)}/${encodeURIComponent(stableId)}/did.json`;
           return res.redirect(301, canonicalUrl);
         }
 
@@ -749,6 +721,17 @@ module.exports = function registerDppApiRoutes(app, {
   app.get("/did/org/:companyId/did.json", async (req, res) => {
     const companyId = parseInt(req.params.companyId, 10);
     if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
-    return res.redirect(301, `/did/company/${companyId}/did.json`);
+
+    try {
+      const company = await loadCompanyById(companyId);
+      if (!company?.is_active) return res.status(404).json({ error: "Company not found" });
+      const companySlug = didService.normalizeCompanySlug(
+        company.did_slug || company.company_name || `company-${company.id}`
+      );
+      return res.redirect(301, `/did/company/${encodeURIComponent(companySlug)}/did.json`);
+    } catch (e) {
+      console.error("[Legacy Org DID]", e.message);
+      return res.status(500).json({ error: "Failed to resolve DID document" });
+    }
   });
 };

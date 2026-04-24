@@ -7,7 +7,8 @@
     "start": "node Server/server.js",
     "dev": "nodemon Server/server.js",
     "contact": "node \"Website form/contact-server.js\"",
-    "contact:dev": "nodemon \"Website form/contact-server.js\""
+    "contact:dev": "nodemon \"Website form/contact-server.js\"",
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "author": "",
@@ -15,20 +16,25 @@
   "type": "commonjs",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1036.0",
-    "bcryptjs": "^2.4.3",
+    "argon2": "^0.43.0",
+    "bcrypt": "^6.0.0",
     "canonicalize": "^2.1.0",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.4",
+    "pino": "^9.9.4",
     "pg": "^8.20.0",
     "qrcode": "^1.5.4",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.1.1"
   }
 }

@@ -62,8 +62,7 @@ module.exports = function createBatteryDictionaryService() {
 
   // Build a JSON-LD context array for a passport type that uses the Claros battery dictionary
   function buildJsonLdContext(typeDef) {
-    const appUrl = process.env.APP_URL || "http://localhost:3001";
-    const clarosContextUrl = `${appUrl}/dictionary/battery/v1/context.jsonld`;
+    const clarosContextUrl = manifest.contextUrl || "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld";
 
     // Base DPP context inline object
     const dppContext = {
@@ -90,7 +89,7 @@ module.exports = function createBatteryDictionaryService() {
         for (const field of (section.fields || [])) {
           if (!field?.key) continue;
           const termIri = resolveFieldKey(field.key) || field.semanticId;
-          if (termIri) {
+          if (termIri && !context?.["@context"]?.[field.key]) {
             inlineOverrides[field.key] = { "@id": termIri };
           }
         }

@@ -1,19 +1,5 @@
 [
   {
-    "key": "none",
-    "display": "n.a.",
-    "description": "No unit applicable; the attribute is dimensionless or textual",
-    "xsdType": "xsd:string",
-    "jsonType": "string"
-  },
-  {
-    "key": "kg",
-    "display": "kg",
-    "description": "Kilogram — SI unit of mass",
-    "xsdType": "xsd:decimal",
-    "jsonType": "number"
-  },
-  {
     "key": "percent",
     "display": "%",
     "description": "Percentage — a proportion expressed as a fraction of one hundred",
@@ -21,9 +7,30 @@
     "jsonType": "number"
   },
   {
-    "key": "kgco2eq_per_kwh",
-    "display": "kgCO2eq/kWh",
-    "description": "Kilograms of CO2 equivalent per kilowatt-hour of battery energy — carbon intensity metric",
+    "key": "celsius",
+    "display": "°C",
+    "description": "Degrees Celsius — unit of temperature on the Celsius scale",
+    "xsdType": "xsd:integer",
+    "jsonType": "integer"
+  },
+  {
+    "key": "a_per_ah",
+    "display": "A/Ah",
+    "description": "Amperes per ampere-hour — C-rate expressing charge or discharge current relative to capacity",
+    "xsdType": "xsd:decimal",
+    "jsonType": "number"
+  },
+  {
+    "key": "ah",
+    "display": "Ah",
+    "description": "Ampere-hour — unit of electric charge representing one ampere flowing for one hour",
+    "xsdType": "xsd:integer",
+    "jsonType": "integer"
+  },
+  {
+    "key": "kg",
+    "display": "kg",
+    "description": "Kilogram — SI unit of mass",
     "xsdType": "xsd:decimal",
     "jsonType": "number"
   },
@@ -35,16 +42,30 @@
     "jsonType": "integer"
   },
   {
-    "key": "ah",
-    "display": "Ah",
-    "description": "Ampere-hour — unit of electric charge representing one ampere flowing for one hour",
+    "key": "kgco2eq_per_kwh",
+    "display": "kgCO2eq/kWh",
+    "description": "Kilograms of CO2 equivalent per kilowatt-hour of battery energy — carbon intensity metric",
+    "xsdType": "xsd:decimal",
+    "jsonType": "number"
+  },
+  {
+    "key": "none",
+    "display": "n.a.",
+    "description": "No unit applicable; the attribute is dimensionless or textual",
+    "xsdType": "xsd:string",
+    "jsonType": "string"
+  },
+  {
+    "key": "ohm",
+    "display": "Ohm",
+    "description": "Ohm — SI unit of electrical resistance",
     "xsdType": "xsd:integer",
     "jsonType": "integer"
   },
   {
-    "key": "wh",
-    "display": "Wh",
-    "description": "Watt-hour — unit of energy equal to one watt of power sustained for one hour",
+    "key": "seconds",
+    "display": "s",
+    "description": "Seconds — SI base unit of time",
     "xsdType": "xsd:integer",
     "jsonType": "integer"
   },
@@ -70,9 +91,9 @@
     "jsonType": "integer"
   },
   {
-    "key": "ohm",
-    "display": "Ohm",
-    "description": "Ohm — SI unit of electrical resistance",
+    "key": "wh",
+    "display": "Wh",
+    "description": "Watt-hour — unit of energy equal to one watt of power sustained for one hour",
     "xsdType": "xsd:integer",
     "jsonType": "integer"
   },
@@ -82,26 +103,5 @@
     "description": "Calendar years — duration measured in full Gregorian years",
     "xsdType": "xsd:decimal",
     "jsonType": "number"
-  },
-  {
-    "key": "celsius",
-    "display": "°C",
-    "description": "Degrees Celsius — unit of temperature on the Celsius scale",
-    "xsdType": "xsd:integer",
-    "jsonType": "integer"
-  },
-  {
-    "key": "a_per_ah",
-    "display": "A/Ah",
-    "description": "Amperes per ampere-hour — C-rate expressing charge or discharge current relative to capacity",
-    "xsdType": "xsd:decimal",
-    "jsonType": "number"
-  },
-  {
-    "key": "seconds",
-    "display": "s",
-    "description": "Seconds — SI base unit of time",
-    "xsdType": "xsd:integer",
-    "jsonType": "integer"
   }
 ]

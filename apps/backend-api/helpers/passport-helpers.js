@@ -151,6 +151,130 @@ const buildPreviewPassportPath = ({
   return `/dpp/preview/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(routeKey)}`;
 };
 
+const decodePathSegment = (value) => {
+  try {
+    return decodeURIComponent(String(value || ""));
+  } catch {
+    return String(value || "");
+  }
+};
+
+const inferFacilityStableId = (passport) => {
+  if (!passport || typeof passport !== "object") return null;
+  const directCandidates = [
+    passport.facility_id,
+    passport.facility,
+    passport.manufacturing_facility_id,
+    passport.manufacturing_facility,
+  ].filter(Boolean);
+  if (directCandidates.length) return String(directCandidates[0]).trim() || null;
+
+  for (const [key, value] of Object.entries(passport)) {
+    if (!value || typeof value !== "string") continue;
+    if (/facility/i.test(key)) return value.trim() || null;
+  }
+  return null;
+};
+
+async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didService }) {
+  const rawPath = String(publicPath || "").trim();
+  if (!rawPath) return null;
+
+  let pathname = rawPath;
+  try {
+    pathname = new URL(rawPath, didService?.getPublicOrigin?.() || "http://localhost").pathname || rawPath;
+  } catch {}
+
+  const currentMatch = pathname.match(/^\/dpp\/([^/]+)\/([^/]+)\/([^/]+)$/i);
+  const inactiveMatch = pathname.match(/^\/dpp\/inactive\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)$/i);
+  const match = inactiveMatch || currentMatch;
+  if (!match) return null;
+
+  const manufacturerSlug = String(match[1] || "").toLowerCase();
+  const modelSlug = String(match[2] || "").toLowerCase();
+  const productId = normalizeProductIdValue(decodePathSegment(match[3]));
+  const versionNumber = inactiveMatch ? Number.parseInt(decodePathSegment(match[4]), 10) : null;
+  if (!productId) return null;
+
+  const companyRows = await pool.query(
+    `SELECT id, company_name, did_slug
+     FROM companies
+     ORDER BY id ASC`
+  );
+
+  const matchingCompanies = companyRows.rows.filter((company) => {
+    const companySlug = String(company.did_slug || "").trim().toLowerCase();
+    const nameSlug = slugifyRouteSegment(company.company_name || "", "manufacturer");
+    return companySlug === manufacturerSlug || nameSlug === manufacturerSlug;
+  });
+  if (!matchingCompanies.length) return null;
+
+  for (const company of matchingCompanies) {
+    const registryRows = await pool.query(
+      `SELECT guid, passport_type
+       FROM passport_registry
+       WHERE company_id = $1
+       ORDER BY created_at DESC`,
+      [company.id]
+    );
+
+    for (const registryRow of registryRows.rows) {
+      const tableName = getTable(registryRow.passport_type);
+      try {
+        const params = [company.id, productId];
+        let versionClause = "";
+        let statusClause = "release_status = 'released'";
+
+        if (Number.isFinite(versionNumber)) {
+          params.push(versionNumber);
+          versionClause = ` AND version_number = $${params.length}`;
+          statusClause = "release_status IN ('released', 'obsolete')";
+        }
+
+        const row = await pool.query(
+          `SELECT guid, lineage_id, company_id, product_id, model_name, granularity, release_status, version_number, *
+           FROM ${tableName}
+           WHERE company_id = $1
+             AND product_id = $2
+             AND deleted_at IS NULL
+             AND ${statusClause}${versionClause}
+           ORDER BY version_number DESC, updated_at DESC
+           LIMIT 1`,
+          params
+        );
+        const passport = row.rows[0];
+        if (!passport) continue;
+
+        const actualModelSlug = slugifyRouteSegment(passport.model_name || passport.product_id, "product");
+        if (actualModelSlug !== modelSlug) continue;
+
+        const stableId = didService.normalizeStableId(passport.lineage_id || passport.guid);
+        const granularity = didService.normalizeGranularity(passport.granularity || "model");
+        const companySlug = didService.normalizeCompanySlug(company.did_slug || company.company_name || `company-${company.id}`);
+        const facilityStableId = inferFacilityStableId(passport);
+
+        return {
+          passportGuid: passport.guid,
+          passportType: registryRow.passport_type,
+          companyId: company.id,
+          productDid: granularity === "item"
+            ? didService.generateItemDid("battery", stableId)
+            : didService.generateModelDid("battery", stableId),
+          dppDid: didService.generateDppDid(granularity, stableId),
+          companyDid: didService.generateCompanyDid(companySlug),
+          facilityDid: facilityStableId ? didService.generateFacilityDid(facilityStableId) : null,
+          granularity,
+          canonicalPath: pathname,
+        };
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return null;
+}
+
 // ─── HISTORY / DIFF HELPERS ───────────────────────────────────────────────────
 
 const coerceBulkFieldValue = (fieldDef, rawValue) => {
@@ -350,6 +474,7 @@ module.exports = {
   buildCurrentPublicPassportPath,
   buildInactivePublicPassportPath,
   buildPreviewPassportPath,
+  resolvePublicPathToSubjects,
   coerceBulkFieldValue,
   getHistoryFieldDefs,
   formatHistoryFieldValue,

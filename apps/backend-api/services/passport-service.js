@@ -838,6 +838,7 @@ module.exports = function createPassportService({
         company_id     INTEGER      NOT NULL,
         model_name     VARCHAR(255),
         product_id     VARCHAR(255) NOT NULL,
+        granularity    VARCHAR(20)  NOT NULL DEFAULT 'model',
         release_status VARCHAR(50)  NOT NULL DEFAULT 'draft',
         version_number INTEGER      NOT NULL DEFAULT 1,
         qr_code        TEXT,

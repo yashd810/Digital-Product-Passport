@@ -24,7 +24,9 @@ const API = import.meta.env.VITE_API_URL || "";
 const ICON_PRESETS = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🔋","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
 
 function getSemanticModelLabel(modelKey) {
-  if (modelKey === "battery_pass_din_spec_99100") return "Battery Pass Data Model";
+  if (modelKey === "claros_battery_dictionary_v1") return "Claros Battery Dictionary";
+  if (modelKey === "battery_pass_din_spec_99100") return "Battery Pass Data Model (Legacy)";
+  if (modelKey === "claros_battery_v1") return "Claros Battery Dictionary (Legacy Alias)";
   return "No semantic model";
 }
 

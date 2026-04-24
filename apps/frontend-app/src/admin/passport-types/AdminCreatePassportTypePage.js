@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authHeaders } from "../../shared/api/authHeaders";
-import batteryPassDinSpec99100 from "../../shared/semantics/battery-pass-din-spec-99100.json";
+import batteryDictionaryTerms from "../../shared/semantics/battery-dictionary-terms.generated.json";
 import {
   ACCESS_LEVELS,
   FIELD_TYPES,
@@ -19,6 +19,9 @@ import { TypeIdentityCard } from "./TypeIdentityCard";
 import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
+const BATTERY_DICTIONARY_MODEL_KEY = "claros_battery_dictionary_v1";
+const LEGACY_BATTERY_MODEL_KEY = "battery_pass_din_spec_99100";
+const LEGACY_CLAROS_BATTERY_MODEL_KEY = "claros_battery_v1";
 const SEMANTIC_MODEL_OPTIONS = [
   {
     key: "",
@@ -26,14 +29,27 @@ const SEMANTIC_MODEL_OPTIONS = [
     description: "Do not attach a semantic model to this passport type yet.",
   },
   {
-    key: "battery_pass_din_spec_99100",
-    label: "Battery Pass Data Model",
-    description: "Use the Battery Pass semantic model and JSON-LD contexts for DIN SPEC 99100 battery passports.",
+    key: BATTERY_DICTIONARY_MODEL_KEY,
+    label: "Claros Battery Dictionary",
+    description: "Use the Claros battery dictionary and JSON-LD context as the default semantic source for battery passports.",
+  },
+  {
+    key: LEGACY_BATTERY_MODEL_KEY,
+    label: "Battery Pass Data Model (Legacy)",
+    description: "Keep compatibility with legacy DIN SPEC 99100 model references while exporting to the Claros battery dictionary.",
   },
 ];
 
 function getSemanticModelLabel(modelKey) {
   return SEMANTIC_MODEL_OPTIONS.find((option) => option.key === modelKey)?.label || "No semantic model";
+}
+
+function isBatteryDictionarySemanticModel(modelKey) {
+  return [
+    BATTERY_DICTIONARY_MODEL_KEY,
+    LEGACY_BATTERY_MODEL_KEY,
+    LEGACY_CLAROS_BATTERY_MODEL_KEY,
+  ].includes(String(modelKey || "").trim());
 }
 
 function batteryPassWords(value) {
@@ -76,25 +92,27 @@ function batteryPassExactCatalogMatch(value) {
 }
 
 const BATTERY_PASS_FIELD_CATALOG = (() => {
-  const grouped = new Map();
-  Object.entries(batteryPassDinSpec99100.fieldSemanticIds || {}).forEach(([sourceKey, semanticId]) => {
-    const canonicalKey = String(semanticId || "").split("#").pop();
-    if (!canonicalKey) return;
-    if (!grouped.has(semanticId)) {
-      grouped.set(semanticId, {
-        key: batteryPassInternalKey(canonicalKey),
-        semanticId,
-        aliases: new Set([canonicalKey, batteryPassHumanize(canonicalKey)]),
-      });
+  return batteryDictionaryTerms.map((term) => {
+    const key = term.appFieldKeys?.[0] || batteryPassInternalKey(term.internalKey || term.label);
+    const semanticId = term.iri || term.termIri;
+    const aliases = new Set([
+      term.label,
+      term.attributeName,
+      term.internalKey,
+      batteryPassHumanize(term.internalKey),
+      term.slug,
+      batteryPassHumanize(term.slug),
+    ]);
+    for (const fieldKey of (term.appFieldKeys || [])) {
+      aliases.add(fieldKey);
+      aliases.add(batteryPassHumanize(fieldKey));
     }
-    const entry = grouped.get(semanticId);
-    entry.aliases.add(sourceKey);
-    entry.aliases.add(batteryPassHumanize(sourceKey));
+    return {
+      key,
+      semanticId,
+      normalizedAliases: [...aliases].map(batteryPassNormalize).filter(Boolean),
+    };
   });
-  return [...grouped.values()].map((entry) => ({
-    ...entry,
-    normalizedAliases: [...entry.aliases].map(batteryPassNormalize).filter(Boolean),
-  }));
 })();
 
 function resolveBatteryPassFieldDefinition(label, currentKey = "") {
@@ -139,30 +157,77 @@ function resolveBatteryPassFieldDefinition(label, currentKey = "") {
 }
 
 function normalizeFieldToBatteryPass(field, semanticModelKey) {
-  if (semanticModelKey !== "battery_pass_din_spec_99100") {
-    return {
-      ...field,
-      key: field.key || toSlug(field.label || ""),
-      semanticId: field.semanticId,
-    };
-  }
-  const matched = resolveBatteryPassFieldDefinition(field.label, field.key);
-  if (!matched) {
+  if (!isBatteryDictionarySemanticModel(semanticModelKey)) {
     return {
       ...field,
       key: field.key || toSlug(field.label || ""),
       semanticId: undefined,
     };
   }
+  const matched = resolveBatteryPassFieldDefinition(field.label, field.key);
+  const nextKey = field._keyManual
+    ? (field.key || toSlug(field.label || ""))
+    : (matched?.key || field.key || toSlug(field.label || ""));
+  if (!matched) {
+    return {
+      ...field,
+      key: nextKey,
+      semanticId: undefined,
+    };
+  }
   return {
     ...field,
-    key: matched.key,
+    key: nextKey,
     semanticId: matched.semanticId,
   };
 }
 
+function syncSectionsWithSemanticModel(currentSections, semanticModelKey) {
+  let hasChanges = false;
+
+  const nextSections = currentSections.map((section) => {
+    let sectionChanged = false;
+
+    const nextFields = section.fields.map((field) => {
+      const normalizedField = normalizeFieldToBatteryPass(field, semanticModelKey);
+      const nextKey = normalizedField.key || field.key;
+      const nextSemanticId = normalizedField.semanticId;
+      const keyChanged = nextKey !== field.key;
+      const semanticChanged = nextSemanticId !== field.semanticId;
+
+      if (!keyChanged && !semanticChanged) return field;
+
+      sectionChanged = true;
+      hasChanges = true;
+
+      if (nextSemanticId) {
+        return {
+          ...field,
+          key: nextKey,
+          semanticId: nextSemanticId,
+        };
+      }
+
+      const nextField = {
+        ...field,
+        key: nextKey,
+      };
+      delete nextField.semanticId;
+      return nextField;
+    });
+
+    if (!sectionChanged) return section;
+    return {
+      ...section,
+      fields: nextFields,
+    };
+  });
+
+  return hasChanges ? nextSections : currentSections;
+}
+
 function resolveSelectedSemanticMatch(field, semanticModelKey) {
-  if (semanticModelKey === "battery_pass_din_spec_99100") {
+  if (isBatteryDictionarySemanticModel(semanticModelKey)) {
     return resolveBatteryPassFieldDefinition(field.label, field.key);
   }
   return null;
@@ -356,6 +421,10 @@ function AdminCreatePassportType() {
     }
   }, [displayName, typeNameManual]);
 
+  useEffect(() => {
+    setSections((currentSections) => syncSectionsWithSemanticModel(currentSections, semanticModelKey));
+  }, [semanticModelKey, sections]);
+
   // ── Section helpers ────────────────────────────────────────
   const addSection = () =>
     setSections(s => [...s, newSection("")]);
@@ -401,13 +470,17 @@ function AdminCreatePassportType() {
         fields: sec.fields.map(f => {
           if (f._id !== fieldId) return f;
           const updated = { ...f, ...patch };
-          if ("label" in patch && !f._keyManual) {
-            if (semanticModelKey === "battery_pass_din_spec_99100") {
+          if ("label" in patch) {
+            if (isBatteryDictionarySemanticModel(semanticModelKey)) {
               const batteryPassField = resolveBatteryPassFieldDefinition(patch.label, f.key);
-              updated.key = batteryPassField?.key || toSlug(patch.label);
               updated.semanticId = batteryPassField?.semanticId;
+              if (!f._keyManual) {
+                updated.key = batteryPassField?.key || toSlug(patch.label);
+              }
             } else {
-              updated.key = toSlug(patch.label);
+              if (!f._keyManual) {
+                updated.key = toSlug(patch.label);
+              }
               delete updated.semanticId;
             }
           }
@@ -760,10 +833,10 @@ function AdminCreatePassportType() {
                     </button>
                   </div>
                   <div className="acpt-section-submodel-row">
-                    <span className="acpt-meta-sub-label">{semanticModelKey === "battery_pass_din_spec_99100" ? "🔋 Battery Pass Mapping" : "🧩 Semantic Mapping"}</span>
+                    <span className="acpt-meta-sub-label">{isBatteryDictionarySemanticModel(semanticModelKey) ? "🔋 Battery Dictionary Mapping" : "🧩 Semantic Mapping"}</span>
                     <span className="acpt-semantic-hint">
-                      {semanticModelKey === "battery_pass_din_spec_99100"
-                        ? "Field keys and semantic IDs are derived automatically from the selected Battery Pass model."
+                      {isBatteryDictionarySemanticModel(semanticModelKey)
+                        ? "Field keys and semantic IDs are derived automatically from the selected Claros battery dictionary."
                         : `Selected model: ${getSemanticModelLabel(semanticModelKey)}. Select a semantic model above to enable automatic semantic mapping for this passport type.`}
                     </span>
                   </div>
@@ -956,8 +1029,8 @@ function AdminCreatePassportType() {
                         <div className="acpt-semantic-label">
                           🔬 Semantic Metadata
                           <span className="acpt-semantic-hint">
-                            {semanticModelKey === "battery_pass_din_spec_99100"
-                              ? "Hidden from users. The label is matched against the selected Battery Pass model and the export uses the official semantic ID."
+                            {isBatteryDictionarySemanticModel(semanticModelKey)
+                              ? "Hidden from users. The label is matched against the selected battery dictionary term and the export uses the canonical Claros term IRI."
                               : "Hidden from users. Select a semantic model to enable automatic semantic IDs for this field."}
                           </span>
                         </div>
@@ -1001,8 +1074,8 @@ function AdminCreatePassportType() {
                               />
                             </div>
                             <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
-                              {semanticModelKey === "battery_pass_din_spec_99100"
-                                ? (`Matched model key: ${resolveSelectedSemanticMatch(field, semanticModelKey)?.key || "Use a Battery Pass field label to map this field automatically."}`)
+                              {isBatteryDictionarySemanticModel(semanticModelKey)
+                                ? (`Matched model key: ${resolveSelectedSemanticMatch(field, semanticModelKey)?.key || "Use a battery dictionary field label to map this field automatically."}`)
                                 : "Choose a semantic model in Type Identity to enable automatic semantic mapping."}
                             </div>
                           </div>

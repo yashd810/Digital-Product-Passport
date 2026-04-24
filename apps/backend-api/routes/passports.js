@@ -97,6 +97,66 @@ module.exports = function registerPassportRoutes(app, {
     ]
   );
 
+  const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
+
+  async function getCompanyDppPolicy(companyId) {
+    const result = await pool.query(
+      `SELECT c.id,
+              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS default_granularity,
+              COALESCE(p.allow_granularity_override, NOT COALESCE(c.granularity_locked, false)) AS allow_granularity_override,
+              COALESCE(p.mint_model_dids, true) AS mint_model_dids,
+              COALESCE(p.mint_item_dids, true) AS mint_item_dids,
+              COALESCE(p.mint_facility_dids, false) AS mint_facility_dids,
+              COALESCE(p.vc_issuance_enabled, true) AS vc_issuance_enabled,
+              COALESCE(p.jsonld_export_enabled, true) AS jsonld_export_enabled,
+              COALESCE(p.claros_battery_dictionary_enabled, true) AS claros_battery_dictionary_enabled
+       FROM companies c
+       LEFT JOIN company_dpp_policies p ON p.company_id = c.id
+       WHERE c.id = $1
+       LIMIT 1`,
+      [companyId]
+    );
+    return result.rows[0] || null;
+  }
+
+  function resolveGranularityForCreate(companyPolicy, requestedGranularity) {
+    const fallbackGranularity = String(companyPolicy?.default_granularity || "item").trim().toLowerCase();
+    const normalizedRequested = requestedGranularity === undefined || requestedGranularity === null || requestedGranularity === ""
+      ? null
+      : String(requestedGranularity).trim().toLowerCase();
+
+    if (normalizedRequested && !VALID_GRANULARITIES.has(normalizedRequested)) {
+      const error = new Error("granularity must be one of: model, batch, item");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (!companyPolicy) return normalizedRequested || fallbackGranularity;
+
+    if (!companyPolicy.allow_granularity_override && normalizedRequested && normalizedRequested !== fallbackGranularity) {
+      const error = new Error(`Granularity override is disabled for this company. The enforced value is "${fallbackGranularity}".`);
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const effectiveGranularity = normalizedRequested && companyPolicy.allow_granularity_override
+      ? normalizedRequested
+      : fallbackGranularity;
+
+    if (effectiveGranularity === "model" && companyPolicy.mint_model_dids === false) {
+      const error = new Error("Model-level DIDs are disabled for this company policy.");
+      error.statusCode = 400;
+      throw error;
+    }
+    if ((effectiveGranularity === "item" || effectiveGranularity === "batch") && companyPolicy.mint_item_dids === false) {
+      const error = new Error("Item-level DIDs are disabled for this company policy.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return effectiveGranularity;
+  }
+
 
   // ─── API KEY MANAGEMENT ────────────────────────────────────────────────────
 
@@ -221,7 +281,7 @@ module.exports = function registerPassportRoutes(app, {
     try {
       const { companyId } = req.params;
       const normalizedBody = normalizePassportRequestBody(req.body);
-      const { passport_type, model_name, product_id, ...fields } = normalizedBody;
+      const { passport_type, model_name, product_id, granularity: requestedGranularity, ...fields } = normalizedBody;
       const userId = req.user.userId;
 
       if (!passport_type) return res.status(400).json({ error: "passport_type is required" });
@@ -234,6 +294,8 @@ module.exports = function registerPassportRoutes(app, {
       const guid = uuidv4();
       const lineageId = guid;
       const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
+      const companyPolicy = await getCompanyDppPolicy(companyId);
+      const effectiveGranularity = resolveGranularityForCreate(companyPolicy, requestedGranularity);
 
       const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
       if (existingByProductId) {
@@ -253,8 +315,8 @@ module.exports = function registerPassportRoutes(app, {
       const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
       const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
 
-      const allCols = ["guid","lineage_id","company_id","model_name","product_id","created_by", ...dataFields];
-      const allVals = [guid, lineageId, companyId, model_name || null, normalizedProductId, userId, ...dataFields.map(k => processedFields[k])];
+      const allCols = ["guid","lineage_id","company_id","model_name","product_id","granularity","created_by", ...dataFields];
+      const allVals = [guid, lineageId, companyId, model_name || null, normalizedProductId, effectiveGranularity, userId, ...dataFields.map(k => processedFields[k])];
       const places  = allCols.map((_, i) => `$${i + 1}`).join(", ");
 
       const client = await pool.connect();
@@ -279,11 +341,11 @@ module.exports = function registerPassportRoutes(app, {
       } finally {
         client.release();
       }
-      await logAudit(companyId, userId, "CREATE", tableName, guid, null, { product_id: normalizedProductId, passport_type: resolvedPassportType, model_name });
+      await logAudit(companyId, userId, "CREATE", tableName, guid, null, { product_id: normalizedProductId, passport_type: resolvedPassportType, model_name, granularity: effectiveGranularity });
       res.status(201).json({ success: true, passport: result.rows[0] });
     } catch (e) {
       console.error("Create passport error:", e.message);
-      res.status(500).json({ error: "Failed to create passport" });
+      res.status(e.statusCode || 500).json({ error: e.message || "Failed to create passport" });
     }
   });
 
@@ -303,12 +365,13 @@ module.exports = function registerPassportRoutes(app, {
 
       const resolvedPassportType = typeSchema.typeName;
       const tableName = getTable(resolvedPassportType);
+      const companyPolicy = await getCompanyDppPolicy(companyId);
       const results = [];
       let created = 0, skipped = 0, failed = 0;
 
       for (let i = 0; i < passports.length; i++) {
         const item = normalizePassportRequestBody(passports[i] || {});
-        const { model_name, product_id, ...fields } = item;
+        const { model_name, product_id, granularity: requestedGranularity, ...fields } = item;
         const guid = uuidv4();
         const lineageId = guid;
         const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
@@ -324,10 +387,11 @@ module.exports = function registerPassportRoutes(app, {
             results.push({ index: i, product_id: normalizedProductId, success: false, error: `Unknown passport field(s): ${invalidFieldKeys.join(", ")}` });
             failed++; continue;
           }
+          const effectiveGranularity = resolveGranularityForCreate(companyPolicy, requestedGranularity);
           const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
           const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
-          const allCols  = ["guid","lineage_id","company_id","model_name","product_id","created_by", ...dataFields];
-          const allVals  = [guid, lineageId, companyId, model_name || null, normalizedProductId, userId, ...dataFields.map(k => processedFields[k])];
+          const allCols  = ["guid","lineage_id","company_id","model_name","product_id","granularity","created_by", ...dataFields];
+          const allVals  = [guid, lineageId, companyId, model_name || null, normalizedProductId, effectiveGranularity, userId, ...dataFields.map(k => processedFields[k])];
           const places   = allCols.map((_, idx) => `$${idx + 1}`).join(", ");
 
           const r = await pool.query(
@@ -340,8 +404,8 @@ module.exports = function registerPassportRoutes(app, {
             companyId,
             passportType: resolvedPassportType,
           });
-          await logAudit(companyId, userId, "CREATE", tableName, guid, null, { product_id: normalizedProductId, passport_type: resolvedPassportType, model_name, bulk: true });
-          results.push({ index: i, success: true, guid, product_id: normalizedProductId, model_name: model_name || null });
+          await logAudit(companyId, userId, "CREATE", tableName, guid, null, { product_id: normalizedProductId, passport_type: resolvedPassportType, model_name, granularity: effectiveGranularity, bulk: true });
+          results.push({ index: i, success: true, guid, product_id: normalizedProductId, model_name: model_name || null, granularity: effectiveGranularity });
           created++;
         } catch (e) {
           results.push({ index: i, product_id: normalizedProductId, success: false, error: e.message });
@@ -942,9 +1006,9 @@ module.exports = function registerPassportRoutes(app, {
       const sigData = await signPassport({ ...released, passport_type: passportType }, typeRes.rows[0] || null);
       if (sigData) {
         await pool.query(
-          `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, signing_key_id, released_at, vc_json)
-           VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
-          [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+          `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
+          [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
         );
       }
 
@@ -1367,9 +1431,9 @@ module.exports = function registerPassportRoutes(app, {
           const sigData = await signPassport({ ...releasedRow, passport_type: passportType }, typeRes.rows[0] || null);
           if (sigData) {
             await pool.query(
-              `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, signing_key_id, released_at, vc_json)
-               VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
-              [guid, releasedRow.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+              `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
+              [guid, releasedRow.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
           }
 

@@ -1,0 +1,902 @@
+[
+  {
+    "number": 1,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "DPP Schema Version",
+    "short_definition": "Identifies the version of the schema specification that this Digital Product Passport instance conforms to.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 2,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "DPP Status",
+    "short_definition": "Indicates the current publication or lifecycle status of the Digital Product Passport record.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 3,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "DPP Granularity",
+    "short_definition": "Describes the level of detail at which passport data is reported, such as model-level or individual unit-level granularity.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 4,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Date-time of Latest DPP Update",
+    "short_definition": "The date and time at which the most recent change to this Digital Product Passport was recorded.",
+    "unit": "n.a.",
+    "data_format": "Timestamp UTC-based"
+  },
+  {
+    "number": 5,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Unique Battery Passport Identifier",
+    "short_definition": "A globally unique, persistent URI that unambiguously identifies this specific Digital Product Passport instance.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 6,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Unique Battery Identifier",
+    "short_definition": "A globally unique URI that distinctly identifies the physical battery unit or model described by this passport.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 7,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Battery Model Identifier",
+    "short_definition": "A manufacturer-assigned identifier that designates a particular battery model or product line.",
+    "unit": "n.a.",
+    "data_format": "ID (string)"
+  },
+  {
+    "number": 8,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Battery Serial Number",
+    "short_definition": "A unique alphanumeric code assigned to an individual battery unit for traceability purposes.",
+    "unit": "n.a.",
+    "data_format": "ID (string)"
+  },
+  {
+    "number": 9,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Unique Economic Operator Identifier",
+    "short_definition": "A unique identifier assigned to the economic operator responsible for placing the battery on the market.",
+    "unit": "n.a.",
+    "data_format": "ID (string)"
+  },
+  {
+    "number": 10,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Unique Manufacturer Identifier",
+    "short_definition": "A unique identifier assigned to the legal entity that manufactured the battery.",
+    "unit": "n.a.",
+    "data_format": "ID (string)"
+  },
+  {
+    "number": 11,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Unique Facility Identifier",
+    "short_definition": "A unique identifier for the manufacturing facility or plant where the battery was produced.",
+    "unit": "n.a.",
+    "data_format": "ID (string)"
+  },
+  {
+    "number": 12,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Economic Operator Information",
+    "short_definition": "Contact and descriptive details about the economic operator responsible for the battery's market placement.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 13,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Manufacturer Information",
+    "short_definition": "Name, address, and contact details for the company that manufactured the battery.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 14,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Manufacturing Place",
+    "short_definition": "The geographic location, including country and optionally city or region, where the battery was manufactured.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 15,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Manufacturing Date",
+    "short_definition": "The year and month in which the battery was manufactured, expressed in YYYY-MM format.",
+    "unit": "n.a.",
+    "data_format": "Date[YYYY-MM]"
+  },
+  {
+    "number": 16,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Date of Putting Battery into Service",
+    "short_definition": "The year and month the battery was first placed into operational service or commissioned.",
+    "unit": "n.a.",
+    "data_format": "Date[YYYY-MM]"
+  },
+  {
+    "number": 17,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Warranty Period",
+    "short_definition": "The duration covered by the manufacturer's warranty for the battery, expressed as an end date in YYYY-MM format.",
+    "unit": "n.a.",
+    "data_format": "Date[YYYY-MM]"
+  },
+  {
+    "number": 18,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Battery Category",
+    "short_definition": "The regulatory classification of the battery such as portable, light means of transport, industrial, or electric vehicle.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 19,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Battery Mass",
+    "short_definition": "The total mass of the complete battery pack or system as supplied, measured in kilograms.",
+    "unit": "kg",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 20,
+    "category": "Identifiers and Product Data",
+    "subcategory": null,
+    "attribute_name": "Battery Status",
+    "short_definition": "The current lifecycle stage of the battery, such as original use, repurposed, remanufactured, or end-of-life.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 21,
+    "category": "Labels and Conformity Documentation",
+    "subcategory": null,
+    "attribute_name": "Separate Collection Symbol",
+    "short_definition": "A URI referencing the mandatory symbol indicating that the battery must be collected separately from general household waste.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 22,
+    "category": "Labels and Conformity Documentation",
+    "subcategory": null,
+    "attribute_name": "Cadmium and Lead Symbols",
+    "short_definition": "Chemical hazard symbols or textual indicators that must appear on batteries containing cadmium or lead above threshold concentrations.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 23,
+    "category": "Labels and Conformity Documentation",
+    "subcategory": null,
+    "attribute_name": "Carbon Footprint Label",
+    "short_definition": "The label and corresponding performance class letter assigned to the battery based on its lifecycle carbon footprint intensity.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 24,
+    "category": "Labels and Conformity Documentation",
+    "subcategory": null,
+    "attribute_name": "Extinguishing Agent",
+    "short_definition": "The recommended fire suppression agent or method to be used in the event of a battery fire.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 25,
+    "category": "Labels and Conformity Documentation",
+    "subcategory": null,
+    "attribute_name": "Meaning of Labels and Symbols",
+    "short_definition": "Explanatory text describing what each label, marking, or symbol printed on the battery or its packaging signifies.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 26,
+    "category": "Labels and Conformity Documentation",
+    "subcategory": null,
+    "attribute_name": "EU Declaration of Conformity",
+    "short_definition": "A URI linking to the official EU Declaration of Conformity document certifying compliance with applicable regulations.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 27,
+    "category": "Labels and Conformity Documentation",
+    "subcategory": null,
+    "attribute_name": "Compliance Test Report Results",
+    "short_definition": "A URI pointing to the results or summary of test reports carried out to demonstrate regulatory compliance.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 28,
+    "category": "Battery Carbon Footprint",
+    "subcategory": null,
+    "attribute_name": "Carbon Footprint per Functional Unit",
+    "short_definition": "Total lifecycle greenhouse gas emissions attributable to the battery, expressed per kilowatt-hour of rated energy.",
+    "unit": "kgCO2eq/kWh",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 29,
+    "category": "Battery Carbon Footprint",
+    "subcategory": null,
+    "attribute_name": "Raw Materials Lifecycle Carbon Contribution",
+    "short_definition": "The share of the battery's total carbon footprint attributable to the extraction and preprocessing of raw materials.",
+    "unit": "kgCO2eq/kWh",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 30,
+    "category": "Battery Carbon Footprint",
+    "subcategory": null,
+    "attribute_name": "Production Lifecycle Carbon Contribution",
+    "short_definition": "The portion of the battery's carbon footprint arising from the main manufacturing and assembly processes.",
+    "unit": "kgCO2eq/kWh",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 31,
+    "category": "Battery Carbon Footprint",
+    "subcategory": null,
+    "attribute_name": "Distribution Lifecycle Carbon Contribution",
+    "short_definition": "The carbon emissions associated with transporting and distributing the battery from manufacturing site to market.",
+    "unit": "kgCO2eq/kWh",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 32,
+    "category": "Battery Carbon Footprint",
+    "subcategory": null,
+    "attribute_name": "End-of-life Lifecycle Carbon Contribution",
+    "short_definition": "The carbon footprint contribution from end-of-life treatment and recycling of the battery and its components.",
+    "unit": "kgCO2eq/kWh",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 33,
+    "category": "Battery Carbon Footprint",
+    "subcategory": null,
+    "attribute_name": "Carbon Footprint Performance Class",
+    "short_definition": "A letter grade or class designation ranking the battery's carbon intensity relative to regulatory thresholds.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 34,
+    "category": "Battery Carbon Footprint",
+    "subcategory": null,
+    "attribute_name": "Public Carbon Footprint Study URL",
+    "short_definition": "A publicly accessible URI linking to the full lifecycle carbon footprint study underpinning the reported values.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 35,
+    "category": "Battery Carbon Footprint",
+    "subcategory": null,
+    "attribute_name": "Absolute Carbon Footprint",
+    "short_definition": "The total lifecycle greenhouse gas emissions of the battery expressed as an absolute value in kilograms of CO2 equivalent.",
+    "unit": "kgCO2eq",
+    "data_format": "Integer"
+  },
+  {
+    "number": 36,
+    "category": "Supply Chain Due Diligence",
+    "subcategory": null,
+    "attribute_name": "Due Diligence Report",
+    "short_definition": "A URI linking to the published supply chain due diligence report covering responsible sourcing of battery materials.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 37,
+    "category": "Supply Chain Due Diligence",
+    "subcategory": null,
+    "attribute_name": "Third-party Scheme Assurances",
+    "short_definition": "Declarations or certifications from independent third-party organisations confirming adherence to recognised responsible sourcing schemes.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 38,
+    "category": "Supply Chain Due Diligence",
+    "subcategory": null,
+    "attribute_name": "Supply Chain Indices",
+    "short_definition": "Quantitative or categorical indicators measuring the social and environmental performance of the battery supply chain.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 39,
+    "category": "Materials and Composition",
+    "subcategory": null,
+    "attribute_name": "Battery Chemistry",
+    "short_definition": "A description of the electrochemical technology used in the battery, such as lithium-ion, nickel-metal hydride, or lead-acid.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 40,
+    "category": "Materials and Composition",
+    "subcategory": null,
+    "attribute_name": "Critical Raw Materials",
+    "short_definition": "A list of materials classified as critical raw materials that are present in the battery above defined threshold concentrations.",
+    "unit": "n.a.",
+    "data_format": "Array (string)"
+  },
+  {
+    "number": 41,
+    "category": "Materials and Composition",
+    "subcategory": null,
+    "attribute_name": "Cathode, Anode and Electrolyte Materials",
+    "short_definition": "Lists of the active materials and chemical compounds used in the cathode, anode, and electrolyte of the battery.",
+    "unit": "n.a.",
+    "data_format": "Array (string)"
+  },
+  {
+    "number": 42,
+    "category": "Materials and Composition",
+    "subcategory": null,
+    "attribute_name": "Hazardous Substances",
+    "short_definition": "Identification of hazardous chemical substances present in the battery that require disclosure under applicable regulations.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 43,
+    "category": "Materials and Composition",
+    "subcategory": null,
+    "attribute_name": "Substance Environmental and Health Impact",
+    "short_definition": "Information about the potential environmental and human health effects associated with substances present in the battery.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 44,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Dismantling and Removal Manual",
+    "short_definition": "A URI referencing the technical manual detailing safe procedures for dismantling and removing the battery from its application.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 45,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Component Part Numbers",
+    "short_definition": "A URI or reference document listing the manufacturer part numbers for all serviceable or replaceable battery components.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 46,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Spare Parts Source Information",
+    "short_definition": "Details about where and how to obtain genuine spare parts or components for battery maintenance and repair.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 47,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Safety Measures",
+    "short_definition": "Precautions and protective measures that must be observed when handling, storing, or working on the battery.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 48,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Pre-consumer Recycled Nickel Share",
+    "short_definition": "The percentage of nickel in the battery that originates from pre-consumer recycled sources such as manufacturing scrap.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 49,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Pre-consumer Recycled Cobalt Share",
+    "short_definition": "The percentage of cobalt in the battery derived from pre-consumer recycled material streams.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 50,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Pre-consumer Recycled Lithium Share",
+    "short_definition": "The proportion of lithium content in the battery originating from pre-consumer recycling processes.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 51,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Post-consumer Recycled Nickel Share",
+    "short_definition": "The percentage of nickel in the battery sourced from post-consumer recycled material collected after end-user use.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 52,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Post-consumer Recycled Cobalt Share",
+    "short_definition": "The proportion of cobalt in the battery that comes from post-consumer recycled material streams.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 53,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Post-consumer Recycled Lithium Share",
+    "short_definition": "The share of lithium content in the battery derived from post-consumer recycled sources.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 54,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Recycled Lead Share",
+    "short_definition": "The percentage of lead used in the battery that has been recovered from recycled material sources.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 55,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Renewable Content Share",
+    "short_definition": "The percentage of battery material content derived from renewable biological or sustainable resource streams.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 56,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "End-user Waste Prevention Information",
+    "short_definition": "A URI pointing to guidance for end-users on how to extend battery life and avoid unnecessary waste.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 57,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "Separate Waste Collection Information",
+    "short_definition": "A URI linking to information for end-users about how and where to deposit spent batteries for separate collection.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 58,
+    "category": "Circularity and Resource Efficiency",
+    "subcategory": null,
+    "attribute_name": "End-of-life and Collection Information",
+    "short_definition": "A URI referencing comprehensive guidance on battery collection, preparation for second-life use, and proper end-of-life treatment.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  },
+  {
+    "number": 59,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Rated Capacity",
+    "short_definition": "The total electrical charge the battery can deliver under specified conditions as declared by the manufacturer, expressed in ampere-hours.",
+    "unit": "Ah",
+    "data_format": "Integer"
+  },
+  {
+    "number": 60,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Remaining Capacity",
+    "short_definition": "The charge capacity the battery can still deliver at the time of measurement, expressed in ampere-hours.",
+    "unit": "Ah",
+    "data_format": "Integer"
+  },
+  {
+    "number": 61,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Capacity Fade",
+    "short_definition": "The percentage reduction in the battery's charge capacity relative to its original rated capacity.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 62,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Certified Usable Battery Energy",
+    "short_definition": "The minimum usable energy the battery is certified to store and deliver, expressed in watt-hours.",
+    "unit": "Wh",
+    "data_format": "Integer"
+  },
+  {
+    "number": 63,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Remaining Usable Battery Energy",
+    "short_definition": "The amount of usable energy the battery can still deliver at the point of measurement, expressed in watt-hours.",
+    "unit": "Wh",
+    "data_format": "Integer"
+  },
+  {
+    "number": 64,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "State of Certified Energy (SoCE)",
+    "short_definition": "The ratio of remaining usable energy to the certified usable energy, expressed as a percentage.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 65,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "State of Charge (SoC)",
+    "short_definition": "The current charge level of the battery expressed as a percentage of its full charge capacity.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 66,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Minimum Voltage",
+    "short_definition": "The lowest terminal voltage the battery may reach during discharge without causing damage or loss of function.",
+    "unit": "V",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 67,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Maximum Voltage",
+    "short_definition": "The highest terminal voltage permitted during charging without exceeding safe operating limits.",
+    "unit": "V",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 68,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Nominal Voltage",
+    "short_definition": "The representative voltage at which the battery is rated to operate under normal load conditions.",
+    "unit": "V",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 69,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Original Power Capability",
+    "short_definition": "The maximum power output the battery was capable of delivering when new, expressed in watts.",
+    "unit": "W",
+    "data_format": "Integer"
+  },
+  {
+    "number": 70,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Remaining Power Capability",
+    "short_definition": "The current maximum power output the battery is able to deliver at the point of measurement, in watts.",
+    "unit": "W",
+    "data_format": "Integer"
+  },
+  {
+    "number": 71,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Power Fade",
+    "short_definition": "The reduction in maximum power capability since the battery left the factory, expressed in watts.",
+    "unit": "W",
+    "data_format": "Integer"
+  },
+  {
+    "number": 72,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Maximum Permitted Battery Power",
+    "short_definition": "The upper limit of power the battery is permitted to deliver or absorb without risk of damage or unsafe operation.",
+    "unit": "W",
+    "data_format": "Integer"
+  },
+  {
+    "number": 73,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Power to Energy Ratio",
+    "short_definition": "The ratio of the battery's nominal power to its nominal energy, indicating how power-dense or energy-dense the design is.",
+    "unit": "W/Wh",
+    "data_format": "Integer"
+  },
+  {
+    "number": 74,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Initial Round-trip Energy Efficiency",
+    "short_definition": "The ratio of energy discharged to energy charged over a complete charge-discharge cycle when the battery was new, expressed as a percentage.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 75,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Round-trip Efficiency at 50% Cycle Life",
+    "short_definition": "The measured round-trip energy efficiency at the midpoint of the battery's expected charge-discharge cycle life.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 76,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Remaining Round-trip Energy Efficiency",
+    "short_definition": "The current round-trip energy efficiency of the battery measured at the time of reporting.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 77,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Energy Efficiency Fade",
+    "short_definition": "The percentage decline in round-trip energy efficiency compared to the battery's initial efficiency when new.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 78,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Initial Self-discharge Rate",
+    "short_definition": "The rate at which the battery loses charge spontaneously when idle, measured when the battery was new, expressed as a percentage per unit time.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 79,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Current Self-discharge Rate",
+    "short_definition": "The measured rate of spontaneous charge loss in the battery at the time of reporting.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 80,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Self-discharge Rate Evolution",
+    "short_definition": "A value or trend describing how the battery's self-discharge rate has changed over its operational lifetime.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 81,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Initial Internal Resistance",
+    "short_definition": "The electrical resistance measured within the battery cell, module, or pack when first commissioned, expressed in ohms.",
+    "unit": "Ohm",
+    "data_format": "Integer"
+  },
+  {
+    "number": 82,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Internal Resistance Increase",
+    "short_definition": "The percentage rise in battery internal resistance relative to its initial value, reflecting degradation over use.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 83,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Expected Lifetime (years)",
+    "short_definition": "The number of calendar years the battery is designed to remain in service under normal operating conditions.",
+    "unit": "years",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 84,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Expected Lifetime (cycles)",
+    "short_definition": "The number of full charge-discharge cycles the battery is designed to complete before reaching end-of-life criteria.",
+    "unit": "n.a.",
+    "data_format": "Integer"
+  },
+  {
+    "number": 85,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Full Charge-discharge Cycles",
+    "short_definition": "The total number of complete charge-discharge cycles the battery has undergone since first use.",
+    "unit": "n.a.",
+    "data_format": "Integer"
+  },
+  {
+    "number": 86,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Cycle-life Reference Test",
+    "short_definition": "The name or designation of the standardised test procedure used to determine the battery's expected cycle life.",
+    "unit": "n.a.",
+    "data_format": "String"
+  },
+  {
+    "number": 87,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Cycle-life C-rate",
+    "short_definition": "The charge or discharge C-rate applied during the cycle-life reference test, expressed in amperes per ampere-hour.",
+    "unit": "A/Ah",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 88,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Energy Throughput",
+    "short_definition": "The cumulative amount of energy delivered by the battery over its entire operational life, expressed in watt-hours.",
+    "unit": "Wh",
+    "data_format": "Integer"
+  },
+  {
+    "number": 89,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Capacity Throughput",
+    "short_definition": "The total electrical charge the battery has delivered throughout its life, expressed in ampere-hours.",
+    "unit": "Ah",
+    "data_format": "Integer"
+  },
+  {
+    "number": 90,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Capacity Threshold for Exhaustion",
+    "short_definition": "The minimum percentage of rated capacity below which the battery is considered exhausted or unsuitable for its intended application.",
+    "unit": "%",
+    "data_format": "Decimal"
+  },
+  {
+    "number": 91,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Temperature Information",
+    "short_definition": "General temperature-related information relevant to the battery's safe and optimal operation.",
+    "unit": "°C",
+    "data_format": "Integer"
+  },
+  {
+    "number": 92,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Temperature Range Lower Boundary",
+    "short_definition": "The minimum ambient temperature at which the battery can be stored or operated without adverse effects.",
+    "unit": "°C",
+    "data_format": "Integer"
+  },
+  {
+    "number": 93,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Temperature Range Upper Boundary",
+    "short_definition": "The maximum ambient temperature at which the battery can be stored or operated without risk of damage.",
+    "unit": "°C",
+    "data_format": "Integer"
+  },
+  {
+    "number": 94,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Time in High Temperature",
+    "short_definition": "The cumulative duration in seconds the battery has been exposed to temperatures above the defined upper boundary.",
+    "unit": "s",
+    "data_format": "Integer"
+  },
+  {
+    "number": 95,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Time in Low Temperature",
+    "short_definition": "The total time in seconds the battery has been exposed to temperatures below the defined lower boundary.",
+    "unit": "s",
+    "data_format": "Integer"
+  },
+  {
+    "number": 96,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Time Charging in High Temperature",
+    "short_definition": "The cumulative seconds the battery has been actively charging while the temperature exceeded the upper operating boundary.",
+    "unit": "s",
+    "data_format": "Integer"
+  },
+  {
+    "number": 97,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Time Charging in Low Temperature",
+    "short_definition": "The total seconds the battery spent charging while exposed to temperatures below the lower operating boundary.",
+    "unit": "s",
+    "data_format": "Integer"
+  },
+  {
+    "number": 98,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Deep Discharge Events",
+    "short_definition": "The number of occurrences where the battery was discharged below the minimum safe voltage threshold.",
+    "unit": "n.a.",
+    "data_format": "Integer"
+  },
+  {
+    "number": 99,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Overcharge Events",
+    "short_definition": "The count of instances where the battery was charged beyond its maximum permitted voltage or state of charge.",
+    "unit": "n.a.",
+    "data_format": "Integer"
+  },
+  {
+    "number": 100,
+    "category": "Performance and Durability",
+    "subcategory": null,
+    "attribute_name": "Accident Information",
+    "short_definition": "A URI linking to documented information about any accidents or adverse incidents involving the battery.",
+    "unit": "n.a.",
+    "data_format": "URI/URL"
+  }
+]

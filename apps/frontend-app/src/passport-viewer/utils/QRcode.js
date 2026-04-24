@@ -6,6 +6,9 @@ const API = import.meta.env.VITE_API_URL || "";
 
 /**
  * Generate QR code image from the canonical public passport path.
+ * Consumer-facing QR codes must always encode the HTTPS public URL, never raw DID strings.
+ * Print guidance: use error correction level H, a 4-module quiet zone, and keep the
+ * physical X-dimension at or above 0.25 mm when rendered in print workflows.
  * Returns base64 encoded PNG data URL.
  */
 export const generateQRCode = async ({ productId, companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "" }) => {
@@ -23,7 +26,7 @@ export const generateQRCode = async ({ productId, companyName = "", modelName = 
       errorCorrectionLevel: "H",
       type: "image/png",
       quality: 0.95,
-      margin: 1,
+      margin: 4,
       width: 300,
     });
   } catch (error) {

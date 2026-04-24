@@ -64,6 +64,17 @@ function remapJsonObjectKeys(value, keyMap) {
   return next;
 }
 
+function toDidSlug(value, fallback = "company") {
+  const normalized = String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
+  return normalized || fallback;
+}
+
 /**
  * Database initialization — creates or alters all tables and indexes.
  * Extracted from server.js to keep startup logic separate from route handling.
@@ -103,6 +114,77 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
   await pool.query(`
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS granularity_locked BOOLEAN NOT NULL DEFAULT false
+  `);
+  await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS did_slug VARCHAR(160)
+  `);
+  const companyRows = await pool.query(`
+    SELECT id, company_name, did_slug
+    FROM companies
+    ORDER BY id ASC
+  `);
+  if (companyRows.rows.length) {
+    const usedSlugs = new Set(
+      companyRows.rows
+        .map((row) => String(row.did_slug || "").trim())
+        .filter(Boolean)
+    );
+    for (const row of companyRows.rows) {
+      if (row.did_slug) continue;
+      const baseSlug = toDidSlug(row.company_name, `company-${row.id}`);
+      let nextSlug = baseSlug;
+      let suffix = 2;
+      while (usedSlugs.has(nextSlug)) {
+        nextSlug = `${baseSlug}-${suffix++}`;
+      }
+      usedSlugs.add(nextSlug);
+      await pool.query(
+        `UPDATE companies
+         SET did_slug = $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [nextSlug, row.id]
+      );
+    }
+  }
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_did_slug_unique
+      ON companies(did_slug)
+      WHERE did_slug IS NOT NULL
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company_dpp_policies (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE UNIQUE,
+      default_granularity VARCHAR(10) NOT NULL DEFAULT 'item' CHECK (default_granularity IN ('model', 'batch', 'item')),
+      allow_granularity_override BOOLEAN NOT NULL DEFAULT false,
+      mint_model_dids BOOLEAN NOT NULL DEFAULT true,
+      mint_item_dids BOOLEAN NOT NULL DEFAULT true,
+      mint_facility_dids BOOLEAN NOT NULL DEFAULT false,
+      vc_issuance_enabled BOOLEAN NOT NULL DEFAULT true,
+      jsonld_export_enabled BOOLEAN NOT NULL DEFAULT true,
+      claros_battery_dictionary_enabled BOOLEAN NOT NULL DEFAULT true,
+      legacy_semantic_compatibility BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    INSERT INTO company_dpp_policies (
+      company_id,
+      default_granularity,
+      allow_granularity_override
+    )
+    SELECT
+      c.id,
+      CASE
+        WHEN c.dpp_granularity IN ('model', 'batch', 'item') THEN c.dpp_granularity
+        ELSE 'item'
+      END,
+      COALESCE(c.granularity_locked, false) = false
+    FROM companies c
+    ON CONFLICT (company_id) DO NOTHING
   `);
 
   // DPP subject registry — tracks issued product/DPP DIDs per passport
@@ -592,8 +674,22 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       key_id     VARCHAR(64) PRIMARY KEY,
       public_key TEXT        NOT NULL,
       algorithm  VARCHAR(50) NOT NULL DEFAULT 'RSA-SHA256',
+      algorithm_version VARCHAR(20) NOT NULL DEFAULT 'RS256',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE passport_signing_keys
+    ADD COLUMN IF NOT EXISTS algorithm_version VARCHAR(20) NOT NULL DEFAULT 'RS256'
+  `);
+  await pool.query(`
+    UPDATE passport_signing_keys
+    SET algorithm_version = CASE
+      WHEN algorithm = 'ECDSA-SHA256' THEN 'ES256'
+      ELSE 'RS256'
+    END
+    WHERE algorithm_version IS NULL
+       OR algorithm_version NOT IN ('RS256', 'ES256')
   `);
 
   // One in-progress draft per super-admin user
@@ -765,6 +861,10 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
         UPDATE ${tableName}
         SET lineage_id = guid
         WHERE lineage_id IS NULL
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS granularity VARCHAR(20) NOT NULL DEFAULT 'model'
       `);
       await pool.query(
         `UPDATE ${tableName}

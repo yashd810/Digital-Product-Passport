@@ -1,19 +1,29 @@
 {
-  "semanticModelKey": "claros_battery_v1",
-  "name": "Claros Battery DPP Dictionary",
+  "semanticModelKey": "claros_battery_dictionary_v1",
+  "legacySemanticModelKeys": [
+    "battery_pass_din_spec_99100",
+    "claros_battery_v1"
+  ],
+  "name": "Claros Battery Dictionary",
   "version": "1.0.0",
-  "publishedAt": "2026-04-23",
+  "description": "Internal battery passport dictionary derived from the BatteryPass Data Attribute Longlist v1.3.",
+  "batteryCategoryScope": [
+    "EV",
+    "LMT",
+    "Industrial",
+    "Stationary"
+  ],
+  "sourceWorkbook": "2026_BatteryPass-Ready_DataAttributeLongList_v1.3.xlsx",
+  "generatedAt": "2026-04-24T17:40:07.377Z",
   "publisher": {
-    "name": "Claros DPP Platform",
-    "domain": "www.claros-dpp.online",
-    "issuerDid": "did:web:www.claros-dpp.online"
+    "name": "Claros DPP",
+    "url": "https://www.claros-dpp.online"
   },
+  "issuerDid": "did:web:www.claros-dpp.online",
   "baseIri": "https://www.claros-dpp.online/dictionary/battery/v1",
   "contextUrl": "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld",
-  "termsUrl": "https://www.claros-dpp.online/dictionary/battery/v1/terms",
-  "categoriesUrl": "https://www.claros-dpp.online/dictionary/battery/v1/categories",
-  "unitsUrl": "https://www.claros-dpp.online/dictionary/battery/v1/units",
-  "fieldMapUrl": "https://www.claros-dpp.online/dictionary/battery/v1/field-map",
-  "specReferences": ["JTC 24 BatteryPass-Ready Data Attribute Long List v1.3"],
-  "note": "This is an original internal dictionary published by Claros DPP. Term definitions are independently authored based on publicly available JTC specifications."
+  "termsUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/terms",
+  "unitsUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/units",
+  "categoriesUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/categories",
+  "fieldMapUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/field-map"
 }

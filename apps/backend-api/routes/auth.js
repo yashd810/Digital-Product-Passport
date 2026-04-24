@@ -8,6 +8,7 @@ module.exports = function registerAuthRoutes(app, {
   JWT_SECRET,
   hashPassword,
   verifyPassword,
+  verifyPasswordAndUpgrade,
   generateToken,
   hashOpaqueToken,
   validatePasswordPolicy,
@@ -124,8 +125,8 @@ module.exports = function registerAuthRoutes(app, {
       if (u.sso_only) {
         return res.status(400).json({ error: "This account uses enterprise SSO. Use the SSO sign-in option instead." });
       }
-      const ok = await verifyPassword(password, u.password_hash);
-      if (!ok) {
+      const passwordCheck = await verifyPasswordAndUpgrade(password, u);
+      if (!passwordCheck.valid) {
         // Increment lockout counter
         const resetAt = new Date(Date.now() + 15 * 60 * 1000);
         await pool.query(
@@ -138,6 +139,17 @@ module.exports = function registerAuthRoutes(app, {
           [lockKey, resetAt]
         ).catch(() => {});
         return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      if (passwordCheck.needsUpgrade && passwordCheck.nextHash) {
+        await pool.query(
+          `UPDATE users
+           SET password_hash = $1,
+               pepper_version = $2,
+               updated_at = NOW()
+           WHERE id = $3`,
+          [passwordCheck.nextHash, passwordCheck.pepperVersion, u.id]
+        ).catch(() => {});
       }
 
       // Clear lockout on successful login

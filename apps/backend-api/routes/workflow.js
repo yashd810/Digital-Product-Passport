@@ -197,9 +197,9 @@ module.exports = function registerWorkflowRoutes(app, {
             const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeRes.rows[0] || null);
             if (sigData) {
               await pool.query(
-                `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, signing_key_id, released_at, vc_json)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
-                [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+                `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
+                [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
               );
             }
             await markOlderVersionsObsolete(tableName, guid, released.version_number);
@@ -254,9 +254,9 @@ module.exports = function registerWorkflowRoutes(app, {
           const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeRes.rows[0] || null);
           if (sigData) {
             await pool.query(
-              `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, signing_key_id, released_at, vc_json)
-               VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
-              [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+              `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
+              [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
           }
           await markOlderVersionsObsolete(tableName, guid, released.version_number);

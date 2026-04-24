@@ -6,32 +6,46 @@ module.exports = function registerDictionaryRoutes(app, {
 }) {
   const svc = batteryDictionaryService;
 
+  const setCache = (res, contentType = "application/json") => {
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+  };
+
+  const sendPrettyJson = (res, payload, contentType = "application/json") => {
+    setCache(res, contentType);
+    res.send(`${JSON.stringify(payload, null, 2)}\n`);
+  };
+
+  const sendPrettyError = (res, statusCode, payload) => {
+    res.status(statusCode);
+    res.setHeader("Content-Type", "application/json");
+    res.send(`${JSON.stringify(payload, null, 2)}\n`);
+  };
+
   // ─── JSON-LD CONTEXT (served at canonical dictionary URL) ─────────────────
-  app.get("/dictionary/battery/v1/context.jsonld", (_req, res) => {
-    res.setHeader("Content-Type", "application/ld+json");
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    res.json(svc.getContext());
+  app.get(["/dictionary/battery/v1/context.jsonld", "/api/dictionary/battery/v1/context.jsonld"], publicReadRateLimit, (_req, res) => {
+    sendPrettyJson(res, svc.getContext(), "application/ld+json");
   });
 
   // ─── MANIFEST ─────────────────────────────────────────────────────────────
   app.get(["/api/dictionary/battery/v1/manifest", "/dictionary/battery/v1/manifest.json"],
     publicReadRateLimit, (_req, res) => {
-      res.json(svc.getManifest());
+      sendPrettyJson(res, svc.getManifest());
     });
 
   // ─── CATEGORIES ───────────────────────────────────────────────────────────
   app.get("/api/dictionary/battery/v1/categories", publicReadRateLimit, (_req, res) => {
-    res.json(svc.getCategories());
+    sendPrettyJson(res, svc.getCategories());
   });
 
   // ─── UNITS ────────────────────────────────────────────────────────────────
   app.get("/api/dictionary/battery/v1/units", publicReadRateLimit, (_req, res) => {
-    res.json(svc.getUnits());
+    sendPrettyJson(res, svc.getUnits());
   });
 
   // ─── FIELD MAP ────────────────────────────────────────────────────────────
   app.get("/api/dictionary/battery/v1/field-map", publicReadRateLimit, (_req, res) => {
-    res.json(svc.getFieldMap());
+    sendPrettyJson(res, svc.getFieldMap());
   });
 
   // ─── TERMS (all, or filtered by category) ────────────────────────────────
@@ -53,17 +67,17 @@ module.exports = function registerDictionaryRoutes(app, {
       );
     }
 
-    res.json(results);
+    sendPrettyJson(res, results);
   });
 
   // ─── SINGLE TERM ──────────────────────────────────────────────────────────
   app.get("/api/dictionary/battery/v1/terms/:slug", publicReadRateLimit, (req, res) => {
     const slug = String(req.params.slug || "").trim().toLowerCase();
     if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
-      return res.status(400).json({ error: "Invalid slug" });
+      return sendPrettyError(res, 400, { error: "Invalid slug" });
     }
     const term = svc.getTermBySlug(slug);
-    if (!term) return res.status(404).json({ error: "Term not found" });
-    res.json(term);
+    if (!term) return sendPrettyError(res, 404, { error: "Term not found" });
+    sendPrettyJson(res, term);
   });
 };

@@ -5,6 +5,9 @@ const express    = require("express");
 const nodemailer = require("nodemailer");
 const fs         = require("fs");
 const path       = require("path");
+const logger     = require("../services/logger");
+
+global.console = logger.console;
 
 const EMAIL_STYLES_PATH = process.env.EMAIL_STYLES_PATH
   || path.join(__dirname, "..", "..", "frontend-app", "src", "assets", "styles", "email-styles.css");

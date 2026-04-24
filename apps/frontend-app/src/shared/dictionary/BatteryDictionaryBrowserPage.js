@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import "./BatteryDictionaryBrowserPage.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -10,248 +12,424 @@ const DATA_TYPE_COLORS = {
   uri: "#10b981",
 };
 
+function buildDictionaryBasePath(pathname) {
+  if (pathname.startsWith("/admin/")) return "/admin/dictionary/battery/v1";
+  if (pathname.startsWith("/dashboard/")) return "/dashboard/dictionary/battery/v1";
+  return "/dictionary/battery/v1";
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || `Request failed (${response.status})`);
+  }
+  return response.json();
+}
+
 function TypeBadge({ jsonType, format }) {
-  const display = format === "uri" ? "URI" : jsonType || "string";
-  const color = DATA_TYPE_COLORS[format === "uri" ? "uri" : jsonType] || "#6b7280";
+  const display = format === "URI/URL" ? "URI" : jsonType || "string";
+  const typeKey = format === "URI/URL" ? "uri" : (jsonType || "string");
+  const color = DATA_TYPE_COLORS[typeKey] || "#6b7280";
   return (
-    <span style={{
-      display: "inline-block",
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "2px 7px",
-      borderRadius: 4,
-      background: color + "22",
-      color,
-      border: `1px solid ${color}44`,
-      textTransform: "uppercase",
-      letterSpacing: "0.5px",
-    }}>
+    <span
+      className={`dictionary-type-badge dictionary-type-${typeKey.replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "default"}`}
+      style={{
+        "--dictionary-type-color": color,
+        "--dictionary-type-background": `${color}22`,
+        "--dictionary-type-border": `${color}44`,
+      }}
+    >
       {display}
     </span>
   );
 }
 
-function TermCard({ term, units }) {
-  const unitObj = units.find(u => u.key === term.unit);
-  const unitDisplay = unitObj ? unitObj.display : term.unit === "none" ? null : term.unit;
+function TermCard({ term, unitsByKey, termHref }) {
+  const unitObj = unitsByKey.get(term.unit);
+  const unitDisplay = term.unitDisplay || unitObj?.display || (term.unit === "none" ? null : term.unit);
 
   return (
-    <div style={{
-      background: "var(--card-bg, #fff)",
-      border: "1px solid var(--border, #e5e7eb)",
-      borderRadius: 8,
-      padding: "14px 16px",
-      marginBottom: 10,
-    }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <strong style={{ fontSize: 14 }}>{term.label}</strong>
+    <article className="dictionary-term-card">
+      <div className="dictionary-term-header">
+        <div className="dictionary-term-main">
+          <div className="dictionary-term-heading-row">
+            <strong className="dictionary-term-title">{term.label}</strong>
             <TypeBadge jsonType={term.dataType?.jsonType} format={term.dataType?.format} />
-            {unitDisplay && (
-              <span style={{ fontSize: 12, color: "#6b7280", fontStyle: "italic" }}>{unitDisplay}</span>
-            )}
+            {unitDisplay && <span className="dictionary-term-unit">{unitDisplay}</span>}
           </div>
-          <p style={{ fontSize: 13, color: "var(--text-secondary, #6b7280)", margin: "0 0 6px" }}>
-            {term.definition}
-          </p>
-          <div style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace", wordBreak: "break-all" }}>
-            <span style={{ color: "#d1d5db" }}>IRI: </span>
-            <a href={term.iri} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent, #4a9eff)" }}>
+          <p className="dictionary-term-definition">{term.definition}</p>
+          <div className="dictionary-term-meta-line">
+            <span className="dictionary-term-meta-label">IRI:</span>
+            <a href={term.iri} target="_blank" rel="noopener noreferrer" className="dictionary-link dictionary-link-mono">
               {term.iri}
             </a>
           </div>
           {term.appFieldKeys?.length > 0 && (
-            <div style={{ marginTop: 4, fontSize: 11, color: "#9ca3af" }}>
-              <span style={{ color: "#d1d5db" }}>Field keys: </span>
-              {term.appFieldKeys.map(k => (
-                <code key={k} style={{
-                  background: "var(--code-bg, #f3f4f6)", borderRadius: 3,
-                  padding: "1px 4px", marginRight: 4, fontSize: 10,
-                }}>{k}</code>
+            <div className="dictionary-term-field-row">
+              <span className="dictionary-term-meta-label">Field keys:</span>
+              {term.appFieldKeys.map((key) => (
+                <code key={key} className="dictionary-field-pill">{key}</code>
               ))}
             </div>
           )}
         </div>
-        <div style={{ fontSize: 11, color: "#9ca3af", flexShrink: 0 }}>
-          #{term.specRef}
+        <div className="dictionary-term-side">
+          <div className="dictionary-term-ref">#{term.specRef || term.number}</div>
+          <Link to={termHref} className="dictionary-card-link">Open term</Link>
         </div>
       </div>
+    </article>
+  );
+}
+
+function DetailRow({ label, value, mono = false, empty = "Not specified" }) {
+  const display = value === null || value === undefined || value === "" ? empty : value;
+  return (
+    <div className="dictionary-detail-item">
+      <span className="dictionary-detail-label">{label}</span>
+      <span className={`dictionary-detail-value${mono ? " dictionary-detail-value-mono" : ""}`}>{display}</span>
     </div>
   );
 }
 
+function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath }) {
+  const categoryLabel = categories.find((category) => category.key === term.category)?.label || term.categoryLabel || term.category;
+  const unitDisplay = term.unitDisplay || unitsByKey.get(term.unit)?.display || (term.unit === "none" ? "n.a." : term.unit);
+
+  return (
+    <>
+      <div className="dictionary-results-bar">
+        <Link to={basePath} className="dictionary-inline-link">Back to dictionary</Link>
+        <div className="dictionary-footer-links">
+          <a href={`${API}/api/dictionary/battery/v1/terms/${term.slug}`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+            Term JSON
+          </a>
+          <a href={term.iri} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+            Term IRI
+          </a>
+        </div>
+      </div>
+
+      <div className="dictionary-detail-layout">
+        <section className="dictionary-detail-panel dictionary-detail-main">
+          <div className="dictionary-chip-row">
+            <span className="dictionary-chip">Term #{term.specRef || term.number}</span>
+            <span className="dictionary-chip dictionary-chip-muted">{categoryLabel}</span>
+          </div>
+
+          <h1 className="dictionary-detail-title">{term.label}</h1>
+          <p className="dictionary-detail-subtitle">{term.definition}</p>
+
+          <div className="dictionary-detail-tag-row">
+            <TypeBadge jsonType={term.dataType?.jsonType} format={term.dataType?.format} />
+            <span className="dictionary-detail-tag">{unitDisplay}</span>
+            {term.subcategory && <span className="dictionary-detail-tag">{term.subcategory}</span>}
+          </div>
+
+          <div className="dictionary-detail-grid">
+            <DetailRow label="Category" value={categoryLabel} />
+            <DetailRow label="Subcategory" value={term.subcategory} />
+            <DetailRow label="Data format" value={term.dataType?.format} />
+            <DetailRow label="JSON type" value={term.dataType?.jsonType} />
+            <DetailRow label="XSD datatype" value={term.dataType?.xsdType} mono />
+            <DetailRow label="Unit" value={unitDisplay} />
+            <DetailRow label="Access rights" value={term.accessRights} />
+            <DetailRow label="Static vs dynamic" value={term.staticOrDynamic} />
+            <DetailRow label="Internal key" value={term.internalKey || term.internal_key} mono />
+            <DetailRow label="Element ID" value={term.elementId || term.element_id} mono />
+          </div>
+
+          <div className="dictionary-detail-section">
+            <h2>Regulation references</h2>
+            {term.regulationReferences?.length ? (
+              <div className="dictionary-detail-pill-row">
+                {term.regulationReferences.map((reference) => (
+                  <span key={reference} className="dictionary-field-pill">{reference}</span>
+                ))}
+              </div>
+            ) : (
+              <p className="dictionary-detail-empty">No regulation references are attached to this term yet.</p>
+            )}
+          </div>
+
+          <div className="dictionary-detail-section">
+            <h2>Application field keys</h2>
+            {term.appFieldKeys?.length ? (
+              <div className="dictionary-detail-pill-row">
+                {term.appFieldKeys.map((key) => (
+                  <code key={key} className="dictionary-field-pill">{key}</code>
+                ))}
+              </div>
+            ) : (
+              <p className="dictionary-detail-empty">No application field keys are mapped yet.</p>
+            )}
+          </div>
+        </section>
+
+        <aside className="dictionary-detail-panel dictionary-detail-sidebar">
+          <div className="dictionary-side-card dictionary-side-card-plain">
+            <h2>Dictionary reference URL</h2>
+            <a href={term.iri} target="_blank" rel="noopener noreferrer" className="dictionary-link dictionary-link-mono">
+              {term.iri}
+            </a>
+            <p>This is the canonical term identifier used by JSON-LD exports and semantic mappings.</p>
+          </div>
+
+          <div className="dictionary-side-card dictionary-side-card-plain">
+            <h2>Dictionary context</h2>
+            <a href={manifest?.contextUrl} target="_blank" rel="noopener noreferrer" className="dictionary-link dictionary-link-mono">
+              {manifest?.contextUrl}
+            </a>
+            <p>The shared context provides the canonical namespace and type declarations for battery exports.</p>
+          </div>
+        </aside>
+      </div>
+    </>
+  );
+}
+
 export default function BatteryDictionaryBrowserPage() {
+  const { slug } = useParams();
+  const location = useLocation();
+  const basePath = useMemo(() => buildDictionaryBasePath(location.pathname), [location.pathname]);
+  const isDetailView = Boolean(slug);
+
   const [terms, setTerms] = useState([]);
+  const [term, setTerm] = useState(null);
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [manifest, setManifest] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let ignore = false;
     setLoading(true);
-    Promise.all([
-      fetch(`${API}/api/dictionary/battery/v1/terms`).then(r => r.json()),
-      fetch(`${API}/api/dictionary/battery/v1/categories`).then(r => r.json()),
-      fetch(`${API}/api/dictionary/battery/v1/units`).then(r => r.json()),
-      fetch(`${API}/api/dictionary/battery/v1/manifest`).then(r => r.json()),
-    ])
-      .then(([t, c, u, m]) => {
-        setTerms(t);
-        setCategories(c);
-        setUnits(u);
-        setManifest(m);
+    setError(null);
+
+    const requests = isDetailView
+      ? Promise.all([
+          fetchJson(`${API}/api/dictionary/battery/v1/terms/${slug}`),
+          fetchJson(`${API}/api/dictionary/battery/v1/categories`),
+          fetchJson(`${API}/api/dictionary/battery/v1/units`),
+          fetchJson(`${API}/api/dictionary/battery/v1/manifest`),
+        ])
+      : Promise.all([
+          fetchJson(`${API}/api/dictionary/battery/v1/terms`),
+          fetchJson(`${API}/api/dictionary/battery/v1/categories`),
+          fetchJson(`${API}/api/dictionary/battery/v1/units`),
+          fetchJson(`${API}/api/dictionary/battery/v1/manifest`),
+        ]);
+
+    requests
+      .then((payload) => {
+        if (ignore) return;
+        if (isDetailView) {
+          const [singleTerm, nextCategories, nextUnits, nextManifest] = payload;
+          setTerm(singleTerm);
+          setTerms([]);
+          setCategories(nextCategories);
+          setUnits(nextUnits);
+          setManifest(nextManifest);
+        } else {
+          const [nextTerms, nextCategories, nextUnits, nextManifest] = payload;
+          setTerms(nextTerms);
+          setTerm(null);
+          setCategories(nextCategories);
+          setUnits(nextUnits);
+          setManifest(nextManifest);
+        }
         setLoading(false);
       })
-      .catch(() => {
-        setError("Failed to load dictionary. Please try again.");
+      .catch((requestError) => {
+        if (ignore) return;
+        setError(requestError.message || "Failed to load dictionary. Please try again.");
         setLoading(false);
       });
-  }, []);
 
-  const filteredTerms = terms.filter(t => {
-    const matchesCategory = !activeCategory || t.category === activeCategory;
-    const q = search.toLowerCase();
-    const matchesSearch = !q ||
-      t.label.toLowerCase().includes(q) ||
-      t.definition.toLowerCase().includes(q) ||
-      (t.appFieldKeys || []).some(k => k.includes(q));
-    return matchesCategory && matchesSearch;
-  });
+    return () => {
+      ignore = true;
+    };
+  }, [isDetailView, slug]);
 
-  if (loading) {
+  const unitsByKey = useMemo(
+    () => new Map(units.map((unit) => [unit.key, unit])),
+    [units]
+  );
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map();
+    for (const nextTerm of terms) {
+      counts.set(nextTerm.category, (counts.get(nextTerm.category) || 0) + 1);
+    }
+    return counts;
+  }, [terms]);
+
+  const activeCategoryLabel = useMemo(
+    () => categories.find((category) => category.key === activeCategory)?.label || null,
+    [categories, activeCategory]
+  );
+
+  const filteredTerms = useMemo(() => {
+    const query = deferredSearch.trim().toLowerCase();
+    return terms.filter((nextTerm) => {
+      const matchesCategory = !activeCategory || nextTerm.category === activeCategory;
+      const matchesSearch = !query
+        || nextTerm.label.toLowerCase().includes(query)
+        || nextTerm.definition.toLowerCase().includes(query)
+        || nextTerm.slug.includes(query)
+        || (nextTerm.appFieldKeys || []).some((key) => key.toLowerCase().includes(query));
+      return matchesCategory && matchesSearch;
+    });
+  }, [terms, activeCategory, deferredSearch]);
+
+  if (loading || (isDetailView && !term)) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: "var(--text-secondary, #6b7280)" }}>
-        Loading battery dictionary…
-      </div>
+      <section className="dictionary-page dictionary-page-state">
+        <div className="dictionary-state-card">Loading battery dictionary…</div>
+      </section>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: "#ef4444" }}>{error}</div>
+      <section className="dictionary-page dictionary-page-state">
+        <div className="dictionary-state-card dictionary-state-card-error">{error}</div>
+      </section>
     );
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>
-          Battery DPP Dictionary
-        </h1>
-        {manifest && (
-          <p style={{ fontSize: 13, color: "var(--text-secondary, #6b7280)", margin: "0 0 8px" }}>
-            {manifest.name} · v{manifest.version} · {terms.length} terms
+    <section className="dictionary-page">
+      <div className="dictionary-hero">
+        <div className="dictionary-hero-main">
+          <div className="dictionary-chip-row">
+            <span className="dictionary-chip">Semantic Dictionary</span>
+            {manifest?.version && <span className="dictionary-chip dictionary-chip-muted">v{manifest.version}</span>}
+          </div>
+
+          <h1>{isDetailView ? term?.label : "Battery DPP Dictionary"}</h1>
+          <p className="dictionary-hero-subtitle">
+            {isDetailView
+              ? "Canonical dictionary metadata for this battery term, including its JSON-LD identifier, datatype contract, and field mappings."
+              : `${manifest?.name || "Claros Battery Dictionary"} with canonical terms, JSON-LD links, and field-key mappings for the battery passport model.`}
           </p>
-        )}
-        <div style={{ fontSize: 12, color: "#9ca3af", fontFamily: "monospace" }}>
-          Base IRI:{" "}
-          <a
-            href={manifest?.baseIri}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "var(--accent, #4a9eff)" }}
-          >
-            {manifest?.baseIri}
-          </a>
+
+          <div className="dictionary-meta-grid">
+            <div className="dictionary-meta-card">
+              <span>{isDetailView ? "Term number" : "Total terms"}</span>
+              <strong>{isDetailView ? (term?.specRef || term?.number) : terms.length}</strong>
+            </div>
+            <div className="dictionary-meta-card">
+              <span>{isDetailView ? "Category" : "Categories"}</span>
+              <strong>{isDetailView ? (term?.categoryLabel || categories.find((category) => category.key === term?.category)?.label || "n.a.") : categories.length}</strong>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Search */}
-      <input
-        type="search"
-        placeholder="Search terms, field keys, definitions…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "9px 14px",
-          borderRadius: 8,
-          border: "1px solid var(--border, #e5e7eb)",
-          fontSize: 14,
-          marginBottom: 16,
-          background: "var(--input-bg, #fff)",
-          color: "var(--text, #111)",
-          boxSizing: "border-box",
-        }}
-      />
-
-      {/* Category tabs */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
-        <button
-          onClick={() => setActiveCategory(null)}
-          style={{
-            padding: "5px 12px",
-            borderRadius: 20,
-            fontSize: 12,
-            border: "1px solid var(--border, #e5e7eb)",
-            background: !activeCategory ? "var(--accent, #4a9eff)" : "transparent",
-            color: !activeCategory ? "#fff" : "var(--text, #111)",
-            cursor: "pointer",
-          }}
-        >
-          All ({terms.length})
-        </button>
-        {categories.map(cat => {
-          const count = terms.filter(t => t.category === cat.key).length;
-          return (
-            <button
-              key={cat.key}
-              onClick={() => setActiveCategory(activeCategory === cat.key ? null : cat.key)}
-              style={{
-                padding: "5px 12px",
-                borderRadius: 20,
-                fontSize: 12,
-                border: "1px solid var(--border, #e5e7eb)",
-                background: activeCategory === cat.key ? "var(--accent, #4a9eff)" : "transparent",
-                color: activeCategory === cat.key ? "#fff" : "var(--text, #111)",
-                cursor: "pointer",
-              }}
+        <aside className="dictionary-hero-side">
+          <div className="dictionary-side-card">
+            <h2>Dictionary Base IRI</h2>
+            <a
+              href={manifest?.baseIri}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="dictionary-link dictionary-link-mono"
             >
-              {cat.label} ({count})
-            </button>
-          );
-        })}
+              {manifest?.baseIri}
+            </a>
+            <p>Use this as the canonical namespace for exported battery passport semantics.</p>
+          </div>
+        </aside>
       </div>
 
-      {/* Results count */}
-      <p style={{ fontSize: 12, color: "#9ca3af", margin: "0 0 12px" }}>
-        {filteredTerms.length} term{filteredTerms.length !== 1 ? "s" : ""}
-        {activeCategory && categories.find(c => c.key === activeCategory)
-          ? ` in ${categories.find(c => c.key === activeCategory).label}` : ""}
-        {search ? ` matching "${search}"` : ""}
-      </p>
-
-      {/* Terms list */}
-      {filteredTerms.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 40, color: "#9ca3af" }}>
-          No terms found.
-        </div>
+      {isDetailView ? (
+        <DictionaryDetail
+          term={term}
+          categories={categories}
+          unitsByKey={unitsByKey}
+          manifest={manifest}
+          basePath={basePath}
+        />
       ) : (
-        filteredTerms.map(term => (
-          <TermCard key={term.slug} term={term} units={units} />
-        ))
-      )}
+        <>
+          <div className="dictionary-toolbar-card">
+            <div className="dictionary-search-row">
+              <input
+                type="search"
+                placeholder="Search terms, field keys, definitions..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="dictionary-search-input"
+              />
+            </div>
 
-      {/* Footer links */}
-      <div style={{ marginTop: 32, paddingTop: 16, borderTop: "1px solid var(--border, #e5e7eb)", fontSize: 12, color: "#9ca3af" }}>
-        <a href={`${API}/dictionary/battery/v1/context.jsonld`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent, #4a9eff)", marginRight: 16 }}>
-          JSON-LD Context
-        </a>
-        <a href={`${API}/api/dictionary/battery/v1/manifest`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent, #4a9eff)", marginRight: 16 }}>
-          Manifest
-        </a>
-        <a href={`${API}/api/dictionary/battery/v1/terms`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent, #4a9eff)", marginRight: 16 }}>
-          Terms JSON
-        </a>
-        <a href={`${API}/api/dictionary/battery/v1/units`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent, #4a9eff)" }}>
-          Units
-        </a>
-      </div>
-    </div>
+            <div className="dictionary-category-row">
+              <button
+                type="button"
+                onClick={() => setActiveCategory(null)}
+                className={`dictionary-category-pill${!activeCategory ? " is-active" : ""}`}
+              >
+                All
+                <span>{terms.length}</span>
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category.key}
+                  type="button"
+                  onClick={() => setActiveCategory(activeCategory === category.key ? null : category.key)}
+                  className={`dictionary-category-pill${activeCategory === category.key ? " is-active" : ""}`}
+                >
+                  {category.label}
+                  <span>{categoryCounts.get(category.key) || category.termCount || 0}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="dictionary-results-bar">
+            <p className="dictionary-results-copy">
+              {filteredTerms.length} term{filteredTerms.length !== 1 ? "s" : ""}
+              {activeCategoryLabel ? ` in ${activeCategoryLabel}` : ""}
+              {deferredSearch.trim() ? ` matching "${deferredSearch.trim()}"` : ""}
+            </p>
+
+            <div className="dictionary-footer-links">
+              <a href={`${API}/api/dictionary/battery/v1/context.jsonld`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                JSON-LD Context
+              </a>
+              <a href={`${API}/api/dictionary/battery/v1/manifest`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                Manifest
+              </a>
+              <a href={`${API}/api/dictionary/battery/v1/terms`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                Terms JSON
+              </a>
+              <a href={`${API}/api/dictionary/battery/v1/units`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                Units
+              </a>
+            </div>
+          </div>
+
+          {filteredTerms.length === 0 ? (
+            <div className="dictionary-state-card">No terms found.</div>
+          ) : (
+            <div className="dictionary-terms-list">
+              {filteredTerms.map((nextTerm) => (
+                <TermCard
+                  key={nextTerm.slug}
+                  term={nextTerm}
+                  unitsByKey={unitsByKey}
+                  termHref={`${basePath}/terms/${nextTerm.slug}`}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }

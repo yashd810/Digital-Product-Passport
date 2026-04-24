@@ -395,6 +395,7 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
   const [passport,      setPassport]      = useState(null);
   const [company,       setCompany]       = useState(null);
   const [typeDef,       setTypeDef]       = useState(null);
+  const [canonicalJson, setCanonicalJson] = useState(null);
   const [dynamicValues, setDynamicValues] = useState({});
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState("");
@@ -411,6 +412,7 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
 
     setLoading(true);
     setError("");
+    setCanonicalJson(null);
     fetch(endpoint, requestInit)
       .then(r => r.ok ? r.json() : Promise.reject("not found"))
       .then(async data => {
@@ -430,18 +432,24 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
             }),
           }).catch(() => {});
         }
-        const [companyRes, typeRes, dynamicRes] = await Promise.all([
+        const [companyRes, typeRes, dynamicRes, canonicalRes] = await Promise.all([
           resolvedPassport.company_id   ? fetch(`${API}/api/companies/${resolvedPassport.company_id}/profile`)     : Promise.resolve(null),
           resolvedPassport.passport_type ? fetch(`${API}/api/passport-types/${resolvedPassport.passport_type}`)    : Promise.resolve(null),
           resolvedPassport.inactive_public_version || !resolvedPassport.guid
             ? Promise.resolve(null)
             : fetch(`${API}/api/passports/${resolvedPassport.guid}/dynamic-values`),
+          previewMode || !resolvedPassport.linked_data?.canonical_json_url
+            ? Promise.resolve(null)
+            : fetch(resolvedPassport.linked_data.canonical_json_url),
         ]);
         if (companyRes?.ok)  setCompany(await companyRes.json());
         if (typeRes?.ok)     setTypeDef(await typeRes.json());
         if (dynamicRes?.ok) {
           const d = await dynamicRes.json();
           if (d?.values) setDynamicValues(d.values);
+        }
+        if (canonicalRes?.ok) {
+          setCanonicalJson(await canonicalRes.json());
         }
       })
       .catch(() => setError("Passport not found"))
@@ -462,25 +470,64 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
 
   const umbrellaCategory = typeDef?.umbrella_category || "";
   const isBattery = /battery/i.test(umbrellaCategory);
+  const linkedDataPayload = passport?.linked_data?.public_url && canonicalJson
+    ? {
+        "@context": [
+          "https://schema.org",
+          {
+            subjectDid: "https://schema.digitalproductpassport.eu/ns/dpp#subjectDid",
+            dppDid: "https://schema.digitalproductpassport.eu/ns/dpp#dppDid",
+            companyDid: "https://schema.digitalproductpassport.eu/ns/dpp#companyDid",
+            facilityDid: "https://schema.digitalproductpassport.eu/ns/dpp#facilityDid",
+            canonicalPassport: "https://schema.digitalproductpassport.eu/ns/dpp#canonicalPassport",
+          },
+        ],
+        "@type": "WebPage",
+        url: passport.linked_data.public_url,
+        identifier: passport.guid,
+        name: passport.model_name || passport.product_id || "Digital Product Passport",
+        subjectDid: passport.linked_data?.canonical_subjects?.subjectDid || passport.linked_data?.related_subjects?.productDid || null,
+        dppDid: passport.linked_data?.canonical_subjects?.dppDid || passport.linked_data?.related_subjects?.dppDid || null,
+        companyDid: passport.linked_data?.canonical_subjects?.companyDid || passport.linked_data?.related_subjects?.companyDid || null,
+        facilityDid: passport.linked_data?.canonical_subjects?.facilityDid || passport.linked_data?.related_subjects?.facilityDid || null,
+        canonicalPassport: canonicalJson,
+      }
+    : null;
 
   if (isBattery) {
     return (
-      <BatteryConsumerView
+      <>
+        {linkedDataPayload && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(linkedDataPayload) }}
+          />
+        )}
+        <BatteryConsumerView
+          passport={passport}
+          company={company}
+          typeDef={typeDef}
+          dynamicValues={dynamicValues}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      {linkedDataPayload && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(linkedDataPayload) }}
+        />
+      )}
+      <GenericConsumerView
         passport={passport}
         company={company}
         typeDef={typeDef}
         dynamicValues={dynamicValues}
       />
-    );
-  }
-
-  return (
-    <GenericConsumerView
-      passport={passport}
-      company={company}
-      typeDef={typeDef}
-      dynamicValues={dynamicValues}
-    />
+    </>
   );
 }
 

@@ -36,6 +36,11 @@ function AdminCompanies() {
   const [deleteTarget,   setDeleteTarget]   = useState(null);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError,    setDeleteError]    = useState("");
+  const [policyTarget,   setPolicyTarget]   = useState(null);
+  const [policyForm,     setPolicyForm]     = useState(null);
+  const [policyError,    setPolicyError]    = useState("");
+  const [policyLoading,  setPolicyLoading]  = useState(false);
+  const [policySaving,   setPolicySaving]   = useState(false);
   const [sortConfig,     setSortConfig]     = useState({ key: "created_at", direction: "desc" });
   const [columnFilters,  setColumnFilters]  = useState({});
   const [showFilters,    setShowFilters]    = useState(false);
@@ -182,6 +187,63 @@ function AdminCompanies() {
     }
   };
 
+  const openPolicyEditor = async (company) => {
+    try {
+      setPolicyTarget(company);
+      setPolicyError("");
+      setPolicyLoading(true);
+      const response = await fetch(`${API}/api/admin/companies/${company.id}/dpp-policy`, {
+        headers: { ...authHeaders() },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to load company DPP policy");
+      setPolicyForm({
+        default_granularity: data.default_granularity || "item",
+        allow_granularity_override: !!data.allow_granularity_override,
+        mint_model_dids: !!data.mint_model_dids,
+        mint_item_dids: !!data.mint_item_dids,
+        mint_facility_dids: !!data.mint_facility_dids,
+        vc_issuance_enabled: !!data.vc_issuance_enabled,
+        jsonld_export_enabled: !!data.jsonld_export_enabled,
+        claros_battery_dictionary_enabled: !!data.claros_battery_dictionary_enabled,
+        legacy_semantic_compatibility: !!data.legacy_semantic_compatibility,
+      });
+    } catch (e) {
+      setPolicyError(e.message || "Failed to load company DPP policy");
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const handlePolicyFieldChange = (field, value) => {
+    setPolicyForm((prev) => ({ ...(prev || {}), [field]: value }));
+    setPolicyError("");
+  };
+
+  const savePolicy = async (e) => {
+    e.preventDefault();
+    if (!policyTarget || !policyForm) return;
+    try {
+      setPolicySaving(true);
+      const response = await fetch(`${API}/api/admin/companies/${policyTarget.id}/dpp-policy`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(policyForm),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to save company DPP policy");
+      setSuccessMsg(`Updated DPP policy for ${policyTarget.company_name}`);
+      setPolicyTarget(null);
+      setPolicyForm(null);
+      setPolicyError("");
+      await fetchCompanies();
+    } catch (e) {
+      setPolicyError(e.message || "Failed to save company DPP policy");
+    } finally {
+      setPolicySaving(false);
+    }
+  };
+
   return (
     <div className="companies-section">
       <h2>Company Management</h2>
@@ -316,6 +378,15 @@ function AdminCompanies() {
                       </button>
                       <button
                         className="menu-item"
+                        onClick={() => {
+                          setOpenKebabId(null);
+                          openPolicyEditor(company);
+                        }}
+                      >
+                        ⚙️ DPP Policy
+                      </button>
+                      <button
+                        className="menu-item"
                         onClick={() => { setOpenKebabId(null); navigate("/admin/invite", { state: { preselectedCompanyId: String(company.id) } }); }}
                       >
                         ✉️ Invite
@@ -413,6 +484,72 @@ function AdminCompanies() {
                     : "Enable Access"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {policyTarget && (
+        <div className="apt-modal-overlay" onClick={() => !policySaving && setPolicyTarget(null)}>
+          <div className="apt-modal companies-delete-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="apt-modal-title">DPP Policy</h3>
+            <p className="apt-modal-warning" style={{ background: "rgba(13,181,176,0.08)", borderColor: "rgba(13,181,176,0.28)", color: "var(--text-primary)" }}>
+              Configure DPP issuance behavior for <strong>{policyTarget.company_name}</strong>.
+            </p>
+            {policyLoading ? (
+              <div className="loading">Loading policy…</div>
+            ) : (
+              <form onSubmit={savePolicy} className="company-form">
+                {policyError && <div className="alert alert-error admin-alert-inline-wide">{policyError}</div>}
+                <div className="form-group">
+                  <label htmlFor="defaultGranularity">Default Granularity</label>
+                  <select
+                    id="defaultGranularity"
+                    value={policyForm?.default_granularity || "item"}
+                    onChange={(e) => handlePolicyFieldChange("default_granularity", e.target.value)}
+                    disabled={policySaving}
+                  >
+                    <option value="item">Item</option>
+                    <option value="batch">Batch</option>
+                    <option value="model">Model</option>
+                  </select>
+                </div>
+
+                {[
+                  ["allow_granularity_override", "Allow granularity override"],
+                  ["mint_model_dids", "Mint model DIDs"],
+                  ["mint_item_dids", "Mint item DIDs"],
+                  ["mint_facility_dids", "Mint facility DIDs"],
+                  ["vc_issuance_enabled", "Enable VC issuance"],
+                  ["jsonld_export_enabled", "Enable JSON-LD export"],
+                  ["claros_battery_dictionary_enabled", "Enable Claros battery dictionary"],
+                  ["legacy_semantic_compatibility", "Enable legacy semantic compatibility"],
+                ].map(([field, label]) => (
+                  <label key={field} className="checkbox-label" style={{ marginBottom: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!policyForm?.[field]}
+                      onChange={(e) => handlePolicyFieldChange(field, e.target.checked)}
+                      disabled={policySaving}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+
+                <div className="apt-modal-actions">
+                  <button
+                    type="button"
+                    className="cancel-btn"
+                    onClick={() => setPolicyTarget(null)}
+                    disabled={policySaving}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="apt-modal-confirm-btn" disabled={policySaving}>
+                    {policySaving ? "Saving…" : "Save Policy"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
