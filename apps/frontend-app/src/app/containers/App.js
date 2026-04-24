@@ -195,6 +195,8 @@ function App() {
           <Route path="repository/symbols" element={<CompanyRepository user={user} companyId={companyId} activeTab="symbols" />} />
           <Route path="archived"        element={<ArchivedPassports user={user} companyId={companyId} />} />
           <Route path="manual"          element={<ManualCenter mode="user" user={user} companyId={companyId} />} />
+          <Route path="dictionary/battery/v1" element={<BatteryDictionaryBrowserPage />} />
+          <Route path="dictionary/battery/v1/*" element={<BatteryDictionaryBrowserPage />} />
         </Route>
 
         {/* Admin */}
@@ -218,6 +220,8 @@ function App() {
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
           <Route path="analytics/:companySlug"        element={<AdminCompanyAnalytics />} />
           <Route path="company/:companyId/profile"   element={<CompanyProfile user={user} />} />
+          <Route path="dictionary/battery/v1"        element={<BatteryDictionaryBrowserPage />} />
+          <Route path="dictionary/battery/v1/*"      element={<BatteryDictionaryBrowserPage />} />
         </Route>
 
         {/* Create / Edit */}

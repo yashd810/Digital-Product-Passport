@@ -74,7 +74,7 @@ function AdminLayout({ user, onLogout }) {
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           📘 Manual
         </NavLink>
-        <NavLink to="/dictionary/battery/v1"
+        <NavLink to="/admin/dictionary/battery/v1"
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           🔖 Battery Dictionary
         </NavLink>
