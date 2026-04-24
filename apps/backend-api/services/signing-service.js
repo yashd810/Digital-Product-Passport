@@ -1,6 +1,6 @@
 "use strict";
 
-module.exports = function createSigningService({ pool, crypto, canonicalize }) {
+module.exports = function createSigningService({ pool, crypto, canonicalize, dppIdentity }) {
   // ─── DIGITAL SIGNATURE ──────────────────────────────────────────────────────
 
   let _signingKey = null; // { privateKey, publicKey, keyId }
@@ -14,8 +14,14 @@ module.exports = function createSigningService({ pool, crypto, canonicalize }) {
       _signingKey = { privateKey: privPem, publicKey: pubPem, keyId };
       console.log("[Signing] Loaded key from environment. Key ID:", keyId);
     } else {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "[Signing] SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY must be set in production. " +
+          "Ephemeral keys are not allowed in production because signatures become unverifiable after restart."
+        );
+      }
       console.warn("[Signing] SIGNING_PRIVATE_KEY not set — generating ephemeral key pair.");
-      console.warn("[Signing] Set SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY env vars for production!");
+      console.warn("[Signing] This is only safe for local development. Set SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY before deploying.");
       const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", {
         modulusLength: 2048,
         publicKeyEncoding:  { type: "spki",  format: "pem" },
@@ -44,6 +50,20 @@ module.exports = function createSigningService({ pool, crypto, canonicalize }) {
     return `did:web:${domain}`;
   }
 
+  // Stable DID for a specific DPP/passport subject
+  function subjectDid(guid) {
+    const appUrl = process.env.APP_URL || "http://localhost:3001";
+    const domain = new URL(appUrl).host;
+    return `did:web:${domain}:dpp:${guid}`;
+  }
+
+  // Stable DID for an economic operator (company)
+  function companyDid(companyId) {
+    const appUrl = process.env.APP_URL || "http://localhost:3001";
+    const domain = new URL(appUrl).host;
+    return `did:web:${domain}:org:${companyId}`;
+  }
+
   function buildVC(passport, typeDef, releasedAt) {
     const appUrl  = process.env.APP_URL || "http://localhost:3001";
     const did     = issuerDid();
@@ -53,7 +73,8 @@ module.exports = function createSigningService({ pool, crypto, canonicalize }) {
       for (const field of (section.fields || [])) {
         if (field.dynamic) continue;
         const v = passport[field.key];
-        if (v !== null && v !== undefined && v !== "") fields[field.key] = String(v);
+        // Preserve native types — do not coerce to String
+        if (v !== null && v !== undefined && v !== "") fields[field.key] = v;
       }
     }
     return {
@@ -67,7 +88,10 @@ module.exports = function createSigningService({ pool, crypto, canonicalize }) {
       issuer:       did,
       issuanceDate: releasedAt,
       credentialSubject: {
-        id:            `${appUrl}/passport/${passport.guid}`,
+        // Subject DID: prefer product-based DID (companyId + product_id) over guid-based fallback
+        id: (dppIdentity && passport.product_id && passport.company_id)
+          ? dppIdentity.productModelDid(passport.company_id, passport.product_id)
+          : subjectDid(passport.guid),
         passportType:  passport.passport_type,
         modelName:     passport.model_name  || null,
         productId:     passport.product_id  || null,
@@ -191,6 +215,8 @@ module.exports = function createSigningService({ pool, crypto, canonicalize }) {
     loadOrGenerateSigningKey,
     canonicalJSON,
     issuerDid,
+    subjectDid,
+    companyDid,
     buildVC,
     createJws,
     signPassport,

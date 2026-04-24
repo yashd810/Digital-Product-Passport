@@ -39,6 +39,7 @@ const CreateHub = lazy(() => import("../../user/dashboard/create/CreateHub"));
 const ArchivedPassports = lazy(() => import("../../user/dashboard/archived/ArchivedPassportsPage"));
 
 const AdminLayout = lazy(() => import("../../admin/layout/AdminLayout"));
+const BatteryDictionaryBrowserPage = lazy(() => import("../../shared/dictionary/BatteryDictionaryBrowserPage"));
 const AdminAnalytics = lazy(() => import("../../admin/pages/AdminAnalytics"));
 const AdminCompanies = lazy(() => import("../../admin/pages/AdminCompanies"));
 const AdminInvite = lazy(() => import("../../admin/pages/AdminInvite"));
@@ -230,6 +231,10 @@ function App() {
             <EditPassportRoute user={user} companyId={companyId} />
           </ProtectedRoute>
         } />
+
+        {/* Battery Dictionary — public, accessible from both admin and user layouts */}
+        <Route path="/dictionary/battery/v1" element={<BatteryDictionaryBrowserPage />} />
+        <Route path="/dictionary/battery/v1/*" element={<BatteryDictionaryBrowserPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

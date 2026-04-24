@@ -63,7 +63,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_registry",
         purpose: "Maps every passport GUID to its company, type, public access key, and device API key.",
-        columns: ["guid", "lineage_id", "company_id", "passport_type", "access_key", "device_api_key", "created_at"],
+        columns: ["guid", "lineage_id", "company_id", "passport_type", "access_key_hash", "access_key_prefix", "device_api_key_hash", "device_api_key_prefix", "created_at"],
       },
       {
         name: "din_spec_99100_passports",
@@ -355,14 +355,14 @@ export const SECURITY_KEY_TABLE = {
     ],
     [
       "Device API key",
-      "Passport row > Device Integration, GET /api/companies/:companyId/passports/:guid/device-key, or regenerate endpoint",
+      "Passport row > Device Integration metadata, then issue or regenerate once when needed",
       "x-device-key header",
       "POST /api/passports/:guid/dynamic-values for live measurements such as temperature, mass, or battery data",
       "Listing all passports, editing normal passport fields, or calling company admin endpoints",
     ],
     [
       "Passport access key",
-      "Public sharing workflow or GET /api/companies/:companyId/passports/:guid/access-key",
+      "Public viewer metadata, then issue or regenerate once when you need to share restricted-field access",
       "JSON body on POST /api/passports/:guid/unlock as { accessKey: \"...\" }",
       "Unlocking restricted fields in the public viewer for one passport",
       "General API authentication, company APIs, or device integrations",
@@ -476,7 +476,8 @@ export const READ_EXPORT_API_TABLE = {
     ["See version diff input", "GET /api/companies/:companyId/passports/:guid/diff", "Bearer token and company access", "Query param: passportType", "All versions needed for compare views."],
     ["See passport history", "GET /api/companies/:companyId/passports/:guid/history", "Bearer token and company access", "No body", "Version history including non-public data for authorized company users."],
     ["Change whether one history version is public", "PATCH /api/companies/:companyId/passports/:guid/history/:versionNumber", "Bearer token, company access, editor or company admin", "{ isPublic: true or false }", "Updates public-history visibility for that version."],
-    ["Read passport access key", "GET /api/companies/:companyId/passports/:guid/access-key", "Bearer token and company access", "No body", "The current unlock key used by the public restricted-fields flow."],
+    ["Read passport access-key metadata", "GET /api/companies/:companyId/passports/:guid/access-key", "Bearer token and company access", "No body", "Returns whether a key exists plus safe metadata such as a prefix and rotation time, not the raw secret."],
+    ["Regenerate passport access key", "POST /api/companies/:companyId/passports/:guid/access-key/regenerate", "Bearer token, company access, editor or company admin", "No body", "Issues a brand-new access key and reveals it once in the response. The old key stops working immediately."],
     ["Get current edit lock", "GET /api/companies/:companyId/passports/:guid/edit-session", "Bearer token and company access", "No body", "Shows whether another user is actively editing."],
     ["Start or refresh edit lock", "POST /api/companies/:companyId/passports/:guid/edit-session", "Bearer token, company access, editor or company admin", "No body", "Marks the current user as the active editor."],
     ["Clear edit lock", "DELETE /api/companies/:companyId/passports/:guid/edit-session", "Bearer token and company access", "No body", "Ends the current edit session."],
@@ -498,8 +499,8 @@ export const PUBLIC_AND_LIVE_API_TABLE = {
     ["Read latest live values", "GET /api/passports/:guid/dynamic-values", "No auth", "No body", "The most recent live value per dynamic field."],
     ["Read one live field history", "GET /api/passports/:guid/dynamic-values/:fieldKey/history", "No auth", "Optional query param: limit", "Time-series history for one dynamic field."],
     ["Push live device values", "POST /api/passports/:guid/dynamic-values", "x-device-key header", "{ fieldKey: value, anotherField: value }", "Stores a new live reading per field."],
-    ["Read device key", "GET /api/companies/:companyId/passports/:guid/device-key", "Bearer token and company access", "No body", "Returns the current device key for that passport."],
-    ["Regenerate device key", "POST /api/companies/:companyId/passports/:guid/device-key/regenerate", "Bearer token, company access, editor or company admin", "No body", "Replaces the old device key with a new one."],
+    ["Read device-key metadata", "GET /api/companies/:companyId/passports/:guid/device-key", "Bearer token and company access", "No body", "Returns whether a device key exists plus safe metadata such as a prefix and rotation time, not the raw secret."],
+    ["Regenerate device key", "POST /api/companies/:companyId/passports/:guid/device-key/regenerate", "Bearer token, company access, editor or company admin", "No body", "Issues a brand-new device key and reveals it once in the response. The old key stops working immediately."],
     ["Manual live-value override", "PATCH /api/companies/:companyId/passports/:guid/dynamic-values", "Bearer token, company access, editor or company admin", "{ fieldKey: value }", "Lets a user save manual live values without a physical device push."],
   ],
 };

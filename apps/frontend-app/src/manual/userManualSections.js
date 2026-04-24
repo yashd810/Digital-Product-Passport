@@ -655,7 +655,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "API",
       audience: "Company users and integration teams that need controlled reads or exports",
       title: "Read, compare, and export passport data with the company APIs",
-      summary: "Not every integration is a write integration. Many teams simply need to read what already exists, fetch many passports by known IDs, export CSV or JSON, inspect version history, or retrieve one passport's access key or device key. These endpoints stay inside the normal company security boundary and therefore still use bearer authentication.",
+      summary: "Not every integration is a write integration. Many teams simply need to read what already exists, fetch many passports by known IDs, export CSV or JSON, inspect version history, or check whether one passport already has an access key or device key configured. These endpoints stay inside the normal company security boundary and therefore still use bearer authentication.",
       facts: [
         { label: "Read auth", value: "Bearer token with company access" },
         { label: "Best use case", value: "Internal tools, controlled exports, compare/history pages, and support diagnostics" },

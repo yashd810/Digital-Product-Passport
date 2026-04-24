@@ -14,6 +14,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1036.0",
     "bcryptjs": "^2.4.3",
     "canonicalize": "^2.1.0",
     "cors": "^2.8.6",

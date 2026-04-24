@@ -3,18 +3,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-
-function encodePathSegment(value) {
-  return encodeURIComponent(String(value || "")).replace(/%2F/g, "/");
-}
-
-function sha256Hex(buffer) {
-  return crypto.createHash("sha256").update(buffer).digest("hex");
-}
-
-function hmac(key, value, encoding) {
-  return crypto.createHmac("sha256", key).update(value).digest(encoding);
-}
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 
 function normalizeBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -125,95 +114,56 @@ function createS3StorageService(options) {
     || (forcePathStyle
       ? `${endpointUrl.origin}/${bucket}`
       : `${endpointUrl.protocol}//${bucket}.${endpointUrl.host}`);
+  const s3 = new S3Client({
+    region,
+    endpoint,
+    forcePathStyle,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  });
 
-  function buildRequestParts(storageKey) {
-    const keyPath = String(storageKey || "").replace(/^\/+/, "");
-    if (forcePathStyle) {
-      return {
-        host: endpointUrl.host,
-        pathname: `/${bucket}/${encodePathSegment(keyPath)}`,
-      };
-    }
+  function buildHeaderReader(response) {
+    const headers = new Map();
+    if (response.ContentType) headers.set("content-type", String(response.ContentType));
+    if (response.ContentLength !== undefined && response.ContentLength !== null) headers.set("content-length", String(response.ContentLength));
+    if (response.CacheControl) headers.set("cache-control", String(response.CacheControl));
+    if (response.ETag) headers.set("etag", String(response.ETag));
     return {
-      host: `${bucket}.${endpointUrl.host}`,
-      pathname: `/${encodePathSegment(keyPath)}`,
+      get(name) {
+        return headers.get(String(name || "").toLowerCase()) || null;
+      },
     };
   }
 
-  async function signedFetch(method, storageKey, { body = null, contentType = "", cacheControl = "" } = {}) {
-    const now = new Date();
-    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
-    const shortDate = amzDate.slice(0, 8);
-    const payloadHash = sha256Hex(body || Buffer.alloc(0));
-    const requestParts = buildRequestParts(storageKey);
-    const canonicalUri = requestParts.pathname;
-    const headerEntries = [
-      ["host", requestParts.host],
-      ["x-amz-content-sha256", payloadHash],
-      ["x-amz-date", amzDate],
-    ];
-    if (contentType) {
-      headerEntries.push(["content-type", contentType]);
+  async function bodyToBuffer(body) {
+    if (!body) return Buffer.alloc(0);
+    if (Buffer.isBuffer(body)) return body;
+    if (typeof body.transformToByteArray === "function") {
+      return Buffer.from(await body.transformToByteArray());
     }
-    if (cacheControl) {
-      headerEntries.push(["cache-control", cacheControl]);
+    if (typeof body[Symbol.asyncIterator] === "function") {
+      const chunks = [];
+      for await (const chunk of body) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
     }
-    headerEntries.sort((a, b) => a[0].localeCompare(b[0]));
-    const canonicalHeaders = headerEntries.map(([name, value]) => `${name}:${value}`);
-    const signedHeaderNames = headerEntries.map(([name]) => name);
-
-    const canonicalRequest = [
-      method,
-      canonicalUri,
-      "",
-      `${canonicalHeaders.join("\n")}\n`,
-      signedHeaderNames.join(";"),
-      payloadHash,
-    ].join("\n");
-
-    const credentialScope = `${shortDate}/${region}/s3/aws4_request`;
-    const stringToSign = [
-      "AWS4-HMAC-SHA256",
-      amzDate,
-      credentialScope,
-      sha256Hex(Buffer.from(canonicalRequest)),
-    ].join("\n");
-
-    const dateKey = hmac(`AWS4${secretAccessKey}`, shortDate);
-    const regionKey = hmac(dateKey, region);
-    const serviceKey = hmac(regionKey, "s3");
-    const signingKey = hmac(serviceKey, "aws4_request");
-    const signature = hmac(signingKey, stringToSign, "hex");
-
-    const headers = {
-      "x-amz-content-sha256": payloadHash,
-      "x-amz-date": amzDate,
-      Authorization: `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaderNames.join(";")}, Signature=${signature}`,
-    };
-    if (contentType) headers["Content-Type"] = contentType;
-    if (cacheControl) headers["Cache-Control"] = cacheControl;
-
-    const response = await fetch(`${endpointUrl.protocol}//${requestParts.host}${canonicalUri}`, {
-      method,
-      headers,
-      body,
-    });
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      throw new Error(`Object storage ${method} failed (${response.status}): ${detail || response.statusText}`);
-    }
-    return response;
+    return Buffer.from(await body.transformToString());
   }
 
   return {
     name: "s3",
     isLocal: false,
     async saveObject({ key, buffer, contentType, cacheControl }) {
-      await signedFetch("PUT", key, {
-        body: buffer,
-        contentType,
-        cacheControl,
-      });
+      await s3.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        CacheControl: cacheControl,
+      }));
       return {
         provider: "s3",
         storageKey: key,
@@ -224,11 +174,21 @@ function createS3StorageService(options) {
     },
     async deleteObject(storageKey) {
       if (!storageKey) return;
-      await signedFetch("DELETE", storageKey);
+      await s3.send(new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: storageKey,
+      }));
     },
     async deleteLegacyPath() {},
     async fetchObject(storageKey) {
-      return signedFetch("GET", storageKey);
+      const response = await s3.send(new GetObjectCommand({
+        Bucket: bucket,
+        Key: storageKey,
+      }));
+      return {
+        headers: buildHeaderReader(response),
+        arrayBuffer: async () => bodyToBuffer(response.Body),
+      };
     },
     getPublicUrl(storageKey) {
       return appPublicBase

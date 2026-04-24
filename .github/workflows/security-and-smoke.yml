@@ -1,0 +1,59 @@
+name: Security And Smoke
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/backend-api/package-lock.json
+      - run: npm ci
+      - run: node --check Server/server.js
+      - run: node --check routes/auth.js
+      - run: node --check routes/passports.js
+      - run: node --check services/storage-service.js
+      - run: node tests/dpp-identity.test.js
+      - run: npm audit --audit-level=high
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/frontend-app/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  public-viewer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/public-passport-viewer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/public-passport-viewer/package-lock.json
+      - run: npm ci
+      - run: npm run build

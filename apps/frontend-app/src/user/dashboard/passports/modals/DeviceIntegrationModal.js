@@ -6,6 +6,7 @@ const API = import.meta.env.VITE_API_URL || "";
 
 export function DeviceIntegrationModal({ passport, passportType, companyId, onClose }) {
   const [deviceKey, setDeviceKey] = useState(null);
+  const [deviceKeyMeta, setDeviceKeyMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -18,7 +19,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
   useEffect(() => {
     fetch(`${API}/api/companies/${companyId}/passports/${passport.guid}/device-key`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d?.deviceKey) setDeviceKey(d.deviceKey); })
+      .then((d) => { if (d) setDeviceKeyMeta(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
 
@@ -52,7 +53,14 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
         headers: authHeaders(),
       });
       const d = await r.json();
-      if (r.ok) setDeviceKey(d.deviceKey);
+      if (r.ok) {
+        setDeviceKey(d.deviceKey);
+        setDeviceKeyMeta({
+          hasDeviceKey: true,
+          keyPrefix: d.keyPrefix || null,
+          lastRotatedAt: d.lastRotatedAt || new Date().toISOString(),
+        });
+      }
     } catch {}
     finally { setRegenerating(false); }
   };
@@ -105,12 +113,12 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
               <div className="device-key-row"><span className="device-loading-copy">Loading…</span></div>
             ) : (
               <div className="device-key-row">
-                <code className="device-key-code">{deviceKey || "—"}</code>
+                <code className="device-key-code">{deviceKey || deviceKeyMeta?.keyPrefix || "Not issued yet"}</code>
                 <button className="device-copy-btn" onClick={copyKey} disabled={!deviceKey}>
                   {copied ? "✓ Copied" : "Copy"}
                 </button>
                 <button className="device-regen-btn" onClick={handleRegenerate} disabled={regenerating}>
-                  {regenerating ? "…" : "Regenerate"}
+                  {regenerating ? "…" : deviceKeyMeta?.hasDeviceKey ? "Regenerate" : "Issue Key"}
                 </button>
               </div>
             )}

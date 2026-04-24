@@ -268,6 +268,10 @@ function DashboardLayout({ user, companyId, onLogout }) {
               <NavLink to="/dashboard/manual" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📘 Manual
               </NavLink>
+              <NavLink to="/dictionary/battery/v1"
+                className={() => `sidebar-link${location.pathname.startsWith("/dictionary") ? " active" : ""}`}>
+                🔖 Battery Dictionary
+              </NavLink>
             </nav>
           </aside>
 

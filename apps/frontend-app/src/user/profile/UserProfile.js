@@ -4,6 +4,7 @@ import { authHeaders } from "../../shared/api/authHeaders";
 import "../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
+const PASSWORD_MIN_LENGTH = 12;
 
 function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = true, showLanguageSelector = true, profileTitle, profileSubtitle }) {
   const { t } = useI18n();
@@ -114,7 +115,10 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
       return;
     }
     if (newPw !== confPw) { flash("error", "New passwords don't match"); return; }
-    if (newPw.length < 6) { flash("error", "Password must be at least 6 characters"); return; }
+    if (newPw.length < PASSWORD_MIN_LENGTH) {
+      flash("error", `Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+      return;
+    }
     setSavingPw(true);
     try {
       const r = await fetch(`${API}/api/users/me/password`, {
@@ -274,8 +278,8 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
               <div className="form-row-2">
                 <div className="form-group">
                   <label>{t("newPassword")}</label>
-                  <input type="password" value={newPw} placeholder="Min. 6 characters" disabled={savingPw}
-                    onChange={e => setNewPw(e.target.value)} required minLength={6} />
+                  <input type="password" value={newPw} placeholder={`Min. ${PASSWORD_MIN_LENGTH} characters`} disabled={savingPw}
+                    onChange={e => setNewPw(e.target.value)} required minLength={PASSWORD_MIN_LENGTH} />
                 </div>
                 <div className="form-group">
                   <label>{t("confirmPassword")}</label>

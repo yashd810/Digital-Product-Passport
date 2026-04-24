@@ -60,10 +60,9 @@ module.exports = function registerPassportPublicRoutes(app, {
         pool.query("SELECT fields_json FROM passport_types WHERE type_name = $1", [passport.passport_type]),
       ]);
       const companyName = companyNameMap.get(String(sanitizedPassport.company_id)) || "";
-      const jsonLdContext = buildJsonLdContext(typeRes.rows[0] || null);
 
-      res.json({
-        "@context": jsonLdContext,
+      const acceptsJsonLd = (req.headers.accept || "").includes("application/ld+json");
+      const basePayload = {
         ...sanitizedPassport,
         public_path: buildCurrentPublicPassportPath({
           companyName,
@@ -81,7 +80,14 @@ module.exports = function registerPassportPublicRoutes(app, {
           versionNumber: sanitizedPassport.version_number,
         }),
         inactive_public_version: version !== null && Number(version) === Number(sanitizedPassport.version_number),
-      });
+      };
+
+      if (acceptsJsonLd) {
+        const jsonLdContext = buildJsonLdContext(typeRes.rows[0] || null);
+        res.setHeader("Content-Type", "application/ld+json");
+        return res.json({ "@context": jsonLdContext, ...basePayload });
+      }
+      res.json(basePayload);
     } catch (e) {
       if (e.code === "AMBIGUOUS_PRODUCT_ID") {
         return res.status(409).json({ error: e.message });
@@ -158,8 +164,13 @@ module.exports = function registerPassportPublicRoutes(app, {
         stripRestrictedFieldsForPublicView(passport, passport_type),
         pool.query("SELECT fields_json FROM passport_types WHERE type_name = $1", [passport_type]),
       ]);
-      const jsonLdContext2 = buildJsonLdContext(typeRes2.rows[0] || null);
-      res.json({ "@context": jsonLdContext2, ...sanitizedPassport });
+
+      if ((req.headers.accept || "").includes("application/ld+json")) {
+        const jsonLdContext2 = buildJsonLdContext(typeRes2.rows[0] || null);
+        res.setHeader("Content-Type", "application/ld+json");
+        return res.json({ "@context": jsonLdContext2, ...sanitizedPassport });
+      }
+      res.json(sanitizedPassport);
     } catch (e) { res.status(500).json({ error: "Failed to fetch passport" }); }
   });
 
@@ -315,15 +326,17 @@ module.exports = function registerPassportPublicRoutes(app, {
       if (!accessKey) return res.status(400).json({ error: "accessKey is required" });
 
       const reg = await pool.query(
-        "SELECT passport_type, access_key FROM passport_registry WHERE guid = $1",
+        "SELECT passport_type, access_key_hash FROM passport_registry WHERE guid = $1",
         [guid]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      const storedKey = reg.rows[0].access_key || "";
       const suppliedKey = String(accessKey);
-      const keysMatch = storedKey.length === suppliedKey.length &&
-        crypto.timingSafeEqual(Buffer.from(storedKey), Buffer.from(suppliedKey));
+      const suppliedHash = crypto.createHash("sha256").update(suppliedKey).digest("hex");
+      const storedHash = String(reg.rows[0].access_key_hash || "");
+      if (!storedHash) return res.status(401).json({ error: "Access key is not configured for this passport" });
+      const keysMatch = storedHash.length === suppliedHash.length &&
+        crypto.timingSafeEqual(Buffer.from(storedHash, "hex"), Buffer.from(suppliedHash, "hex"));
       if (!keysMatch)
         return res.status(401).json({ error: "Invalid access key" });
 

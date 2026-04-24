@@ -19,12 +19,41 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     }, {});
   };
 
-  const authenticateToken = (req, res, next) => {
+  const authenticateToken = async (req, res, next) => {
     const cookies = parseCookies(req);
     const token = cookies[SESSION_COOKIE_NAME] || (req.headers["authorization"] || "").split(" ")[1];
     if (!token) return res.status(401).json({ error: "Access token required" });
-    try { req.user = jwt.verify(token, JWT_SECRET); next(); }
-    catch { return res.status(403).json({ error: "Invalid or expired token" }); }
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      const currentUserRes = await pool.query(
+        `SELECT id, email, company_id, role, is_active, session_version
+         FROM users
+         WHERE id = $1
+         LIMIT 1`,
+        [payload.userId]
+      );
+      if (!currentUserRes.rows.length || !currentUserRes.rows[0].is_active) {
+        return res.status(401).json({ error: "Session is no longer valid" });
+      }
+
+      const currentUser = currentUserRes.rows[0];
+      const tokenSessionVersion = Number.parseInt(payload.sessionVersion, 10);
+      const currentSessionVersion = Number.parseInt(currentUser.session_version, 10) || 1;
+      if (!Number.isFinite(tokenSessionVersion) || tokenSessionVersion !== currentSessionVersion) {
+        return res.status(401).json({ error: "Session has been revoked. Please sign in again." });
+      }
+
+      req.user = {
+        userId: currentUser.id,
+        email: currentUser.email,
+        companyId: currentUser.company_id,
+        role: currentUser.role,
+        sessionVersion: currentSessionVersion,
+      };
+      next();
+    } catch {
+      return res.status(403).json({ error: "Invalid or expired token" });
+    }
   };
 
   const isSuperAdmin = (req, res, next) =>

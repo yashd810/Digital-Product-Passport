@@ -18,11 +18,15 @@ const createCacheService       = require("../services/cache-service");
 const createStorageService     = require("../services/storage-service");
 const createOauthService       = require("../services/oauth-service");
 const { createTransporter, brandedEmail, sendOtpEmail } = require("../services/email");
+const { validatePasswordPolicy, hashSecret, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../services/security-service");
 const createAuthMiddleware     = require("../middleware/auth");
 const { createRateLimiters }   = require("../middleware/rate-limit");
 const createAssetService       = require("../services/asset-management");
 const createPassportService    = require("../services/passport-service");
 const { buildBatteryPassJsonExport, buildPassportJsonLdContext } = require("../services/battery-pass-export");
+const createPassportRepresentationService = require("../services/passport-representation-service");
+const dppIdentity                         = require("../services/dpp-identity-service");
+const createBatteryDictionaryService      = require("../services/battery-dictionary-service");
 
 const {
   IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS,
@@ -52,6 +56,8 @@ const registerAssetManagementApiRoutes    = require("../routes/asset-management-
 const registerPassportRoutes              = require("../routes/passports");
 const registerPassportPublicRoutes        = require("../routes/passport-public");
 const registerCompanyRoutes               = require("../routes/company");
+const registerDppApiRoutes                = require("../routes/dpp-api");
+const registerDictionaryRoutes            = require("../routes/dictionary");
 
 // ─── DIRECTORIES ─────────────────────────────────────────────────────────────
 const APP_ROOT_DIR = path.resolve(__dirname, "../../..");
@@ -71,6 +77,19 @@ const UPLOADS_BASE_DIR = path.resolve(
   process.env.UPLOADS_DIR || path.join(LOCAL_STORAGE_DIR, "uploads")
 );
 const GLOBAL_SYMBOLS_DIR = path.join(UPLOADS_BASE_DIR, "symbols");
+const PASSPORT_STORAGE_PREFIX = "passport-files/";
+
+const normalizeStorageRequestKey = (value) => {
+  const raw = String(value || "").replace(/^\/+/, "").replace(/\\/g, "/");
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+};
+
+const isPassportStorageKey = (value) => normalizeStorageRequestKey(value)
+  .startsWith(PASSPORT_STORAGE_PREFIX);
 
 [LOCAL_STORAGE_DIR, FILES_BASE_DIR, REPO_BASE_DIR, GLOBAL_SYMBOLS_DIR].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -218,8 +237,18 @@ if (IS_PRODUCTION) {
 const applyPepper    = (pw) => crypto.createHmac("sha256", PEPPER).update(pw).digest("hex");
 const hashPassword   = async (pt) => ({ hash: await bcrypt.hash(applyPepper(pt), 12), pepperVersion: CURRENT_PEPPER_VERSION });
 const verifyPassword = (pt, hash) => bcrypt.compare(applyPepper(pt), hash);
-const generateToken  = (userId, email, companyId, role) =>
-  jwt.sign({ userId, email, companyId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1) => {
+  const user = typeof userOrId === "object" && userOrId !== null
+    ? userOrId
+    : { id: userOrId, email, company_id: companyId, role, session_version: sessionVersion };
+  return jwt.sign({
+    userId: user.id || user.userId,
+    email: user.email,
+    companyId: user.company_id !== undefined ? user.company_id : (user.companyId ?? null),
+    role: user.role,
+    sessionVersion: user.session_version !== undefined ? user.session_version : (user.sessionVersion ?? 1),
+  }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+};
 const hashOpaqueToken = (value) => crypto.createHash("sha256").update(String(value)).digest("hex");
 
 const serializeCookie = (name, value, options = {}) => {
@@ -361,7 +390,13 @@ const upload = multer({
   fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
 });
 if (storageService.isLocal) {
-  app.use("/storage", express.static(LOCAL_STORAGE_DIR, {
+  app.use("/storage", (req, res, next) => {
+    const storageKey = normalizeStorageRequestKey(req.path);
+    if (isPassportStorageKey(storageKey)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    next();
+  }, express.static(LOCAL_STORAGE_DIR, {
     setHeaders: (res, fp) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
       if (fp.endsWith(".pdf")) {
@@ -373,16 +408,11 @@ if (storageService.isLocal) {
       }
     },
   }));
-  app.use("/passport-files", express.static(FILES_BASE_DIR, {
-    setHeaders: (res, fp) => {
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Cross-Origin-Resource-Policy", fp.endsWith(".pdf") ? "cross-origin" : "same-site");
-      if (fp.endsWith(".pdf")) {
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", "inline");
-      }
-    },
-  }));
+  // /passport-files direct static serving is intentionally removed.
+  // Passport files must be served through /public-files/:publicId so the app
+  // can enforce visibility rules and avoid exposing predictable bucket paths.
+  // New uploads store an opaque public_id; legacy files without an attachment
+  // record will 404 via /public-files and need to be re-uploaded.
   app.use("/repository-files", express.static(REPO_BASE_DIR, {
     setHeaders: (res, fp) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
@@ -409,8 +439,11 @@ const repoSymbolUpload = multer({
 
 if (!storageService.isLocal && storageService.fetchObject) {
   app.get(/^\/storage\/(.+)$/, async (req, res) => {
-    const storageKey = String(req.params[0] || "").replace(/^\/+/, "");
+    const storageKey = normalizeStorageRequestKey(req.params[0]);
     if (!storageKey) return res.status(400).json({ error: "Storage key required" });
+    if (isPassportStorageKey(storageKey)) {
+      return res.status(404).json({ error: "Stored object not found" });
+    }
     try {
       const objectResponse = await storageService.fetchObject(storageKey);
       const contentType = objectResponse.headers.get("content-type");
@@ -439,8 +472,14 @@ if (!storageService.isLocal && storageService.fetchObject) {
 }
 
 // ─── SIGNING SERVICE ─────────────────────────────────────────────────────────
-const signingService = createSigningService({ pool, crypto, canonicalize });
+const signingService = createSigningService({ pool, crypto, canonicalize, dppIdentity });
 const { signPassport, verifyPassportSignature } = signingService;
+
+// ─── PASSPORT REPRESENTATION SERVICE ────────────────────────────────────────
+const { buildOperationalDppPayload } = createPassportRepresentationService();
+
+// ─── BATTERY DICTIONARY SERVICE ──────────────────────────────────────────────
+const batteryDictionaryService = createBatteryDictionaryService();
 
 // ─── PASSPORT SERVICE ────────────────────────────────────────────────────────
 const passportService = createPassportService({
@@ -498,6 +537,26 @@ const rewritePathPrefix = (targetPath, sourceDir, destinationDir) => {
   return path.join(nd, path.relative(ns, nt));
 };
 
+const extractLegacyPassportStorageKey = (rawUrl) => {
+  const text = String(rawUrl || "").trim();
+  if (!text) return null;
+
+  const parsePathname = (value) => {
+    try {
+      return decodeURIComponent(new URL(value, process.env.APP_URL || `http://localhost:${PORT}`).pathname || "");
+    } catch {
+      return value;
+    }
+  };
+
+  const pathname = parsePathname(text).replace(/\\/g, "/");
+  const pathMatch = pathname.match(/(?:^|\/)(passport-files\/[^?#]+)/);
+  if (pathMatch?.[1]) return normalizeStorageRequestKey(pathMatch[1]);
+
+  const textMatch = text.replace(/\\/g, "/").match(/(?:^|\/)(passport-files\/[^?#]+)/);
+  return textMatch?.[1] ? normalizeStorageRequestKey(textMatch[1]) : null;
+};
+
 const migrateRepositoryFilePaths = async () => {
   const legacyRepoDirs = [...new Set([
     path.join(APP_ROOT_DIR, "storage", "local-storage", "repository-files"),
@@ -521,6 +580,114 @@ const migrateRepositoryFilePaths = async () => {
   if (updated) console.log(`[storage] Migrated ${updated} company_repository file_path value(s) to ${REPO_BASE_DIR}`);
 };
 
+const backfillLegacyPassportAttachmentLinks = async () => {
+  const typeRes = await pool.query("SELECT type_name, fields_json FROM passport_types ORDER BY type_name ASC");
+  const appUrl = String(
+    process.env.PUBLIC_APP_URL
+    || process.env.APP_URL
+    || process.env.SERVER_URL
+    || `http://localhost:${PORT}`
+  ).replace(/\/+$/, "");
+
+  let attachmentRowsCreated = 0;
+  let passportFieldsRewritten = 0;
+
+  for (const typeRow of typeRes.rows) {
+    try {
+      const fileFields = (typeRow.fields_json?.sections || [])
+        .flatMap((section) => section.fields || [])
+        .filter((field) => field?.type === "file" && /^[a-z][a-z0-9_]+$/.test(field.key || ""))
+        .map((field) => field.key);
+
+      if (!fileFields.length) continue;
+
+      const tableName = getTable(typeRow.type_name);
+      const likeClauses = [];
+      const params = [];
+
+      for (const fieldKey of fileFields) {
+        params.push("%/storage/passport-files/%", "%/passport-files/%", "%passport-files/%");
+        const start = params.length - 2;
+        likeClauses.push(`(${fieldKey} LIKE $${start} OR ${fieldKey} LIKE $${start + 1} OR ${fieldKey} LIKE $${start + 2})`);
+      }
+
+      const candidateRes = await pool.query(
+        `SELECT id, guid, company_id, release_status, ${fileFields.join(", ")}
+         FROM ${tableName}
+         WHERE deleted_at IS NULL
+           AND (${likeClauses.join(" OR ")})`,
+        params
+      );
+
+      for (const row of candidateRes.rows) {
+        for (const fieldKey of fileFields) {
+          const currentValue = row[fieldKey];
+          if (typeof currentValue !== "string" || currentValue.includes("/public-files/")) continue;
+
+          const storageKey = extractLegacyPassportStorageKey(currentValue);
+          if (!isPassportStorageKey(storageKey)) continue;
+
+          const filePath = storageService.isLocal && storageService.getLocalAbsolutePath
+            ? storageService.getLocalAbsolutePath(storageKey)
+            : null;
+
+          const existingAttachmentRes = await pool.query(
+            `SELECT public_id
+             FROM passport_attachments
+             WHERE passport_guid = $1
+               AND field_key = $2
+               AND (
+                 (storage_key IS NOT NULL AND storage_key = $3)
+                 OR (file_path IS NOT NULL AND file_path = $4)
+               )
+             ORDER BY id DESC
+             LIMIT 1`,
+            [row.guid, fieldKey, storageKey, filePath]
+          );
+
+          let publicId = existingAttachmentRes.rows[0]?.public_id || null;
+
+          if (!publicId) {
+            publicId = crypto.randomBytes(10).toString("base64url").slice(0, 16);
+            await pool.query(
+              `INSERT INTO passport_attachments
+                 (public_id, company_id, passport_guid, field_key, file_path, storage_key, storage_provider, file_url, mime_type, is_public)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'application/pdf', $9)`,
+              [
+                publicId,
+                row.company_id,
+                row.guid,
+                fieldKey,
+                filePath,
+                storageKey,
+                storageService.provider || null,
+                currentValue,
+                isPublicHistoryStatus(row.release_status),
+              ]
+            );
+            attachmentRowsCreated += 1;
+          }
+
+          const publicFileUrl = `${appUrl}/public-files/${publicId}`;
+          if (currentValue !== publicFileUrl) {
+            await pool.query(
+              `UPDATE ${tableName} SET ${fieldKey} = $1, updated_at = NOW() WHERE id = $2`,
+              [publicFileUrl, row.id]
+            );
+            passportFieldsRewritten += 1;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`[storage] Legacy passport file backfill skipped for ${typeRow.type_name}:`, error.message);
+    }
+  }
+
+  if (attachmentRowsCreated || passportFieldsRewritten) {
+    console.log(`[storage] Backfilled ${attachmentRowsCreated} passport attachment row(s) and rewrote ${passportFieldsRewritten} passport file link(s)`);
+  }
+};
+
 // ─── STARTUP ─────────────────────────────────────────────────────────────────
 process.on("unhandledRejection", (reason) => console.error("[Unhandled Rejection]", reason));
 
@@ -529,6 +696,7 @@ pool.query("SELECT NOW()")
     await initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS });
     console.log("[DB] Initialized successfully");
     await migrateRepositoryFilePaths();
+    await backfillLegacyPassportAttachmentLinks();
     await signingService.loadOrGenerateSigningKey();
     assetService.startAssetManagementScheduler();
   })
@@ -563,6 +731,8 @@ registerWorkflowRoutes(app, {
 
 registerAuthRoutes(app, {
   pool, jwt, JWT_SECRET, hashPassword, verifyPassword, generateToken, hashOpaqueToken,
+  validatePasswordPolicy, PASSWORD_MIN_LENGTH,
+  SESSION_COOKIE_NAME,
   setAuthCookie, clearAuthCookie, sendOtpEmail, createTransporter, brandedEmail,
   logAudit, authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
   authenticateToken, checkCompanyAccess, oauthService,
@@ -589,6 +759,7 @@ registerPassportRoutes(app, {
   pool, fs, crypto, authenticateToken, checkCompanyAccess, checkCompanyAdmin,
   requireEditor, authenticateApiKey, publicReadRateLimit, publicHeavyRateLimit,
   apiKeyReadRateLimit, assetWriteRateLimit, upload,
+  hashSecret, createAccessKeyMaterial, createDeviceKeyMaterial,
   IN_REVISION_STATUSES_SQL, EDITABLE_RELEASE_STATUSES_SQL, REVISION_BLOCKING_STATUSES_SQL,
   EDIT_SESSION_TIMEOUT_HOURS, EDIT_SESSION_TIMEOUT_SQL, IN_REVISION_STATUS, SYSTEM_PASSPORT_FIELDS,
   getTable, normalizePassportRow, normalizeReleaseStatus, isEditablePassportStatus,
@@ -623,6 +794,89 @@ registerCompanyRoutes(app, {
   getWritablePassportColumns, getStoredPassportValues,
   logAudit, EDITABLE_RELEASE_STATUSES_SQL, SYSTEM_PASSPORT_FIELDS,
   buildBatteryPassJsonExport,
+});
+
+registerDppApiRoutes(app, {
+  pool, publicReadRateLimit,
+  getTable, normalizePassportRow,
+  normalizeProductIdValue,
+  stripRestrictedFieldsForPublicView, getCompanyNameMap,
+  resolveReleasedPassportByProductId,
+  signingService,
+  buildOperationalDppPayload,
+  buildPassportJsonLdContext,
+  dppIdentity,
+});
+
+registerDictionaryRoutes(app, { publicReadRateLimit, batteryDictionaryService });
+
+// ─── APP-MEDIATED FILE SERVING ────────────────────────────────────────────────
+// Files are served through the app, not directly from storage, so:
+//   - storage paths are never exposed in URLs
+//   - access can be revoked without changing URLs
+//   - visibility rules are enforced at serve-time
+app.get("/public-files/:publicId", publicReadRateLimit, async (req, res) => {
+  try {
+    const { publicId } = req.params;
+    if (!/^[a-zA-Z0-9_-]{8,24}$/.test(publicId)) {
+      return res.status(400).json({ error: "Invalid file identifier" });
+    }
+
+    const row = await pool.query(
+      "SELECT * FROM passport_attachments WHERE public_id = $1",
+      [publicId]
+    );
+    if (!row.rows.length) return res.status(404).json({ error: "File not found" });
+
+    const attachment = row.rows[0];
+
+    // Only serve files that are flagged as public (i.e. belong to a released passport)
+    if (!attachment.is_public) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.setHeader("Cross-Origin-Resource-Policy", attachment.mime_type === "application/pdf" ? "cross-origin" : "same-site");
+
+    if (storageService.isLocal && attachment.file_path) {
+      // Prevent path traversal: resolve and verify the path is inside FILES_BASE_DIR
+      const safePath = path.resolve(attachment.file_path);
+      if (safePath !== FILES_BASE_DIR && !safePath.startsWith(`${FILES_BASE_DIR}${path.sep}`)) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      if (!fs.existsSync(safePath)) return res.status(404).json({ error: "File not found" });
+      const mimeType = attachment.mime_type || "application/octet-stream";
+      res.setHeader("Content-Type", mimeType);
+      if (mimeType === "application/pdf") {
+        res.setHeader("Content-Disposition", "inline");
+        res.removeHeader("X-Frame-Options");
+      }
+      return res.sendFile(safePath);
+    }
+
+    if (!storageService.isLocal && storageService.fetchObject && isPassportStorageKey(attachment.storage_key)) {
+      // Cloud: proxy stream through app (hides bucket URL from client)
+      const objectResponse = await storageService.fetchObject(attachment.storage_key);
+      const contentType = objectResponse.headers?.get("content-type") || attachment.mime_type;
+      const contentLength = objectResponse.headers?.get("content-length");
+      const etag = objectResponse.headers?.get("etag");
+      if (contentType) res.setHeader("Content-Type", contentType);
+      if (contentLength) res.setHeader("Content-Length", contentLength);
+      if (etag) res.setHeader("ETag", etag);
+      if (contentType === "application/pdf") {
+        res.setHeader("Content-Disposition", "inline");
+        res.removeHeader("X-Frame-Options");
+      }
+      const buffer = Buffer.from(await objectResponse.arrayBuffer());
+      return res.send(buffer);
+    }
+
+    res.status(404).json({ error: "File not available" });
+  } catch (e) {
+    console.error("[public-files]", e.message);
+    res.status(500).json({ error: "Failed to serve file" });
+  }
 });
 
 registerHealthRoutes(app);

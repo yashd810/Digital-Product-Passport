@@ -485,7 +485,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Core tables", value: "26 named tables discovered in the current public schema, plus generated `<type>_passports` tables" },
         { label: "Catalog pattern", value: "Passport types define fields in `passport_types`, then runtime records live in type-specific passport tables" },
-        { label: "Key registry", value: "`passport_registry` connects GUID, company, passport type, public access key, and device key" },
+        { label: "Key registry", value: "`passport_registry` connects GUID, company, passport type, and the hashed metadata for public access keys and device keys" },
         { label: "API families", value: `${BACKEND_API_FAMILIES.length} major endpoint families mapped in this manual` },
       ],
       journeys: [

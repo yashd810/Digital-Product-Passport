@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import "../styles/Landing.css";
 
 const API = import.meta.env.VITE_API_URL || "";
+const PASSWORD_MIN_LENGTH = 12;
 
 export function ForgotPassword() {
   const navigate = useNavigate();
@@ -120,7 +121,10 @@ export function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+      return;
+    }
     if (password !== confirm)  { setError("Passwords do not match"); return; }
     setLoading(true);
     try {
@@ -141,8 +145,8 @@ export function ResetPassword() {
 
   const strength = (p) => {
     if (!p) return null;
-    if (p.length < 6) return { label:"Too short", color:"#e53e3e", pct:20 };
-    if (p.length < 8) return { label:"Weak",      color:"#dd6b20", pct:40 };
+    if (p.length < PASSWORD_MIN_LENGTH) return { label:"Too short", color:"#e53e3e", pct:20 };
+    if (p.length < PASSWORD_MIN_LENGTH + 2) return { label:"Weak", color:"#dd6b20", pct:40 };
     const has = (re) => re.test(p);
     const score = [has(/[A-Z]/),has(/[0-9]/),has(/[^A-Za-z0-9]/)].filter(Boolean).length;
     if (score === 0) return { label:"Fair",   color:"#d69e2e", pct:55 };
@@ -201,7 +205,7 @@ export function ResetPassword() {
             <label htmlFor="newpw">New Password</label>
             <input
               id="newpw" type="password" value={password} required
-              placeholder="Min. 6 characters" disabled={loading}
+              placeholder={`Min. ${PASSWORD_MIN_LENGTH} characters`} disabled={loading}
               onChange={e => setPassword(e.target.value)}
               autoFocus
             />

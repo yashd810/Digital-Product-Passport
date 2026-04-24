@@ -48,7 +48,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [accessKeyInput,    setAccessKeyInput]    = useState("");
   const [accessError,       setAccessError]       = useState("");
   const [unlocking,         setUnlocking]         = useState(false);
-  const [passportAccessKey, setPassportAccessKey] = useState(null);   // key shown to logged-in users
+  const [passportAccessKeyMeta, setPassportAccessKeyMeta] = useState(null);
+  const [passportAccessKey, setPassportAccessKey] = useState(null);   // one-time reveal after rotation
+  const [accessKeyBusy,     setAccessKeyBusy]     = useState(false);
   const [keyCopied,         setKeyCopied]         = useState(false);
   const [showHistoryModal,  setShowHistoryModal]  = useState(false);
   const [activeSectionKey,  setActiveSectionKey]  = useState("");
@@ -156,16 +158,41 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       .catch(() => {});
   }, [passport?.guid, passport?.release_status]);
 
-  // Fetch the access key so logged-in company users can share it with authorised parties
+  // Fetch access-key metadata for logged-in company users.
   useEffect(() => {
     if (!isLoggedIn || !passport?.guid || !passport?.company_id) return;
     fetch(`${API}/api/companies/${passport.company_id}/passports/${passport.guid}/access-key`, {
       headers: authHeaders(),
     })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.accessKey) setPassportAccessKey(d.accessKey); })
+      .then((d) => { if (d) setPassportAccessKeyMeta(d); })
       .catch(() => {});
   }, [passport?.guid, passport?.company_id, isLoggedIn]);
+
+  const handleRegenerateAccessKey = async () => {
+    if (!passport?.guid || !passport?.company_id) return;
+    if (!window.confirm("Issue a new passport access key? The previous key will stop working immediately.")) return;
+    setAccessKeyBusy(true);
+    try {
+      const r = await fetch(`${API}/api/companies/${passport.company_id}/passports/${passport.guid}/access-key/regenerate`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Failed to rotate access key");
+      setPassportAccessKey(d.accessKey || null);
+      setPassportAccessKeyMeta({
+        hasAccessKey: true,
+        keyPrefix: d.keyPrefix || null,
+        lastRotatedAt: d.lastRotatedAt || new Date().toISOString(),
+      });
+      setKeyCopied(false);
+    } catch (e) {
+      setAccessError(e.message || "Failed to rotate access key");
+    } finally {
+      setAccessKeyBusy(false);
+    }
+  };
 
   // UI event handlers
   const handleUnlock = async () => {
@@ -333,26 +360,38 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
             )}
 
             {/* Access key info bar — only visible to logged-in company users */}
-            {isLoggedIn && passportAccessKey && (
+            {isLoggedIn && (passportAccessKeyMeta || passportAccessKey) && (
               <div className="access-key-bar">
                 <span className="access-key-bar-icon">🔑</span>
                 <div className="access-key-bar-text">
                   <strong>Passport Access Key</strong>
                   <span className="access-key-bar-hint">
-                    Share this key with authorised parties (Notified Bodies, EU Commission, etc.) so they can view restricted fields on the public passport page.
+                    Access keys are now write-only for security. Issue a new key when you need to share restricted-field access with an authorised party.
                   </span>
                 </div>
-                <code className="access-key-bar-code">{passportAccessKey}</code>
-                <button
-                  className="access-key-bar-copy"
-                  onClick={() => {
-                    navigator.clipboard.writeText(passportAccessKey);
-                    setKeyCopied(true);
-                    setTimeout(() => setKeyCopied(false), 2000);
-                  }}
-                >
-                  {keyCopied ? "✓ Copied" : "Copy"}
-                </button>
+                <code className="access-key-bar-code">
+                  {passportAccessKey || passportAccessKeyMeta?.keyPrefix || "Not issued yet"}
+                </code>
+                {passportAccessKey ? (
+                  <button
+                    className="access-key-bar-copy"
+                    onClick={() => {
+                      navigator.clipboard.writeText(passportAccessKey);
+                      setKeyCopied(true);
+                      setTimeout(() => setKeyCopied(false), 2000);
+                    }}
+                  >
+                    {keyCopied ? "✓ Copied" : "Copy"}
+                  </button>
+                ) : (
+                  <button
+                    className="access-key-bar-copy"
+                    onClick={handleRegenerateAccessKey}
+                    disabled={accessKeyBusy}
+                  >
+                    {accessKeyBusy ? "Issuing…" : passportAccessKeyMeta?.hasAccessKey ? "Regenerate" : "Issue Key"}
+                  </button>
+                )}
               </div>
             )}
 

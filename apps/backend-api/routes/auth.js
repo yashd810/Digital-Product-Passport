@@ -10,6 +10,9 @@ module.exports = function registerAuthRoutes(app, {
   verifyPassword,
   generateToken,
   hashOpaqueToken,
+  validatePasswordPolicy,
+  PASSWORD_MIN_LENGTH,
+  SESSION_COOKIE_NAME,
   setAuthCookie,
   clearAuthCookie,
   sendOtpEmail,
@@ -31,8 +34,8 @@ module.exports = function registerAuthRoutes(app, {
       const { token, firstName, lastName, password } = req.body;
       if (!token || !firstName || !lastName || !password)
         return res.status(400).json({ error: "All fields are required" });
-      if (password.length < 6)
-        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      const passwordPolicyError = validatePasswordPolicy(password);
+      if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
 
       const tokenRow = await pool.query(
         `SELECT it.*, c.company_name FROM invite_tokens it
@@ -54,13 +57,13 @@ module.exports = function registerAuthRoutes(app, {
       const result = await pool.query(
         `INSERT INTO users (email, password_hash, first_name, last_name, company_id, role, pepper_version)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING id, email, company_id, role, first_name, last_name`,
+         RETURNING id, email, company_id, role, first_name, last_name, session_version`,
         [invite.email, hash, firstName, lastName, assignedCompanyId, role, pepperVersion]
       );
       await pool.query("UPDATE invite_tokens SET used = true WHERE token = $1", [token]);
 
       const u = result.rows[0];
-      const sessionToken = generateToken(u.id, u.email, u.company_id, u.role);
+      const sessionToken = generateToken(u);
       setAuthCookie(res, sessionToken);
       res.status(201).json({
         success: true,
@@ -158,7 +161,7 @@ module.exports = function registerAuthRoutes(app, {
       }
 
       await pool.query("UPDATE users SET last_login_at = NOW() WHERE id = $1", [u.id]).catch(() => {});
-      const sessionToken = generateToken(u.id, u.email, u.company_id, u.role);
+      const sessionToken = generateToken(u);
       setAuthCookie(res, sessionToken);
       res.json({
         success: true,
@@ -204,7 +207,7 @@ module.exports = function registerAuthRoutes(app, {
         "UPDATE users SET otp_code = NULL, otp_expires_at = NULL, last_login_at = NOW() WHERE id = $1",
         [u.id]
       );
-      const sessionToken = generateToken(u.id, u.email, u.company_id, u.role);
+      const sessionToken = generateToken(u);
       setAuthCookie(res, sessionToken);
       res.json({
         success: true,
@@ -216,9 +219,29 @@ module.exports = function registerAuthRoutes(app, {
   });
 
   // ─── LOGOUT ─────────────────────────────────────────────────────────────────
-  app.post("/api/auth/logout", (_req, res) => {
-    clearAuthCookie(res);
-    res.json({ success: true });
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      const authHeader = String(req.headers.authorization || "");
+      const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+      const sessionCookie = String(req.headers.cookie || "")
+        .split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(`${SESSION_COOKIE_NAME}=`));
+      const cookieToken = sessionCookie ? decodeURIComponent(sessionCookie.slice(`${SESSION_COOKIE_NAME}=`.length)) : "";
+      const token = bearerToken || cookieToken;
+      if (token) {
+        try {
+          const payload = jwt.verify(token, JWT_SECRET);
+          await pool.query(
+            "UPDATE users SET session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $1",
+            [payload.userId]
+          );
+        } catch {}
+      }
+    } finally {
+      clearAuthCookie(res);
+      res.json({ success: true });
+    }
   });
 
   app.get("/api/auth/sso/providers", publicReadRateLimit, async (_req, res) => {
@@ -321,7 +344,8 @@ module.exports = function registerAuthRoutes(app, {
     try {
       const { token, newPassword } = req.body;
       if (!token || !newPassword) return res.status(400).json({ error: "token and newPassword required" });
-      if (newPassword.length < 6) return res.status(400).json({ error: "Password too short" });
+      const passwordPolicyError = validatePasswordPolicy(newPassword);
+      if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
       const tokenHash = hashOpaqueToken(token);
       const r = await pool.query(
         "SELECT user_id FROM password_reset_tokens WHERE token = ANY($1::text[]) AND used = false AND expires_at > NOW()",
@@ -329,8 +353,15 @@ module.exports = function registerAuthRoutes(app, {
       );
       if (!r.rows.length) return res.status(400).json({ error: "Invalid or expired token" });
       const { hash, pepperVersion } = await hashPassword(newPassword);
-      await pool.query("UPDATE users SET password_hash = $1, pepper_version = $2, updated_at = NOW() WHERE id = $3",
-        [hash, pepperVersion, r.rows[0].user_id]);
+      await pool.query(
+        `UPDATE users
+         SET password_hash = $1,
+             pepper_version = $2,
+             session_version = COALESCE(session_version, 1) + 1,
+             updated_at = NOW()
+         WHERE id = $3`,
+        [hash, pepperVersion, r.rows[0].user_id]
+      );
       await pool.query("UPDATE password_reset_tokens SET used = true WHERE token = ANY($1::text[])", [[token, tokenHash]]);
       res.json({ success: true });
     } catch { res.status(500).json({ error: "Password reset failed" }); }
@@ -419,12 +450,7 @@ module.exports = function registerAuthRoutes(app, {
 
   app.post("/api/users/me/token", authenticateToken, async (req, res) => {
     try {
-      const freshToken = generateToken(
-        req.user.userId,
-        req.user.email,
-        req.user.companyId,
-        req.user.role
-      );
+      const freshToken = generateToken(req.user);
       setAuthCookie(res, freshToken);
       res.json({ token: freshToken });
     } catch {
@@ -469,14 +495,25 @@ module.exports = function registerAuthRoutes(app, {
     try {
       const { currentPassword, newPassword } = req.body;
       if (!currentPassword || !newPassword) return res.status(400).json({ error: "Both passwords required" });
-      if (newPassword.length < 6) return res.status(400).json({ error: "Password too short" });
+      const passwordPolicyError = validatePasswordPolicy(newPassword);
+      if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
       const u = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.user.userId]);
       if (!await verifyPassword(currentPassword, u.rows[0].password_hash))
         return res.status(401).json({ error: "Current password is incorrect" });
       const { hash, pepperVersion } = await hashPassword(newPassword);
-      await pool.query("UPDATE users SET password_hash = $1, pepper_version = $2, updated_at = NOW() WHERE id = $3",
-        [hash, pepperVersion, req.user.userId]);
-      res.json({ success: true });
+      const updated = await pool.query(
+        `UPDATE users
+         SET password_hash = $1,
+             pepper_version = $2,
+             session_version = COALESCE(session_version, 1) + 1,
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING id, email, company_id, role, session_version`,
+        [hash, pepperVersion, req.user.userId]
+      );
+      const freshToken = generateToken(updated.rows[0]);
+      setAuthCookie(res, freshToken);
+      res.json({ success: true, min_password_length: PASSWORD_MIN_LENGTH });
     } catch { res.status(500).json({ error: "Failed" }); }
   });
 
@@ -503,7 +540,7 @@ module.exports = function registerAuthRoutes(app, {
       const { role } = req.body;
       if (!["company_admin","editor","viewer"].includes(role))
         return res.status(400).json({ error: "Invalid role" });
-      await pool.query("UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 AND company_id = $3",
+      await pool.query("UPDATE users SET role = $1, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $2 AND company_id = $3",
         [role, req.params.userId, req.params.companyId]);
       res.json({ success: true });
     } catch { res.status(500).json({ error: "Failed" }); }
@@ -513,7 +550,7 @@ module.exports = function registerAuthRoutes(app, {
     try {
       if (req.user.role !== "company_admin" && req.user.role !== "super_admin")
         return res.status(403).json({ error: "Admin only" });
-      await pool.query("UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1 AND company_id = $2",
+      await pool.query("UPDATE users SET is_active = false, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $1 AND company_id = $2",
         [req.params.userId, req.params.companyId]);
       res.json({ success: true });
     } catch { res.status(500).json({ error: "Failed" }); }

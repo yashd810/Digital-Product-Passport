@@ -1,0 +1,44 @@
+[
+  {
+    "key": "identifiers-and-product-data",
+    "label": "Identifiers and Product Data",
+    "description": "Core identifiers, manufacturer details, and general product data attributes that uniquely describe the battery and its origin.",
+    "termCount": 20
+  },
+  {
+    "key": "labels-and-conformity",
+    "label": "Labels and Conformity Documentation",
+    "description": "Attributes covering mandatory labeling symbols, conformity declarations, and compliance test documentation required for regulatory approval.",
+    "termCount": 7
+  },
+  {
+    "key": "carbon-footprint",
+    "label": "Battery Carbon Footprint",
+    "description": "Quantitative greenhouse gas emission values across the full battery lifecycle, including per-stage contributions and the overall performance class.",
+    "termCount": 8
+  },
+  {
+    "key": "supply-chain-due-diligence",
+    "label": "Supply Chain Due Diligence",
+    "description": "Information verifying responsible sourcing practices, third-party audit assurances, and measurable supply chain integrity indices.",
+    "termCount": 3
+  },
+  {
+    "key": "materials-and-composition",
+    "label": "Materials and Composition",
+    "description": "Detailed declarations of the chemical composition, critical and hazardous materials, and electrode chemistry used in the battery.",
+    "termCount": 5
+  },
+  {
+    "key": "circularity-and-resource-efficiency",
+    "label": "Circularity and Resource Efficiency",
+    "description": "Data supporting end-of-life handling, recycled and renewable content shares, spare parts availability, and waste prevention guidance.",
+    "termCount": 15
+  },
+  {
+    "key": "performance-and-durability",
+    "label": "Performance and Durability",
+    "description": "Technical performance parameters covering capacity, energy, voltage, efficiency, lifetime, and operational condition data for the battery.",
+    "termCount": 42
+  }
+]

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/Landing.css";
 
 const API = import.meta.env.VITE_API_URL || "";
+const PASSWORD_MIN_LENGTH = 12;
 
 function Register({ setToken, setUser, setCompanyId }) {
   const navigate  = useNavigate();
@@ -66,8 +67,8 @@ function Register({ setToken, setUser, setCompanyId }) {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
       return;
     }
 

@@ -18,6 +18,10 @@ function normalizeArray(value, fallback = []) {
   return fallback;
 }
 
+function sha256Base64Url(value) {
+  return crypto.createHash("sha256").update(String(value || "")).digest("base64url");
+}
+
 function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache }) {
   const rawProviders = parseJsonEnv("OAUTH_PROVIDERS_JSON", []);
   const providers = Array.isArray(rawProviders)
@@ -82,7 +86,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     return jwt.verify(token, JWT_SECRET);
   }
 
-  async function exchangeCode(provider, metadata, code, redirectUri) {
+  async function exchangeCode(provider, metadata, code, redirectUri, codeVerifier) {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: provider.clientId,
@@ -90,6 +94,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       code,
       redirect_uri: redirectUri,
     });
+    if (codeVerifier) body.set("code_verifier", codeVerifier);
     const response = await fetch(metadata.token_endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -147,7 +152,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     assertEmailAllowed(provider, email);
 
     const existingIdentity = await pool.query(
-      `SELECT u.id, u.email, u.company_id, u.role, u.first_name, u.last_name, u.is_active
+      `SELECT u.id, u.email, u.company_id, u.role, u.first_name, u.last_name, u.is_active, u.session_version
          FROM user_identities ui
          JOIN users u ON u.id = ui.user_id
         WHERE ui.provider_key = $1 AND ui.provider_subject = $2
@@ -169,7 +174,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     let user = null;
     if (provider.autoLinkByEmail) {
       const existingUser = await pool.query(
-        `SELECT id, email, company_id, role, first_name, last_name, is_active
+        `SELECT id, email, company_id, role, first_name, last_name, is_active, session_version
            FROM users
           WHERE email = $1
           LIMIT 1`,
@@ -194,7 +199,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       const insertedUser = await pool.query(
         `INSERT INTO users (email, password_hash, first_name, last_name, company_id, role, pepper_version, auth_source, sso_only)
          VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8)
-         RETURNING id, email, company_id, role, first_name, last_name, is_active`,
+         RETURNING id, email, company_id, role, first_name, last_name, is_active, session_version`,
         [
           email,
           randomPasswordHash,
@@ -225,9 +230,11 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
 
   function buildAuthUrl(provider, metadata, req, redirectTo = "") {
     const nonce = crypto.randomUUID();
+    const codeVerifier = crypto.randomBytes(48).toString("base64url");
     const state = signState({
       provider: provider.key,
       nonce,
+      codeVerifier,
       redirectTo: redirectTo || "/dashboard",
     });
     const redirectUri = `${process.env.SERVER_URL || `${req.protocol}://${req.get("host")}`}/api/auth/sso/${provider.key}/callback`;
@@ -238,6 +245,8 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       scope: provider.scopes.join(" "),
       state,
       nonce,
+      code_challenge: sha256Base64Url(codeVerifier),
+      code_challenge_method: "S256",
     });
     return `${metadata.authorization_endpoint}?${params.toString()}`;
   }
@@ -259,7 +268,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     if (statePayload.provider !== provider.key) throw new Error("Invalid SSO state");
     const metadata = await getProviderMetadata(provider);
     const redirectUri = `${process.env.SERVER_URL || `${req.protocol}://${req.get("host")}`}/api/auth/sso/${provider.key}/callback`;
-    const tokenSet = await exchangeCode(provider, metadata, code, redirectUri);
+    const tokenSet = await exchangeCode(provider, metadata, code, redirectUri, statePayload.codeVerifier);
     const claims = await validateIdToken(provider, metadata, tokenSet, statePayload.nonce);
     const profile = await hydrateProfile(provider, metadata, tokenSet, claims);
     const user = await resolveUserForOauth(provider, profile);
@@ -269,7 +278,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       [user.id]
     ).catch(() => {});
 
-    const sessionToken = generateToken(user.id, user.email, user.company_id, user.role);
+    const sessionToken = generateToken(user);
     setAuthCookie(res, sessionToken);
 
     const appBase = String(process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "");

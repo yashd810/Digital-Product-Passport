@@ -2,6 +2,7 @@
 
 const batteryPassDinSpec99100 = require("../resources/semantics/battery-pass-din-spec-99100.json");
 const BATTERY_PASS_MODEL_KEY = "battery_pass_din_spec_99100";
+const CLAROS_BATTERY_MODEL_KEY = "claros_battery_v1";
 
 const DPP_CONTEXT = {
   "@version": 1.1,
@@ -57,6 +58,11 @@ function isBatteryPassSemanticExport(passportType, options = {}) {
   );
 }
 
+function isClarosBatteryDictionaryExport(passportType, options = {}) {
+  const modelKey = String(options.semanticModelKey || "").trim().toLowerCase();
+  return isBatteryPassExportType(passportType) && modelKey === CLAROS_BATTERY_MODEL_KEY;
+}
+
 function buildInlineContext(passports, passportType, options = {}) {
   const ctx = {};
 
@@ -86,17 +92,22 @@ function sanitizePassport(passport, passportType) {
   return clean;
 }
 
-function buildPassportJsonLdContext(typeDef, passportType = null) {
-  const options = arguments[2] || {};
+function buildPassportJsonLdContext(typeDef, passportType = null, options = {}, batteryDictionaryService = null) {
   const resolvedType = String(passportType || typeDef?.type_name || "").trim().toLowerCase();
   const contexts = [DPP_CONTEXT];
-  const inlineContext = {};
-  const sections = typeDef?.fields_json?.sections || [];
 
+  // Prefer new Claros dictionary when available
+  if (batteryDictionaryService && isBatteryPassExportType(resolvedType)) {
+    return batteryDictionaryService.buildJsonLdContext(typeDef);
+  }
+
+  // Legacy Battery Pass DIN SPEC semantic export
   if (!isBatteryPassSemanticExport(resolvedType, options)) {
     return contexts;
   }
 
+  const inlineContext = {};
+  const sections = typeDef?.fields_json?.sections || [];
   for (const section of sections) {
     for (const field of (section.fields || [])) {
       if (!field?.key) continue;
@@ -106,9 +117,7 @@ function buildPassportJsonLdContext(typeDef, passportType = null) {
     }
   }
 
-  if (isBatteryPassSemanticExport(resolvedType, options)) {
-    contexts.push(...batteryPassDinSpec99100.contextUrls);
-  }
+  contexts.push(...batteryPassDinSpec99100.contextUrls);
   if (Object.keys(inlineContext).length > 0) {
     contexts.push(inlineContext);
   }

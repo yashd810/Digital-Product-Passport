@@ -432,6 +432,68 @@ module.exports = function registerAdminRoutes(app, {
     }
   });
 
+  // ─── COMPANY DPP POLICY ───────────────────────────────────────────────────
+  app.patch("/api/admin/companies/:id/dpp-policy", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const { dpp_granularity, granularity_locked } = req.body || {};
+
+      const validGranularities = ["model", "item", "batch"];
+      if (dpp_granularity !== undefined && !validGranularities.includes(dpp_granularity)) {
+        return res.status(400).json({
+          error: `dpp_granularity must be one of: ${validGranularities.join(", ")}`,
+        });
+      }
+
+      if (granularity_locked !== undefined && typeof granularity_locked !== "boolean") {
+        return res.status(400).json({ error: "granularity_locked must be a boolean" });
+      }
+
+      const setClauses = [];
+      const params = [];
+      let idx = 1;
+
+      if (dpp_granularity !== undefined) {
+        setClauses.push(`dpp_granularity = $${idx++}`);
+        params.push(dpp_granularity);
+      }
+      if (granularity_locked !== undefined) {
+        setClauses.push(`granularity_locked = $${idx++}`);
+        params.push(granularity_locked);
+      }
+
+      if (!setClauses.length) {
+        return res.status(400).json({ error: "No fields to update. Provide dpp_granularity and/or granularity_locked." });
+      }
+
+      setClauses.push(`updated_at = NOW()`);
+      params.push(companyId);
+
+      const r = await pool.query(
+        `UPDATE companies
+         SET ${setClauses.join(", ")}
+         WHERE id = $${idx}
+         RETURNING *`,
+        params
+      );
+      if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
+
+      await logAudit(
+        companyId, req.user.userId,
+        "UPDATE_DPP_POLICY", "companies", String(companyId),
+        null,
+        { dpp_granularity, granularity_locked }
+      );
+
+      res.json({ success: true, company: r.rows[0] });
+    } catch (e) {
+      console.error("DPP policy update error:", e.message);
+      res.status(500).json({ error: "Failed to update DPP policy" });
+    }
+  });
+
   app.delete("/api/admin/companies/:companyId", authenticateToken, isSuperAdmin, async (req, res) => {
     const client = await pool.connect();
     let passportGuids = [];
@@ -639,7 +701,10 @@ module.exports = function registerAdminRoutes(app, {
       }
 
       const updated = await pool.query(
-        `UPDATE users SET is_active = $1, updated_at = NOW()
+        `UPDATE users
+         SET is_active = $1,
+             session_version = COALESCE(session_version, 1) + 1,
+             updated_at = NOW()
          WHERE id = $2 AND role = 'super_admin'
          RETURNING id, email, first_name, last_name, is_active, created_at, last_login_at`,
         [active, userId]
@@ -887,7 +952,10 @@ module.exports = function registerAdminRoutes(app, {
       const { role } = req.body;
       if (!["company_admin","editor","viewer"].includes(role))
         return res.status(400).json({ error: "Invalid role" });
-      await pool.query("UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2", [role, req.params.userId]);
+      await pool.query(
+        "UPDATE users SET role = $1, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $2",
+        [role, req.params.userId]
+      );
       res.json({ success: true });
     } catch { res.status(500).json({ error: "Failed" }); }
   });

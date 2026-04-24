@@ -15,6 +15,9 @@ module.exports = function registerPassportRoutes(app, {
   apiKeyReadRateLimit,
   assetWriteRateLimit,
   upload,
+  hashSecret,
+  createAccessKeyMaterial,
+  createDeviceKeyMaterial,
   // passport service helpers
   IN_REVISION_STATUSES_SQL,
   EDITABLE_RELEASE_STATUSES_SQL,
@@ -61,6 +64,39 @@ module.exports = function registerPassportRoutes(app, {
   buildBatteryPassJsonExport,
   storageService,
 }) {
+  const insertPassportRegistry = async ({
+    client = pool,
+    guid,
+    lineageId,
+    companyId,
+    passportType,
+    accessKeyHash = null,
+    accessKeyPrefix = null,
+    accessKeyLastRotatedAt = null,
+    deviceApiKeyHash = null,
+    deviceApiKeyPrefix = null,
+    deviceKeyLastRotatedAt = null,
+  }) => client.query(
+    `INSERT INTO passport_registry
+       (guid, lineage_id, company_id, passport_type,
+        access_key_hash, access_key_prefix, access_key_last_rotated_at,
+        device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (guid) DO NOTHING`,
+    [
+      guid,
+      lineageId,
+      companyId,
+      passportType,
+      accessKeyHash,
+      accessKeyPrefix,
+      accessKeyLastRotatedAt,
+      deviceApiKeyHash,
+      deviceApiKeyPrefix,
+      deviceKeyLastRotatedAt,
+    ]
+  );
+
 
   // ─── API KEY MANAGEMENT ────────────────────────────────────────────────────
 
@@ -229,10 +265,13 @@ module.exports = function registerPassportRoutes(app, {
           `INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places}) RETURNING *`,
           allVals
         );
-        await client.query(
-          `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type) VALUES ($1, $2, $3, $4) ON CONFLICT (guid) DO NOTHING`,
-          [guid, lineageId, companyId, resolvedPassportType]
-        );
+        await insertPassportRegistry({
+          client,
+          guid,
+          lineageId,
+          companyId,
+          passportType: resolvedPassportType,
+        });
         await client.query("COMMIT");
       } catch (e) {
         await client.query("ROLLBACK");
@@ -295,10 +334,12 @@ module.exports = function registerPassportRoutes(app, {
             `INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places}) RETURNING guid, model_name, product_id`,
             allVals
           );
-          await pool.query(
-            `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type) VALUES ($1,$2,$3,$4) ON CONFLICT (guid) DO NOTHING`,
-            [guid, lineageId, companyId, resolvedPassportType]
-          );
+          await insertPassportRegistry({
+            guid,
+            lineageId,
+            companyId,
+            passportType: resolvedPassportType,
+          });
           await logAudit(companyId, userId, "CREATE", tableName, guid, null, { product_id: normalizedProductId, passport_type: resolvedPassportType, model_name, bulk: true });
           results.push({ index: i, success: true, guid, product_id: normalizedProductId, model_name: model_name || null });
           created++;
@@ -608,12 +649,43 @@ module.exports = function registerPassportRoutes(app, {
   app.get("/api/companies/:companyId/passports/:guid/access-key", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(
-        "SELECT access_key FROM passport_registry WHERE guid = $1 AND company_id = $2",
+        `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at
+         FROM passport_registry
+         WHERE guid = $1 AND company_id = $2`,
         [req.params.guid, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-      res.json({ accessKey: r.rows[0].access_key });
+      res.json({
+        hasAccessKey: !!r.rows[0].access_key_hash,
+        keyPrefix: r.rows[0].access_key_prefix || null,
+        lastRotatedAt: r.rows[0].access_key_last_rotated_at || null,
+        revealable: false,
+      });
     } catch (e) { res.status(500).json({ error: "Failed to get access key" }); }
+  });
+
+  app.post("/api/companies/:companyId/passports/:guid/access-key/regenerate", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+    try {
+      const { guid, companyId } = req.params;
+      const material = createAccessKeyMaterial();
+      const updated = await pool.query(
+        `UPDATE passport_registry
+         SET access_key = NULL,
+             access_key_hash = $1,
+             access_key_prefix = $2,
+             access_key_last_rotated_at = NOW()
+         WHERE guid = $3 AND company_id = $4
+         RETURNING access_key_prefix, access_key_last_rotated_at`,
+        [material.hash, material.prefix, guid, companyId]
+      );
+      if (!updated.rows.length) return res.status(404).json({ error: "Passport not found" });
+      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passport_registry", guid, null, { key_prefix: material.prefix });
+      res.json({
+        accessKey: material.rawKey,
+        keyPrefix: updated.rows[0].access_key_prefix,
+        lastRotatedAt: updated.rows[0].access_key_last_rotated_at,
+      });
+    } catch (e) { res.status(500).json({ error: "Failed to rotate access key" }); }
   });
 
   // ─── BULK UPDATE ALL ───────────────────────────────────────────────────────
@@ -877,6 +949,11 @@ module.exports = function registerPassportRoutes(app, {
       }
 
       await markOlderVersionsObsolete(tableName, guid, released.version_number);
+      // Make all attachments for this passport publicly accessible now that it is released
+      await pool.query(
+        "UPDATE passport_attachments SET is_public = true WHERE passport_guid = $1",
+        [guid]
+      ).catch(() => {});
       await logAudit(companyId, req.user.userId, "RELEASE", tableName, guid, { release_status: "draft_or_in_revision" }, { release_status: "released" });
       res.json({ success: true, passport: normalizePassportRow(released) });
     } catch (e) { res.status(500).json({ error: "Failed to release passport" }); }
@@ -924,16 +1001,26 @@ module.exports = function registerPassportRoutes(app, {
       await pool.query(`INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places})`, allVals);
 
       const sourceRegistry = await pool.query(
-        `SELECT access_key, device_api_key FROM passport_registry WHERE guid = $1 AND company_id = $2 LIMIT 1`,
+        `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
+                device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
+         FROM passport_registry
+         WHERE guid = $1 AND company_id = $2
+         LIMIT 1`,
         [guid, companyId]
       );
       const sourceKeys = sourceRegistry.rows[0] || {};
-      await pool.query(
-        `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type, access_key, device_api_key)
-         VALUES ($1, $2, $3, $4, COALESCE($5, gen_random_uuid()::text), COALESCE($6, replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')))
-         ON CONFLICT (guid) DO NOTHING`,
-        [newGuid, src.lineage_id, companyId, passportType, sourceKeys.access_key || null, sourceKeys.device_api_key || null]
-      );
+      await insertPassportRegistry({
+        guid: newGuid,
+        lineageId: src.lineage_id,
+        companyId,
+        passportType,
+        accessKeyHash: sourceKeys.access_key_hash || null,
+        accessKeyPrefix: sourceKeys.access_key_prefix || null,
+        accessKeyLastRotatedAt: sourceKeys.access_key_last_rotated_at || null,
+        deviceApiKeyHash: sourceKeys.device_api_key_hash || null,
+        deviceApiKeyPrefix: sourceKeys.device_api_key_prefix || null,
+        deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null,
+      });
 
       await logAudit(companyId, userId, "REVISE", tableName, newGuid, { version_number: src.version_number }, { version_number: newVersion });
       res.json({ success: true, guid: newGuid, newVersion, release_status: IN_REVISION_STATUS });
@@ -1085,16 +1172,26 @@ module.exports = function registerPassportRoutes(app, {
             await pool.query(`INSERT INTO ${tableName} (${allColumns.join(", ")}) VALUES (${placeholders})`, allValues);
 
             const sourceRegistry = await pool.query(
-              `SELECT access_key, device_api_key FROM passport_registry WHERE guid = $1 AND company_id = $2 LIMIT 1`,
+              `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
+                      device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
+               FROM passport_registry
+               WHERE guid = $1 AND company_id = $2
+               LIMIT 1`,
               [guid, companyId]
             );
             const sourceKeys = sourceRegistry.rows[0] || {};
-            await pool.query(
-              `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type, access_key, device_api_key)
-               VALUES ($1, $2, $3, $4, COALESCE($5, gen_random_uuid()::text), COALESCE($6, replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')))
-               ON CONFLICT (guid) DO NOTHING`,
-              [newGuid, source.lineage_id, companyId, passportType, sourceKeys.access_key || null, sourceKeys.device_api_key || null]
-            );
+            await insertPassportRegistry({
+              guid: newGuid,
+              lineageId: source.lineage_id,
+              companyId,
+              passportType,
+              accessKeyHash: sourceKeys.access_key_hash || null,
+              accessKeyPrefix: sourceKeys.access_key_prefix || null,
+              accessKeyLastRotatedAt: sourceKeys.access_key_last_rotated_at || null,
+              deviceApiKeyHash: sourceKeys.device_api_key_hash || null,
+              deviceApiKeyPrefix: sourceKeys.device_api_key_prefix || null,
+              deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null,
+            });
 
             let detailStatus = submitToWorkflow ? "submitted" : "revised";
             let detailMessage = revisionNote || null;
@@ -1613,12 +1710,32 @@ module.exports = function registerPassportRoutes(app, {
           return res.status(404).json({ error: "Editable passport not found" });
         }
 
+        // Register in passport_attachments with an opaque public_id for app-mediated serving
+        const publicId = crypto.randomBytes(10).toString("base64url").slice(0, 16);
+        const appUrl = process.env.APP_URL || "http://localhost:3001";
+        const publicFileUrl = `${appUrl}/public-files/${publicId}`;
+        await pool.query(
+          `INSERT INTO passport_attachments
+             (public_id, company_id, passport_guid, field_key, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, is_public)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
+           ON CONFLICT (public_id) DO NOTHING`,
+          [
+            publicId, companyId, guid, fieldKey,
+            stored.path || null,
+            stored.storageKey || null,
+            stored.provider || null,
+            fileUrl,
+            req.file.mimetype || "application/octet-stream",
+            req.file.size || null,
+          ]
+        ).catch(() => {});
+
         await pool.query(
           `UPDATE ${tableName} SET ${fieldKey} = $1, updated_at = NOW() WHERE id = $2`,
-          [fileUrl, row.rows[0].id]
+          [publicFileUrl, row.rows[0].id]
         );
-        await logAudit(companyId, req.user.userId, "UPLOAD", tableName, guid, null, { fieldKey, fileUrl });
-        res.json({ success: true, url: fileUrl, fieldKey });
+        await logAudit(companyId, req.user.userId, "UPLOAD", tableName, guid, null, { fieldKey, publicFileUrl });
+        res.json({ success: true, url: publicFileUrl, fieldKey });
       } catch (e) {
         if (e.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "File too large. Max 20 MB." });
         res.status(500).json({ error: "Upload failed" });
@@ -1742,13 +1859,24 @@ module.exports = function registerPassportRoutes(app, {
 
   // ─── QR CODE ───────────────────────────────────────────────────────────────
 
-  app.post("/api/passports/:guid/qrcode", authenticateToken, async (req, res) => {
+  app.post("/api/passports/:guid/qrcode", authenticateToken, requireEditor, async (req, res) => {
     try {
       const { qrCode, passportType } = req.body;
       if (!qrCode || !passportType) return res.status(400).json({ error: "qrCode and passportType required" });
 
+      // Validate QR value is an HTTPS URL, not a raw DID string
+      if (!qrCode.startsWith("https://") && !qrCode.startsWith("http://")) {
+        return res.status(400).json({ error: "QR code must be an HTTPS URL" });
+      }
+
       const reg = await pool.query("SELECT company_id FROM passport_registry WHERE guid = $1", [req.params.guid]);
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found in registry" });
+
+      // Enforce company ownership — editors can only update passports in their own company
+      const passportCompanyId = String(reg.rows[0].company_id);
+      if (req.user.role !== "super_admin" && String(req.user.companyId) !== passportCompanyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
 
       const tableName = getTable(passportType);
       await pool.query(`UPDATE ${tableName} SET qr_code = $1, updated_at = NOW() WHERE guid = $2`, [qrCode, req.params.guid]);
@@ -1855,12 +1983,16 @@ module.exports = function registerPassportRoutes(app, {
       const deviceKey = req.headers["x-device-key"];
       if (!deviceKey) return res.status(401).json({ error: "x-device-key header required" });
 
-      const reg = await pool.query("SELECT device_api_key FROM passport_registry WHERE guid = $1", [guid]);
+      const reg = await pool.query(
+        "SELECT device_api_key_hash FROM passport_registry WHERE guid = $1",
+        [guid]
+      );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
-      const storedKey = String(reg.rows[0].device_api_key || "");
-      const submittedKey = String(deviceKey || "");
-      const storedBuf = Buffer.from(storedKey);
-      const submittedBuf = Buffer.from(submittedKey);
+      const storedHash = String(reg.rows[0].device_api_key_hash || "");
+      if (!storedHash) return res.status(403).json({ error: "Device key is not configured for this passport" });
+      const submittedHash = hashSecret(String(deviceKey || ""));
+      const storedBuf = Buffer.from(storedHash, "hex");
+      const submittedBuf = Buffer.from(submittedHash, "hex");
       if (storedBuf.length !== submittedBuf.length || !crypto.timingSafeEqual(storedBuf, submittedBuf))
         return res.status(403).json({ error: "Invalid device key" });
 
@@ -1890,21 +2022,43 @@ module.exports = function registerPassportRoutes(app, {
   app.get("/api/companies/:companyId/passports/:guid/device-key", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { guid } = req.params;
-      const r = await pool.query("SELECT device_api_key FROM passport_registry WHERE guid = $1", [guid]);
+      const r = await pool.query(
+        `SELECT device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
+         FROM passport_registry
+         WHERE guid = $1 AND company_id = $2`,
+        [guid, req.params.companyId]
+      );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-      res.json({ deviceKey: r.rows[0].device_api_key });
+      res.json({
+        hasDeviceKey: !!r.rows[0].device_api_key_hash,
+        keyPrefix: r.rows[0].device_api_key_prefix || null,
+        lastRotatedAt: r.rows[0].device_key_last_rotated_at || null,
+        revealable: false,
+      });
     } catch (e) { res.status(500).json({ error: "Failed to fetch device key" }); }
   });
 
   app.post("/api/companies/:companyId/passports/:guid/device-key/regenerate", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { guid } = req.params;
+      const material = createDeviceKeyMaterial();
       const r = await pool.query(
-        `UPDATE passport_registry SET device_api_key = replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '') WHERE guid = $1 RETURNING device_api_key`,
-        [guid]
+        `UPDATE passport_registry
+         SET device_api_key = NULL,
+             device_api_key_hash = $1,
+             device_api_key_prefix = $2,
+             device_key_last_rotated_at = NOW()
+         WHERE guid = $3 AND company_id = $4
+         RETURNING device_api_key_prefix, device_key_last_rotated_at`,
+        [material.hash, material.prefix, guid, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-      res.json({ deviceKey: r.rows[0].device_api_key });
+      await logAudit(req.params.companyId, req.user.userId, "ROTATE_DEVICE_KEY", "passport_registry", guid, null, { key_prefix: material.prefix });
+      res.json({
+        deviceKey: material.rawKey,
+        keyPrefix: r.rows[0].device_api_key_prefix,
+        lastRotatedAt: r.rows[0].device_key_last_rotated_at,
+      });
     } catch (e) { res.status(500).json({ error: "Failed to regenerate device key" }); }
   });
 
