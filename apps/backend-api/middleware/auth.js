@@ -53,6 +53,15 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       }
 
       const currentUser = currentUserRes.rows[0];
+      const audienceRes = await pool.query(
+        `SELECT audience
+         FROM user_access_audiences
+         WHERE user_id = $1
+           AND is_active = true
+           AND (company_id IS NULL OR company_id = $2)
+           AND (expires_at IS NULL OR expires_at > NOW())`,
+        [currentUser.id, currentUser.company_id]
+      ).catch(() => ({ rows: [] }));
       const tokenSessionVersion = Number.parseInt(payload.sessionVersion, 10);
       const currentSessionVersion = Number.parseInt(currentUser.session_version, 10) || 1;
       if (!Number.isFinite(tokenSessionVersion) || tokenSessionVersion !== currentSessionVersion) {
@@ -65,6 +74,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
         companyId: currentUser.company_id,
         role: currentUser.role,
         sessionVersion: currentSessionVersion,
+        accessAudiences: audienceRes.rows.map((row) => String(row.audience || "").trim()).filter(Boolean),
       };
       next();
     } catch {

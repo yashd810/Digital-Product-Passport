@@ -22,7 +22,7 @@ const createOauthService       = require("../services/oauth-service");
 const createPasswordService    = require("../services/password-service");
 const logger                   = require("../services/logger");
 const { createTransporter, brandedEmail, sendOtpEmail } = require("../services/email");
-const { validatePasswordPolicy, hashSecret, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../services/security-service");
+const { validatePasswordPolicy, hashSecret, hashOtpCode, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../services/security-service");
 const createAuthMiddleware     = require("../middleware/auth");
 const { createRateLimiters, startRateLimitMaintenance } = require("../middleware/rate-limit");
 const createAssetService       = require("../services/asset-management");
@@ -32,6 +32,7 @@ const createPassportRepresentationService = require("../services/passport-repres
 const dppIdentity                         = require("../services/dpp-identity-service");
 const createBatteryDictionaryService      = require("../services/battery-dictionary-service");
 const createComplianceService             = require("../services/compliance-service");
+const createAccessRightsService           = require("../services/access-rights-service");
 const createProductIdentifierService      = require("../services/product-identifier-service");
 
 global.console = logger.console;
@@ -333,7 +334,10 @@ startRateLimitMaintenance(pool);
 
 // ─── ASSET MANAGEMENT AUTH MIDDLEWARE ────────────────────────────────────────
 const requireAssetManagementKey = (req, res, next) => {
-  if (!ASSET_SHARED_SECRET) return next();
+  if (!ASSET_SHARED_SECRET) {
+    logger.error("[asset-management] ASSET_MANAGEMENT_SHARED_SECRET is not configured");
+    return res.status(503).json({ error: "Asset management integration is unavailable" });
+  }
   const submitted = String(req.headers["x-asset-key"] || "");
   if (!submitted) return res.status(401).json({ error: "x-asset-key header required" });
   const expectedBuf = Buffer.from(String(ASSET_SHARED_SECRET));
@@ -512,9 +516,9 @@ const didService = createDidService({
   publicOrigin: process.env.PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000",
   apiOrigin: process.env.SERVER_URL || `http://localhost:${PORT}`,
 });
-const canonicalPassportSerializer = createCanonicalPassportSerializer({ didService });
-const { buildCanonicalPassportPayload } = canonicalPassportSerializer;
 const productIdentifierService = createProductIdentifierService({ didService });
+const canonicalPassportSerializer = createCanonicalPassportSerializer({ didService, productIdentifierService });
+const { buildCanonicalPassportPayload } = canonicalPassportSerializer;
 
 // ─── SIGNING SERVICE ─────────────────────────────────────────────────────────
 const signingService = createSigningService({
@@ -527,11 +531,12 @@ const signingService = createSigningService({
 const { signPassport, verifyPassportSignature } = signingService;
 
 // ─── PASSPORT REPRESENTATION SERVICE ────────────────────────────────────────
-const { buildOperationalDppPayload } = createPassportRepresentationService();
+const { buildOperationalDppPayload } = createPassportRepresentationService({ productIdentifierService });
 
 // ─── BATTERY DICTIONARY SERVICE ──────────────────────────────────────────────
 const batteryDictionaryService = createBatteryDictionaryService();
 const complianceService = createComplianceService({ pool, batteryDictionaryService });
+const accessRightsService = createAccessRightsService({ pool });
 
 // ─── PASSPORT SERVICE ────────────────────────────────────────────────────────
 const passportService = createPassportService({
@@ -549,6 +554,7 @@ const {
   IN_REVISION_STATUSES_SQL, EDITABLE_RELEASE_STATUSES_SQL, REVISION_BLOCKING_STATUSES_SQL,
   EDIT_SESSION_TIMEOUT_HOURS, EDIT_SESSION_TIMEOUT_SQL,
   logAudit, createNotification,
+  verifyAuditLogChain,
   getPassportTypeSchema, findExistingPassportByProductId,
   getPassportLineageContext, getPassportVersionsByLineage,
   getCompanyNameMap, stripRestrictedFieldsForPublicView,
@@ -789,7 +795,7 @@ registerWorkflowRoutes(app, {
 
 registerAuthRoutes(app, {
   pool, jwt, JWT_SECRET, hashPassword, verifyPassword, verifyPasswordAndUpgrade, generateToken, hashOpaqueToken,
-  validatePasswordPolicy, PASSWORD_MIN_LENGTH,
+  validatePasswordPolicy, PASSWORD_MIN_LENGTH, hashOtpCode,
   SESSION_COOKIE_NAME,
   setAuthCookie, clearAuthCookie, sendOtpEmail, createTransporter, brandedEmail,
   logAudit, authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
@@ -830,9 +836,10 @@ registerPassportRoutes(app, {
   fetchCompanyPassportRecord, resolveCompanyPreviewPassport,
   updatePassportRowById, buildPassportVersionHistory,
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
+  verifyAuditLogChain,
   stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
   submitPassportToWorkflow, signPassport,
-  buildBatteryPassJsonExport, storageService, complianceService, productIdentifierService,
+  buildBatteryPassJsonExport, storageService, complianceService, accessRightsService, productIdentifierService,
 });
 
 registerPassportPublicRoutes(app, {
@@ -857,11 +864,11 @@ registerCompanyRoutes(app, {
   findExistingPassportByProductId, updatePassportRowById,
   getWritablePassportColumns, getStoredPassportValues,
   logAudit, EDITABLE_RELEASE_STATUSES_SQL, SYSTEM_PASSPORT_FIELDS,
-  buildBatteryPassJsonExport, productIdentifierService,
+  buildBatteryPassJsonExport, productIdentifierService, complianceService, accessRightsService,
 });
 
 registerDppApiRoutes(app, {
-  pool, publicReadRateLimit,
+  pool, publicReadRateLimit, authenticateToken, requireEditor,
   getTable, normalizePassportRow,
   normalizeProductIdValue,
   stripRestrictedFieldsForPublicView, getCompanyNameMap,
@@ -873,6 +880,10 @@ registerDppApiRoutes(app, {
   didService,
   dppIdentity,
   productIdentifierService,
+  updatePassportRowById,
+  isEditablePassportStatus,
+  logAudit,
+  accessRightsService,
 });
 
 registerDictionaryRoutes(app, { publicReadRateLimit, batteryDictionaryService });

@@ -1,6 +1,6 @@
 "use strict";
 
-module.exports = function createPassportRepresentationService() {
+module.exports = function createPassportRepresentationService({ productIdentifierService = null } = {}) {
   function toIsoTimestamp(value) {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value);
@@ -38,10 +38,10 @@ module.exports = function createPassportRepresentationService() {
     const resolvedGranularity = granularity || "model";
 
     // ── economicOperatorId uses company DID when dppIdentity available ────────
-    let economicOperatorId;
-    if (dppIdentity) {
+    let economicOperatorId = passport.economic_operator_id || null;
+    if (!economicOperatorId && dppIdentity) {
       economicOperatorId = dppIdentity.companyDid(passport.company_id);
-    } else {
+    } else if (!economicOperatorId) {
       // Legacy fallback using :org: path
       const appUrl = process.env.APP_URL || "http://localhost:3001";
       const domain = new URL(appUrl).host;
@@ -55,6 +55,15 @@ module.exports = function createPassportRepresentationService() {
 
     if (passport.product_identifier_did) {
       productDid = passport.product_identifier_did;
+    }
+
+    if (!productDid && passport.product_id) {
+      productDid = productIdentifierService?.buildCanonicalProductDid?.({
+        companyId: passport.company_id,
+        passportType: passport.passport_type || typeDef?.type_name || "battery",
+        rawProductId: passport.product_id,
+        granularity: resolvedGranularity,
+      }) || null;
     }
 
     if (dppIdentity && passport.product_id) {
@@ -97,13 +106,15 @@ module.exports = function createPassportRepresentationService() {
     return {
       // JTC 18223 canonical header fields
       digitalProductPassportId:  dppDidValue || null,
-      uniqueProductIdentifier:   passport.product_identifier_did || passport.product_id || null,
+      uniqueProductIdentifier:   productDid || null,
       granularity:               resolvedGranularity,
       dppSchemaVersion:          passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
       dppStatus:                 passport.release_status,
       lastUpdate:                toIsoTimestamp(passport.updated_at || passport.created_at),
       economicOperatorId,
       contentSpecificationIds:   Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],
+      complianceProfileKey:      passport.compliance_profile_key || null,
+      carrierPolicyKey:          passport.carrier_policy_key || null,
       ...(companyName ? { economicOperatorName: companyName } : {}),
 
       // DID-based identifiers (product-id-based, not guid-based)

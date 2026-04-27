@@ -1,5 +1,7 @@
 "use strict";
 
+const nodeCrypto = require("crypto");
+
 const IN_REVISION_STATUSES_SQL       = `('in_revision','revised')`;
 const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','in_revision','revised')`;
 const REVISION_BLOCKING_STATUSES_SQL = `('draft','in_revision','revised','in_review')`;
@@ -34,16 +36,111 @@ module.exports = function createPassportService({
 }) {
   // ─── AUDIT / NOTIFICATION ────────────────────────────────────────────────
 
-  async function logAudit(companyId, userId, action, tableName, passportGuid, oldData, newData) {
+  async function logAudit(companyId, userId, action, tableName, passportGuid, oldData, newData, options = {}) {
     try {
+      const previousHashRes = await pool.query(
+        `SELECT event_hash
+         FROM audit_logs
+         WHERE (
+           ($1::int IS NULL AND company_id IS NULL)
+           OR company_id = $1
+         )
+         ORDER BY id DESC
+         LIMIT 1`,
+        [companyId || null]
+      ).catch(() => ({ rows: [] }));
+      const previousEventHash = previousHashRes.rows[0]?.event_hash || null;
+      const payload = {
+        companyId: companyId || null,
+        userId: userId || null,
+        action,
+        tableName: tableName || null,
+        recordId: passportGuid || null,
+        oldData: oldData || null,
+        newData: newData || null,
+        actorIdentifier: options.actorIdentifier || null,
+        audience: options.audience || null,
+      };
+      const eventHash = nodeCrypto
+        .createHash("sha256")
+        .update(`${previousEventHash || ""}:${JSON.stringify(payload)}`)
+        .digest("hex");
+
       await pool.query(
-        `INSERT INTO audit_logs (company_id,user_id,action,table_name,record_id,old_values,new_values)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [companyId || null, userId || null, action, tableName, passportGuid || null,
-         oldData ? JSON.stringify(oldData) : null,
-         newData ? JSON.stringify(newData) : null]
+        `INSERT INTO audit_logs (
+           company_id,user_id,action,table_name,record_id,old_values,new_values,
+           actor_identifier,audience,previous_event_hash,event_hash
+         )
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          companyId || null,
+          userId || null,
+          action,
+          tableName,
+          passportGuid || null,
+          oldData ? JSON.stringify(oldData) : null,
+          newData ? JSON.stringify(newData) : null,
+          options.actorIdentifier || null,
+          options.audience || null,
+          previousEventHash,
+          eventHash,
+        ]
       );
     } catch (e) { console.error("Audit log error (non-fatal):", e.message); }
+  }
+
+  async function verifyAuditLogChain(companyId = null) {
+    const result = await pool.query(
+      `SELECT id, company_id, user_id, action, table_name, record_id, old_values, new_values,
+              actor_identifier, audience, previous_event_hash, event_hash
+       FROM audit_logs
+       WHERE (
+         ($1::int IS NULL AND company_id IS NULL)
+         OR company_id = $1
+       )
+       ORDER BY id ASC`,
+      [companyId || null]
+    );
+
+    let previousHash = null;
+    const failures = [];
+
+    for (const row of result.rows) {
+      const payload = {
+        companyId: row.company_id || null,
+        userId: row.user_id || null,
+        action: row.action,
+        tableName: row.table_name || null,
+        recordId: row.record_id || null,
+        oldData: row.old_values || null,
+        newData: row.new_values || null,
+        actorIdentifier: row.actor_identifier || null,
+        audience: row.audience || null,
+      };
+      const expectedHash = nodeCrypto
+        .createHash("sha256")
+        .update(`${previousHash || ""}:${JSON.stringify(payload)}`)
+        .digest("hex");
+
+      if (row.previous_event_hash !== previousHash || row.event_hash !== expectedHash) {
+        failures.push({
+          id: row.id,
+          expectedPreviousEventHash: previousHash,
+          storedPreviousEventHash: row.previous_event_hash,
+          expectedEventHash: expectedHash,
+          storedEventHash: row.event_hash,
+        });
+      }
+
+      previousHash = row.event_hash || expectedHash;
+    }
+
+    return {
+      verified: failures.length === 0,
+      checkedEntries: result.rows.length,
+      failures,
+      latestEventHash: previousHash,
+    };
   }
 
   async function createNotification(userId, type, title, message, passportGuid, actionUrl) {
@@ -872,6 +969,11 @@ module.exports = function createPassportService({
         model_name     VARCHAR(255),
         product_id     VARCHAR(255) NOT NULL,
         product_identifier_did TEXT,
+        compliance_profile_key VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1',
+        content_specification_ids TEXT,
+        carrier_policy_key VARCHAR(120),
+        economic_operator_id TEXT,
+        facility_id TEXT,
         granularity    VARCHAR(20)  NOT NULL DEFAULT 'model',
         release_status VARCHAR(50)  NOT NULL DEFAULT 'draft',
         version_number INTEGER      NOT NULL DEFAULT 1,
@@ -1048,6 +1150,7 @@ module.exports = function createPassportService({
     EDIT_SESSION_TIMEOUT_SQL,
     // functions
     logAudit,
+    verifyAuditLogChain,
     createNotification,
     getPassportTypeSchema,
     findExistingPassportByProductId,

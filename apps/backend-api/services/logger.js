@@ -8,6 +8,7 @@ const REDACT_PATHS = [
   "password_hash",
   "token",
   "otp_code",
+  "otp_code_hash",
   "accessKey",
   "access_key",
   "req.headers.authorization",

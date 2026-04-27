@@ -1,6 +1,6 @@
 "use strict";
 
-function createCanonicalPassportSerializer({ didService }) {
+function createCanonicalPassportSerializer({ didService, productIdentifierService = null }) {
   const HEADER_FIELD_ALIASES = {
     granularity: new Set(["granularity", "dpp_granularity", "dppgranularity"]),
     dppSchemaVersion: new Set(["dpp_schema_version", "dppschemaversion"]),
@@ -154,6 +154,14 @@ function createCanonicalPassportSerializer({ didService }) {
       ? didService.generateItemDid(didPassportType, stableId)
       : didService.generateModelDid(didPassportType, stableId);
     const dppDid = didService.generateDppDid(resolvedGranularity, stableId);
+    const derivedProductIdentifierDid = passport?.product_id
+      ? productIdentifierService?.buildCanonicalProductDid?.({
+          companyId: passport.company_id,
+          passportType,
+          rawProductId: passport.product_id,
+          granularity: resolvedGranularity,
+        }) || null
+      : null;
 
     const schemaFields = (typeDef?.fields_json?.sections || [])
       .flatMap((section) => section.fields || [])
@@ -191,7 +199,7 @@ function createCanonicalPassportSerializer({ didService }) {
 
     return {
       digitalProductPassportId: dppDid,
-      uniqueProductIdentifier: passport.product_identifier_did || passport.product_id || null,
+      uniqueProductIdentifier: passport.product_identifier_did || derivedProductIdentifierDid || null,
       granularity: toTitleCaseGranularity(resolvedGranularity),
       dppSchemaVersion,
       dppStatus,
@@ -199,6 +207,8 @@ function createCanonicalPassportSerializer({ didService }) {
       economicOperatorId,
       facilityId,
       contentSpecificationIds: Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],
+      complianceProfileKey: passport.compliance_profile_key || null,
+      carrierPolicyKey: passport.carrier_policy_key || null,
       subjectDid,
       dppDid,
       companyDid,

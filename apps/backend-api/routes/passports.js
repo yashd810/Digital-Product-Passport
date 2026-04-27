@@ -56,6 +56,7 @@ module.exports = function registerPassportRoutes(app, {
   clearExpiredEditSessions,
   listActiveEditSessions,
   markOlderVersionsObsolete,
+  verifyAuditLogChain,
   stripRestrictedFieldsForPublicView,
   getCompanyNameMap,
   queryTableStats,
@@ -65,6 +66,7 @@ module.exports = function registerPassportRoutes(app, {
   buildBatteryPassJsonExport,
   storageService,
   complianceService,
+  accessRightsService,
   productIdentifierService,
 }) {
   const insertPassportRegistry = async ({
@@ -159,6 +161,36 @@ module.exports = function registerPassportRoutes(app, {
       [companyId]
     );
     return result.rows[0] || null;
+  }
+
+  async function loadCompanyComplianceIdentity(companyId) {
+    const result = await pool.query(
+      `SELECT economic_operator_identifier, economic_operator_identifier_scheme
+       FROM companies
+       WHERE id = $1
+       LIMIT 1`,
+      [companyId]
+    );
+    return result.rows[0] || null;
+  }
+
+  function serializeProfileDefaultValue(value) {
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return value ?? null;
+  }
+
+  async function buildComplianceManagedFields({ companyId, passportType, granularity, requestedFields = {} }) {
+    const profile = complianceService.resolveProfileMetadata({ passportType, granularity });
+    const companyIdentity = await loadCompanyComplianceIdentity(companyId);
+    return {
+      compliance_profile_key: requestedFields.compliance_profile_key || profile.key,
+      content_specification_ids: serializeProfileDefaultValue(
+        requestedFields.content_specification_ids || profile.contentSpecificationIds
+      ),
+      carrier_policy_key: requestedFields.carrier_policy_key || profile.defaultCarrierPolicyKey || null,
+      economic_operator_id: requestedFields.economic_operator_id || companyIdentity?.economic_operator_identifier || null,
+      facility_id: requestedFields.facility_id || null,
+    };
   }
 
   async function loadLatestLivePassport({ companyId, guid, passportType, releaseStatusSql = null }) {
@@ -366,7 +398,18 @@ module.exports = function registerPassportRoutes(app, {
     try {
       const { companyId } = req.params;
       const normalizedBody = normalizePassportRequestBody(req.body);
-      const { passport_type, model_name, product_id, granularity: requestedGranularity, ...fields } = normalizedBody;
+      const {
+        passport_type,
+        model_name,
+        product_id,
+        granularity: requestedGranularity,
+        compliance_profile_key,
+        content_specification_ids,
+        carrier_policy_key,
+        economic_operator_id,
+        facility_id,
+        ...fields
+      } = normalizedBody;
       const userId = req.user.userId;
 
       if (!passport_type) return res.status(400).json({ error: "passport_type is required" });
@@ -387,6 +430,18 @@ module.exports = function registerPassportRoutes(app, {
         productId: normalizedProductId,
         granularity: effectiveGranularity,
       });
+      const complianceManagedFields = await buildComplianceManagedFields({
+        companyId,
+        passportType: resolvedPassportType,
+        granularity: effectiveGranularity,
+        requestedFields: {
+          compliance_profile_key,
+          content_specification_ids,
+          carrier_policy_key,
+          economic_operator_id,
+          facility_id,
+        },
+      });
 
       const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
       if (existingByProductId) {
@@ -406,7 +461,22 @@ module.exports = function registerPassportRoutes(app, {
       const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
       const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
 
-      const allCols = ["guid","lineage_id","company_id","model_name","product_id","product_identifier_did","granularity","created_by", ...dataFields];
+      const allCols = [
+        "guid",
+        "lineage_id",
+        "company_id",
+        "model_name",
+        "product_id",
+        "product_identifier_did",
+        "compliance_profile_key",
+        "content_specification_ids",
+        "carrier_policy_key",
+        "economic_operator_id",
+        "facility_id",
+        "granularity",
+        "created_by",
+        ...dataFields,
+      ];
       const allVals = [
         guid,
         lineageId,
@@ -414,6 +484,11 @@ module.exports = function registerPassportRoutes(app, {
         model_name || null,
         storedProductIdentifiers.product_id,
         storedProductIdentifiers.product_identifier_did,
+        complianceManagedFields.compliance_profile_key,
+        complianceManagedFields.content_specification_ids,
+        complianceManagedFields.carrier_policy_key,
+        complianceManagedFields.economic_operator_id,
+        complianceManagedFields.facility_id,
         effectiveGranularity,
         userId,
         ...dataFields.map(k => processedFields[k]),
@@ -448,6 +523,7 @@ module.exports = function registerPassportRoutes(app, {
         passport_type: resolvedPassportType,
         model_name,
         granularity: effectiveGranularity,
+        compliance_profile_key: complianceManagedFields.compliance_profile_key,
       });
       res.status(201).json({ success: true, passport: result.rows[0] });
     } catch (e) {
@@ -478,7 +554,17 @@ module.exports = function registerPassportRoutes(app, {
 
       for (let i = 0; i < passports.length; i++) {
         const item = normalizePassportRequestBody(passports[i] || {});
-        const { model_name, product_id, granularity: requestedGranularity, ...fields } = item;
+        const {
+          model_name,
+          product_id,
+          granularity: requestedGranularity,
+          compliance_profile_key,
+          content_specification_ids,
+          carrier_policy_key,
+          economic_operator_id,
+          facility_id,
+          ...fields
+        } = item;
         const guid = uuidv4();
         const lineageId = guid;
         const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
@@ -501,10 +587,41 @@ module.exports = function registerPassportRoutes(app, {
             productId: normalizedProductId,
             granularity: effectiveGranularity,
           });
+          const complianceManagedFields = await buildComplianceManagedFields({
+            companyId,
+            passportType: resolvedPassportType,
+            granularity: effectiveGranularity,
+            requestedFields: {
+              compliance_profile_key,
+              content_specification_ids,
+              carrier_policy_key,
+              economic_operator_id,
+              facility_id,
+            },
+          });
           const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
           const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
-          const allCols  = ["guid","lineage_id","company_id","model_name","product_id","product_identifier_did","granularity","created_by", ...dataFields];
-          const allVals  = [guid, lineageId, companyId, model_name || null, storedProductIdentifiers.product_id, storedProductIdentifiers.product_identifier_did, effectiveGranularity, userId, ...dataFields.map(k => processedFields[k])];
+          const allCols  = [
+            "guid","lineage_id","company_id","model_name","product_id","product_identifier_did",
+            "compliance_profile_key","content_specification_ids","carrier_policy_key","economic_operator_id","facility_id",
+            "granularity","created_by", ...dataFields,
+          ];
+          const allVals  = [
+            guid,
+            lineageId,
+            companyId,
+            model_name || null,
+            storedProductIdentifiers.product_id,
+            storedProductIdentifiers.product_identifier_did,
+            complianceManagedFields.compliance_profile_key,
+            complianceManagedFields.content_specification_ids,
+            complianceManagedFields.carrier_policy_key,
+            complianceManagedFields.economic_operator_id,
+            complianceManagedFields.facility_id,
+            effectiveGranularity,
+            userId,
+            ...dataFields.map(k => processedFields[k]),
+          ];
           const places   = allCols.map((_, idx) => `$${idx + 1}`).join(", ");
 
           const r = await pool.query(
@@ -533,6 +650,7 @@ module.exports = function registerPassportRoutes(app, {
             product_identifier_did: storedProductIdentifiers.product_identifier_did,
             model_name: model_name || null,
             granularity: effectiveGranularity,
+            compliance_profile_key: complianceManagedFields.compliance_profile_key,
           });
           created++;
         } catch (e) {
@@ -2124,6 +2242,194 @@ module.exports = function registerPassportRoutes(app, {
       );
       res.json(r.rows);
     } catch { res.status(500).json({ error: "Failed to fetch audit logs" }); }
+  });
+
+  app.get("/api/companies/:companyId/audit-logs/integrity", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      const report = await verifyAuditLogChain(Number.parseInt(req.params.companyId, 10));
+      res.json(report);
+    } catch {
+      res.status(500).json({ error: "Failed to verify audit log integrity" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/access-audiences/users/:userId", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, audience, reason, expires_at, is_active, created_at, updated_at
+         FROM user_access_audiences
+         WHERE company_id = $1
+           AND user_id = $2
+         ORDER BY audience, created_at DESC`,
+        [req.params.companyId, req.params.userId]
+      );
+      res.json(result.rows);
+    } catch {
+      res.status(500).json({ error: "Failed to fetch access audiences" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/access-audiences/users/:userId", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      const audience = String(req.body?.audience || "").trim();
+      if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
+        return res.status(400).json({ error: "audience must be a non-public supported audience" });
+      }
+      const expiresAt = req.body?.expires_at ? new Date(req.body.expires_at) : null;
+      if (expiresAt && Number.isNaN(expiresAt.getTime())) {
+        return res.status(400).json({ error: "expires_at must be a valid ISO timestamp" });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO user_access_audiences (
+           user_id, company_id, audience, granted_by, reason, expires_at, is_active, updated_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, true, NOW())
+         ON CONFLICT (user_id, company_id, audience)
+         DO UPDATE SET
+           granted_by = EXCLUDED.granted_by,
+           reason = EXCLUDED.reason,
+           expires_at = EXCLUDED.expires_at,
+           is_active = true,
+           updated_at = NOW()
+         RETURNING id, audience, reason, expires_at, is_active, created_at, updated_at`,
+        [
+          req.params.userId,
+          req.params.companyId,
+          audience,
+          req.user.userId,
+          req.body?.reason || null,
+          expiresAt,
+        ]
+      );
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "GRANT_USER_AUDIENCE",
+        "user_access_audiences",
+        req.params.userId,
+        null,
+        { audience, expires_at: expiresAt ? expiresAt.toISOString() : null },
+        { audience }
+      );
+
+      res.status(201).json(result.rows[0]);
+    } catch {
+      res.status(500).json({ error: "Failed to grant access audience" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/passports/:guid/access-grants", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT pag.id, pag.audience, pag.element_id_path, pag.grantee_user_id, pag.granted_by, pag.reason,
+                pag.expires_at, pag.is_active, pag.created_at, pag.updated_at,
+                u.email AS grantee_email, u.first_name AS grantee_first_name, u.last_name AS grantee_last_name
+         FROM passport_access_grants pag
+         LEFT JOIN users u ON u.id = pag.grantee_user_id
+         WHERE pag.company_id = $1
+           AND pag.passport_guid = $2
+         ORDER BY pag.created_at DESC`,
+        [req.params.companyId, req.params.guid]
+      );
+      res.json(result.rows);
+    } catch {
+      res.status(500).json({ error: "Failed to fetch passport access grants" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/passports/:guid/access-grants", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      const audience = String(req.body?.audience || "").trim();
+      if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
+        return res.status(400).json({ error: "audience must be a non-public supported audience" });
+      }
+      const granteeUserId = Number.parseInt(req.body?.grantee_user_id, 10);
+      if (!Number.isFinite(granteeUserId)) {
+        return res.status(400).json({ error: "grantee_user_id is required" });
+      }
+      const expiresAt = req.body?.expires_at ? new Date(req.body.expires_at) : null;
+      if (expiresAt && Number.isNaN(expiresAt.getTime())) {
+        return res.status(400).json({ error: "expires_at must be a valid ISO timestamp" });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO passport_access_grants (
+           passport_guid, company_id, audience, element_id_path, grantee_user_id, granted_by, reason, expires_at, is_active, updated_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
+         ON CONFLICT (passport_guid, audience, grantee_user_id, element_id_path)
+         DO UPDATE SET
+           granted_by = EXCLUDED.granted_by,
+           reason = EXCLUDED.reason,
+           expires_at = EXCLUDED.expires_at,
+           is_active = true,
+           updated_at = NOW()
+         RETURNING *`,
+        [
+          req.params.guid,
+          req.params.companyId,
+          audience,
+          req.body?.element_id_path || null,
+          granteeUserId,
+          req.user.userId,
+          req.body?.reason || null,
+          expiresAt,
+        ]
+      );
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "GRANT_PASSPORT_AUDIENCE",
+        "passport_access_grants",
+        req.params.guid,
+        null,
+        {
+          audience,
+          grantee_user_id: granteeUserId,
+          element_id_path: req.body?.element_id_path || null,
+          expires_at: expiresAt ? expiresAt.toISOString() : null,
+        },
+        { audience }
+      );
+
+      res.status(201).json(result.rows[0]);
+    } catch {
+      res.status(500).json({ error: "Failed to grant passport access" });
+    }
+  });
+
+  app.delete("/api/companies/:companyId/passports/:guid/access-grants/:grantId", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `UPDATE passport_access_grants
+         SET is_active = false,
+             updated_at = NOW()
+         WHERE id = $1
+           AND company_id = $2
+           AND passport_guid = $3
+         RETURNING id, audience, grantee_user_id, element_id_path`,
+        [req.params.grantId, req.params.companyId, req.params.guid]
+      );
+      if (!result.rows.length) return res.status(404).json({ error: "Grant not found" });
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "REVOKE_PASSPORT_AUDIENCE",
+        "passport_access_grants",
+        req.params.guid,
+        result.rows[0],
+        { revoked: true },
+        { audience: result.rows[0].audience }
+      );
+
+      res.json({ success: true, grant: result.rows[0] });
+    } catch {
+      res.status(500).json({ error: "Failed to revoke passport access" });
+    }
   });
 
   // ─── QR CODE ───────────────────────────────────────────────────────────────

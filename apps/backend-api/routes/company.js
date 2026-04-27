@@ -24,6 +24,8 @@ module.exports = function registerCompanyRoutes(app, {
   SYSTEM_PASSPORT_FIELDS,
   buildBatteryPassJsonExport,
   productIdentifierService,
+  complianceService,
+  accessRightsService,
 }) {
   function buildStoredProductIdentifiers({ companyId, passportType, productId, granularity = "item" }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
@@ -35,6 +37,34 @@ module.exports = function registerCompanyRoutes(app, {
     return {
       product_id: normalized.productIdInput || null,
       product_identifier_did: normalized.productIdentifierDid || null,
+    };
+  }
+
+  function serializeProfileDefaultValue(value) {
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return value ?? null;
+  }
+
+  async function loadCompanyComplianceIdentity(companyId) {
+    const result = await pool.query(
+      `SELECT economic_operator_identifier
+       FROM companies
+       WHERE id = $1
+       LIMIT 1`,
+      [companyId]
+    );
+    return result.rows[0] || null;
+  }
+
+  async function buildComplianceManagedFields({ companyId, passportType }) {
+    const profile = complianceService.resolveProfileMetadata({ passportType, granularity: "item" });
+    const companyIdentity = await loadCompanyComplianceIdentity(companyId);
+    return {
+      compliance_profile_key: profile.key,
+      content_specification_ids: serializeProfileDefaultValue(profile.contentSpecificationIds),
+      carrier_policy_key: profile.defaultCarrierPolicyKey || null,
+      economic_operator_id: companyIdentity?.economic_operator_identifier || null,
+      facility_id: null,
     };
   }
 
@@ -70,6 +100,127 @@ module.exports = function registerCompanyRoutes(app, {
       );
       res.json({ success: true });
     } catch { res.status(500).json({ error: "Failed to save company profile" }); }
+  });
+
+  app.get("/api/companies/:companyId/compliance-identity", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      const companyRes = await pool.query(
+        `SELECT id, company_name, did_slug, economic_operator_identifier, economic_operator_identifier_scheme
+         FROM companies
+         WHERE id = $1
+         LIMIT 1`,
+        [req.params.companyId]
+      );
+      if (!companyRes.rows.length) return res.status(404).json({ error: "Company not found" });
+
+      const facilitiesRes = await pool.query(
+        `SELECT id, facility_identifier, identifier_scheme, display_name, metadata_json, is_active, created_at, updated_at
+         FROM company_facilities
+         WHERE company_id = $1
+         ORDER BY updated_at DESC, id DESC`,
+        [req.params.companyId]
+      );
+
+      res.json({
+        company: companyRes.rows[0],
+        facilities: facilitiesRes.rows,
+      });
+    } catch {
+      res.status(500).json({ error: "Failed to fetch compliance identity" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/compliance-identity", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+    try {
+      const economicOperatorIdentifier = req.body?.economic_operator_identifier === undefined
+        ? undefined
+        : String(req.body.economic_operator_identifier || "").trim();
+      const economicOperatorIdentifierScheme = req.body?.economic_operator_identifier_scheme === undefined
+        ? undefined
+        : String(req.body.economic_operator_identifier_scheme || "").trim();
+
+      await pool.query(
+        `UPDATE companies
+         SET economic_operator_identifier = COALESCE($1, economic_operator_identifier),
+             economic_operator_identifier_scheme = COALESCE($2, economic_operator_identifier_scheme),
+             updated_at = NOW()
+         WHERE id = $3`,
+        [
+          economicOperatorIdentifier === undefined ? null : economicOperatorIdentifier,
+          economicOperatorIdentifierScheme === undefined ? null : economicOperatorIdentifierScheme,
+          req.params.companyId,
+        ]
+      );
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "UPDATE_COMPLIANCE_IDENTITY",
+        "companies",
+        req.params.companyId,
+        null,
+        {
+          economic_operator_identifier: economicOperatorIdentifier === undefined ? null : economicOperatorIdentifier,
+          economic_operator_identifier_scheme: economicOperatorIdentifierScheme === undefined ? null : economicOperatorIdentifierScheme,
+        },
+        { actorIdentifier: req.user.email || `user:${req.user.userId}` }
+      );
+
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ error: "Failed to update compliance identity" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/facilities", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+    try {
+      const facilityIdentifier = String(req.body?.facility_identifier || "").trim();
+      const identifierScheme = String(req.body?.identifier_scheme || "").trim();
+      if (!facilityIdentifier || !identifierScheme) {
+        return res.status(400).json({ error: "facility_identifier and identifier_scheme are required" });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO company_facilities (
+           company_id, facility_identifier, identifier_scheme, display_name, metadata_json, created_by
+         )
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+         ON CONFLICT (company_id, identifier_scheme, facility_identifier)
+         DO UPDATE SET
+           display_name = EXCLUDED.display_name,
+           metadata_json = EXCLUDED.metadata_json,
+           is_active = true,
+           updated_at = NOW()
+         RETURNING *`,
+        [
+          req.params.companyId,
+          facilityIdentifier,
+          identifierScheme,
+          req.body?.display_name || null,
+          JSON.stringify(req.body?.metadata_json || {}),
+          req.user.userId,
+        ]
+      );
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "UPSERT_FACILITY_IDENTIFIER",
+        "company_facilities",
+        facilityIdentifier,
+        null,
+        {
+          facility_identifier: facilityIdentifier,
+          identifier_scheme: identifierScheme,
+          display_name: req.body?.display_name || null,
+        },
+        { actorIdentifier: req.user.email || `user:${req.user.userId}` }
+      );
+
+      res.status(201).json(result.rows[0]);
+    } catch {
+      res.status(500).json({ error: "Failed to save facility identifier" });
+    }
   });
 
   // ─── PASSPORT TEMPLATES ──────────────────────────────────────────────────
@@ -393,8 +544,30 @@ module.exports = function registerCompanyRoutes(app, {
               passportType: resolvedPassportType,
               productId: normalizedProductId,
             });
-            const allCols = ["guid","lineage_id","company_id","model_name","product_id","product_identifier_did","created_by", ...dataFields];
-            const allVals = [newGuid, lineageId, companyId, model_name || null, storedProductIdentifiers.product_id, storedProductIdentifiers.product_identifier_did, userId, ...getStoredPassportValues(dataFields, fields)];
+            const complianceManagedFields = await buildComplianceManagedFields({
+              companyId,
+              passportType: resolvedPassportType,
+            });
+            const allCols = [
+              "guid","lineage_id","company_id","model_name","product_id","product_identifier_did",
+              "compliance_profile_key","content_specification_ids","carrier_policy_key","economic_operator_id","facility_id",
+              "created_by", ...dataFields,
+            ];
+            const allVals = [
+              newGuid,
+              lineageId,
+              companyId,
+              model_name || null,
+              storedProductIdentifiers.product_id,
+              storedProductIdentifiers.product_identifier_did,
+              complianceManagedFields.compliance_profile_key,
+              complianceManagedFields.content_specification_ids,
+              complianceManagedFields.carrier_policy_key,
+              complianceManagedFields.economic_operator_id,
+              complianceManagedFields.facility_id,
+              userId,
+              ...getStoredPassportValues(dataFields, fields),
+            ];
             await pool.query(
               `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_,i)=>`$${i+1}`).join(",")})`,
               allVals
@@ -554,8 +727,30 @@ module.exports = function registerCompanyRoutes(app, {
               passportType: resolvedPassportType,
               productId: normalizedProductId,
             });
-            const allCols = ["guid","lineage_id","company_id","model_name","product_id","product_identifier_did","created_by",...dataFields];
-            const allVals = [newGuid, lineageId, companyId, model_name || null, storedProductIdentifiers.product_id, storedProductIdentifiers.product_identifier_did, userId, ...getStoredPassportValues(dataFields, fields)];
+            const complianceManagedFields = await buildComplianceManagedFields({
+              companyId,
+              passportType: resolvedPassportType,
+            });
+            const allCols = [
+              "guid","lineage_id","company_id","model_name","product_id","product_identifier_did",
+              "compliance_profile_key","content_specification_ids","carrier_policy_key","economic_operator_id","facility_id",
+              "created_by",...dataFields,
+            ];
+            const allVals = [
+              newGuid,
+              lineageId,
+              companyId,
+              model_name || null,
+              storedProductIdentifiers.product_id,
+              storedProductIdentifiers.product_identifier_did,
+              complianceManagedFields.compliance_profile_key,
+              complianceManagedFields.content_specification_ids,
+              complianceManagedFields.carrier_policy_key,
+              complianceManagedFields.economic_operator_id,
+              complianceManagedFields.facility_id,
+              userId,
+              ...getStoredPassportValues(dataFields, fields),
+            ];
             await pool.query(
               `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_,i)=>`$${i+1}`).join(",")})`,
               allVals

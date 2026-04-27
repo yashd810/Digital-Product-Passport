@@ -1,0 +1,565 @@
+openapi: 3.1.0
+info:
+  title: Claros DPP Standards API
+  version: "2026-04-27"
+  description: >
+    Standards-facing Digital Product Passport API aligned to the repository's
+    current JTC24-oriented route surface. Supports product identifier lookup,
+    version reads, fine-grained element reads, batch lookup, and registry-style
+    registration of released passports.
+servers:
+  - url: https://www.claros-dpp.online
+    description: Production
+  - url: http://localhost:3001
+    description: Local backend
+tags:
+  - name: DPP
+  - name: Registry
+paths:
+  /api/v1/dpps/{productIdentifier}:
+    get:
+      tags: [DPP]
+      summary: Read a released passport by product identifier
+      parameters:
+        - $ref: '#/components/parameters/ProductIdentifier'
+        - $ref: '#/components/parameters/CompanyIdQuery'
+        - $ref: '#/components/parameters/VersionNumberQuery'
+        - $ref: '#/components/parameters/RepresentationQuery'
+      responses:
+        '200':
+          description: Passport payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DppPayload'
+            application/ld+json:
+              schema:
+                $ref: '#/components/schemas/JsonLdPayload'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AmbiguousProductIdentifier'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dppsByProductIds:
+    post:
+      tags: [DPP]
+      summary: Batch read released passports by product identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productIdentifiers]
+              properties:
+                productIdentifiers:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: string
+                companyId:
+                  type: integer
+                versionNumber:
+                  type: integer
+                representation:
+                  type: string
+                  enum: [compressed, full]
+                format:
+                  type: string
+                  enum: [json, jsonld]
+      responses:
+        '200':
+          description: Batch lookup response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [representation, format, results]
+                properties:
+                  representation:
+                    type: string
+                    enum: [compressed, full]
+                  format:
+                    type: string
+                    enum: [json, jsonld]
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BatchLookupResult'
+            application/ld+json:
+              schema:
+                type: object
+                required: [representation, format, results]
+                properties:
+                  representation:
+                    type: string
+                    enum: [compressed, full]
+                  format:
+                    type: string
+                    enum: [json, jsonld]
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BatchLookupResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dppIdsByProductIds:
+    post:
+      tags: [DPP]
+      summary: Resolve DPP identifiers for multiple product identifiers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productIdentifiers]
+              properties:
+                productIdentifiers:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: string
+                companyId:
+                  type: integer
+      responses:
+        '200':
+          description: DPP identifier lookup response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      required: [productIdentifier, found]
+                      properties:
+                        productIdentifier:
+                          type: string
+                        found:
+                          type: boolean
+                        dppId:
+                          type: string
+                        uniqueProductIdentifier:
+                          type: string
+                        companyId:
+                          type: integer
+                        passportType:
+                          type: string
+                        error:
+                          type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dppsByProductId/{productId}:
+    get:
+      tags: [DPP]
+      summary: Read a released passport by raw product identifier
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/CompanyIdQuery'
+        - $ref: '#/components/parameters/VersionNumberQuery'
+        - $ref: '#/components/parameters/RepresentationQuery'
+      responses:
+        '200':
+          description: Passport payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DppPayload'
+            application/ld+json:
+              schema:
+                $ref: '#/components/schemas/JsonLdPayload'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AmbiguousProductIdentifier'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dpps/{productIdentifier}/versions/{versionNumber}:
+    get:
+      tags: [DPP]
+      summary: Read a specific released passport version
+      parameters:
+        - $ref: '#/components/parameters/ProductIdentifier'
+        - $ref: '#/components/parameters/VersionNumberPath'
+        - $ref: '#/components/parameters/CompanyIdQuery'
+        - $ref: '#/components/parameters/RepresentationQuery'
+      responses:
+        '200':
+          description: Passport payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DppPayload'
+            application/ld+json:
+              schema:
+                $ref: '#/components/schemas/JsonLdPayload'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AmbiguousProductIdentifier'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dppsByIdAndDate/{dppId}:
+    get:
+      tags: [DPP]
+      summary: Read a released passport version by DPP ID and date
+      parameters:
+        - name: dppId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/RepresentationQuery'
+      responses:
+        '200':
+          description: Passport payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DppPayload'
+            application/ld+json:
+              schema:
+                $ref: '#/components/schemas/JsonLdPayload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dpps/{productIdentifier}/elements/{elementIdPath}:
+    get:
+      tags: [DPP]
+      summary: Read a specific passport data element from the canonical payload
+      parameters:
+        - $ref: '#/components/parameters/ProductIdentifier'
+        - $ref: '#/components/parameters/ElementIdPath'
+        - $ref: '#/components/parameters/CompanyIdQuery'
+      responses:
+        '200':
+          description: Element payload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [productIdentifier, elementIdPath, value]
+                properties:
+                  productIdentifier:
+                    type: string
+                  dppId:
+                    type: string
+                  elementIdPath:
+                    type: string
+                  elementId:
+                    type: string
+                  dictionaryReference:
+                    type: string
+                    nullable: true
+                  cardinality:
+                    type: string
+                    enum: [single, multi]
+                  value: {}
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AmbiguousProductIdentifier'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [DPP]
+      summary: Update a writable DPP data element on an editable passport revision
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: dppId
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/ElementIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: {}
+      responses:
+        '200':
+          description: Updated element response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [productIdentifier, elementIdPath, value]
+                properties:
+                  productIdentifier:
+                    type: string
+                  dppId:
+                    type: string
+                  elementIdPath:
+                    type: string
+                  elementId:
+                    type: string
+                  dictionaryReference:
+                    type: string
+                    nullable: true
+                  cardinality:
+                    type: string
+                    enum: [single, multi]
+                  value: {}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Forbidden
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Editable passport conflict
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/registerDPP:
+    post:
+      tags: [Registry]
+      summary: Register a released passport with a registry target
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productIdentifier]
+              properties:
+                productIdentifier:
+                  type: string
+                registryName:
+                  type: string
+                  default: local
+                companyId:
+                  type: integer
+      responses:
+        '201':
+          description: Registration stored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, registration, payload]
+                properties:
+                  success:
+                    type: boolean
+                  registration:
+                    $ref: '#/components/schemas/RegistryRegistration'
+                  payload:
+                    $ref: '#/components/schemas/RegistryPayload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AmbiguousProductIdentifier'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+  parameters:
+    ProductIdentifier:
+      name: productIdentifier
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Raw product ID or canonical DID-based product identifier.
+    CompanyIdQuery:
+      name: companyId
+      in: query
+      required: false
+      schema:
+        type: integer
+    VersionNumberQuery:
+      name: versionNumber
+      in: query
+      required: false
+      schema:
+        type: integer
+    VersionNumberPath:
+      name: versionNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+    RepresentationQuery:
+      name: representation
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [compressed, full]
+    ElementIdPath:
+      name: elementIdPath
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Canonical field key or element identifier path.
+  schemas:
+    DppPayload:
+      type: object
+      properties:
+        digitalProductPassportId:
+          type: string
+        uniqueProductIdentifier:
+          type: string
+        dppSchemaVersion:
+          type: string
+        dppStatus:
+          type: string
+        contentSpecificationIds:
+          type: array
+          items:
+            type: string
+      additionalProperties: true
+    JsonLdPayload:
+      allOf:
+        - type: object
+          properties:
+            '@context': {}
+        - $ref: '#/components/schemas/DppPayload'
+    BatchLookupResult:
+      type: object
+      required: [productIdentifier, found]
+      properties:
+        productIdentifier:
+          type: string
+        found:
+          type: boolean
+        error:
+          type: string
+        companyIds:
+          type: array
+          items:
+            type: integer
+        payload:
+          oneOf:
+            - $ref: '#/components/schemas/DppPayload'
+            - $ref: '#/components/schemas/JsonLdPayload'
+    RegistryRegistration:
+      type: object
+      properties:
+        id:
+          type: integer
+        passport_guid:
+          type: string
+          format: uuid
+        company_id:
+          type: integer
+        product_identifier:
+          type: string
+        dpp_id:
+          type: string
+        registry_name:
+          type: string
+        status:
+          type: string
+        registered_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    RegistryPayload:
+      type: object
+      properties:
+        digitalProductPassportId:
+          type: string
+        uniqueProductIdentifier:
+          type: string
+        subjectDid:
+          type: string
+        dppDid:
+          type: string
+        companyDid:
+          type: string
+        publicUrl:
+          type: string
+        contentSpecificationIds:
+          type: array
+          items:
+            type: string
+        passportType:
+          type: string
+        versionNumber:
+          type: integer
+        requestedBy:
+          type: integer
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+  responses:
+    BadRequest:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    AmbiguousProductIdentifier:
+      description: Identifier matches multiple passports
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+              companyIds:
+                type: array
+                items:
+                  type: integer
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

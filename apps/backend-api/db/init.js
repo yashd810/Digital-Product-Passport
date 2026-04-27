@@ -95,6 +95,14 @@ async function initDb(pool, {
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS did_slug VARCHAR(160)
   `);
+  await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS economic_operator_identifier TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS economic_operator_identifier_scheme VARCHAR(80)
+  `);
     await runMigration(pool, "2026-04-27.backfill-company-did-slugs", async () => {
       const companyRows = await pool.query(`
         SELECT id, company_name, did_slug
@@ -192,6 +200,30 @@ async function initDb(pool, {
     CREATE INDEX IF NOT EXISTS idx_dpp_subject_registry_product
       ON dpp_subject_registry(company_id, product_id)
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dpp_registry_registrations (
+      id SERIAL PRIMARY KEY,
+      passport_guid UUID NOT NULL,
+      company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      product_identifier TEXT NOT NULL,
+      dpp_id TEXT NOT NULL,
+      registry_name VARCHAR(120) NOT NULL DEFAULT 'local',
+      status VARCHAR(40) NOT NULL DEFAULT 'registered',
+      registration_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+      registered_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (registry_name, dpp_id)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_dpp_registry_registrations_guid
+      ON dpp_registry_registrations(passport_guid)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_dpp_registry_registrations_company
+      ON dpp_registry_registrations(company_id, registry_name)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -212,6 +244,32 @@ async function initDb(pool, {
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS otp_code_hash TEXT
+  `);
+  await runMigration(pool, "2026-04-27.backfill-otp-code-hash", async () => {
+    const otpRows = await pool.query(`
+      SELECT id, otp_code
+      FROM users
+      WHERE otp_code IS NOT NULL
+        AND COALESCE(TRIM(otp_code_hash), '') = ''
+    `);
+    for (const row of otpRows.rows) {
+      const rawOtp = String(row.otp_code || "").trim();
+      if (!rawOtp) continue;
+      const otpHash = /^[a-f0-9]{64}$/i.test(rawOtp)
+        ? rawOtp.toLowerCase()
+        : require("crypto").createHash("sha256").update(rawOtp).digest("hex");
+      await pool.query(
+        `UPDATE users
+         SET otp_code_hash = $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [otpHash, row.id]
+      );
+    }
+  });
 
   /* Add missing columns to existing users table (for migrations) */
   await pool.query(`
@@ -307,6 +365,26 @@ async function initDb(pool, {
       new_values       JSONB,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE audit_logs
+    ADD COLUMN IF NOT EXISTS actor_identifier TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE audit_logs
+    ADD COLUMN IF NOT EXISTS audience VARCHAR(80)
+  `);
+  await pool.query(`
+    ALTER TABLE audit_logs
+    ADD COLUMN IF NOT EXISTS previous_event_hash VARCHAR(64)
+  `);
+  await pool.query(`
+    ALTER TABLE audit_logs
+    ADD COLUMN IF NOT EXISTS event_hash VARCHAR(64)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_company_created
+      ON audit_logs(company_id, created_at DESC, id DESC)
   `);
 
   await pool.query(`
@@ -453,6 +531,26 @@ async function initDb(pool, {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company_facilities (
+      id                  SERIAL PRIMARY KEY,
+      company_id          INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      facility_identifier TEXT NOT NULL,
+      identifier_scheme   VARCHAR(80) NOT NULL,
+      display_name        VARCHAR(255),
+      metadata_json       JSONB NOT NULL DEFAULT '{}'::jsonb,
+      is_active           BOOLEAN NOT NULL DEFAULT true,
+      created_by          INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (company_id, identifier_scheme, facility_identifier)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_company_facilities_company
+      ON company_facilities(company_id, is_active, updated_at DESC)
+  `);
   await pool.query(`
     ALTER TABLE company_repository
     ADD COLUMN IF NOT EXISTS storage_key TEXT
@@ -526,6 +624,48 @@ async function initDb(pool, {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash    ON api_keys(key_hash)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_access_audiences (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      company_id  INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      audience    VARCHAR(80) NOT NULL,
+      granted_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reason      TEXT,
+      expires_at  TIMESTAMPTZ,
+      is_active   BOOLEAN NOT NULL DEFAULT true,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, company_id, audience)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_user_access_audiences_user
+      ON user_access_audiences(user_id, company_id, audience)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_access_grants (
+      id               SERIAL PRIMARY KEY,
+      passport_guid    UUID NOT NULL REFERENCES passport_registry(guid) ON DELETE CASCADE,
+      company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      audience         VARCHAR(80) NOT NULL,
+      element_id_path  TEXT,
+      grantee_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      granted_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reason           TEXT,
+      expires_at       TIMESTAMPTZ,
+      is_active        BOOLEAN NOT NULL DEFAULT true,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (passport_guid, audience, grantee_user_id, element_id_path)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_access_grants_passport
+      ON passport_access_grants(passport_guid, audience, grantee_user_id)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS request_rate_limits (
@@ -877,6 +1017,26 @@ async function initDb(pool, {
       await pool.query(`
         ALTER TABLE ${tableName}
         ADD COLUMN IF NOT EXISTS product_identifier_did TEXT
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS compliance_profile_key VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1'
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS content_specification_ids TEXT
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS carrier_policy_key VARCHAR(120)
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS economic_operator_id TEXT
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS facility_id TEXT
       `);
       await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did

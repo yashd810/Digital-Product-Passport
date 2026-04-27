@@ -4,6 +4,22 @@ Last updated: 2026-04-24
 
 This repository contains the multi-tenant Digital Product Passport platform, the public passport viewer, and the battery dictionary assets used by JSON-LD exports and VC issuance.
 
+## Standards API contract
+
+Code/files:
+- `apps/backend-api/routes/dpp-api.js`
+- `docs/openapi/dpp-api-v1.yaml`
+
+The repository now includes a machine-readable OpenAPI contract for the standards-facing DPP routes:
+- `GET /api/v1/dpps/{productIdentifier}`
+- `POST /api/v1/dppsByProductIds`
+- `GET /api/v1/dpps/{productIdentifier}/versions/{versionNumber}`
+- `GET /api/v1/dpps/{productIdentifier}/elements/{elementIdPath}`
+- `POST /api/v1/registerDPP`
+
+OpenAPI file:
+- `docs/openapi/dpp-api-v1.yaml`
+
 ## Public routes summary
 
 Code/files:

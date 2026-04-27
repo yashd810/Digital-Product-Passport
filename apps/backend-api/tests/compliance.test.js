@@ -8,6 +8,17 @@ function createMockPool(typeDef) {
       if (sql.includes("FROM passport_types")) {
         return { rows: typeDef && params[0] === typeDef.type_name ? [typeDef] : [] };
       }
+      if (sql.includes("FROM companies")) {
+        return {
+          rows: [{
+            id: 5,
+            company_name: "Acme Energy",
+            did_slug: "acme-energy",
+            economic_operator_identifier: "EORI-ACME-001",
+            economic_operator_identifier_scheme: "EORI",
+          }],
+        };
+      }
       throw new Error(`Unhandled mock query: ${sql}`);
     },
   };
@@ -94,11 +105,11 @@ const TYPE_DEF = {
         key: "general",
         label: "General",
         fields: [
-          { key: "passport_identifier", label: "Passport Identifier", type: "text", access: ["public"] },
-          { key: "battery_category", label: "Battery Category", type: "text", access: ["public"] },
-          { key: "battery_mass", label: "Battery Mass", type: "text", access: ["public"] },
-          { key: "state_of_charge_soc", label: "State of Charge", type: "text", access: ["legitimate_interest"] },
-          { key: "certificate_url", label: "Certificate URL", type: "url", access: ["notified_bodies"] },
+          { key: "passport_identifier", label: "Passport Identifier", type: "text", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+          { key: "battery_category", label: "Battery Category", type: "text", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+          { key: "battery_mass", label: "Battery Mass", type: "text", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+          { key: "state_of_charge_soc", label: "State of Charge", type: "text", access: ["legitimate_interest"], confidentiality: "restricted", updateAuthority: ["economic_operator"] },
+          { key: "certificate_url", label: "Certificate URL", type: "url", access: ["notified_bodies"], confidentiality: "regulated", updateAuthority: ["economic_operator", "notified_bodies"] },
         ],
       },
     ],
@@ -114,6 +125,11 @@ describe("compliance service", () => {
 
     const result = await service.evaluatePassport({
       passport_type: "din_spec_99100",
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",
@@ -140,6 +156,11 @@ describe("compliance service", () => {
 
     const result = await service.evaluatePassport({
       passport_type: "din_spec_99100",
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "not-a-number",
@@ -180,6 +201,11 @@ describe("compliance service", () => {
 
     const result = await service.evaluatePassport({
       passport_type: "din_spec_99100",
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
     }, "din_spec_99100");
@@ -198,6 +224,11 @@ describe("compliance service", () => {
 
     const result = await service.evaluatePassport({
       passport_type: "din_spec_99100",
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "Industrial",
       battery_mass: "450.5",
@@ -209,5 +240,29 @@ describe("compliance service", () => {
     expect(result.completeness.missingFields.map((field) => field.key)).toContain("certificate_url");
     expect(result.completeness.missingFields.map((field) => field.key)).not.toContain("state_of_charge_soc");
     expect(result.category.ignoredFields.map((field) => field.key)).toContain("state_of_charge_soc");
+  });
+
+  test("blocks release when profile governance fields are missing", async () => {
+    const service = createComplianceService({
+      pool: createMockPool(TYPE_DEF),
+      batteryDictionaryService: createMockBatteryDictionaryService(),
+    });
+
+    const result = await service.evaluatePassport({
+      passport_type: "din_spec_99100",
+      company_id: 5,
+      passport_identifier: "BAT-2026-001",
+      battery_category: "EV",
+      battery_mass: "450.5",
+    }, "din_spec_99100");
+
+    expect(result.profile.key).toBe("battery_dpp_v1");
+    expect(result.blockingIssues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "PROFILE_GOVERNANCE_FIELD_MISSING",
+        "CARRIER_POLICY_MISSING",
+        "FACILITY_IDENTIFIER_MISSING",
+      ])
+    );
   });
 });

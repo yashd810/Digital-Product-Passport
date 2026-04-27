@@ -13,6 +13,7 @@ module.exports = function registerAuthRoutes(app, {
   hashOpaqueToken,
   validatePasswordPolicy,
   PASSWORD_MIN_LENGTH,
+  hashOtpCode,
   SESSION_COOKIE_NAME,
   setAuthCookie,
   clearAuthCookie,
@@ -157,10 +158,10 @@ module.exports = function registerAuthRoutes(app, {
 
       if (u.two_factor_enabled) {
         const otp     = String(Math.floor(100000 + Math.random() * 900000));
-        const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+        const otpHash = hashOtpCode(otp);
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         await pool.query(
-          "UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3",
+          "UPDATE users SET otp_code_hash = $1, otp_code = NULL, otp_expires_at = $2 WHERE id = $3",
           [otpHash, expiresAt, u.id]
         );
         try { await sendOtpEmail(u, otp); }
@@ -204,19 +205,20 @@ module.exports = function registerAuthRoutes(app, {
       if (!result.rows.length) return res.status(401).json({ error: "User not found" });
       const u = result.rows[0];
 
-      if (!u.otp_code || !u.otp_expires_at || new Date() > new Date(u.otp_expires_at)) {
+      const storedOtpHash = String(u.otp_code_hash || u.otp_code || "").trim();
+      if (!storedOtpHash || !u.otp_expires_at || new Date() > new Date(u.otp_expires_at)) {
         return res.status(401).json({ error: "Verification code has expired. Please log in again." });
       }
 
-      const submitHash = crypto.createHash("sha256").update(String(otp).trim()).digest("hex");
-      const storedBuf  = Buffer.from(u.otp_code, "hex");
+      const submitHash = hashOtpCode(otp);
+      const storedBuf  = Buffer.from(storedOtpHash, "hex");
       const submitBuf  = Buffer.from(submitHash, "hex");
       if (storedBuf.length !== submitBuf.length || !crypto.timingSafeEqual(storedBuf, submitBuf)) {
         return res.status(401).json({ error: "Invalid verification code" });
       }
 
       await pool.query(
-        "UPDATE users SET otp_code = NULL, otp_expires_at = NULL, last_login_at = NOW() WHERE id = $1",
+        "UPDATE users SET otp_code_hash = NULL, otp_code = NULL, otp_expires_at = NULL, last_login_at = NOW() WHERE id = $1",
         [u.id]
       );
       const sessionToken = generateToken(u);
@@ -302,10 +304,10 @@ module.exports = function registerAuthRoutes(app, {
       const u = result.rows[0];
 
       const otp     = String(Math.floor(100000 + Math.random() * 900000));
-      const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+      const otpHash = hashOtpCode(otp);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
       await pool.query(
-        "UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3",
+        "UPDATE users SET otp_code_hash = $1, otp_code = NULL, otp_expires_at = $2 WHERE id = $3",
         [otpHash, expiresAt, u.id]
       );
       await sendOtpEmail(u, otp);
