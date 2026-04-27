@@ -49,6 +49,10 @@ function hashOtpCode(secret) {
   return crypto.createHash("sha256").update(String(secret || "").trim()).digest("hex");
 }
 
+function generateOtpCode() {
+  return String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
 function timingSafeEqualHex(left, right) {
   const leftHex = String(left || "");
   const rightHex = String(right || "");
@@ -90,6 +94,7 @@ module.exports = {
   validatePasswordPolicy,
   hashSecret,
   hashOtpCode,
+  generateOtpCode,
   timingSafeEqualHex,
   createAccessKeyMaterial,
   createDeviceKeyMaterial,

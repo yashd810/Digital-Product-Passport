@@ -3,6 +3,7 @@
 const {
   validatePasswordPolicy,
   hashOtpCode,
+  generateOtpCode,
 } = require("../services/security-service");
 
 describe("security service", () => {
@@ -22,5 +23,10 @@ describe("security service", () => {
     const second = hashOtpCode("123456");
     expect(first).toBe(second);
     expect(first).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  test("generateOtpCode returns a zero-padded 6 digit code", () => {
+    const code = generateOtpCode();
+    expect(code).toMatch(/^\d{6}$/);
   });
 });

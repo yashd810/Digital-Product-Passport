@@ -1,6 +1,6 @@
 /* ─── EMAIL TEMPLATE STYLES ──────────────────────────────────────────────────
    Shared CSS for all transactional emails sent by the application.
-   Loaded at runtime by Backend/server.js and Backend/contact-server.js and
+   Loaded at runtime by Backend/server.js and
    injected into the <style> block of each HTML email.
 
    Sections:

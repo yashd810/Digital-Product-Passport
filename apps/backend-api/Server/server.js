@@ -21,7 +21,7 @@ const createOauthService       = require("../services/oauth-service");
 const createPasswordService    = require("../services/password-service");
 const logger                   = require("../services/logger");
 const { createTransporter, brandedEmail, sendOtpEmail } = require("../services/email");
-const { validatePasswordPolicy, hashSecret, hashOtpCode, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../services/security-service");
+const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../services/security-service");
 const createAuthMiddleware     = require("../middleware/auth");
 const { createRateLimiters, startRateLimitMaintenance } = require("../middleware/rate-limit");
 const createAssetService       = require("../services/asset-management");
@@ -114,7 +114,7 @@ app.set("trust proxy", 1);
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 if (IS_PRODUCTION) app.set("env", "production");
 
-const defaultAllowedOrigins = [
+const defaultAllowedOrigins = IS_PRODUCTION ? [] : [
   "http://localhost:3000", "http://127.0.0.1:3000",
   "http://localhost:5173", "http://127.0.0.1:5173",
   `http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`,
@@ -844,7 +844,7 @@ registerWorkflowRoutes(app, {
 
 registerAuthRoutes(app, {
   pool, jwt, JWT_SECRET, hashPassword, verifyPassword, verifyPasswordAndUpgrade, generateToken, hashOpaqueToken,
-  validatePasswordPolicy, PASSWORD_MIN_LENGTH, hashOtpCode,
+  validatePasswordPolicy, PASSWORD_MIN_LENGTH, hashOtpCode, generateOtpCode,
   SESSION_COOKIE_NAME,
   setAuthCookie, clearAuthCookie, sendOtpEmail, createTransporter, brandedEmail,
   logAudit, authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,

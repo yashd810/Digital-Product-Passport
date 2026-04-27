@@ -15,6 +15,7 @@ module.exports = function registerAuthRoutes(app, {
   validatePasswordPolicy,
   PASSWORD_MIN_LENGTH,
   hashOtpCode,
+  generateOtpCode,
   SESSION_COOKIE_NAME,
   setAuthCookie,
   clearAuthCookie,
@@ -158,7 +159,7 @@ module.exports = function registerAuthRoutes(app, {
       await pool.query("DELETE FROM request_rate_limits WHERE bucket_key = $1", [lockKey]).catch(() => {});
 
       if (u.two_factor_enabled) {
-        const otp     = String(Math.floor(100000 + Math.random() * 900000));
+        const otp     = generateOtpCode();
         const otpHash = hashOtpCode(otp);
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         await pool.query(
@@ -304,7 +305,7 @@ module.exports = function registerAuthRoutes(app, {
       if (!result.rows.length) return res.status(401).json({ error: "User not found" });
       const u = result.rows[0];
 
-      const otp     = String(Math.floor(100000 + Math.random() * 900000));
+      const otp     = generateOtpCode();
       const otpHash = hashOtpCode(otp);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
       await pool.query(

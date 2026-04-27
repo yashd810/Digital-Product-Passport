@@ -22,6 +22,14 @@ function sha256Base64Url(value) {
   return crypto.createHash("sha256").update(String(value || "")).digest("base64url");
 }
 
+function normalizeRedirectPath(redirectTo, fallback = "/dashboard") {
+  const raw = String(redirectTo || "").trim();
+  if (!raw) return fallback;
+  if (!raw.startsWith("/")) return fallback;
+  if (raw.startsWith("//")) return fallback;
+  return raw;
+}
+
 function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache, hashPassword }) {
   const rawProviders = parseJsonEnv("OAUTH_PROVIDERS_JSON", []);
   const providers = Array.isArray(rawProviders)
@@ -235,7 +243,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       provider: provider.key,
       nonce,
       codeVerifier,
-      redirectTo: redirectTo || "/dashboard",
+      redirectTo: normalizeRedirectPath(redirectTo, "/dashboard"),
     });
     const redirectUri = `${process.env.SERVER_URL || `${req.protocol}://${req.get("host")}`}/api/auth/sso/${provider.key}/callback`;
     const params = new URLSearchParams({
@@ -282,7 +290,8 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     setAuthCookie(res, sessionToken);
 
     const appBase = String(process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "");
-    const redirectPath = statePayload.redirectTo || (user.role === "super_admin" ? "/admin" : "/dashboard");
+    const defaultRedirectPath = user.role === "super_admin" ? "/admin" : "/dashboard";
+    const redirectPath = normalizeRedirectPath(statePayload.redirectTo, defaultRedirectPath);
     return `${appBase}/oauth/callback?next=${encodeURIComponent(redirectPath)}`;
   }
 
@@ -295,3 +304,4 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
 }
 
 module.exports = createOauthService;
+module.exports.normalizeRedirectPath = normalizeRedirectPath;
