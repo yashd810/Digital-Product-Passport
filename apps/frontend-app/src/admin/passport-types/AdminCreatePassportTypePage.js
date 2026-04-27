@@ -98,17 +98,27 @@ const BATTERY_PASS_FIELD_CATALOG = (() => {
     }
     return {
       key,
+      label: term.label || batteryPassHumanize(key),
       semanticId,
       normalizedAliases: [...aliases].map(batteryPassNormalize).filter(Boolean),
     };
   });
 })();
 
+const BATTERY_PASS_FIELD_BY_SEMANTIC_ID = new Map(
+  BATTERY_PASS_FIELD_CATALOG.map((entry) => [entry.semanticId, entry])
+);
+
 function resolveBatteryPassFieldDefinition(label, currentKey = "") {
+  const exactKeyMatch = batteryPassExactCatalogMatch(currentKey);
   const normalizedLabel = batteryPassNormalize(label);
   if (!normalizedLabel) {
-    return batteryPassExactCatalogMatch(currentKey);
+    return exactKeyMatch;
   }
+
+  const exactLabelMatch = batteryPassExactCatalogMatch(label);
+  if (exactLabelMatch) return exactLabelMatch;
+  if (exactKeyMatch && batteryPassNormalize(currentKey) === normalizedLabel) return exactKeyMatch;
 
   let best = null;
   let bestScore = 0;
@@ -141,8 +151,53 @@ function resolveBatteryPassFieldDefinition(label, currentKey = "") {
     }
   }
 
+  if (exactKeyMatch && bestScore < 700) return exactKeyMatch;
   if (bestScore >= 220) return best;
-  return batteryPassExactCatalogMatch(currentKey);
+  return exactKeyMatch;
+}
+
+function resolveBatteryPassFieldDefinitionBySemanticId(semanticId) {
+  return BATTERY_PASS_FIELD_BY_SEMANTIC_ID.get(String(semanticId || "").trim()) || null;
+}
+
+function resolveBatteryPassFieldDefinitionByInput(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  return (
+    resolveBatteryPassFieldDefinitionBySemanticId(raw)
+    || BATTERY_PASS_FIELD_CATALOG.find((entry) => entry.key === raw)
+    || BATTERY_PASS_FIELD_CATALOG.find((entry) => entry.label === raw)
+    || batteryPassExactCatalogMatch(raw)
+    || null
+  );
+}
+
+function buildBatteryPassSearchQuery(entry) {
+  return [entry.key, entry.label, entry.semanticId]
+    .map((value) => String(value || "").toLowerCase())
+    .join(" ");
+}
+
+function getFilteredBatteryPassCatalog(query, selectedSemanticId = "") {
+  const normalizedQuery = String(query || "").trim().toLowerCase();
+  let results = BATTERY_PASS_FIELD_CATALOG;
+  if (normalizedQuery) {
+    results = BATTERY_PASS_FIELD_CATALOG.filter((entry) => buildBatteryPassSearchQuery(entry).includes(normalizedQuery));
+  }
+
+  const selectedEntry = resolveBatteryPassFieldDefinitionBySemanticId(selectedSemanticId);
+  if (selectedEntry && !results.some((entry) => entry.semanticId === selectedEntry.semanticId)) {
+    results = [selectedEntry, ...results];
+  }
+
+  return results;
+}
+
+function getSemanticSearchDisplayValue(field) {
+  if (field._semanticSearch) return field._semanticSearch;
+  const selectedEntry = resolveBatteryPassFieldDefinitionBySemanticId(field.semanticId);
+  if (!selectedEntry) return "";
+  return `${selectedEntry.key} - ${selectedEntry.label}`;
 }
 
 function normalizeFieldToBatteryPass(field, semanticModelKey) {
@@ -153,21 +208,9 @@ function normalizeFieldToBatteryPass(field, semanticModelKey) {
       semanticId: undefined,
     };
   }
-  const matched = resolveBatteryPassFieldDefinition(field.label, field.key);
-  const nextKey = field._keyManual
-    ? (field.key || toSlug(field.label || ""))
-    : (matched?.key || field.key || toSlug(field.label || ""));
-  if (!matched) {
-    return {
-      ...field,
-      key: nextKey,
-      semanticId: undefined,
-    };
-  }
   return {
     ...field,
-    key: nextKey,
-    semanticId: matched.semanticId,
+    key: field.key || toSlug(field.label || ""),
   };
 }
 
@@ -216,8 +259,13 @@ function syncSectionsWithSemanticModel(currentSections, semanticModelKey) {
 }
 
 function resolveSelectedSemanticMatch(field, semanticModelKey) {
-  if (isBatteryDictionarySemanticModel(semanticModelKey)) {
-    return resolveBatteryPassFieldDefinition(field.label, field.key);
+  if (field.semanticId) {
+    const catalogEntry = resolveBatteryPassFieldDefinitionBySemanticId(field.semanticId);
+    return {
+      key: catalogEntry?.key || field.key || toSlug(field.label || ""),
+      label: catalogEntry?.label || field.label || batteryPassHumanize(field.key || ""),
+      semanticId: field.semanticId,
+    };
   }
   return null;
 }
@@ -272,10 +320,11 @@ function AdminCreatePassportType() {
   }, [success]);
 
   const applyDraft = (draft) => {
+    const nextSemanticModelKey = draft.semanticModelKey || "";
     setDisplayName(draft.displayName || "");
     setUmbrella(draft.umbrella || "");
     setUmbrellaIcon(draft.umbrellaIcon || "📋");
-    setSemanticModelKey(draft.semanticModelKey || "");
+    setSemanticModelKey(nextSemanticModelKey);
     setTypeName(draft.typeName || "");
     setTypeNameManual(draft.typeNameManual || false);
     const restored = (draft.sections || []).map(sec => rekeySection({
@@ -284,7 +333,7 @@ function AdminCreatePassportType() {
       label_i18n: sec.label_i18n || {},
       fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
-    if (restored.length > 0) setSections(restored);
+    if (restored.length > 0) setSections(syncSectionsWithSemanticModel(restored, nextSemanticModelKey));
   };
 
   // Load draft only when the user explicitly chooses to continue it
@@ -346,7 +395,7 @@ function AdminCreatePassportType() {
         if (rows.length === 0) { setCsvError("No valid rows found in CSV."); return; }
         const parsed = buildSectionsFromCSV(rows);
         if (parsed.length === 0) { setCsvError("Could not build sections from CSV."); return; }
-        setSections(parsed);
+        setSections(syncSectionsWithSemanticModel(parsed, semanticModelKey));
       } catch {
         setCsvError("Failed to parse CSV. Check the file format.");
       }
@@ -372,7 +421,8 @@ function AdminCreatePassportType() {
     setDisplayName(ed.display_name || "");
     setUmbrella(ed.umbrella_category || "");
     setUmbrellaIcon(ed.umbrella_icon || "📋");
-    setSemanticModelKey(ed.semantic_model_key || "");
+    const nextSemanticModelKey = ed.semantic_model_key || "";
+    setSemanticModelKey(nextSemanticModelKey);
     setTypeName(ed.type_name || "");
     setTypeNameManual(true); // lock type_name, it cannot change
     const editSections = (ed.fields_json?.sections || []).map(sec => rekeySection({
@@ -381,7 +431,7 @@ function AdminCreatePassportType() {
       label_i18n: sec.label_i18n || {},
       fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
-    if (editSections.length > 0) setSections(editSections);
+    if (editSections.length > 0) setSections(syncSectionsWithSemanticModel(editSections, nextSemanticModelKey));
   }, []); // runs once
 
   // Pre-fill from clone data if navigated with state — read once from navigation state at mount
@@ -393,14 +443,15 @@ function AdminCreatePassportType() {
     setDisplayName(`Clone of ${cd.display_name || cd.type_name}`);
     setUmbrella(cd.umbrella_category || "");
     setUmbrellaIcon(cd.umbrella_icon || "📋");
-    setSemanticModelKey(cd.semantic_model_key || "");
+    const nextSemanticModelKey = cd.semantic_model_key || "";
+    setSemanticModelKey(nextSemanticModelKey);
     const clonedSections = (cd.fields_json?.sections || []).map(sec => rekeySection({
       ...sec,
       _id:       Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
       fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
-    if (clonedSections.length > 0) setSections(clonedSections);
+    if (clonedSections.length > 0) setSections(syncSectionsWithSemanticModel(clonedSections, nextSemanticModelKey));
   }, []); // runs once — initial clone data captured in ref above
 
   // Auto-generate type_name from display_name unless user has manually overridden it
@@ -412,7 +463,7 @@ function AdminCreatePassportType() {
 
   useEffect(() => {
     setSections((currentSections) => syncSectionsWithSemanticModel(currentSections, semanticModelKey));
-  }, [semanticModelKey, sections]);
+  }, [semanticModelKey]);
 
   // ── Section helpers ────────────────────────────────────────
   const addSection = () =>
@@ -458,22 +509,23 @@ function AdminCreatePassportType() {
         ...sec,
         fields: sec.fields.map(f => {
           if (f._id !== fieldId) return f;
-          const updated = { ...f, ...patch };
-          if ("label" in patch) {
-            if (isBatteryDictionarySemanticModel(semanticModelKey)) {
-              const batteryPassField = resolveBatteryPassFieldDefinition(patch.label, f.key);
-              updated.semanticId = batteryPassField?.semanticId;
-              if (!f._keyManual) {
-                updated.key = batteryPassField?.key || toSlug(patch.label);
-              }
-            } else {
-              if (!f._keyManual) {
-                updated.key = toSlug(patch.label);
-              }
-              delete updated.semanticId;
+          let updated = { ...f, ...patch };
+          const shouldNormalizeSemantic =
+            "label" in patch ||
+            "key" in patch ||
+            "_keyManual" in patch;
+
+          if (shouldNormalizeSemantic) {
+            updated = normalizeFieldToBatteryPass(updated, semanticModelKey);
+          }
+
+          if ("label" in patch && !patch.label) {
+            delete updated.semanticId;
+            delete updated.semanticMode;
+            if (!updated._keyManual) {
+              updated.key = toSlug(patch.label || "");
             }
           }
-          if ("label" in patch && !patch.label) delete updated.semanticId;
           // Switching TO table: set defaults
           if (patch.type === "table" && f.type !== "table") {
             updated.table_rows = 2;
@@ -510,9 +562,88 @@ function AdminCreatePassportType() {
       if (sec._id !== sectionId) return sec;
       return {
         ...sec,
+        fields: sec.fields.map(f => {
+          if (f._id !== fieldId) return f;
+          return normalizeFieldToBatteryPass({ ...f, _keyManual: true }, semanticModelKey);
+        }),
+      };
+    }));
+
+  const applyManualSemanticSelection = (sectionId, fieldId, selectionValue) =>
+    setSections(s => s.map(sec => {
+      if (sec._id !== sectionId) return sec;
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f._id !== fieldId) return f;
+          const selected = resolveBatteryPassFieldDefinitionByInput(selectionValue);
+          if (!selected) {
+            return {
+              ...f,
+              _semanticSearch: selectionValue,
+            };
+          }
+          return {
+            ...f,
+            semanticId: selected.semanticId,
+            _semanticOpen: false,
+            _semanticSearch: `${selected.key} - ${selected.label}`,
+          };
+        }),
+      };
+    }));
+
+  const updateSemanticSearchInput = (sectionId, fieldId, value) =>
+    setSections(s => s.map(sec => {
+      if (sec._id !== sectionId) return sec;
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f._id !== fieldId) return f;
+          const nextValue = String(value || "");
+          if (!nextValue.trim()) {
+            return {
+              ...f,
+              semanticId: undefined,
+              _semanticSearch: "",
+              _semanticOpen: true,
+            };
+          }
+          return {
+            ...f,
+            semanticId: undefined,
+            _semanticSearch: nextValue,
+            _semanticOpen: true,
+          };
+        }),
+      };
+    }));
+
+  const setSemanticPickerOpen = (sectionId, fieldId, isOpen) =>
+    setSections(s => s.map(sec => {
+      if (sec._id !== sectionId) return sec;
+      return {
+        ...sec,
         fields: sec.fields.map(f =>
-          f._id === fieldId ? { ...f, _keyManual: true } : f
+          f._id === fieldId ? { ...f, _semanticOpen: isOpen } : f
         ),
+      };
+    }));
+
+  const clearManualSemanticSelection = (sectionId, fieldId) =>
+    setSections(s => s.map(sec => {
+      if (sec._id !== sectionId) return sec;
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f._id !== fieldId) return f;
+          const normalized = normalizeFieldToBatteryPass({
+            ...f,
+            semanticId: undefined,
+            _semanticSearch: "",
+          }, semanticModelKey);
+          return normalized;
+        }),
       };
     }));
 
@@ -825,8 +956,8 @@ function AdminCreatePassportType() {
                     <span className="acpt-meta-sub-label">{isBatteryDictionarySemanticModel(semanticModelKey) ? "🔋 Battery Dictionary Mapping" : "🧩 Semantic Mapping"}</span>
                     <span className="acpt-semantic-hint">
                       {isBatteryDictionarySemanticModel(semanticModelKey)
-                        ? "Field keys and semantic IDs are derived automatically from the selected Claros battery dictionary."
-                        : `Selected model: ${getSemanticModelLabel(semanticModelKey)}. Select a semantic model above to enable automatic semantic mapping for this passport type.`}
+                        ? "Field keys still follow the field label, but semantic IDs are selected manually from the Claros battery dictionary."
+                        : `Selected model: ${getSemanticModelLabel(semanticModelKey)}. Select a semantic model above to enable semantic mapping for this passport type.`}
                     </span>
                   </div>
                   {section._i18nOpen && (
@@ -861,6 +992,15 @@ function AdminCreatePassportType() {
                 )}
                 {section.fields.map((field, fi) => (
                   <div key={field._id} className="acpt-field-wrap">
+                    {(() => {
+                      const selectedSemanticMatch = resolveSelectedSemanticMatch(field, semanticModelKey);
+                      const semanticSearchOptions = getFilteredBatteryPassCatalog(
+                        field._semanticSearch || "",
+                        field.semanticId || ""
+                      );
+                      const semanticSearchValue = getSemanticSearchDisplayValue(field);
+                      return (
+                        <>
                     <div className="acpt-field-row">
                       <span className="acpt-field-num">{fi + 1}</span>
 
@@ -1019,8 +1159,8 @@ function AdminCreatePassportType() {
                           🔬 Semantic Metadata
                           <span className="acpt-semantic-hint">
                             {isBatteryDictionarySemanticModel(semanticModelKey)
-                              ? "Hidden from users. The label is matched against the selected battery dictionary term and the export uses the canonical Claros term IRI."
-                              : "Hidden from users. Select a semantic model to enable automatic semantic IDs for this field."}
+                              ? "Hidden from users. Select the battery dictionary term manually and the export will use that canonical Claros term IRI."
+                              : "Hidden from users. Select a semantic model to enable semantic IDs for this field."}
                           </span>
                         </div>
                         <div className="acpt-meta-fields-row">
@@ -1051,24 +1191,55 @@ function AdminCreatePassportType() {
                             </select>
                           </div>
                         </div>
-                        <div className="acpt-meta-field-group acpt-meta-field-group-full">
-                          <span className="acpt-meta-sub-label">Matched Semantic ID</span>
-                          <div className="acpt-uri-wrap">
-                            <div className="acpt-uri-input-row">
+                        {isBatteryDictionarySemanticModel(semanticModelKey) && (
+                          <div className="acpt-meta-field-group acpt-meta-field-group-full">
+                            <span className="acpt-meta-sub-label">Semantic Term</span>
+                            <div className="acpt-semantic-picker">
                               <input
                                 type="text"
-                                className="acpt-input acpt-mono acpt-input-small acpt-uri-text"
-                                value={resolveSelectedSemanticMatch(field, semanticModelKey)?.semanticId || "No semantic ID match yet"}
-                                readOnly
+                                value={semanticSearchValue}
+                                onFocus={() => setSemanticPickerOpen(section._id, field._id, true)}
+                                onBlur={() => window.setTimeout(() => setSemanticPickerOpen(section._id, field._id, false), 120)}
+                                onChange={e => updateSemanticSearchInput(section._id, field._id, e.target.value)}
+                                placeholder="Search battery dictionary by key, label, or semantic ID"
+                                className="acpt-input acpt-input-small acpt-semantic-search"
                               />
+                              {field._semanticOpen && (
+                                <div className="acpt-semantic-results">
+                                  <button
+                                    type="button"
+                                    className={`acpt-semantic-option${!selectedSemanticMatch ? " selected" : ""}`}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      clearManualSemanticSelection(section._id, field._id);
+                                    }}
+                                  >
+                                    <span className="acpt-semantic-option-title">No semantic term selected</span>
+                                  </button>
+                                  {semanticSearchOptions.map((entry) => (
+                                    <button
+                                      key={entry.semanticId}
+                                      type="button"
+                                      className={`acpt-semantic-option${field.semanticId === entry.semanticId ? " selected" : ""}`}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        applyManualSemanticSelection(section._id, field._id, entry.semanticId);
+                                      }}
+                                    >
+                                      <span className="acpt-semantic-option-title">{entry.key} - {entry.label}</span>
+                                      <span className="acpt-semantic-option-meta">{entry.semanticId}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                             <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
-                              {isBatteryDictionarySemanticModel(semanticModelKey)
-                                ? (`Matched model key: ${resolveSelectedSemanticMatch(field, semanticModelKey)?.key || "Use a battery dictionary field label to map this field automatically."}`)
-                                : "Choose a semantic model in Type Identity to enable automatic semantic mapping."}
+                              {selectedSemanticMatch
+                                ? `Selected term: ${selectedSemanticMatch?.label || selectedSemanticMatch?.key || "Dictionary term"}`
+                                : "No semantic term selected yet."}
                             </div>
                           </div>
-                        </div>
+                        )}
                       </div>
 
                       {/* Dynamic (live data) toggle */}
@@ -1179,6 +1350,9 @@ function AdminCreatePassportType() {
                         </div>
                       </div>
                     )}
+                        </>
+                      );
+                    })()}
                   </div>
                 ))}
 
