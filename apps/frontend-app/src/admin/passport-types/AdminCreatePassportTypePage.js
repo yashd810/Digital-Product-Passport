@@ -20,8 +20,6 @@ import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 const BATTERY_DICTIONARY_MODEL_KEY = "claros_battery_dictionary_v1";
-const LEGACY_BATTERY_MODEL_KEY = "battery_pass_din_spec_99100";
-const LEGACY_CLAROS_BATTERY_MODEL_KEY = "claros_battery_v1";
 const SEMANTIC_MODEL_OPTIONS = [
   {
     key: "",
@@ -33,11 +31,6 @@ const SEMANTIC_MODEL_OPTIONS = [
     label: "Claros Battery Dictionary",
     description: "Use the Claros battery dictionary and JSON-LD context as the default semantic source for battery passports.",
   },
-  {
-    key: LEGACY_BATTERY_MODEL_KEY,
-    label: "Battery Pass Data Model (Legacy)",
-    description: "Keep compatibility with legacy DIN SPEC 99100 model references while exporting to the Claros battery dictionary.",
-  },
 ];
 
 function getSemanticModelLabel(modelKey) {
@@ -45,11 +38,7 @@ function getSemanticModelLabel(modelKey) {
 }
 
 function isBatteryDictionarySemanticModel(modelKey) {
-  return [
-    BATTERY_DICTIONARY_MODEL_KEY,
-    LEGACY_BATTERY_MODEL_KEY,
-    LEGACY_CLAROS_BATTERY_MODEL_KEY,
-  ].includes(String(modelKey || "").trim());
+  return String(modelKey || "").trim() === BATTERY_DICTIONARY_MODEL_KEY;
 }
 
 function batteryPassWords(value) {

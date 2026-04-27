@@ -24,8 +24,10 @@ jobs:
       - run: node --check Server/server.js
       - run: node --check routes/auth.js
       - run: node --check routes/passports.js
+      - run: node --check routes/dpp-api.js
+      - run: node --check services/product-identifier-service.js
       - run: node --check services/storage-service.js
-      - run: node tests/dpp-identity.test.js
+      - run: npm test
       - run: npm audit --audit-level=high
 
   frontend:

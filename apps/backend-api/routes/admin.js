@@ -12,7 +12,6 @@ const COMPANY_POLICY_DEFAULTS = {
   vc_issuance_enabled: true,
   jsonld_export_enabled: true,
   claros_battery_dictionary_enabled: true,
-  legacy_semantic_compatibility: false,
 };
 
 const COMPANY_POLICY_BOOL_FIELDS = [
@@ -23,7 +22,6 @@ const COMPANY_POLICY_BOOL_FIELDS = [
   "vc_issuance_enabled",
   "jsonld_export_enabled",
   "claros_battery_dictionary_enabled",
-  "legacy_semantic_compatibility",
 ];
 
 module.exports = function registerAdminRoutes(app, {
@@ -58,10 +56,9 @@ module.exports = function registerAdminRoutes(app, {
          mint_facility_dids,
          vc_issuance_enabled,
          jsonld_export_enabled,
-         claros_battery_dictionary_enabled,
-         legacy_semantic_compatibility
+         claros_battery_dictionary_enabled
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (company_id) DO NOTHING`,
       [
         companyId,
@@ -73,7 +70,6 @@ module.exports = function registerAdminRoutes(app, {
         COMPANY_POLICY_DEFAULTS.vc_issuance_enabled,
         COMPANY_POLICY_DEFAULTS.jsonld_export_enabled,
         COMPANY_POLICY_DEFAULTS.claros_battery_dictionary_enabled,
-        COMPANY_POLICY_DEFAULTS.legacy_semantic_compatibility,
       ]
     );
   }

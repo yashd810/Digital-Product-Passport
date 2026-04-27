@@ -24,13 +24,15 @@ const logger                   = require("../services/logger");
 const { createTransporter, brandedEmail, sendOtpEmail } = require("../services/email");
 const { validatePasswordPolicy, hashSecret, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../services/security-service");
 const createAuthMiddleware     = require("../middleware/auth");
-const { createRateLimiters }   = require("../middleware/rate-limit");
+const { createRateLimiters, startRateLimitMaintenance } = require("../middleware/rate-limit");
 const createAssetService       = require("../services/asset-management");
 const createPassportService    = require("../services/passport-service");
 const { buildBatteryPassJsonExport, buildPassportJsonLdContext } = require("../services/battery-pass-export");
 const createPassportRepresentationService = require("../services/passport-representation-service");
 const dppIdentity                         = require("../services/dpp-identity-service");
 const createBatteryDictionaryService      = require("../services/battery-dictionary-service");
+const createComplianceService             = require("../services/compliance-service");
+const createProductIdentifierService      = require("../services/product-identifier-service");
 
 global.console = logger.console;
 
@@ -118,6 +120,7 @@ const defaultAllowedOrigins = [
 const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || "")
   .split(",").map(s => s.trim()).filter(Boolean);
 const allowedOriginSet = new Set([...defaultAllowedOrigins, ...envAllowedOrigins]);
+const cspConnectSrc = ["'self'", ...allowedOriginSet];
 
 app.use(cors({
   origin: (origin, cb) => {
@@ -128,7 +131,20 @@ app.use(cors({
 }));
 
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      fontSrc: ["'self'", "data:", "https:"],
+      connectSrc: cspConnectSrc,
+    },
+  },
   crossOriginResourcePolicy: false,
 }));
 
@@ -304,7 +320,7 @@ const oauthService = createOauthService({
 // ─── AUTH MIDDLEWARE ─────────────────────────────────────────────────────────
 const {
   authenticateToken, isSuperAdmin, checkCompanyAccess,
-  requireEditor, checkCompanyAdmin, authenticateApiKey,
+  requireEditor, checkCompanyAdmin, authenticateApiKey, requireApiKeyScope,
 } = createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, SESSION_COOKIE_NAME });
 
 // ─── RATE LIMITERS ───────────────────────────────────────────────────────────
@@ -313,6 +329,7 @@ const {
   publicHeavyRateLimit, publicUnlockRateLimit,
   apiKeyReadRateLimit, assetWriteRateLimit, assetSourceFetchRateLimit,
 } = createRateLimiters(pool);
+startRateLimitMaintenance(pool);
 
 // ─── ASSET MANAGEMENT AUTH MIDDLEWARE ────────────────────────────────────────
 const requireAssetManagementKey = (req, res, next) => {
@@ -483,7 +500,7 @@ if (!storageService.isLocal && storageService.fetchObject) {
       const buffer = Buffer.from(await objectResponse.arrayBuffer());
       res.send(buffer);
     } catch (error) {
-      console.error("[storage] Failed to proxy object:", storageKey, error.message);
+      logger.error({ storageKey, err: error }, "[storage] Failed to proxy object");
       res.status(404).json({ error: "Stored object not found" });
     }
   });
@@ -497,6 +514,7 @@ const didService = createDidService({
 });
 const canonicalPassportSerializer = createCanonicalPassportSerializer({ didService });
 const { buildCanonicalPassportPayload } = canonicalPassportSerializer;
+const productIdentifierService = createProductIdentifierService({ didService });
 
 // ─── SIGNING SERVICE ─────────────────────────────────────────────────────────
 const signingService = createSigningService({
@@ -513,6 +531,7 @@ const { buildOperationalDppPayload } = createPassportRepresentationService();
 
 // ─── BATTERY DICTIONARY SERVICE ──────────────────────────────────────────────
 const batteryDictionaryService = createBatteryDictionaryService();
+const complianceService = createComplianceService({ pool, batteryDictionaryService });
 
 // ─── PASSPORT SERVICE ────────────────────────────────────────────────────────
 const passportService = createPassportService({
@@ -522,6 +541,7 @@ const passportService = createPassportService({
   getWritablePassportColumns, getStoredPassportValues, toStoredPassportValue,
   coerceBulkFieldValue, comparableHistoryFieldValue, formatHistoryFieldValue, getHistoryFieldDefs,
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath,
+  productIdentifierService,
   createTransporter, brandedEmail,
 });
 
@@ -726,7 +746,13 @@ process.on("unhandledRejection", (reason) => logger.error({ err: reason }, "[Unh
 
 pool.query("SELECT NOW()")
   .then(async () => {
-    await initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS });
+    await initDb(pool, {
+      getTable,
+      createPassportTable,
+      IN_REVISION_STATUS,
+      LEGACY_IN_REVISION_STATUS,
+      productIdentifierService,
+    });
     logger.info("[DB] Initialized successfully");
     await migrateRepositoryFilePaths();
     await backfillLegacyPassportAttachmentLinks();
@@ -758,7 +784,7 @@ registerWorkflowRoutes(app, {
   pool, authenticateToken, checkCompanyAccess, requireEditor,
   submitPassportToWorkflow, getTable, IN_REVISION_STATUS,
   signPassport, markOlderVersionsObsolete, logAudit, buildCurrentPublicPassportPath,
-  createNotification,
+  createNotification, complianceService,
 });
 
 registerAuthRoutes(app, {
@@ -789,7 +815,7 @@ registerAssetManagementApiRoutes(app, {
 
 registerPassportRoutes(app, {
   pool, fs, crypto, authenticateToken, checkCompanyAccess, checkCompanyAdmin,
-  requireEditor, authenticateApiKey, publicReadRateLimit, publicHeavyRateLimit,
+  requireEditor, authenticateApiKey, requireApiKeyScope, publicReadRateLimit, publicHeavyRateLimit,
   apiKeyReadRateLimit, assetWriteRateLimit, upload,
   hashSecret, createAccessKeyMaterial, createDeviceKeyMaterial,
   IN_REVISION_STATUSES_SQL, EDITABLE_RELEASE_STATUSES_SQL, REVISION_BLOCKING_STATUSES_SQL,
@@ -806,7 +832,7 @@ registerPassportRoutes(app, {
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
   stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
   submitPassportToWorkflow, signPassport,
-  buildBatteryPassJsonExport, storageService,
+  buildBatteryPassJsonExport, storageService, complianceService, productIdentifierService,
 });
 
 registerPassportPublicRoutes(app, {
@@ -831,7 +857,7 @@ registerCompanyRoutes(app, {
   findExistingPassportByProductId, updatePassportRowById,
   getWritablePassportColumns, getStoredPassportValues,
   logAudit, EDITABLE_RELEASE_STATUSES_SQL, SYSTEM_PASSPORT_FIELDS,
-  buildBatteryPassJsonExport,
+  buildBatteryPassJsonExport, productIdentifierService,
 });
 
 registerDppApiRoutes(app, {
@@ -842,9 +868,11 @@ registerDppApiRoutes(app, {
   resolveReleasedPassportByProductId,
   signingService,
   buildOperationalDppPayload,
+  buildCanonicalPassportPayload,
   buildPassportJsonLdContext,
   didService,
   dppIdentity,
+  productIdentifierService,
 });
 
 registerDictionaryRoutes(app, { publicReadRateLimit, batteryDictionaryService });
@@ -913,7 +941,7 @@ app.get("/public-files/:publicId", publicReadRateLimit, async (req, res) => {
 
     res.status(404).json({ error: "File not available" });
   } catch (e) {
-    console.error("[public-files]", e.message);
+    logger.error({ err: e }, "[public-files] Failed to serve file");
     res.status(500).json({ error: "Failed to serve file" });
   }
 });
@@ -958,7 +986,7 @@ app.post("/api/contact", publicReadRateLimit, async (req, res) => {
     });
     res.json({ ok: true });
   } catch (e) {
-    console.error("[Contact] Failed to send contact email:", e.message);
+    logger.error({ err: e }, "[Contact] Failed to send contact email");
     res.status(500).json({ error: "Failed to send message. Please email us directly." });
   }
 });

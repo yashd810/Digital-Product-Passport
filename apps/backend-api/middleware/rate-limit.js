@@ -1,5 +1,7 @@
 "use strict";
 
+const logger = require("../services/logger");
+
 const envInt = (name, fallback) => {
   const raw = process.env[name];
   const parsed = Number.parseInt(raw || "", 10);
@@ -10,11 +12,14 @@ const envInt = (name, fallback) => {
  * Factory: returns an Express middleware that rate-limits by a per-request bucket key.
  * Bucket counts are persisted in the request_rate_limits table.
  */
-const createRateLimiter = (pool) => ({ key, limit, windowMs, message }) =>
+const createRateLimiter = (pool, state) => ({ key, limit, windowMs, message }) =>
   async (req, res, next) => {
     const now = Date.now();
     const bucketKey = String(key(req) || "").slice(0, 255);
     if (!bucketKey) return next();
+    if (now < state.dbUnavailableUntil) {
+      return res.status(503).json({ error: "Rate limiting is temporarily unavailable. Please retry shortly." });
+    }
 
     const resetAt  = new Date(now + windowMs);
     const nowDate  = new Date(now);
@@ -38,22 +43,64 @@ const createRateLimiter = (pool) => ({ key, limit, windowMs, message }) =>
       );
 
       const row = result.rows[0];
+      state.consecutiveDbFailures = 0;
+      state.dbUnavailableUntil = 0;
       if ((row?.count || 0) > limit) {
         return res.status(429).json({ error: message });
       }
       next();
     } catch (err) {
-      console.error("[rateLimit] falling back after DB error:", err.message);
-      next();
+      state.consecutiveDbFailures += 1;
+      const threshold = state.failureThreshold;
+      if (state.consecutiveDbFailures >= threshold) {
+        state.dbUnavailableUntil = now + state.cooldownMs;
+      }
+      logger.error({
+        err,
+        consecutiveDbFailures: state.consecutiveDbFailures,
+        threshold,
+        cooldownMs: state.cooldownMs,
+      }, "[rateLimit] rejecting request after DB error");
+      return res.status(503).json({ error: "Rate limiting is temporarily unavailable. Please retry shortly." });
     }
   };
+
+async function cleanupExpiredRateLimits(pool) {
+  const result = await pool.query(
+    `DELETE FROM request_rate_limits
+     WHERE reset_at <= NOW()`
+  );
+  return Number(result.rowCount || 0);
+}
+
+function startRateLimitMaintenance(pool) {
+  const intervalMs = envInt("RATE_LIMIT_CLEANUP_INTERVAL_MS", 5 * 60 * 1000);
+  const timer = setInterval(async () => {
+    try {
+      const deleted = await cleanupExpiredRateLimits(pool);
+      if (deleted > 0) {
+        logger.info({ deleted }, "[rateLimit] cleaned expired buckets");
+      }
+    } catch (err) {
+      logger.error({ err }, "[rateLimit] cleanup failed");
+    }
+  }, intervalMs);
+  if (typeof timer.unref === "function") timer.unref();
+  return timer;
+}
 
 /**
  * Creates all application rate-limiter middleware instances.
  * Call once with the pool and destructure the returned object.
  */
 const createRateLimiters = (pool) => {
-  const rateLimit = createRateLimiter(pool);
+  const state = {
+    consecutiveDbFailures: 0,
+    dbUnavailableUntil: 0,
+    failureThreshold: envInt("RATE_LIMIT_DB_FAILURE_THRESHOLD", 3),
+    cooldownMs: envInt("RATE_LIMIT_DB_FAILURE_COOLDOWN_MS", 60 * 1000),
+  };
+  const rateLimit = createRateLimiter(pool, state);
 
   return {
     authRateLimit: rateLimit({
@@ -135,4 +182,9 @@ const createRateLimiters = (pool) => {
   };
 };
 
-module.exports = { envInt, createRateLimiters };
+module.exports = {
+  envInt,
+  createRateLimiters,
+  cleanupExpiredRateLimits,
+  startRateLimitMaintenance,
+};

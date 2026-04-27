@@ -16,14 +16,17 @@ module.exports = function createBatteryDictionaryService() {
   const categories      = loadJson("categories.json");
   const units           = loadJson("units.json");
   const fieldMap        = loadJson("field-map.json");
-  const compatibilityMap = loadJson("compatibility-map.json");
   const context         = loadJson("context.jsonld");
+  const categoryRules   = loadJson("category-rules.json");
 
   // Index terms by slug and by field key for fast lookup
   const termsBySlug = {};
   const termsByFieldKey = {};
+  const termsByIri = {};
   for (const term of terms) {
     termsBySlug[term.slug] = term;
+    if (term.iri) termsByIri[term.iri] = term;
+    if (term.termIri) termsByIri[term.termIri] = term;
     for (const key of (term.appFieldKeys || [])) {
       termsByFieldKey[key] = term;
     }
@@ -39,8 +42,8 @@ module.exports = function createBatteryDictionaryService() {
   function getCategories() { return categories; }
   function getUnits() { return units; }
   function getFieldMap() { return fieldMap; }
-  function getCompatibilityMap() { return compatibilityMap; }
   function getContext() { return context; }
+  function getCategoryRules() { return categoryRules; }
 
   function getTermBySlug(slug) {
     return termsBySlug[String(slug || "")] || null;
@@ -58,6 +61,16 @@ module.exports = function createBatteryDictionaryService() {
   // Returns the term object for a given app field key, or null
   function getTermByFieldKey(fieldKey) {
     return termsByFieldKey[String(fieldKey || "")] || null;
+  }
+
+  function getTermByIri(iri) {
+    return termsByIri[String(iri || "")] || null;
+  }
+
+  function getCategoryRequirementForField(fieldKey, category) {
+    const requirements = categoryRules?.requirementsByFieldKey?.[String(fieldKey || "")]?.requirements || null;
+    if (!requirements) return null;
+    return requirements[String(category || "")] || null;
   }
 
   // Build a JSON-LD context array for a passport type that uses the Claros battery dictionary
@@ -108,12 +121,14 @@ module.exports = function createBatteryDictionaryService() {
     getCategories,
     getUnits,
     getFieldMap,
-    getCompatibilityMap,
     getContext,
+    getCategoryRules,
     getTermBySlug,
     getTermsByCategory,
     resolveFieldKey,
     getTermByFieldKey,
+    getTermByIri,
+    getCategoryRequirementForField,
     buildJsonLdContext,
   };
 };

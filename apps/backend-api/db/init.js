@@ -1,69 +1,5 @@
 "use strict";
 
-const batteryPassDinSpec99100 = require("../resources/semantics/battery-pass-din-spec-99100.json");
-
-function toBatteryPassInternalKey(value) {
-  return String(value || "")
-    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .replace(/_+/g, "_");
-}
-
-const BATTERY_PASS_CANONICAL_BY_SEMANTIC_ID = (() => {
-  const map = {};
-  Object.values(batteryPassDinSpec99100.fieldSemanticIds || {}).forEach((semanticId) => {
-    const fragment = String(semanticId || "").split("#").pop();
-    const internalKey = toBatteryPassInternalKey(fragment);
-    if (semanticId && internalKey) map[semanticId] = internalKey;
-  });
-  return map;
-})();
-
-const BATTERY_PASS_SEMANTIC_BY_KEY = (() => {
-  const map = {};
-  Object.entries(batteryPassDinSpec99100.fieldSemanticIds || {}).forEach(([fieldKey, semanticId]) => {
-    map[fieldKey] = semanticId;
-  });
-  Object.entries(BATTERY_PASS_CANONICAL_BY_SEMANTIC_ID).forEach(([semanticId, fieldKey]) => {
-    map[fieldKey] = semanticId;
-  });
-  return map;
-})();
-
-function quoteIdent(identifier) {
-  return `"${String(identifier || "").replace(/"/g, "\"\"")}"`;
-}
-
-function migrateBatteryPassField(field) {
-  if (!field || !field.key) return { field, changed: false, oldKey: null, newKey: null };
-  const semanticId = field.semanticId || BATTERY_PASS_SEMANTIC_BY_KEY[field.key] || null;
-  if (!semanticId) return { field, changed: false, oldKey: field.key, newKey: field.key };
-  const canonicalKey = BATTERY_PASS_CANONICAL_BY_SEMANTIC_ID[semanticId] || field.key;
-  const changed = field.key !== canonicalKey || field.semanticId !== semanticId;
-  return {
-    field: { ...field, key: canonicalKey, semanticId },
-    changed,
-    oldKey: field.key,
-    newKey: canonicalKey,
-  };
-}
-
-function remapJsonObjectKeys(value, keyMap) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const next = { ...value };
-  Object.entries(keyMap).forEach(([oldKey, newKey]) => {
-    if (oldKey === newKey) return;
-    if (!(oldKey in next)) return;
-    if (!(newKey in next) || next[newKey] === null || next[newKey] === undefined || next[newKey] === "") {
-      next[newKey] = next[oldKey];
-    }
-    delete next[oldKey];
-  });
-  return next;
-}
-
 function toDidSlug(value, fallback = "company") {
   const normalized = String(value || "")
     .normalize("NFKD")
@@ -75,6 +11,37 @@ function toDidSlug(value, fallback = "company") {
   return normalized || fallback;
 }
 
+const SCHEMA_MIGRATION_LOCK_KEY = 18224027;
+
+async function ensureSchemaMigrationsTable(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id         VARCHAR(200) PRIMARY KEY,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function runMigration(pool, migrationId, handler) {
+  const existing = await pool.query(
+    `SELECT 1
+     FROM schema_migrations
+     WHERE id = $1
+     LIMIT 1`,
+    [migrationId]
+  );
+  if (existing.rows.length) return false;
+
+  await handler();
+  await pool.query(
+    `INSERT INTO schema_migrations (id)
+     VALUES ($1)
+     ON CONFLICT (id) DO NOTHING`,
+    [migrationId]
+  );
+  return true;
+}
+
 /**
  * Database initialization — creates or alters all tables and indexes.
  * Extracted from server.js to keep startup logic separate from route handling.
@@ -84,8 +51,17 @@ function toDidSlug(value, fallback = "company") {
  *   await initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS });
  */
 
-async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS }) {
-  await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
+async function initDb(pool, {
+  getTable,
+  createPassportTable,
+  IN_REVISION_STATUS,
+  LEGACY_IN_REVISION_STATUS,
+  productIdentifierService,
+}) {
+  await pool.query(`SELECT pg_advisory_lock($1)`, [SCHEMA_MIGRATION_LOCK_KEY]);
+  try {
+    await ensureSchemaMigrationsTable(pool);
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
 
   // Core user and company management tables
   await pool.query(`
@@ -119,35 +95,36 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS did_slug VARCHAR(160)
   `);
-  const companyRows = await pool.query(`
-    SELECT id, company_name, did_slug
-    FROM companies
-    ORDER BY id ASC
-  `);
-  if (companyRows.rows.length) {
-    const usedSlugs = new Set(
-      companyRows.rows
-        .map((row) => String(row.did_slug || "").trim())
-        .filter(Boolean)
-    );
-    for (const row of companyRows.rows) {
-      if (row.did_slug) continue;
-      const baseSlug = toDidSlug(row.company_name, `company-${row.id}`);
-      let nextSlug = baseSlug;
-      let suffix = 2;
-      while (usedSlugs.has(nextSlug)) {
-        nextSlug = `${baseSlug}-${suffix++}`;
-      }
-      usedSlugs.add(nextSlug);
-      await pool.query(
-        `UPDATE companies
-         SET did_slug = $1,
-             updated_at = NOW()
-         WHERE id = $2`,
-        [nextSlug, row.id]
+    await runMigration(pool, "2026-04-27.backfill-company-did-slugs", async () => {
+      const companyRows = await pool.query(`
+        SELECT id, company_name, did_slug
+        FROM companies
+        ORDER BY id ASC
+      `);
+      if (!companyRows.rows.length) return;
+      const usedSlugs = new Set(
+        companyRows.rows
+          .map((row) => String(row.did_slug || "").trim())
+          .filter(Boolean)
       );
-    }
-  }
+      for (const row of companyRows.rows) {
+        if (row.did_slug) continue;
+        const baseSlug = toDidSlug(row.company_name, `company-${row.id}`);
+        let nextSlug = baseSlug;
+        let suffix = 2;
+        while (usedSlugs.has(nextSlug)) {
+          nextSlug = `${baseSlug}-${suffix++}`;
+        }
+        usedSlugs.add(nextSlug);
+        await pool.query(
+          `UPDATE companies
+           SET did_slug = $1,
+               updated_at = NOW()
+           WHERE id = $2`,
+          [nextSlug, row.id]
+        );
+      }
+    });
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_did_slug_unique
       ON companies(did_slug)
@@ -165,10 +142,13 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       vc_issuance_enabled BOOLEAN NOT NULL DEFAULT true,
       jsonld_export_enabled BOOLEAN NOT NULL DEFAULT true,
       claros_battery_dictionary_enabled BOOLEAN NOT NULL DEFAULT true,
-      legacy_semantic_compatibility BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE company_dpp_policies
+    DROP COLUMN IF EXISTS legacy_semantic_compatibility
   `);
   await pool.query(`
     INSERT INTO company_dpp_policies (
@@ -194,6 +174,7 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       company_id      INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
       passport_guid   TEXT NOT NULL,
       product_id      TEXT NOT NULL,
+      product_identifier_did TEXT,
       granularity     VARCHAR(20) NOT NULL DEFAULT 'model',
       product_did     TEXT NOT NULL,
       dpp_did         TEXT NOT NULL,
@@ -517,11 +498,31 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       name         VARCHAR(100) NOT NULL,
       key_hash     VARCHAR(64)  NOT NULL UNIQUE,
       key_prefix   VARCHAR(16)  NOT NULL,
+      key_salt     VARCHAR(64),
+      hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'sha256',
+      scopes       TEXT[]       NOT NULL DEFAULT ARRAY['dpp:read']::text[],
+      expires_at   TIMESTAMPTZ,
       created_by   INT REFERENCES users(id) ON DELETE SET NULL,
       created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
       last_used_at TIMESTAMPTZ,
       is_active    BOOLEAN      NOT NULL DEFAULT true
     )
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS scopes TEXT[] NOT NULL DEFAULT ARRAY['dpp:read']::text[]
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS key_salt VARCHAR(64)
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'sha256'
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash    ON api_keys(key_hash)`);
@@ -580,11 +581,13 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1
   `);
-  await pool.query(`
-    UPDATE users
-    SET session_version = 1
-    WHERE session_version IS NULL OR session_version < 1
-  `).catch(() => {});
+  await runMigration(pool, "2026-04-27.backfill-user-session-version", async () => {
+    await pool.query(`
+      UPDATE users
+      SET session_version = 1
+      WHERE session_version IS NULL OR session_version < 1
+    `).catch(() => {});
+  });
 
   // Dynamic field values — time-series: every push appends a new row, nothing is ever overwritten
   await pool.query(`
@@ -818,6 +821,7 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       version_number   INTEGER NOT NULL DEFAULT 1,
       model_name       VARCHAR(255),
       product_id       VARCHAR(255),
+      product_identifier_did TEXT,
       release_status   VARCHAR(50),
       row_data         JSONB NOT NULL,
       archived_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -827,6 +831,10 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
   await pool.query(`
     ALTER TABLE passport_archives
     ADD COLUMN IF NOT EXISTS lineage_id UUID
+  `);
+  await pool.query(`
+    ALTER TABLE passport_archives
+    ADD COLUMN IF NOT EXISTS product_identifier_did TEXT
   `);
   await pool.query(`
     UPDATE passport_archives
@@ -866,28 +874,91 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
         ALTER TABLE ${tableName}
         ADD COLUMN IF NOT EXISTS granularity VARCHAR(20) NOT NULL DEFAULT 'model'
       `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS product_identifier_did TEXT
+      `);
+      await pool.query(`
+        CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did
+          ON ${tableName}(company_id, product_identifier_did)
+          WHERE deleted_at IS NULL
+      `);
       await pool.query(
         `UPDATE ${tableName}
          SET release_status = $1
          WHERE release_status = $2`,
         [IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS]
       );
+
+      if (productIdentifierService) {
+        await runMigration(pool, `2026-04-27.backfill-product-identifier-did.${type_name}`, async () => {
+          const liveRows = await pool.query(
+            `SELECT id, company_id, product_id, granularity
+             FROM ${tableName}
+             WHERE deleted_at IS NULL
+               AND COALESCE(TRIM(product_id), '') <> ''
+               AND COALESCE(TRIM(product_identifier_did), '') = ''`
+          );
+          for (const row of liveRows.rows) {
+            const canonicalDid = productIdentifierService.buildCanonicalProductDid({
+              companyId: row.company_id,
+              passportType: type_name,
+              rawProductId: row.product_id,
+              granularity: row.granularity || "item",
+            });
+            if (!canonicalDid) continue;
+            await pool.query(
+              `UPDATE ${tableName}
+               SET product_identifier_did = $1
+               WHERE id = $2`,
+              [canonicalDid, row.id]
+            );
+          }
+
+          const archiveRows = await pool.query(
+            `SELECT id, company_id, product_id, row_data
+             FROM passport_archives
+             WHERE passport_type = $1
+               AND COALESCE(TRIM(product_id), '') <> ''
+               AND COALESCE(TRIM(product_identifier_did), '') = ''`,
+            [type_name]
+          );
+          for (const row of archiveRows.rows) {
+            const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
+            const canonicalDid = productIdentifierService.buildCanonicalProductDid({
+              companyId: row.company_id,
+              passportType: type_name,
+              rawProductId: row.product_id,
+              granularity: rowData?.granularity || "item",
+            });
+            if (!canonicalDid) continue;
+            await pool.query(
+              `UPDATE passport_archives
+               SET product_identifier_did = $1
+               WHERE id = $2`,
+              [canonicalDid, row.id]
+            );
+          }
+        });
+      }
     } catch (e) {
       console.warn(`[initDb] Could not normalize revision status for ${type_name}:`, e.message);
     }
   }
 
   try {
-    const legacyDinSpecCol = await pool.query(`
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'din_spec_99100_passports'
-        AND column_name = 'carbon_footprint_performance_class'
-      LIMIT 1
-    `);
+    await runMigration(pool, "2026-04-27.finalize-din-spec-carbon-footprint-column", async () => {
+      const legacyDinSpecCol = await pool.query(`
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'din_spec_99100_passports'
+          AND column_name = 'carbon_footprint_performance_class'
+        LIMIT 1
+      `);
 
-    if (legacyDinSpecCol.rows.length) {
+      if (!legacyDinSpecCol.rows.length) return;
+
       await pool.query(`
         UPDATE din_spec_99100_passports
         SET carbon_footprint_label_and_performance_class =
@@ -899,162 +970,20 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
         ALTER TABLE din_spec_99100_passports
         DROP COLUMN IF EXISTS carbon_footprint_performance_class
       `);
-    }
+    });
   } catch (e) {
     console.warn("[initDb] Could not finalize DIN SPEC carbon footprint label/performance-class migration:", e.message);
   }
 
-  try {
-    const batteryTypeName = batteryPassDinSpec99100.passportType;
-    const typeRes = await pool.query(
-      "SELECT id, type_name, fields_json FROM passport_types WHERE type_name = $1 LIMIT 1",
-      [batteryTypeName]
-    );
-    if (typeRes.rows.length) {
-      const typeRow = typeRes.rows[0];
-      const sections = typeRow.fields_json?.sections || [];
-      const keyMap = {};
-      let schemaChanged = false;
-      let fieldDefinitionsChanged = 0;
-      let columnsRenamed = 0;
-      let columnsMerged = 0;
-      let archiveRowsUpdated = 0;
-      let dynamicRowsUpdated = 0;
-      let templateRowsDeleted = 0;
-      let templateRowsUpdated = 0;
-
-      const migratedSections = sections.map((section) => {
-        const migratedFields = (section.fields || []).map((field) => {
-          const migrated = migrateBatteryPassField(field);
-          if (migrated.changed) {
-            schemaChanged = true;
-            fieldDefinitionsChanged += 1;
-          }
-          if (migrated.oldKey && migrated.newKey && migrated.oldKey !== migrated.newKey) {
-            keyMap[migrated.oldKey] = migrated.newKey;
-          }
-          return migrated.field;
-        });
-        return { ...section, fields: migratedFields };
-      });
-
-      if (schemaChanged) {
-        await pool.query(
-          "UPDATE passport_types SET fields_json = $1, updated_at = NOW() WHERE id = $2",
-          [JSON.stringify({ sections: migratedSections }), typeRow.id]
-        );
-      }
-
-      if (Object.keys(keyMap).length) {
-        const tableName = getTable(batteryTypeName);
-        for (const [oldKey, newKey] of Object.entries(keyMap)) {
-          const oldColRes = await pool.query(
-            `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2 LIMIT 1`,
-            [tableName, oldKey]
-          );
-          if (!oldColRes.rows.length) continue;
-
-          const newColRes = await pool.query(
-            `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2 LIMIT 1`,
-            [tableName, newKey]
-          );
-
-          if (!newColRes.rows.length) {
-            await pool.query(`ALTER TABLE ${quoteIdent(tableName)} RENAME COLUMN ${quoteIdent(oldKey)} TO ${quoteIdent(newKey)}`);
-            columnsRenamed += 1;
-          } else {
-            await pool.query(
-              `UPDATE ${quoteIdent(tableName)}
-               SET ${quoteIdent(newKey)} = COALESCE(${quoteIdent(newKey)}, ${quoteIdent(oldKey)})
-               WHERE ${quoteIdent(oldKey)} IS NOT NULL`
-            );
-            await pool.query(`ALTER TABLE ${quoteIdent(tableName)} DROP COLUMN IF EXISTS ${quoteIdent(oldKey)}`);
-            columnsMerged += 1;
-          }
-        }
-
-        const archiveRows = await pool.query(
-          "SELECT id, row_data FROM passport_archives WHERE passport_type = $1",
-          [batteryTypeName]
-        );
-        for (const row of archiveRows.rows) {
-          const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
-          const remapped = remapJsonObjectKeys(rowData, keyMap);
-          if (JSON.stringify(remapped) !== JSON.stringify(rowData)) {
-            await pool.query(
-              "UPDATE passport_archives SET row_data = $1 WHERE id = $2",
-              [JSON.stringify(remapped), row.id]
-            );
-            archiveRowsUpdated += 1;
-          }
-        }
-
-        for (const [oldKey, newKey] of Object.entries(keyMap)) {
-          const dynamicUpdateRes = await pool.query(
-            `UPDATE passport_dynamic_values
-             SET field_key = $1
-             WHERE field_key = $2
-               AND passport_guid IN (SELECT guid FROM passport_registry WHERE passport_type = $3)`,
-            [newKey, oldKey, batteryTypeName]
-          );
-          dynamicRowsUpdated += dynamicUpdateRes.rowCount || 0;
-          const templateDeleteRes = await pool.query(
-            `DELETE FROM passport_template_fields ptf
-             WHERE ptf.field_key = $1
-               AND ptf.template_id IN (SELECT id FROM passport_templates WHERE passport_type = $3)
-               AND EXISTS (
-                 SELECT 1
-                 FROM passport_template_fields existing
-                 WHERE existing.template_id = ptf.template_id
-                   AND existing.field_key = $2
-               )`,
-            [oldKey, newKey, batteryTypeName]
-          );
-          templateRowsDeleted += templateDeleteRes.rowCount || 0;
-          const templateUpdateRes = await pool.query(
-            `UPDATE passport_template_fields
-             SET field_key = $1
-             WHERE field_key = $2
-               AND template_id IN (SELECT id FROM passport_templates WHERE passport_type = $3)`,
-            [newKey, oldKey, batteryTypeName]
-          );
-          templateRowsUpdated += templateUpdateRes.rowCount || 0;
-        }
-
-        const totalChanges =
-          fieldDefinitionsChanged +
-          columnsRenamed +
-          columnsMerged +
-          archiveRowsUpdated +
-          dynamicRowsUpdated +
-          templateRowsDeleted +
-          templateRowsUpdated;
-
-        if (totalChanges > 0) {
-          console.log(
-            `[initDb] Battery Pass migration applied for ${batteryTypeName}: ` +
-            `${fieldDefinitionsChanged} field definitions normalized, ` +
-            `${columnsRenamed} columns renamed, ` +
-            `${columnsMerged} columns merged, ` +
-            `${archiveRowsUpdated} archived rows rewritten, ` +
-            `${dynamicRowsUpdated} dynamic value rows updated, ` +
-            `${templateRowsDeleted} duplicate template rows removed, ` +
-            `${templateRowsUpdated} template rows updated.`
-          );
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("[initDb] Could not migrate Battery Pass canonical field keys:", e.message);
-  }
-
-  await pool.query(
-    `UPDATE passport_workflow
-     SET previous_release_status = $1
-     WHERE previous_release_status = $2`,
-    [IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS]
-  ).catch((e) => {
-    console.warn("[initDb] Could not normalize workflow revision status:", e.message);
+  await runMigration(pool, "2026-04-27.normalize-workflow-revision-status", async () => {
+    await pool.query(
+      `UPDATE passport_workflow
+       SET previous_release_status = $1
+       WHERE previous_release_status = $2`,
+      [IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS]
+    ).catch((e) => {
+      console.warn("[initDb] Could not normalize workflow revision status:", e.message);
+    });
   });
 
   // ── Templates tables ─────────────────────────────────────────────────────
@@ -1221,6 +1150,9 @@ async function initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS,
       END IF;
     END $$;
   `).catch(() => {});
+  } finally {
+    await pool.query(`SELECT pg_advisory_unlock($1)`, [SCHEMA_MIGRATION_LOCK_KEY]).catch(() => {});
+  }
 }
 
 module.exports = { initDb };

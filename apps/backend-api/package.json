@@ -6,8 +6,6 @@
   "scripts": {
     "start": "node Server/server.js",
     "dev": "nodemon Server/server.js",
-    "contact": "node \"Website form/contact-server.js\"",
-    "contact:dev": "nodemon \"Website form/contact-server.js\"",
     "test": "jest --runInBand"
   },
   "keywords": [],

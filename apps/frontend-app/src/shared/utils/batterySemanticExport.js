@@ -1,8 +1,5 @@
-import batteryPassDinSpec99100 from "../semantics/battery-pass-din-spec-99100.json";
-
+const BATTERY_PASS_PASSPORT_TYPE = "din_spec_99100";
 const BATTERY_PASS_MODEL_KEY = "claros_battery_dictionary_v1";
-const LEGACY_BATTERY_PASS_MODEL_KEY = "battery_pass_din_spec_99100";
-const LEGACY_CLAROS_BATTERY_MODEL_KEY = "claros_battery_v1";
 const BATTERY_CONTEXT_URL = "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld";
 
 const DPP_CONTEXT = {
@@ -26,18 +23,13 @@ function normalizeSemanticModelKey(modelKey) {
 }
 
 export function isBatteryPassExportType(passportType) {
-  return String(passportType || "").trim().toLowerCase() === batteryPassDinSpec99100.passportType;
+  return String(passportType || "").trim().toLowerCase() === BATTERY_PASS_PASSPORT_TYPE;
 }
 
 function shouldUseBatteryDictionary(passportType, options = {}) {
   if (!isBatteryPassExportType(passportType)) return false;
   const modelKey = normalizeSemanticModelKey(options.semanticModelKey);
-  return (
-    !modelKey ||
-    modelKey === BATTERY_PASS_MODEL_KEY ||
-    modelKey === LEGACY_BATTERY_PASS_MODEL_KEY ||
-    modelKey === LEGACY_CLAROS_BATTERY_MODEL_KEY
-  );
+  return !modelKey || modelKey === BATTERY_PASS_MODEL_KEY;
 }
 
 function sanitizePassport(passport, passportType) {
@@ -74,13 +66,10 @@ export function buildPassportJsonLdExport(passports, passportType) {
     "@graph": graph,
     ...(shouldUseBatteryDictionary(resolvedType, options)
       ? {
-          passport_type: batteryPassDinSpec99100.passportType,
+          passport_type: BATTERY_PASS_PASSPORT_TYPE,
           semantic_model: {
             semanticModelKey: BATTERY_PASS_MODEL_KEY,
             contextUrl: BATTERY_CONTEXT_URL,
-            legacyRequestedModelKey: normalizeSemanticModelKey(options.semanticModelKey) === LEGACY_BATTERY_PASS_MODEL_KEY
-              ? LEGACY_BATTERY_PASS_MODEL_KEY
-              : null,
           },
         }
       : {}),

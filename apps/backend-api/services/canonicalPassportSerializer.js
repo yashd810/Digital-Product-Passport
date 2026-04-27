@@ -171,7 +171,11 @@ function createCanonicalPassportSerializer({ didService }) {
     const dppStatus = toDppStatus(passport?.release_status || rawDppStatus);
     const economicOperatorId = findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.economicOperatorId) || passport?.economic_operator_id || companyDid;
     const facilityId = findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.facilityId) || passport?.facility_id || null;
-    const contentSpecificationIdsRaw = findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.contentSpecificationIds) || passport?.content_specification_ids || [];
+    const contentSpecificationIdsRaw =
+      findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.contentSpecificationIds)
+      || passport?.content_specification_ids
+      || typeDef?.semantic_model_key
+      || [];
     const contentSpecificationIds = Array.isArray(contentSpecificationIdsRaw)
       ? contentSpecificationIdsRaw
       : parseArrayValue(contentSpecificationIdsRaw);
@@ -186,8 +190,8 @@ function createCanonicalPassportSerializer({ didService }) {
     });
 
     return {
-      digitalProductPassportId: `${publicOrigin}/passports/${passport.guid}`,
-      uniqueProductIdentifier: passport.product_id || null,
+      digitalProductPassportId: dppDid,
+      uniqueProductIdentifier: passport.product_identifier_did || passport.product_id || null,
       granularity: toTitleCaseGranularity(resolvedGranularity),
       dppSchemaVersion,
       dppStatus,

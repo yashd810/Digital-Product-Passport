@@ -1,5 +1,7 @@
 "use strict";
 
+const logger = require("../services/logger");
+
 /**
  * Authentication and authorization middleware.
  *
@@ -9,6 +11,20 @@
  */
 
 module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, SESSION_COOKIE_NAME }) {
+  const normalizeScopes = (scopes) => Array.isArray(scopes)
+    ? scopes.map((scope) => String(scope || "").trim()).filter(Boolean)
+    : [];
+  const API_KEY_PREFIX_LENGTH = 16;
+
+  const getApiKeyPrefix = (rawKey) => String(rawKey || "").slice(0, API_KEY_PREFIX_LENGTH);
+  const hashLegacyApiKey = (rawKey) => crypto.createHash("sha256").update(String(rawKey || "")).digest("hex");
+  const hashApiKeyWithSalt = (rawKey, salt, algorithm = "hmac_sha256") => {
+    if (algorithm === "hmac_sha256" && salt) {
+      return crypto.createHmac("sha256", String(salt)).update(String(rawKey || "")).digest("hex");
+    }
+    return hashLegacyApiKey(rawKey);
+  };
+
   const parseCookies = (req) => {
     const raw = req.headers.cookie || "";
     return raw.split(";").reduce((acc, part) => {
@@ -85,20 +101,58 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   const authenticateApiKey = async (req, res, next) => {
     const key = req.headers["x-api-key"];
     if (!key) return res.status(401).json({ error: "API key required. Send it via the X-API-Key header." });
-    const keyHash = crypto.createHash("sha256").update(key).digest("hex");
     try {
-      const r = await pool.query(
-        "SELECT id, company_id FROM api_keys WHERE key_hash = $1 AND is_active = true",
-        [keyHash]
-      );
-      if (!r.rows.length) return res.status(401).json({ error: "Invalid or revoked API key." });
-      pool.query("UPDATE api_keys SET last_used_at = NOW() WHERE id = $1", [r.rows[0].id]).catch(() => {});
-      req.apiKey = { keyId: r.rows[0].id, companyId: String(r.rows[0].company_id) };
+      const keyPrefix = getApiKeyPrefix(key);
+      let matchedRow = null;
+
+      if (keyPrefix) {
+        const prefixed = await pool.query(
+          `SELECT id, company_id, scopes, expires_at, key_hash, key_salt, hash_algorithm
+           FROM api_keys
+           WHERE key_prefix = $1
+             AND is_active = true
+             AND (expires_at IS NULL OR expires_at > NOW())`,
+          [keyPrefix]
+        );
+        matchedRow = prefixed.rows.find((row) => {
+          const computed = hashApiKeyWithSalt(key, row.key_salt, row.hash_algorithm);
+          return computed === row.key_hash;
+        }) || null;
+      }
+
+      if (!matchedRow) {
+        const legacyHash = hashLegacyApiKey(key);
+        const legacy = await pool.query(
+          `SELECT id, company_id, scopes, expires_at
+           FROM api_keys
+           WHERE key_hash = $1
+             AND is_active = true
+             AND (expires_at IS NULL OR expires_at > NOW())
+           LIMIT 1`,
+          [legacyHash]
+        );
+        matchedRow = legacy.rows[0] || null;
+      }
+
+      if (!matchedRow) return res.status(401).json({ error: "Invalid or revoked API key." });
+      pool.query("UPDATE api_keys SET last_used_at = NOW() WHERE id = $1", [matchedRow.id]).catch(() => {});
+      req.apiKey = {
+        keyId: matchedRow.id,
+        companyId: String(matchedRow.company_id),
+        scopes: normalizeScopes(matchedRow.scopes),
+        expiresAt: matchedRow.expires_at || null,
+      };
       next();
     } catch (e) {
-      console.error("API key auth error:", e.message);
+      logger.error({ err: e }, "API key auth error");
       res.status(500).json({ error: "Authentication error" });
     }
+  };
+
+  const requireApiKeyScope = (requiredScope) => (req, res, next) => {
+    const scopes = normalizeScopes(req.apiKey?.scopes);
+    if (scopes.includes(requiredScope) || scopes.includes("*")) return next();
+    return res.status(403).json({ error: `API key scope "${requiredScope}" is required.` });
   };
 
   return {
@@ -109,5 +163,6 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     requireEditor,
     checkCompanyAdmin,
     authenticateApiKey,
+    requireApiKeyScope,
   };
 };

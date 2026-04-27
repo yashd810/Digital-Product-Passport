@@ -1,9 +1,5 @@
 {
   "semanticModelKey": "claros_battery_dictionary_v1",
-  "legacySemanticModelKeys": [
-    "battery_pass_din_spec_99100",
-    "claros_battery_v1"
-  ],
   "name": "Claros Battery Dictionary",
   "version": "1.0.0",
   "description": "Internal battery passport dictionary derived from the BatteryPass Data Attribute Longlist v1.3.",

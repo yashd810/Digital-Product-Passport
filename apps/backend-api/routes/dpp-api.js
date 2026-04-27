@@ -15,9 +15,11 @@ module.exports = function registerDppApiRoutes(app, {
   resolveReleasedPassportByProductId,
   signingService,
   buildOperationalDppPayload,
+  buildCanonicalPassportPayload,
   buildPassportJsonLdContext,
   didService,
   dppIdentity, // the dpp-identity-service module
+  productIdentifierService,
 }) {
 
   // ─── HELPERS ───────────────────────────────────────────────────────────────
@@ -30,31 +32,29 @@ module.exports = function registerDppApiRoutes(app, {
    * Load a released passport record by companyId + productId.
    * Returns { passport, typeDef, companyName } or null.
    */
-  async function loadReleasedPassport(companyId, rawProductId) {
+  async function loadReleasedPassport(companyId, rawProductId, options = {}) {
     const productId = normalizeProductIdValue
       ? normalizeProductIdValue(rawProductId)
       : rawProductId;
+    if (!productId) return null;
 
-    if (resolveReleasedPassportByProductId) {
-      const result = await resolveReleasedPassportByProductId({ companyId, productId });
-      return result || null;
-    }
+    const result = await resolveReleasedPassportByProductId(productId, {
+      companyId,
+      versionNumber: options.versionNumber ?? null,
+      granularity: options.granularity || "item",
+    });
+    if (!result?.passport) return null;
 
-    // Fallback: manual lookup
-    const reg = await pool.query(
-      `SELECT pr.guid, pr.passport_type
-       FROM passport_registry pr
-       JOIN (
-         SELECT passport_type, product_id, company_id
-         FROM passport_registry
-         WHERE company_id = $1
-       ) sub ON sub.passport_type = pr.passport_type
-       WHERE pr.company_id = $1
-       LIMIT 1`,
-      [companyId]
-    );
-    if (!reg.rows.length) return null;
-    return null;
+    const [companyNameMap, typeRes] = await Promise.all([
+      getCompanyNameMap([result.passport.company_id]),
+      pool.query("SELECT type_name, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [result.passport.passport_type]),
+    ]);
+
+    return {
+      passport: result.passport,
+      typeDef: typeRes.rows[0] || null,
+      companyName: companyNameMap.get(String(result.passport.company_id)) || "",
+    };
   }
 
   /**
@@ -63,6 +63,23 @@ module.exports = function registerDppApiRoutes(app, {
   function acceptsJsonLd(req) {
     const accept = req.headers.accept || "";
     return accept.includes("application/ld+json");
+  }
+
+  function getRepresentation(req) {
+    const raw = String(req.query.representation || "").trim().toLowerCase();
+    return raw === "full" ? "full" : "compressed";
+  }
+
+  async function buildPassportResponse(req, passport, typeDef, companyName) {
+    const sanitized = await stripRestrictedFieldsForPublicView(passport, passport.passport_type);
+    if (getRepresentation(req) === "full") {
+      return buildCanonicalPassportPayload(sanitized, typeDef, { companyName });
+    }
+    return buildOperationalDppPayload(sanitized, typeDef, {
+      companyName,
+      granularity: sanitized.granularity || "model",
+      dppIdentity,
+    });
   }
 
   /**
@@ -114,45 +131,7 @@ module.exports = function registerDppApiRoutes(app, {
    * Throws { ambiguous: true } if genuinely ambiguous across companies.
    */
   async function dbLookupByCompanyAndProduct(companyId, productId) {
-    // Find all passport types this company has
-    const regRows = await pool.query(
-      `SELECT DISTINCT passport_type FROM passport_registry
-       WHERE company_id = $1`,
-      [companyId]
-    );
-    if (!regRows.rows.length) return null;
-
-    const passportTypes = regRows.rows.map(r => r.passport_type);
-    let found = null;
-
-    for (const passportType of passportTypes) {
-      const tableName = getTable(passportType);
-      const r = await pool.query(
-        `SELECT * FROM ${tableName}
-         WHERE company_id = $1
-           AND product_id = $2
-           AND deleted_at IS NULL
-           AND release_status = 'released'
-         ORDER BY version_number DESC
-         LIMIT 1`,
-        [companyId, productId]
-      );
-      if (r.rows.length) {
-        found = { ...normalizePassportRow(r.rows[0]), passport_type: passportType };
-        break;
-      }
-    }
-
-    if (!found) return null;
-
-    const [companyNameMap, typeRes] = await Promise.all([
-      getCompanyNameMap([found.company_id]),
-      pool.query("SELECT fields_json FROM passport_types WHERE type_name = $1", [found.passport_type]),
-    ]);
-    const companyName = companyNameMap.get(String(found.company_id)) || "";
-    const typeDef = typeRes.rows[0] || null;
-
-    return { passport: found, typeDef, companyName };
+    return loadReleasedPassport(companyId, productId);
   }
 
   async function loadCompanyById(companyId) {
@@ -194,54 +173,18 @@ module.exports = function registerDppApiRoutes(app, {
    * Returns { passport, typeDef, companyName } or null.
    * Throws { code: 'AMBIGUOUS_PRODUCT_ID' } if multiple companies have the same product_id.
    */
-  async function dbLookupByProductIdOnly(productId) {
-    // Search across all passport type tables
-    const allTypes = await pool.query(
-      "SELECT type_name FROM passport_types WHERE is_active = true"
-    );
-
-    const matches = [];
-    for (const row of allTypes.rows) {
-      const tableName = getTable(row.type_name);
-      try {
-        const r = await pool.query(
-          `SELECT *, '${row.type_name}' AS _passport_type FROM ${tableName}
-           WHERE product_id = $1
-             AND deleted_at IS NULL
-             AND release_status = 'released'
-           ORDER BY version_number DESC
-           LIMIT 1`,
-          [productId]
-        );
-        if (r.rows.length) {
-          matches.push({ ...normalizePassportRow(r.rows[0]), passport_type: row.type_name });
-        }
-      } catch {
-        // Table may not exist; skip
-      }
-    }
-
-    if (!matches.length) return null;
-
-    // Check for ambiguity: multiple different company_ids
-    const companyIds = [...new Set(matches.map(m => m.company_id))];
-    if (companyIds.length > 1) {
-      const err = new Error("AMBIGUOUS_PRODUCT_ID");
-      err.code = "AMBIGUOUS_PRODUCT_ID";
-      err.companyIds = companyIds;
-      throw err;
-    }
-
-    const passport = matches[0];
-
+  async function dbLookupByProductIdOnly(productId, { versionNumber = null } = {}) {
+    const result = await resolveReleasedPassportByProductId(productId, { versionNumber });
+    if (!result?.passport) return null;
     const [companyNameMap, typeRes] = await Promise.all([
-      getCompanyNameMap([passport.company_id]),
-      pool.query("SELECT fields_json FROM passport_types WHERE type_name = $1", [passport.passport_type]),
+      getCompanyNameMap([result.passport.company_id]),
+      pool.query("SELECT type_name, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [result.passport.passport_type]),
     ]);
-    const companyName = companyNameMap.get(String(passport.company_id)) || "";
-    const typeDef = typeRes.rows[0] || null;
-
-    return { passport, typeDef, companyName };
+    return {
+      passport: result.passport,
+      typeDef: typeRes.rows[0] || null,
+      companyName: companyNameMap.get(String(result.passport.company_id)) || "",
+    };
   }
 
   // ─── GET /api/dpp/by-product/:productId ────────────────────────────────────
@@ -268,17 +211,9 @@ module.exports = function registerDppApiRoutes(app, {
 
       if (!result) return res.status(404).json({ error: "Passport not found or not released" });
 
-      const { passport, typeDef, companyName } = result;
-      const sanitized = await stripRestrictedFieldsForPublicView(passport, passport.passport_type);
-
-      const payload = buildOperationalDppPayload(sanitized, typeDef, {
-        companyName,
-        granularity: "model",
-        dppIdentity,
-      });
-
+      const payload = await buildPassportResponse(req, result.passport, result.typeDef, result.companyName);
       if (acceptsJsonLd(req)) {
-        const context = buildPassportJsonLdContext(typeDef);
+        const context = buildPassportJsonLdContext(result.typeDef);
         res.setHeader("Content-Type", "application/ld+json");
         return res.json({ "@context": context, ...payload });
       }
@@ -304,17 +239,9 @@ module.exports = function registerDppApiRoutes(app, {
       const result = await dbLookupByCompanyAndProduct(companyId, productId);
       if (!result) return res.status(404).json({ error: "Passport not found or not released" });
 
-      const { passport, typeDef, companyName } = result;
-      const sanitized = await stripRestrictedFieldsForPublicView(passport, passport.passport_type);
-
-      const payload = buildOperationalDppPayload(sanitized, typeDef, {
-        companyName,
-        granularity: "model",
-        dppIdentity,
-      });
-
+      const payload = await buildPassportResponse(req, result.passport, result.typeDef, result.companyName);
       if (acceptsJsonLd(req)) {
-        const context = buildPassportJsonLdContext(typeDef);
+        const context = buildPassportJsonLdContext(result.typeDef);
         res.setHeader("Content-Type", "application/ld+json");
         return res.json({ "@context": context, ...payload });
       }
@@ -324,6 +251,114 @@ module.exports = function registerDppApiRoutes(app, {
     } catch (e) {
       console.error("[DPP API by-company-product]", e.message);
       res.status(500).json({ error: "Failed to fetch DPP" });
+    }
+  });
+
+  app.get("/api/v1/dpps/:productIdentifier", publicReadRateLimit, async (req, res) => {
+    try {
+      const productIdentifier = decodeURIComponent(req.params.productIdentifier);
+      const companyId = req.query.companyId ? Number.parseInt(req.query.companyId, 10) : null;
+      const versionNumber = req.query.versionNumber ? Number.parseInt(req.query.versionNumber, 10) : null;
+      if (!productIdentifier) return res.status(400).json({ error: "productIdentifier is required" });
+      if (req.query.companyId && !Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid companyId" });
+
+      const result = companyId
+        ? await loadReleasedPassport(companyId, productIdentifier, { versionNumber })
+        : await dbLookupByProductIdOnly(productIdentifier, { versionNumber });
+
+      if (!result) return res.status(404).json({ error: "Passport not found or not released" });
+
+      const payload = await buildPassportResponse(req, result.passport, result.typeDef, result.companyName);
+      if (acceptsJsonLd(req)) {
+        const context = buildPassportJsonLdContext(result.typeDef);
+        res.setHeader("Content-Type", "application/ld+json");
+        return res.json({ "@context": context, ...payload });
+      }
+
+      res.setHeader("Content-Type", "application/json");
+      return res.json(payload);
+    } catch (e) {
+      if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+        return res.status(409).json({
+          error: "AMBIGUOUS_PRODUCT_ID",
+          message: "Multiple passports match this identifier. Provide companyId or use the canonical product DID.",
+        });
+      }
+      console.error("[Standards DPP API]", e.message);
+      return res.status(500).json({ error: "Failed to fetch DPP" });
+    }
+  });
+
+  app.get("/api/v1/dpps/:productIdentifier/versions/:versionNumber", publicReadRateLimit, async (req, res) => {
+    try {
+      const productIdentifier = decodeURIComponent(req.params.productIdentifier);
+      const companyId = req.query.companyId ? Number.parseInt(req.query.companyId, 10) : null;
+      const versionNumber = Number.parseInt(req.params.versionNumber, 10);
+      if (!productIdentifier) return res.status(400).json({ error: "productIdentifier is required" });
+      if (!Number.isFinite(versionNumber)) return res.status(400).json({ error: "Invalid versionNumber" });
+      if (req.query.companyId && !Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid companyId" });
+
+      const result = companyId
+        ? await loadReleasedPassport(companyId, productIdentifier, { versionNumber })
+        : await dbLookupByProductIdOnly(productIdentifier, { versionNumber });
+      if (!result) return res.status(404).json({ error: "Passport not found or not released" });
+
+      const payload = await buildPassportResponse(
+        { ...req, query: { ...req.query, representation: req.query.representation } },
+        result.passport,
+        result.typeDef,
+        result.companyName
+      );
+      if (acceptsJsonLd(req)) {
+        const context = buildPassportJsonLdContext(result.typeDef);
+        res.setHeader("Content-Type", "application/ld+json");
+        return res.json({ "@context": context, ...payload });
+      }
+
+      res.setHeader("Content-Type", "application/json");
+      return res.json(payload);
+    } catch (e) {
+      if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+        return res.status(409).json({
+          error: "AMBIGUOUS_PRODUCT_ID",
+          message: "Multiple passports match this identifier. Provide companyId or use the canonical product DID.",
+        });
+      }
+      console.error("[Standards DPP version API]", e.message);
+      return res.status(500).json({ error: "Failed to fetch DPP version" });
+    }
+  });
+
+  app.get("/api/v1/dpps/:productIdentifier/elements/:elementIdPath", publicReadRateLimit, async (req, res) => {
+    try {
+      const productIdentifier = decodeURIComponent(req.params.productIdentifier);
+      const elementIdPath = decodeURIComponent(req.params.elementIdPath || "");
+      const companyId = req.query.companyId ? Number.parseInt(req.query.companyId, 10) : null;
+      if (!productIdentifier || !elementIdPath) return res.status(400).json({ error: "productIdentifier and elementIdPath are required" });
+
+      const result = companyId
+        ? await loadReleasedPassport(companyId, productIdentifier)
+        : await dbLookupByProductIdOnly(productIdentifier);
+      if (!result) return res.status(404).json({ error: "Passport not found or not released" });
+
+      const payload = buildCanonicalPassportPayload(result.passport, result.typeDef, { companyName: result.companyName });
+      const value = payload.fields?.[elementIdPath];
+      if (value === undefined) return res.status(404).json({ error: "Data element not found" });
+
+      return res.json({
+        productIdentifier: result.passport.product_identifier_did || result.passport.product_id,
+        elementIdPath,
+        value,
+      });
+    } catch (e) {
+      if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+        return res.status(409).json({
+          error: "AMBIGUOUS_PRODUCT_ID",
+          message: "Multiple passports match this identifier. Provide companyId or use the canonical product DID.",
+        });
+      }
+      console.error("[Standards DPP element API]", e.message);
+      return res.status(500).json({ error: "Failed to fetch DPP data element" });
     }
   });
 
@@ -560,9 +595,9 @@ module.exports = function registerDppApiRoutes(app, {
       const companyName    = companyNameMap.get(String(company_id)) || "";
 
       const publicUrl  = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
-      const productDid = passport.product_id
+      const productDid = passport.product_identifier_did || (passport.product_id
         ? dppIdentity.productModelDid(company_id, passport.product_id)
-        : null;
+        : null);
       const pDppDid = passport.product_id
         ? dppIdentity.dppDid("model", company_id, passport.product_id)
         : null;
@@ -570,6 +605,7 @@ module.exports = function registerDppApiRoutes(app, {
       res.json({
         publicUrl,
         productId:   passport.product_id || null,
+        productIdentifierDid: passport.product_identifier_did || null,
         modelName:   passport.model_name  || null,
         companyName,
         dppDid:      pDppDid,
@@ -610,20 +646,15 @@ module.exports = function registerDppApiRoutes(app, {
         if (!r.rows.length) return res.status(404).json({ error: "Passport not found or not released" });
 
         const passport  = { ...normalizePassportRow(r.rows[0]), passport_type };
-        const sanitized = await stripRestrictedFieldsForPublicView(passport, passport_type);
 
         const [companyNameMap, typeRes] = await Promise.all([
-          getCompanyNameMap([sanitized.company_id]),
-          pool.query("SELECT fields_json FROM passport_types WHERE type_name = $1", [passport_type]),
+          getCompanyNameMap([passport.company_id]),
+          pool.query("SELECT type_name, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [passport_type]),
         ]);
-        const companyName = companyNameMap.get(String(sanitized.company_id)) || "";
+        const companyName = companyNameMap.get(String(passport.company_id)) || "";
         const typeDef     = typeRes.rows[0] || null;
 
-        const payload = buildOperationalDppPayload(sanitized, typeDef, {
-          companyName,
-          granularity: "model",
-          dppIdentity,
-        });
+        const payload = await buildPassportResponse(req, passport, typeDef, companyName);
 
         if (acceptJsonLd) {
           const context = buildPassportJsonLdContext(typeDef);

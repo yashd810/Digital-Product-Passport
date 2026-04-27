@@ -27,6 +27,7 @@ module.exports = function createPassportService({
   getHistoryFieldDefs,
   buildCurrentPublicPassportPath,
   buildInactivePublicPassportPath,
+  productIdentifierService,
   // email service
   createTransporter,
   brandedEmail,
@@ -172,7 +173,7 @@ module.exports = function createPassportService({
       archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
     }
     const archiveRes = await pool.query(
-      `SELECT guid, lineage_id, company_id, passport_type, version_number, model_name, product_id, release_status, archived_at, row_data
+      `SELECT guid, lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, archived_at, row_data
        FROM passport_archives
        WHERE lineage_id = $1
          AND passport_type = $2${archiveCompanyFilter}
@@ -194,6 +195,7 @@ module.exports = function createPassportService({
           version_number: row.version_number ?? rowData?.version_number,
           model_name: row.model_name || rowData?.model_name,
           product_id: row.product_id || rowData?.product_id,
+          product_identifier_did: row.product_identifier_did || rowData?.product_identifier_did,
           release_status: row.release_status || rowData?.release_status,
           archived: true,
           archived_at: row.archived_at,
@@ -348,17 +350,33 @@ module.exports = function createPassportService({
     };
   }
 
-  async function resolveReleasedPassportByProductId(productId, { versionNumber = null } = {}) {
+  async function resolveReleasedPassportByProductId(productId, { versionNumber = null, companyId = null, passportType = "battery", granularity = "item" } = {}) {
     const normalizedProductId = normalizeProductIdValue(productId);
     if (!normalizedProductId) return { passport: null, archived: false };
+    const isDidIdentifier = productIdentifierService?.isDidIdentifier?.(normalizedProductId);
+    const candidates = isDidIdentifier
+      ? [normalizedProductId]
+      : productIdentifierService?.buildLookupCandidates?.({
+          companyId,
+          passportType,
+          productId: normalizedProductId,
+          granularity,
+        }) || [normalizedProductId];
 
     const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
     const matches = [];
 
     for (const { type_name } of ptRows.rows) {
       const tableName = getTable(type_name);
-      const liveParams = [normalizedProductId];
+      const liveParams = candidates;
       let versionSql = "";
+      let companySql = "";
+      let companyParamOffset = liveParams.length;
+      if (companyId !== null && companyId !== undefined) {
+        liveParams.push(companyId);
+        companyParamOffset = liveParams.length;
+        companySql = ` AND company_id = $${companyParamOffset}`;
+      }
       if (versionNumber !== null && versionNumber !== undefined) {
         liveParams.push(versionNumber);
         versionSql = ` AND version_number = $${liveParams.length}`;
@@ -367,12 +385,12 @@ module.exports = function createPassportService({
       const liveRes = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE product_id = $1
+         WHERE (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
            AND ${
              versionNumber !== null && versionNumber !== undefined
                ? "release_status IN ('released', 'obsolete')"
                : "release_status = 'released'"
-           }
+           }${companySql}
            AND deleted_at IS NULL${versionSql}
          ORDER BY version_number DESC, updated_at DESC
          LIMIT 1`,
@@ -386,19 +404,25 @@ module.exports = function createPassportService({
         continue;
       }
 
-      const archiveParams = versionNumber !== null && versionNumber !== undefined
-        ? [normalizedProductId, type_name, versionNumber]
-        : [normalizedProductId, type_name];
+      const archiveParams = [candidates, type_name];
+      let archiveCompanySql = "";
+      if (companyId !== null && companyId !== undefined) {
+        archiveParams.push(companyId);
+        archiveCompanySql = ` AND company_id = $${archiveParams.length}`;
+      }
+      if (versionNumber !== null && versionNumber !== undefined) {
+        archiveParams.push(versionNumber);
+      }
       const archiveRes = await pool.query(
-        `SELECT row_data
+        `SELECT product_identifier_did, row_data
          FROM passport_archives
-         WHERE product_id = $1
-           AND passport_type = $2
+         WHERE (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
+           AND passport_type = $2${archiveCompanySql}
            AND ${
              versionNumber !== null && versionNumber !== undefined
                ? "release_status IN ('released', 'obsolete')"
                : "release_status = 'released'"
-           }${versionNumber !== null && versionNumber !== undefined ? " AND version_number = $3" : ""}
+           }${versionNumber !== null && versionNumber !== undefined ? ` AND version_number = $${archiveParams.length}` : ""}
          ORDER BY version_number DESC, archived_at DESC
          LIMIT 1`,
         archiveParams
@@ -408,7 +432,12 @@ module.exports = function createPassportService({
           ? JSON.parse(archiveRes.rows[0].row_data)
           : archiveRes.rows[0].row_data;
         matches.push({
-          passport: { ...normalizePassportRow(rowData), passport_type: type_name, archived: true },
+          passport: {
+            ...normalizePassportRow(rowData),
+            product_identifier_did: archiveRes.rows[0].product_identifier_did || rowData?.product_identifier_did,
+            passport_type: type_name,
+            archived: true,
+          },
           archived: true,
         });
       }
@@ -416,7 +445,7 @@ module.exports = function createPassportService({
 
     if (!matches.length) return { passport: null, archived: false };
     if (matches.length > 1) {
-      const error = new Error(`Multiple released passports share product_id "${normalizedProductId}".`);
+      const error = new Error(`Multiple released passports share product identifier "${normalizedProductId}".`);
       error.code = "AMBIGUOUS_PRODUCT_ID";
       throw error;
     }
@@ -502,6 +531,10 @@ module.exports = function createPassportService({
   async function resolveCompanyPreviewPassportByProductId(companyId, productId) {
     const normalizedProductId = normalizeProductIdValue(productId);
     if (!companyId || !normalizedProductId) return { passport: null, archived: false };
+    const candidates = productIdentifierService?.buildLookupCandidates?.({
+      companyId,
+      productId: normalizedProductId,
+    }) || [normalizedProductId];
 
     const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
     const liveMatches = [];
@@ -512,11 +545,11 @@ module.exports = function createPassportService({
         `SELECT *
          FROM ${tableName}
          WHERE company_id = $1
-           AND product_id = $2
+           AND (product_id = ANY($2::text[]) OR product_identifier_did = ANY($2::text[]))
            AND deleted_at IS NULL
          ORDER BY version_number DESC, updated_at DESC, id DESC
          LIMIT 1`,
-        [companyId, normalizedProductId]
+        [companyId, candidates]
       );
       if (liveRes.rows.length) {
         liveMatches.push({
@@ -527,7 +560,7 @@ module.exports = function createPassportService({
     }
 
     if (liveMatches.length > 1) {
-      const error = new Error(`Multiple passports in company "${companyId}" share product_id "${normalizedProductId}".`);
+      const error = new Error(`Multiple passports in company "${companyId}" share product identifier "${normalizedProductId}".`);
       error.code = "AMBIGUOUS_PRODUCT_ID";
       throw error;
     }
@@ -540,10 +573,10 @@ module.exports = function createPassportService({
          FROM passport_archives
          WHERE company_id = $1
            AND passport_type = $2
-           AND product_id = $3
+           AND (product_id = ANY($3::text[]) OR product_identifier_did = ANY($3::text[]))
          ORDER BY version_number DESC, archived_at DESC
          LIMIT 1`,
-        [companyId, type_name, normalizedProductId]
+        [companyId, type_name, candidates]
       );
       if (archiveRes.rows.length) {
         const rowData = typeof archiveRes.rows[0].row_data === "string"
@@ -557,7 +590,7 @@ module.exports = function createPassportService({
     }
 
     if (archiveMatches.length > 1) {
-      const error = new Error(`Multiple archived passports in company "${companyId}" share product_id "${normalizedProductId}".`);
+      const error = new Error(`Multiple archived passports in company "${companyId}" share product identifier "${normalizedProductId}".`);
       error.code = "AMBIGUOUS_PRODUCT_ID";
       throw error;
     }
@@ -838,6 +871,7 @@ module.exports = function createPassportService({
         company_id     INTEGER      NOT NULL,
         model_name     VARCHAR(255),
         product_id     VARCHAR(255) NOT NULL,
+        product_identifier_did TEXT,
         granularity    VARCHAR(20)  NOT NULL DEFAULT 'model',
         release_status VARCHAR(50)  NOT NULL DEFAULT 'draft',
         version_number INTEGER      NOT NULL DEFAULT 1,
@@ -856,6 +890,7 @@ module.exports = function createPassportService({
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_guid ON ${tableName}(guid) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_lineage ON ${tableName}(lineage_id) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_status ON ${tableName}(release_status) WHERE deleted_at IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did ON ${tableName}(company_id, product_identifier_did) WHERE deleted_at IS NULL`);
   }
 
   async function queryTableStats(typeName, companyId = null) {

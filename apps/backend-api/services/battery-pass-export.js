@@ -3,17 +3,14 @@
 const fs = require("fs");
 const path = require("path");
 
-const batteryPassDinSpec99100 = require("../resources/semantics/battery-pass-din-spec-99100.json");
 const batteryDictionaryManifest = require("../resources/semantics/battery/v1/manifest.json");
 const batteryDictionaryTerms = require("../resources/semantics/battery/v1/terms.json");
-const compatibilityMap = require("../resources/semantics/battery/v1/compatibility-map.json");
 const clarosBatteryContext = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../resources/semantics/battery/v1/context.jsonld"), "utf8")
 );
 
+const BATTERY_PASS_PASSPORT_TYPE = "din_spec_99100";
 const BATTERY_PASS_MODEL_KEY = "claros_battery_dictionary_v1";
-const LEGACY_BATTERY_PASS_MODEL_KEY = "battery_pass_din_spec_99100";
-const LEGACY_CLAROS_BATTERY_MODEL_KEY = "claros_battery_v1";
 const BATTERY_CONTEXT_URL = batteryDictionaryManifest.contextUrl || "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld";
 const CLAROS_CONTEXT_ENTRIES = clarosBatteryContext?.["@context"] || {};
 
@@ -92,20 +89,12 @@ function resolveRequestedBatteryModelKey(options = {}, typeDef = null) {
   return explicitModelKey || BATTERY_PASS_MODEL_KEY;
 }
 
-function isLegacyBatterySemanticModel(modelKey) {
-  return modelKey === LEGACY_BATTERY_PASS_MODEL_KEY;
-}
-
 function isSupportedBatterySemanticModel(modelKey) {
-  return [
-    BATTERY_PASS_MODEL_KEY,
-    LEGACY_BATTERY_PASS_MODEL_KEY,
-    LEGACY_CLAROS_BATTERY_MODEL_KEY,
-  ].includes(modelKey);
+  return modelKey === BATTERY_PASS_MODEL_KEY;
 }
 
 function isBatteryPassExportType(passportType) {
-  return String(passportType || "").trim().toLowerCase() === batteryPassDinSpec99100.passportType;
+  return String(passportType || "").trim().toLowerCase() === BATTERY_PASS_PASSPORT_TYPE;
 }
 
 function shouldUseBatteryDictionary(passportType, options = {}, typeDef = null) {
@@ -115,14 +104,10 @@ function shouldUseBatteryDictionary(passportType, options = {}, typeDef = null) 
 }
 
 function resolveDictionaryTermIri(fieldKey, semanticId = null, options = {}, typeDef = null) {
-  const modelKey = resolveRequestedBatteryModelKey(options, typeDef);
-  if (semanticId && compatibilityMap[semanticId]) {
-    return compatibilityMap[semanticId];
-  }
   if (semanticId && /^https?:\/\//i.test(String(semanticId))) {
     return semanticId;
   }
-  if (semanticId && !isLegacyBatterySemanticModel(modelKey)) {
+  if (semanticId) {
     return semanticId;
   }
   return getSemanticIdForFieldKey(fieldKey);
@@ -217,15 +202,12 @@ function buildPassportJsonLdExport(passports, passportType) {
     "@graph": graph,
     ...(shouldUseBatteryDictionary(resolvedType, options)
       ? {
-          passport_type: batteryPassDinSpec99100.passportType,
+          passport_type: BATTERY_PASS_PASSPORT_TYPE,
           semantic_model: {
             semanticModelKey: BATTERY_PASS_MODEL_KEY,
             contextUrl: batteryDictionaryManifest.contextUrl,
             termsUrl: batteryDictionaryManifest.termsUrl,
             issuerDid: batteryDictionaryManifest.issuerDid,
-            legacyRequestedModelKey: isLegacyBatterySemanticModel(resolveRequestedBatteryModelKey(options))
-              ? LEGACY_BATTERY_PASS_MODEL_KEY
-              : null,
           },
         }
       : {}),

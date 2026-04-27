@@ -12,13 +12,11 @@ const LEGACY_TERMS_PATH = path.join(OUTPUT_DIR, "terms.json");
 const LEGACY_CATEGORIES_PATH = path.join(OUTPUT_DIR, "categories.json");
 const LEGACY_UNITS_PATH = path.join(OUTPUT_DIR, "units.json");
 const LEGACY_FIELD_MAP_PATH = path.join(OUTPUT_DIR, "field-map.json");
-const LEGACY_SPEC_PATH = path.join(ROOT, "apps/backend-api/resources/semantics/battery-pass-din-spec-99100.json");
 
 const BASE_IRI = "https://www.claros-dpp.online/dictionary/battery/v1";
 const TERM_BASE_IRI = `${BASE_IRI}/terms/`;
 const API_BASE = "https://www.claros-dpp.online/api/dictionary/battery/v1";
 const MODEL_KEY = "claros_battery_dictionary_v1";
-const LEGACY_MODEL_KEY = "battery_pass_din_spec_99100";
 
 const DATA_TYPE_MAP = {
   String: { format: "String", jsonType: "string", xsdType: "xsd:string" },
@@ -130,7 +128,6 @@ function main() {
   const legacyCategories = ensureArray(readJson(LEGACY_CATEGORIES_PATH, []), "legacy categories");
   const legacyUnits = ensureArray(readJson(LEGACY_UNITS_PATH, []), "legacy units");
   const legacyFieldMap = readJson(LEGACY_FIELD_MAP_PATH, {}) || {};
-  const legacySpec = readJson(LEGACY_SPEC_PATH, {}) || {};
 
   const sourceStat = fs.statSync(SOURCE_PATH);
   const generatedAt = sourceStat.mtime.toISOString();
@@ -248,14 +245,6 @@ function main() {
 
   const units = [...unitsByKey.values()].sort((a, b) => a.display.localeCompare(b.display));
 
-  const compatibilityMap = {};
-  for (const [fieldKey, semanticId] of Object.entries(legacySpec.fieldSemanticIds || {})) {
-    const termIri = fieldMap[fieldKey];
-    if (termIri) {
-      compatibilityMap[semanticId] = termIri;
-    }
-  }
-
   const context = {
     "@context": {
       "@version": 1.1,
@@ -273,7 +262,6 @@ function main() {
 
   const manifest = {
     semanticModelKey: MODEL_KEY,
-    legacySemanticModelKeys: [LEGACY_MODEL_KEY, "claros_battery_v1"],
     name: "Claros Battery Dictionary",
     version: "1.0.0",
     description: "Internal battery passport dictionary derived from the BatteryPass Data Attribute Longlist v1.3.",
@@ -300,7 +288,6 @@ function main() {
   fs.writeFileSync(path.join(OUTPUT_DIR, "categories.json"), stableStringify(categories));
   fs.writeFileSync(path.join(OUTPUT_DIR, "units.json"), stableStringify(units));
   fs.writeFileSync(path.join(OUTPUT_DIR, "context.jsonld"), stableStringify(context));
-  fs.writeFileSync(path.join(OUTPUT_DIR, "compatibility-map.json"), stableStringify(compatibilityMap));
   fs.writeFileSync(path.join(OUTPUT_DIR, "field-map.json"), stableStringify(fieldMap));
   fs.writeFileSync(path.join(FRONTEND_SEMANTICS_DIR, "battery-dictionary-terms.generated.json"), stableStringify(terms));
 

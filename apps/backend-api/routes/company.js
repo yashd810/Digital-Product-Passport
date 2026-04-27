@@ -23,7 +23,20 @@ module.exports = function registerCompanyRoutes(app, {
   EDITABLE_RELEASE_STATUSES_SQL,
   SYSTEM_PASSPORT_FIELDS,
   buildBatteryPassJsonExport,
+  productIdentifierService,
 }) {
+  function buildStoredProductIdentifiers({ companyId, passportType, productId, granularity = "item" }) {
+    const normalized = productIdentifierService.normalizeProductIdentifiers({
+      companyId,
+      passportType,
+      rawProductId: productId,
+      granularity,
+    });
+    return {
+      product_id: normalized.productIdInput || null,
+      product_identifier_did: normalized.productIdentifierDid || null,
+    };
+  }
 
   // ─── COMPANY PROFILE ─────────────────────────────────────────────────────
 
@@ -321,7 +334,15 @@ module.exports = function registerCompanyRoutes(app, {
               }
             }
             const updateData = { model_name, ...fields };
-            if (product_id !== undefined) updateData.product_id = normalizedProductId;
+            if (product_id !== undefined) {
+              const storedProductIdentifiers = buildStoredProductIdentifiers({
+                companyId,
+                passportType: resolvedPassportType,
+                productId: normalizedProductId,
+              });
+              updateData.product_id = storedProductIdentifiers.product_id;
+              updateData.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+            }
             const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: updateData, excluded });
             if (!updateCols.length) { skipped++; continue; }
             await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "csv_upsert" });
@@ -336,7 +357,17 @@ module.exports = function registerCompanyRoutes(app, {
             if (existingByProductId) {
               const existingStatus = normalizeReleaseStatus(existingByProductId.release_status);
               if (isEditablePassportStatus(existingStatus)) {
-                const updateData = { model_name, product_id: normalizedProductId, ...fields };
+                const storedProductIdentifiers = buildStoredProductIdentifiers({
+                  companyId,
+                  passportType: resolvedPassportType,
+                  productId: normalizedProductId,
+                });
+                const updateData = {
+                  model_name,
+                  product_id: storedProductIdentifiers.product_id,
+                  product_identifier_did: storedProductIdentifiers.product_identifier_did,
+                  ...fields,
+                };
                 const updateCols = await updatePassportRowById({ tableName, rowId: existingByProductId.id, userId, data: updateData, excluded });
                 if (!updateCols.length) {
                   details.push({ guid: existingByProductId.guid, product_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
@@ -357,8 +388,13 @@ module.exports = function registerCompanyRoutes(app, {
             const newGuid = uuidv4();
             const lineageId = newGuid;
             const dataFields = getWritablePassportColumns(fields, excluded);
-            const allCols = ["guid","lineage_id","company_id","model_name","product_id","created_by", ...dataFields];
-            const allVals = [newGuid, lineageId, companyId, model_name || null, normalizedProductId, userId, ...getStoredPassportValues(dataFields, fields)];
+            const storedProductIdentifiers = buildStoredProductIdentifiers({
+              companyId,
+              passportType: resolvedPassportType,
+              productId: normalizedProductId,
+            });
+            const allCols = ["guid","lineage_id","company_id","model_name","product_id","product_identifier_did","created_by", ...dataFields];
+            const allVals = [newGuid, lineageId, companyId, model_name || null, storedProductIdentifiers.product_id, storedProductIdentifiers.product_identifier_did, userId, ...getStoredPassportValues(dataFields, fields)];
             await pool.query(
               `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_,i)=>`$${i+1}`).join(",")})`,
               allVals
@@ -456,7 +492,15 @@ module.exports = function registerCompanyRoutes(app, {
               }
             }
             const updateData = { model_name, ...fields };
-            if (product_id !== undefined) updateData.product_id = normalizedProductId;
+            if (product_id !== undefined) {
+              const storedProductIdentifiers = buildStoredProductIdentifiers({
+                companyId,
+                passportType: resolvedPassportType,
+                productId: normalizedProductId,
+              });
+              updateData.product_id = storedProductIdentifiers.product_id;
+              updateData.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+            }
             const updateCols = await updatePassportRowById({ tableName, rowId: existing.rows[0].id, userId, data: updateData, excluded });
             if (!updateCols.length) {
               details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "no changes detected" });
@@ -474,7 +518,17 @@ module.exports = function registerCompanyRoutes(app, {
             if (existingByProductId) {
               const existingStatus = normalizeReleaseStatus(existingByProductId.release_status);
               if (isEditablePassportStatus(existingStatus)) {
-                const allData = { model_name, product_id: normalizedProductId, ...fields };
+                const storedProductIdentifiers = buildStoredProductIdentifiers({
+                  companyId,
+                  passportType: resolvedPassportType,
+                  productId: normalizedProductId,
+                });
+                const allData = {
+                  model_name,
+                  product_id: storedProductIdentifiers.product_id,
+                  product_identifier_did: storedProductIdentifiers.product_identifier_did,
+                  ...fields,
+                };
                 const updateCols = await updatePassportRowById({ tableName, rowId: existingByProductId.id, userId, data: allData, excluded });
                 if (!updateCols.length) {
                   details.push({ guid: existingByProductId.guid, product_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
@@ -495,8 +549,13 @@ module.exports = function registerCompanyRoutes(app, {
             const newGuid = uuidv4();
             const lineageId = newGuid;
             const dataFields = getWritablePassportColumns(fields, excluded);
-            const allCols = ["guid","lineage_id","company_id","model_name","product_id","created_by",...dataFields];
-            const allVals = [newGuid, lineageId, companyId, model_name || null, normalizedProductId, userId, ...getStoredPassportValues(dataFields, fields)];
+            const storedProductIdentifiers = buildStoredProductIdentifiers({
+              companyId,
+              passportType: resolvedPassportType,
+              productId: normalizedProductId,
+            });
+            const allCols = ["guid","lineage_id","company_id","model_name","product_id","product_identifier_did","created_by",...dataFields];
+            const allVals = [newGuid, lineageId, companyId, model_name || null, storedProductIdentifiers.product_id, storedProductIdentifiers.product_identifier_did, userId, ...getStoredPassportValues(dataFields, fields)];
             await pool.query(
               `INSERT INTO ${tableName} (${allCols.join(",")}) VALUES (${allCols.map((_,i)=>`$${i+1}`).join(",")})`,
               allVals
