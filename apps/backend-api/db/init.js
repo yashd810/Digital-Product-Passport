@@ -212,7 +212,7 @@ async function initDb(pool, {
       registry_name VARCHAR(120) NOT NULL DEFAULT 'local',
       status VARCHAR(40) NOT NULL DEFAULT 'registered',
       registration_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-      registered_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      registered_by INTEGER,
       registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (registry_name, dpp_id)
@@ -239,7 +239,7 @@ async function initDb(pool, {
       config_json               JSONB NOT NULL DEFAULT '{}'::jsonb,
       is_active                 BOOLEAN NOT NULL DEFAULT true,
       is_backup_provider        BOOLEAN NOT NULL DEFAULT true,
-      created_by                INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_by                INTEGER,
       created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -253,7 +253,7 @@ async function initDb(pool, {
       id                  SERIAL PRIMARY KEY,
       backup_provider_id  INTEGER REFERENCES backup_service_providers(id) ON DELETE SET NULL,
       backup_provider_key VARCHAR(120) NOT NULL,
-      passport_guid       UUID NOT NULL REFERENCES passport_registry(guid) ON DELETE CASCADE,
+      passport_guid       UUID NOT NULL,
       lineage_id          UUID,
       company_id          INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
       passport_type       VARCHAR(100),
@@ -1361,6 +1361,42 @@ async function initDb(pool, {
         ALTER TABLE passport_registry
           ADD CONSTRAINT passport_registry_company_id_fkey
           FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `).catch(() => {});
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'dpp_registry_registrations_registered_by_fkey'
+      ) THEN
+        ALTER TABLE dpp_registry_registrations
+          ADD CONSTRAINT dpp_registry_registrations_registered_by_fkey
+          FOREIGN KEY (registered_by) REFERENCES users(id) ON DELETE SET NULL;
+      END IF;
+    END $$;
+  `).catch(() => {});
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'backup_service_providers_created_by_fkey'
+      ) THEN
+        ALTER TABLE backup_service_providers
+          ADD CONSTRAINT backup_service_providers_created_by_fkey
+          FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+      END IF;
+    END $$;
+  `).catch(() => {});
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'passport_backup_replications_passport_guid_fkey'
+      ) THEN
+        ALTER TABLE passport_backup_replications
+          ADD CONSTRAINT passport_backup_replications_passport_guid_fkey
+          FOREIGN KEY (passport_guid) REFERENCES passport_registry(guid) ON DELETE CASCADE;
       END IF;
     END $$;
   `).catch(() => {});
