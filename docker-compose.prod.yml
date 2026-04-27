@@ -32,7 +32,8 @@ services:
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     env_file:
-      - ${DPP_ENV_FILE:-.env.prod}
+      - path: ${DPP_ENV_FILE:-.env.prod}
+        required: false
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -79,7 +80,8 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     env_file:
-      - ${DPP_ENV_FILE:-.env.prod}
+      - path: ${DPP_ENV_FILE:-.env.prod}
+        required: false
     environment:
       POSTGRES_DB: "${DB_NAME}"
       POSTGRES_USER: "${DB_USER}"

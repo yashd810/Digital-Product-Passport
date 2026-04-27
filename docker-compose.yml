@@ -38,8 +38,10 @@ services:
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     env_file:
-      - .env
-      - ./apps/backend-api/.env
+      - path: .env
+        required: false
+      - path: ./apps/backend-api/.env
+        required: false
     environment:
       NODE_ENV: development
       PORT: 3001
