@@ -24,6 +24,37 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     }
     return hashLegacyApiKey(rawKey);
   };
+  const buildApiKeyHashRecord = (rawKey) => {
+    const keySalt = crypto.randomBytes(16).toString("hex");
+    return {
+      keyPrefix: getApiKeyPrefix(rawKey),
+      keySalt,
+      hashAlgorithm: "hmac_sha256",
+      keyHash: crypto.createHmac("sha256", keySalt).update(String(rawKey || "")).digest("hex"),
+    };
+  };
+  const needsApiKeyUpgrade = (rawKey, row) => {
+    if (!row) return false;
+    if (row.hash_algorithm !== "hmac_sha256") return true;
+    if (!row.key_salt) return true;
+    return row.key_prefix !== getApiKeyPrefix(rawKey);
+  };
+  const scheduleApiKeyUpgrade = (rawKey, row) => {
+    if (!needsApiKeyUpgrade(rawKey, row)) return;
+    const upgraded = buildApiKeyHashRecord(rawKey);
+    pool.query(
+      `UPDATE api_keys
+       SET key_hash = $1,
+           key_prefix = $2,
+           key_salt = $3,
+           hash_algorithm = $4
+       WHERE id = $5
+         AND key_hash = $6`,
+      [upgraded.keyHash, upgraded.keyPrefix, upgraded.keySalt, upgraded.hashAlgorithm, row.id, row.key_hash]
+    ).catch((err) => {
+      logger.error({ err, keyId: row.id }, "API key migration upgrade failed");
+    });
+  };
 
   const parseCookies = (req) => {
     const raw = req.headers.cookie || "";
@@ -128,12 +159,13 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
           const computed = hashApiKeyWithSalt(key, row.key_salt, row.hash_algorithm);
           return computed === row.key_hash;
         }) || null;
+        if (matchedRow) scheduleApiKeyUpgrade(key, matchedRow);
       }
 
       if (!matchedRow) {
         const legacyHash = hashLegacyApiKey(key);
         const legacy = await pool.query(
-          `SELECT id, company_id, scopes, expires_at
+          `SELECT id, company_id, scopes, expires_at, key_hash, key_prefix, key_salt, hash_algorithm
            FROM api_keys
            WHERE key_hash = $1
              AND is_active = true
@@ -142,6 +174,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
           [legacyHash]
         );
         matchedRow = legacy.rows[0] || null;
+        if (matchedRow) scheduleApiKeyUpgrade(key, matchedRow);
       }
 
       if (!matchedRow) return res.status(401).json({ error: "Invalid or revoked API key." });

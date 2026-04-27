@@ -1,5 +1,7 @@
 "use strict";
 
+const logger = require("../services/logger");
+
 module.exports = function registerAssetManagementApiRoutes(app, {
   pool,
   requireAssetManagementKey,
@@ -60,7 +62,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         },
       });
     } catch (error) {
-      console.error("Asset bootstrap error:", error.message);
+      logger.error("Asset bootstrap error:", error.message);
       res.status(500).json({ error: "Failed to load Asset Management bootstrap data" });
     }
   });
@@ -114,7 +116,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         },
       });
     } catch (error) {
-      console.error("Asset passport load error:", error.message);
+      logger.error("Asset passport load error:", error.message);
       res.status(500).json({ error: "Failed to load passports for Asset Management" });
     }
   });
@@ -125,7 +127,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const fetched = await fetchAssetSourceRecords(sourceConfig);
       res.json(fetched);
     } catch (error) {
-      console.error("Asset source fetch error:", error.message);
+      logger.error("Asset source fetch error:", error.message);
       res.status(400).json({ error: error.message || "Failed to fetch ERP/API records" });
     }
   });
@@ -141,7 +143,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       });
       res.json(payload);
     } catch (error) {
-      console.error("Asset preview error:", error.message);
+      logger.error("Asset preview error:", error.message);
       res.status(400).json({ error: error.message || "Failed to generate asset JSON" });
     }
   });
@@ -189,7 +191,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         generated_payload: preview.generated_payload,
       });
     } catch (error) {
-      console.error("Asset push error:", error.message);
+      logger.error("Asset push error:", error.message);
       res.status(400).json({ error: error.message || "Failed to push asset payload" });
     }
   });
@@ -204,7 +206,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       );
       res.json({ jobs: jobs.rows });
     } catch (error) {
-      console.error("Asset jobs load error:", error.message);
+      logger.error("Asset jobs load error:", error.message);
       res.status(500).json({ error: "Failed to load asset jobs" });
     }
   });
@@ -256,7 +258,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       res.status(201).json({ job: inserted.rows[0] });
     } catch (error) {
-      console.error("Asset job create error:", error.message);
+      logger.error("Asset job create error:", error.message);
       res.status(400).json({ error: error.message || "Failed to save asset job" });
     }
   });
@@ -326,7 +328,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       res.json({ job: updated.rows[0] });
     } catch (error) {
-      console.error("Asset job update error:", error.message);
+      logger.error("Asset job update error:", error.message);
       res.status(400).json({ error: error.message || "Failed to update asset job" });
     }
   });
@@ -349,7 +351,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       res.json(result);
     } catch (error) {
-      console.error("Asset job run error:", error.message);
+      logger.error("Asset job run error:", error.message);
       res.status(400).json({ error: error.message || "Failed to run asset job" });
     }
   });
@@ -366,7 +368,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       res.json({ runs: runs.rows });
     } catch (error) {
-      console.error("Asset run load error:", error.message);
+      logger.error("Asset run load error:", error.message);
       res.status(500).json({ error: "Failed to load asset run history" });
     }
   });

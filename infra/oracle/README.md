@@ -109,3 +109,13 @@ This keeps the checked-out repo clean while still letting Docker Compose read th
   - `api.example.com`
   - `viewer.example.com`
   - `assets.example.com`
+
+## HTTP/2 minimum for public delivery
+
+The production Caddy edge in [Caddyfile](./Caddyfile) explicitly restricts the public HTTPS listener to `h2` and `h3`.
+
+This means:
+
+- HTTP/1.1 is not negotiated for public TLS traffic
+- HTTP/2 is the minimum supported public transport version
+- HTTP/3 is allowed as a stricter, newer transport on clients that support it

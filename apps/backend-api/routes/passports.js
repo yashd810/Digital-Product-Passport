@@ -1,6 +1,7 @@
 "use strict";
 
 const { v4: uuidv4 } = require("uuid");
+const logger = require("../services/logger");
 
 module.exports = function registerPassportRoutes(app, {
   pool,
@@ -35,6 +36,7 @@ module.exports = function registerPassportRoutes(app, {
   normalizeProductIdValue,
   generateProductIdValue,
   normalizePassportRequestBody,
+  extractExplicitFacilityId,
   getWritablePassportColumns,
   getStoredPassportValues,
   toStoredPassportValue,
@@ -68,6 +70,7 @@ module.exports = function registerPassportRoutes(app, {
   complianceService,
   accessRightsService,
   productIdentifierService,
+  backupProviderService,
 }) {
   const insertPassportRegistry = async ({
     client = pool,
@@ -174,6 +177,27 @@ module.exports = function registerPassportRoutes(app, {
     return result.rows[0] || null;
   }
 
+  async function resolveManagedFacilityId({ companyId, requestedFields = {} }) {
+    const candidateFacilityId = extractExplicitFacilityId(requestedFields);
+    if (!candidateFacilityId) return null;
+
+    const facilityRes = await pool.query(
+      `SELECT facility_identifier
+       FROM company_facilities
+       WHERE company_id = $1
+         AND facility_identifier = $2
+         AND is_active = true
+       LIMIT 1`,
+      [companyId, candidateFacilityId]
+    );
+    if (!facilityRes.rows.length) {
+      const error = new Error(`Unknown or inactive facility identifier "${candidateFacilityId}"`);
+      error.statusCode = 400;
+      throw error;
+    }
+    return candidateFacilityId;
+  }
+
   function serializeProfileDefaultValue(value) {
     if (Array.isArray(value)) return JSON.stringify(value);
     return value ?? null;
@@ -182,6 +206,7 @@ module.exports = function registerPassportRoutes(app, {
   async function buildComplianceManagedFields({ companyId, passportType, granularity, requestedFields = {} }) {
     const profile = complianceService.resolveProfileMetadata({ passportType, granularity });
     const companyIdentity = await loadCompanyComplianceIdentity(companyId);
+    const resolvedFacilityId = await resolveManagedFacilityId({ companyId, requestedFields });
     return {
       compliance_profile_key: requestedFields.compliance_profile_key || profile.key,
       content_specification_ids: serializeProfileDefaultValue(
@@ -189,7 +214,7 @@ module.exports = function registerPassportRoutes(app, {
       ),
       carrier_policy_key: requestedFields.carrier_policy_key || profile.defaultCarrierPolicyKey || null,
       economic_operator_id: requestedFields.economic_operator_id || companyIdentity?.economic_operator_identifier || null,
-      facility_id: requestedFields.facility_id || null,
+      facility_id: resolvedFacilityId,
     };
   }
 
@@ -214,6 +239,36 @@ module.exports = function registerPassportRoutes(app, {
       { ...normalizePassportRow(passport), passport_type: passportType },
       passportType
     );
+  }
+
+  async function replicatePassportToBackup({
+    passport,
+    passportType = null,
+    companyName = "",
+    reason = "manual",
+    snapshotScope = "released_current",
+  }) {
+    if (!backupProviderService || !passport?.guid || !passport?.company_id) {
+      return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
+    }
+
+    const resolvedPassportType = passportType || passport.passport_type;
+    if (!resolvedPassportType) {
+      return { success: true, skipped: true, reason: "PASSPORT_TYPE_REQUIRED" };
+    }
+
+    const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
+    const resolvedCompanyName = companyName
+      || (await getCompanyNameMap([passport.company_id])).get(String(passport.company_id))
+      || "";
+
+    return backupProviderService.replicatePassportSnapshot({
+      passport: { ...normalizePassportRow(passport), passport_type: resolvedPassportType },
+      typeDef,
+      companyName: resolvedCompanyName,
+      reason,
+      snapshotScope,
+    });
   }
 
   function resolveGranularityForCreate(companyPolicy, requestedGranularity) {
@@ -306,7 +361,7 @@ module.exports = function registerPassportRoutes(app, {
         ]
       );
       res.status(201).json({ ...r.rows[0], key: rawKey });
-    } catch (e) { console.error("Create API key error:", e.message); res.status(500).json({ error: "Failed to create API key" }); }
+    } catch (e) { logger.error("Create API key error:", e.message); res.status(500).json({ error: "Failed to create API key" }); }
   });
 
   app.delete("/api/companies/:companyId/api-keys/:keyId", authenticateToken, checkCompanyAdmin, async (req, res) => {
@@ -368,7 +423,7 @@ module.exports = function registerPassportRoutes(app, {
         offset: off,
         passports: r.rows.map(p => ({ ...p, passport_type: type })),
       });
-    } catch (e) { console.error("API v1 list error:", e.message); res.status(500).json({ error: "Failed to fetch passports" }); }
+    } catch (e) { logger.error("API v1 list error:", e.message); res.status(500).json({ error: "Failed to fetch passports" }); }
   });
 
   app.get("/api/v1/passports/:guid", authenticateApiKey, requireApiKeyScope("dpp:read"), apiKeyReadRateLimit, async (req, res) => {
@@ -389,7 +444,7 @@ module.exports = function registerPassportRoutes(app, {
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
       res.json({ ...r.rows[0], passport_type: reg.rows[0].passport_type });
-    } catch (e) { console.error("API v1 get error:", e.message); res.status(500).json({ error: "Failed to fetch passport" }); }
+    } catch (e) { logger.error("API v1 get error:", e.message); res.status(500).json({ error: "Failed to fetch passport" }); }
   });
 
   // ─── PASSPORT CRUD ─────────────────────────────────────────────────────────
@@ -435,6 +490,7 @@ module.exports = function registerPassportRoutes(app, {
         passportType: resolvedPassportType,
         granularity: effectiveGranularity,
         requestedFields: {
+          ...fields,
           compliance_profile_key,
           content_specification_ids,
           carrier_policy_key,
@@ -527,7 +583,7 @@ module.exports = function registerPassportRoutes(app, {
       });
       res.status(201).json({ success: true, passport: result.rows[0] });
     } catch (e) {
-      console.error("Create passport error:", e.message);
+      logger.error("Create passport error:", e.message);
       res.status(e.statusCode || 500).json({ error: e.message || "Failed to create passport" });
     }
   });
@@ -592,6 +648,7 @@ module.exports = function registerPassportRoutes(app, {
             passportType: resolvedPassportType,
             granularity: effectiveGranularity,
             requestedFields: {
+              ...fields,
               compliance_profile_key,
               content_specification_ids,
               carrier_policy_key,
@@ -661,7 +718,7 @@ module.exports = function registerPassportRoutes(app, {
 
       res.status(207).json({ summary: { total: passports.length, created, skipped, failed }, results });
     } catch (e) {
-      console.error("Bulk create error:", e.message);
+      logger.error("Bulk create error:", e.message);
       res.status(500).json({ error: "Bulk create failed" });
     }
   });
@@ -769,7 +826,7 @@ module.exports = function registerPassportRoutes(app, {
       }
       res.json({ total: identifiers.length, found: results.filter(r => r._status === "found").length, results });
     } catch (e) {
-      console.error("Bulk fetch error:", e.message);
+      logger.error("Bulk fetch error:", e.message);
       res.status(500).json({ error: "Bulk fetch failed" });
     }
   });
@@ -837,7 +894,7 @@ module.exports = function registerPassportRoutes(app, {
       res.setHeader("Content-Disposition", `attachment; filename="${passportType}_export.csv"`);
       res.send(csvLines.join("\n"));
     } catch (e) {
-      console.error("Export by type error:", e.message);
+      logger.error("Export by type error:", e.message);
       res.status(500).json({ error: "Export failed" });
     }
   });
@@ -889,7 +946,7 @@ module.exports = function registerPassportRoutes(app, {
       const r = await pool.query(q, params);
       res.json(r.rows);
     } catch (e) {
-      console.error("Archived list error:", e.message);
+      logger.error("Archived list error:", e.message);
       res.status(500).json({ error: "Failed to fetch archived passports" });
     }
   });
@@ -919,7 +976,7 @@ module.exports = function registerPassportRoutes(app, {
       const compliance = await complianceService.evaluatePassport(resolved.passport, passportType);
       res.json(compliance);
     } catch (e) {
-      console.error("Compliance fetch error:", e.message);
+      logger.error("Compliance fetch error:", e.message);
       res.status(500).json({ error: "Failed to evaluate passport compliance" });
     }
   });
@@ -1109,7 +1166,7 @@ module.exports = function registerPassportRoutes(app, {
 
       res.json({ summary: { matched: matchCount, updated: updatedGuids.length, fields_updated: updateKeys }, guids: updatedGuids });
     } catch (e) {
-      console.error("Bulk update all error:", e.message);
+      logger.error("Bulk update all error:", e.message);
       res.status(500).json({ error: "Bulk update all failed", detail: e.message });
     }
   });
@@ -1166,7 +1223,7 @@ module.exports = function registerPassportRoutes(app, {
       await logAudit(companyId, userId, "UPDATE", tableName, guid, null, { fields_updated: updateFields });
       res.json({ success: true });
     } catch (e) {
-      console.error("PATCH /passports/:guid error:", e.message);
+      logger.error("PATCH /passports/:guid error:", e.message);
       res.status(500).json({ error: "Failed to update passport", detail: e.message });
     }
   });
@@ -1270,7 +1327,7 @@ module.exports = function registerPassportRoutes(app, {
           details.push({ guid: matchedGuid, product_id: normalizedProductId || undefined, status: "updated", fields_updated: updateCols });
           updated++;
         } catch (e) {
-          console.error("Bulk PATCH item error:", e.message);
+          logger.error("Bulk PATCH item error:", e.message);
           details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: e.message });
           failed++;
         }
@@ -1278,7 +1335,7 @@ module.exports = function registerPassportRoutes(app, {
 
       res.json({ summary: { updated, skipped, failed, total: passports.length }, details });
     } catch (e) {
-      console.error("Bulk PATCH error:", e.message);
+      logger.error("Bulk PATCH error:", e.message);
       res.status(500).json({ error: "Bulk update failed", detail: e.message });
     }
   });
@@ -1342,6 +1399,12 @@ module.exports = function registerPassportRoutes(app, {
         [guid]
       ).catch(() => {});
       await logAudit(companyId, req.user.userId, "RELEASE", tableName, guid, { release_status: "draft_or_in_revision" }, { release_status: "released" });
+      await replicatePassportToBackup({
+        passport: { ...released, passport_type: passportType },
+        passportType,
+        reason: "release",
+        snapshotScope: "released_current",
+      }).catch(() => {});
       res.json({ success: true, passport: normalizePassportRow(released), compliance });
     } catch (e) { res.status(500).json({ error: "Failed to release passport" }); }
   });
@@ -1624,7 +1687,7 @@ module.exports = function registerPassportRoutes(app, {
         details,
       });
     } catch (e) {
-      console.error("Bulk revise error:", e.message);
+      logger.error("Bulk revise error:", e.message);
       res.status(500).json({ error: "Bulk revise failed" });
     }
   });
@@ -1713,7 +1776,7 @@ module.exports = function registerPassportRoutes(app, {
 
       res.json({ summary: { deleted, skipped, failed, total: identifiers.length }, details });
     } catch (e) {
-      console.error("Bulk DELETE error:", e.message);
+      logger.error("Bulk DELETE error:", e.message);
       res.status(500).json({ error: "Bulk delete failed", detail: e.message });
     }
   });
@@ -1769,7 +1832,7 @@ module.exports = function registerPassportRoutes(app, {
 
       res.json({ summary: { released, skipped, failed, total: items.length }, details });
     } catch (e) {
-      console.error("Bulk release error:", e.message);
+      logger.error("Bulk release error:", e.message);
       res.status(500).json({ error: "Bulk release failed", detail: e.message });
     }
   });
@@ -1805,7 +1868,7 @@ module.exports = function registerPassportRoutes(app, {
 
       res.json({ summary: { submitted, skipped, failed, total: items.length }, details });
     } catch (e) {
-      console.error("Bulk workflow error:", e.message);
+      logger.error("Bulk workflow error:", e.message);
       res.status(500).json({ error: "Bulk workflow submit failed", detail: e.message });
     }
   });
@@ -1841,11 +1904,19 @@ module.exports = function registerPassportRoutes(app, {
         `UPDATE ${tableName} SET deleted_at = NOW() WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
         [lineageContext.lineage_id, companyId]
       );
+      for (const row of rows.rows) {
+        await replicatePassportToBackup({
+          passport: { ...row, passport_type: passportType },
+          passportType,
+          reason: "archive",
+          snapshotScope: "archived_history",
+        }).catch(() => {});
+      }
 
       await logAudit(companyId, userId, "ARCHIVE", tableName, guid, null, { versions_archived: rows.rows.length });
       res.json({ success: true, versions_archived: rows.rows.length });
     } catch (e) {
-      console.error("Archive error:", e.message);
+      logger.error("Archive error:", e.message);
       res.status(500).json({ error: "Failed to archive passport" });
     }
   });
@@ -1887,13 +1958,21 @@ module.exports = function registerPassportRoutes(app, {
             `UPDATE ${tableName} SET deleted_at = NOW() WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
             [lineageContext.lineage_id, companyId]
           );
+          for (const row of rows.rows) {
+            await replicatePassportToBackup({
+              passport: { ...row, passport_type: passportType },
+              passportType,
+              reason: "bulk_archive",
+              snapshotScope: "archived_history",
+            }).catch(() => {});
+          }
           await logAudit(companyId, userId, "ARCHIVE", tableName, guid, null, { versions_archived: rows.rows.length });
           archived++;
         } catch { skipped++; }
       }
       res.json({ summary: { archived, skipped, total: items.length } });
     } catch (e) {
-      console.error("Bulk archive error:", e.message);
+      logger.error("Bulk archive error:", e.message);
       res.status(500).json({ error: "Bulk archive failed" });
     }
   });
@@ -1936,7 +2015,7 @@ module.exports = function registerPassportRoutes(app, {
       await logAudit(companyId, userId, "UNARCHIVE", tableName, guid, null, { versions_restored: archiveRows.rows.length });
       res.json({ success: true, versions_restored: archiveRows.rows.length });
     } catch (e) {
-      console.error("Unarchive error:", e.message);
+      logger.error("Unarchive error:", e.message);
       res.status(500).json({ error: "Failed to unarchive passport" });
     }
   });
@@ -1970,7 +2049,7 @@ module.exports = function registerPassportRoutes(app, {
       }
       res.json({ summary: { restored, skipped, total: guids.length } });
     } catch (e) {
-      console.error("Bulk unarchive error:", e.message);
+      logger.error("Bulk unarchive error:", e.message);
       res.status(500).json({ error: "Bulk unarchive failed" });
     }
   });
@@ -2187,7 +2266,7 @@ module.exports = function registerPassportRoutes(app, {
             const key = new Date(row.month_bucket).toISOString().slice(0, 7);
             trendSeriesMap[umbrella_category].monthlyCounts[key] = (trendSeriesMap[umbrella_category].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
           });
-        } catch (e) { console.error(`Analytics error for ${companyId}/${type_name}:`, e.message); }
+        } catch (e) { logger.error(`Analytics error for ${companyId}/${type_name}:`, e.message); }
       }
 
       const scanRes = await pool.query(
@@ -2320,6 +2399,42 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
+  app.delete("/api/companies/:companyId/access-audiences/users/:userId/:audience", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      const audience = String(req.params.audience || "").trim();
+      if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
+        return res.status(400).json({ error: "audience must be a non-public supported audience" });
+      }
+
+      const result = await pool.query(
+        `UPDATE user_access_audiences
+         SET is_active = false,
+             updated_at = NOW()
+         WHERE company_id = $1
+           AND user_id = $2
+           AND audience = $3
+         RETURNING id, audience, user_id, is_active, updated_at`,
+        [req.params.companyId, req.params.userId, audience]
+      );
+      if (!result.rows.length) return res.status(404).json({ error: "Access audience not found" });
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "REVOKE_USER_AUDIENCE",
+        "user_access_audiences",
+        req.params.userId,
+        result.rows[0],
+        { revoked: true, audience },
+        { audience }
+      );
+
+      res.json({ success: true, accessAudience: result.rows[0] });
+    } catch {
+      res.status(500).json({ error: "Failed to revoke access audience" });
+    }
+  });
+
   app.get("/api/companies/:companyId/passports/:guid/access-grants", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const result = await pool.query(
@@ -2429,6 +2544,152 @@ module.exports = function registerPassportRoutes(app, {
       res.json({ success: true, grant: result.rows[0] });
     } catch {
       res.status(500).json({ error: "Failed to revoke passport access" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/backup-providers", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService) return res.json([]);
+      const providers = await backupProviderService.listProviders({ companyId: req.params.companyId });
+      res.json(providers);
+    } catch {
+      res.status(500).json({ error: "Failed to fetch backup providers" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/backup-providers", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
+      const provider = await backupProviderService.upsertProvider({
+        companyId: req.params.companyId,
+        providerKey: req.body?.provider_key || req.body?.providerKey,
+        providerType: req.body?.provider_type || req.body?.providerType || "oci_object_storage",
+        displayName: req.body?.display_name || req.body?.displayName || "OCI Object Storage Backup",
+        objectPrefix: req.body?.object_prefix || req.body?.objectPrefix || "backup-provider",
+        publicBaseUrl: req.body?.public_base_url || req.body?.publicBaseUrl || null,
+        supportsPublicHandover: req.body?.supports_public_handover !== false && req.body?.supportsPublicHandover !== false,
+        config: req.body?.config_json || req.body?.config || {},
+        createdBy: req.user.userId,
+        isActive: req.body?.is_active !== false && req.body?.isActive !== false,
+      });
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "UPSERT_BACKUP_PROVIDER",
+        "backup_service_providers",
+        null,
+        null,
+        { provider_key: provider.provider_key, provider_type: provider.provider_type }
+      );
+      res.status(201).json(provider);
+    } catch (error) {
+      res.status(400).json({ error: error.message || "Failed to upsert backup provider" });
+    }
+  });
+
+  app.delete("/api/companies/:companyId/backup-providers/:providerKey", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
+      const provider = await backupProviderService.revokeProvider({ providerKey: req.params.providerKey });
+      if (!provider) return res.status(404).json({ error: "Backup provider not found" });
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "REVOKE_BACKUP_PROVIDER",
+        "backup_service_providers",
+        null,
+        { provider_key: req.params.providerKey },
+        { revoked: true }
+      );
+      res.json({ success: true, provider });
+    } catch {
+      res.status(500).json({ error: "Failed to revoke backup provider" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/passports/:guid/backup-replications", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      if (!backupProviderService) return res.json([]);
+      const replications = await backupProviderService.listReplications({
+        companyId: req.params.companyId,
+        passportGuid: req.params.guid,
+      });
+      res.json(replications);
+    } catch {
+      res.status(500).json({ error: "Failed to fetch backup replications" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/passports/:guid/backup-replications", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
+      const passportType = req.body?.passportType || req.body?.passport_type;
+      if (!passportType) return res.status(400).json({ error: "passportType required in body" });
+
+      const currentPassport = await loadLatestLivePassport({
+        companyId: req.params.companyId,
+        guid: req.params.guid,
+        passportType,
+        releaseStatusSql: "('released','obsolete')",
+      });
+      if (!currentPassport) return res.status(404).json({ error: "Released passport not found" });
+
+      const result = await replicatePassportToBackup({
+        passport: { ...currentPassport, passport_type: passportType },
+        passportType,
+        reason: "manual_replication",
+        snapshotScope: req.body?.snapshotScope || req.body?.snapshot_scope || "released_current",
+      });
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "REPLICATE_PASSPORT_BACKUP",
+        "passport_backup_replications",
+        req.params.guid,
+        null,
+        { passportType, resultCount: result.results?.length || 0 }
+      );
+
+      res.status(202).json(result);
+    } catch {
+      res.status(500).json({ error: "Failed to replicate passport backup" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/passports/:guid/backup-replications/verify", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
+      const replicationId = req.body?.replicationId ?? req.body?.replication_id ?? null;
+      if (replicationId !== null && replicationId !== undefined && !Number.isFinite(Number(replicationId))) {
+        return res.status(400).json({ error: "replicationId must be a valid integer" });
+      }
+      const result = await backupProviderService.verifyReplications({
+        companyId: req.params.companyId,
+        passportGuid: req.params.guid,
+        replicationId,
+      });
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "VERIFY_PASSPORT_BACKUP",
+        "passport_backup_replications",
+        req.params.guid,
+        null,
+        {
+          replicationId: replicationId || null,
+          verified: result.verified || 0,
+          failed: result.failed || 0,
+        }
+      );
+
+      if (result.error) {
+        return res.status(404).json({ error: result.error, results: result.results || [] });
+      }
+      return res.status(result.success ? 200 : 207).json(result);
+    } catch {
+      res.status(500).json({ error: "Failed to verify backup replications" });
     }
   });
 
@@ -2670,6 +2931,6 @@ module.exports = function registerPassportRoutes(app, {
         ORDER BY pt.umbrella_category, pt.display_name
       `, [req.params.companyId]);
       res.json(r.rows);
-    } catch (e) { console.error("passport-types fetch error:", e.message); res.status(500).json({ error: "Failed to fetch passport types" }); }
+    } catch (e) { logger.error("passport-types fetch error:", e.message); res.status(500).json({ error: "Failed to fetch passport types" }); }
   });
 };

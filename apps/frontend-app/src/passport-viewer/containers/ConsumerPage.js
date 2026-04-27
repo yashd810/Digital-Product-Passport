@@ -5,6 +5,7 @@ import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i
 import { formatPassportStatus, isReleasedPassportStatus } from "../../passports/utils/passportStatus";
 import { authHeaders } from "../../shared/api/authHeaders";
 import { buildPreviewTechnicalPassportPath, buildTechnicalPassportPath } from "../../passports/utils/passportRoutes";
+import { ViewerDomainIndicator } from "../components/ViewerBlocks";
 import "../styles/PassportViewer.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -129,6 +130,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
           {isReleasedPassportStatus(passport.release_status) && (
             <div className="cp-verified"><span>✅</span> Verified Product Passport</div>
           )}
+          <ViewerDomainIndicator compact />
           <p className="cp-tagline">{theme.tagline}</p>
         </div>
         <div className="cp-hero-pattern" aria-hidden="true">
@@ -230,6 +232,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
         <div className="cp-footer">
           <div className="cp-footer-brand">🌍 Digital Product Passport System</div>
           <div className="cp-footer-guid">Product ID: {passport.product_id || "—"}</div>
+          <ViewerDomainIndicator />
           {theme.companyWebsite && (
             <a className="cp-footer-company-link" href={theme.companyWebsite} target="_blank" rel="noopener noreferrer">
               Visit company website
@@ -311,6 +314,7 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
           {isReleasedPassportStatus(passport.release_status) && (
             <div className="cp-verified"><span>✅</span> Verified Product Passport</div>
           )}
+          <ViewerDomainIndicator compact />
           <p className="cp-tagline">{theme.tagline}</p>
         </div>
         <div className="cp-hero-pattern" aria-hidden="true">
@@ -374,6 +378,7 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
         <div className="cp-footer">
           <div className="cp-footer-brand">🌍 Digital Product Passport System</div>
           <div className="cp-footer-guid">Product ID: {passport.product_id || "—"}</div>
+          <ViewerDomainIndicator />
           {theme.companyWebsite && (
             <a className="cp-footer-company-link" href={theme.companyWebsite} target="_blank" rel="noopener noreferrer">
               Visit company website

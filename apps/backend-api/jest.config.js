@@ -9,6 +9,8 @@ module.exports = {
     "<rootDir>/tests/product-identifier.test.js",
     "<rootDir>/tests/passport-representation.test.js",
     "<rootDir>/tests/dpp-api.test.js",
+    "<rootDir>/tests/backup-provider-service.test.js",
+    "<rootDir>/tests/auth-middleware.test.js",
     "<rootDir>/tests/rate-limit.test.js",
     "<rootDir>/tests/security-service.test.js",
     "<rootDir>/tests/canonical-json.test.js",

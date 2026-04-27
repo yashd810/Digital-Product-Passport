@@ -62,6 +62,43 @@
   border-bottom-color: rgba(255,255,255,0.52);
 }
 
+.viewer-domain-indicator {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.viewer-domain-indicator.compact {
+  margin-top: 8px;
+}
+
+.viewer-domain-indicator-trusted {
+  color: rgba(240,246,250,0.96);
+}
+
+.viewer-domain-indicator-warning {
+  color: #fff4cf;
+  background: rgba(163, 84, 0, 0.22);
+  border-color: rgba(255, 211, 131, 0.38);
+}
+
+.viewer-domain-indicator-label {
+  opacity: 0.84;
+}
+
+.viewer-domain-indicator-host {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+}
+
 .viewer-content {
   width: 100%;
   padding: 24px 24px 60px;
@@ -97,6 +134,20 @@
 .viewer-footer-subtle {
   font-size: 0.76rem;
   opacity: 0.82;
+}
+
+[data-theme="light"] .viewer-domain-indicator,
+.consumer-page .viewer-domain-indicator {
+  color: #17304a;
+  border-color: rgba(23, 48, 74, 0.12);
+  background: rgba(13, 181, 176, 0.08);
+}
+
+[data-theme="light"] .viewer-domain-indicator-warning,
+.consumer-page .viewer-domain-indicator-warning {
+  color: #7a3f00;
+  background: rgba(255, 213, 128, 0.26);
+  border-color: rgba(194, 122, 15, 0.22);
 }
 
 .viewer-topbar {
@@ -982,6 +1033,10 @@
 .cp-footer-brand { font-size: 12px; color: #456177; margin-bottom: 4px; }
 .cp-footer-guid  { font-size: 10px; color: #89a5bf; font-family: monospace; }
 .cp-footer-note  { font-size: 11px; color: #456177; margin-top: 8px; }
+.cp-footer .viewer-domain-indicator {
+  justify-content: center;
+  margin: 10px auto 0;
+}
 .cp-footer-company-link {
   display: inline-block;
   margin-top: 8px;

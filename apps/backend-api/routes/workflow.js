@@ -1,3 +1,5 @@
+const logger = require("../services/logger");
+
 module.exports = function registerWorkflowRoutes(app, {
   pool,
   authenticateToken,
@@ -110,7 +112,7 @@ module.exports = function registerWorkflowRoutes(app, {
       });
       res.json({ success: true, workflowId: result.workflowId, compliance: workflowTarget.compliance });
     } catch (e) {
-      console.error("Submit review error:", e.message);
+      logger.error("Submit review error:", e.message);
       res.status(500).json({ error: "Failed" });
     }
   });
@@ -153,7 +155,7 @@ module.exports = function registerWorkflowRoutes(app, {
       await pool.query("DELETE FROM passport_workflow WHERE id = $1", [wf.id]);
       res.json({ success: true, message: "Workflow removed and passport reverted to revision" });
     } catch (e) {
-      console.error("Remove workflow error:", e.message);
+      logger.error("Remove workflow error:", e.message);
       res.status(500).json({ error: "Failed to remove workflow" });
     }
   });
@@ -373,7 +375,7 @@ module.exports = function registerWorkflowRoutes(app, {
 
       res.json({ success: true, status: "approved" });
     } catch (e) {
-      console.error("Workflow action error:", e.message);
+      logger.error("Workflow action error:", e.message);
       res.status(500).json({ error: "Failed" });
     }
   });

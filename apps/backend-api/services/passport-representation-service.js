@@ -79,12 +79,7 @@ module.exports = function createPassportRepresentationService({ productIdentifie
     // ── Extract user-defined fields with native types ─────────────────────────
     const sections = typeDef?.fields_json?.sections || [];
     const userFields = {};
-    const explicitFacilityId = passport.facility_id
-      || passport.facility_identifier
-      || passport.manufacturing_facility_id
-      || passport.manufacturing_facility_identifier
-      || null;
-    let facilityId = explicitFacilityId;
+    const facilityId = passport.facility_id || null;
 
     for (const section of sections) {
       for (const field of section.fields || []) {

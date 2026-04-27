@@ -4,6 +4,58 @@ import { buildPublicViewerUrl } from "../../passports/utils/publicViewerUrl";
 
 const API = import.meta.env.VITE_API_URL || "";
 
+function shouldRenderIec61406Marker(granularity = "item") {
+  return String(granularity || "item").trim().toLowerCase() !== "model";
+}
+
+function drawIec61406Marker(canvas, {
+  foreground = "#0b1826",
+  background = "#ffffff",
+} = {}) {
+  const context = canvas.getContext("2d");
+  if (!context) return;
+
+  const markerSize = Math.max(18, Math.round(canvas.width * 0.18));
+  const inset = Math.max(4, Math.round(canvas.width * 0.04));
+  const startX = inset;
+  const startY = inset;
+
+  context.save();
+  context.fillStyle = background;
+  context.fillRect(startX - 2, startY - 2, markerSize + 4, markerSize + 4);
+  context.beginPath();
+  context.moveTo(startX, startY);
+  context.lineTo(startX + markerSize, startY);
+  context.lineTo(startX, startY + markerSize);
+  context.closePath();
+  context.fillStyle = foreground;
+  context.fill();
+  context.restore();
+}
+
+export const renderPassportQrToCanvas = async (canvas, {
+  url,
+  granularity = "item",
+  width = 300,
+  margin = 4,
+  color = {},
+} = {}) => {
+  if (!canvas || !url) return null;
+  await QRCode.toCanvas(canvas, url, {
+    errorCorrectionLevel: "H",
+    margin,
+    width,
+    color,
+  });
+  if (shouldRenderIec61406Marker(granularity)) {
+    drawIec61406Marker(canvas, {
+      foreground: color.dark || "#0b1826",
+      background: color.light || "#ffffff",
+    });
+  }
+  return canvas;
+};
+
 /**
  * Generate QR code image from the canonical public passport path.
  * Consumer-facing QR codes must always encode the HTTPS public URL, never raw DID strings.
@@ -11,7 +63,7 @@ const API = import.meta.env.VITE_API_URL || "";
  * physical X-dimension at or above 0.25 mm when rendered in print workflows.
  * Returns base64 encoded PNG data URL.
  */
-export const generateQRCode = async ({ productId, companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "" }) => {
+export const generateQRCode = async ({ productId, companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "", granularity = "item" }) => {
   try {
     const passportPath = buildPublicPassportPath({
       companyName,
@@ -22,13 +74,18 @@ export const generateQRCode = async ({ productId, companyName = "", modelName = 
     });
     if (!passportPath) return null;
     const passportLink = buildPublicViewerUrl(passportPath);
-    return await QRCode.toDataURL(passportLink, {
-      errorCorrectionLevel: "H",
-      type: "image/png",
-      quality: 0.95,
-      margin: 4,
+    const canvas = document.createElement("canvas");
+    await renderPassportQrToCanvas(canvas, {
+      url: passportLink,
+      granularity,
       width: 300,
+      margin: 4,
+      color: {
+        dark: "#0b1826",
+        light: "#ffffff",
+      },
     });
+    return canvas.toDataURL("image/png", 0.95);
   } catch (error) {
     return null;
   }
@@ -79,4 +136,4 @@ export const fetchQRCodeFromDatabase = async (guid) => {
   }
 };
 
-export default { generateQRCode, saveQRCodeToDatabase, fetchQRCodeFromDatabase };
+export default { generateQRCode, saveQRCodeToDatabase, fetchQRCodeFromDatabase, renderPassportQrToCanvas };

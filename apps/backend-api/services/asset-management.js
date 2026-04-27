@@ -11,6 +11,7 @@
 
 const dns = require("dns").promises;
 const net = require("net");
+const logger = require("./logger");
 
 module.exports = function createAssetService({
   pool,
@@ -772,7 +773,7 @@ module.exports = function createAssetService({
         await runAssetManagementJob(job, "scheduled");
       }
     } catch (error) {
-      console.error("[AssetManagement] scheduler error:", error.message);
+      logger.error("[AssetManagement] scheduler error:", error.message);
     } finally {
       assetSchedulerBusy = false;
     }

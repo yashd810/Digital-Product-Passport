@@ -34,6 +34,54 @@ function createMockBatteryDictionaryService() {
   };
   const terms = [
     {
+      slug: "dpp-schema-version",
+      iri: "https://example.com/terms/dpp-schema-version",
+      appFieldKeys: ["dpp_schema_version"],
+      dataType: { format: "String", jsonType: "string", xsdType: "xsd:string" },
+    },
+    {
+      slug: "dpp-status",
+      iri: "https://example.com/terms/dpp-status",
+      appFieldKeys: ["dpp_status"],
+      dataType: { format: "String", jsonType: "string", xsdType: "xsd:string" },
+    },
+    {
+      slug: "dpp-granularity",
+      iri: "https://example.com/terms/dpp-granularity",
+      appFieldKeys: ["dpp_granularity"],
+      dataType: { format: "String", jsonType: "string", xsdType: "xsd:string" },
+    },
+    {
+      slug: "last-updated-at",
+      iri: "https://example.com/terms/last-updated-at",
+      appFieldKeys: ["last_updated_at"],
+      dataType: { format: "Timestamp UTC-based", jsonType: "string", xsdType: "xsd:dateTime" },
+    },
+    {
+      slug: "unique-dpp-identifier",
+      iri: "https://example.com/terms/unique-dpp-identifier",
+      appFieldKeys: ["unique_dpp_identifier", "unique_passport_identifier"],
+      dataType: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
+    },
+    {
+      slug: "unique-product-identifier",
+      iri: "https://example.com/terms/unique-product-identifier",
+      appFieldKeys: ["unique_product_identifier", "unique_battery_identifier"],
+      dataType: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
+    },
+    {
+      slug: "economic-operator-identifier",
+      iri: "https://example.com/terms/economic-operator-identifier",
+      appFieldKeys: ["economic_operator_identifier"],
+      dataType: { format: "ID (string)", jsonType: "string", xsdType: "xsd:string" },
+    },
+    {
+      slug: "facility-identifier",
+      iri: "https://example.com/terms/facility-identifier",
+      appFieldKeys: ["facility_identifier"],
+      dataType: { format: "ID (string)", jsonType: "string", xsdType: "xsd:string" },
+    },
+    {
       slug: "battery-category",
       iri: "https://example.com/terms/battery-category",
       appFieldKeys: ["battery_category"],
@@ -70,6 +118,16 @@ function createMockBatteryDictionaryService() {
   );
   const termsByIri = Object.fromEntries(terms.map((term) => [term.iri, term]));
   const requirementsByFieldKey = {
+    dpp_schema_version: { EV: "mandatory_espr_jtc24", LMT: "mandatory_espr_jtc24", Industrial: "mandatory_espr_jtc24", Stationary: "mandatory_espr_jtc24" },
+    dpp_status: { EV: "mandatory_espr_jtc24", LMT: "mandatory_espr_jtc24", Industrial: "mandatory_espr_jtc24", Stationary: "mandatory_espr_jtc24" },
+    dpp_granularity: { EV: "mandatory_espr_jtc24", LMT: "mandatory_espr_jtc24", Industrial: "mandatory_espr_jtc24", Stationary: "mandatory_espr_jtc24" },
+    last_updated_at: { EV: "mandatory_espr_jtc24", LMT: "mandatory_espr_jtc24", Industrial: "mandatory_espr_jtc24", Stationary: "mandatory_espr_jtc24" },
+    unique_dpp_identifier: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
+    unique_passport_identifier: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
+    unique_product_identifier: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
+    unique_battery_identifier: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
+    economic_operator_identifier: { EV: "mandatory_espr_jtc24", LMT: "mandatory_espr_jtc24", Industrial: "mandatory_espr_jtc24", Stationary: "mandatory_espr_jtc24" },
+    facility_identifier: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
     passport_identifier: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
     battery_category: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
     battery_mass: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
@@ -93,6 +151,22 @@ function createMockBatteryDictionaryService() {
     getCategoryRequirementForField(fieldKey, category) {
       return requirementsByFieldKey[fieldKey]?.[category] || null;
     },
+  };
+}
+
+function buildCanonicalPassportPayload(passport, _typeDef, { company } = {}) {
+  return {
+    digitalProductPassportId: passport?.guid
+      ? `did:web:www.example.test:did:dpp:item:${passport.guid}`
+      : "did:web:www.example.test:did:dpp:item:mock",
+    uniqueProductIdentifier: passport?.product_identifier_did
+      || `did:web:www.example.test:did:battery:item:${passport?.passport_identifier || "mock"}`,
+    dppSchemaVersion: passport?.dpp_schema_version || "prEN 18223:2025",
+    dppStatus: passport?.release_status || "Draft",
+    granularity: passport?.granularity || "item",
+    lastUpdate: passport?.updated_at || passport?.created_at || "2026-04-27T10:00:00.000Z",
+    economicOperatorId: passport?.economic_operator_id || company?.economic_operator_identifier || "EORI-ACME-001",
+    facilityId: passport?.facility_id || passport?.facility_identifier || null,
   };
 }
 
@@ -121,6 +195,7 @@ describe("compliance service", () => {
     const service = createComplianceService({
       pool: createMockPool(TYPE_DEF),
       batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
     });
 
     const result = await service.evaluatePassport({
@@ -141,6 +216,7 @@ describe("compliance service", () => {
     expect(result.directReleaseAllowed).toBe(false);
     expect(result.workflowRequired).toBe(true);
     expect(result.completeness.percentage).toBe(60);
+    expect(result.managedSemanticIssues).toEqual([]);
     expect(result.completeness.missingFields.map((field) => field.key)).toEqual(
       expect.arrayContaining(["state_of_charge_soc", "certificate_url"])
     );
@@ -152,6 +228,7 @@ describe("compliance service", () => {
     const service = createComplianceService({
       pool: createMockPool(TYPE_DEF),
       batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
     });
 
     const result = await service.evaluatePassport({
@@ -197,6 +274,7 @@ describe("compliance service", () => {
     const service = createComplianceService({
       pool: createMockPool(typeDef),
       batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
     });
 
     const result = await service.evaluatePassport({
@@ -220,6 +298,7 @@ describe("compliance service", () => {
     const service = createComplianceService({
       pool: createMockPool(TYPE_DEF),
       batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
     });
 
     const result = await service.evaluatePassport({
@@ -246,6 +325,7 @@ describe("compliance service", () => {
     const service = createComplianceService({
       pool: createMockPool(TYPE_DEF),
       batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
     });
 
     const result = await service.evaluatePassport({
@@ -263,6 +343,85 @@ describe("compliance service", () => {
         "CARRIER_POLICY_MISSING",
         "FACILITY_IDENTIFIER_MISSING",
       ])
+    );
+  });
+
+  test("blocks release when a battery profile does not expose a controlled-access layer", async () => {
+    const publicOnlyTypeDef = {
+      ...TYPE_DEF,
+      fields_json: {
+        sections: [
+          {
+            key: "general",
+            label: "General",
+            fields: TYPE_DEF.fields_json.sections[0].fields.map((field) => ({
+              ...field,
+              access: ["public"],
+              confidentiality: "public",
+            })),
+          },
+        ],
+      },
+    };
+
+    const service = createComplianceService({
+      pool: createMockPool(publicOnlyTypeDef),
+      batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
+    });
+
+    const result = await service.evaluatePassport({
+      passport_type: "din_spec_99100",
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
+      passport_identifier: "BAT-2026-001",
+      battery_category: "EV",
+      battery_mass: "450.5",
+      state_of_charge_soc: "50.0",
+      certificate_url: "https://example.com/certificate",
+    }, "din_spec_99100");
+
+    expect(result.workflowReleaseAllowed).toBe(false);
+    expect(result.blockingIssues.map((issue) => issue.code)).toContain("CONTROLLED_ACCESS_LAYER_MISSING");
+  });
+
+  test("blocks release when managed mandatory standards identifiers cannot be derived", async () => {
+    const service = createComplianceService({
+      pool: createMockPool(TYPE_DEF),
+      batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload: () => ({
+        digitalProductPassportId: null,
+        uniqueProductIdentifier: null,
+        dppSchemaVersion: null,
+        dppStatus: "Draft",
+        granularity: "item",
+        lastUpdate: null,
+        economicOperatorId: null,
+        facilityId: null,
+      }),
+    });
+
+    const result = await service.evaluatePassport({
+      passport_type: "din_spec_99100",
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
+      passport_identifier: "BAT-2026-001",
+      battery_category: "EV",
+      battery_mass: "450.5",
+      state_of_charge_soc: "50.0",
+      certificate_url: "https://example.com/certificate",
+    }, "din_spec_99100");
+
+    expect(result.workflowReleaseAllowed).toBe(false);
+    expect(result.managedSemanticIssues.map((issue) => issue.code)).toContain("MANAGED_SEMANTIC_FIELD_MISSING");
+    expect(result.managedSemanticIssues.map((issue) => issue.key)).toEqual(
+      expect.arrayContaining(["unique_dpp_identifier", "unique_product_identifier"])
     );
   });
 });

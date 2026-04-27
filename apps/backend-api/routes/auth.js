@@ -1,6 +1,7 @@
 "use strict";
 const { v4: uuidv4 } = require("uuid");
 const crypto = require("crypto");
+const logger = require("../services/logger");
 
 module.exports = function registerAuthRoutes(app, {
   pool,
@@ -72,7 +73,7 @@ module.exports = function registerAuthRoutes(app, {
         user: { id: u.id, email: u.email, companyId: u.company_id, role: u.role,
                 first_name: u.first_name, last_name: u.last_name, company_name: invite.company_name || null },
       });
-    } catch (e) { console.error("Register error:", e.message); res.status(500).json({ error: "Registration failed" }); }
+    } catch (e) { logger.error("Register error:", e.message); res.status(500).json({ error: "Registration failed" }); }
   });
 
   // ─── VALIDATE INVITE ────────────────────────────────────────────────────────
@@ -166,7 +167,7 @@ module.exports = function registerAuthRoutes(app, {
         );
         try { await sendOtpEmail(u, otp); }
         catch (emailErr) {
-          console.error("OTP email failed:", emailErr.message);
+          logger.error("OTP email failed:", emailErr.message);
           return res.status(500).json({ error: "Failed to send verification code. Please try again." });
         }
         const preAuthToken = jwt.sign({ userId: u.id, pre_auth: true }, JWT_SECRET, { expiresIn: "10m" });
@@ -182,7 +183,7 @@ module.exports = function registerAuthRoutes(app, {
         user: { id: u.id, email: u.email, companyId: u.company_id, role: u.role,
                 first_name: u.first_name, last_name: u.last_name, company_name: u.company_name },
       });
-    } catch (e) { console.error("Login error:", e.message); res.status(500).json({ error: "Login failed" }); }
+    } catch (e) { logger.error("Login error:", e.message); res.status(500).json({ error: "Login failed" }); }
   });
 
   // ─── VERIFY OTP (2FA second step) ───────────────────────────────────────────
@@ -229,7 +230,7 @@ module.exports = function registerAuthRoutes(app, {
         user: { id: u.id, email: u.email, companyId: u.company_id, role: u.role,
                 first_name: u.first_name, last_name: u.last_name, company_name: u.company_name },
       });
-    } catch (e) { console.error("OTP verify error:", e.message); res.status(500).json({ error: "Verification failed" }); }
+    } catch (e) { logger.error("OTP verify error:", e.message); res.status(500).json({ error: "Verification failed" }); }
   });
 
   // ─── LOGOUT ─────────────────────────────────────────────────────────────────
@@ -312,7 +313,7 @@ module.exports = function registerAuthRoutes(app, {
       );
       await sendOtpEmail(u, otp);
       res.json({ success: true });
-    } catch (e) { console.error("Resend OTP error:", e.message); res.status(500).json({ error: "Failed to resend code" }); }
+    } catch (e) { logger.error("Resend OTP error:", e.message); res.status(500).json({ error: "Failed to resend code" }); }
   });
 
   // ─── FORGOT PASSWORD ─────────────────────────────────────────────────────────
@@ -339,7 +340,7 @@ module.exports = function registerAuthRoutes(app, {
           <p style="font-size:13px;color:#888;text-align:center">If you didn't request this, you can safely ignore this email.</p>` }),
       });
       res.json({ success: true });
-    } catch (e) { console.error("Forgot password:", e.message); res.status(500).json({ error: "Failed to send email" }); }
+    } catch (e) { logger.error("Forgot password:", e.message); res.status(500).json({ error: "Failed to send email" }); }
   });
 
   app.get("/api/auth/validate-reset-token", publicReadRateLimit, async (req, res) => {
@@ -439,7 +440,7 @@ module.exports = function registerAuthRoutes(app, {
 
       res.json({ success: true, message: `Invitation sent to ${inviteeEmail}` });
     } catch (e) {
-      console.error("Invite error:", e.message);
+      logger.error("Invite error:", e.message);
       res.status(500).json({ error: "Failed to send invitation.", detail: e.message });
     }
   });
@@ -502,7 +503,7 @@ module.exports = function registerAuthRoutes(app, {
         [enable, req.user.userId]
       );
       res.json({ success: true, two_factor_enabled: enable });
-    } catch (e) { console.error("2FA toggle error:", e.message); res.status(500).json({ error: "Failed to update 2FA setting" }); }
+    } catch (e) { logger.error("2FA toggle error:", e.message); res.status(500).json({ error: "Failed to update 2FA setting" }); }
   });
 
   app.patch("/api/users/me/password", authenticateToken, async (req, res) => {

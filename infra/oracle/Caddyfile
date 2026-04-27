@@ -1,3 +1,11 @@
+{
+	# prEN 18216 requires HTTP/2 as the minimum public transport version.
+	# Restrict the HTTPS listener to HTTP/2+ so HTTP/1.1 is not negotiated at the edge.
+	servers :443 {
+		protocols h2 h3
+	}
+}
+
 claros-dpp.online, www.claros-dpp.online {
 	reverse_proxy 127.0.0.1:8080
 }

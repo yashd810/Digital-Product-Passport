@@ -2,7 +2,7 @@
 
 const logger = require("./logger");
 
-module.exports = function createSigningService({ pool, crypto, canonicalize, didService, buildCanonicalPassportPayload }) {
+module.exports = function createSigningService({ pool, crypto, canonicalizeJson, didService, buildCanonicalPassportPayload }) {
   // ─── DIGITAL SIGNATURE ──────────────────────────────────────────────────────
 
   let _signingKey = null; // { privateKey, publicKey, keyId }
@@ -66,7 +66,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalize, did
   }
 
   function canonicalJSON(val) {
-    return canonicalize(val);
+    return canonicalizeJson(val);
   }
 
   function issuerDid() {

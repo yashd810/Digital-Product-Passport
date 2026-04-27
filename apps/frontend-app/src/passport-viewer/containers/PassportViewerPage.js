@@ -121,6 +121,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
           modelName: passport.model_name,
+          granularity: passport.granularity || "item",
         });
         if (generated) {
           setQrCode(generated);

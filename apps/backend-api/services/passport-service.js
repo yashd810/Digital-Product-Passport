@@ -1,6 +1,7 @@
 "use strict";
 
 const nodeCrypto = require("crypto");
+const logger = require("./logger");
 
 const IN_REVISION_STATUSES_SQL       = `('in_revision','revised')`;
 const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','in_revision','revised')`;
@@ -86,7 +87,7 @@ module.exports = function createPassportService({
           eventHash,
         ]
       );
-    } catch (e) { console.error("Audit log error (non-fatal):", e.message); }
+    } catch (e) { logger.error("Audit log error (non-fatal):", e.message); }
   }
 
   async function verifyAuditLogChain(companyId = null) {
@@ -151,7 +152,7 @@ module.exports = function createPassportService({
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [userId, type, title, message || null, passportGuid || null, actionUrl || null]
       );
-    } catch (e) { console.error("Notification error (non-fatal):", e.message); }
+    } catch (e) { logger.error("Notification error (non-fatal):", e.message); }
   }
 
   // ─── PASSPORT TYPE SCHEMA ────────────────────────────────────────────────
@@ -916,7 +917,7 @@ module.exports = function createPassportService({
         [lineageId, newVersionNumber]
       );
     } catch (e) {
-      console.error("Mark obsolete error (non-fatal):", e.message);
+      logger.error("Mark obsolete error (non-fatal):", e.message);
     }
   }
 
@@ -1117,7 +1118,7 @@ module.exports = function createPassportService({
           });
         }
       } catch (e) {
-        console.error("Review email error:", e.message);
+        logger.error("Review email error:", e.message);
       }
     }
 

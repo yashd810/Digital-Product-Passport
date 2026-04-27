@@ -1,4 +1,5 @@
 "use strict";
+const crypto = require("crypto");
 const logger = require("../services/logger");
 
 // ─── DPP API ROUTES ───────────────────────────────────────────────────────────
@@ -13,6 +14,7 @@ module.exports = function registerDppApiRoutes(app, {
   getTable,
   normalizePassportRow,
   normalizeProductIdValue,
+  extractExplicitFacilityId,
   stripRestrictedFieldsForPublicView,
   getCompanyNameMap,
   resolveReleasedPassportByProductId,
@@ -27,6 +29,14 @@ module.exports = function registerDppApiRoutes(app, {
   isEditablePassportStatus,
   logAudit,
   accessRightsService,
+  normalizePassportRequestBody,
+  SYSTEM_PASSPORT_FIELDS,
+  getWritablePassportColumns,
+  toStoredPassportValue,
+  getPassportTypeSchema,
+  findExistingPassportByProductId,
+  complianceService,
+  backupProviderService,
 }) {
 
   // ─── HELPERS ───────────────────────────────────────────────────────────────
@@ -147,6 +157,83 @@ module.exports = function registerDppApiRoutes(app, {
       cardinality: Array.isArray(value) ? "multi" : "single",
       value,
     };
+  }
+
+  const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
+
+  async function loadCompanyComplianceIdentity(companyId) {
+    const result = await pool.query(
+      `SELECT economic_operator_identifier, economic_operator_identifier_scheme
+       FROM companies
+       WHERE id = $1
+       LIMIT 1`,
+      [companyId]
+    ).catch(() => ({ rows: [] }));
+    return result.rows[0] || null;
+  }
+
+  async function resolveManagedFacilityId({ companyId, requestedFields = {} }) {
+    const candidateFacilityId = extractExplicitFacilityId(requestedFields);
+    if (!candidateFacilityId) return null;
+
+    const facilityRes = await pool.query(
+      `SELECT facility_identifier
+       FROM company_facilities
+       WHERE company_id = $1
+         AND facility_identifier = $2
+         AND is_active = true
+       LIMIT 1`,
+      [companyId, candidateFacilityId]
+    ).catch(() => ({ rows: [] }));
+    if (!facilityRes.rows.length) {
+      const error = new Error(`Unknown or inactive facility identifier "${candidateFacilityId}"`);
+      error.statusCode = 400;
+      throw error;
+    }
+    return candidateFacilityId;
+  }
+
+  function serializeProfileDefaultValue(value) {
+    if (Array.isArray(value)) return JSON.stringify(value);
+    return value ?? null;
+  }
+
+  async function buildStandardsCreateFields({ companyId, passportType, granularity, requestedFields = {} }) {
+    const profile = complianceService?.resolveProfileMetadata?.({ passportType, granularity }) || {
+      key: "generic_dpp_v1",
+      contentSpecificationIds: [],
+      defaultCarrierPolicyKey: null,
+    };
+    const companyIdentity = await loadCompanyComplianceIdentity(companyId);
+    const resolvedFacilityId = await resolveManagedFacilityId({ companyId, requestedFields });
+    return {
+      compliance_profile_key: requestedFields.compliance_profile_key || profile.key,
+      content_specification_ids: serializeProfileDefaultValue(
+        requestedFields.content_specification_ids || profile.contentSpecificationIds || []
+      ),
+      carrier_policy_key: requestedFields.carrier_policy_key || profile.defaultCarrierPolicyKey || null,
+      economic_operator_id: requestedFields.economic_operator_id || companyIdentity?.economic_operator_identifier || null,
+      facility_id: resolvedFacilityId,
+    };
+  }
+
+  async function replicatePassportToBackup({
+    passport,
+    typeDef,
+    companyName = "",
+    reason = "manual",
+    snapshotScope = "released_current",
+  }) {
+    if (!backupProviderService || !passport?.guid || !passport?.company_id) {
+      return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
+    }
+    return backupProviderService.replicatePassportSnapshot({
+      passport,
+      typeDef,
+      companyName,
+      reason,
+      snapshotScope,
+    });
   }
 
   function parseDppIdentifier(dppId) {
@@ -419,6 +506,140 @@ module.exports = function registerDppApiRoutes(app, {
     return matches[0];
   }
 
+  async function resolveEditablePassportForIdentifier(productIdentifier, companyId = null) {
+    const parsedDppId = parseDppIdentifier(productIdentifier);
+    if (parsedDppId) {
+      if (companyId !== null && parsedDppId.kind === "legacy" && Number(companyId) !== Number(parsedDppId.companyId)) {
+        return null;
+      }
+      return resolveEditablePassportByDppId(productIdentifier);
+    }
+
+    const typeRows = await pool.query("SELECT type_name, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
+    const matches = [];
+
+    for (const typeRow of typeRows.rows) {
+      const tableName = getTable(typeRow.type_name);
+      const candidates = productIdentifierService?.buildLookupCandidates?.({
+        companyId,
+        passportType: typeRow.type_name,
+        productId: productIdentifier,
+        granularity: "item",
+      }) || [productIdentifier];
+      const params = [candidates];
+      let companySql = "";
+      if (companyId !== null && companyId !== undefined) {
+        params.push(companyId);
+        companySql = ` AND company_id = $${params.length}`;
+      }
+
+      const result = await pool.query(
+        `SELECT *
+         FROM ${tableName}
+         WHERE (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))${companySql}
+           AND release_status IN ('draft', 'in_revision', 'revised')
+           AND deleted_at IS NULL
+         ORDER BY version_number DESC, updated_at DESC
+         LIMIT 1`,
+        params
+      );
+      if (result.rows.length) {
+        matches.push({
+          passport: { ...normalizePassportRow(result.rows[0]), passport_type: typeRow.type_name },
+          typeDef: typeRow,
+          tableName,
+        });
+      }
+    }
+
+    if (!matches.length) return null;
+    matches.sort((left, right) => {
+      const leftTime = new Date(left.passport.updated_at || left.passport.created_at || 0).getTime();
+      const rightTime = new Date(right.passport.updated_at || right.passport.created_at || 0).getTime();
+      if (rightTime !== leftTime) return rightTime - leftTime;
+      return Number(right.passport.version_number || 0) - Number(left.passport.version_number || 0);
+    });
+
+    if (matches.length > 1 && matches[0].passport.guid !== matches[1].passport.guid) {
+      const error = new Error(`Multiple editable passports match identifier "${productIdentifier}".`);
+      error.code = "AMBIGUOUS_PRODUCT_ID";
+      error.companyIds = [...new Set(matches.map(({ passport }) => Number(passport.company_id)).filter(Number.isFinite))];
+      throw error;
+    }
+
+    return matches[0];
+  }
+
+  async function updateEditableElement({ editable, elementIdPath, value, user }) {
+    const headerFieldMap = {
+      dppSchemaVersion: "dpp_schema_version",
+      facilityId: "facility_id",
+      economicOperatorId: "economic_operator_id",
+      complianceProfileKey: "compliance_profile_key",
+      carrierPolicyKey: "carrier_policy_key",
+      contentSpecificationIds: "content_specification_ids",
+    };
+    const schemaField = findSchemaFieldDefinition(editable.typeDef, elementIdPath);
+    const targetColumn = schemaField?.key || headerFieldMap[elementIdPath] || null;
+    if (!targetColumn) {
+      return {
+        statusCode: 400,
+        body: { error: "This element path is not writable through the standards element API" },
+      };
+    }
+
+    const writeDecision = await accessRightsService.canWriteElement({
+      passportGuid: editable.passport.guid,
+      typeDef: editable.typeDef,
+      elementIdPath,
+      user,
+      passportCompanyId: editable.passport.company_id,
+    });
+    if (!writeDecision.allowed) {
+      return {
+        statusCode: 403,
+        body: {
+          error: "FORBIDDEN",
+          updateAuthority: writeDecision.updateAuthority,
+          confidentiality: writeDecision.confidentiality,
+        },
+      };
+    }
+
+    await updatePassportRowById({
+      tableName: editable.tableName,
+      rowId: editable.passport.id,
+      userId: user.userId,
+      data: { [targetColumn]: value },
+    });
+
+    await logAudit(
+      editable.passport.company_id,
+      user.userId,
+      "PATCH_DPP_ELEMENT",
+      editable.tableName,
+      editable.passport.guid,
+      { [targetColumn]: editable.passport[targetColumn] ?? null },
+      { [targetColumn]: value },
+      {
+        actorIdentifier: user.email || `user:${user.userId}`,
+        audience: writeDecision.matchedAuthority || "economic_operator",
+      }
+    );
+
+    const sourcePassport = { ...editable.passport, [targetColumn]: value };
+    const canonicalPayload = buildCanonicalPassportPayload(sourcePassport, editable.typeDef, { companyName: "" });
+    return {
+      statusCode: 200,
+      body: buildElementEnvelope(
+        sourcePassport,
+        editable.typeDef,
+        elementIdPath,
+        extractCanonicalElementValue(canonicalPayload, elementIdPath)
+      ),
+    };
+  }
+
   async function buildBatchLookupResult(productIdentifier, {
     companyId = null,
     versionNumber = null,
@@ -625,6 +846,186 @@ module.exports = function registerDppApiRoutes(app, {
     } catch (e) {
       logger.error({ err: e }, "[DPP API by-company-product]");
       res.status(500).json({ error: "Failed to fetch DPP" });
+    }
+  });
+
+  app.post("/api/v1/dpps", authenticateToken, requireEditor, async (req, res) => {
+    try {
+      const normalizedBody = normalizePassportRequestBody ? normalizePassportRequestBody(req.body) : (req.body || {});
+      const submittedCompanyId = normalizedBody.companyId ?? normalizedBody.company_id;
+      const companyId = req.user.role === "super_admin"
+        ? Number.parseInt(submittedCompanyId, 10)
+        : Number.parseInt(req.user.companyId, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "A valid companyId is required" });
+
+      const requestedPassportType = normalizedBody.passport_type || normalizedBody.passportType;
+      if (!requestedPassportType) return res.status(400).json({ error: "passportType is required" });
+      const typeSchema = await getPassportTypeSchema(requestedPassportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
+
+      const productIdInput = normalizeProductIdValue(
+        normalizedBody.product_id || normalizedBody.productId || normalizedBody.productIdentifier
+      );
+      if (!productIdInput) return res.status(400).json({ error: "productId is required" });
+
+      const requestedGranularity = String(normalizedBody.granularity || "item").trim().toLowerCase() || "item";
+      if (!VALID_GRANULARITIES.has(requestedGranularity)) {
+        return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
+      }
+
+      const resolvedPassportType = typeSchema.typeName;
+      const tableName = getTable(resolvedPassportType);
+      const guid = crypto.randomUUID();
+      const lineageId = guid;
+      const storedProductIdentifiers = productIdentifierService.normalizeProductIdentifiers({
+        companyId,
+        passportType: resolvedPassportType,
+        rawProductId: productIdInput,
+        granularity: requestedGranularity,
+      });
+      const existingByProductId = await findExistingPassportByProductId({
+        tableName,
+        companyId,
+        productId: storedProductIdentifiers.productIdInput,
+      });
+      if (existingByProductId) {
+        return res.status(409).json({
+          error: `A passport with Serial Number "${storedProductIdentifiers.productIdInput}" already exists.`,
+          existing_guid: existingByProductId.guid,
+          release_status: existingByProductId.release_status || null,
+        });
+      }
+
+      const {
+        passport_type,
+        passportType,
+        companyId: ignoredCompanyId,
+        company_id,
+        product_id,
+        productId,
+        productIdentifier,
+        model_name,
+        modelName,
+        granularity,
+        compliance_profile_key,
+        content_specification_ids,
+        carrier_policy_key,
+        economic_operator_id,
+        facility_id,
+        ...fields
+      } = normalizedBody;
+      void passport_type;
+      void passportType;
+      void ignoredCompanyId;
+      void company_id;
+      void product_id;
+      void productId;
+      void productIdentifier;
+      void granularity;
+
+      const invalidFieldKeys = Object.keys(fields).filter((key) =>
+        !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key)
+      );
+      if (invalidFieldKeys.length) {
+        return res.status(400).json({ error: "Unknown passport field(s) in request body", fields: invalidFieldKeys });
+      }
+
+      const complianceManagedFields = await buildStandardsCreateFields({
+        companyId,
+        passportType: resolvedPassportType,
+        granularity: requestedGranularity,
+        requestedFields: {
+          ...fields,
+          compliance_profile_key,
+          content_specification_ids,
+          carrier_policy_key,
+          economic_operator_id,
+          facility_id,
+        },
+      });
+      const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
+      const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
+      const allColumns = [
+        "guid",
+        "lineage_id",
+        "company_id",
+        "model_name",
+        "product_id",
+        "product_identifier_did",
+        "compliance_profile_key",
+        "content_specification_ids",
+        "carrier_policy_key",
+        "economic_operator_id",
+        "facility_id",
+        "granularity",
+        "created_by",
+        ...dataFields,
+      ];
+      const allValues = [
+        guid,
+        lineageId,
+        companyId,
+        model_name || modelName || null,
+        storedProductIdentifiers.productIdInput,
+        storedProductIdentifiers.productIdentifierDid,
+        complianceManagedFields.compliance_profile_key,
+        complianceManagedFields.content_specification_ids,
+        complianceManagedFields.carrier_policy_key,
+        complianceManagedFields.economic_operator_id,
+        complianceManagedFields.facility_id,
+        requestedGranularity,
+        req.user.userId,
+        ...dataFields.map((key) => processedFields[key]),
+      ];
+      const placeholders = allColumns.map((_, index) => `$${index + 1}`).join(", ");
+
+      const insertResult = await pool.query(
+        `INSERT INTO ${tableName} (${allColumns.join(", ")})
+         VALUES (${placeholders})
+         RETURNING *`,
+        allValues
+      );
+      await pool.query(
+        `INSERT INTO passport_registry (guid, lineage_id, company_id, passport_type)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (guid) DO NOTHING`,
+        [guid, lineageId, companyId, resolvedPassportType]
+      );
+
+      const createdPassport = {
+        ...normalizePassportRow(insertResult.rows[0]),
+        passport_type: resolvedPassportType,
+      };
+      const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
+      const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
+      const payload = buildCanonicalPassportPayload(createdPassport, typeDef, { companyName });
+
+      await logAudit(companyId, req.user.userId, "CREATE_DPP", tableName, guid, null, {
+        passport_type: resolvedPassportType,
+        product_id: storedProductIdentifiers.productIdInput,
+        product_identifier_did: storedProductIdentifiers.productIdentifierDid,
+        granularity: requestedGranularity,
+      });
+      await replicatePassportToBackup({
+        passport: createdPassport,
+        typeDef,
+        companyName,
+        reason: "standards_create",
+        snapshotScope: "editable_draft",
+      }).catch(() => {});
+
+      return res.status(201).json({
+        success: true,
+        passportGuid: createdPassport.guid,
+        dppId: payload.digitalProductPassportId,
+        passport: payload,
+      });
+    } catch (e) {
+      if (e.statusCode) {
+        return res.status(e.statusCode).json({ error: e.message });
+      }
+      logger.error({ err: e }, "[Standards DPP create API]");
+      return res.status(500).json({ error: "Failed to create DPP" });
     }
   });
 
@@ -858,6 +1259,196 @@ module.exports = function registerDppApiRoutes(app, {
     }
   });
 
+  app.patch("/api/v1/dpps/:dppId", authenticateToken, requireEditor, async (req, res) => {
+    try {
+      const dppId = decodeURIComponent(req.params.dppId || "");
+      if (!dppId) return res.status(400).json({ error: "dppId is required" });
+      if (!parseDppIdentifier(dppId)) return res.status(400).json({ error: "dppId must be a DPP DID" });
+
+      const editable = await resolveEditablePassportByDppId(dppId);
+      if (!editable?.passport) return res.status(404).json({ error: "Editable passport not found" });
+      if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(editable.passport.company_id)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      if (!isEditablePassportStatus(editable.passport.release_status)) {
+        return res.status(409).json({ error: "Passport is not editable" });
+      }
+
+      const normalizedBody = normalizePassportRequestBody ? normalizePassportRequestBody(req.body) : (req.body || {});
+      const {
+        passport_type,
+        passportType,
+        companyId,
+        company_id,
+        granularity,
+        product_id,
+        productId,
+        productIdentifier,
+        model_name,
+        modelName,
+        compliance_profile_key,
+        content_specification_ids,
+        carrier_policy_key,
+        economic_operator_id,
+        facility_id,
+        ...fields
+      } = normalizedBody;
+      void passport_type;
+      void passportType;
+      void companyId;
+      void company_id;
+      void granularity;
+
+      const invalidFieldKeys = Object.keys(fields).filter((key) =>
+        !SYSTEM_PASSPORT_FIELDS.has(key) && !editable.typeDef?.fields_json?.sections?.some((section) => (section.fields || []).some((field) => field.key === key))
+      );
+      if (invalidFieldKeys.length) {
+        return res.status(400).json({ error: "Unknown passport field(s) in request body", fields: invalidFieldKeys });
+      }
+
+      const updateData = {};
+      if (model_name !== undefined || modelName !== undefined) {
+        updateData.model_name = model_name ?? modelName ?? null;
+      }
+      if (compliance_profile_key !== undefined) updateData.compliance_profile_key = compliance_profile_key || null;
+      if (content_specification_ids !== undefined) {
+        updateData.content_specification_ids = serializeProfileDefaultValue(content_specification_ids);
+      }
+      if (carrier_policy_key !== undefined) updateData.carrier_policy_key = carrier_policy_key || null;
+      if (economic_operator_id !== undefined) updateData.economic_operator_id = economic_operator_id || null;
+      if (facility_id !== undefined || extractExplicitFacilityId(fields)) {
+        updateData.facility_id = await resolveManagedFacilityId({
+          companyId: editable.passport.company_id,
+          requestedFields: { ...fields, facility_id },
+        });
+      }
+
+      const nextProductId = normalizeProductIdValue(product_id || productId || productIdentifier);
+      if (product_id !== undefined || productId !== undefined || productIdentifier !== undefined) {
+        if (!nextProductId) return res.status(400).json({ error: "productId cannot be blank" });
+        const existingByProductId = await findExistingPassportByProductId({
+          tableName: editable.tableName,
+          companyId: editable.passport.company_id,
+          productId: nextProductId,
+          excludeGuid: editable.passport.guid,
+          excludeLineageId: editable.passport.lineage_id,
+        });
+        if (existingByProductId) {
+          return res.status(409).json({
+            error: `A passport with Serial Number "${nextProductId}" already exists.`,
+            existing_guid: existingByProductId.guid,
+            release_status: existingByProductId.release_status || null,
+          });
+        }
+        const normalizedProductIdentifiers = productIdentifierService.normalizeProductIdentifiers({
+          companyId: editable.passport.company_id,
+          passportType: editable.passport.passport_type,
+          rawProductId: nextProductId,
+          granularity: editable.passport.granularity || "item",
+        });
+        updateData.product_id = normalizedProductIdentifiers.productIdInput;
+        updateData.product_identifier_did = normalizedProductIdentifiers.productIdentifierDid;
+      }
+
+      const dataFields = getWritablePassportColumns(fields).filter((key) =>
+        (editable.typeDef?.fields_json?.sections || []).some((section) => (section.fields || []).some((field) => field.key === key))
+      );
+      const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
+      Object.assign(updateData, processedFields);
+
+      const updatedFields = await updatePassportRowById({
+        tableName: editable.tableName,
+        rowId: editable.passport.id,
+        userId: req.user.userId,
+        data: updateData,
+      });
+      if (!updatedFields.length) return res.status(400).json({ error: "No fields to update" });
+
+      const companyName = (await getCompanyNameMap([editable.passport.company_id])).get(String(editable.passport.company_id)) || "";
+      const updatedPassport = {
+        ...editable.passport,
+        ...updateData,
+      };
+      const payload = buildCanonicalPassportPayload(updatedPassport, editable.typeDef, { companyName });
+
+      await logAudit(editable.passport.company_id, req.user.userId, "PATCH_DPP", editable.tableName, editable.passport.guid, null, {
+        fields_updated: updatedFields,
+      });
+      await replicatePassportToBackup({
+        passport: updatedPassport,
+        typeDef: editable.typeDef,
+        companyName,
+        reason: "standards_patch",
+        snapshotScope: "editable_draft",
+      }).catch(() => {});
+
+      return res.json({
+        success: true,
+        passportGuid: editable.passport.guid,
+        dppId: payload.digitalProductPassportId,
+        updatedFields,
+        passport: payload,
+      });
+    } catch (e) {
+      if (e.statusCode) {
+        return res.status(e.statusCode).json({ error: e.message });
+      }
+      if (e.code === "AMBIGUOUS_DPP_ID") {
+        return res.status(409).json({ error: "AMBIGUOUS_DPP_ID" });
+      }
+      logger.error({ err: e }, "[Standards DPP PATCH API]");
+      return res.status(500).json({ error: "Failed to update DPP" });
+    }
+  });
+
+  app.delete("/api/v1/dpps/:dppId", authenticateToken, requireEditor, async (req, res) => {
+    try {
+      const dppId = decodeURIComponent(req.params.dppId || "");
+      if (!dppId) return res.status(400).json({ error: "dppId is required" });
+      if (!parseDppIdentifier(dppId)) return res.status(400).json({ error: "dppId must be a DPP DID" });
+
+      const editable = await resolveEditablePassportByDppId(dppId);
+      if (!editable?.passport) return res.status(404).json({ error: "Editable passport not found" });
+      if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(editable.passport.company_id)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      if (!isEditablePassportStatus(editable.passport.release_status)) {
+        return res.status(409).json({ error: "Passport is not editable" });
+      }
+
+      await replicatePassportToBackup({
+        passport: editable.passport,
+        typeDef: editable.typeDef,
+        reason: "standards_delete",
+        snapshotScope: "deleted_editable",
+      }).catch(() => {});
+
+      const deleted = await pool.query(
+        `UPDATE ${editable.tableName}
+         SET deleted_at = NOW(),
+             updated_at = NOW()
+         WHERE guid = $1
+           AND release_status IN ('draft', 'in_revision', 'revised')
+           AND deleted_at IS NULL
+         RETURNING guid`,
+        [editable.passport.guid]
+      );
+      if (!deleted.rows.length) return res.status(404).json({ error: "Passport not found or not editable" });
+
+      await logAudit(editable.passport.company_id, req.user.userId, "DELETE_DPP", editable.tableName, editable.passport.guid, {
+        dppId,
+      }, null);
+
+      return res.json({ success: true, dppId, passportGuid: editable.passport.guid });
+    } catch (e) {
+      if (e.code === "AMBIGUOUS_DPP_ID") {
+        return res.status(409).json({ error: "AMBIGUOUS_DPP_ID" });
+      }
+      logger.error({ err: e }, "[Standards DPP DELETE API]");
+      return res.status(500).json({ error: "Failed to delete DPP" });
+    }
+  });
+
   app.get("/api/v1/dpps/:productIdentifier/elements/:elementIdPath", publicReadRateLimit, async (req, res) => {
     try {
       const productIdentifier = decodeURIComponent(req.params.productIdentifier);
@@ -948,20 +1539,21 @@ module.exports = function registerDppApiRoutes(app, {
     }
   });
 
-  app.patch("/api/v1/dpps/:dppId/elements/:elementIdPath", authenticateToken, requireEditor, async (req, res) => {
+  app.patch("/api/v1/dpps/:productIdentifier/elements/:elementIdPath", authenticateToken, requireEditor, async (req, res) => {
     try {
-      const dppId = decodeURIComponent(req.params.dppId || "");
+      const productIdentifier = decodeURIComponent(req.params.productIdentifier || "");
       const elementIdPath = decodeURIComponent(req.params.elementIdPath || "");
-      if (!dppId || !elementIdPath) {
-        return res.status(400).json({ error: "dppId and elementIdPath are required" });
+      const companyId = req.user.role === "super_admin"
+        ? (req.query.companyId ? Number.parseInt(req.query.companyId, 10) : null)
+        : Number.parseInt(req.user.companyId, 10);
+      if (!productIdentifier || !elementIdPath) {
+        return res.status(400).json({ error: "productIdentifier and elementIdPath are required" });
+      }
+      if (req.query.companyId && !Number.isFinite(companyId) && req.user.role === "super_admin") {
+        return res.status(400).json({ error: "Invalid companyId" });
       }
 
-      const parsedDppId = parseDppIdentifier(dppId);
-      if (!parsedDppId) {
-        return res.status(400).json({ error: "dppId must be a valid DPP DID" });
-      }
-
-      const editable = await resolveEditablePassportByDppId(dppId);
+      const editable = await resolveEditablePassportForIdentifier(productIdentifier, companyId);
       if (!editable?.passport) {
         return res.status(404).json({ error: "Editable passport not found. Create or revise a draft before updating elements." });
       }
@@ -975,65 +1567,19 @@ module.exports = function registerDppApiRoutes(app, {
         return res.status(400).json({ error: "value is required" });
       }
 
-      const headerFieldMap = {
-        dppSchemaVersion: "dpp_schema_version",
-        facilityId: "facility_id",
-        economicOperatorId: "economic_operator_id",
-        complianceProfileKey: "compliance_profile_key",
-        carrierPolicyKey: "carrier_policy_key",
-        contentSpecificationIds: "content_specification_ids",
-      };
-      const schemaField = findSchemaFieldDefinition(editable.typeDef, elementIdPath);
-      const targetColumn = schemaField?.key || headerFieldMap[elementIdPath] || null;
-      if (!targetColumn) {
-        return res.status(400).json({ error: "This element path is not writable through the standards element API" });
-      }
-
-      const writeDecision = await accessRightsService.canWriteElement({
-        passportGuid: editable.passport.guid,
-        typeDef: editable.typeDef,
+      const result = await updateEditableElement({
+        editable,
         elementIdPath,
+        value: req.body.value,
         user: req.user,
-        passportCompanyId: editable.passport.company_id,
       });
-      if (!writeDecision.allowed) {
-        return res.status(403).json({
-          error: "FORBIDDEN",
-          updateAuthority: writeDecision.updateAuthority,
-          confidentiality: writeDecision.confidentiality,
-        });
-      }
-
-      await updatePassportRowById({
-        tableName: editable.tableName,
-        rowId: editable.passport.id,
-        userId: req.user.userId,
-        data: { [targetColumn]: req.body.value },
-      });
-
-      await logAudit(
-        editable.passport.company_id,
-        req.user.userId,
-        "PATCH_DPP_ELEMENT",
-        editable.tableName,
-        editable.passport.guid,
-        { [targetColumn]: editable.passport[targetColumn] ?? null },
-        { [targetColumn]: req.body.value },
-        {
-          actorIdentifier: req.user.email || `user:${req.user.userId}`,
-          audience: writeDecision.matchedAuthority || "economic_operator",
-        }
-      );
-
-      const refreshedEditable = await resolveEditablePassportByDppId(dppId);
-      const sourcePassport = refreshedEditable?.passport || { ...editable.passport, [targetColumn]: req.body.value };
-      const sourceTypeDef = refreshedEditable?.typeDef || editable.typeDef;
-      const canonicalPayload = buildCanonicalPassportPayload(sourcePassport, sourceTypeDef, { companyName: "" });
-      const value = extractCanonicalElementValue(canonicalPayload, elementIdPath);
-      return res.json(buildElementEnvelope(sourcePassport, sourceTypeDef, elementIdPath, value));
+      return res.status(result.statusCode).json(result.body);
     } catch (e) {
-      if (e.code === "AMBIGUOUS_DPP_ID") {
-        return res.status(409).json({ error: "AMBIGUOUS_DPP_ID" });
+      if (e.code === "AMBIGUOUS_DPP_ID" || e.code === "AMBIGUOUS_PRODUCT_ID") {
+        return res.status(409).json({
+          error: e.code,
+          companyIds: e.companyIds || [],
+        });
       }
       logger.error({ err: e }, "[Standards DPP element PATCH API]");
       return res.status(500).json({ error: "Failed to update DPP data element" });
@@ -1101,6 +1647,13 @@ module.exports = function registerDppApiRoutes(app, {
           req.user.userId,
         ]
       );
+      await replicatePassportToBackup({
+        passport: result.passport,
+        typeDef: result.typeDef,
+        companyName: result.companyName,
+        reason: "registry_registration",
+        snapshotScope: "released_current",
+      }).catch(() => {});
 
       return res.status(201).json({
         success: true,

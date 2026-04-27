@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import QRCode from "qrcode";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import { authHeaders } from "../../../shared/api/authHeaders";
 import { buildPassportJsonLdExport } from "../../../shared/utils/batterySemanticExport";
 import { formatPassportStatus, isPublishedPassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
+import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -209,7 +209,12 @@ function ArchivedPassports({ user, companyId }) {
         if (!resolvedPath) throw new Error("Archived passport link is unavailable for this QR code");
         const archivedUrl = buildPublicViewerUrl(resolvedPath);
         if (!archivedUrl) throw new Error("Archived passport link is unavailable for this QR code");
-        await QRCode.toCanvas(canvas, archivedUrl, { width: 300, margin: 2 });
+        await renderPassportQrToCanvas(canvas, {
+          url: archivedUrl,
+          granularity: p.granularity || "item",
+          width: 300,
+          margin: 2,
+        });
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
         link.download = `archived_${p.product_id || p.guid}_v${getArchivedPublicVersionNumber(p)}.png`;

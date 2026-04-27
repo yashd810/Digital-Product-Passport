@@ -6,6 +6,45 @@ import { formatPassportStatus, getPassportActivityState } from "../../passports/
 import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel } from "../utils/viewerHelpers";
 
 const API = import.meta.env.VITE_API_URL || "";
+const PUBLIC_VIEWER_URL = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
+
+function getDomainIndicatorState() {
+  if (typeof window === "undefined") {
+    return { currentHost: "", expectedHost: "", trusted: true, label: "" };
+  }
+
+  const currentHost = window.location.host || "";
+  let expectedHost = "";
+  try {
+    expectedHost = PUBLIC_VIEWER_URL ? new URL(PUBLIC_VIEWER_URL).host : "";
+  } catch {
+    expectedHost = "";
+  }
+
+  const localHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  const isLocal = localHosts.has(window.location.hostname);
+  const trusted = !expectedHost || currentHost === expectedHost || isLocal;
+  return {
+    currentHost,
+    expectedHost,
+    trusted,
+    label: trusted
+      ? (isLocal ? `Local preview · ${currentHost}` : `Verified domain · ${currentHost}`)
+      : `Check domain · expected ${expectedHost || "trusted viewer host"}`,
+  };
+}
+
+export function ViewerDomainIndicator({ compact = false }) {
+  const indicator = getDomainIndicatorState();
+  if (!indicator.label) return null;
+
+  return (
+    <div className={`viewer-domain-indicator viewer-domain-indicator-${indicator.trusted ? "trusted" : "warning"}${compact ? " compact" : ""}`}>
+      <span className="viewer-domain-indicator-label">{indicator.label}</span>
+      <strong className="viewer-domain-indicator-host">{indicator.currentHost || indicator.expectedHost || "unknown-host"}</strong>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Viewer UI Blocks
@@ -124,6 +163,7 @@ export function Header({ displayName, lang, setLang, guid, companyData, brandThe
         <div>
           <h1>{brandTheme?.title || "Digital Product Passport"}</h1>
           <p>{companyData?.company_name ? `${companyData.company_name} · ${displayName}` : displayName}</p>
+          <ViewerDomainIndicator compact />
           {brandTheme?.companyWebsite && (
             <a href={brandTheme.companyWebsite} target="_blank" rel="noopener noreferrer" className="viewer-header-website">
               {brandTheme.companyWebsite.replace(/^https?:\/\//i, "")}
@@ -148,6 +188,7 @@ export function Footer({ brandTheme }) {
   return (
     <footer className="viewer-footer">
       <p className="viewer-footer-provider">{brandTheme?.footerText || "Powered by ClarosDPP, digital passport provider via software as a service."}</p>
+      <ViewerDomainIndicator />
       <p className="viewer-footer-subtle">
         <a href={supportHref} className="viewer-footer-link">{supportLabel}</a>
       </p>

@@ -41,6 +41,142 @@ paths:
           $ref: '#/components/responses/AmbiguousProductIdentifier'
         '500':
           $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [DPP]
+      summary: Update an editable passport revision by DPP ID
+      description: >
+        The path value must be a DPP DID for update operations. This route updates
+        the editable whole-passport revision rather than an individual data element.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIdentifier'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Updated editable passport payload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, passportGuid, dppId, passport]
+                properties:
+                  success:
+                    type: boolean
+                  passportGuid:
+                    type: string
+                    format: uuid
+                  dppId:
+                    type: string
+                  updatedFields:
+                    type: array
+                    items:
+                      type: string
+                  passport:
+                    $ref: '#/components/schemas/DppPayload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Forbidden
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Editable passport conflict
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [DPP]
+      summary: Delete an editable passport revision by DPP ID
+      description: The path value must be a DPP DID for delete operations.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIdentifier'
+      responses:
+        '200':
+          description: Delete result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, dppId, passportGuid]
+                properties:
+                  success:
+                    type: boolean
+                  dppId:
+                    type: string
+                  passportGuid:
+                    type: string
+                    format: uuid
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Forbidden
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Editable passport conflict
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dpps:
+    post:
+      tags: [DPP]
+      summary: Create an editable passport revision in the standards namespace
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passportType, productId]
+              properties:
+                companyId:
+                  type: integer
+                passportType:
+                  type: string
+                productId:
+                  type: string
+                granularity:
+                  type: string
+                  enum: [model, batch, item]
+                model_name:
+                  type: string
+      responses:
+        '201':
+          description: Editable passport created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, passportGuid, dppId, passport]
+                properties:
+                  success:
+                    type: boolean
+                  passportGuid:
+                    type: string
+                    format: uuid
+                  dppId:
+                    type: string
+                  passport:
+                    $ref: '#/components/schemas/DppPayload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Forbidden
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Product identifier conflict
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/dppsByProductIds:
     post:
       tags: [DPP]
@@ -291,12 +427,9 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: dppId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/ProductIdentifier'
         - $ref: '#/components/parameters/ElementIdPath'
+        - $ref: '#/components/parameters/CompanyIdQuery'
       requestBody:
         required: true
         content:

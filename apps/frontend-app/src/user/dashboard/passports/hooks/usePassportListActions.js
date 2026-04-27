@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import QRCode from "qrcode";
 import { authHeaders } from "../../../../shared/api/authHeaders";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
 import {
@@ -8,6 +7,7 @@ import {
 } from "../../../../passports/utils/passportStatus";
 import { buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
+import { renderPassportQrToCanvas } from "../../../../passport-viewer/utils/QRcode";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -128,10 +128,11 @@ export function usePassportListActions({
 
         const passportUrl = buildPublicViewerUrl(passportPath);
         if (!passportUrl) throw new Error("Passport link is unavailable for this QR code");
-        await QRCode.toCanvas(qrCanvas, passportUrl, {
-          errorCorrectionLevel: "H",
-          margin: 1,
+        await renderPassportQrToCanvas(qrCanvas, {
+          url: passportUrl,
+          granularity: passport.granularity || "item",
           width: qrSize,
+          margin: 1,
           color: {
             dark: isBlackAndWhite ? "#000000" : (format === "jpeg" ? "#0b1826" : "#f0f6fa"),
             light: background,

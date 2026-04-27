@@ -1,10 +1,10 @@
 "use strict";
 
 const crypto = require("crypto");
-const canonicalize = require("canonicalize");
 
 const createDidService = require("../services/did-service");
 const createCanonicalPassportSerializer = require("../services/canonicalPassportSerializer");
+const canonicalizeJson = require("../services/json-canonicalization");
 const createSigningService = require("../services/signing-service");
 
 function createMockPool() {
@@ -65,7 +65,7 @@ function buildTestHarness(pool) {
   const signingService = createSigningService({
     pool,
     crypto,
-    canonicalize,
+    canonicalizeJson,
     didService,
     buildCanonicalPassportPayload: serializer.buildCanonicalPassportPayload,
   });

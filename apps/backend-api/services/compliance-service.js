@@ -282,7 +282,33 @@ function isMandatoryRequirementLevel(level) {
   return level === "mandatory_battreg" || level === "mandatory_espr_jtc24";
 }
 
-module.exports = function createComplianceService({ pool, batteryDictionaryService }) {
+const MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS = {
+  dpp_schema_version: ({ canonicalPayload, passport }) =>
+    canonicalPayload?.dppSchemaVersion || passport?.dpp_schema_version || null,
+  dpp_status: ({ canonicalPayload, passport }) =>
+    canonicalPayload?.dppStatus || passport?.dpp_status || passport?.release_status || null,
+  dpp_granularity: ({ canonicalPayload, passport }) =>
+    canonicalPayload?.granularity || passport?.granularity || null,
+  last_updated_at: ({ canonicalPayload, passport }) =>
+    canonicalPayload?.lastUpdate || passport?.updated_at || passport?.created_at || null,
+  unique_dpp_identifier: ({ canonicalPayload }) =>
+    canonicalPayload?.digitalProductPassportId || canonicalPayload?.dppDid || null,
+  unique_passport_identifier: ({ canonicalPayload }) =>
+    canonicalPayload?.digitalProductPassportId || canonicalPayload?.dppDid || null,
+  unique_battery_identifier: ({ canonicalPayload }) =>
+    canonicalPayload?.uniqueProductIdentifier || canonicalPayload?.productDid || null,
+  unique_product_identifier: ({ canonicalPayload }) =>
+    canonicalPayload?.uniqueProductIdentifier || canonicalPayload?.productDid || null,
+  economic_operator_identifier: ({ canonicalPayload, company, passport }) =>
+    canonicalPayload?.economicOperatorId
+    || passport?.economic_operator_id
+    || company?.economic_operator_identifier
+    || null,
+  facility_identifier: ({ canonicalPayload, passport }) =>
+    canonicalPayload?.facilityId || passport?.facility_id || passport?.facility_identifier || null,
+};
+
+module.exports = function createComplianceService({ pool, batteryDictionaryService, buildCanonicalPassportPayload = null }) {
   const manifest = batteryDictionaryService.getManifest();
   const categoryRules = batteryDictionaryService.getCategoryRules ? batteryDictionaryService.getCategoryRules() : null;
   const supportedBatteryCategories = Array.isArray(manifest?.batteryCategoryScope)
@@ -512,6 +538,36 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     return issues;
   }
 
+  function validateAudienceLayerCoverage(fields, profile) {
+    const issues = [];
+    if (profile?.key !== PROFILE_CATALOG.battery_dpp_v1.key) return issues;
+
+    const hasPublicAudience = fields.some((field) => {
+      const access = Array.isArray(field?.access) ? field.access : [];
+      return access.includes("public");
+    });
+    const hasControlledAudience = fields.some((field) => {
+      const access = Array.isArray(field?.access) ? field.access : [];
+      return access.some((audience) => audience && audience !== "public");
+    });
+
+    if (!hasPublicAudience) {
+      issues.push(createIssue({
+        code: "PUBLIC_ACCESS_LAYER_MISSING",
+        message: "Battery DPP profiles must expose at least one publicly accessible field layer before release.",
+      }));
+    }
+
+    if (!hasControlledAudience) {
+      issues.push(createIssue({
+        code: "CONTROLLED_ACCESS_LAYER_MISSING",
+        message: "Battery DPP profiles must expose at least one restricted-access field layer before release.",
+      }));
+    }
+
+    return issues;
+  }
+
   function validateProfileGovernance({ passport, profile, company }) {
     const issues = [];
     const granularity = String(passport?.granularity || profile?.granularity || "item").trim().toLowerCase() || "item";
@@ -606,6 +662,72 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     return issues;
   }
 
+  function evaluateManagedSemanticFields({
+    fields,
+    passport,
+    typeDef,
+    company,
+    profile,
+    normalizedCategory,
+  }) {
+    const managedFields = [];
+    const issues = [];
+
+    if (!buildCanonicalPassportPayload || profile?.key !== PROFILE_CATALOG.battery_dpp_v1.key) {
+      return { managedFields, issues };
+    }
+
+    const schemaFieldKeys = new Set(fields.map((field) => field.key).filter(Boolean));
+    const canonicalPayload = buildCanonicalPassportPayload(passport || {}, typeDef, { company });
+
+    for (const [fieldKey, resolveValue] of Object.entries(MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS)) {
+      if (schemaFieldKeys.has(fieldKey)) continue;
+
+      const applicability = getCategoryApplicabilityForField(fieldKey, normalizedCategory);
+      if (applicability && !applicability.applicable) continue;
+
+      const term = batteryDictionaryService.getTermByFieldKey
+        ? batteryDictionaryService.getTermByFieldKey(fieldKey)
+        : null;
+      const label = term?.label || fieldKey;
+      const value = resolveValue({ canonicalPayload, company, passport: passport || {} });
+      const mandatory = applicability ? applicability.mandatory : false;
+      const requirementLevel = applicability?.requirementLevel || null;
+
+      managedFields.push({
+        key: fieldKey,
+        label,
+        requirementLevel,
+        mandatory,
+        filled: hasMeaningfulValue({ type: "text" }, value),
+        source: "managed",
+        value: isBlankValue(value) ? null : value,
+      });
+
+      if (mandatory && !hasMeaningfulValue({ type: "text" }, value)) {
+        issues.push(createIssue({
+          code: "MANAGED_SEMANTIC_FIELD_MISSING",
+          message: `Managed standards field "${label}" is required before release but could not be derived from passport metadata.`,
+          key: fieldKey,
+          label,
+        }));
+        continue;
+      }
+
+      if (term && !isBlankValue(value) && !isValueCompatibleWithTerm(value, term)) {
+        issues.push(createIssue({
+          code: "MANAGED_SEMANTIC_VALUE_TYPE_MISMATCH",
+          message: `Managed standards field "${label}" does not match the semantic datatype ${formatExpectedType(term)}.`,
+          key: fieldKey,
+          label,
+          expectedType: formatExpectedType(term),
+        }));
+      }
+    }
+
+    return { managedFields, issues };
+  }
+
   function evaluateBatteryCategory(fields, passport, completeness) {
     const categoryField = fields.find((field) => field.key === "battery_category")
       || fields.find((field) => normalizeLookupKey(field.label) === "battery category");
@@ -669,7 +791,12 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
         isBatteryPassport: false,
         completeness: { totalFields: 0, filledFields: 0, missingFields: [], percentage: 0 },
         accessIssues: [issue],
+        governanceIssues: [],
+        audienceLayerIssues: [],
+        profileIssues: [],
         semanticIssues: [],
+        managedSemanticFields: [],
+        managedSemanticIssues: [],
         category: { raw: null, normalized: null, supported: supportedBatteryCategories, focusFields: [], missingFocusFields: [], issues: [] },
         blockingIssues: [issue],
         directReleaseAllowed: false,
@@ -691,6 +818,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     const completeness = buildCompleteness(fields, passport || {}, { normalizedCategory });
     const accessIssues = validateAccess(fields);
     const governanceIssues = validateFieldGovernance(fields);
+    const audienceLayerIssues = validateAudienceLayerCoverage(fields, profile);
     const semanticIssues = validateSemanticData(fields, passport || {});
     const batteryCategory = isBatteryPassport(resolvedTypeDef, passportType || passport?.passport_type)
       ? evaluateBatteryCategory(fields, passport || {}, completeness)
@@ -710,7 +838,23 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
         };
 
     const profileIssues = validateProfileGovernance({ passport: passport || {}, profile, company });
-    const blockingIssues = [...accessIssues, ...governanceIssues, ...semanticIssues, ...profileIssues, ...batteryCategory.issues];
+    const managedSemantic = evaluateManagedSemanticFields({
+      fields,
+      passport: passport || {},
+      typeDef: resolvedTypeDef,
+      company,
+      profile,
+      normalizedCategory,
+    });
+    const blockingIssues = [
+      ...accessIssues,
+      ...governanceIssues,
+      ...audienceLayerIssues,
+      ...semanticIssues,
+      ...profileIssues,
+      ...managedSemantic.issues,
+      ...batteryCategory.issues,
+    ];
     const workflowReleaseAllowed = blockingIssues.length === 0;
     const directReleaseAllowed = workflowReleaseAllowed && completeness.missingFields.length === 0;
     const workflowRequired = workflowReleaseAllowed && completeness.missingFields.length > 0;
@@ -729,8 +873,11 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       completeness,
       accessIssues,
       governanceIssues,
+      audienceLayerIssues,
       profileIssues,
       semanticIssues,
+      managedSemanticFields: managedSemantic.managedFields,
+      managedSemanticIssues: managedSemantic.issues,
       category: batteryCategory,
       blockingIssues,
       directReleaseAllowed,

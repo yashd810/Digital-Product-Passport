@@ -1,3 +1,5 @@
+const logger = require("../services/logger");
+
 module.exports = function registerRepositoryRoutes(app, {
   pool,
   fs,
@@ -171,7 +173,7 @@ module.exports = function registerRepositoryRoutes(app, {
         if (row.file_path && !row.storage_key) {
           const safeFilePath = path.resolve(row.file_path);
           if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR)) {
-            console.error("[repository-delete] Refusing to delete file outside repository root:", safeFilePath);
+            logger.error("[repository-delete] Refusing to delete file outside repository root:", safeFilePath);
             return res.status(400).json({ error: "Stored file path is invalid" });
           }
         }
@@ -235,7 +237,7 @@ module.exports = function registerRepositoryRoutes(app, {
         );
         res.status(201).json(withResolvedFileUrl(r.rows[0]));
       } catch (e) {
-        console.error("Company symbol upload error:", e.message);
+      logger.error("Company symbol upload error:", e.message);
         res.status(500).json({ error: e.message || "Upload failed" });
       }
     }
@@ -281,7 +283,7 @@ module.exports = function registerRepositoryRoutes(app, {
       }
       res.json({ success: true, inserted, skipped, symbols: symbols.length, companies: companies.length });
     } catch (e) {
-      console.error("Symbol migration error:", e.message);
+      logger.error("Symbol migration error:", e.message);
       res.status(500).json({ error: `Migration failed: ${e.message}` });
     }
   });

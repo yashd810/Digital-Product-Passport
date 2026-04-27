@@ -3,6 +3,7 @@
 const express = require("express");
 
 const registerDppApiRoutes = require("../routes/dpp-api");
+const { extractExplicitFacilityId } = require("../helpers/passport-helpers");
 
 function createMockResponse() {
   return {
@@ -124,9 +125,20 @@ function createTestApp() {
     version_number: 3,
     manufacturer: "Draft Manufacturer",
   };
+  const backupProviderService = {
+    replicatePassportSnapshot: jest.fn(async () => ({ success: true, results: [] })),
+  };
 
   const pool = {
     query: jest.fn(async (sql, params = []) => {
+      if (String(sql).includes("SELECT economic_operator_identifier")) {
+        return {
+          rows: [{
+            economic_operator_identifier: "did:web:www.example.test:did:company:5",
+            economic_operator_identifier_scheme: "did",
+          }],
+        };
+      }
       if (String(sql).includes("SELECT type_name, semantic_model_key, fields_json FROM passport_types")) {
         return {
           rows: [{
@@ -174,6 +186,32 @@ function createTestApp() {
           }],
         };
       }
+      if (String(sql).includes("INSERT INTO battery_passports")) {
+        editablePassport = {
+          ...editablePassport,
+          guid: params[0],
+          lineage_id: params[1],
+          company_id: params[2],
+          model_name: params[3],
+          product_id: params[4],
+          product_identifier_did: params[5],
+          compliance_profile_key: params[6],
+          content_specification_ids: params[7],
+          carrier_policy_key: params[8],
+          economic_operator_id: params[9],
+          facility_id: params[10],
+          granularity: params[11],
+          created_by: params[12],
+          public_summary: params[13] || editablePassport.public_summary,
+        };
+        return { rows: [editablePassport] };
+      }
+      if (String(sql).includes("INSERT INTO passport_registry")) {
+        return { rows: [] };
+      }
+      if (String(sql).includes("SET deleted_at = NOW()") && String(sql).includes("FROM battery_passports") === false) {
+        return { rows: [{ guid: editablePassport.guid }] };
+      }
       if (String(sql).includes("FROM battery_passports") && String(sql).includes("release_status IN ('draft', 'in_revision', 'revised')")) {
         return {
           rows: [editablePassport],
@@ -210,6 +248,7 @@ function createTestApp() {
     getTable: (typeName) => `${typeName}_passports`,
     normalizePassportRow: (row) => row,
     normalizeProductIdValue: (value) => String(value || "").trim(),
+    extractExplicitFacilityId,
     stripRestrictedFieldsForPublicView: async (passport) => passport,
     getCompanyNameMap: async () => new Map([["5", "Acme Energy"]]),
     resolveReleasedPassportByProductId: async (productId, { companyId = null } = {}) => {
@@ -259,10 +298,15 @@ function createTestApp() {
       didToDocumentUrl: () => null,
     },
     productIdentifierService: {
+      normalizeProductIdentifiers: ({ rawProductId }) => ({
+        productIdInput: rawProductId,
+        productIdentifierDid: `did:web:www.example.test:did:battery:item:c5-${String(rawProductId).toLowerCase()}`,
+      }),
       buildLookupCandidates: ({ productId }) => [productId, releasedPassport.product_identifier_did],
     },
     updatePassportRowById: async ({ data }) => {
       editablePassport = { ...editablePassport, ...data };
+      return Object.keys(data);
     },
     isEditablePassportStatus: (status) => ["draft", "in_revision", "revised"].includes(status),
     logAudit: jest.fn(async () => {}),
@@ -289,12 +333,66 @@ function createTestApp() {
         confidentiality: "regulated",
       })),
     },
+    normalizePassportRequestBody: (body) => body,
+    SYSTEM_PASSPORT_FIELDS: new Set([
+      "company_id",
+      "created_by",
+      "guid",
+      "lineage_id",
+      "release_status",
+      "version_number",
+    ]),
+    getWritablePassportColumns: (data) => Object.keys(data || {}),
+    toStoredPassportValue: (value) => value,
+    getPassportTypeSchema: async () => ({
+      typeName: "battery",
+      allowedKeys: new Set(["manufacturer", "public_summary"]),
+    }),
+    findExistingPassportByProductId: async () => null,
+    complianceService: {
+      loadPassportTypeDefinition: async () => ({
+        type_name: "battery",
+        semantic_model_key: "claros_battery_dictionary_v1",
+        fields_json: {
+          sections: [{
+            fields: [
+              { key: "manufacturer", type: "text", semanticId: "urn:test:manufacturer", access: ["notified_bodies"], confidentiality: "regulated", updateAuthority: ["economic_operator"] },
+              { key: "public_summary", type: "text", semanticId: "urn:test:public-summary", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+            ],
+          }],
+        },
+      }),
+      resolveProfileMetadata: () => ({
+        key: "battery_dpp_v1",
+        contentSpecificationIds: ["claros_battery_dictionary_v1"],
+        defaultCarrierPolicyKey: "battery_qr_public_entry_v1",
+      }),
+    },
+    backupProviderService,
   });
 
   return app;
 }
 
 describe("DPP standards API", () => {
+  test("POST /api/v1/dpps creates an editable passport in the standards namespace", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dpps",
+      body: {
+        passportType: "battery",
+        productId: "BAT-NEW-001",
+        public_summary: "Fresh battery passport",
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.success).toBe(true);
+    expect(response.body.passport.uniqueProductIdentifier).toContain("bat-new-001");
+  });
+
   test("POST /api/v1/dppsByProductIds returns batch lookup results", async () => {
     const app = createTestApp();
 
@@ -364,14 +462,14 @@ describe("DPP standards API", () => {
     });
   });
 
-  test("PATCH /api/v1/dpps/:dppId/elements/:elementIdPath updates an editable field", async () => {
+  test("PATCH /api/v1/dpps/:productIdentifier/elements/:elementIdPath updates an editable field", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "patch",
-      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
+      path: "/api/v1/dpps/:productIdentifier/elements/:elementIdPath",
       params: {
-        dppId: "did:web:www.example.test:did:dpp:item:5:BAT-2026-001",
+        productIdentifier: "BAT-2026-001",
         elementIdPath: "manufacturer",
       },
       body: {
@@ -384,6 +482,44 @@ describe("DPP standards API", () => {
       elementIdPath: "manufacturer",
       dictionaryReference: "urn:test:manufacturer",
       value: "Updated Manufacturer",
+    });
+  });
+
+  test("PATCH /api/v1/dpps/:dppId updates an editable passport revision", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/v1/dpps/:dppId",
+      params: {
+        dppId: "did:web:www.example.test:did:dpp:item:5:BAT-2026-001",
+      },
+      body: {
+        manufacturer: "Whole Passport Update",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.updatedFields).toContain("manufacturer");
+    expect(response.body.passport.fields.manufacturer).toBe("Whole Passport Update");
+  });
+
+  test("DELETE /api/v1/dpps/:dppId deletes an editable passport revision", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "delete",
+      path: "/api/v1/dpps/:dppId",
+      params: {
+        dppId: "did:web:www.example.test:did:dpp:item:5:BAT-2026-001",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      dppId: "did:web:www.example.test:did:dpp:item:5:BAT-2026-001",
     });
   });
 

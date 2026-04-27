@@ -1,5 +1,7 @@
 "use strict";
 
+const logger = require("../services/logger");
+
 module.exports = function registerPassportPublicRoutes(app, {
   pool,
   crypto,
@@ -680,7 +682,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
       res.json({ ...verifyResult, ...(credential ? { credential } : {}) });
     } catch (error) {
-      console.error("Signature verify error:", error.message);
+      logger.error("Signature verify error:", error.message);
       res.status(500).json({ error: "Verification failed" });
     }
   });
@@ -712,7 +714,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({ id: PLATFORM_DID }));
     } catch (error) {
-      console.error("DID document error:", error.message);
+      logger.error("DID document error:", error.message);
       return res.status(500).json({ error: "Failed to generate DID document" });
     }
   });

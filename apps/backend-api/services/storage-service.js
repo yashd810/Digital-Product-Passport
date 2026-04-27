@@ -89,6 +89,21 @@ function createLocalStorageService(options) {
     resolveAbsolutePath(storageKey) {
       return absolutePathForKey(storageKey);
     },
+    async fetchObject(storageKey) {
+      const absolutePath = absolutePathForKey(storageKey);
+      const stats = await fs.promises.stat(absolutePath);
+      const buffer = await fs.promises.readFile(absolutePath);
+      return {
+        headers: {
+          get(name) {
+            const normalized = String(name || "").toLowerCase();
+            if (normalized === "content-length") return String(stats.size);
+            return null;
+          },
+        },
+        arrayBuffer: async () => buffer,
+      };
+    },
   };
 }
 

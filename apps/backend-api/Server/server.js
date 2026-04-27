@@ -10,7 +10,6 @@ const jwt            = require("jsonwebtoken");
 const multer         = require("multer");
 const fs             = require("fs");
 const path           = require("path");
-const canonicalize   = require("canonicalize");
 
 const { initDb }               = require("../db/init");
 const createSigningService     = require("../services/signing-service");
@@ -34,6 +33,8 @@ const createBatteryDictionaryService      = require("../services/battery-diction
 const createComplianceService             = require("../services/compliance-service");
 const createAccessRightsService           = require("../services/access-rights-service");
 const createProductIdentifierService      = require("../services/product-identifier-service");
+const createBackupProviderService         = require("../services/backup-provider-service");
+const canonicalizeJson                    = require("../services/json-canonicalization");
 
 global.console = logger.console;
 
@@ -44,7 +45,7 @@ const {
   normalizeReleaseStatus, isPublicHistoryStatus, isEditablePassportStatus,
   normalizePassportRow,
   toStoredPassportValue,
-  normalizePassportRequestBody, normalizeProductIdValue, generateProductIdValue,
+  normalizePassportRequestBody, normalizeProductIdValue, generateProductIdValue, extractExplicitFacilityId,
   getWritablePassportColumns, getStoredPassportValues,
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath, buildPreviewPassportPath,
   resolvePublicPathToSubjects,
@@ -253,6 +254,47 @@ const ASSET_ERP_PRESETS = [
   },
 ];
 
+function toBooleanEnv(value, fallback = false) {
+  if (value === undefined || value === null || value === "") return fallback;
+  return !["0", "false", "no", "off"].includes(String(value).trim().toLowerCase());
+}
+
+function assertProductionStorageReadiness() {
+  if (!IS_PRODUCTION) return;
+
+  const storageProvider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
+  const allowLocalStorage = toBooleanEnv(process.env.ALLOW_LOCAL_STORAGE_IN_PRODUCTION, false);
+  const allowMissingBackupProvider = toBooleanEnv(process.env.ALLOW_MISSING_BACKUP_PROVIDER_IN_PRODUCTION, false);
+  const missing = [];
+
+  if (storageProvider === "local" && !allowLocalStorage) {
+    throw new Error("[PRODUCTION] STORAGE_PROVIDER=local is blocked in production. Configure S3-compatible object storage or explicitly set ALLOW_LOCAL_STORAGE_IN_PRODUCTION=true for a temporary exception.");
+  }
+
+  if (storageProvider === "s3") {
+    for (const key of [
+      "STORAGE_S3_ENDPOINT",
+      "STORAGE_S3_REGION",
+      "STORAGE_S3_BUCKET",
+      "STORAGE_S3_ACCESS_KEY_ID",
+      "STORAGE_S3_SECRET_ACCESS_KEY",
+    ]) {
+      if (!process.env[key]) missing.push(key);
+    }
+  }
+
+  if (!toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false) && !allowMissingBackupProvider) {
+    missing.push("BACKUP_PROVIDER_ENABLED=true");
+  }
+  if (toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false) && !process.env.BACKUP_PROVIDER_OBJECT_PREFIX) {
+    missing.push("BACKUP_PROVIDER_OBJECT_PREFIX");
+  }
+
+  if (missing.length) {
+    throw new Error(`[PRODUCTION] Storage/DR guard failed. Missing required production storage configuration: ${missing.join(", ")}`);
+  }
+}
+
 if (IS_PRODUCTION) {
   const missing = [];
   if (!process.env.JWT_SECRET) missing.push("JWT_SECRET");
@@ -264,6 +306,8 @@ if (IS_PRODUCTION) {
   if (!process.env.JWT_SECRET) logger.warn("[SECURITY] JWT_SECRET is not set — using insecure default. Set it in .env before deploying.");
   if (!process.env.PEPPER_V1)  logger.warn("[SECURITY] PEPPER_V1 is not set — using insecure default. Set it in .env before deploying.");
 }
+
+assertProductionStorageReadiness();
 
 // ─── AUTH HELPERS ────────────────────────────────────────────────────────────
 const passwordService = createPasswordService({
@@ -524,7 +568,7 @@ const { buildCanonicalPassportPayload } = canonicalPassportSerializer;
 const signingService = createSigningService({
   pool,
   crypto,
-  canonicalize,
+  canonicalizeJson,
   didService,
   buildCanonicalPassportPayload,
 });
@@ -535,8 +579,13 @@ const { buildOperationalDppPayload } = createPassportRepresentationService({ pro
 
 // ─── BATTERY DICTIONARY SERVICE ──────────────────────────────────────────────
 const batteryDictionaryService = createBatteryDictionaryService();
-const complianceService = createComplianceService({ pool, batteryDictionaryService });
+const complianceService = createComplianceService({ pool, batteryDictionaryService, buildCanonicalPassportPayload });
 const accessRightsService = createAccessRightsService({ pool });
+const backupProviderService = createBackupProviderService({
+  pool,
+  storageService,
+  buildCanonicalPassportPayload,
+});
 
 // ─── PASSPORT SERVICE ────────────────────────────────────────────────────────
 const passportService = createPassportService({
@@ -827,7 +876,7 @@ registerPassportRoutes(app, {
   IN_REVISION_STATUSES_SQL, EDITABLE_RELEASE_STATUSES_SQL, REVISION_BLOCKING_STATUSES_SQL,
   EDIT_SESSION_TIMEOUT_HOURS, EDIT_SESSION_TIMEOUT_SQL, IN_REVISION_STATUS, SYSTEM_PASSPORT_FIELDS,
   getTable, normalizePassportRow, normalizeReleaseStatus, isEditablePassportStatus,
-  normalizeProductIdValue, generateProductIdValue, normalizePassportRequestBody,
+  normalizeProductIdValue, generateProductIdValue, normalizePassportRequestBody, extractExplicitFacilityId,
   getWritablePassportColumns, getStoredPassportValues, toStoredPassportValue,
   coerceBulkFieldValue, buildCurrentPublicPassportPath, buildInactivePublicPassportPath,
   buildPreviewPassportPath, isPublicHistoryStatus,
@@ -840,6 +889,7 @@ registerPassportRoutes(app, {
   stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
   submitPassportToWorkflow, signPassport,
   buildBatteryPassJsonExport, storageService, complianceService, accessRightsService, productIdentifierService,
+  backupProviderService,
 });
 
 registerPassportPublicRoutes(app, {
@@ -859,7 +909,7 @@ registerPassportPublicRoutes(app, {
 
 registerCompanyRoutes(app, {
   pool, authenticateToken, checkCompanyAccess, requireEditor, publicReadRateLimit,
-  getTable, getPassportTypeSchema, normalizePassportRequestBody,
+  getTable, getPassportTypeSchema, normalizePassportRequestBody, extractExplicitFacilityId,
   normalizeProductIdValue, normalizeReleaseStatus, isEditablePassportStatus,
   findExistingPassportByProductId, updatePassportRowById,
   getWritablePassportColumns, getStoredPassportValues,
@@ -870,7 +920,7 @@ registerCompanyRoutes(app, {
 registerDppApiRoutes(app, {
   pool, publicReadRateLimit, authenticateToken, requireEditor,
   getTable, normalizePassportRow,
-  normalizeProductIdValue,
+  normalizeProductIdValue, extractExplicitFacilityId,
   stripRestrictedFieldsForPublicView, getCompanyNameMap,
   resolveReleasedPassportByProductId,
   signingService,
@@ -884,6 +934,14 @@ registerDppApiRoutes(app, {
   isEditablePassportStatus,
   logAudit,
   accessRightsService,
+  normalizePassportRequestBody,
+  SYSTEM_PASSPORT_FIELDS,
+  getWritablePassportColumns,
+  toStoredPassportValue,
+  getPassportTypeSchema,
+  findExistingPassportByProductId,
+  complianceService,
+  backupProviderService,
 });
 
 registerDictionaryRoutes(app, { publicReadRateLimit, batteryDictionaryService });

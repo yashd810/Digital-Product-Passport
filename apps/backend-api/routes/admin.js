@@ -2,6 +2,7 @@
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs   = require("fs");
+const logger = require("../services/logger");
 
 const COMPANY_POLICY_DEFAULTS = {
   default_granularity: "item",
@@ -148,7 +149,7 @@ module.exports = function registerAdminRoutes(app, {
     try {
       const r = await pool.query("SELECT * FROM umbrella_categories ORDER BY name");
       res.json(r.rows);
-    } catch (e) { console.error("List umbrellas error:", e.message); res.status(500).json({ error: "Failed to fetch categories" }); }
+    } catch (e) { logger.error("List umbrellas error:", e.message); res.status(500).json({ error: "Failed to fetch categories" }); }
   });
 
   app.post("/api/admin/umbrella-categories", authenticateToken, isSuperAdmin, async (req, res) => {
@@ -202,7 +203,7 @@ module.exports = function registerAdminRoutes(app, {
         ORDER BY pt.umbrella_category, pt.display_name
       `);
       res.json(r.rows);
-    } catch (e) { console.error("List passport types error:", e.message); res.status(500).json({ error: "Failed to fetch passport types" }); }
+    } catch (e) { logger.error("List passport types error:", e.message); res.status(500).json({ error: "Failed to fetch passport types" }); }
   });
 
   // Public — used by PassportViewer and PassportForm
@@ -254,7 +255,7 @@ module.exports = function registerAdminRoutes(app, {
 
       res.json({ success: true, passportType: r.rows[0] });
     } catch (e) {
-      console.error("Patch passport type error:", e.message);
+      logger.error("Patch passport type error:", e.message);
       res.status(500).json({ error: "Failed to update passport type" });
     }
   });
@@ -289,7 +290,7 @@ module.exports = function registerAdminRoutes(app, {
 
       res.json({ success: true });
     } catch (e) {
-      console.error("Delete passport type error:", e.message);
+      logger.error("Delete passport type error:", e.message);
       res.status(500).json({ error: "Failed to delete passport type" });
     }
   });
@@ -346,7 +347,7 @@ module.exports = function registerAdminRoutes(app, {
       res.status(201).json({ success: true, passportType: r.rows[0] });
     } catch (e) {
       if (e.code === "23505") return res.status(400).json({ error: "A passport type with this type_name already exists" });
-      console.error("Create passport type error:", e.message);
+      logger.error("Create passport type error:", e.message);
       res.status(500).json({ error: "Failed to create passport type" });
     }
   });
@@ -438,7 +439,7 @@ module.exports = function registerAdminRoutes(app, {
       );
       res.status(201).json(r.rows[0]);
     } catch (e) {
-      console.error("Symbol upload error:", e.message);
+      logger.error("Symbol upload error:", e.message);
       res.status(500).json({ error: e.message || "Failed to upload symbol" });
     }
   });
@@ -546,7 +547,7 @@ module.exports = function registerAdminRoutes(app, {
 
       res.json({ success: true, company: updated.rows[0] });
     } catch (e) {
-      console.error("Asset management toggle error:", e.message);
+      logger.error("Asset management toggle error:", e.message);
       res.status(500).json({ error: "Failed to update Asset Management access" });
     }
   });
@@ -573,7 +574,7 @@ module.exports = function registerAdminRoutes(app, {
         ...policy,
       });
     } catch (e) {
-      console.error("DPP policy fetch error:", e.message);
+      logger.error("DPP policy fetch error:", e.message);
       res.status(500).json({ error: "Failed to fetch DPP policy" });
     }
   });
@@ -644,7 +645,7 @@ module.exports = function registerAdminRoutes(app, {
 
       res.json({ success: true, policy });
     } catch (e) {
-      console.error("DPP policy update error:", e.message);
+      logger.error("DPP policy update error:", e.message);
       res.status(500).json({ error: "Failed to update DPP policy" });
     }
   });
@@ -746,7 +747,7 @@ module.exports = function registerAdminRoutes(app, {
       });
     } catch (e) {
       try { await client.query("ROLLBACK"); } catch {}
-      console.error("Delete company error:", e.message);
+      logger.error("Delete company error:", e.message);
       res.status(500).json({ error: "Failed to delete company" });
     } finally {
       client.release();
@@ -818,7 +819,7 @@ module.exports = function registerAdminRoutes(app, {
           ` }),
         });
       } catch (mailErr) {
-        console.error("Super admin invite mail error:", mailErr.message);
+        logger.error("Super admin invite mail error:", mailErr.message);
         return res.status(201).json({
           success: true, emailSent: false, registerUrl,
           warning: "Invite created, but the email could not be sent.",
@@ -829,7 +830,7 @@ module.exports = function registerAdminRoutes(app, {
 
       res.status(201).json({ success: true, emailSent: true, message: `Invitation sent to ${inviteeEmail}` });
     } catch (e) {
-      console.error("Super admin invite error:", e.message);
+      logger.error("Super admin invite error:", e.message);
       res.status(500).json({ error: "Failed to send super admin invitation", detail: e.message });
     }
   });
@@ -876,7 +877,7 @@ module.exports = function registerAdminRoutes(app, {
         revokedCurrentSessionUser: !active && Number(userId) === Number(req.user.userId),
       });
     } catch (e) {
-      console.error("Super admin access update error:", e.message);
+      logger.error("Super admin access update error:", e.message);
       res.status(500).json({ error: "Failed to update super admin access" });
     }
   });
@@ -972,7 +973,7 @@ module.exports = function registerAdminRoutes(app, {
               total_count: stats.total, draft_count: stats.draft,
               released_count: stats.released, revised_count: stats.revised,
             });
-          } catch (e) { console.error(`Analytics error for ${company.id}/${typeAccess.type_name}:`, e.message); }
+          } catch (e) { logger.error(`Analytics error for ${company.id}/${typeAccess.type_name}:`, e.message); }
         }
 
         byCompany.push(compStats);
@@ -987,7 +988,7 @@ module.exports = function registerAdminRoutes(app, {
       byCompany.forEach(c => { c.total_passports += c.archived_count; });
 
       res.json({ overall, byCompany, byType, byUmbrella });
-    } catch (e) { console.error("Admin analytics error:", e.message); res.status(500).json({ error: "Failed to fetch analytics" }); }
+    } catch (e) { logger.error("Admin analytics error:", e.message); res.status(500).json({ error: "Failed to fetch analytics" }); }
   });
 
   app.get("/api/admin/companies/:companyId/analytics", authenticateToken, isSuperAdmin, async (req, res) => {
@@ -1059,7 +1060,7 @@ module.exports = function registerAdminRoutes(app, {
             trendSeriesMap[umbrella_category].monthlyCounts[key] =
               (trendSeriesMap[umbrella_category].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
           });
-        } catch (e) { console.error(`Per-company analytics error for ${companyId}/${type_name}:`, e.message); }
+        } catch (e) { logger.error(`Per-company analytics error for ${companyId}/${type_name}:`, e.message); }
       }
 
       const scanRes = await pool.query(
@@ -1140,7 +1141,7 @@ module.exports = function registerAdminRoutes(app, {
       });
     } catch (e) {
       if (e.code === "23505") return res.status(400).json({ error: "Access already granted" });
-      console.error("Grant access error:", e.message);
+      logger.error("Grant access error:", e.message);
       res.status(500).json({ error: "Failed to grant access" });
     }
   });
@@ -1168,7 +1169,7 @@ module.exports = function registerAdminRoutes(app, {
 
       res.json({ success: true });
     } catch (e) {
-      console.error("Revoke access error:", e.message);
+      logger.error("Revoke access error:", e.message);
       res.status(500).json({ error: "Failed to revoke access" });
     }
   });
@@ -1186,6 +1187,6 @@ module.exports = function registerAdminRoutes(app, {
       `, [req.params.companyId]);
 
       res.json(r.rows);
-    } catch (e) { console.error("passport-types fetch error:", e.message); res.status(500).json({ error: "Failed to fetch passport types" }); }
+    } catch (e) { logger.error("passport-types fetch error:", e.message); res.status(500).json({ error: "Failed to fetch passport types" }); }
   });
 };

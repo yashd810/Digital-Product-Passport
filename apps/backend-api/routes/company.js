@@ -1,6 +1,7 @@
 "use strict";
 
 const { v4: uuidv4 } = require("uuid");
+const logger = require("../services/logger");
 
 module.exports = function registerCompanyRoutes(app, {
   pool,
@@ -239,7 +240,7 @@ module.exports = function registerCompanyRoutes(app, {
       q += ` ORDER BY t.passport_type, t.name`;
       const r = await pool.query(q, params);
       res.json(r.rows);
-    } catch (e) { console.error(e); res.status(500).json({ error: "Failed" }); }
+    } catch (e) { logger.error(e); res.status(500).json({ error: "Failed" }); }
   });
 
   app.get("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -283,7 +284,7 @@ module.exports = function registerCompanyRoutes(app, {
         }
       }
       res.json(t.rows[0]);
-    } catch (e) { console.error(e); res.status(500).json({ error: "Failed" }); }
+    } catch (e) { logger.error(e); res.status(500).json({ error: "Failed" }); }
   });
 
   app.put("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -388,7 +389,7 @@ module.exports = function registerCompanyRoutes(app, {
       res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passport_type}_drafts.csv"`);
       res.send(csvLines.join("\n"));
     } catch (e) {
-      console.error("Export drafts error:", e.message);
+      logger.error("Export drafts error:", e.message);
       res.status(500).json({ error: "Export failed" });
     }
   });
@@ -580,7 +581,7 @@ module.exports = function registerCompanyRoutes(app, {
             created++;
           }
         } catch (e) {
-          console.error("Upsert CSV row error:", e.message);
+          logger.error("Upsert CSV row error:", e.message);
           details.push({ status: "failed", error: e.message });
           failed++;
         }
@@ -588,7 +589,7 @@ module.exports = function registerCompanyRoutes(app, {
 
       res.json({ summary: { created, updated, skipped, failed }, details });
     } catch (e) {
-      console.error("Upsert CSV error:", e.message);
+      logger.error("Upsert CSV error:", e.message);
       res.status(500).json({ error: "Import failed" });
     }
   });
@@ -763,7 +764,7 @@ module.exports = function registerCompanyRoutes(app, {
             created++;
           }
         } catch (e) {
-          console.error("Upsert JSON item error:", e.message);
+          logger.error("Upsert JSON item error:", e.message);
           details.push({ guid: incomingGuid, status: "failed", error: e.message });
           failed++;
         }
@@ -771,7 +772,7 @@ module.exports = function registerCompanyRoutes(app, {
 
       res.json({ summary: { created, updated, skipped, failed }, details });
     } catch (e) {
-      console.error("Upsert JSON error:", e.message);
+      logger.error("Upsert JSON error:", e.message);
       res.status(500).json({ error: "Import failed" });
     }
   });

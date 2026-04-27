@@ -1,5 +1,7 @@
 "use strict";
 
+const logger = require("../services/logger");
+
 function toDidSlug(value, fallback = "company") {
   const normalized = String(value || "")
     .normalize("NFKD")
@@ -223,6 +225,77 @@ async function initDb(pool, {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dpp_registry_registrations_company
       ON dpp_registry_registrations(company_id, registry_name)
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS backup_service_providers (
+      id                        SERIAL PRIMARY KEY,
+      company_id                INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      provider_key              VARCHAR(120) NOT NULL UNIQUE,
+      provider_type             VARCHAR(60) NOT NULL DEFAULT 'oci_object_storage',
+      display_name              VARCHAR(255) NOT NULL,
+      object_prefix             TEXT NOT NULL DEFAULT 'backup-provider',
+      public_base_url           TEXT,
+      supports_public_handover  BOOLEAN NOT NULL DEFAULT true,
+      config_json               JSONB NOT NULL DEFAULT '{}'::jsonb,
+      is_active                 BOOLEAN NOT NULL DEFAULT true,
+      is_backup_provider        BOOLEAN NOT NULL DEFAULT true,
+      created_by                INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_backup_service_providers_company
+      ON backup_service_providers(company_id, is_active, provider_key)
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_backup_replications (
+      id                  SERIAL PRIMARY KEY,
+      backup_provider_id  INTEGER REFERENCES backup_service_providers(id) ON DELETE SET NULL,
+      backup_provider_key VARCHAR(120) NOT NULL,
+      passport_guid       UUID NOT NULL REFERENCES passport_registry(guid) ON DELETE CASCADE,
+      lineage_id          UUID,
+      company_id          INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      passport_type       VARCHAR(100),
+      version_number      INTEGER NOT NULL DEFAULT 1,
+      dpp_id              TEXT,
+      snapshot_scope      VARCHAR(60) NOT NULL DEFAULT 'released_current',
+      replication_status  VARCHAR(40) NOT NULL DEFAULT 'pending',
+      storage_provider    VARCHAR(60),
+      storage_key         TEXT,
+      public_url          TEXT,
+      payload_hash        VARCHAR(64),
+      payload_json        JSONB NOT NULL DEFAULT '{}'::jsonb,
+      error_message       TEXT,
+      replicated_at       TIMESTAMPTZ,
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (backup_provider_key, passport_guid, version_number, snapshot_scope)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_backup_replications_passport
+      ON passport_backup_replications(company_id, passport_guid, version_number DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_backup_replications_status
+      ON passport_backup_replications(replication_status, updated_at DESC)
+  `);
+  await pool.query(`
+    ALTER TABLE passport_backup_replications
+    ADD COLUMN IF NOT EXISTS verification_status VARCHAR(40) NOT NULL DEFAULT 'pending'
+  `);
+  await pool.query(`
+    ALTER TABLE passport_backup_replications
+    ADD COLUMN IF NOT EXISTS verification_error_message TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE passport_backup_replications
+    ADD COLUMN IF NOT EXISTS verified_payload_hash VARCHAR(64)
+  `);
+  await pool.query(`
+    ALTER TABLE passport_backup_replications
+    ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ
   `);
 
   await pool.query(`
@@ -608,6 +681,10 @@ async function initDb(pool, {
   `);
   await pool.query(`
     ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS key_prefix VARCHAR(16)
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
     ADD COLUMN IF NOT EXISTS scopes TEXT[] NOT NULL DEFAULT ARRAY['dpp:read']::text[]
   `);
   await pool.query(`
@@ -624,6 +701,7 @@ async function initDb(pool, {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash    ON api_keys(key_hash)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_prefix   ON api_keys(key_prefix)`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_access_audiences (
@@ -1166,7 +1244,7 @@ async function initDb(pool, {
       is_model_data BOOLEAN DEFAULT FALSE,
       UNIQUE(template_id, field_key)
     );
-  `).catch(e => console.error("Template table init error:", e.message));
+  `).catch(e => logger.error("Template table init error:", e.message));
 
   // ── Messaging tables ─────────────────────────────────────────────────────
   await pool.query(`
@@ -1188,7 +1266,7 @@ async function initDb(pool, {
       body            TEXT NOT NULL,
       created_at      TIMESTAMPTZ DEFAULT NOW()
     );
-  `).catch(e => console.error("Messaging table init error:", e.message));
+  `).catch(e => logger.error("Messaging table init error:", e.message));
 
   // ── Password reset tokens ─────────────────────────────────────────────────
   await pool.query(`
@@ -1200,7 +1278,7 @@ async function initDb(pool, {
       expires_at TIMESTAMPTZ NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
-  `).catch(e => console.error("password_reset_tokens init error:", e.message));
+  `).catch(e => logger.error("password_reset_tokens init error:", e.message));
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user ON password_reset_tokens(user_id)
   `).catch(() => {});
@@ -1264,7 +1342,7 @@ async function initDb(pool, {
       is_public     BOOLEAN      NOT NULL DEFAULT false,
       created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
-  `).catch(e => console.error("passport_attachments init error:", e.message));
+  `).catch(e => logger.error("passport_attachments init error:", e.message));
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_attachments_guid
       ON passport_attachments(passport_guid)

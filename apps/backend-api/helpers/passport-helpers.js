@@ -80,6 +80,30 @@ const normalizeProductIdValue = (value) =>
 const generateProductIdValue = (guid) =>
   `PID-${String(guid || "").slice(0, 8)}`;
 
+const FACILITY_FIELD_CANDIDATES = [
+  "facility_id",
+  "facilityId",
+  "facility_identifier",
+  "facilityIdentifier",
+  "manufacturing_facility_id",
+  "manufacturingFacilityId",
+  "manufacturing_facility_identifier",
+  "manufacturingFacilityIdentifier",
+  "manufacturing_facility",
+  "manufacturingFacility",
+];
+
+const extractExplicitFacilityId = (source) => {
+  if (!source || typeof source !== "object") return null;
+  for (const key of FACILITY_FIELD_CANDIDATES) {
+    const value = source[key];
+    if (value === undefined || value === null) continue;
+    const normalized = String(value).trim();
+    if (normalized) return normalized;
+  }
+  return null;
+};
+
 // ─── COLUMN HELPERS ───────────────────────────────────────────────────────────
 
 const getWritablePassportColumns = (data, excluded = SYSTEM_PASSPORT_FIELDS) =>
@@ -159,22 +183,7 @@ const decodePathSegment = (value) => {
   }
 };
 
-const inferFacilityStableId = (passport) => {
-  if (!passport || typeof passport !== "object") return null;
-  const directCandidates = [
-    passport.facility_id,
-    passport.facility,
-    passport.manufacturing_facility_id,
-    passport.manufacturing_facility,
-  ].filter(Boolean);
-  if (directCandidates.length) return String(directCandidates[0]).trim() || null;
-
-  for (const [key, value] of Object.entries(passport)) {
-    if (!value || typeof value !== "string") continue;
-    if (/facility/i.test(key)) return value.trim() || null;
-  }
-  return null;
-};
+const inferFacilityStableId = (passport) => extractExplicitFacilityId(passport);
 
 async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didService }) {
   const rawPath = String(publicPath || "").trim();
@@ -468,6 +477,7 @@ module.exports = {
   normalizePassportRequestBody,
   normalizeProductIdValue,
   generateProductIdValue,
+  extractExplicitFacilityId,
   getWritablePassportColumns,
   getStoredPassportValues,
   slugifyRouteSegment,

@@ -1,3 +1,5 @@
+const logger = require("../services/logger");
+
 module.exports = function registerMessagingRoutes(app, {
   pool,
   authenticateToken,
@@ -38,7 +40,7 @@ module.exports = function registerMessagingRoutes(app, {
       );
       res.json(r.rows);
     } catch (e) {
-      console.error("List conversations error:", e.message);
+      logger.error("List conversations error:", e.message);
       res.status(500).json({ error: "Failed" });
     }
   });
@@ -84,7 +86,7 @@ module.exports = function registerMessagingRoutes(app, {
       }
       res.json({ id: convId });
     } catch (e) {
-      console.error("Create conversation error:", e.message);
+      logger.error("Create conversation error:", e.message);
       res.status(500).json({ error: "Failed" });
     }
   });
@@ -124,7 +126,7 @@ module.exports = function registerMessagingRoutes(app, {
       );
       res.json(r.rows.reverse());
     } catch (e) {
-      console.error("Get messages error:", e.message);
+      logger.error("Get messages error:", e.message);
       res.status(500).json({ error: "Failed" });
     }
   });
@@ -151,7 +153,7 @@ module.exports = function registerMessagingRoutes(app, {
       );
       res.json(r.rows[0]);
     } catch (e) {
-      console.error("Send message error:", e.message);
+      logger.error("Send message error:", e.message);
       res.status(500).json({ error: "Failed" });
     }
   });

@@ -1,3 +1,5 @@
+const logger = require("../services/logger");
+
 module.exports = function registerNotificationRoutes(app, {
   pool,
   authenticateToken,
@@ -55,7 +57,7 @@ module.exports = function registerNotificationRoutes(app, {
       );
       res.json(r.rows);
     } catch (e) {
-      console.error("Full notifications error:", e.message);
+      logger.error("Full notifications error:", e.message);
       res.status(500).json({ error: "Failed" });
     }
   });

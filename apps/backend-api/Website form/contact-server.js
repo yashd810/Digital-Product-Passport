@@ -190,7 +190,7 @@ app.post("/api/contact", async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    console.error("[contact-server] Error:", err.message);
+    logger.error("[contact-server] Error:", err.message);
     res.status(500).json({ error: "Failed to send. Please try again or email us directly." });
   }
 });
