@@ -34,17 +34,17 @@ module.exports = function createAssetService({
   ASSET_MATCH_FIELDS,
   ASSET_IGNORED_SYSTEM_COLUMNS,
   ASSET_SCHEDULER_INTERVAL_MS,
-  ASSET_SOURCE_ALLOWED_HOSTS,
+  ASSET_SOURCE_ALLOWED_HOSTS
 }) {
 
   // ─── SSRF protection helpers ────────────────────────────────────────────────
 
   const isLocalHostname = (hostname) => {
     const normalized = String(hostname || "").trim().toLowerCase().replace(/\.$/, "");
-    return normalized === "localhost"
-      || normalized === "localhost.localdomain"
-      || normalized.endsWith(".localhost")
-      || normalized.endsWith(".local");
+    return normalized === "localhost" ||
+    normalized === "localhost.localdomain" ||
+    normalized.endsWith(".localhost") ||
+    normalized.endsWith(".local");
   };
 
   const isPrivateIpAddress = (address) => {
@@ -55,28 +55,28 @@ module.exports = function createAssetService({
     if (family === 4) {
       const octets = normalized.split(".").map((part) => Number.parseInt(part, 10));
       const [a, b] = octets;
-      return a === 10
-        || a === 127
-        || a === 0
-        || (a === 100 && b >= 64 && b <= 127)
-        || (a === 169 && b === 254)
-        || (a === 172 && b >= 16 && b <= 31)
-        || (a === 192 && b === 168)
-        || (a === 198 && (b === 18 || b === 19));
+      return a === 10 ||
+      a === 127 ||
+      a === 0 ||
+      a === 100 && b >= 64 && b <= 127 ||
+      a === 169 && b === 254 ||
+      a === 172 && b >= 16 && b <= 31 ||
+      a === 192 && b === 168 ||
+      a === 198 && (b === 18 || b === 19);
     }
 
     if (family === 6) {
-      return normalized === "::1"
-        || normalized.startsWith("fc")
-        || normalized.startsWith("fd")
-        || normalized.startsWith("fe8")
-        || normalized.startsWith("fe9")
-        || normalized.startsWith("fea")
-        || normalized.startsWith("feb")
-        || normalized.startsWith("::ffff:127.")
-        || normalized.startsWith("::ffff:10.")
-        || normalized.startsWith("::ffff:192.168.")
-        || /^::ffff:172\.(1[6-9]|2\d|3[0-1])\./.test(normalized);
+      return normalized === "::1" ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd") ||
+      normalized.startsWith("fe8") ||
+      normalized.startsWith("fe9") ||
+      normalized.startsWith("fea") ||
+      normalized.startsWith("feb") ||
+      normalized.startsWith("::ffff:127.") ||
+      normalized.startsWith("::ffff:10.") ||
+      normalized.startsWith("::ffff:192.168.") ||
+      /^::ffff:172\.(1[6-9]|2\d|3[0-1])\./.test(normalized);
     }
 
     return true;
@@ -134,7 +134,7 @@ module.exports = function createAssetService({
         method,
         headers,
         signal: controller.signal,
-        redirect: "error",
+        redirect: "error"
       };
 
       if (!["GET", "HEAD"].includes(method) && sourceConfig.body !== undefined && sourceConfig.body !== "") {
@@ -151,15 +151,15 @@ module.exports = function createAssetService({
       const response = await fetch(parsedUrl, requestInit);
       const text = await response.text();
       let parsedPayload = text;
-      try { parsedPayload = text ? JSON.parse(text) : null; } catch {}
+      try {parsedPayload = text ? JSON.parse(text) : null;} catch {}
 
       if (!response.ok) {
         throw new Error(`ERP/API request failed (${response.status})`);
       }
 
-      let extracted = sourceConfig.recordPath
-        ? getValueAtPath(parsedPayload, sourceConfig.recordPath)
-        : parsedPayload;
+      let extracted = sourceConfig.recordPath ?
+      getValueAtPath(parsedPayload, sourceConfig.recordPath) :
+      parsedPayload;
 
       if (!Array.isArray(extracted) && isPlainObject(extracted)) {
         extracted = extracted.items || extracted.records || extracted.rows || extracted.data;
@@ -189,7 +189,7 @@ module.exports = function createAssetService({
         records,
         sample: records.slice(0, 3),
         endpoint: parsedUrl.toString(),
-        fetched_at: new Date().toISOString(),
+        fetched_at: new Date().toISOString()
       };
     } finally {
       clearTimeout(timeout);
@@ -207,13 +207,13 @@ module.exports = function createAssetService({
     const fieldMap = getAssetFieldMap(typeSchema);
     const currentRows = await getLatestCompanyPassports({
       companyId,
-      passportType: typeSchema.typeName,
+      passportType: typeSchema.typeName
     });
-    const currentByGuid = new Map(currentRows.map((row) => [row.guid, row]));
+    const currentByGuid = new Map(currentRows.map((row) => [row.dppId, row]));
     const currentByProductId = new Map(
-      currentRows
-        .filter((row) => normalizeProductIdValue(row.product_id))
-        .map((row) => [normalizeProductIdValue(row.product_id), row])
+      currentRows.
+      filter((row) => normalizeProductIdValue(row.product_id)).
+      map((row) => [normalizeProductIdValue(row.product_id), row])
     );
 
     const batchTargets = new Set();
@@ -226,7 +226,7 @@ module.exports = function createAssetService({
       ready_for_passport_update: 0,
       ready_for_dynamic_push: 0,
       skipped: 0,
-      failed: 0,
+      failed: 0
     };
 
     records.forEach((rawRecord, index) => {
@@ -236,45 +236,45 @@ module.exports = function createAssetService({
         return;
       }
 
-      const matchGuid = String(rawRecord.match_guid || rawRecord.guid || "").trim();
+      const matchGuid = String(rawRecord.match_dpp_id || rawRecord.dppId || "").trim();
       const matchProductId = normalizeProductIdValue(
-        rawRecord.match_product_id !== undefined
-          ? rawRecord.match_product_id
-          : (!matchGuid ? rawRecord.product_id : "")
+        rawRecord.match_product_id !== undefined ?
+        rawRecord.match_product_id :
+        !matchGuid ? rawRecord.product_id : ""
       );
 
       if (!matchGuid && !matchProductId) {
         details.push({
           row_index: index + 1,
           status: "failed",
-          error: "Each asset row needs guid, match_guid, product_id, or match_product_id",
+          error: "Each asset row needs dppId, match_dpp_id, product_id, or match_product_id"
         });
         summary.failed += 1;
         return;
       }
 
-      const matchedRow = matchGuid
-        ? currentByGuid.get(matchGuid)
-        : currentByProductId.get(matchProductId);
+      const matchedRow = matchGuid ?
+      currentByGuid.get(matchGuid) :
+      currentByProductId.get(matchProductId);
 
       if (!matchedRow) {
         details.push({
           row_index: index + 1,
-          guid: matchGuid || undefined,
+          dppId: matchGuid || undefined,
           product_id: matchProductId || undefined,
           status: "skipped",
-          reason: "No matching passport was found",
+          reason: "No matching passport was found"
         });
         summary.skipped += 1;
         return;
       }
 
-      if (batchTargets.has(matchedRow.guid)) {
+      if (batchTargets.has(matchedRow.dppId)) {
         details.push({
           row_index: index + 1,
-          guid: matchedRow.guid,
+          dppId: matchedRow.dppId,
           status: "failed",
-          error: "This passport is targeted more than once in the same asset batch",
+          error: "This passport is targeted more than once in the same asset batch"
         });
         summary.failed += 1;
         return;
@@ -348,14 +348,14 @@ module.exports = function createAssetService({
         } else {
           passportUpdate.product_id = normalizedNextProductId;
           const duplicate = currentByProductId.get(normalizedNextProductId);
-          if (duplicate && duplicate.guid !== matchedRow.guid) {
+          if (duplicate && duplicate.dppId !== matchedRow.dppId) {
             errors.push(`Serial Number "${normalizedNextProductId}" already belongs to another passport`);
           }
           const reservedGuid = batchProductIds.get(normalizedNextProductId);
-          if (reservedGuid && reservedGuid !== matchedRow.guid) {
+          if (reservedGuid && reservedGuid !== matchedRow.dppId) {
             errors.push(`Serial Number "${normalizedNextProductId}" is assigned twice in this batch`);
           } else {
-            batchProductIds.set(normalizedNextProductId, matchedRow.guid);
+            batchProductIds.set(normalizedNextProductId, matchedRow.dppId);
           }
         }
       }
@@ -363,10 +363,10 @@ module.exports = function createAssetService({
       if (errors.length) {
         details.push({
           row_index: index + 1,
-          guid: matchedRow.guid,
+          dppId: matchedRow.dppId,
           product_id: matchedRow.product_id,
           status: "failed",
-          error: errors.join("; "),
+          error: errors.join("; ")
         });
         summary.failed += 1;
         return;
@@ -375,29 +375,29 @@ module.exports = function createAssetService({
       if (!hasPassportUpdate && !hasDynamicValues) {
         details.push({
           row_index: index + 1,
-          guid: matchedRow.guid,
+          dppId: matchedRow.dppId,
           product_id: matchedRow.product_id,
           status: "skipped",
-          reason: "No changes detected for this row",
+          reason: "No changes detected for this row"
         });
         summary.skipped += 1;
         return;
       }
 
-      batchTargets.add(matchedRow.guid);
+      batchTargets.add(matchedRow.dppId);
       generatedRecords.push({
         row_index: index + 1,
-        matched_guid: matchedRow.guid,
+        matched_dpp_id: matchedRow.dppId,
         matched_product_id: matchedRow.product_id,
         matched_release_status: matchedRow.release_status,
         is_editable: matchedRow.is_editable,
         match: {
-          guid: matchGuid || null,
+          dppId: matchGuid || null,
           product_id: matchProductId || null,
-          matched_by: matchGuid ? "guid" : "product_id",
+          matched_by: matchGuid ? "dppId" : "product_id"
         },
         passport_update: passportUpdate,
-        dynamic_values: dynamicValues,
+        dynamic_values: dynamicValues
       });
 
       summary.ready += 1;
@@ -405,11 +405,11 @@ module.exports = function createAssetService({
       if (hasDynamicValues) summary.ready_for_dynamic_push += 1;
       details.push({
         row_index: index + 1,
-        guid: matchedRow.guid,
+        dppId: matchedRow.dppId,
         product_id: matchedRow.product_id,
         status: "ready",
         passport_fields: Object.keys(passportUpdate),
-        dynamic_fields: Object.keys(dynamicValues),
+        dynamic_fields: Object.keys(dynamicValues)
       });
     });
 
@@ -425,8 +425,8 @@ module.exports = function createAssetService({
         company_id: Number(companyId),
         passport_type: typeSchema.typeName,
         generated_at: new Date().toISOString(),
-        records: generatedRecords,
-      },
+        records: generatedRecords
+      }
     };
   }
 
@@ -442,19 +442,19 @@ module.exports = function createAssetService({
       passports_updated: 0,
       dynamic_fields_pushed: 0,
       skipped: 0,
-      failed: 0,
+      failed: 0
     };
     const details = [];
 
     for (const item of records) {
-      const matchedGuid = String(item.matched_guid || "").trim();
+      const matchedGuid = String(item.matched_dpp_id || "").trim();
       const passportUpdate = isPlainObject(item.passport_update) ? { ...item.passport_update } : {};
       const dynamicValues = isPlainObject(item.dynamic_values) ? { ...item.dynamic_values } : {};
       const detail = {
         row_index: item.row_index,
-        guid: matchedGuid || undefined,
+        dppId: matchedGuid || undefined,
         passport_fields: Object.keys(passportUpdate),
-        dynamic_fields: Object.keys(dynamicValues),
+        dynamic_fields: Object.keys(dynamicValues)
       };
 
       try {
@@ -463,7 +463,7 @@ module.exports = function createAssetService({
           const editable = await pool.query(
             `SELECT id
              FROM ${tableName}
-             WHERE guid = $1
+             WHERE dpp_id = $1
                AND company_id = $2
                AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}
                AND deleted_at IS NULL
@@ -486,7 +486,7 @@ module.exports = function createAssetService({
                 tableName,
                 companyId,
                 productId: normalizeProductIdValue(passportUpdate.product_id),
-                excludeGuid: matchedGuid,
+                excludeGuid: matchedGuid
               });
               if (duplicate) {
                 throw new Error(`Serial Number "${passportUpdate.product_id}" already belongs to another passport`);
@@ -497,7 +497,7 @@ module.exports = function createAssetService({
               tableName,
               rowId: editable.rows[0].id,
               userId,
-              data: passportUpdate,
+              data: passportUpdate
             });
 
             if (updatedFields.length) {
@@ -520,13 +520,13 @@ module.exports = function createAssetService({
         }
 
         const dynamicEntries = Object.entries(dynamicValues).filter(([fieldKey]) =>
-          /^[a-z][a-z0-9_]{0,99}$/.test(fieldKey)
+        /^[a-z][a-z0-9_]{0,99}$/.test(fieldKey)
         );
 
         if (dynamicEntries.length) {
           for (const [fieldKey, value] of dynamicEntries) {
             await pool.query(
-              `INSERT INTO passport_dynamic_values (passport_guid, field_key, value, updated_at)
+              `INSERT INTO passport_dynamic_values (passport_dpp_id, field_key, value, updated_at)
                VALUES ($1, $2, $3, NOW())`,
               [matchedGuid, fieldKey, toDynamicStoredValue(value)]
             );
@@ -552,14 +552,14 @@ module.exports = function createAssetService({
 
         details.push({
           ...detail,
-          status: detail.passport_status === "skipped" ? "partial" : "updated",
+          status: detail.passport_status === "skipped" ? "partial" : "updated"
         });
       } catch (error) {
         summary.failed += 1;
         details.push({
           ...detail,
           status: "failed",
-          error: error.message,
+          error: error.message
         });
       }
     }
@@ -576,7 +576,7 @@ module.exports = function createAssetService({
     status,
     summary,
     requestJson,
-    generatedJson,
+    generatedJson
   }) {
     const inserted = await pool.query(
       `INSERT INTO asset_management_runs
@@ -584,16 +584,16 @@ module.exports = function createAssetService({
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING id, created_at`,
       [
-        jobId,
-        companyId,
-        passportType || null,
-        triggerType,
-        sourceKind || null,
-        status,
-        summary ? JSON.stringify(summary) : null,
-        requestJson ? JSON.stringify(requestJson) : null,
-        generatedJson ? JSON.stringify(generatedJson) : null,
-      ]
+      jobId,
+      companyId,
+      passportType || null,
+      triggerType,
+      sourceKind || null,
+      status,
+      summary ? JSON.stringify(summary) : null,
+      requestJson ? JSON.stringify(requestJson) : null,
+      generatedJson ? JSON.stringify(generatedJson) : null]
+
     );
     return inserted.rows[0];
   }
@@ -621,16 +621,16 @@ module.exports = function createAssetService({
         sourceMeta: {
           endpoint: fetched.endpoint,
           fetched_at: fetched.fetched_at,
-          count: fetched.count,
-        },
+          count: fetched.count
+        }
       };
     }
 
     return {
       records: Array.isArray(job.records_json) ? job.records_json : [],
       sourceMeta: {
-        stored_records: Array.isArray(job.records_json) ? job.records_json.length : 0,
-      },
+        stored_records: Array.isArray(job.records_json) ? job.records_json.length : 0
+      }
     };
   }
 
@@ -646,25 +646,25 @@ module.exports = function createAssetService({
         companyId: job.company_id,
         passportType: job.passport_type,
         records: resolved.records,
-        options,
+        options
       });
       const pushResult = await executeAssetPush({
         companyId: job.company_id,
         generatedPayload: prepared.generated_payload,
         source: `asset_job:${job.id || "manual"}`,
-        userId,
+        userId
       });
 
-      const status = pushResult.summary.failed
-        ? (pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed")
-        : "success";
-      const nextRunAt = job.is_active
-        ? resolveAssetJobNextRunAt({
-            startAt: job.start_at || prepared.generated_at,
-            intervalMinutes: job.interval_minutes,
-            from: new Date(),
-          })
-        : null;
+      const status = pushResult.summary.failed ?
+      pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed" :
+      "success";
+      const nextRunAt = job.is_active ?
+      resolveAssetJobNextRunAt({
+        startAt: job.start_at || prepared.generated_at,
+        intervalMinutes: job.interval_minutes,
+        from: new Date()
+      }) :
+      null;
 
       if (job.id) {
         await pool.query(
@@ -677,12 +677,12 @@ module.exports = function createAssetService({
                updated_at = NOW()
            WHERE id = $1`,
           [
-            job.id,
-            status,
-            JSON.stringify(pushResult.summary),
-            nextRunAt,
-            nextRunAt ? true : false,
-          ]
+          job.id,
+          status,
+          JSON.stringify(pushResult.summary),
+          nextRunAt,
+          nextRunAt ? true : false]
+
         );
       }
 
@@ -696,25 +696,25 @@ module.exports = function createAssetService({
         summary: pushResult.summary,
         requestJson: {
           options,
-          sourceMeta: resolved.sourceMeta,
+          sourceMeta: resolved.sourceMeta
         },
-        generatedJson: prepared.generated_payload,
+        generatedJson: prepared.generated_payload
       });
 
       return {
         status,
         run,
         preview: prepared,
-        result: pushResult,
+        result: pushResult
       };
     } catch (error) {
-      const nextRunAt = job.is_active
-        ? resolveAssetJobNextRunAt({
-            startAt: job.start_at || new Date(),
-            intervalMinutes: job.interval_minutes,
-            from: new Date(),
-          })
-        : null;
+      const nextRunAt = job.is_active ?
+      resolveAssetJobNextRunAt({
+        startAt: job.start_at || new Date(),
+        intervalMinutes: job.interval_minutes,
+        from: new Date()
+      }) :
+      null;
 
       if (job.id) {
         await pool.query(
@@ -727,11 +727,11 @@ module.exports = function createAssetService({
                updated_at = NOW()
            WHERE id = $1`,
           [
-            job.id,
-            JSON.stringify({ error: error.message }),
-            nextRunAt,
-            nextRunAt ? true : false,
-          ]
+          job.id,
+          JSON.stringify({ error: error.message }),
+          nextRunAt,
+          nextRunAt ? true : false]
+
         );
       }
 
@@ -744,13 +744,13 @@ module.exports = function createAssetService({
         status: "failed",
         summary: { error: error.message },
         requestJson: { options },
-        generatedJson: null,
+        generatedJson: null
       });
 
       return {
         status: "failed",
         run,
-        error,
+        error
       };
     }
   }
@@ -797,6 +797,6 @@ module.exports = function createAssetService({
     resolveAssetJobRecords,
     runAssetManagementJob,
     processDueAssetJobs,
-    startAssetManagementScheduler,
+    startAssetManagementScheduler
   };
 };

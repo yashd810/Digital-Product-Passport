@@ -13,11 +13,11 @@ module.exports = function registerWorkflowRoutes(app, {
   logAudit,
   buildCurrentPublicPassportPath,
   createNotification,
-  complianceService,
+  complianceService
 }) {
-  const loadLivePassportRow = async ({ companyId, guid, passportType, status = null }) => {
+  const loadLivePassportRow = async ({ companyId, dppId: dppId, passportType, status = null }) => {
     const tableName = getTable(passportType);
-    const params = [guid];
+    const params = [dppId];
     let companyFilter = "";
     let statusFilter = "";
     if (companyId !== null && companyId !== undefined) {
@@ -32,7 +32,7 @@ module.exports = function registerWorkflowRoutes(app, {
     const result = await pool.query(
       `SELECT *
        FROM ${tableName}
-       WHERE guid = $1${companyFilter}${statusFilter}
+       WHERE dpp_id = $1${companyFilter}${statusFilter}
        ORDER BY version_number DESC
        LIMIT 1`,
       params
@@ -40,8 +40,8 @@ module.exports = function registerWorkflowRoutes(app, {
     return result.rows[0] || null;
   };
 
-  const evaluateWorkflowReleaseCompliance = async ({ companyId, guid, passportType, status = null }) => {
-    const passport = await loadLivePassportRow({ companyId, guid, passportType, status });
+  const evaluateWorkflowReleaseCompliance = async ({ companyId, dppId: dppId, passportType, status = null }) => {
+    const passport = await loadLivePassportRow({ companyId, dppId: dppId, passportType, status });
     if (!passport) return null;
     const compliance = await complianceService.evaluatePassport(
       { ...passport, passport_type: passportType },
@@ -54,25 +54,25 @@ module.exports = function registerWorkflowRoutes(app, {
     const enriched = [];
     for (const row of rows) {
       let info = {
-        model_name: row.passport_guid?.substring(0, 8) || "?",
+        model_name: row.passport_dpp_id?.substring(0, 8) || "?",
         version_number: 1,
         product_id: null,
-        release_status: null,
+        release_status: null
       };
       try {
         const regRow = await pool.query(
-          "SELECT passport_type FROM passport_registry WHERE guid = $1 LIMIT 1",
-          [row.passport_guid]
+          "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
+          [row.passport_dpp_id]
         );
         const actualType = regRow.rows[0]?.passport_type || row.passport_type;
         const tableName = getTable(actualType);
         const r = await pool.query(
           `SELECT model_name, version_number, product_id, release_status
            FROM ${tableName}
-           WHERE guid = $1
+           WHERE dpp_id = $1
            ORDER BY version_number DESC
            LIMIT 1`,
-          [row.passport_guid]
+          [row.passport_dpp_id]
         );
         if (r.rows.length) info = r.rows[0];
       } catch {}
@@ -81,16 +81,16 @@ module.exports = function registerWorkflowRoutes(app, {
     return enriched;
   };
 
-  app.post("/api/companies/:companyId/passports/:guid/submit-review", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/submit-review", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const { passportType, reviewerId, approverId } = req.body;
       if (!passportType) return res.status(400).json({ error: "passportType required" });
       if (!reviewerId && !approverId) {
         return res.status(400).json({ error: "Select at least one reviewer or approver for workflow submission." });
       }
 
-      const workflowTarget = await evaluateWorkflowReleaseCompliance({ companyId, guid, passportType });
+      const workflowTarget = await evaluateWorkflowReleaseCompliance({ companyId, dppId: dppId, passportType });
       if (!workflowTarget?.passport) {
         return res.status(404).json({ error: "Passport not found" });
       }
@@ -98,17 +98,17 @@ module.exports = function registerWorkflowRoutes(app, {
         return res.status(422).json({
           error: "Passport failed compliance validation. Fix the blocking issues before submitting it to workflow.",
           code: "PASSPORT_COMPLIANCE_FAILED",
-          compliance: workflowTarget.compliance,
+          compliance: workflowTarget.compliance
         });
       }
 
       const result = await submitPassportToWorkflow({
         companyId,
-        guid,
+        dppId: dppId,
         passportType,
         userId: req.user.userId,
         reviewerId,
-        approverId,
+        approverId
       });
       res.json({ success: true, workflowId: result.workflowId, compliance: workflowTarget.compliance });
     } catch (e) {
@@ -117,14 +117,14 @@ module.exports = function registerWorkflowRoutes(app, {
     }
   });
 
-  app.delete("/api/passports/:guid/workflow", authenticateToken, async (req, res) => {
+  app.delete("/api/passports/:dppId/workflow", authenticateToken, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const userId = req.user.userId;
 
       const wfRes = await pool.query(
-        "SELECT * FROM passport_workflow WHERE passport_guid = $1 ORDER BY created_at DESC LIMIT 1",
-        [guid]
+        "SELECT * FROM passport_workflow WHERE passport_dpp_id = $1 ORDER BY created_at DESC LIMIT 1",
+        [dppId]
       );
       if (!wfRes.rows.length) return res.status(404).json({ error: "No workflow found" });
       const wf = wfRes.rows[0];
@@ -138,8 +138,8 @@ module.exports = function registerWorkflowRoutes(app, {
       }
 
       const regRes = await pool.query(
-        "SELECT passport_type FROM passport_registry WHERE guid = $1 LIMIT 1",
-        [guid]
+        "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
+        [dppId]
       );
       const passportType = regRes.rows[0]?.passport_type || wf.passport_type;
 
@@ -147,8 +147,8 @@ module.exports = function registerWorkflowRoutes(app, {
         const tableName = getTable(passportType);
         const originalStatus = wf.previous_release_status || "in_revision";
         await pool.query(
-          `UPDATE ${tableName} SET release_status=$1, updated_at=NOW() WHERE guid=$2`,
-          [originalStatus, guid]
+          `UPDATE ${tableName} SET release_status=$1, updated_at=NOW() WHERE dpp_id=$2`,
+          [originalStatus, dppId]
         );
       }
 
@@ -160,9 +160,9 @@ module.exports = function registerWorkflowRoutes(app, {
     }
   });
 
-  app.post("/api/passports/:guid/workflow/:action", authenticateToken, async (req, res) => {
+  app.post("/api/passports/:dppId/workflow/:action", authenticateToken, async (req, res) => {
     try {
-      const { guid, action } = req.params;
+      const { dppId: dppId, action } = req.params;
       const { comment, passportType } = req.body;
       const userId = req.user.userId;
 
@@ -171,15 +171,15 @@ module.exports = function registerWorkflowRoutes(app, {
       }
 
       const wfRes = await pool.query(
-        "SELECT * FROM passport_workflow WHERE passport_guid = $1 AND overall_status = 'in_progress' ORDER BY created_at DESC LIMIT 1",
-        [guid]
+        "SELECT * FROM passport_workflow WHERE passport_dpp_id = $1 AND overall_status = 'in_progress' ORDER BY created_at DESC LIMIT 1",
+        [dppId]
       );
       if (!wfRes.rows.length) return res.status(404).json({ error: "No active workflow found for this passport" });
       const wf = wfRes.rows[0];
 
       const regRes = await pool.query(
-        "SELECT passport_type FROM passport_registry WHERE guid = $1 LIMIT 1",
-        [guid]
+        "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
+        [dppId]
       );
       const resolvedPassportType = regRes.rows[0]?.passport_type || wf.passport_type || passportType;
       if (!resolvedPassportType) return res.status(400).json({ error: "passportType required" });
@@ -196,12 +196,12 @@ module.exports = function registerWorkflowRoutes(app, {
         `SELECT p.model_name, p.product_id, p.version_number, c.company_name
          FROM ${tableName} p
          LEFT JOIN companies c ON c.id = p.company_id
-         WHERE p.guid = $1
+         WHERE p.dpp_id = $1
          ORDER BY p.version_number DESC
          LIMIT 1`,
-        [guid]
+        [dppId]
       );
-      const pInfo = pRes.rows[0] || { model_name: guid.substring(0, 8), product_id: null, version_number: 1, company_name: "" };
+      const pInfo = pRes.rows[0] || { model_name: dppId.substring(0, 8), product_id: null, version_number: 1, company_name: "" };
 
       if (action === "reject") {
         const col = isReviewer ? "review_status" : "approval_status";
@@ -213,8 +213,8 @@ module.exports = function registerWorkflowRoutes(app, {
         await pool.query(
           `UPDATE ${tableName}
            SET release_status = $2, updated_at = NOW()
-           WHERE guid=$1 AND release_status='in_review'`,
-          [guid, pInfo.version_number > 1 ? IN_REVISION_STATUS : "draft"]
+           WHERE dpp_id=$1 AND release_status='in_review'`,
+          [dppId, pInfo.version_number > 1 ? IN_REVISION_STATUS : "draft"]
         );
         if (wf.submitted_by) {
           const actor = await pool.query("SELECT first_name, last_name FROM users WHERE id=$1", [userId]);
@@ -224,7 +224,7 @@ module.exports = function registerWorkflowRoutes(app, {
             "workflow_rejected",
             `❌ ${pInfo.model_name} was rejected`,
             `${isReviewer ? "Review" : "Approval"} rejected by ${actorName}${comment ? ` — ${comment.substring(0, 80)}` : ""}`,
-            guid,
+            dppId,
             `/dashboard/passports/${resolvedPassportType}`
           );
         }
@@ -235,9 +235,9 @@ module.exports = function registerWorkflowRoutes(app, {
         if (!wf.approver_id || wf.approval_status === "skipped") {
           const reviewReleaseTarget = await evaluateWorkflowReleaseCompliance({
             companyId: wf.company_id,
-            guid,
+            dppId: dppId,
             passportType: resolvedPassportType,
-            status: "in_review",
+            status: "in_review"
           });
           if (!reviewReleaseTarget?.passport) {
             return res.status(404).json({ error: "Passport not found" });
@@ -246,7 +246,7 @@ module.exports = function registerWorkflowRoutes(app, {
             return res.status(422).json({
               error: "Passport still has blocking compliance issues. Fix them before final approval and release.",
               code: "PASSPORT_COMPLIANCE_FAILED",
-              compliance: reviewReleaseTarget.compliance,
+              compliance: reviewReleaseTarget.compliance
             });
           }
         }
@@ -257,8 +257,8 @@ module.exports = function registerWorkflowRoutes(app, {
         );
         if (!wf.approver_id || wf.approval_status === "skipped") {
           const relRes = await pool.query(
-            `UPDATE ${tableName} SET release_status='released', updated_at=NOW() WHERE guid=$1 AND release_status='in_review' RETURNING *`,
-            [guid]
+            `UPDATE ${tableName} SET release_status='released', updated_at=NOW() WHERE dpp_id=$1 AND release_status='in_review' RETURNING *`,
+            [dppId]
           );
           if (relRes.rows.length) {
             const released = relRes.rows[0];
@@ -266,18 +266,18 @@ module.exports = function registerWorkflowRoutes(app, {
             const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null);
             if (sigData) {
               await pool.query(
-                `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
-                [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+                `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
+                [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
               );
             }
-            await markOlderVersionsObsolete(tableName, guid, released.version_number);
+            await markOlderVersionsObsolete(tableName, dppId, released.version_number);
             await logAudit(
               wf.company_id,
               userId,
               "RELEASE",
               tableName,
-              guid,
+              dppId,
               { release_status: "in_review" },
               { release_status: "released", via: "workflow_review" }
             );
@@ -287,14 +287,14 @@ module.exports = function registerWorkflowRoutes(app, {
             const releasePath = buildCurrentPublicPassportPath({
               companyName: pInfo.company_name,
               modelName: pInfo.model_name,
-              productId: pInfo.product_id || guid,
+              productId: pInfo.product_id || dppId
             });
             await createNotification(
               wf.submitted_by,
               "workflow_approved",
               `✅ ${pInfo.model_name} reviewed and released!`,
               null,
-              guid,
+              dppId,
               releasePath
             );
           }
@@ -304,16 +304,16 @@ module.exports = function registerWorkflowRoutes(app, {
             "workflow_approval",
             `Approval needed: ${pInfo.model_name}`,
             "Review passed — your approval is required",
-            guid,
+            dppId,
             "/dashboard/workflow"
           );
         }
       } else if (isApprover) {
         const approvalReleaseTarget = await evaluateWorkflowReleaseCompliance({
           companyId: wf.company_id,
-          guid,
+          dppId: dppId,
           passportType: resolvedPassportType,
-          status: "in_review",
+          status: "in_review"
         });
         if (!approvalReleaseTarget?.passport) {
           return res.status(404).json({ error: "Passport not found" });
@@ -322,7 +322,7 @@ module.exports = function registerWorkflowRoutes(app, {
           return res.status(422).json({
             error: "Passport still has blocking compliance issues. Fix them before approval and release.",
             code: "PASSPORT_COMPLIANCE_FAILED",
-            compliance: approvalReleaseTarget.compliance,
+            compliance: approvalReleaseTarget.compliance
           });
         }
 
@@ -331,8 +331,8 @@ module.exports = function registerWorkflowRoutes(app, {
           [comment || null, wf.id]
         );
         const relRes = await pool.query(
-          `UPDATE ${tableName} SET release_status='released', updated_at=NOW() WHERE guid=$1 AND release_status='in_review' RETURNING *`,
-          [guid]
+          `UPDATE ${tableName} SET release_status='released', updated_at=NOW() WHERE dpp_id=$1 AND release_status='in_review' RETURNING *`,
+          [dppId]
         );
         if (relRes.rows.length) {
           const released = relRes.rows[0];
@@ -340,18 +340,18 @@ module.exports = function registerWorkflowRoutes(app, {
           const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null);
           if (sigData) {
             await pool.query(
-              `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
-              [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+              `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
+              [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
           }
-          await markOlderVersionsObsolete(tableName, guid, released.version_number);
+          await markOlderVersionsObsolete(tableName, dppId, released.version_number);
           await logAudit(
             wf.company_id,
             userId,
             "RELEASE",
             tableName,
-            guid,
+            dppId,
             { release_status: "in_review" },
             { release_status: "released", via: "workflow_approval" }
           );
@@ -360,14 +360,14 @@ module.exports = function registerWorkflowRoutes(app, {
           const releasePath = buildCurrentPublicPassportPath({
             companyName: pInfo.company_name,
             modelName: pInfo.model_name,
-            productId: pInfo.product_id || guid,
+            productId: pInfo.product_id || dppId
           });
           await createNotification(
             wf.submitted_by,
             "workflow_approved",
             `🚀 ${pInfo.model_name} approved and released!`,
             null,
-            guid,
+            dppId,
             releasePath
           );
         }
@@ -410,7 +410,7 @@ module.exports = function registerWorkflowRoutes(app, {
 
       res.json({
         inProgress: await enrichWorkflowRows(inProgress.rows),
-        history: await enrichWorkflowRows(history.rows),
+        history: await enrichWorkflowRows(history.rows)
       });
     } catch {
       res.status(500).json({ error: "Failed" });

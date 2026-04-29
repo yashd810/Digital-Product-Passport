@@ -16,41 +16,37 @@ tags:
   - name: DPP
   - name: Registry
 paths:
-  /api/v1/dpps/{productIdentifier}:
-    get:
+  /api/v1/dpps/{dppId}:
+    options:
       tags: [DPP]
-      summary: Read a released passport by product identifier
+      summary: Advertise supported patch media types for the DPP resource
       parameters:
-        - $ref: '#/components/parameters/ProductIdentifier'
-        - $ref: '#/components/parameters/CompanyIdQuery'
-        - $ref: '#/components/parameters/VersionNumberQuery'
-        - $ref: '#/components/parameters/RepresentationQuery'
+        - $ref: '#/components/parameters/DppIdPath'
       responses:
-        '200':
-          description: Passport payload
-          content:
-            application/json:
+        '204':
+          description: Patch capability metadata
+          headers:
+            Allow:
+              description: Supported methods for this resource path.
               schema:
-                $ref: '#/components/schemas/DppPayload'
-            application/ld+json:
+                type: string
+            Accept-Patch:
+              description: Supported patch document media types.
               schema:
-                $ref: '#/components/schemas/JsonLdPayload'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/AmbiguousProductIdentifier'
-        '500':
-          $ref: '#/components/responses/InternalError'
+                type: string
     patch:
       tags: [DPP]
       summary: Update an editable passport revision by DPP ID
       description: >
-        The path value must be a DPP DID for update operations. This route updates
-        the editable whole-passport revision rather than an individual data element.
+        The path value may be a strong DPP record identifier or a DPP DID. This
+        route updates the editable whole-passport revision rather than an individual
+        data element. The request body is treated as a partial JSON Merge Patch:
+        omitted fields are left unchanged. The API accepts both `application/json`
+        and RFC 7396 `application/merge-patch+json`.
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/ProductIdentifier'
+        - $ref: '#/components/parameters/DppIdPath'
       requestBody:
         required: true
         content:
@@ -58,21 +54,29 @@ paths:
             schema:
               type: object
               additionalProperties: true
+          application/merge-patch+json:
+            schema:
+              type: object
+              additionalProperties: true
       responses:
         '200':
           description: Updated editable passport payload
+          headers:
+            Accept-Patch:
+              description: Supported patch document media types.
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 type: object
-                required: [success, passportGuid, dppId, passport]
+                required: [success, dppId, digitalProductPassportId, passport]
                 properties:
                   success:
                     type: boolean
-                  passportGuid:
-                    type: string
-                    format: uuid
                   dppId:
+                    type: string
+                  digitalProductPassportId:
                     type: string
                   updatedFields:
                     type: array
@@ -82,6 +86,8 @@ paths:
                     $ref: '#/components/schemas/DppPayload'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '415':
+          description: Unsupported patch media type
         '403':
           description: Forbidden
         '404':
@@ -93,11 +99,14 @@ paths:
     delete:
       tags: [DPP]
       summary: Delete an editable passport revision by DPP ID
-      description: The path value must be a DPP DID for delete operations.
+      description: >
+        The path value may be a strong DPP record identifier or a DPP DID. This
+        operation is limited to editable draft/in-revision DPP rows. Released DPPs
+        must use the archive lifecycle action instead of DELETE.
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/ProductIdentifier'
+        - $ref: '#/components/parameters/DppIdPath'
       responses:
         '200':
           description: Delete result
@@ -105,15 +114,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [success, dppId, passportGuid]
+                required: [success, dppId, digitalProductPassportId]
                 properties:
                   success:
                     type: boolean
                   dppId:
                     type: string
-                  passportGuid:
+                  digitalProductPassportId:
                     type: string
-                    format: uuid
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -121,7 +129,55 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Editable passport conflict
+          description: >
+            Editable passport conflict or released DPP lifecycle conflict. When the
+            target DPP is already released, the response points clients to the
+            archive lifecycle endpoint.
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dpps/{dppId}/archive:
+    post:
+      tags: [DPP]
+      summary: Archive an active/released DPP as an end-of-life lifecycle action
+      description: >
+        Archives a released or inactive live DPP lineage without using DELETE.
+        This is the standards-facing end-of-life action for DPPs that are no
+        longer meant to remain active in the live registry surface.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DppIdPath'
+      responses:
+        '200':
+          description: DPP archived
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, lifecycleAction, lifecycleStatus, versionsArchived, dppId, digitalProductPassportId]
+                properties:
+                  success:
+                    type: boolean
+                  lifecycleAction:
+                    type: string
+                    enum: [archive]
+                  lifecycleStatus:
+                    type: string
+                    enum: [Archived]
+                  versionsArchived:
+                    type: integer
+                  dppId:
+                    type: string
+                  digitalProductPassportId:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Forbidden
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Ambiguous DPP identifier
         '500':
           $ref: '#/components/responses/InternalError'
   /api/v1/dpps:
@@ -156,14 +212,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [success, passportGuid, dppId, passport]
+                required: [success, dppId, digitalProductPassportId, passport]
                 properties:
                   success:
                     type: boolean
-                  passportGuid:
-                    type: string
-                    format: uuid
                   dppId:
+                    type: string
+                  digitalProductPassportId:
                     type: string
                   passport:
                     $ref: '#/components/schemas/DppPayload'
@@ -180,19 +235,69 @@ paths:
   /api/v1/dppsByProductIds:
     post:
       tags: [DPP]
-      summary: Batch read released passports by product identifier
+      summary: Resolve DPP IDs for multiple productId values
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [productIdentifiers]
+              required: [productId]
               properties:
-                productIdentifiers:
+                productId:
                   type: array
                   minItems: 1
-                  maxItems: 100
+                  maxItems: 1000
+                  items:
+                    type: string
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 100
+                cursor:
+                  type: string
+      responses:
+        '200':
+          description: DPP identifier lookup response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [identifiers, limit, cursor, nextCursor]
+                properties:
+                  identifiers:
+                    type: array
+                    items:
+                      type: string
+                  limit:
+                    type: integer
+                  cursor:
+                    type: string
+                    nullable: true
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/dppsByProductIds/search:
+    post:
+      tags: [DPP]
+      summary: Extension batch search that returns full passport payload results
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId]
+              properties:
+                productId:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
                   items:
                     type: string
                 companyId:
@@ -201,25 +306,40 @@ paths:
                   type: integer
                 representation:
                   type: string
-                  enum: [compressed, full]
+                  enum: [compressed, expanded]
                 format:
                   type: string
                   enum: [json, jsonld]
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 100
+                cursor:
+                  type: string
       responses:
         '200':
-          description: Batch lookup response
+          description: Batch payload lookup response
           content:
             application/json:
               schema:
                 type: object
-                required: [representation, format, results]
+                required: [representation, format, limit, cursor, nextCursor, results]
                 properties:
                   representation:
                     type: string
-                    enum: [compressed, full]
+                    enum: [compressed, expanded]
                   format:
                     type: string
                     enum: [json, jsonld]
+                  limit:
+                    type: integer
+                  cursor:
+                    type: string
+                    nullable: true
+                  nextCursor:
+                    type: string
+                    nullable: true
                   results:
                     type: array
                     items:
@@ -227,71 +347,26 @@ paths:
             application/ld+json:
               schema:
                 type: object
-                required: [representation, format, results]
+                required: [representation, format, limit, cursor, nextCursor, results]
                 properties:
                   representation:
                     type: string
-                    enum: [compressed, full]
+                    enum: [compressed, expanded]
                   format:
                     type: string
                     enum: [json, jsonld]
+                  limit:
+                    type: integer
+                  cursor:
+                    type: string
+                    nullable: true
+                  nextCursor:
+                    type: string
+                    nullable: true
                   results:
                     type: array
                     items:
                       $ref: '#/components/schemas/BatchLookupResult'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/InternalError'
-  /api/v1/dppIdsByProductIds:
-    post:
-      tags: [DPP]
-      summary: Resolve DPP identifiers for multiple product identifiers
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [productIdentifiers]
-              properties:
-                productIdentifiers:
-                  type: array
-                  minItems: 1
-                  maxItems: 100
-                  items:
-                    type: string
-                companyId:
-                  type: integer
-      responses:
-        '200':
-          description: DPP identifier lookup response
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [results]
-                properties:
-                  results:
-                    type: array
-                    items:
-                      type: object
-                      required: [productIdentifier, found]
-                      properties:
-                        productIdentifier:
-                          type: string
-                        found:
-                          type: boolean
-                        dppId:
-                          type: string
-                        uniqueProductIdentifier:
-                          type: string
-                        companyId:
-                          type: integer
-                        passportType:
-                          type: string
-                        error:
-                          type: string
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
@@ -299,15 +374,14 @@ paths:
   /api/v1/dppsByProductId/{productId}:
     get:
       tags: [DPP]
-      summary: Read a released passport by raw product identifier
+      summary: Read the current active/latest released passport by productId
+      description: >
+        Standards-conformant productId lookup route. Use `representation=expanded`
+        to receive the prEN 18223-style expanded payload with a Digital Product
+        Passport header plus `elements[]`. The legacy `representation=full`
+        value remains accepted as a backward-compatible alias.
       parameters:
-        - name: productId
-          in: path
-          required: true
-          schema:
-            type: string
-        - $ref: '#/components/parameters/CompanyIdQuery'
-        - $ref: '#/components/parameters/VersionNumberQuery'
+        - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/RepresentationQuery'
       responses:
         '200':
@@ -315,10 +389,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DppPayload'
+                oneOf:
+                  - $ref: '#/components/schemas/DppPayload'
+                  - $ref: '#/components/schemas/ExpandedDppPayload'
             application/ld+json:
               schema:
-                $ref: '#/components/schemas/JsonLdPayload'
+                oneOf:
+                  - $ref: '#/components/schemas/JsonLdPayload'
+                  - $ref: '#/components/schemas/ExpandedJsonLdPayload'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -350,16 +428,15 @@ paths:
           $ref: '#/components/responses/AmbiguousProductIdentifier'
         '500':
           $ref: '#/components/responses/InternalError'
-  /api/v1/dppsByIdAndDate/{dppId}:
+  /api/v1/dppsByProductIdAndDate/{productId}:
     get:
       tags: [DPP]
-      summary: Read a released passport version by DPP ID and date
+      summary: Read a released passport version by product ID and date
+      description: >
+        Standards-conformant productId-and-date lookup route. This route accepts
+        only the raw `productId` value plus a required ISO 8601 `date` query.
       parameters:
-        - name: dppId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/ProductIdPath'
         - name: date
           in: query
           required: true
@@ -383,14 +460,19 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalError'
-  /api/v1/dpps/{productIdentifier}/elements/{elementIdPath}:
+  /api/v1/dpps/{dppId}/elements/{elementIdPath}:
     get:
       tags: [DPP]
       summary: Read a specific passport data element from the canonical payload
+      description: >
+        Reads one DPP data element by `dppId` and element path. The current
+        implementation supports simple DPP element paths such as `manufacturer`,
+        `$.manufacturer`, `$.fields.manufacturer`, or bracketed equivalents like
+        `$['fields']['manufacturer']`. Full RFC 9535 JSONPath features such as
+        recursive descent, filters, slices, unions, and wildcards are not supported.
       parameters:
-        - $ref: '#/components/parameters/ProductIdentifier'
+        - $ref: '#/components/parameters/DppIdPath'
         - $ref: '#/components/parameters/ElementIdPath'
-        - $ref: '#/components/parameters/CompanyIdQuery'
       responses:
         '200':
           description: Element payload
@@ -418,16 +500,19 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/AmbiguousProductIdentifier'
+          description: Ambiguous DPP identifier
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/v1/dpps/{dppId}/elements/{elementIdPath}:
     patch:
       tags: [DPP]
       summary: Update a writable DPP data element on an editable passport revision
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/ProductIdentifier'
+        - $ref: '#/components/parameters/DppIdPath'
         - $ref: '#/components/parameters/ElementIdPath'
         - $ref: '#/components/parameters/CompanyIdQuery'
       requestBody:
@@ -436,9 +521,19 @@ paths:
           application/json:
             schema:
               type: object
-              required: [value]
               properties:
+                elementId:
+                  type: string
+                dictionaryReference:
+                  type: string
+                valueDataType:
+                  type: string
                 value: {}
+              required: [value]
+              description: >
+                Supports either a minimal body like `{ "value": ... }` or a fuller
+                DataElement-style body containing `elementId`, `dictionaryReference`,
+                `valueDataType`, and `value`.
       responses:
         '200':
           description: Updated element response
@@ -501,8 +596,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [success, registration, payload]
+                required: [statusCode, registrationId, success, registration, payload]
                 properties:
+                  statusCode:
+                    type: string
+                    enum: [SuccessCreated]
+                  registrationId:
+                    type: string
+                    description: Standards-friendly registry entry identifier such as `local:123`.
                   success:
                     type: boolean
                   registration:
@@ -528,13 +629,27 @@ components:
       in: header
       name: x-api-key
   parameters:
+    ProductIdPath:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Raw product ID value used for standards search endpoints.
     ProductIdentifier:
       name: productIdentifier
       in: path
       required: true
       schema:
         type: string
-      description: Raw product ID or canonical DID-based product identifier.
+      description: Legacy product identifier parameter used on compatibility routes.
+    DppIdPath:
+      name: dppId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Strong DPP record identifier or DPP DID for an editable passport revision.
     CompanyIdQuery:
       name: companyId
       in: query
@@ -559,14 +674,19 @@ components:
       required: false
       schema:
         type: string
-        enum: [compressed, full]
+        enum: [compressed, expanded]
+      description: >
+        Use `expanded` for the prEN 18223-style header plus `elements[]` export.
+        The legacy value `full` is also accepted as a backward-compatible alias.
     ElementIdPath:
       name: elementIdPath
       in: path
       required: true
       schema:
         type: string
-      description: Canonical field key or element identifier path.
+      description: >
+        Canonical field key or supported simple DPP element path. Full RFC 9535
+        JSONPath is not currently supported.
   schemas:
     DppPayload:
       type: object
@@ -590,6 +710,38 @@ components:
           properties:
             '@context': {}
         - $ref: '#/components/schemas/DppPayload'
+    ExpandedElement:
+      type: object
+      properties:
+        elementId:
+          type: string
+        objectType:
+          type: string
+        dictionaryReference:
+          type: string
+        valueDataType:
+          type: string
+        value: {}
+        elements:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpandedElement'
+      additionalProperties: true
+    ExpandedDppPayload:
+      allOf:
+        - $ref: '#/components/schemas/DppPayload'
+        - type: object
+          properties:
+            elements:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExpandedElement'
+    ExpandedJsonLdPayload:
+      allOf:
+        - type: object
+          properties:
+            '@context': {}
+        - $ref: '#/components/schemas/ExpandedDppPayload'
     BatchLookupResult:
       type: object
       required: [productIdentifier, found]

@@ -4,10 +4,54 @@ export const TRANS_LANGS = LANGUAGES.filter((language) => language.code !== "en"
 
 export const ACCESS_LEVELS = [
   { value: "public",              label: "Public" },
+  { value: "consumers",           label: "Consumers" },
+  { value: "economic_operator",   label: "Economic Operators" },
+  { value: "manufacturer",        label: "Manufacturers" },
+  { value: "authorized_representative", label: "Authorized Representatives" },
+  { value: "importer",            label: "Importers" },
+  { value: "distributor",         label: "Distributors" },
+  { value: "dealer",              label: "Dealers" },
+  { value: "fulfilment_service_provider", label: "Fulfilment Service Providers" },
+  { value: "delegated_operator",  label: "Delegated Operators" },
+  { value: "professional_repairer", label: "Professional Repairers" },
+  { value: "independent_operator", label: "Independent Operators" },
+  { value: "recycler",            label: "Recyclers" },
   { value: "notified_bodies",     label: "Notified Bodies" },
   { value: "market_surveillance", label: "Market Surveillance Authorities" },
+  { value: "customs_authority",   label: "Customs Authorities" },
   { value: "eu_commission",       label: "The EU Commission" },
+  { value: "main_dpp_service_provider", label: "Main DPP Service Providers" },
+  { value: "backup_dpp_service_provider", label: "Back-up DPP Service Providers" },
   { value: "legitimate_interest", label: "Person with Legitimate Interest" },
+];
+
+export const CONFIDENTIALITY_LEVELS = [
+  { value: "public", label: "Public" },
+  { value: "restricted", label: "Restricted" },
+  { value: "confidential", label: "Confidential" },
+  { value: "trade_secret", label: "Trade Secret" },
+  { value: "regulated", label: "Regulated" },
+];
+
+export const UPDATE_AUTHORITIES = [
+  { value: "economic_operator", label: "Economic Operators" },
+  { value: "manufacturer", label: "Manufacturers" },
+  { value: "authorized_representative", label: "Authorized Representatives" },
+  { value: "importer", label: "Importers" },
+  { value: "distributor", label: "Distributors" },
+  { value: "dealer", label: "Dealers" },
+  { value: "fulfilment_service_provider", label: "Fulfilment Service Providers" },
+  { value: "delegated_operator", label: "Delegated Operators" },
+  { value: "professional_repairer", label: "Professional Repairers" },
+  { value: "independent_operator", label: "Independent Operators" },
+  { value: "recycler", label: "Recyclers" },
+  { value: "notified_bodies", label: "Notified Bodies" },
+  { value: "market_surveillance", label: "Market Surveillance Authorities" },
+  { value: "customs_authority", label: "Customs Authorities" },
+  { value: "eu_commission", label: "The EU Commission" },
+  { value: "main_dpp_service_provider", label: "Main DPP Service Providers" },
+  { value: "backup_dpp_service_provider", label: "Back-up DPP Service Providers" },
+  { value: "system", label: "System" },
 ];
 
 export const FIELD_TYPES = [
@@ -144,5 +188,7 @@ export function newField(label = "") {
     label_i18n: {},
     type: "text",
     access: ["public"],
+    confidentiality: "public",
+    updateAuthority: ["economic_operator"],
   };
 }

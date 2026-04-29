@@ -95,10 +95,10 @@ export const generateQRCode = async ({ productId, companyName = "", modelName = 
  * Save QR code to database.
  * passportType is required so the server knows which table to update.
  */
-export const saveQRCodeToDatabase = async (guid, qrCodeDataUrl, passportType) => {
+export const saveQRCodeToDatabase = async (dppId, qrCodeDataUrl, passportType) => {
   try {
     if (!qrCodeDataUrl) return null;
-    const response = await fetch(`${API}/api/passports/${guid}/qrcode`, {
+    const response = await fetch(`${API}/api/passports/${dppId}/qrcode`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -120,9 +120,9 @@ export const saveQRCodeToDatabase = async (guid, qrCodeDataUrl, passportType) =>
 /**
  * Fetch QR code from database.
  */
-export const fetchQRCodeFromDatabase = async (guid) => {
+export const fetchQRCodeFromDatabase = async (dppId) => {
   try {
-    const response = await fetch(`${API}/api/passports/${guid}/qrcode`);
+    const response = await fetch(`${API}/api/passports/${dppId}/qrcode`);
 
     if (!response.ok) {
       if (response.status === 404) return null; // not yet generated — that's fine

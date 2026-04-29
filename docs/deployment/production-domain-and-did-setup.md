@@ -27,7 +27,7 @@ OCI backup provider notes:
 - the backup-provider service writes immutable passport snapshot JSON through the same S3-compatible storage layer already used for cloud files
 - in OCI Object Storage deployments, point the existing `STORAGE_S3_*` settings at the OCI compatibility endpoint and enable the backup provider with the `BACKUP_PROVIDER_*` env vars
 - release and archive flows now emit backup replication records, and company admins can manage provider metadata plus inspect replication history through the backend API
-- backup replications can now be re-verified through `POST /api/companies/:companyId/passports/:guid/backup-replications/verify`, which fetches the stored object and compares its payload hash against the recorded replication hash
+- backup replications can now be re-verified through `POST /api/companies/:companyId/passports/:dppId/backup-replications/verify`, which fetches the stored object and compares its payload hash against the recorded replication hash
 - the backend now refuses to boot in production when storage/DR guardrails are missing unless you explicitly set a temporary override environment variable
 
 Recommended domain layout:

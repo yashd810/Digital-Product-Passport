@@ -7,7 +7,8 @@ const LEGACY_IN_REVISION_STATUS = "revised";
 
 const SYSTEM_PASSPORT_FIELDS = new Set([
   "id",
-  "guid",
+  "dpp_id",
+  "dppId",
   "lineage_id",
   "company_id",
   "created_by",
@@ -49,8 +50,17 @@ const isEditablePassportStatus = (status) =>
 
 // ─── ROW NORMALIZATION ────────────────────────────────────────────────────────
 
-const normalizePassportRow = (row) =>
-  row ? { ...row, release_status: normalizeReleaseStatus(row.release_status) } : row;
+const normalizePassportRow = (row) => {
+  if (!row) return row;
+  const dppId = row.dppId ?? row.dpp_id ?? null;
+  const normalized = {
+    ...row,
+    dpp_id: row.dpp_id ?? dppId,
+    dppId,
+    release_status: normalizeReleaseStatus(row.release_status),
+  };
+  return normalized;
+};
 
 const toStoredPassportValue = (value) =>
   (Array.isArray(value) || (typeof value === "object" && value !== null))
@@ -68,17 +78,21 @@ const normalizePassportRequestBody = (body = {}) => {
   if (normalized.product_id === undefined && normalized.productId !== undefined) {
     normalized.product_id = normalized.productId;
   }
+  if (normalized.dpp_id === undefined) {
+    if (normalized.dppId !== undefined) normalized.dpp_id = normalized.dppId;
+  }
   delete normalized.passportType;
   delete normalized.modelName;
   delete normalized.productId;
+  delete normalized.dppId;
   return normalized;
 };
 
 const normalizeProductIdValue = (value) =>
   typeof value === "string" ? value.trim() : "";
 
-const generateProductIdValue = (guid) =>
-  `PID-${String(guid || "").slice(0, 8)}`;
+const generateProductIdValue = (dppId) =>
+  `PID-${String(dppId || "").replace(/^dpp_/i, "").slice(0, 8)}`;
 
 const FACILITY_FIELD_CANDIDATES = [
   "facility_id",
@@ -166,9 +180,9 @@ const buildPreviewPassportPath = ({
   manufacturedBy = "",
   modelName = "",
   productId = "",
-  fallbackGuid = "",
+  fallbackDppId = "",
 }) => {
-  const routeKey = normalizeProductIdValue(productId) || String(fallbackGuid || "").trim();
+  const routeKey = normalizeProductIdValue(productId) || String(fallbackDppId || "").trim();
   if (!routeKey) return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
   const modelSlug = slugifyRouteSegment(modelName || routeKey, "product");
@@ -220,7 +234,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
 
   for (const company of matchingCompanies) {
     const registryRows = await pool.query(
-      `SELECT guid, passport_type
+      `SELECT dpp_id AS "dppId", passport_type
        FROM passport_registry
        WHERE company_id = $1
        ORDER BY created_at DESC`,
@@ -241,7 +255,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
         }
 
         const row = await pool.query(
-          `SELECT guid, lineage_id, company_id, product_id, model_name, granularity, release_status, version_number, *
+          `SELECT dpp_id AS "dppId", lineage_id, company_id, product_id, model_name, granularity, release_status, version_number, *
            FROM ${tableName}
            WHERE company_id = $1
              AND product_id = $2
@@ -257,13 +271,13 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
         const actualModelSlug = slugifyRouteSegment(passport.model_name || passport.product_id, "product");
         if (actualModelSlug !== modelSlug) continue;
 
-        const stableId = didService.normalizeStableId(passport.lineage_id || passport.guid);
+        const stableId = didService.normalizeStableId(passport.lineage_id || passport.dppId);
         const granularity = didService.normalizeGranularity(passport.granularity || "model");
         const companySlug = didService.normalizeCompanySlug(company.did_slug || company.company_name || `company-${company.id}`);
         const facilityStableId = inferFacilityStableId(passport);
 
         return {
-          passportGuid: passport.guid,
+          passportDppId: passport.dppId,
           passportType: registryRow.passport_type,
           companyId: company.id,
           productDid: granularity === "item"
@@ -377,7 +391,7 @@ const isPlainObject = (value) =>
 const getAssetFieldMap = (typeSchema) => {
   const map = new Map();
   [
-    { key: "guid",       label: "Passport GUID",  type: "text", system: true },
+    { key: "dppId",      label: "Passport DPP ID",  type: "text", system: true },
     { key: "product_id", label: "Serial Number",  type: "text", system: true },
     { key: "model_name", label: "Model Name",     type: "text", system: true },
   ].forEach((field) => map.set(field.key, field));

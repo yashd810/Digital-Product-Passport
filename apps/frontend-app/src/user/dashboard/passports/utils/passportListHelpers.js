@@ -17,7 +17,7 @@ export function sortPassportsByVersionDesc(a, b) {
 export function getPassportGroupKey(passport) {
   if (passport?.lineage_id) return `lineage:${passport.lineage_id}`;
   if (passport?.product_id) return `product:${passport.passport_type || "passport"}:${passport.product_id}`;
-  return `guid:${passport?.guid || ""}`;
+  return `dppId:${passport?.dppId || ""}`;
 }
 
 export function parseCsvRow(line) {
@@ -77,8 +77,8 @@ export function calcCompleteness(passport, typeDefinitions = []) {
 export function dedupeLatestReleasedPassports(passports = []) {
   const latestByLineage = new Map();
   passports.forEach((passport) => {
-    if (!passport?.guid || !isReleasedPassportStatus(passport.release_status)) return;
-    const key = passport.lineage_id || passport.guid;
+    if (!passport?.dppId || !isReleasedPassportStatus(passport.release_status)) return;
+    const key = passport.lineage_id || passport.dppId;
     const current = latestByLineage.get(key);
     if (!current || Number(passport.version_number || 0) > Number(current.version_number || 0)) {
       latestByLineage.set(key, passport);

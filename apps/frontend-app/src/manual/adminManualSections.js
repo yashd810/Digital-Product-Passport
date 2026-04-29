@@ -453,7 +453,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       table: ASSET_MANAGEMENT_API_TABLE,
       warnings: [
         "Asset Management should only be enabled for companies that actually need high-volume operational updates.",
-        "Because this layer can update many passports in one run, support teams should ask companies to preview first and use stable match keys such as guid or product_id.",
+        "Because this layer can update many passports in one run, support teams should ask companies to preview first and use stable match keys such as dppId or product_id.",
       ],
     },
     {
@@ -485,7 +485,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Core tables", value: "26 named tables discovered in the current public schema, plus generated `<type>_passports` tables" },
         { label: "Catalog pattern", value: "Passport types define fields in `passport_types`, then runtime records live in type-specific passport tables" },
-        { label: "Key registry", value: "`passport_registry` connects GUID, company, passport type, and the hashed metadata for public access keys and device keys" },
+        { label: "Key registry", value: "`passport_registry` connects DPP ID, company, passport type, and the hashed metadata for public access keys and device keys" },
         { label: "API families", value: `${BACKEND_API_FAMILIES.length} major endpoint families mapped in this manual` },
       ],
       journeys: [

@@ -341,7 +341,7 @@ export default function CreateHub({ user, companyId }) {
                 <MethodCard
                   icon="🔧"
                   title="Import / update via JSON or CSV"
-                  description="Upload a JSON array or a CSV file to create new passports or update existing drafts. If a GUID is present in the file, the matching draft is updated instead of a new one created."
+                  description="Upload a JSON array or a CSV file to create new passports or update existing drafts. If a DPP ID is present in the file, the matching draft is updated instead of a new one created."
                   tag="Create + Update"
                   tagColor="blue"
                   onClick={() => navigate(`/csv-import/${selectedType.type_name}/update-csv`)}

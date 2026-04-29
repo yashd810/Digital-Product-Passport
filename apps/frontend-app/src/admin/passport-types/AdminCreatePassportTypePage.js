@@ -4,9 +4,11 @@ import { authHeaders } from "../../shared/api/authHeaders";
 import batteryDictionaryTerms from "../../shared/semantics/battery-dictionary-terms.generated.json";
 import {
   ACCESS_LEVELS,
+  CONFIDENTIALITY_LEVELS,
   FIELD_TYPES,
   ICON_PRESETS,
   TRANS_LANGS,
+  UPDATE_AUTHORITIES,
   buildSectionsFromCSV,
   downloadTemplate,
   newField,
@@ -39,6 +41,23 @@ function getSemanticModelLabel(modelKey) {
 
 function isBatteryDictionarySemanticModel(modelKey) {
   return String(modelKey || "").trim() === BATTERY_DICTIONARY_MODEL_KEY;
+}
+
+function normalizeCategoryKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isBatteryUmbrellaCategory(value) {
+  return normalizeCategoryKey(value).includes("battery");
+}
+
+function normalizeSemanticModelKeyForUmbrella(umbrellaCategory, semanticModelKey) {
+  if (isBatteryUmbrellaCategory(umbrellaCategory)) return BATTERY_DICTIONARY_MODEL_KEY;
+  return String(semanticModelKey || "").trim();
 }
 
 function batteryPassWords(value) {
@@ -320,9 +339,10 @@ function AdminCreatePassportType() {
   }, [success]);
 
   const applyDraft = (draft) => {
-    const nextSemanticModelKey = draft.semanticModelKey || "";
+    const nextUmbrella = draft.umbrella || "";
+    const nextSemanticModelKey = normalizeSemanticModelKeyForUmbrella(nextUmbrella, draft.semanticModelKey || "");
     setDisplayName(draft.displayName || "");
-    setUmbrella(draft.umbrella || "");
+    setUmbrella(nextUmbrella);
     setUmbrellaIcon(draft.umbrellaIcon || "📋");
     setSemanticModelKey(nextSemanticModelKey);
     setTypeName(draft.typeName || "");
@@ -419,9 +439,10 @@ function AdminCreatePassportType() {
     const ed = initialEditData.current;
     if (!ed) return;
     setDisplayName(ed.display_name || "");
-    setUmbrella(ed.umbrella_category || "");
+    const nextUmbrella = ed.umbrella_category || "";
+    setUmbrella(nextUmbrella);
     setUmbrellaIcon(ed.umbrella_icon || "📋");
-    const nextSemanticModelKey = ed.semantic_model_key || "";
+    const nextSemanticModelKey = normalizeSemanticModelKeyForUmbrella(nextUmbrella, ed.semantic_model_key || "");
     setSemanticModelKey(nextSemanticModelKey);
     setTypeName(ed.type_name || "");
     setTypeNameManual(true); // lock type_name, it cannot change
@@ -441,9 +462,10 @@ function AdminCreatePassportType() {
     if (!cd) return;
     cloneSourceTypeName.current = cd.type_name;
     setDisplayName(`Clone of ${cd.display_name || cd.type_name}`);
-    setUmbrella(cd.umbrella_category || "");
+    const nextUmbrella = cd.umbrella_category || "";
+    setUmbrella(nextUmbrella);
     setUmbrellaIcon(cd.umbrella_icon || "📋");
-    const nextSemanticModelKey = cd.semantic_model_key || "";
+    const nextSemanticModelKey = normalizeSemanticModelKeyForUmbrella(nextUmbrella, cd.semantic_model_key || "");
     setSemanticModelKey(nextSemanticModelKey);
     const clonedSections = (cd.fields_json?.sections || []).map(sec => rekeySection({
       ...sec,
@@ -460,6 +482,12 @@ function AdminCreatePassportType() {
       setTypeName(toSlug(displayName));
     }
   }, [displayName, typeNameManual]);
+
+  useEffect(() => {
+    if (!isBatteryUmbrellaCategory(umbrella)) return;
+    if (semanticModelKey === BATTERY_DICTIONARY_MODEL_KEY) return;
+    setSemanticModelKey(BATTERY_DICTIONARY_MODEL_KEY);
+  }, [umbrella, semanticModelKey]);
 
   useEffect(() => {
     setSections((currentSections) => syncSectionsWithSemanticModel(currentSections, semanticModelKey));
@@ -697,6 +725,11 @@ function AdminCreatePassportType() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return setError("Umbrella category is required.");
     }
+    if (isBatteryUmbrellaCategory(umbrella) && semanticModelKey !== BATTERY_DICTIONARY_MODEL_KEY) {
+      setInvalidFields(["semanticModelKey"]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError(`Battery passport types must use the "${BATTERY_DICTIONARY_MODEL_KEY}" semantic model.`);
+    }
     if (!editMode) {
       if (!typeName.trim()) {
         setInvalidFields(["typeName"]);
@@ -802,7 +835,7 @@ function AdminCreatePassportType() {
           display_name:      displayName,
           umbrella_category: umbrella,
           umbrella_icon:     umbrellaIcon,
-          semantic_model_key: semanticModelKey || null,
+          semantic_model_key: normalizeSemanticModelKeyForUmbrella(umbrella, semanticModelKey) || null,
           sections:          cleanSections,
         }),
       });
@@ -816,9 +849,9 @@ function AdminCreatePassportType() {
       setInvalidFields([]);
       if (!editMode) {
         setDisplayName("");
-        setUmbrella("");
-        setUmbrellaIcon("📋");
-        setSemanticModelKey("");
+          setUmbrella("");
+          setUmbrellaIcon("📋");
+          setSemanticModelKey("");
         setTypeName("");
         setTypeNameManual(false);
         setSections([newSection("General")]);
@@ -872,6 +905,7 @@ function AdminCreatePassportType() {
           setUmbrellaIcon={setUmbrellaIcon}
           semanticModelKey={semanticModelKey}
           setSemanticModelKey={setSemanticModelKey}
+          isBatteryUmbrellaCategory={isBatteryUmbrellaCategory(umbrella)}
           semanticModelOptions={SEMANTIC_MODEL_OPTIONS}
           umbrellaOptions={umbrellaOptions}
           typeName={typeName}
@@ -1125,6 +1159,47 @@ function AdminCreatePassportType() {
                                     : currentAccess.filter(a => a !== level.value);
                                   updateField(section._id, field._id, { access: next });
                                 }
+                              }}
+                            />
+                            <span>{level.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div className="acpt-field-access">
+                      <label className="acpt-access-check">
+                        <span>🧾 Confidentiality:</span>
+                        <select
+                          value={field.confidentiality || "public"}
+                          onChange={e => updateField(section._id, field._id, { confidentiality: e.target.value })}
+                        >
+                          {CONFIDENTIALITY_LEVELS.map(level => (
+                            <option key={level.value} value={level.value}>
+                              {level.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="acpt-field-access">
+                      <span className="acpt-access-label">✍️ Update Authority:</span>
+                      {UPDATE_AUTHORITIES.map(level => {
+                        const currentAuthorities = field.updateAuthority || ["economic_operator"];
+                        const isChecked = currentAuthorities.includes(level.value);
+                        return (
+                          <label key={level.value} className="acpt-access-check">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => {
+                                const next = e.target.checked
+                                  ? [...new Set([...currentAuthorities, level.value])]
+                                  : currentAuthorities.filter(a => a !== level.value);
+                                updateField(section._id, field._id, {
+                                  updateAuthority: next.length ? next : ["economic_operator"],
+                                });
                               }}
                             />
                             <span>{level.label}</span>

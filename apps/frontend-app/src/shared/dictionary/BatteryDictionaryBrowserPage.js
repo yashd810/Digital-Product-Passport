@@ -183,6 +183,22 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath }) 
             </a>
             <p>The shared context provides the canonical namespace and type declarations for battery exports.</p>
           </div>
+
+          <div className="dictionary-side-card dictionary-side-card-plain">
+            <h2>Governance and traceability</h2>
+            <p>
+              {manifest?.authority?.derivationNotice
+                || "This dictionary is a Claros-maintained derived implementation vocabulary."}
+            </p>
+            <div className="dictionary-footer-links">
+              <a href={manifest?.categoryRulesUrl || `${API}/api/dictionary/battery/v1/category-rules`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                Category rules
+              </a>
+              <a href={manifest?.termsUrl || `${API}/api/dictionary/battery/v1/terms`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                Terms JSON
+              </a>
+            </div>
+          </div>
         </aside>
       </div>
     </>
@@ -343,6 +359,34 @@ export default function BatteryDictionaryBrowserPage() {
               {manifest?.baseIri}
             </a>
             <p>Use this as the canonical namespace for exported battery passport semantics.</p>
+          </div>
+
+          <div className="dictionary-side-card dictionary-side-card-plain">
+            <h2>Authority</h2>
+            <p>{manifest?.authority?.officialStatus || "implementation-vocabulary"}</p>
+            <p>
+              Source: {manifest?.authority?.normativeSource?.title || "BatteryPass source material"}
+              {manifest?.authority?.normativeSource?.version ? ` v${manifest.authority.normativeSource.version}` : ""}
+            </p>
+          </div>
+
+          <div className="dictionary-side-card dictionary-side-card-plain">
+            <h2>Governance</h2>
+            <p>Steward: {manifest?.governance?.steward?.name || manifest?.publisher?.name || "Claros DPP"}</p>
+            <p>{manifest?.governance?.changeControl || "Versioned static artifacts with repository-based change control."}</p>
+          </div>
+
+          <div className="dictionary-side-card dictionary-side-card-plain">
+            <h2>Regulatory traceability</h2>
+            <p>{manifest?.regulatoryTraceability?.traceabilityMethod || "Term-level source and regulation metadata are published with the dictionary artifacts."}</p>
+            <div className="dictionary-footer-links">
+              <a href={manifest?.categoryRulesUrl || `${API}/api/dictionary/battery/v1/category-rules`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                Category rules
+              </a>
+              <a href={`${API}/api/dictionary/battery/v1/field-map`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                Field map
+              </a>
+            </div>
           </div>
         </aside>
       </div>

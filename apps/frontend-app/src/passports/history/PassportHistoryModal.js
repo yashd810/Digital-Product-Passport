@@ -20,7 +20,7 @@ function formatHistoryDate(value) {
 }
 
 function PassportHistoryModal({
-  guid,
+  dppId,
   productId = "",
   passportType,
   companyId = null,
@@ -41,7 +41,7 @@ function PassportHistoryModal({
       setError("");
       try {
         const endpoint = isCompanyMode
-          ? `${API}/api/companies/${companyId}/passports/${guid}/history`
+          ? `${API}/api/companies/${companyId}/passports/${dppId}/history`
           : `${API}/api/passports/by-product/${encodeURIComponent(productId)}/history`;
         const response = await fetch(endpoint, isCompanyMode ? { headers: authHeaders() } : undefined);
         const data = await response.json().catch(() => ({}));
@@ -56,7 +56,7 @@ function PassportHistoryModal({
 
     loadHistory();
     return () => { active = false; };
-  }, [companyId, guid, isCompanyMode, productId]);
+  }, [companyId, dppId, isCompanyMode, productId]);
 
   const toggleVisibility = async (entry) => {
     if (!isCompanyMode || !isPublicHistoryStatus(entry.release_status)) return;
@@ -64,7 +64,7 @@ function PassportHistoryModal({
     setError("");
     try {
       const response = await fetch(
-        `${API}/api/companies/${companyId}/passports/${guid}/history/${entry.version_number}`,
+        `${API}/api/companies/${companyId}/passports/${dppId}/history/${entry.version_number}`,
         {
           method: "PATCH",
           headers: authHeaders({ "Content-Type": "application/json" }),

@@ -13,7 +13,7 @@ const AUTOSAVE_DEBOUNCE_MS = 2000;
 function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { guid, passportType: typeParam } = useParams();
+  const { dppId, passportType: typeParam } = useParams();
 
   const passportType = typeProp || typeParam ||
     new URLSearchParams(location.search).get("passportType");
@@ -135,11 +135,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   }, [mode, templateId, companyId]);
 
   useEffect(() => {
-    if (mode !== "edit" || !guid || !passportType) return;
+    if (mode !== "edit" || !dppId || !passportType) return;
     (async () => {
       try {
         const r = await fetch(
-          `${API}/api/companies/${companyId}/passports/${guid}?passportType=${passportType}`,
+          `${API}/api/companies/${companyId}/passports/${dppId}?passportType=${passportType}`,
           { headers: authHeaders() }
         );
         if (!r.ok) throw new Error("Failed to load passport");
@@ -152,7 +152,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       } catch (e) { setError(e.message); }
       finally { setIsLoading(false); }
     })();
-  }, [guid, mode, passportType, companyId, token]);
+  }, [dppId, mode, passportType, companyId, token]);
 
   const toggle      = (k)        => setExpanded(p => ({ ...p, [k]: !p[k] }));
   const handleField = (key, val) => {
@@ -185,7 +185,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const buildEditableBody = () => {
     const NON_SCHEMA = new Set([
-      "id","guid","company_id","created_by","created_at","passport_type",
+      "id","dppId","company_id","created_by","created_at","passport_type",
       "version_number","release_status","deleted_at","qr_code",
       "created_by_email","first_name","last_name","updated_by","updated_at",
       "model_name","product_id",  // handled explicitly below — must not be overridden by cleanData
@@ -204,7 +204,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const refreshEditPresence = async (method = "GET") => {
-    if (mode !== "edit" || !guid || !passportType || !companyId) return;
+    if (mode !== "edit" || !dppId || !passportType || !companyId) return;
     const init = method === "POST"
       ? {
           method,
@@ -215,7 +215,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           method,
           headers: authHeaders(),
         };
-    const r = await fetch(`${API}/api/companies/${companyId}/passports/${guid}/edit-session`, init);
+    const r = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}/edit-session`, init);
     if (!r.ok) throw new Error("Failed to update edit presence");
     const data = await r.json();
     if (mountedRef.current) {
@@ -226,9 +226,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const releaseEditPresence = async () => {
-    if (mode !== "edit" || !guid || !companyId || !sessionActiveRef.current) return;
+    if (mode !== "edit" || !dppId || !companyId || !sessionActiveRef.current) return;
     try {
-      await fetch(`${API}/api/companies/${companyId}/passports/${guid}/edit-session`, {
+      await fetch(`${API}/api/companies/${companyId}/passports/${dppId}/edit-session`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -237,14 +237,14 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const saveEditChanges = async ({ showSuccessMessage = false } = {}) => {
-    if (mode !== "edit" || !guid || !passportType || saveInFlightRef.current) return false;
+    if (mode !== "edit" || !dppId || !passportType || saveInFlightRef.current) return false;
 
     saveInFlightRef.current = true;
     if (mountedRef.current) setAutoSaveState("saving");
 
     try {
       const body = buildEditableBody();
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${guid}`, {
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}`, {
         method:"PATCH",
         headers: authHeaders({ "Content-Type":"application/json" }),
         body: JSON.stringify(body),
@@ -257,7 +257,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       const uploadedKeys = [];
       for (const [key, file] of Object.entries(fileSelections)) {
         if (file) {
-          await uploadFile(key, file, guid);
+          await uploadFile(key, file, dppId);
           uploadedKeys.push(key);
         }
       }
@@ -291,7 +291,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   useEffect(() => {
-    if (mode !== "edit" || !guid || !passportType || !companyId || isLoading) return;
+    if (mode !== "edit" || !dppId || !passportType || !companyId || isLoading) return;
 
     refreshEditPresence("POST").catch(() => {});
 
@@ -331,23 +331,23 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       window.removeEventListener("scroll", handleActivity);
       releaseEditPresence();
     };
-  }, [mode, guid, passportType, companyId, isLoading, sessionExpired]);
+  }, [mode, dppId, passportType, companyId, isLoading, sessionExpired]);
 
   useEffect(() => {
-    if (mode !== "edit" || !guid || !passportType || isLoading || !dirtyRef.current) return;
+    if (mode !== "edit" || !dppId || !passportType || isLoading || !dirtyRef.current) return;
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
       saveEditChanges();
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [mode, guid, passportType, companyId, modelName, productId, formData, fileSelections, isLoading]);
+  }, [mode, dppId, passportType, companyId, modelName, productId, formData, fileSelections, isLoading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(""); setSuccess(""); setIsSaving(true);
 
     try {
-      let passportGuid = guid;
+      let passportDppId = dppId;
       const trimmedProductId = productId.trim();
 
       if (mode === "create") {
@@ -369,7 +369,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         });
         if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Failed to create"); }
         const { passport } = await r.json();
-        passportGuid = passport.guid;
+        passportDppId = passport.dppId;
       } else {
         const saved = await saveEditChanges({ showSuccessMessage: false });
         if (!saved) throw new Error("Failed to update");
@@ -377,7 +377,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
       if (mode === "create") {
         for (const [key, file] of Object.entries(fileSelections)) {
-          if (file) await uploadFile(key, file, passportGuid);
+          if (file) await uploadFile(key, file, passportDppId);
         }
         setFileSelections({});
         window.scrollTo({ top: 0, behavior: "smooth" });

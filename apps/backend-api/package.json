@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node Server/server.js",
     "dev": "nodemon Server/server.js",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "generate:battery-dictionary": "node ../../scripts/generate-battery-dictionary.js"
   },
   "keywords": [],
   "author": "",

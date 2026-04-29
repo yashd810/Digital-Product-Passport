@@ -6,7 +6,31 @@ const DPP_CONTEXT = {
   "@version": 1.1,
   dpp: "https://schema.digitalproductpassport.eu/ns/dpp#",
   DigitalProductPassport: "dpp:DigitalProductPassport",
-  guid: "dpp:guid",
+  digitalProductPassportId: "dpp:digitalProductPassportId",
+  uniqueProductIdentifier: "dpp:uniqueProductIdentifier",
+  granularity: "dpp:granularity",
+  dppSchemaVersion: "dpp:dppSchemaVersion",
+  dppStatus: "dpp:dppStatus",
+  lastUpdated: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+  lastUpdate: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+  economicOperatorId: "dpp:economicOperatorId",
+  facilityId: "dpp:facilityId",
+  contentSpecificationIds: "dpp:contentSpecificationIds",
+  subjectDid: "dpp:subjectDid",
+  dppDid: "dpp:dppDid",
+  companyDid: "dpp:companyDid",
+  elements: "dpp:elements",
+  elementId: "dpp:elementId",
+  objectType: "dpp:objectType",
+  dictionaryReference: { "@id": "dpp:dictionaryReference", "@type": "@id" },
+  valueDataType: "dpp:valueDataType",
+  value: "dpp:value",
+  extensions: "dpp:extensions",
+  claros: "dpp:claros",
+  passportType: "dpp:passportType",
+  versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+  internalId: "dpp:internalId",
+  dppId: "dpp:dppId",
   passport_type: "dpp:passportType",
   semantic_model: "dpp:semanticModel",
   model_name: "dpp:modelName",
@@ -22,14 +46,29 @@ function normalizeSemanticModelKey(modelKey) {
   return String(modelKey || "").trim().toLowerCase();
 }
 
+function normalizeCategoryKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isBatteryUmbrellaCategory(umbrellaCategory) {
+  const normalized = normalizeCategoryKey(umbrellaCategory);
+  return Boolean(normalized) && normalized.includes("battery");
+}
+
 export function isBatteryPassExportType(passportType) {
   return String(passportType || "").trim().toLowerCase() === BATTERY_PASS_PASSPORT_TYPE;
 }
 
 function shouldUseBatteryDictionary(passportType, options = {}) {
-  if (!isBatteryPassExportType(passportType)) return false;
+  if (isBatteryUmbrellaCategory(options.umbrellaCategory)) return true;
   const modelKey = normalizeSemanticModelKey(options.semanticModelKey);
-  return !modelKey || modelKey === BATTERY_PASS_MODEL_KEY;
+  if (modelKey === BATTERY_PASS_MODEL_KEY) return true;
+  if (modelKey) return isBatteryPassExportType(passportType);
+  return isBatteryPassExportType(passportType);
 }
 
 function sanitizePassport(passport, passportType) {
@@ -66,7 +105,7 @@ export function buildPassportJsonLdExport(passports, passportType) {
     "@graph": graph,
     ...(shouldUseBatteryDictionary(resolvedType, options)
       ? {
-          passport_type: BATTERY_PASS_PASSPORT_TYPE,
+          passport_type: resolvedType || graph[0]?.passport_type || null,
           semantic_model: {
             semanticModelKey: BATTERY_PASS_MODEL_KEY,
             contextUrl: BATTERY_CONTEXT_URL,

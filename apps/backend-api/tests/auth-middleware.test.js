@@ -20,6 +20,65 @@ function createResponse() {
 }
 
 describe("auth middleware API key migration", () => {
+  test("attaches the company economic operator identifier to authenticated JWT users", async () => {
+    const pool = {
+      query: jest.fn(async (sql, params = []) => {
+        if (String(sql).includes("FROM users u") && String(sql).includes("LEFT JOIN companies c")) {
+          return {
+            rows: [{
+              id: 9,
+              email: "editor@example.test",
+              company_id: 5,
+              role: "company_admin",
+              is_active: true,
+              session_version: 3,
+              economic_operator_identifier: "did:web:www.example.test:did:company:5",
+              economic_operator_identifier_scheme: "did",
+            }],
+          };
+        }
+        if (String(sql).includes("FROM user_access_audiences")) {
+          return { rows: [{ audience: "notified_bodies" }] };
+        }
+        throw new Error(`Unexpected query: ${sql} :: ${params.join(",")}`);
+      }),
+    };
+
+    const { authenticateToken } = createAuthMiddleware({
+      jwt: {
+        verify: jest.fn(() => ({ userId: 9, sessionVersion: 3 })),
+      },
+      crypto,
+      pool,
+      JWT_SECRET: "test",
+      SESSION_COOKIE_NAME: "sid",
+    });
+
+    const req = {
+      headers: {
+        authorization: "Bearer token-value",
+      },
+    };
+    const res = createResponse();
+    let nextCalled = false;
+
+    await authenticateToken(req, res, () => {
+      nextCalled = true;
+    });
+
+    expect(nextCalled).toBe(true);
+    expect(req.user).toMatchObject({
+      userId: 9,
+      companyId: 5,
+      role: "company_admin",
+      actorIdentifier: "did:web:www.example.test:did:company:5",
+      actorIdentifierScheme: "did",
+      economicOperatorIdentifier: "did:web:www.example.test:did:company:5",
+      economicOperatorIdentifierScheme: "did",
+      accessAudiences: ["notified_bodies"],
+    });
+  });
+
   test("upgrades legacy SHA-256 API keys to salted HMAC-SHA256 after a successful auth", async () => {
     const rawKey = "dpp_legacy_key_for_tests";
     const legacyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
@@ -37,14 +96,16 @@ describe("auth middleware API key migration", () => {
               id: 7,
               company_id: 5,
               scopes: ["dpp:read"],
-              expires_at: null,
-              key_hash: legacyHash,
-              key_prefix: null,
-              key_salt: null,
-              hash_algorithm: "sha256",
-            }],
-          };
-        }
+            expires_at: null,
+            key_hash: legacyHash,
+            key_prefix: null,
+            key_salt: null,
+            hash_algorithm: "sha256",
+            economic_operator_identifier: "did:web:www.example.test:did:company:5",
+            economic_operator_identifier_scheme: "did",
+          }],
+        };
+      }
         if (String(sql).includes("UPDATE api_keys") && String(sql).includes("SET key_hash = $1")) {
           return { rows: [] };
         }
@@ -80,6 +141,10 @@ describe("auth middleware API key migration", () => {
       companyId: "5",
       keyId: 7,
       scopes: ["dpp:read"],
+      actorIdentifier: "did:web:www.example.test:did:company:5",
+      actorIdentifierScheme: "did",
+      economicOperatorIdentifier: "did:web:www.example.test:did:company:5",
+      economicOperatorIdentifierScheme: "did",
     });
 
     const upgradeCall = calls.find(({ sql }) => sql.includes("SET key_hash = $1"));

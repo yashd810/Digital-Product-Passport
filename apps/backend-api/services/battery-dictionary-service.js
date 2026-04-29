@@ -82,7 +82,7 @@ module.exports = function createBatteryDictionaryService() {
       "@version": 1.1,
       dpp: "https://schema.digitalproductpassport.eu/ns/dpp#",
       DigitalProductPassport: "dpp:DigitalProductPassport",
-      guid: "dpp:guid",
+      dppId: "dpp:dppId",
       passport_type: "dpp:passportType",
       semantic_model: "dpp:semanticModel",
       model_name: "dpp:modelName",

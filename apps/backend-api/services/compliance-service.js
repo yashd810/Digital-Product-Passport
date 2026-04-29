@@ -1,13 +1,32 @@
 "use strict";
 
+const {
+  BATTERY_DICTIONARY_MODEL_KEY,
+  LEGACY_BATTERY_PASSPORT_TYPE,
+  shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
+} = require("./battery-dictionary-targeting");
+
 const VALID_ACCESS_LEVELS = new Set([
   "public",
+  "consumers",
   "notified_bodies",
   "market_surveillance",
+  "customs_authority",
   "eu_commission",
   "legitimate_interest",
   "economic_operator",
   "delegated_operator",
+  "manufacturer",
+  "authorized_representative",
+  "importer",
+  "distributor",
+  "dealer",
+  "fulfilment_service_provider",
+  "professional_repairer",
+  "independent_operator",
+  "recycler",
+  "main_dpp_service_provider",
+  "backup_dpp_service_provider",
 ]);
 
 const VALID_CONFIDENTIALITY_LEVELS = new Set([
@@ -21,14 +40,26 @@ const VALID_CONFIDENTIALITY_LEVELS = new Set([
 const VALID_UPDATE_AUTHORITIES = new Set([
   "economic_operator",
   "delegated_operator",
+  "manufacturer",
+  "authorized_representative",
+  "importer",
+  "distributor",
+  "dealer",
+  "fulfilment_service_provider",
+  "professional_repairer",
+  "independent_operator",
+  "recycler",
   "notified_bodies",
   "market_surveillance",
+  "customs_authority",
   "eu_commission",
+  "main_dpp_service_provider",
+  "backup_dpp_service_provider",
   "system",
 ]);
 
-const BATTERY_PASS_PASSPORT_TYPE = "din_spec_99100";
-const BATTERY_SEMANTIC_MODEL_KEY = "claros_battery_dictionary_v1";
+const BATTERY_PASS_PASSPORT_TYPE = LEGACY_BATTERY_PASSPORT_TYPE;
+const BATTERY_SEMANTIC_MODEL_KEY = BATTERY_DICTIONARY_MODEL_KEY;
 const APPLICABLE_REQUIREMENT_LEVELS = new Set([
   "mandatory_battreg",
   "mandatory_espr_jtc24",
@@ -139,7 +170,12 @@ function isBlankValue(value) {
   if (value === null || value === undefined) return true;
   if (typeof value === "string") return normalizeText(value) === "";
   if (Array.isArray(value)) return value.length === 0;
+  if (isPlainObject(value)) return Object.keys(value).length === 0;
   return false;
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function isNumericString(value) {
@@ -157,15 +193,17 @@ function isBooleanLike(value) {
 
 function isDateTimeLike(value) {
   const text = normalizeText(value);
-  if (!text || !/[tT]/.test(text)) return false;
+  if (!text || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(text)) {
+    return false;
+  }
   return !Number.isNaN(Date.parse(text));
 }
 
 function isDateLike(value) {
   const text = normalizeText(value);
-  if (!text) return false;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return true;
-  return !Number.isNaN(Date.parse(text));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const parsed = new Date(`${text}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === text;
 }
 
 function isYearMonthLike(value) {
@@ -178,6 +216,73 @@ function isUriLike(value) {
   if (!text) return false;
   if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return true;
   return /^https?:\/\//i.test(text);
+}
+
+function isLanguageTagLike(value) {
+  return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(normalizeText(value));
+}
+
+function isScalarValue(value) {
+  return value === null
+    || value === undefined
+    || typeof value === "string"
+    || typeof value === "number"
+    || typeof value === "boolean";
+}
+
+function looksLikeJson(value) {
+  const text = normalizeText(value);
+  return (text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"));
+}
+
+function parseStructuredValue(field, value) {
+  if (Array.isArray(value) || isPlainObject(value) || typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  if (field?.type === "table" || looksLikeJson(trimmed)) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+function isExplicitMultiLanguageField(field) {
+  const key = normalizeText(field?.key).toLowerCase();
+  const valueKind = normalizeText(field?.valueKind || field?.value_kind || field?.expandedObjectType || field?.objectTypeHint).toLowerCase();
+  return valueKind === "multilanguage"
+    || valueKind === "multilingual"
+    || valueKind === "i18n"
+    || key.endsWith("_i18n")
+    || key.endsWith("_intl")
+    || key.includes("multilang")
+    || key.includes("localized");
+}
+
+function isMultiLanguageValue(value) {
+  if (!isPlainObject(value)) return false;
+  const entries = Object.entries(value);
+  if (!entries.length) return false;
+  return entries.every(([key, entryValue]) =>
+    isLanguageTagLike(key) && isScalarValue(entryValue)
+  );
+}
+
+function normalizeArrayItemType(value) {
+  if (typeof value === "number") return "number";
+  if (Array.isArray(value)) return "array";
+  if (isPlainObject(value)) return "object";
+  return typeof value;
+}
+
+function hasMixedArrayItemTypes(value) {
+  if (!Array.isArray(value)) return false;
+  const populatedItems = value.filter((item) => !isBlankValue(item));
+  if (populatedItems.length <= 1) return false;
+  const expectedType = normalizeArrayItemType(populatedItems[0]);
+  return populatedItems.some((item) => normalizeArrayItemType(item) !== expectedType);
 }
 
 function formatExpectedType(term) {
@@ -221,6 +326,10 @@ function isSchemaFieldCompatibleWithTerm(field, term) {
 
 function isValueCompatibleWithTerm(value, term) {
   if (isBlankValue(value)) return true;
+
+  if (Array.isArray(value)) {
+    return value.filter((item) => !isBlankValue(item)).every((item) => isValueCompatibleWithTerm(item, term));
+  }
 
   const jsonType = normalizeText(term?.dataType?.jsonType).toLowerCase();
   const xsdType = normalizeText(term?.dataType?.xsdType).toLowerCase();
@@ -290,7 +399,7 @@ const MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS = {
   dpp_granularity: ({ canonicalPayload, passport }) =>
     canonicalPayload?.granularity || passport?.granularity || null,
   last_updated_at: ({ canonicalPayload, passport }) =>
-    canonicalPayload?.lastUpdate || passport?.updated_at || passport?.created_at || null,
+    canonicalPayload?.lastUpdated || canonicalPayload?.lastUpdate || passport?.updated_at || passport?.created_at || null,
   unique_dpp_identifier: ({ canonicalPayload }) =>
     canonicalPayload?.digitalProductPassportId || canonicalPayload?.dppDid || null,
   unique_passport_identifier: ({ canonicalPayload }) =>
@@ -317,7 +426,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
 
   async function loadPassportTypeDefinition(passportType) {
     const result = await pool.query(
-      `SELECT id, type_name, display_name, semantic_model_key, fields_json
+      `SELECT id, type_name, display_name, umbrella_category, semantic_model_key, fields_json
        FROM passport_types
        WHERE type_name = $1
        LIMIT 1`,
@@ -327,8 +436,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
   }
 
   function isBatteryPassport(typeDef, passportType = null) {
-    return normalizeText(typeDef?.semantic_model_key).toLowerCase() === BATTERY_SEMANTIC_MODEL_KEY
-      || normalizeText(passportType || typeDef?.type_name).toLowerCase() === BATTERY_PASS_PASSPORT_TYPE;
+    return shouldTargetBatteryDictionary({ passportType, typeDef });
   }
 
   async function loadCompanyGovernance(companyId) {
@@ -626,15 +734,25 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     return issues;
   }
 
-  function validateSemanticData(fields, passport) {
-    const issues = [];
+function validateSemanticData(fields, passport) {
+  const issues = [];
 
-    for (const field of fields) {
-      const term = findSemanticTermForField(field);
-      if (!term) continue;
+  for (const field of fields) {
+    const term = findSemanticTermForField(field);
+    if (field.__isBatteryPassport && !term) {
+      issues.push(createIssue({
+        code: "SEMANTIC_TERM_NOT_FOUND",
+        message: `Field "${field.label || field.key}" is not mapped to a dictionary term in terms.json.`,
+        key: field.key,
+        label: field.label || field.key,
+        section: field.section_label || field.section_key || null,
+      }));
+      continue;
+    }
+    if (!term) continue;
 
-      if (!isSchemaFieldCompatibleWithTerm(field, term)) {
-        issues.push(createIssue({
+    if (!isSchemaFieldCompatibleWithTerm(field, term)) {
+      issues.push(createIssue({
           code: "SEMANTIC_FIELD_TYPE_MISMATCH",
           message: `Field "${field.label || field.key}" is configured as "${field.type}" but its semantic datatype expects ${formatExpectedType(term)}.`,
           key: field.key,
@@ -644,8 +762,56 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
         }));
       }
 
-      const value = passport?.[field.key];
+      const value = parseStructuredValue(field, passport?.[field.key]);
       if (!hasMeaningfulValue(field, value)) continue;
+
+      if (Array.isArray(value) && hasMixedArrayItemTypes(value)) {
+        issues.push(createIssue({
+          code: "SEMANTIC_ARRAY_ITEM_TYPE_MISMATCH",
+          message: `Field "${field.label || field.key}" contains array items with mixed JSON types.`,
+          key: field.key,
+          label: field.label || field.key,
+          section: field.section_label || field.section_key || null,
+        }));
+      }
+
+      if ((isExplicitMultiLanguageField(field) || isMultiLanguageValue(value)) && isPlainObject(value)) {
+        for (const [languageTag, localizedValue] of Object.entries(value)) {
+          if (!isLanguageTagLike(languageTag)) {
+            issues.push(createIssue({
+              code: "SEMANTIC_LANGUAGE_TAG_INVALID",
+              message: `Field "${field.label || field.key}" uses invalid language tag "${languageTag}".`,
+              key: field.key,
+              label: field.label || field.key,
+              section: field.section_label || field.section_key || null,
+            }));
+          }
+          if (!isScalarValue(localizedValue)) {
+            issues.push(createIssue({
+              code: "SEMANTIC_MULTILANGUAGE_VALUE_INVALID",
+              message: `Field "${field.label || field.key}" contains non-scalar content for language tag "${languageTag}".`,
+              key: field.key,
+              label: field.label || field.key,
+              section: field.section_label || field.section_key || null,
+            }));
+          }
+        }
+      }
+
+      const expectedUnit = normalizeText(term?.unit).toLowerCase();
+      if (expectedUnit && expectedUnit !== "none" && isPlainObject(value) && value.unit && normalizeText(value.unit).toLowerCase() !== expectedUnit) {
+        issues.push(createIssue({
+          code: "SEMANTIC_UNIT_MISMATCH",
+          message: `Field "${field.label || field.key}" uses unit "${value.unit}" but the dictionary expects "${term.unit}".`,
+          key: field.key,
+          label: field.label || field.key,
+          section: field.section_label || field.section_key || null,
+        }));
+      }
+
+      if ((isExplicitMultiLanguageField(field) || isMultiLanguageValue(value)) && isPlainObject(value)) {
+        continue;
+      }
 
       if (!isValueCompatibleWithTerm(value, term)) {
         issues.push(createIssue({
@@ -659,7 +825,20 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       }
     }
 
-    return issues;
+  return issues;
+}
+
+  function buildRequiredFieldIssues(completeness, options = {}) {
+    const normalizedCategory = options.normalizedCategory || null;
+    return (completeness?.missingMandatoryFields || []).map((field) => createIssue({
+      code: field.requirementLevel ? "CATEGORY_REQUIRED_FIELD_MISSING" : "REQUIRED_FIELD_MISSING",
+      message: field.requirementLevel && normalizedCategory
+        ? `Field "${field.label || field.key}" is required for battery category "${normalizedCategory}" before release.`
+        : `Field "${field.label || field.key}" is required before release.`,
+      key: field.key,
+      label: field.label || field.key,
+      section: field.section || null,
+    }));
   }
 
   function evaluateManagedSemanticFields({
@@ -795,6 +974,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
         audienceLayerIssues: [],
         profileIssues: [],
         semanticIssues: [],
+        requiredFieldIssues: [],
         managedSemanticFields: [],
         managedSemanticIssues: [],
         category: { raw: null, normalized: null, supported: supportedBatteryCategories, focusFields: [], missingFocusFields: [], issues: [] },
@@ -805,8 +985,12 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       };
     }
 
-    const fields = flattenSchemaFields(resolvedTypeDef);
-    const normalizedCategory = isBatteryPassport(resolvedTypeDef, passportType || passport?.passport_type)
+    const batteryPassport = isBatteryPassport(resolvedTypeDef, passportType || passport?.passport_type);
+    const fields = flattenSchemaFields(resolvedTypeDef).map((field) => ({
+      ...field,
+      __isBatteryPassport: batteryPassport,
+    }));
+    const normalizedCategory = batteryPassport
       ? normalizeBatteryCategory((passport || {}).battery_category)
       : null;
     const profile = resolveProfileMetadata({
@@ -820,7 +1004,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     const governanceIssues = validateFieldGovernance(fields);
     const audienceLayerIssues = validateAudienceLayerCoverage(fields, profile);
     const semanticIssues = validateSemanticData(fields, passport || {});
-    const batteryCategory = isBatteryPassport(resolvedTypeDef, passportType || passport?.passport_type)
+    const batteryCategory = batteryPassport
       ? evaluateBatteryCategory(fields, passport || {}, completeness)
       : {
           raw: null,
@@ -838,6 +1022,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
         };
 
     const profileIssues = validateProfileGovernance({ passport: passport || {}, profile, company });
+    const requiredFieldIssues = buildRequiredFieldIssues(completeness, { normalizedCategory });
     const managedSemantic = evaluateManagedSemanticFields({
       fields,
       passport: passport || {},
@@ -851,6 +1036,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       ...governanceIssues,
       ...audienceLayerIssues,
       ...semanticIssues,
+      ...requiredFieldIssues,
       ...profileIssues,
       ...managedSemantic.issues,
       ...batteryCategory.issues,
@@ -869,13 +1055,14 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       } : null,
       passportType: resolvedTypeDef.type_name,
       semanticModelKey: resolvedTypeDef.semantic_model_key || null,
-      isBatteryPassport: isBatteryPassport(resolvedTypeDef, passportType || passport?.passport_type),
+      isBatteryPassport: batteryPassport,
       completeness,
       accessIssues,
       governanceIssues,
       audienceLayerIssues,
       profileIssues,
       semanticIssues,
+      requiredFieldIssues,
       managedSemanticFields: managedSemantic.managedFields,
       managedSemanticIssues: managedSemantic.issues,
       category: batteryCategory,

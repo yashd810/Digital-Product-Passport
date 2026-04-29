@@ -66,6 +66,13 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     }, {});
   };
 
+  const buildActorIdentity = (row = {}) => ({
+    actorIdentifier: row.economic_operator_identifier || null,
+    actorIdentifierScheme: row.economic_operator_identifier_scheme || null,
+    economicOperatorIdentifier: row.economic_operator_identifier || null,
+    economicOperatorIdentifierScheme: row.economic_operator_identifier_scheme || null,
+  });
+
   const authenticateToken = async (req, res, next) => {
     const cookies = parseCookies(req);
     const token = cookies[SESSION_COOKIE_NAME] || (req.headers["authorization"] || "").split(" ")[1];
@@ -73,8 +80,10 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     try {
       const payload = jwt.verify(token, JWT_SECRET);
       const currentUserRes = await pool.query(
-        `SELECT id, email, company_id, role, is_active, session_version
-         FROM users
+        `SELECT u.id, u.email, u.company_id, u.role, u.is_active, u.session_version,
+                c.economic_operator_identifier, c.economic_operator_identifier_scheme
+         FROM users u
+         LEFT JOIN companies c ON c.id = u.company_id
          WHERE id = $1
          LIMIT 1`,
         [payload.userId]
@@ -106,6 +115,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
         role: currentUser.role,
         sessionVersion: currentSessionVersion,
         accessAudiences: audienceRes.rows.map((row) => String(row.audience || "").trim()).filter(Boolean),
+        ...buildActorIdentity(currentUser),
       };
       next();
     } catch {
@@ -148,11 +158,13 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
 
       if (keyPrefix) {
         const prefixed = await pool.query(
-          `SELECT id, company_id, scopes, expires_at, key_hash, key_salt, hash_algorithm
-           FROM api_keys
+          `SELECT ak.id, ak.company_id, ak.scopes, ak.expires_at, ak.key_hash, ak.key_salt, ak.hash_algorithm,
+                  c.economic_operator_identifier, c.economic_operator_identifier_scheme
+           FROM api_keys ak
+           LEFT JOIN companies c ON c.id = ak.company_id
            WHERE key_prefix = $1
-             AND is_active = true
-             AND (expires_at IS NULL OR expires_at > NOW())`,
+             AND ak.is_active = true
+             AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`,
           [keyPrefix]
         );
         matchedRow = prefixed.rows.find((row) => {
@@ -165,11 +177,13 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       if (!matchedRow) {
         const legacyHash = hashLegacyApiKey(key);
         const legacy = await pool.query(
-          `SELECT id, company_id, scopes, expires_at, key_hash, key_prefix, key_salt, hash_algorithm
-           FROM api_keys
+          `SELECT ak.id, ak.company_id, ak.scopes, ak.expires_at, ak.key_hash, ak.key_prefix, ak.key_salt, ak.hash_algorithm,
+                  c.economic_operator_identifier, c.economic_operator_identifier_scheme
+           FROM api_keys ak
+           LEFT JOIN companies c ON c.id = ak.company_id
            WHERE key_hash = $1
-             AND is_active = true
-             AND (expires_at IS NULL OR expires_at > NOW())
+             AND ak.is_active = true
+             AND (ak.expires_at IS NULL OR ak.expires_at > NOW())
            LIMIT 1`,
           [legacyHash]
         );
@@ -184,6 +198,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
         companyId: String(matchedRow.company_id),
         scopes: normalizeScopes(matchedRow.scopes),
         expiresAt: matchedRow.expires_at || null,
+        ...buildActorIdentity(matchedRow),
       };
       next();
     } catch (e) {

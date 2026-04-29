@@ -64,7 +64,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
       if (hasWorkflow) {
         // Submit to workflow
         const r = await fetch(
-          `${API}/api/companies/${companyId}/passports/${passport.guid}/submit-review`,
+          `${API}/api/companies/${companyId}/passports/${passport.dppId}/submit-review`,
           {
             method: "POST",
             headers: authHeaders({ "Content-Type":"application/json" }),
@@ -81,7 +81,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
       } else {
         // Direct release (no workflow)
         const r = await fetch(
-          `${API}/api/companies/${companyId}/passports/${passport.guid}/release`,
+          `${API}/api/companies/${companyId}/passports/${passport.dppId}/release`,
           {
             method: "PATCH",
             headers: authHeaders({ "Content-Type":"application/json" }),

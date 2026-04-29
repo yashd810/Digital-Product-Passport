@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { authHeaders } from "../../../../shared/api/authHeaders";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-export function ExportModal({ passports, filteredPassports, pagePassports, selectedPassports, activeType, allPassportTypes, onClose, onDone }) {
+export function ExportModal({ passports, filteredPassports, pagePassports, selectedPassports, activeType, allPassportTypes, companyId, onClose, onDone }) {
   const [scope, setScope] = useState("all");
   const [format, setFormat] = useState("csv");
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const formatLabel = format === "jsonld" ? "JSON-LD" : format.toUpperCase();
 
-  const selectedList = passports.filter((passport) => selectedPassports.has(`${passport.guid}-${passport.version_number}`));
+  const selectedList = passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${passport.version_number}`));
 
   const scopePassports = {
     selected: selectedList,
@@ -40,7 +41,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     const allFields = (data.fields_json?.sections || []).flatMap((section) => section.fields || []);
     const rows = [
       ["Field Name", ...list.map((passport) => passport.model_name)],
-      ["guid", ...list.map((passport) => passport.guid)],
+      ["dppId", ...list.map((passport) => passport.dppId)],
       ["model_name", ...list.map((passport) => passport.model_name || "")],
       ["product_id", ...list.map((passport) => passport.product_id || "")],
       ...allFields
@@ -61,19 +62,31 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
     const data = await r.json();
     const semanticModelKey = data.semantic_model_key || allPassportTypes.find((item) => item.type_name === type)?.semantic_model_key || "";
-    const allFields = (data.fields_json?.sections || []).flatMap((section) => section.fields || []);
-    const output = list.map((passport) => {
-      const obj = {
-        guid: passport.guid,
-        model_name: passport.model_name,
-        product_id: passport.product_id,
-        release_status: passport.release_status,
-        version_number: passport.version_number,
-      };
-      allFields.forEach((field) => { obj[field.key] = passport[field.key] ?? null; });
-      return obj;
-    });
-    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey });
+    const umbrellaCategory = data.umbrella_category || allPassportTypes.find((item) => item.type_name === type)?.umbrella_category || "";
+    const output = [];
+    for (const passport of list) {
+      const targetCompanyId = passport.company_id || companyId;
+      if (!targetCompanyId) {
+        throw new Error("A company identifier is required for JSON-LD export.");
+      }
+      const query = new URLSearchParams({
+        passportType: type,
+        representation: "full",
+      });
+      if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
+        query.set("versionNumber", String(passport.version_number));
+      }
+      const payloadResponse = await fetch(
+        `${API}/api/companies/${targetCompanyId}/passports/${passport.dppId}?${query.toString()}`,
+        { headers: authHeaders() }
+      );
+      const payloadData = await payloadResponse.json().catch(() => ({}));
+      if (!payloadResponse.ok) {
+        throw new Error(payloadData.error || `Failed to fetch full export payload for ${passport.dppId}`);
+      }
+      output.push(payloadData);
+    }
+    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, umbrellaCategory });
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

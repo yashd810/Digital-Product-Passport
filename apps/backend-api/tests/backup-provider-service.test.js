@@ -23,7 +23,7 @@ describe("backup provider service", () => {
           return {
             rows: [{
               backup_provider_key: params[1],
-              passport_guid: params[2],
+              passport_dpp_id: params[2],
               version_number: params[6],
               snapshot_scope: params[8],
               replication_status: params[9],
@@ -84,7 +84,7 @@ describe("backup provider service", () => {
 
     const storedEnvelope = {
       source: {
-        passportGuid: "72b99c83-952c-4179-96f6-54a513d39dbc",
+        passportDppId: "72b99c83-952c-4179-96f6-54a513d39dbc",
       },
       passport: {
         digitalProductPassportId: "did:web:www.example.test:did:dpp:item:legacy",
@@ -97,11 +97,11 @@ describe("backup provider service", () => {
 
     const pool = {
       query: jest.fn(async (sql, params = []) => {
-        if (String(sql).includes("SELECT id, passport_guid, payload_hash, storage_key")) {
+        if (String(sql).includes("SELECT id, passport_dpp_id, payload_hash, storage_key")) {
           return {
             rows: [{
               id: 91,
-              passport_guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
+              passport_dpp_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
               payload_hash: storedPayloadHash,
               storage_key: "oci-backups/company-5/passport-72/v2/released_current.json",
             }],
@@ -141,7 +141,7 @@ describe("backup provider service", () => {
 
     const result = await service.verifyReplications({
       companyId: 5,
-      passportGuid: "72b99c83-952c-4179-96f6-54a513d39dbc",
+      passportDppId: "72b99c83-952c-4179-96f6-54a513d39dbc",
     });
 
     expect(result.success).toBe(true);

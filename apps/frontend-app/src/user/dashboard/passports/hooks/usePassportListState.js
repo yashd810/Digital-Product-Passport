@@ -71,7 +71,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   }, []);
 
   const getViewerPath = useCallback((passport, { forcePreview = false } = {}) => {
-    if (!passport?.guid) return null;
+    if (!passport?.dppId) return null;
 
     const normalizedStatus = normalizePassportStatus(passport.release_status);
     if (!forcePreview && normalizedStatus === "released" && passport.product_id) {
@@ -95,7 +95,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       companyName: user?.company_name,
       modelName: passport.model_name,
       productId: passport.product_id,
-      previewId: passport.guid,
+      previewId: passport.dppId,
     });
   }, [user?.company_name]);
 
@@ -120,14 +120,14 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     }
   }, [companyId, user?.id]);
 
-  const togglePin = useCallback((guid) => {
+  const togglePin = useCallback((dppId) => {
     if (!companyId || !user?.id) return;
 
     const storageKey = `passport_pins_${companyId}_${user.id}`;
     setPinnedGuids((prev) => {
       const next = new Set(prev);
-      if (next.has(guid)) next.delete(guid);
-      else next.add(guid);
+      if (next.has(dppId)) next.delete(dppId);
+      else next.add(dppId);
       try {
         localStorage.setItem(storageKey, JSON.stringify([...next]));
       } catch {}
@@ -220,7 +220,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
 
       const data = await response.json();
       data.sort((left, right) => {
-        if (left.guid !== right.guid) return left.guid.localeCompare(right.guid);
+        if (left.dppId !== right.dppId) return left.dppId.localeCompare(right.dppId);
         return right.version_number - left.version_number;
       });
       setPassports(data);
@@ -259,8 +259,8 @@ export function usePassportListState({ user, companyId, filterByUser }) {
 
   const displayedPassports = useMemo(() => (
     [...passports].sort((left, right) => {
-      const leftPinWeight = pinnedGuids.has(left.guid) ? 0 : 1;
-      const rightPinWeight = pinnedGuids.has(right.guid) ? 0 : 1;
+      const leftPinWeight = pinnedGuids.has(left.dppId) ? 0 : 1;
+      const rightPinWeight = pinnedGuids.has(right.dppId) ? 0 : 1;
       return leftPinWeight - rightPinWeight;
     })
   ), [passports, pinnedGuids]);
@@ -272,7 +272,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     displayedPassports.forEach((passport) => {
       const groupKey = getPassportGroupKey(passport);
       if (!groupsByKey.has(groupKey)) {
-        const group = { key: groupKey, guid: passport.guid, versions: [] };
+        const group = { key: groupKey, dppId: passport.dppId, versions: [] };
         groupsByKey.set(groupKey, group);
         groups.push(group);
       }
@@ -357,7 +357,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   }, [sortConfig]);
 
   const isFiltering = !!(searchText || filterStatus || Object.values(columnFilters).some(Boolean));
-  const selectedPassportList = passports.filter((passport) => selectedPassports.has(`${passport.guid}-${passport.version_number}`));
+  const selectedPassportList = passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${passport.version_number}`));
 
   const togglePassportGroup = useCallback((groupKey) => {
     setExpandedPassportGroups((prev) => {
@@ -372,10 +372,10 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     const keys = [];
     groups.forEach((group) => {
       if (!group?.latest) return;
-      keys.push(`${group.latest.guid}-${group.latest.version_number}`);
+      keys.push(`${group.latest.dppId}-${group.latest.version_number}`);
       if (expandedPassportGroups.has(group.key)) {
         group.olderVersions.forEach((version) => {
-          keys.push(`${version.guid}-${version.version_number}`);
+          keys.push(`${version.dppId}-${version.version_number}`);
         });
       }
     });
@@ -398,8 +398,8 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     setSelectedPassports(next);
   }, [getVisiblePassportKeys, paginatedPassports, selectedPassports]);
 
-  const toggleSelectPassport = useCallback((guid, version) => {
-    const key = `${guid}-${version}`;
+  const toggleSelectPassport = useCallback((dppId, version) => {
+    const key = `${dppId}-${version}`;
     const next = new Set(selectedPassports);
     if (next.has(key)) next.delete(key);
     else next.add(key);

@@ -91,7 +91,7 @@ export function PassportIntro({ passport, companyData, displayName, qrCode, qrLo
     passport.chemistry ||
     "—";
   const summaryStats = [
-    { label: "Unique Passport Identifier", value: passport.guid || "—" },
+    { label: "Unique Passport Identifier", value: passport.dppId || "—" },
     { label: "Manufacturing Date", value: manufacturingDate },
     { label: "Unique Battery Identifier", value: uniqueBatteryIdentifier },
     { label: "Serial Number", value: serialNumber },
@@ -156,7 +156,7 @@ export function PassportIntro({ passport, companyData, displayName, qrCode, qrLo
   );
 }
 
-export function Header({ displayName, lang, setLang, guid, companyData, brandTheme }) {
+export function Header({ displayName, lang, setLang, dppId, companyData, brandTheme }) {
   return (
     <header className="viewer-header">
       <div className="viewer-header-inner viewer-header-shell">
@@ -174,7 +174,7 @@ export function Header({ displayName, lang, setLang, guid, companyData, brandThe
           {companyData?.company_logo && (
             <img src={companyData.company_logo} alt={`${companyData.company_name || "Company"} logo`} className="viewer-header-brand-logo" />
           )}
-          <ScanBadge guid={guid} />
+          <ScanBadge dppId={dppId} />
           <ViewerLangSelector lang={lang} setLang={setLang} />
         </div>
       </div>
@@ -243,7 +243,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     if (!history[fieldKey]) {
       setHistory(p => ({ ...p, [fieldKey]: { data: [], loading: true } }));
       try {
-        const r = await fetch(`${API}/api/passports/${passport.guid}/dynamic-values/${fieldKey}/history?limit=500`);
+        const r = await fetch(`${API}/api/passports/${passport.dppId}/dynamic-values/${fieldKey}/history?limit=500`);
         const d = r.ok ? await r.json() : null;
         setHistory(p => ({ ...p, [fieldKey]: { data: d?.history || [], loading: false } }));
       } catch {
@@ -562,14 +562,14 @@ export function SignatureBadge({ verification }) {
   );
 }
 
-export function ScanBadge({ guid }) {
+export function ScanBadge({ dppId }) {
   const [count, setCount] = useState(null);
   useEffect(() => {
-    fetch(`${API}/api/passports/${guid}/scan-stats`)
+    fetch(`${API}/api/passports/${dppId}/scan-stats`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d && d.total > 0) setCount(d.total); })
       .catch(() => {});
-  }, [guid]);
+  }, [dppId]);
   if (!count) return null;
   return (
     <div className="viewer-scan-badge">
@@ -607,7 +607,7 @@ export function PrintView({ passport, companyData, sections }) {
             <span><strong>Version:</strong> v{passport.version_number}</span>
             <span><strong>Status:</strong> {statusLabel}</span>
             {passport.product_id && <span><strong>Serial Number:</strong> {passport.product_id}</span>}
-            <span><strong>GUID:</strong> {passport.guid}</span>
+            <span><strong>DPP ID:</strong> {passport.dppId}</span>
           </div>
         </div>
       </div>

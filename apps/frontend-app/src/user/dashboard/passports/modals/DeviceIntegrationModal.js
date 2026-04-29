@@ -17,7 +17,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
   const apiBase = import.meta.env.VITE_API_URL || "";
 
   useEffect(() => {
-    fetch(`${API}/api/companies/${companyId}/passports/${passport.guid}/device-key`, { headers: authHeaders() })
+    fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d) setDeviceKeyMeta(d); })
       .catch(() => {})
@@ -32,7 +32,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
       })
       .catch(() => {});
 
-    fetch(`${API}/api/passports/${passport.guid}/dynamic-values`)
+    fetch(`${API}/api/passports/${passport.dppId}/dynamic-values`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (d?.values) {
@@ -42,13 +42,13 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
         }
       })
       .catch(() => {});
-  }, [companyId, passport.guid, passportType]);
+  }, [companyId, passport.dppId, passportType]);
 
   const handleRegenerate = async () => {
     if (!window.confirm("Regenerate the device key? The old key will stop working immediately.")) return;
     setRegenerating(true);
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.guid}/device-key/regenerate`, {
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key/regenerate`, {
         method: "POST",
         headers: authHeaders(),
       });
@@ -69,7 +69,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     setSaving(true);
     setSaveMsg("");
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.guid}/dynamic-values`, {
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}/dynamic-values`, {
         method: "PATCH",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(manualVals),
@@ -90,7 +90,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const endpoint = `${apiBase}/api/passports/${passport.guid}/dynamic-values`;
+  const endpoint = `${apiBase}/api/passports/${passport.dppId}/dynamic-values`;
   const exampleBody = dynFields.length
     ? `{\n${dynFields.map((field) => `  "${field.key}": "value"`).join(",\n")}\n}`
     : `{\n  "field_key": "value"\n}`;

@@ -8,7 +8,7 @@ import { PassportListRowMenu } from "./PassportListRowMenu";
 
 export function PassportListRow({
   passport,
-  parentGuid = passport.guid,
+  parentGuid = passport.dppId,
   isHistorical = false,
   hasOlderVersions = false,
   user,
@@ -44,10 +44,10 @@ export function PassportListRow({
   togglePin,
 }) {
   const pType = passport.passport_type || activeType;
-  const menuId = `${passport.guid}-${passport.version_number}`;
+  const menuId = `${passport.dppId}-${passport.version_number}`;
   const isOpen = openMenuId === menuId;
   const pct = calcCompleteness(passport, allPassportTypes);
-  const isPinned = pinnedGuids.has(passport.guid);
+  const isPinned = pinnedGuids.has(passport.dppId);
   const isExpanded = expandedPassportGroups.has(parentGuid);
   const normalizedStatus = normalizePassportStatus(passport.release_status);
   const showOlderVersionsToggle = hasOlderVersions && !isHistorical;
@@ -66,7 +66,7 @@ export function PassportListRow({
           return;
         }
         if (selectionMode) {
-          toggleSelectPassport(passport.guid, passport.version_number);
+          toggleSelectPassport(passport.dppId, passport.version_number);
         } else {
           openPassportViewer(passport);
         }
@@ -77,7 +77,7 @@ export function PassportListRow({
           <input
             type="checkbox"
             checked={selectedPassports.has(menuId)}
-            onChange={() => toggleSelectPassport(passport.guid, passport.version_number)}
+            onChange={() => toggleSelectPassport(passport.dppId, passport.version_number)}
             onClick={e => e.stopPropagation()}
           />
         </td>

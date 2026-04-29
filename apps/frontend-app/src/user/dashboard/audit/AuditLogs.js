@@ -248,7 +248,7 @@ function AuditLogs({ companyId }) {
                       </span>
                       <span className="log-table">{log.table_name}</span>
                       {log.record_id && (
-                        <span className="log-guid">{log.record_id.substring(0, 8)}…</span>
+                        <span className="log-dppId">{log.record_id.substring(0, 8)}…</span>
                       )}
                     </div>
 
@@ -282,7 +282,7 @@ function AuditLogs({ companyId }) {
                             <span className="detail-value">{log.record_id || "—"}</span>
                           </div>
                           <div className="detail-item">
-                            <span className="detail-label">Passport GUID</span>
+                            <span className="detail-label">Passport DPP ID</span>
                             <span className="detail-value">{log.record_id || "—"}</span>
                           </div>
                           <div className="detail-item">

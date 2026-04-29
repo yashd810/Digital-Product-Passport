@@ -24,9 +24,9 @@ function parseJson(value, fallback = {}) {
 }
 
 function normalizeObjectPrefix(value) {
-  return normalizeText(value || "backup-provider", "backup-provider")
-    .replace(/^\/+/, "")
-    .replace(/\/+$/, "");
+  return normalizeText(value || "backup-provider", "backup-provider").
+  replace(/^\/+/, "").
+  replace(/\/+$/, "");
 }
 
 function normalizeHash(value) {
@@ -36,7 +36,7 @@ function normalizeHash(value) {
 module.exports = function createBackupProviderService({
   pool,
   storageService,
-  buildCanonicalPassportPayload,
+  buildCanonicalPassportPayload
 }) {
   function buildImplicitProvider(companyId = null) {
     if (!toBoolean(process.env.BACKUP_PROVIDER_ENABLED, false)) return null;
@@ -53,11 +53,11 @@ module.exports = function createBackupProviderService({
         region: normalizeText(process.env.BACKUP_PROVIDER_REGION || process.env.STORAGE_S3_REGION, ""),
         bucket: normalizeText(process.env.BACKUP_PROVIDER_BUCKET || process.env.STORAGE_S3_BUCKET, ""),
         endpoint: normalizeText(process.env.BACKUP_PROVIDER_ENDPOINT || process.env.STORAGE_S3_ENDPOINT, ""),
-        mode: "implicit_env",
+        mode: "implicit_env"
       },
       is_active: true,
       is_backup_provider: true,
-      is_implicit: true,
+      is_implicit: true
     };
   }
 
@@ -94,7 +94,7 @@ module.exports = function createBackupProviderService({
     companyName = "",
     reason = "manual",
     snapshotScope = "released_current",
-    provider,
+    provider
   }) {
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, { companyName });
     return {
@@ -102,7 +102,7 @@ module.exports = function createBackupProviderService({
         providerKey: provider.provider_key,
         providerType: provider.provider_type,
         displayName: provider.display_name,
-        supportsPublicHandover: provider.supports_public_handover !== false,
+        supportsPublicHandover: provider.supports_public_handover !== false
       },
       snapshotScope,
       reason,
@@ -110,18 +110,18 @@ module.exports = function createBackupProviderService({
       source: {
         companyId: passport.company_id || null,
         companyName: companyName || null,
-        passportGuid: passport.guid || null,
-        lineageId: passport.lineage_id || passport.guid || null,
+        passportDppId: passport.dppId || null,
+        lineageId: passport.lineage_id || passport.dppId || null,
         passportType: passport.passport_type || typeDef?.type_name || null,
         versionNumber: Number(passport.version_number) || 1,
-        releaseStatus: passport.release_status || null,
+        releaseStatus: passport.release_status || null
       },
-      passport: canonicalPayload,
+      passport: canonicalPayload
     };
   }
 
   function buildStorageKey({ provider, passport, snapshotScope }) {
-    const lineageId = normalizeText(passport.lineage_id || passport.guid || "unknown-lineage", "unknown-lineage");
+    const lineageId = normalizeText(passport.lineage_id || passport.dppId || "unknown-lineage", "unknown-lineage");
     const versionNumber = Number(passport.version_number) || 1;
     return path.posix.join(
       normalizeObjectPrefix(provider.object_prefix),
@@ -141,19 +141,19 @@ module.exports = function createBackupProviderService({
     storageProvider,
     storageKey,
     publicUrl,
-    errorMessage = null,
+    errorMessage = null
   }) {
     const payloadJson = JSON.stringify(envelope);
     const payloadHash = crypto.createHash("sha256").update(payloadJson).digest("hex");
     const result = await pool.query(
-       `INSERT INTO passport_backup_replications (
-         backup_provider_id, backup_provider_key, passport_guid, lineage_id, company_id, passport_type,
+      `INSERT INTO passport_backup_replications (
+         backup_provider_id, backup_provider_key, passport_dpp_id, lineage_id, company_id, passport_type,
          version_number, dpp_id, snapshot_scope, replication_status, storage_provider, storage_key, public_url,
          payload_hash, payload_json, error_message, verification_status, verification_error_message,
          verified_payload_hash, replicated_at, updated_at
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16, 'pending', NULL, NULL, NOW(), NOW())
-       ON CONFLICT (backup_provider_key, passport_guid, version_number, snapshot_scope)
+       ON CONFLICT (backup_provider_key, passport_dpp_id, version_number, snapshot_scope)
        DO UPDATE SET
          replication_status = EXCLUDED.replication_status,
          storage_provider = EXCLUDED.storage_provider,
@@ -169,23 +169,23 @@ module.exports = function createBackupProviderService({
          updated_at = NOW()
        RETURNING *`,
       [
-        provider.id || null,
-        provider.provider_key,
-        passport.guid,
-        passport.lineage_id || passport.guid,
-        passport.company_id,
-        passport.passport_type || null,
-        Number(passport.version_number) || 1,
-        envelope?.passport?.digitalProductPassportId || null,
-        snapshotScope,
-        replicationStatus,
-        storageProvider || null,
-        storageKey || null,
-        publicUrl || null,
-        payloadHash,
-        payloadJson,
-        errorMessage,
-      ]
+      provider.id || null,
+      provider.provider_key,
+      passport.dppId,
+      passport.lineage_id || passport.dppId,
+      passport.company_id,
+      passport.passport_type || null,
+      Number(passport.version_number) || 1,
+      envelope?.passport?.digitalProductPassportId || null,
+      snapshotScope,
+      replicationStatus,
+      storageProvider || null,
+      storageKey || null,
+      publicUrl || null,
+      payloadHash,
+      payloadJson,
+      errorMessage]
+
     );
     return result.rows[0] || null;
   }
@@ -196,14 +196,14 @@ module.exports = function createBackupProviderService({
     companyName = "",
     reason = "manual",
     snapshotScope = "released_current",
-    providerKey = null,
+    providerKey = null
   }) {
-    if (!passport?.guid || !passport?.company_id) {
+    if (!passport?.dppId || !passport?.company_id) {
       return { success: false, error: "Passport identity is required for backup replication", results: [] };
     }
 
-    const providers = (await listProviders({ companyId: passport.company_id }))
-      .filter((provider) => !providerKey || provider.provider_key === providerKey);
+    const providers = (await listProviders({ companyId: passport.company_id })).
+    filter((provider) => !providerKey || provider.provider_key === providerKey);
 
     if (!providers.length) {
       return { success: true, skipped: true, reason: "NO_BACKUP_PROVIDER", results: [] };
@@ -217,7 +217,7 @@ module.exports = function createBackupProviderService({
         companyName,
         reason,
         snapshotScope,
-        provider,
+        provider
       });
 
       let replicationStatus = "synced";
@@ -234,7 +234,7 @@ module.exports = function createBackupProviderService({
           key: buildStorageKey({ provider, passport, snapshotScope }),
           buffer: Buffer.from(JSON.stringify(envelope, null, 2), "utf8"),
           contentType: "application/json",
-          cacheControl: "private, max-age=0, no-store",
+          cacheControl: "private, max-age=0, no-store"
         });
         storageKey = stored?.storageKey || null;
         publicUrl = stored?.url || null;
@@ -252,18 +252,18 @@ module.exports = function createBackupProviderService({
         storageProvider,
         storageKey,
         publicUrl,
-        errorMessage,
+        errorMessage
       });
       results.push(row || {
         backup_provider_key: provider.provider_key,
         replication_status: replicationStatus,
-        error_message: errorMessage,
+        error_message: errorMessage
       });
     }
 
     return {
       success: results.every((row) => row.replication_status === "synced"),
-      results,
+      results
     };
   }
 
@@ -271,7 +271,7 @@ module.exports = function createBackupProviderService({
     id,
     verificationStatus,
     verificationErrorMessage = null,
-    verifiedPayloadHash = null,
+    verifiedPayloadHash = null
   }) {
     const result = await pool.query(
       `UPDATE passport_backup_replications
@@ -283,11 +283,11 @@ module.exports = function createBackupProviderService({
        WHERE id = $1
        RETURNING *`,
       [
-        id,
-        verificationStatus,
-        verificationErrorMessage,
-        verifiedPayloadHash,
-      ]
+      id,
+      verificationStatus,
+      verificationErrorMessage,
+      verifiedPayloadHash]
+
     );
     return result.rows[0] || null;
   }
@@ -302,14 +302,14 @@ module.exports = function createBackupProviderService({
       return updateVerificationResult({
         id: row.id,
         verificationStatus: "failed",
-        verificationErrorMessage: "Configured storage service does not support backup verification reads",
+        verificationErrorMessage: "Configured storage service does not support backup verification reads"
       });
     }
     if (!row?.storage_key) {
       return updateVerificationResult({
         id: row.id,
         verificationStatus: "failed",
-        verificationErrorMessage: "Replication record is missing a storage key",
+        verificationErrorMessage: "Replication record is missing a storage key"
       });
     }
 
@@ -324,7 +324,7 @@ module.exports = function createBackupProviderService({
       if (!parsed?.passport?.digitalProductPassportId) {
         throw new Error("Backup payload is missing digitalProductPassportId");
       }
-      if (!parsed?.source?.passportGuid || String(parsed.source.passportGuid) !== String(row.passport_guid)) {
+      if (!parsed?.source?.passportDppId || String(parsed.source.passportDppId) !== String(row.passport_dpp_id)) {
         throw new Error("Backup payload passport GUID does not match the replication record");
       }
       if (expectedPayloadHash && expectedPayloadHash !== actualPayloadHash) {
@@ -334,38 +334,38 @@ module.exports = function createBackupProviderService({
       return updateVerificationResult({
         id: row.id,
         verificationStatus: "verified",
-        verifiedPayloadHash,
+        verifiedPayloadHash
       });
     } catch (error) {
       return updateVerificationResult({
         id: row.id,
         verificationStatus: "failed",
-        verificationErrorMessage: error.message,
+        verificationErrorMessage: error.message
       });
     }
   }
 
-  async function listReplications({ companyId, passportGuid }) {
+  async function listReplications({ companyId, passportDppId }) {
     const result = await pool.query(
-      `SELECT id, backup_provider_id, backup_provider_key, passport_guid, lineage_id, company_id, passport_type,
+      `SELECT id, backup_provider_id, backup_provider_key, passport_dpp_id, lineage_id, company_id, passport_type,
               version_number, dpp_id, snapshot_scope, replication_status, storage_provider, storage_key, public_url,
               payload_hash, error_message, verification_status, verification_error_message,
               verified_payload_hash, last_verified_at, created_at, updated_at
        FROM passport_backup_replications
        WHERE company_id = $1
-         AND passport_guid = $2
+         AND passport_dpp_id = $2
        ORDER BY version_number DESC, updated_at DESC, id DESC`,
-      [companyId, passportGuid]
+      [companyId, passportDppId]
     ).catch(() => ({ rows: [] }));
     return result.rows;
   }
 
   async function verifyReplications({
     companyId,
-    passportGuid,
-    replicationId = null,
+    passportDppId,
+    replicationId = null
   }) {
-    const params = [companyId, passportGuid];
+    const params = [companyId, passportDppId];
     let replicationFilterSql = "";
     if (replicationId !== null && replicationId !== undefined) {
       params.push(Number.parseInt(replicationId, 10));
@@ -373,10 +373,10 @@ module.exports = function createBackupProviderService({
     }
 
     const result = await pool.query(
-      `SELECT id, passport_guid, payload_hash, storage_key
+      `SELECT id, passport_dpp_id, payload_hash, storage_key
        FROM passport_backup_replications
        WHERE company_id = $1
-         AND passport_guid = $2${replicationFilterSql}
+         AND passport_dpp_id = $2${replicationFilterSql}
        ORDER BY version_number DESC, updated_at DESC, id DESC`,
       params
     ).catch(() => ({ rows: [] }));
@@ -387,7 +387,7 @@ module.exports = function createBackupProviderService({
         verified: 0,
         failed: 0,
         results: [],
-        error: "No backup replication records were found",
+        error: "No backup replication records were found"
       };
     }
 
@@ -402,7 +402,7 @@ module.exports = function createBackupProviderService({
       success: failed === 0,
       verified,
       failed,
-      results: verificationResults,
+      results: verificationResults
     };
   }
 
@@ -416,7 +416,7 @@ module.exports = function createBackupProviderService({
     supportsPublicHandover = true,
     config = {},
     createdBy = null,
-    isActive = true,
+    isActive = true
   }) {
     const normalizedKey = normalizeText(providerKey);
     if (!normalizedKey) {
@@ -442,17 +442,17 @@ module.exports = function createBackupProviderService({
          updated_at = NOW()
        RETURNING *`,
       [
-        companyId ? Number.parseInt(companyId, 10) : null,
-        normalizedKey,
-        normalizeText(providerType, "oci_object_storage"),
-        normalizeText(displayName, normalizedKey),
-        normalizeObjectPrefix(objectPrefix),
-        publicBaseUrl ? normalizeText(publicBaseUrl) : null,
-        supportsPublicHandover !== false,
-        JSON.stringify(parseJson(config, {})),
-        isActive !== false,
-        createdBy || null,
-      ]
+      companyId ? Number.parseInt(companyId, 10) : null,
+      normalizedKey,
+      normalizeText(providerType, "oci_object_storage"),
+      normalizeText(displayName, normalizedKey),
+      normalizeObjectPrefix(objectPrefix),
+      publicBaseUrl ? normalizeText(publicBaseUrl) : null,
+      supportsPublicHandover !== false,
+      JSON.stringify(parseJson(config, {})),
+      isActive !== false,
+      createdBy || null]
+
     );
     return result.rows[0] || null;
   }
@@ -475,6 +475,6 @@ module.exports = function createBackupProviderService({
     upsertProvider,
     revokeProvider,
     replicatePassportSnapshot,
-    verifyReplications,
+    verifyReplications
   };
 };

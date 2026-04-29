@@ -37,7 +37,7 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
     setSubmitting(true);
     setError("");
     try {
-      const items = selectedList.map((passport) => ({ guid: passport.guid, passportType: passport.passport_type || passport.passportType }));
+      const items = selectedList.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || passport.passportType }));
       const r = await fetch(`${API}/api/companies/${companyId}/passports/bulk-workflow`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),

@@ -106,6 +106,31 @@ function createMockBatteryDictionaryService() {
       dataType: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
     },
     {
+      slug: "inspection-timestamp",
+      iri: "https://example.com/terms/inspection-timestamp",
+      appFieldKeys: ["inspection_timestamp"],
+      dataType: { format: "Timestamp UTC-based", jsonType: "string", xsdType: "xsd:dateTime" },
+    },
+    {
+      slug: "public-summary-i18n",
+      iri: "https://example.com/terms/public-summary-i18n",
+      appFieldKeys: ["public_summary_i18n"],
+      dataType: { format: "String", jsonType: "string", xsdType: "xsd:string" },
+    },
+    {
+      slug: "chemistry-codes",
+      iri: "https://example.com/terms/chemistry-codes",
+      appFieldKeys: ["chemistry_codes"],
+      dataType: { format: "String", jsonType: "string", xsdType: "xsd:string" },
+    },
+    {
+      slug: "measured-mass",
+      iri: "https://example.com/terms/measured-mass",
+      appFieldKeys: ["measured_mass"],
+      unit: "kg",
+      dataType: { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" },
+    },
+    {
       slug: "battery-passport-id",
       iri: "https://example.com/terms/battery-passport-id",
       appFieldKeys: ["passport_identifier"],
@@ -133,6 +158,10 @@ function createMockBatteryDictionaryService() {
     battery_mass: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "mandatory_battreg", Stationary: "mandatory_battreg" },
     state_of_charge_soc: { EV: "mandatory_battreg", LMT: "mandatory_battreg", Industrial: "not_applicable", Stationary: "not_applicable" },
     certificate_url: { EV: "voluntary", LMT: "voluntary", Industrial: "voluntary", Stationary: "voluntary" },
+    inspection_timestamp: { EV: "voluntary", LMT: "voluntary", Industrial: "voluntary", Stationary: "voluntary" },
+    public_summary_i18n: { EV: "voluntary", LMT: "voluntary", Industrial: "voluntary", Stationary: "voluntary" },
+    chemistry_codes: { EV: "voluntary", LMT: "voluntary", Industrial: "voluntary", Stationary: "voluntary" },
+    measured_mass: { EV: "voluntary", LMT: "voluntary", Industrial: "voluntary", Stationary: "voluntary" },
   };
 
   return {
@@ -155,24 +184,24 @@ function createMockBatteryDictionaryService() {
 }
 
 function buildCanonicalPassportPayload(passport, _typeDef, { company } = {}) {
+  const dppIdentifier = passport?.dppId || passport?.dpp_id || passport?.guid || "dpp_mock";
+  const productIdentifier = passport?.product_id || passport?.passport_identifier || "product-mock";
   return {
-    digitalProductPassportId: passport?.guid
-      ? `did:web:www.example.test:did:dpp:item:${passport.guid}`
-      : "did:web:www.example.test:did:dpp:item:mock",
-    uniqueProductIdentifier: passport?.product_identifier_did
-      || `did:web:www.example.test:did:battery:item:${passport?.passport_identifier || "mock"}`,
+    digitalProductPassportId: `https://example.test/dpp/${encodeURIComponent(dppIdentifier)}`,
+    uniqueProductIdentifier: `https://example.test/product/${encodeURIComponent(productIdentifier)}`,
     dppSchemaVersion: passport?.dpp_schema_version || "prEN 18223:2025",
     dppStatus: passport?.release_status || "Draft",
     granularity: passport?.granularity || "item",
-    lastUpdate: passport?.updated_at || passport?.created_at || "2026-04-27T10:00:00.000Z",
+    lastUpdated: passport?.updated_at || passport?.created_at || "2026-04-27T10:00:00.000Z",
     economicOperatorId: passport?.economic_operator_id || company?.economic_operator_identifier || "EORI-ACME-001",
     facilityId: passport?.facility_id || passport?.facility_identifier || null,
   };
 }
 
 const TYPE_DEF = {
-  type_name: "din_spec_99100",
-  semantic_model_key: "claros_battery_dictionary_v1",
+  type_name: "ev_battery_passport_custom",
+  umbrella_category: "Battery Digital Passport",
+  semantic_model_key: "generic_dpp_v1",
   fields_json: {
     sections: [
       {
@@ -199,7 +228,40 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: "din_spec_99100",
+      passport_type: TYPE_DEF.type_name,
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
+      passport_identifier: "BAT-2026-001",
+      battery_category: "EV",
+      battery_mass: "450.5",
+      state_of_charge_soc: "50.0",
+      certificate_url: "",
+    }, TYPE_DEF.type_name);
+
+    expect(result.workflowReleaseAllowed).toBe(true);
+    expect(result.directReleaseAllowed).toBe(false);
+    expect(result.workflowRequired).toBe(true);
+    expect(result.completeness.percentage).toBe(80);
+    expect(result.managedSemanticIssues).toEqual([]);
+    expect(result.completeness.missingFields.map((field) => field.key)).toEqual(
+      expect.arrayContaining(["certificate_url"])
+    );
+    expect(result.category.normalized).toBe("EV");
+    expect(result.category.missingMandatoryFields).toEqual([]);
+  });
+
+  test("blocks release when mandatory battery category fields are missing", async () => {
+    const service = createComplianceService({
+      pool: createMockPool(TYPE_DEF),
+      batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
+    });
+
+    const result = await service.evaluatePassport({
+      passport_type: TYPE_DEF.type_name,
       company_id: 5,
       compliance_profile_key: "battery_dpp_v1",
       content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
@@ -209,19 +271,13 @@ describe("compliance service", () => {
       battery_category: "EV",
       battery_mass: "450.5",
       state_of_charge_soc: "",
-      certificate_url: "",
-    }, "din_spec_99100");
+      certificate_url: "https://example.com/certificate",
+    }, TYPE_DEF.type_name);
 
-    expect(result.workflowReleaseAllowed).toBe(true);
+    expect(result.workflowReleaseAllowed).toBe(false);
     expect(result.directReleaseAllowed).toBe(false);
-    expect(result.workflowRequired).toBe(true);
-    expect(result.completeness.percentage).toBe(60);
-    expect(result.managedSemanticIssues).toEqual([]);
-    expect(result.completeness.missingFields.map((field) => field.key)).toEqual(
-      expect.arrayContaining(["state_of_charge_soc", "certificate_url"])
-    );
-    expect(result.category.normalized).toBe("EV");
-    expect(result.category.missingMandatoryFields.map((field) => field.key)).toContain("state_of_charge_soc");
+    expect(result.blockingIssues.map((issue) => issue.code)).toContain("CATEGORY_REQUIRED_FIELD_MISSING");
+    expect(result.requiredFieldIssues.map((issue) => issue.key)).toContain("state_of_charge_soc");
   });
 
   test("blocks release when semantic values do not match the battery dictionary datatypes", async () => {
@@ -232,7 +288,7 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: "din_spec_99100",
+      passport_type: TYPE_DEF.type_name,
       company_id: 5,
       compliance_profile_key: "battery_dpp_v1",
       content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
@@ -243,13 +299,110 @@ describe("compliance service", () => {
       battery_mass: "not-a-number",
       state_of_charge_soc: "high",
       certificate_url: "notaurl",
-    }, "din_spec_99100");
+    }, TYPE_DEF.type_name);
 
     expect(result.workflowReleaseAllowed).toBe(false);
     expect(result.directReleaseAllowed).toBe(false);
     expect(result.blockingIssues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining([
         "SEMANTIC_VALUE_TYPE_MISMATCH",
+      ])
+    );
+  });
+
+  test("blocks release when a battery field is not mapped in the dictionary", async () => {
+    const typeDef = {
+      ...TYPE_DEF,
+      fields_json: {
+        sections: [
+          {
+            key: "general",
+            label: "General",
+            fields: [
+              ...TYPE_DEF.fields_json.sections[0].fields,
+              { key: "custom_battery_note", label: "Custom Battery Note", type: "text", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+            ],
+          },
+        ],
+      },
+    };
+
+    const service = createComplianceService({
+      pool: createMockPool(typeDef),
+      batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
+    });
+
+    const result = await service.evaluatePassport({
+      passport_type: TYPE_DEF.type_name,
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
+      passport_identifier: "BAT-2026-001",
+      battery_category: "EV",
+      battery_mass: "450.5",
+      state_of_charge_soc: "50.0",
+      certificate_url: "https://example.com/certificate",
+      custom_battery_note: "Unmapped field",
+    }, TYPE_DEF.type_name);
+
+    expect(result.workflowReleaseAllowed).toBe(false);
+    expect(result.blockingIssues.map((issue) => issue.code)).toContain("SEMANTIC_TERM_NOT_FOUND");
+  });
+
+  test("blocks release when dictionary-backed values fail ISO, language-tag, unit, or homogeneous-array checks", async () => {
+    const typeDef = {
+      ...TYPE_DEF,
+      fields_json: {
+        sections: [
+          {
+            key: "general",
+            label: "General",
+            fields: [
+              ...TYPE_DEF.fields_json.sections[0].fields,
+              { key: "inspection_timestamp", label: "Inspection Timestamp", type: "text", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+              { key: "public_summary_i18n", label: "Public Summary", type: "textarea", valueKind: "multilanguage", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+              { key: "chemistry_codes", label: "Chemistry Codes", type: "table", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+              { key: "measured_mass", label: "Measured Mass", type: "text", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+            ],
+          },
+        ],
+      },
+    };
+
+    const service = createComplianceService({
+      pool: createMockPool(typeDef),
+      batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
+    });
+
+    const result = await service.evaluatePassport({
+      passport_type: TYPE_DEF.type_name,
+      company_id: 5,
+      compliance_profile_key: "battery_dpp_v1",
+      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrier_policy_key: "battery_qr_public_entry_v1",
+      facility_id: "PLANT-01",
+      passport_identifier: "BAT-2026-001",
+      battery_category: "EV",
+      battery_mass: "450.5",
+      state_of_charge_soc: "50.0",
+      certificate_url: "https://example.com/certificate",
+      inspection_timestamp: "04/27/2026 10:00",
+      public_summary_i18n: { "english-us": "Battery summary", sv: "Batterisammanfattning" },
+      chemistry_codes: ["NMC", 42],
+      measured_mass: { value: 450, unit: "lb" },
+    }, TYPE_DEF.type_name);
+
+    expect(result.workflowReleaseAllowed).toBe(false);
+    expect(result.blockingIssues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "SEMANTIC_VALUE_TYPE_MISMATCH",
+        "SEMANTIC_LANGUAGE_TAG_INVALID",
+        "SEMANTIC_ARRAY_ITEM_TYPE_MISMATCH",
+        "SEMANTIC_UNIT_MISMATCH",
       ])
     );
   });
@@ -278,7 +431,7 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: "din_spec_99100",
+      passport_type: TYPE_DEF.type_name,
       company_id: 5,
       compliance_profile_key: "battery_dpp_v1",
       content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
@@ -286,7 +439,7 @@ describe("compliance service", () => {
       facility_id: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
-    }, "din_spec_99100");
+    }, TYPE_DEF.type_name);
 
     expect(result.workflowReleaseAllowed).toBe(false);
     expect(result.blockingIssues.map((issue) => issue.code)).toEqual(
@@ -302,7 +455,7 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: "din_spec_99100",
+      passport_type: TYPE_DEF.type_name,
       company_id: 5,
       compliance_profile_key: "battery_dpp_v1",
       content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
@@ -313,7 +466,7 @@ describe("compliance service", () => {
       battery_mass: "450.5",
       certificate_url: "",
       state_of_charge_soc: "",
-    }, "din_spec_99100");
+    }, TYPE_DEF.type_name);
 
     expect(result.category.normalized).toBe("Industrial");
     expect(result.completeness.missingFields.map((field) => field.key)).toContain("certificate_url");
@@ -329,12 +482,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: "din_spec_99100",
+      passport_type: TYPE_DEF.type_name,
       company_id: 5,
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",
-    }, "din_spec_99100");
+    }, TYPE_DEF.type_name);
 
     expect(result.profile.key).toBe("battery_dpp_v1");
     expect(result.blockingIssues.map((issue) => issue.code)).toEqual(
@@ -371,7 +524,7 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: "din_spec_99100",
+      passport_type: TYPE_DEF.type_name,
       company_id: 5,
       compliance_profile_key: "battery_dpp_v1",
       content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
@@ -382,7 +535,7 @@ describe("compliance service", () => {
       battery_mass: "450.5",
       state_of_charge_soc: "50.0",
       certificate_url: "https://example.com/certificate",
-    }, "din_spec_99100");
+    }, TYPE_DEF.type_name);
 
     expect(result.workflowReleaseAllowed).toBe(false);
     expect(result.blockingIssues.map((issue) => issue.code)).toContain("CONTROLLED_ACCESS_LAYER_MISSING");
@@ -398,14 +551,14 @@ describe("compliance service", () => {
         dppSchemaVersion: null,
         dppStatus: "Draft",
         granularity: "item",
-        lastUpdate: null,
+        lastUpdated: null,
         economicOperatorId: null,
         facilityId: null,
       }),
     });
 
     const result = await service.evaluatePassport({
-      passport_type: "din_spec_99100",
+      passport_type: TYPE_DEF.type_name,
       company_id: 5,
       compliance_profile_key: "battery_dpp_v1",
       content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
@@ -416,7 +569,7 @@ describe("compliance service", () => {
       battery_mass: "450.5",
       state_of_charge_soc: "50.0",
       certificate_url: "https://example.com/certificate",
-    }, "din_spec_99100");
+    }, TYPE_DEF.type_name);
 
     expect(result.workflowReleaseAllowed).toBe(false);
     expect(result.managedSemanticIssues.map((issue) => issue.code)).toContain("MANAGED_SEMANTIC_FIELD_MISSING");

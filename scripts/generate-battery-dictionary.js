@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 
+// Maintenance script.
+// Not used at runtime. Run manually when battery-terms-source.json changes.
+// Regenerates backend dictionary JSON files and frontend generated term list.
+
 const fs = require("fs");
 const path = require("path");
 
@@ -265,6 +269,47 @@ function main() {
     name: "Claros Battery Dictionary",
     version: "1.0.0",
     description: "Internal battery passport dictionary derived from the BatteryPass Data Attribute Longlist v1.3.",
+    authority: {
+      modelClass: "internal-derived-dictionary",
+      officialStatus: "implementation-vocabulary",
+      stewardingOrganization: "Claros DPP",
+      normativeSource: {
+        title: "BatteryPass Data Attribute Longlist",
+        version: "1.3",
+        artifactType: "workbook",
+        sourceWorkbook: "2026_BatteryPass-Ready_DataAttributeLongList_v1.3.xlsx",
+        sourceProject: "BatteryPass",
+        sourceRepository: "https://github.com/batterypass/BatteryPassDataModel",
+        sourceAuthority: "BatteryPass consortium",
+      },
+      derivationNotice: "This dictionary is curated by Claros DPP for implementation use. It is derived from BatteryPass source material and is not itself an official EU or BatteryPass controlled vocabulary publication.",
+    },
+    governance: {
+      steward: {
+        name: "Claros DPP",
+        did: "did:web:www.claros-dpp.online",
+        url: "https://www.claros-dpp.online",
+      },
+      maintenanceModel: "curated-release",
+      changeControl: "Dictionary updates are made in-repository, regenerated from a pinned source workbook, and released as versioned static artifacts.",
+      reviewProcess: "Changes should preserve traceable mappings back to source attributes, term identifiers, category applicability, and regulation references where available.",
+    },
+    versioning: {
+      dictionaryVersion: "1.0.0",
+      semanticModelKey: MODEL_KEY,
+      sourceVersion: "BatteryPass Data Attribute Longlist v1.3",
+      generatedAt,
+      compatibilityPolicy: "IRIs under /dictionary/battery/v1 remain stable for non-breaking revisions. Breaking semantic changes require a new version path and semantic model key.",
+    },
+    regulatoryTraceability: {
+      scope: "Battery passport implementation aligned to the Claros battery semantic model.",
+      traceabilityMethod: "Each term carries source-oriented metadata such as specRef/number, source attribute naming, datatype, category placement, and regulationReferences when available from the curated source.",
+      applicabilityModel: "Battery-category applicability is captured separately in category-rules.json and linked to exports during validation.",
+      limitations: [
+        "This manifest documents implementation provenance, not normative legal endorsement.",
+        "Formal compliance claims should cite both the upstream BatteryPass source version and this Claros dictionary version.",
+      ],
+    },
     batteryCategoryScope: ["EV", "LMT", "Industrial", "Stationary"],
     sourceWorkbook: "2026_BatteryPass-Ready_DataAttributeLongList_v1.3.xlsx",
     generatedAt,
@@ -278,6 +323,7 @@ function main() {
     termsUrl: `${API_BASE}/terms`,
     unitsUrl: `${API_BASE}/units`,
     categoriesUrl: `${API_BASE}/categories`,
+    categoryRulesUrl: `${API_BASE}/category-rules`,
     fieldMapUrl: `${API_BASE}/field-map`,
   };
 

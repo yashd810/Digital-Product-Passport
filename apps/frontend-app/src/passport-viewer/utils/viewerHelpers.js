@@ -6,9 +6,24 @@ const API = import.meta.env.VITE_API_URL || "";
 // Access-Control Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 export const ACCESS_LABEL_MAP = {
+  consumers:            "Consumers",
+  economic_operator:    "Economic Operators",
+  manufacturer:         "Manufacturers",
+  authorized_representative: "Authorized Representatives",
+  importer:             "Importers",
+  distributor:          "Distributors",
+  dealer:               "Dealers",
+  fulfilment_service_provider: "Fulfilment Service Providers",
+  delegated_operator:   "Delegated Operators",
+  professional_repairer: "Professional Repairers",
+  independent_operator: "Independent Operators",
+  recycler:             "Recyclers",
   notified_bodies:     "Notified Bodies",
   market_surveillance: "Market Surveillance Authorities",
+  customs_authority:   "Customs Authorities",
   eu_commission:       "The EU Commission",
+  main_dpp_service_provider: "Main DPP Service Providers",
+  backup_dpp_service_provider: "Back-up DPP Service Providers",
   legitimate_interest: "Person with Legitimate Interest",
 };
 
@@ -33,7 +48,7 @@ export function isHeroSummaryField(field, fieldLabel = "") {
   const label = String(fieldLabel || field?.label || "").toLowerCase();
 
   if ([
-    "guid",
+    "dppId",
     "product_id",
     "passport_identifier",
     "unique_passport_identifier",
@@ -57,7 +72,7 @@ export function isHeroSummaryField(field, fieldLabel = "") {
   }
 
   return (
-    label === "guid" ||
+    label === "dppId" ||
     label.includes("passport identifier") ||
     label.includes("manufactured date") ||
     label.includes("manufacturing date") ||

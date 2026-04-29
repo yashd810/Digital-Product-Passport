@@ -102,6 +102,51 @@ const normalizeStorageRequestKey = (value) => {
 const isPassportStorageKey = (value) => normalizeStorageRequestKey(value)
   .startsWith(PASSPORT_STORAGE_PREFIX);
 
+const isPlainRecord = (value) =>
+  value !== null
+  && typeof value === "object"
+  && !Array.isArray(value)
+  && !(value instanceof Date)
+  && !Buffer.isBuffer(value);
+
+const normalizeIncomingDppIdentifiers = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeIncomingDppIdentifiers(entry));
+  }
+  if (!isPlainRecord(value)) return value;
+
+  const normalized = {};
+  for (const [key, rawEntry] of Object.entries(value)) {
+    const entry = normalizeIncomingDppIdentifiers(rawEntry);
+    if (key === "dppId") normalized.dpp_id = entry;
+    else if (key === "dppIds") normalized.dpp_ids = entry;
+    else if (key === "dpp_id") normalized.dpp_id = entry;
+    else if (key === "match_dpp_id") normalized.match_dpp_id = entry;
+    else if (key === "matched_dpp_id") normalized.matched_dpp_id = entry;
+    else if (key === "passportDppId") normalized.passport_dpp_id = entry;
+    else if (key === "passport_dpp_id") normalized.passport_dpp_id = entry;
+    else normalized[key] = entry;
+  }
+  return normalized;
+};
+
+const normalizeOutgoingDppIdentifiers = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeOutgoingDppIdentifiers(entry));
+  }
+  if (!isPlainRecord(value)) return value;
+
+  const normalized = {};
+  for (const [key, rawEntry] of Object.entries(value)) {
+    const entry = normalizeOutgoingDppIdentifiers(rawEntry);
+    if (key === "dpp_id") normalized.dppId = entry;
+    else if (key === "dppIds") normalized.dppIds = entry;
+    else if (key === "passportDppId" || key === "passport_dpp_id" || key === "passport_dpp_id") normalized.passportDppId = entry;
+    else normalized[key] = entry;
+  }
+  return normalized;
+};
+
 [LOCAL_STORAGE_DIR, FILES_BASE_DIR, REPO_BASE_DIR, GLOBAL_SYMBOLS_DIR].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
@@ -179,7 +224,19 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({
+  limit: "10mb",
+  type: ["application/json", "application/merge-patch+json"],
+}));
+app.use((req, res, next) => {
+  if (req.body && (Array.isArray(req.body) || isPlainRecord(req.body))) {
+    req.body = normalizeIncomingDppIdentifiers(req.body);
+  }
+
+  const originalJson = res.json.bind(res);
+  res.json = (payload) => originalJson(normalizeOutgoingDppIdentifiers(payload));
+  next();
+});
 app.use("/uploads/symbols", express.static(GLOBAL_SYMBOLS_DIR));
 app.use("/asset-management", (req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
@@ -225,32 +282,32 @@ const ASSET_IGNORED_SYSTEM_COLUMNS = new Set([
   "deleted_at", "release_status", "version_number", "is_editable", "field_label",
   "created_by_email", "first_name", "last_name",
 ]);
-const ASSET_MATCH_FIELDS = new Set(["guid", "match_guid", "product_id", "match_product_id", "next_product_id"]);
+const ASSET_MATCH_FIELDS = new Set(["dppId", "match_dpp_id", "product_id", "match_product_id", "next_product_id"]);
 const ASSET_ERP_PRESETS = [
   {
     key: "generic_rest", label: "Generic REST",
     description: "Generic JSON API returning an array or records path.",
-    sourceConfig: { method: "GET", recordPath: "data.items", fieldMap: { guid: "guid", product_id: "product_id", model_name: "model_name" } },
+    sourceConfig: { method: "GET", recordPath: "data.items", fieldMap: { dppId: "dppId", product_id: "product_id", model_name: "model_name" } },
   },
   {
     key: "sap_s4hana_material", label: "SAP S/4HANA Material Feed",
     description: "Typical material master style mapping for SAP integrations.",
-    sourceConfig: { method: "GET", recordPath: "d.results", fieldMap: { Material: "product_id", ProductUUID: "guid", ProductDescription: "model_name", Plant: "facility" } },
+    sourceConfig: { method: "GET", recordPath: "d.results", fieldMap: { Material: "product_id", ProductUUID: "dppId", ProductDescription: "model_name", Plant: "facility" } },
   },
   {
     key: "microsoft_bc_items", label: "Business Central Items",
     description: "Business Central item sync using OData-style responses.",
-    sourceConfig: { method: "GET", recordPath: "value", fieldMap: { id: "guid", number: "product_id", displayName: "model_name", inventoryPostingGroup: "category" } },
+    sourceConfig: { method: "GET", recordPath: "value", fieldMap: { id: "dppId", number: "product_id", displayName: "model_name", inventoryPostingGroup: "category" } },
   },
   {
     key: "netsuite_restlet", label: "NetSuite Restlet",
     description: "NetSuite restlet payload with items array.",
-    sourceConfig: { method: "POST", recordPath: "items", fieldMap: { internalId: "guid", itemId: "product_id", displayName: "model_name", location: "facility" } },
+    sourceConfig: { method: "POST", recordPath: "items", fieldMap: { internalId: "dppId", itemId: "product_id", displayName: "model_name", location: "facility" } },
   },
   {
     key: "siemens_teamcenter_items", label: "Siemens Teamcenter Items",
     description: "Teamcenter item feed with product ID matching and optional GUID mapping.",
-    sourceConfig: { method: "GET", recordPath: "items", fieldMap: { item_id: "product_id", uid: "guid", object_name: "model_name" } },
+    sourceConfig: { method: "GET", recordPath: "items", fieldMap: { item_id: "product_id", uid: "dppId", object_name: "model_name" } },
   },
 ];
 
@@ -562,7 +619,11 @@ const didService = createDidService({
 });
 const productIdentifierService = createProductIdentifierService({ didService });
 const canonicalPassportSerializer = createCanonicalPassportSerializer({ didService, productIdentifierService });
-const { buildCanonicalPassportPayload } = canonicalPassportSerializer;
+const {
+  buildCanonicalPassportPayload,
+  buildExpandedPassportPayload,
+  buildExpandedDataElement,
+} = canonicalPassportSerializer;
 
 // ─── SIGNING SERVICE ─────────────────────────────────────────────────────────
 const signingService = createSigningService({
@@ -575,7 +636,10 @@ const signingService = createSigningService({
 const { signPassport, verifyPassportSignature } = signingService;
 
 // ─── PASSPORT REPRESENTATION SERVICE ────────────────────────────────────────
-const { buildOperationalDppPayload } = createPassportRepresentationService({ productIdentifierService });
+const { buildOperationalDppPayload } = createPassportRepresentationService({
+  productIdentifierService,
+  buildCanonicalPassportPayload,
+});
 
 // ─── BATTERY DICTIONARY SERVICE ──────────────────────────────────────────────
 const batteryDictionaryService = createBatteryDictionaryService();
@@ -608,7 +672,7 @@ const {
   getPassportLineageContext, getPassportVersionsByLineage,
   getCompanyNameMap, stripRestrictedFieldsForPublicView,
   fetchCompanyPassportRecord, resolveReleasedPassportByProductId,
-  resolvePublicPassportByGuid, resolveCompanyPreviewPassport,
+  resolvePublicPassportByDppId, resolveCompanyPreviewPassport,
   updatePassportRowById, buildPassportVersionHistory,
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
   getLatestCompanyPassports, createPassportTable, queryTableStats, submitPassportToWorkflow,
@@ -720,7 +784,7 @@ const backfillLegacyPassportAttachmentLinks = async () => {
       }
 
       const candidateRes = await pool.query(
-        `SELECT id, guid, company_id, release_status, ${fileFields.join(", ")}
+        `SELECT id, dpp_id AS "dppId", company_id, release_status, ${fileFields.join(", ")}
          FROM ${tableName}
          WHERE deleted_at IS NULL
            AND (${likeClauses.join(" OR ")})`,
@@ -742,7 +806,7 @@ const backfillLegacyPassportAttachmentLinks = async () => {
           const existingAttachmentRes = await pool.query(
             `SELECT public_id
              FROM passport_attachments
-             WHERE passport_guid = $1
+             WHERE passport_dpp_id = $1
                AND field_key = $2
                AND (
                  (storage_key IS NOT NULL AND storage_key = $3)
@@ -750,7 +814,7 @@ const backfillLegacyPassportAttachmentLinks = async () => {
                )
              ORDER BY id DESC
              LIMIT 1`,
-            [row.guid, fieldKey, storageKey, filePath]
+            [row.dppId, fieldKey, storageKey, filePath]
           );
 
           let publicId = existingAttachmentRes.rows[0]?.public_id || null;
@@ -759,12 +823,12 @@ const backfillLegacyPassportAttachmentLinks = async () => {
             publicId = crypto.randomBytes(10).toString("base64url").slice(0, 16);
             await pool.query(
               `INSERT INTO passport_attachments
-                 (public_id, company_id, passport_guid, field_key, file_path, storage_key, storage_provider, file_url, mime_type, is_public)
+                 (public_id, company_id, passport_dpp_id, field_key, file_path, storage_key, storage_provider, file_url, mime_type, is_public)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'application/pdf', $9)`,
               [
                 publicId,
                 row.company_id,
-                row.guid,
+                row.dppId,
                 fieldKey,
                 filePath,
                 storageKey,
@@ -889,7 +953,7 @@ registerPassportRoutes(app, {
   stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
   submitPassportToWorkflow, signPassport,
   buildBatteryPassJsonExport, storageService, complianceService, accessRightsService, productIdentifierService,
-  backupProviderService,
+  backupProviderService, buildExpandedPassportPayload,
 });
 
 registerPassportPublicRoutes(app, {
@@ -897,12 +961,13 @@ registerPassportPublicRoutes(app, {
   getTable, normalizePassportRow, normalizeProductIdValue,
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath,
   stripRestrictedFieldsForPublicView, getCompanyNameMap,
-  resolveReleasedPassportByProductId, resolvePublicPassportByGuid, buildPassportVersionHistory,
+  resolveReleasedPassportByProductId, resolvePublicPassportByDppId, buildPassportVersionHistory,
   resolvePublicPathToSubjects,
   verifyPassportSignature,
   buildJsonLdContext: buildPassportJsonLdContext,
   buildBatteryPassJsonExport,
   buildCanonicalPassportPayload,
+  buildExpandedPassportPayload,
   signingService,
   didService,
 });
@@ -926,6 +991,8 @@ registerDppApiRoutes(app, {
   signingService,
   buildOperationalDppPayload,
   buildCanonicalPassportPayload,
+  buildExpandedPassportPayload,
+  buildExpandedDataElement,
   buildPassportJsonLdContext,
   didService,
   dppIdentity,

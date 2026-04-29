@@ -26,7 +26,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
   async function loadOrGenerateSigningKey() {
     const privPem = process.env.SIGNING_PRIVATE_KEY?.replace(/\\n/g, "\n");
-    const pubPem  = process.env.SIGNING_PUBLIC_KEY?.replace(/\\n/g, "\n");
+    const pubPem = process.env.SIGNING_PUBLIC_KEY?.replace(/\\n/g, "\n");
 
     if (privPem && pubPem) {
       const keyId = crypto.createHash("sha256").update(pubPem).digest("hex").slice(0, 16);
@@ -44,8 +44,8 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       logger.warn("[Signing] This is only safe for local development. Set SIGNING_PRIVATE_KEY and SIGNING_PUBLIC_KEY before deploying.");
       const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", {
         namedCurve: "P-256",
-        publicKeyEncoding:  { type: "spki",  format: "pem" },
-        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+        publicKeyEncoding: { type: "spki", format: "pem" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" }
       });
       const keyId = crypto.createHash("sha256").update(publicKey).digest("hex").slice(0, 16);
       _signingKey = { privateKey, publicKey, keyId, algorithmVersion: "ES256" };
@@ -57,11 +57,11 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       `INSERT INTO passport_signing_keys (key_id, public_key, algorithm, algorithm_version)
        VALUES ($1, $2, $3, $4) ON CONFLICT (key_id) DO NOTHING`,
       [
-        _signingKey.keyId,
-        _signingKey.publicKey,
-        toLegacySignatureAlgorithm(_signingKey.algorithmVersion),
-        _signingKey.algorithmVersion,
-      ]
+      _signingKey.keyId,
+      _signingKey.publicKey,
+      toLegacySignatureAlgorithm(_signingKey.algorithmVersion),
+      _signingKey.algorithmVersion]
+
     ).catch(() => {});
   }
 
@@ -99,7 +99,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     const company = await loadCompanyForPassport(passport.company_id);
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, {
       company,
-      granularity: passport.granularity || company?.default_granularity || company?.dpp_granularity || "model",
+      granularity: passport.granularity || company?.default_granularity || company?.dpp_granularity || "model"
     });
     const fields = {};
 
@@ -109,7 +109,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
         fields[fieldKey] = value;
       } else if (typeof value === "boolean") {
         fields[fieldKey] = value;
-      } else if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+      } else if (Array.isArray(value) || typeof value === "object" && value !== null) {
         fields[fieldKey] = value;
       } else {
         fields[fieldKey] = value === null || value === undefined ? null : String(value);
@@ -118,81 +118,79 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
     return {
       "@context": [
-        "https://www.w3.org/ns/credentials/v2",
-        "https://w3id.org/security/suites/jws-2020/v1",
-        `${didService?.getApiOrigin?.() || process.env.SERVER_URL || "http://localhost:3001"}/contexts/dpp/v1`,
-      ],
-      id: `${appUrl}/passport/${passport.guid}/credential/v${passport.version_number}`,
+      "https://www.w3.org/ns/credentials/v2",
+      "https://w3id.org/security/suites/jws-2020/v1",
+      `${didService?.getApiOrigin?.() || process.env.SERVER_URL || "http://localhost:3001"}/contexts/dpp/v1`],
+
+      id: `${appUrl}/passport/${passport.dppId}/credential/v${passport.version_number}`,
       type: ["VerifiableCredential", "DigitalProductPassport"],
       issuer: issuerDid(),
       validFrom: releasedAt,
       issuanceDate: releasedAt,
       credentialSubject: {
-        id: `${appUrl}/passport/${passport.guid}`,
+        id: `${appUrl}/passport/${passport.dppId}`,
         digitalProductPassportId: canonicalPayload.digitalProductPassportId,
         uniqueProductIdentifier: canonicalPayload.uniqueProductIdentifier,
         granularity: canonicalPayload.granularity,
         dppSchemaVersion: canonicalPayload.dppSchemaVersion,
         dppStatus: canonicalPayload.dppStatus,
-        lastUpdate: canonicalPayload.lastUpdate,
+        lastUpdated: canonicalPayload.lastUpdated || canonicalPayload.lastUpdate,
         economicOperatorId: canonicalPayload.economicOperatorId,
         facilityId: canonicalPayload.facilityId,
         contentSpecificationIds: canonicalPayload.contentSpecificationIds,
         subjectDid: canonicalPayload.subjectDid,
         dppDid: canonicalPayload.dppDid,
         companyDid: canonicalPayload.companyDid,
-        passportType: canonicalPayload.passportType,
         modelName: passport.model_name || null,
-        versionNumber: canonicalPayload.versionNumber,
-        ...fields,
-      },
+        ...fields
+      }
     };
   }
 
   function createJws(vcWithoutProof, { privateKey, algorithmVersion }) {
     const headerObj = { alg: algorithmVersion, b64: false, crit: ["b64"] };
     const headerB64 = Buffer.from(JSON.stringify(headerObj)).toString("base64url");
-    const payload   = canonicalJSON(vcWithoutProof);
-    const signer    = crypto.createSign("SHA256");
+    const payload = canonicalJSON(vcWithoutProof);
+    const signer = crypto.createSign("SHA256");
     signer.update(`${headerB64}.${payload}`);
     signer.end();
-    const sigB64url = algorithmVersion === "ES256"
-      ? signer.sign({ key: privateKey, dsaEncoding: "ieee-p1363" }, "base64url")
-      : signer.sign(privateKey, "base64url");
+    const sigB64url = algorithmVersion === "ES256" ?
+    signer.sign({ key: privateKey, dsaEncoding: "ieee-p1363" }, "base64url") :
+    signer.sign(privateKey, "base64url");
     return `${headerB64}..${sigB64url}`;
   }
 
   async function signPassport(passport, typeDef) {
     if (!_signingKey) return null;
     const releasedAt = new Date().toISOString();
-    const did        = issuerDid();
-    const company    = await loadCompanyForPassport(passport.company_id);
+    const did = issuerDid();
+    const company = await loadCompanyForPassport(passport.company_id);
 
     if (company && company.vc_issuance_enabled === false) return null;
 
-    const vc       = await buildVC(passport, typeDef, releasedAt);
+    const vc = await buildVC(passport, typeDef, releasedAt);
     const dataHash = crypto.createHash("sha256").update(canonicalJSON(vc)).digest("hex");
-    const jws      = createJws(vc, _signingKey);
+    const jws = createJws(vc, _signingKey);
 
     const vcWithProof = {
       ...vc,
       proof: {
-        type:               "JsonWebSignature2020",
-        created:            releasedAt,
+        type: "JsonWebSignature2020",
+        created: releasedAt,
         verificationMethod: `${did}#key-1`,
-        proofPurpose:       "assertionMethod",
-        jws,
-      },
+        proofPurpose: "assertionMethod",
+        jws
+      }
     };
 
     return {
       dataHash,
-      signature:  jws.split(".")[2],
-      keyId:      _signingKey.keyId,
+      signature: jws.split(".")[2],
+      keyId: _signingKey.keyId,
       signatureAlgorithm: _signingKey.algorithmVersion,
       legacyAlgorithm: toLegacySignatureAlgorithm(_signingKey.algorithmVersion),
       releasedAt,
-      vcJson:     JSON.stringify(vcWithProof),
+      vcJson: JSON.stringify(vcWithProof)
     };
   }
 
@@ -217,10 +215,10 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     return verifier.verify(publicKeyPem, Buffer.from(signature, "base64url"));
   }
 
-  async function verifyPassportSignature(guid, versionNumber) {
+  async function verifyPassportSignature(dppId, versionNumber) {
     const sigRow = await pool.query(
-      "SELECT * FROM passport_signatures WHERE passport_guid = $1 AND version_number = $2",
-      [guid, versionNumber]
+      "SELECT * FROM passport_signatures WHERE passport_dpp_id = $1 AND version_number = $2",
+      [dppId, versionNumber]
     );
     if (!sigRow.rows.length) return { status: "unsigned" };
     const sig = sigRow.rows[0];
@@ -258,25 +256,25 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
           storedAlgorithmVersion: keyRow.rows[0].algorithm_version,
           storedAlgorithm: keyRow.rows[0].algorithm || sig.algorithm,
           headerAlgorithm: headerObj.alg,
-          publicKeyPem,
+          publicKeyPem
         });
         const valid = verifyJwsSignature({
           publicKeyPem,
           algorithmVersion,
           signingInput,
-          signature: jwsSig,
+          signature: jwsSig
         });
 
         return {
-          status:       valid ? "valid" : "invalid",
-          signedAt:     sig.signed_at,
-          keyId:        sig.signing_key_id,
-          dataHash:     sig.data_hash,
-          releasedAt:   sig.released_at,
-          algorithm:    algorithmVersion,
-          proofType:    proof.type || "JsonWebSignature2020",
-          issuer:       vcWithoutProof.issuer,
-          credentialId: vcWithoutProof.id,
+          status: valid ? "valid" : "invalid",
+          signedAt: sig.signed_at,
+          keyId: sig.signing_key_id,
+          dataHash: sig.data_hash,
+          releasedAt: sig.released_at,
+          algorithm: algorithmVersion,
+          proofType: proof.type || "JsonWebSignature2020",
+          issuer: vcWithoutProof.issuer,
+          credentialId: vcWithoutProof.id
         };
       } catch {
         return { status: "invalid", signedAt: sig.signed_at, keyId: sig.signing_key_id };
@@ -287,7 +285,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       status: "invalid",
       signedAt: sig.signed_at,
       keyId: sig.signing_key_id,
-      releasedAt: sig.released_at,
+      releasedAt: sig.released_at
     };
   }
 
@@ -303,6 +301,6 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     createJws,
     signPassport,
     verifyPassportSignature,
-    getSigningKey,
+    getSigningKey
   };
 };

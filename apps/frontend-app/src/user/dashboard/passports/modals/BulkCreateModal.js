@@ -44,7 +44,7 @@ export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
       <div className="dashboard-modal-card dashboard-modal-card-compact">
         <h3 className="dashboard-modal-title">Bulk Create Passports</h3>
         <p className="dashboard-modal-subtitle">
-          Enter how many <strong>{passportType}</strong> drafts you want to create. Each one will get its own GUID and a default untitled name.
+          Enter how many <strong>{passportType}</strong> drafts you want to create. Each one will get its own DPP ID and a default untitled name.
         </p>
         <form onSubmit={handleSubmit} className="bulk-create-form">
           <label htmlFor="bulkCreateCount" className="device-manual-label">Number of Passports</label>

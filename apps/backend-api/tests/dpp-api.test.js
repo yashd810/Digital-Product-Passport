@@ -55,14 +55,37 @@ function findRouteLayer(app, method, path) {
   return layer.route.stack.map((entry) => entry.handle);
 }
 
+function buildActualPath(path, params) {
+  return String(path).replace(/:([A-Za-z0-9_]+)/g, (_, key) => String(params[key] ?? ""));
+}
+
 async function invokeRoute(app, { method, path, body = {}, params = {}, query = {}, headers = {} }) {
-  const handlers = findRouteLayer(app, method, path);
+  const actualPath = buildActualPath(path, params);
+  const handlers = [];
+  for (const layer of app._router?.stack || []) {
+    if (layer.route) {
+      if (layer.route.path === path && layer.route.methods?.[method]) {
+        handlers.push(...layer.route.stack.map((entry) => entry.handle));
+      }
+      continue;
+    }
+    if (["query", "expressInit", "jsonParser"].includes(layer.name)) continue;
+    if (typeof layer.match === "function" && layer.match(actualPath)) {
+      handlers.push(layer.handle);
+    }
+  }
+  if (!handlers.length) {
+    findRouteLayer(app, method, path);
+  }
   const req = {
     method: method.toUpperCase(),
     body,
     params,
     query,
     headers,
+    path: actualPath,
+    originalUrl: actualPath,
+    url: actualPath,
     user: null,
   };
   const res = createMockResponse();
@@ -101,37 +124,75 @@ async function invokeRoute(app, { method, path, body = {}, params = {}, query = 
   return res;
 }
 
-function createTestApp() {
-  const app = express();
-  app.use(express.json());
+function expectStandardError(response, {
+  httpStatus,
+  statusCode,
+  error,
+  text,
+  code,
+  detail,
+  extra = {},
+}) {
+  expect(response.statusCode).toBe(httpStatus);
+  expect(response.headers["x-correlation-id"]).toEqual(expect.any(String));
+  expect(response.body).toMatchObject({
+    statusCode,
+    error,
+    ...extra,
+  });
+  if (detail !== undefined) {
+    expect(response.body.detail).toBe(detail);
+  }
+  expect(Array.isArray(response.body.message)).toBe(true);
+  expect(response.body.message).toHaveLength(1);
+  expect(response.body.message[0]).toMatchObject({
+    messageType: "Error",
+    text,
+    code,
+    correlationId: response.headers["x-correlation-id"],
+  });
+  expect(response.body.message[0].timestamp).toEqual(expect.any(String));
+}
 
-  const releasedPassport = {
+function createTestApp(options = {}) {
+  const app = express();
+  app.use(express.json({ type: ["application/json", "application/merge-patch+json"] }));
+
+  let releasedPassport = {
     id: 14,
-    guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
+    dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+    dpp_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+    lineage_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
     company_id: 5,
     passport_type: "battery",
     product_id: "BAT-2026-001",
     product_identifier_did: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
-    release_status: "released",
+    release_status: options.releasedStatus || "released",
     version_number: 2,
     updated_at: "2026-04-27T10:00:00.000Z",
     granularity: "item",
     manufacturer: "Acme Energy",
   };
-  let editablePassport = {
-    ...releasedPassport,
-    id: 21,
-    release_status: "draft",
-    version_number: 3,
-    manufacturer: "Draft Manufacturer",
-  };
+  let editablePassport = options.includeEditable === false
+    ? null
+    : {
+        ...releasedPassport,
+        id: 21,
+        release_status: options.editableStatus || "draft",
+        version_number: 3,
+        manufacturer: "Draft Manufacturer",
+      };
   const backupProviderService = {
     replicatePassportSnapshot: jest.fn(async () => ({ success: true, results: [] })),
   };
 
   const pool = {
     query: jest.fn(async (sql, params = []) => {
-      if (String(sql).includes("SELECT economic_operator_identifier")) {
+      const normalizedSql = String(sql)
+        .replace(/\bpassport_dpp_id\b/g, "passport_guid")
+        .replace(/\bdpp_id\b/g, "guid");
+
+      if (normalizedSql.includes("SELECT economic_operator_identifier")) {
         return {
           rows: [{
             economic_operator_identifier: "did:web:www.example.test:did:company:5",
@@ -139,10 +200,11 @@ function createTestApp() {
           }],
         };
       }
-      if (String(sql).includes("SELECT type_name, semantic_model_key, fields_json FROM passport_types")) {
+      if (normalizedSql.includes("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types")) {
         return {
           rows: [{
             type_name: "battery",
+            umbrella_category: "Battery Digital Passport",
             semantic_model_key: "claros_battery_dictionary_v1",
             fields_json: {
               sections: [{
@@ -155,10 +217,11 @@ function createTestApp() {
           }],
         };
       }
-      if (String(sql).includes("SELECT type_name, semantic_model_key, fields_json FROM passport_types ORDER BY type_name")) {
+      if (normalizedSql.includes("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name")) {
         return {
           rows: [{
             type_name: "battery",
+            umbrella_category: "Battery Digital Passport",
             semantic_model_key: "claros_battery_dictionary_v1",
             fields_json: {
               sections: [{
@@ -171,11 +234,11 @@ function createTestApp() {
           }],
         };
       }
-      if (String(sql).includes("INSERT INTO dpp_registry_registrations")) {
+      if (normalizedSql.includes("INSERT INTO dpp_registry_registrations")) {
         return {
           rows: [{
             id: 1,
-            passport_guid: releasedPassport.guid,
+            passport_dpp_id: releasedPassport.dppId,
             company_id: releasedPassport.company_id,
             product_identifier: releasedPassport.product_identifier_did,
             dpp_id: "did:web:www.example.test:did:dpp:item:legacy",
@@ -186,10 +249,11 @@ function createTestApp() {
           }],
         };
       }
-      if (String(sql).includes("INSERT INTO battery_passports")) {
+      if (normalizedSql.includes("INSERT INTO battery_passports")) {
         editablePassport = {
           ...editablePassport,
-          guid: params[0],
+          dppId: params[0],
+          dpp_id: params[0],
           lineage_id: params[1],
           company_id: params[2],
           model_name: params[3],
@@ -206,31 +270,64 @@ function createTestApp() {
         };
         return { rows: [editablePassport] };
       }
-      if (String(sql).includes("INSERT INTO passport_registry")) {
+      if (normalizedSql.includes("INSERT INTO passport_registry")) {
         return { rows: [] };
       }
-      if (String(sql).includes("SET deleted_at = NOW()") && String(sql).includes("FROM battery_passports") === false) {
-        return { rows: [{ guid: editablePassport.guid }] };
-      }
-      if (String(sql).includes("FROM battery_passports") && String(sql).includes("release_status IN ('draft', 'in_revision', 'revised')")) {
+      if (normalizedSql.includes("SELECT *") && normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("WHERE lineage_id = $1") && normalizedSql.includes("company_id = $2") && normalizedSql.includes("deleted_at IS NULL")) {
         return {
-          rows: [editablePassport],
+          rows: [releasedPassport, editablePassport].filter(Boolean),
         };
       }
-      if (String(sql).includes("UPDATE battery_passports")) {
-        editablePassport = {
-          ...editablePassport,
-          manufacturer: params[0],
-          updated_by: params[1],
+      if (
+        normalizedSql.includes("SET deleted_at = NOW()")
+        && normalizedSql.includes("WHERE guid = $1")
+        && normalizedSql.includes("release_status IN ('draft', 'in_revision', 'revised')")
+      ) {
+        return { rows: editablePassport ? [{ dpp_id: editablePassport.dppId }] : [] };
+      }
+      if (normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("release_status IN ('draft', 'in_revision', 'revised')")) {
+        return {
+          rows: editablePassport && ["draft", "in_revision", "revised"].includes(editablePassport.release_status)
+            ? [editablePassport]
+            : [],
         };
+      }
+      if (normalizedSql.includes("INSERT INTO passport_archives")) {
         return { rows: [] };
       }
-      if (String(sql).includes("FROM battery_passports") && String(sql).includes("release_status IN ('released', 'obsolete')")) {
+      if (normalizedSql.includes("UPDATE battery_passports")) {
+        if (normalizedSql.includes("WHERE lineage_id = $1")) {
+          releasedPassport = { ...releasedPassport, deleted_at: "2026-04-29T12:00:00.000Z" };
+          if (editablePassport) {
+            editablePassport = { ...editablePassport, deleted_at: "2026-04-29T12:00:00.000Z" };
+          }
+        } else if (editablePassport) {
+          editablePassport = {
+            ...editablePassport,
+            manufacturer: params[0],
+            updated_by: params[1],
+          };
+        }
+        return { rows: [] };
+      }
+      if (normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("release_status IN ('released', 'obsolete')")) {
         return {
-          rows: [releasedPassport],
+          rows: releasedPassport && !releasedPassport.deleted_at ? [releasedPassport] : [],
         };
       }
-      if (String(sql).includes("FROM passport_archives")) {
+      if (
+        String(sql).includes("FROM battery_passports")
+        && String(sql).includes("WHERE (lineage_id = $1 OR dpp_id::text = $1)")
+        && String(sql).includes("release_status = 'released'")
+      ) {
+        const requestedId = params[0];
+        return {
+          rows: releasedPassport && !releasedPassport.deleted_at && (
+            requestedId === releasedPassport.dppId || requestedId === releasedPassport.lineage_id
+          ) ? [releasedPassport] : [],
+        };
+      }
+      if (normalizedSql.includes("FROM passport_archives")) {
         return { rows: [] };
       }
       throw new Error(`Unexpected query: ${sql}`);
@@ -251,30 +348,87 @@ function createTestApp() {
     extractExplicitFacilityId,
     stripRestrictedFieldsForPublicView: async (passport) => passport,
     getCompanyNameMap: async () => new Map([["5", "Acme Energy"]]),
-    resolveReleasedPassportByProductId: async (productId, { companyId = null } = {}) => {
+    resolveReleasedPassportByProductId: async (productId, { companyId = null, strictProductId = false } = {}) => {
+      if (strictProductId && productId === releasedPassport.product_identifier_did) return null;
       if (productId !== "BAT-2026-001" && productId !== releasedPassport.product_identifier_did) return null;
       if (companyId !== null && Number(companyId) !== 5) return null;
       return { passport: { ...releasedPassport } };
     },
     signingService: {},
     buildOperationalDppPayload: (passport) => ({
-      digitalProductPassportId: "did:web:www.example.test:did:dpp:item:legacy",
-      uniqueProductIdentifier: passport.product_identifier_did,
+      digitalProductPassportId: passport.dppId,
+      uniqueProductIdentifier: passport.product_id,
       product_id: passport.product_id,
     }),
     buildCanonicalPassportPayload: (passport) => ({
-      digitalProductPassportId: "did:web:www.example.test:did:dpp:item:legacy",
-      uniqueProductIdentifier: passport.product_identifier_did,
+      digitalProductPassportId: passport.dppId,
+      uniqueProductIdentifier: passport.product_id,
       subjectDid: "did:web:www.example.test:did:battery:item:legacy",
       dppDid: "did:web:www.example.test:did:dpp:item:legacy",
       companyDid: "did:web:www.example.test:did:company:5",
       contentSpecificationIds: ["claros_battery_dictionary_v1"],
-      passportType: "battery",
-      versionNumber: passport.version_number || 2,
+      lastUpdated: passport.updated_at || passport.created_at || "2026-04-27T10:00:00.000Z",
+      extensions: {
+        claros: {
+          passportType: "battery",
+          versionNumber: passport.version_number || 2,
+          internalId: passport.dppId,
+        },
+      },
       fields: {
         manufacturer: passport.manufacturer || "Acme Energy",
         public_summary: passport.public_summary || "Public battery summary",
       },
+    }),
+    buildExpandedPassportPayload: (passport) => ({
+      digitalProductPassportId: passport.dppId,
+      uniqueProductIdentifier: passport.product_id,
+      subjectDid: "did:web:www.example.test:did:battery:item:legacy",
+      dppDid: "did:web:www.example.test:did:dpp:item:legacy",
+      companyDid: "did:web:www.example.test:did:company:5",
+      contentSpecificationIds: ["claros_battery_dictionary_v1"],
+      lastUpdated: passport.updated_at || passport.created_at || "2026-04-27T10:00:00.000Z",
+      extensions: {
+        claros: {
+          passportType: "battery",
+          versionNumber: passport.version_number || 2,
+          internalId: passport.dppId,
+        },
+      },
+      elements: [
+        {
+          elementId: "manufacturer",
+          objectType: "SingleValuedDataElement",
+          dictionaryReference: "urn:test:manufacturer",
+          valueDataType: "String",
+          value: passport.manufacturer || "Acme Energy",
+          elements: [],
+        },
+        {
+          elementId: "public_summary",
+          objectType: "SingleValuedDataElement",
+          dictionaryReference: "urn:test:public-summary",
+          valueDataType: "String",
+          value: passport.public_summary || "Public battery summary",
+          elements: [],
+        },
+      ],
+    }),
+    buildExpandedDataElement: ({ elementIdPath, value, fieldDef }) => ({
+      elementId: fieldDef?.elementId || fieldDef?.key || elementIdPath,
+      objectType: Array.isArray(value)
+        ? "MultiValuedDataElement"
+        : value && typeof value === "object"
+          ? "DataElementCollection"
+          : "SingleValuedDataElement",
+      dictionaryReference: fieldDef?.semanticId || fieldDef?.semantic_id || null,
+      valueDataType: Array.isArray(value)
+        ? "Array"
+        : value && typeof value === "object"
+          ? "Object"
+          : "String",
+      value,
+      elements: [],
     }),
     buildPassportJsonLdContext: () => ({ "@vocab": "https://example.test/terms/" }),
     didService: {
@@ -290,7 +444,7 @@ function createTestApp() {
       facilityDid: (facilityId) => `did:web:www.example.test:did:facility:${facilityId}`,
       platformDid: () => "did:web:www.example.test",
       parseDid: (value) => {
-        if (value === "did:web:www.example.test:did:dpp:item:5:BAT-2026-001") {
+        if (value === "dpp_72b99c83-952c-4179-96f6-54a513d39dbc") {
           return { type: "dpp", granularity: "item", companyId: "5", productId: "BAT-2026-001" };
         }
         return null;
@@ -337,7 +491,8 @@ function createTestApp() {
     SYSTEM_PASSPORT_FIELDS: new Set([
       "company_id",
       "created_by",
-      "guid",
+      "dpp_id",
+      "dppId",
       "lineage_id",
       "release_status",
       "version_number",
@@ -352,6 +507,7 @@ function createTestApp() {
     complianceService: {
       loadPassportTypeDefinition: async () => ({
         type_name: "battery",
+        umbrella_category: "Battery Digital Passport",
         semantic_model_key: "claros_battery_dictionary_v1",
         fields_json: {
           sections: [{
@@ -390,17 +546,249 @@ describe("DPP standards API", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.body.success).toBe(true);
-    expect(response.body.passport.uniqueProductIdentifier).toContain("bat-new-001");
+    expect(response.body.digitalProductPassportId).toMatch(/^dpp_[0-9a-f-]{36}$/i);
+    expect(response.body.dppId).toBe(response.body.digitalProductPassportId);
+    expect(response.body.passport.digitalProductPassportId).toBe(response.body.digitalProductPassportId);
+    expect(response.body.passport.uniqueProductIdentifier).toBe("BAT-NEW-001");
   });
 
-  test("POST /api/v1/dppsByProductIds returns batch lookup results", async () => {
+  test("POST /api/v1/dpps returns expanded elements when representation=expanded is requested", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dpps",
+      query: {
+        representation: "expanded",
+      },
+      body: {
+        passportType: "battery",
+        productId: "BAT-NEW-002",
+        public_summary: "Expanded battery passport",
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.passport.fields).toBeUndefined();
+    expect(response.body.passport.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          elementId: "public_summary",
+          objectType: "SingleValuedDataElement",
+        }),
+      ])
+    );
+  });
+
+  test("GET /api/v1/dppsByProductId/:productId returns the current released passport by productId", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dppsByProductId/:productId",
+      params: {
+        productId: "BAT-2026-001",
+      },
+      query: {
+        representation: "expanded",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.fields).toBeUndefined();
+    expect(response.body.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          elementId: "manufacturer",
+          objectType: "SingleValuedDataElement",
+          dictionaryReference: "urn:test:manufacturer",
+          valueDataType: "String",
+          value: "Acme Energy",
+          elements: [],
+        }),
+      ])
+    );
+  });
+
+  test("GET /api/v1/dppsByProductId/:productId still accepts representation=full as a backwards-compatible alias", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dppsByProductId/:productId",
+      params: {
+        productId: "BAT-2026-001",
+      },
+      query: {
+        representation: "full",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.fields).toBeUndefined();
+    expect(response.body.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          elementId: "manufacturer",
+          objectType: "SingleValuedDataElement",
+        }),
+      ])
+    );
+  });
+
+  test("GET /api/v1/dppsByProductId/:productId only resolves raw productId values", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dppsByProductId/:productId",
+      params: {
+        productId: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+      },
+    });
+
+    expectStandardError(response, {
+      httpStatus: 404,
+      statusCode: "ClientErrorResourceNotFound",
+      error: "Passport not found or not released",
+      text: "Passport not found or not released",
+      code: "404",
+    });
+  });
+
+  test("GET /api/v1/dppsByProductIdAndDate/:productId returns the released passport version for the requested date", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dppsByProductIdAndDate/:productId",
+      params: {
+        productId: "BAT-2026-001",
+      },
+      query: {
+        date: "2026-04-28T00:00:00.000Z",
+        representation: "expanded",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      statusCode: "Success",
+      digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      uniqueProductIdentifier: "BAT-2026-001",
+    });
+    expect(response.body.fields).toBeUndefined();
+    expect(response.body.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          elementId: "manufacturer",
+          objectType: "SingleValuedDataElement",
+          value: "Acme Energy",
+        }),
+      ])
+    );
+  });
+
+  test("GET /api/v1/dppsByProductIdAndDate/:productId only resolves raw productId values", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dppsByProductIdAndDate/:productId",
+      params: {
+        productId: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+      },
+      query: {
+        date: "2026-04-28T00:00:00.000Z",
+      },
+    });
+
+    expectStandardError(response, {
+      httpStatus: 404,
+      statusCode: "ClientErrorResourceNotFound",
+      error: "Passport not found for the requested date",
+      text: "Passport not found for the requested date",
+      code: "404",
+    });
+  });
+
+  test("removes the old product lookup GET routes", () => {
+    const app = createTestApp();
+
+    expect(() => findRouteLayer(app, "get", "/api/dpp/by-product/:productId")).toThrow(
+      "Route not found for GET /api/dpp/by-product/:productId"
+    );
+    expect(() => findRouteLayer(app, "get", "/api/dpp/:companyId/:productId")).toThrow(
+      "Route not found for GET /api/dpp/:companyId/:productId"
+    );
+    expect(() => findRouteLayer(app, "get", "/api/v1/dpps/:productIdentifier")).toThrow(
+      "Route not found for GET /api/v1/dpps/:productIdentifier"
+    );
+    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductId/:productId").length).toBeGreaterThan(0);
+    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductIdAndDate/:productId").length).toBeGreaterThan(0);
+  });
+
+  test("removes the old /api/v1/dppsByIdAndDate/:dppId route", () => {
+    const app = createTestApp();
+
+    expect(() => findRouteLayer(app, "get", "/api/v1/dppsByIdAndDate/:dppId")).toThrow(
+      "Route not found for GET /api/v1/dppsByIdAndDate/:dppId"
+    );
+    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductIdAndDate/:productId").length).toBeGreaterThan(0);
+  });
+
+  test("POST /api/v1/dppsByProductIds returns paged DPP identifiers for productId input", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "post",
       path: "/api/v1/dppsByProductIds",
       body: {
-        productIdentifiers: ["BAT-2026-001", "UNKNOWN-001"],
+        productId: ["BAT-2026-001", "UNKNOWN-001"],
+        limit: 1,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      statusCode: "Success",
+      identifiers: ["dpp_72b99c83-952c-4179-96f6-54a513d39dbc"],
+      limit: 1,
+      cursor: null,
+      nextCursor: expect.any(String),
+    });
+  });
+
+  test("POST /api/v1/dppsByProductIds supports cursor pagination", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dppsByProductIds",
+      body: {
+        productId: ["BAT-2026-001", "UNKNOWN-001"],
+        limit: 1,
+        cursor: Buffer.from(JSON.stringify({ offset: 1 }), "utf8").toString("base64url"),
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      statusCode: "Success",
+      identifiers: [],
+      limit: 1,
+      nextCursor: null,
+    });
+  });
+
+  test("POST /api/v1/dppsByProductIds/search returns batch lookup payload results as an extension", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dppsByProductIds/search",
+      body: {
+        productId: ["BAT-2026-001", "UNKNOWN-001"],
         representation: "compressed",
       },
     });
@@ -418,6 +806,16 @@ describe("DPP standards API", () => {
     });
   });
 
+  test("removes the old /api/v1/dppIdsByProductIds route", () => {
+    const app = createTestApp();
+
+    expect(() => findRouteLayer(app, "post", "/api/v1/dppIdsByProductIds")).toThrow(
+      "Route not found for POST /api/v1/dppIdsByProductIds"
+    );
+    expect(findRouteLayer(app, "post", "/api/v1/dppsByProductIds").length).toBeGreaterThan(0);
+    expect(findRouteLayer(app, "post", "/api/v1/dppsByProductIds/search").length).toBeGreaterThan(0);
+  });
+
   test("POST /api/v1/registerDPP registers an existing released passport", async () => {
     const app = createTestApp();
 
@@ -431,45 +829,29 @@ describe("DPP standards API", () => {
     });
 
     expect(response.statusCode).toBe(201);
+    expect(response.body.statusCode).toBe("SuccessCreated");
+    expect(response.body.registrationId).toBe("local:1");
     expect(response.body.success).toBe(true);
     expect(response.body.registration).toMatchObject({
+      id: 1,
       company_id: 5,
       registry_name: "local",
       status: "registered",
     });
     expect(response.body.payload).toMatchObject({
-      digitalProductPassportId: "did:web:www.example.test:did:dpp:item:legacy",
-      uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+      digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      uniqueProductIdentifier: "BAT-2026-001",
     });
   });
 
-  test("POST /api/v1/dppIdsByProductIds returns DPP identifiers", async () => {
-    const app = createTestApp();
-
-    const response = await invokeRoute(app, {
-      method: "post",
-      path: "/api/v1/dppIdsByProductIds",
-      body: {
-        productIdentifiers: ["BAT-2026-001"],
-      },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.body.results[0]).toMatchObject({
-      productIdentifier: "BAT-2026-001",
-      found: true,
-      dppId: "did:web:www.example.test:did:dpp:item:legacy",
-    });
-  });
-
-  test("PATCH /api/v1/dpps/:productIdentifier/elements/:elementIdPath updates an editable field", async () => {
+  test("PATCH /api/v1/dpps/:dppId/elements/:elementIdPath updates an editable field with a simple value body", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "patch",
-      path: "/api/v1/dpps/:productIdentifier/elements/:elementIdPath",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
       params: {
-        productIdentifier: "BAT-2026-001",
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
         elementIdPath: "manufacturer",
       },
       body: {
@@ -480,8 +862,68 @@ describe("DPP standards API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({
       elementIdPath: "manufacturer",
+      elementId: "manufacturer",
+      objectType: "SingleValuedDataElement",
       dictionaryReference: "urn:test:manufacturer",
+      valueDataType: "String",
       value: "Updated Manufacturer",
+      elements: [],
+    });
+  });
+
+  test("PATCH /api/v1/dpps/:dppId/elements/:elementIdPath accepts a DataElement-style body", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        elementIdPath: "manufacturer",
+      },
+      body: {
+        elementId: "manufacturer",
+        dictionaryReference: "urn:test:manufacturer",
+        valueDataType: "String",
+        value: "Structured Update",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      elementIdPath: "manufacturer",
+      elementId: "manufacturer",
+      objectType: "SingleValuedDataElement",
+      dictionaryReference: "urn:test:manufacturer",
+      valueDataType: "String",
+      value: "Structured Update",
+      elements: [],
+    });
+  });
+
+  test("PATCH /api/v1/dpps/:dppId/elements/:elementIdPath rejects mismatched DataElement metadata", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        elementIdPath: "manufacturer",
+      },
+      body: {
+        elementId: "batteryMass",
+        dictionaryReference: "urn:test:manufacturer",
+        value: "Bad Update",
+      },
+    });
+
+    expectStandardError(response, {
+      httpStatus: 400,
+      statusCode: "ClientErrorBadRequest",
+      error: "elementId does not match the target elementIdPath",
+      text: "elementId does not match the target elementIdPath",
+      code: "400",
     });
   });
 
@@ -492,7 +934,7 @@ describe("DPP standards API", () => {
       method: "patch",
       path: "/api/v1/dpps/:dppId",
       params: {
-        dppId: "did:web:www.example.test:did:dpp:item:5:BAT-2026-001",
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
       },
       body: {
         manufacturer: "Whole Passport Update",
@@ -501,8 +943,108 @@ describe("DPP standards API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body.success).toBe(true);
+    expect(response.body.dppId).toBe("dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
+    expect(response.body.digitalProductPassportId).toBe("dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
     expect(response.body.updatedFields).toContain("manufacturer");
     expect(response.body.passport.fields.manufacturer).toBe("Whole Passport Update");
+  });
+
+  test("PATCH /api/v1/dpps/:dppId returns expanded elements when representation=full is requested", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/v1/dpps/:dppId",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      },
+      query: {
+        representation: "full",
+      },
+      body: {
+        manufacturer: "Whole Passport Update",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.passport.fields).toBeUndefined();
+    expect(response.body.passport.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          elementId: "manufacturer",
+          objectType: "SingleValuedDataElement",
+          value: "Whole Passport Update",
+        }),
+      ])
+    );
+  });
+
+  test("PATCH /api/v1/dpps/:dppId advertises and accepts JSON Merge Patch", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/v1/dpps/:dppId",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      },
+      headers: {
+        "content-type": "application/merge-patch+json",
+      },
+      body: {
+        manufacturer: "Merge Patch Manufacturer",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["accept-patch"]).toBe("application/merge-patch+json, application/json");
+    expect(response.body.passport.fields.manufacturer).toBe("Merge Patch Manufacturer");
+  });
+
+  test("PATCH /api/v1/dpps/:dppId rejects unsupported patch content types", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/v1/dpps/:dppId",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      },
+      headers: {
+        "content-type": "application/xml",
+      },
+      body: {
+        manufacturer: "Nope",
+      },
+    });
+
+    expect(response.headers["accept-patch"]).toBe("application/merge-patch+json, application/json");
+    expectStandardError(response, {
+      httpStatus: 415,
+      statusCode: "ClientErrorBadRequest",
+      error: "Unsupported Media Type",
+      text: "Unsupported Media Type",
+      code: "415",
+      extra: {
+        supportedContentTypes: ["application/json", "application/merge-patch+json"],
+      },
+    });
+  });
+
+  test("OPTIONS /api/v1/dpps/:dppId advertises JSON Merge Patch support", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "options",
+      path: "/api/v1/dpps/:dppId",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["accept-patch"]).toBe("application/merge-patch+json, application/json");
+    expect(response.headers.allow).toBe("PATCH, DELETE, OPTIONS");
   });
 
   test("DELETE /api/v1/dpps/:dppId deletes an editable passport revision", async () => {
@@ -512,44 +1054,122 @@ describe("DPP standards API", () => {
       method: "delete",
       path: "/api/v1/dpps/:dppId",
       params: {
-        dppId: "did:web:www.example.test:did:dpp:item:5:BAT-2026-001",
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
       },
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({
       success: true,
-      dppId: "did:web:www.example.test:did:dpp:item:5:BAT-2026-001",
+      dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
     });
   });
 
-  test("GET /api/v1/dpps/:productIdentifier/elements/:elementIdPath blocks public reads for restricted elements", async () => {
+  test("DELETE /api/v1/dpps/:dppId refuses to delete a released DPP and points clients to archive", async () => {
+    const app = createTestApp({ includeEditable: false });
+
+    const response = await invokeRoute(app, {
+      method: "delete",
+      path: "/api/v1/dpps/:dppId",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      },
+    });
+
+    expectStandardError(response, {
+      httpStatus: 409,
+      statusCode: "ClientResourceConflict",
+      error: "RELEASED_DPP_REQUIRES_ARCHIVE",
+      text: "Released DPPs must use the archive lifecycle action instead of DELETE.",
+      code: "RELEASED_DPP_REQUIRES_ARCHIVE",
+      detail: "Released DPPs must use the archive lifecycle action instead of DELETE.",
+      extra: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        archiveEndpoint: "/api/v1/dpps/dpp_72b99c83-952c-4179-96f6-54a513d39dbc/archive",
+      },
+    });
+  });
+
+  test("POST /api/v1/dpps/:dppId/archive archives a released DPP lineage", async () => {
+    const app = createTestApp({ includeEditable: false });
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dpps/:dppId/archive",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      lifecycleAction: "archive",
+      lifecycleStatus: "Archived",
+      versionsArchived: 1,
+      dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+    });
+  });
+
+  test("GET /api/v1/dpps/:dppId/elements/:elementIdPath blocks public reads for restricted elements", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/v1/dpps/:productIdentifier/elements/:elementIdPath",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
       params: {
-        productIdentifier: "BAT-2026-001",
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
         elementIdPath: "manufacturer",
       },
     });
 
-    expect(response.statusCode).toBe(403);
-    expect(response.body).toMatchObject({
+    expectStandardError(response, {
+      httpStatus: 403,
+      statusCode: "ClientForbidden",
       error: "DATA_ELEMENT_RESTRICTED",
-      audiences: ["notified_bodies"],
+      text: "You are not allowed to perform this action.",
+      code: "DATA_ELEMENT_RESTRICTED",
+      extra: {
+        audiences: ["notified_bodies"],
+      },
     });
   });
 
-  test("GET /api/v1/dpps/:productIdentifier/elements/:elementIdPath/authorized returns restricted elements for authorized users", async () => {
+  test("GET /api/v1/dpps/:dppId/elements/:elementIdPath supports a simple JSONPath-style field path", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/v1/dpps/:productIdentifier/elements/:elementIdPath/authorized",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
       params: {
-        productIdentifier: "BAT-2026-001",
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        elementIdPath: "$.fields.public_summary",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      elementIdPath: "public_summary",
+      elementId: "public_summary",
+      objectType: "SingleValuedDataElement",
+      dictionaryReference: "urn:test:public-summary",
+      valueDataType: "String",
+      value: "Public battery summary",
+      elements: [],
+    });
+  });
+
+  test("GET /api/v1/dpps/:dppId/elements/:elementIdPath/authorized returns restricted elements for authorized users", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath/authorized",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
         elementIdPath: "manufacturer",
       },
     });
@@ -557,11 +1177,37 @@ describe("DPP standards API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({
       elementIdPath: "manufacturer",
+      elementId: "manufacturer",
+      objectType: "SingleValuedDataElement",
+      dictionaryReference: "urn:test:manufacturer",
+      valueDataType: "String",
       value: "Acme Energy",
+      elements: [],
       access: {
         audience: "notified_bodies",
         confidentiality: "regulated",
       },
+    });
+  });
+
+  test("GET /api/v1/dpps/:dppId/elements/:elementIdPath rejects unsupported JSONPath features", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        elementIdPath: "$..manufacturer",
+      },
+    });
+
+    expectStandardError(response, {
+      httpStatus: 400,
+      statusCode: "ClientErrorBadRequest",
+      error: "Only simple DPP element paths are supported; full RFC 9535 JSONPath expressions are not supported",
+      text: "Only simple DPP element paths are supported; full RFC 9535 JSONPath expressions are not supported",
+      code: "400",
     });
   });
 });

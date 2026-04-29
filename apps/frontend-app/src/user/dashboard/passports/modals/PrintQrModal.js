@@ -49,7 +49,7 @@ export function PrintQrModal({ selectedCount, onClose, onConfirm, isExporting })
             </select>
           </div>
           <p className="bulk-create-note">
-            The total label size includes passport category on top, the QR code in the middle, and the passport GUID at the bottom.
+            The total label size includes passport category on top, the QR code in the middle, and the passport DPP ID at the bottom.
           </p>
           {error && <div className="dashboard-inline-error">{error}</div>}
           <div className="dashboard-modal-actions dashboard-modal-actions-end">

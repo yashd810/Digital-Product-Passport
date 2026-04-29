@@ -31,10 +31,10 @@ export function PassportListRowMenu({
 }) {
   return (
     <KebabMenu anchorRect={anchorRect} onClose={() => { setOpenMenuId(null); setMenuAnchorRect(null); }}>
-      <button className="menu-item" onClick={() => togglePin(passport.guid)}>
+      <button className="menu-item" onClick={() => togglePin(passport.dppId)}>
         {isPinned ? "📌 Unpin" : "📌 Pin to top"}
       </button>
-      <button className={`menu-item edit-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.release_status)} onClick={() => { navigate(`/edit/${passport.guid}?passportType=${pType}`); setOpenMenuId(null); }}>
+      <button className={`menu-item edit-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.release_status)} onClick={() => { navigate(`/edit/${passport.dppId}?passportType=${pType}`); setOpenMenuId(null); }}>
         ✏️ Edit
       </button>
       <button className={`menu-item release-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.release_status)} onClick={() => { setReleaseModal({ ...passport, passport_type: pType }); setOpenMenuId(null); }}>
@@ -43,7 +43,7 @@ export function PassportListRowMenu({
       <button className="menu-item" onClick={() => { openPassportViewer(passport, { forcePreview: true }); setOpenMenuId(null); }}>
         👁 Preview public view
       </button>
-      <button className={`menu-item revise-item${!isReleasedPassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isReleasedPassportStatus(passport.release_status)} onClick={() => { handleRevise(passport.guid, passport.version_number, pType); setOpenMenuId(null); }}>
+      <button className={`menu-item revise-item${!isReleasedPassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isReleasedPassportStatus(passport.release_status)} onClick={() => { handleRevise(passport.dppId, passport.version_number, pType); setOpenMenuId(null); }}>
         🔄 Revise
       </button>
       <button className="menu-item" onClick={() => handleClone(passport, pType)}>
@@ -52,10 +52,10 @@ export function PassportListRowMenu({
       <button className={`menu-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.release_status)} onClick={() => { setCsvModal({ passport, pType }); setOpenMenuId(null); }}>
         📤 Update data via CSV
       </button>
-      <button className="menu-item" onClick={() => { setHistoryModal({ guid: passport.guid, passportType: pType }); setOpenMenuId(null); }}>
+      <button className="menu-item" onClick={() => { setHistoryModal({ dppId: passport.dppId, passportType: pType }); setOpenMenuId(null); }}>
         🕘 Update history
       </button>
-      <button className="menu-item" onClick={() => { navigate(`/passport/${passport.guid}/diff?passportType=${pType}`); setOpenMenuId(null); }}>
+      <button className="menu-item" onClick={() => { navigate(`/passport/${passport.dppId}/diff?passportType=${pType}`); setOpenMenuId(null); }}>
         🔀 Compare versions
       </button>
       <button className="menu-item" onClick={() => { setDeviceModal({ passport, pType }); setOpenMenuId(null); }}>
@@ -82,10 +82,10 @@ export function PassportListRowMenu({
       >
         🔗 {getPassportLinkType(passport.release_status) === "passport" ? "Copy passport link" : "Copy preview link"}
       </button>
-      <button className="menu-item" onClick={() => { handleArchive(passport.guid, pType); setOpenMenuId(null); }}>
+      <button className="menu-item" onClick={() => { handleArchive(passport.dppId, pType); setOpenMenuId(null); }}>
         📦 Archive
       </button>
-      <button className={`menu-item delete-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.release_status)} onClick={() => { handleDelete(passport.guid, pType); setOpenMenuId(null); }}>
+      <button className={`menu-item delete-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.release_status)} onClick={() => { handleDelete(passport.dppId, pType); setOpenMenuId(null); }}>
         🗑️ Delete
       </button>
     </KebabMenu>

@@ -37,7 +37,7 @@ module.exports = function createPassportService({
 }) {
   // ─── AUDIT / NOTIFICATION ────────────────────────────────────────────────
 
-  async function logAudit(companyId, userId, action, tableName, passportGuid, oldData, newData, options = {}) {
+  async function logAudit(companyId, userId, action, tableName, passportDppId, oldData, newData, options = {}) {
     try {
       const previousHashRes = await pool.query(
         `SELECT event_hash
@@ -56,7 +56,7 @@ module.exports = function createPassportService({
         userId: userId || null,
         action,
         tableName: tableName || null,
-        recordId: passportGuid || null,
+        recordId: passportDppId || null,
         oldData: oldData || null,
         newData: newData || null,
         actorIdentifier: options.actorIdentifier || null,
@@ -78,7 +78,7 @@ module.exports = function createPassportService({
           userId || null,
           action,
           tableName,
-          passportGuid || null,
+          passportDppId || null,
           oldData ? JSON.stringify(oldData) : null,
           newData ? JSON.stringify(newData) : null,
           options.actorIdentifier || null,
@@ -144,13 +144,13 @@ module.exports = function createPassportService({
     };
   }
 
-  async function createNotification(userId, type, title, message, passportGuid, actionUrl) {
+  async function createNotification(userId, type, title, message, passportDppId, actionUrl) {
     if (!userId) return;
     try {
       await pool.query(
-        `INSERT INTO notifications (user_id,type,title,message,passport_guid,action_url)
+        `INSERT INTO notifications (user_id,type,title,message,passport_dpp_id,action_url)
          VALUES ($1,$2,$3,$4,$5,$6)`,
-        [userId, type, title, message || null, passportGuid || null, actionUrl || null]
+        [userId, type, title, message || null, passportDppId || null, actionUrl || null]
       );
     } catch (e) { logger.error("Notification error (non-fatal):", e.message); }
   }
@@ -184,22 +184,24 @@ module.exports = function createPassportService({
     tableName,
     companyId,
     productId,
+    excludeDppId = null,
     excludeGuid = null,
     excludeLineageId = null,
   }) {
     if (!productId) return null;
     const params = [companyId, productId];
     let exclusionSql = "";
-    if (excludeGuid) {
-      params.push(excludeGuid);
-      exclusionSql += ` AND guid <> $${params.length}`;
+    const resolvedExcludeDppId = excludeDppId || excludeGuid || null;
+    if (resolvedExcludeDppId) {
+      params.push(resolvedExcludeDppId);
+      exclusionSql += ` AND dpp_id <> $${params.length}`;
     }
     if (excludeLineageId) {
       params.push(excludeLineageId);
       exclusionSql += ` AND lineage_id <> $${params.length}`;
     }
     const existing = await pool.query(
-      `SELECT id, guid, lineage_id, product_id, release_status, version_number
+      `SELECT id, dpp_id AS "dppId", lineage_id, product_id, release_status, version_number
        FROM ${tableName}
        WHERE company_id = $1
          AND product_id = $2
@@ -211,34 +213,34 @@ module.exports = function createPassportService({
     return existing.rows[0] || null;
   }
 
-  async function getPassportLineageContext({ guid, passportType, companyId = null }) {
+  async function getPassportLineageContext({ dppId = null, passportType, companyId = null }) {
     const tableName = getTable(passportType);
-    const liveParams = [guid];
+    const liveParams = [dppId];
     let liveCompanyFilter = "";
     if (companyId !== null && companyId !== undefined) {
       liveParams.push(companyId);
       liveCompanyFilter = ` AND company_id = $${liveParams.length}`;
     }
     const liveRes = await pool.query(
-      `SELECT guid, lineage_id, product_id
+      `SELECT dpp_id AS "dppId", lineage_id, product_id
        FROM ${tableName}
-       WHERE guid = $1${liveCompanyFilter}
+       WHERE dpp_id = $1${liveCompanyFilter}
        ORDER BY version_number DESC
        LIMIT 1`,
       liveParams
     );
     if (liveRes.rows.length) return liveRes.rows[0];
 
-    const archiveParams = [guid, passportType];
+    const archiveParams = [dppId, passportType];
     let archiveCompanyFilter = "";
     if (companyId !== null && companyId !== undefined) {
       archiveParams.push(companyId);
       archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
     }
     const archiveRes = await pool.query(
-      `SELECT guid, lineage_id, product_id
+      `SELECT dpp_id AS "dppId", lineage_id, product_id
        FROM passport_archives
-       WHERE guid = $1
+       WHERE dpp_id = $1
          AND passport_type = $2${archiveCompanyFilter}
        ORDER BY version_number DESC
        LIMIT 1`,
@@ -271,7 +273,7 @@ module.exports = function createPassportService({
       archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
     }
     const archiveRes = await pool.query(
-      `SELECT guid, lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, archived_at, row_data
+      `SELECT dpp_id AS "dppId", lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, archived_at, row_data
        FROM passport_archives
        WHERE lineage_id = $1
          AND passport_type = $2${archiveCompanyFilter}
@@ -280,13 +282,13 @@ module.exports = function createPassportService({
     );
 
     const liveVersions = liveRes.rows.map(normalizePassportRow);
-    const seenGuids = new Set(liveVersions.map((row) => row.guid));
+    const seenDppIds = new Set(liveVersions.map((row) => row.dppId));
     const archiveVersions = archiveRes.rows
       .map((row) => {
         const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
         return {
           ...rowData,
-          guid: row.guid || rowData?.guid,
+          dpp_id: row.dppId || rowData?.dpp_id || rowData?.dppId,
           lineage_id: row.lineage_id || rowData?.lineage_id,
           company_id: row.company_id || rowData?.company_id,
           passport_type: row.passport_type || rowData?.passport_type,
@@ -300,7 +302,7 @@ module.exports = function createPassportService({
         };
       })
       .map(normalizePassportRow)
-      .filter((row) => row?.guid && !seenGuids.has(row.guid));
+      .filter((row) => row?.dppId && !seenDppIds.has(row.dppId));
 
     return [...liveVersions, ...archiveVersions]
       .sort((a, b) => Number(b.version_number || 0) - Number(a.version_number || 0));
@@ -338,13 +340,15 @@ module.exports = function createPassportService({
     return sanitized;
   }
 
-  async function fetchCompanyPassportRecord({ companyId, guid, passportType = null }) {
+  async function fetchCompanyPassportRecord({ companyId, dppId = null, passportType = null, versionNumber = null }) {
     let resolvedPassportType = passportType || null;
+    const hasExplicitVersion = Number.isFinite(Number(versionNumber));
+    const parsedVersionNumber = hasExplicitVersion ? Number(versionNumber) : null;
 
     if (!resolvedPassportType) {
       const regRes = await pool.query(
-        "SELECT passport_type FROM passport_registry WHERE guid = $1 AND company_id = $2",
-        [guid, companyId]
+        "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2",
+        [dppId, companyId]
       );
       if (regRes.rows.length) resolvedPassportType = regRes.rows[0].passport_type;
     }
@@ -353,10 +357,10 @@ module.exports = function createPassportService({
       const archiveTypeRes = await pool.query(
         `SELECT passport_type
          FROM passport_archives
-         WHERE guid = $1 AND company_id = $2
+         WHERE dpp_id = $1 AND company_id = $2
          ORDER BY version_number DESC, archived_at DESC
          LIMIT 1`,
-        [guid, companyId]
+        [dppId, companyId]
       );
       if (archiveTypeRes.rows.length) resolvedPassportType = archiveTypeRes.rows[0].passport_type;
     }
@@ -364,13 +368,20 @@ module.exports = function createPassportService({
     if (!resolvedPassportType) return null;
 
     const tableName = getTable(resolvedPassportType);
+    const liveParams = [dppId, companyId];
+    let liveVersionSql = "";
+    if (parsedVersionNumber !== null) {
+      liveParams.push(parsedVersionNumber);
+      liveVersionSql = ` AND p.version_number = $${liveParams.length}`;
+    }
     const liveRes = await pool.query(
       `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
        FROM ${tableName} p
        LEFT JOIN users u ON u.id = p.created_by
-       WHERE p.guid = $1 AND p.company_id = $2 AND p.deleted_at IS NULL
+       WHERE p.dpp_id = $1 AND p.company_id = $2 AND p.deleted_at IS NULL${liveVersionSql}
+       ORDER BY p.version_number DESC, p.updated_at DESC
        LIMIT 1`,
-      [guid, companyId]
+      liveParams
     );
     if (liveRes.rows.length) {
       return {
@@ -379,13 +390,19 @@ module.exports = function createPassportService({
       };
     }
 
+    const archiveParams = [dppId, companyId, resolvedPassportType];
+    let archiveVersionSql = "";
+    if (parsedVersionNumber !== null) {
+      archiveParams.push(parsedVersionNumber);
+      archiveVersionSql = ` AND pa.version_number = $${archiveParams.length}`;
+    }
     const archiveRes = await pool.query(
       `SELECT pa.row_data
        FROM passport_archives pa
-       WHERE pa.guid = $1 AND pa.company_id = $2 AND pa.passport_type = $3
+       WHERE pa.dpp_id = $1 AND pa.company_id = $2 AND pa.passport_type = $3${archiveVersionSql}
        ORDER BY pa.version_number DESC, pa.archived_at DESC
        LIMIT 1`,
-      [guid, companyId, resolvedPassportType]
+      archiveParams
     );
     if (!archiveRes.rows.length) return null;
 
@@ -399,13 +416,13 @@ module.exports = function createPassportService({
     };
   }
 
-  async function resolveReleasedPassportByGuid(guid) {
-    const normalizedGuid = String(guid || "").trim();
-    if (!normalizedGuid) return { passport: null, archived: false };
+  async function resolveReleasedPassportByDppId(dppId) {
+    const normalizedDppId = String(dppId || "").trim();
+    if (!normalizedDppId) return { passport: null, archived: false };
 
     const reg = await pool.query(
-      "SELECT passport_type FROM passport_registry WHERE guid = $1 LIMIT 1",
-      [normalizedGuid]
+      "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
+      [normalizedDppId]
     );
     if (!reg.rows.length) return { passport: null, archived: false };
 
@@ -414,12 +431,12 @@ module.exports = function createPassportService({
 
     const liveRes = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE guid = $1
+       WHERE dpp_id = $1
          AND release_status = 'released'
          AND deleted_at IS NULL
        ORDER BY version_number DESC
        LIMIT 1`,
-      [normalizedGuid]
+      [normalizedDppId]
     );
     if (liveRes.rows.length) {
       return {
@@ -430,12 +447,12 @@ module.exports = function createPassportService({
 
     const archiveRes = await pool.query(
       `SELECT row_data FROM passport_archives
-       WHERE guid = $1
+       WHERE dpp_id = $1
          AND passport_type = $2
          AND release_status = 'released'
        ORDER BY version_number DESC
        LIMIT 1`,
-      [normalizedGuid, passportType]
+      [normalizedDppId, passportType]
     );
     if (!archiveRes.rows.length) return { passport: null, archived: false };
 
@@ -448,11 +465,19 @@ module.exports = function createPassportService({
     };
   }
 
-  async function resolveReleasedPassportByProductId(productId, { versionNumber = null, companyId = null, passportType = "battery", granularity = "item" } = {}) {
+  async function resolveReleasedPassportByProductId(productId, {
+    versionNumber = null,
+    companyId = null,
+    passportType = "battery",
+    granularity = "item",
+    strictProductId = false,
+  } = {}) {
     const normalizedProductId = normalizeProductIdValue(productId);
     if (!normalizedProductId) return { passport: null, archived: false };
     const isDidIdentifier = productIdentifierService?.isDidIdentifier?.(normalizedProductId);
-    const candidates = isDidIdentifier
+    const candidates = strictProductId
+      ? [normalizedProductId]
+      : isDidIdentifier
       ? [normalizedProductId]
       : productIdentifierService?.buildLookupCandidates?.({
           companyId,
@@ -460,6 +485,9 @@ module.exports = function createPassportService({
           productId: normalizedProductId,
           granularity,
         }) || [normalizedProductId];
+    const matchSql = strictProductId
+      ? "product_id = ANY($1::text[])"
+      : "(product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))";
 
     const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
     const matches = [];
@@ -483,7 +511,7 @@ module.exports = function createPassportService({
       const liveRes = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
+         WHERE ${matchSql}
            AND ${
              versionNumber !== null && versionNumber !== undefined
                ? "release_status IN ('released', 'obsolete')"
@@ -514,7 +542,7 @@ module.exports = function createPassportService({
       const archiveRes = await pool.query(
         `SELECT product_identifier_did, row_data
          FROM passport_archives
-         WHERE (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
+         WHERE ${matchSql}
            AND passport_type = $2${archiveCompanySql}
            AND ${
              versionNumber !== null && versionNumber !== undefined
@@ -550,13 +578,13 @@ module.exports = function createPassportService({
     return matches[0];
   }
 
-  async function resolvePublicPassportByGuid(guid, { versionNumber = null } = {}) {
-    const normalizedGuid = String(guid || "").trim();
-    if (!normalizedGuid) return { passport: null, archived: false };
+  async function resolvePublicPassportByDppId(dppId, { versionNumber = null } = {}) {
+    const normalizedDppId = String(dppId || "").trim();
+    if (!normalizedDppId) return { passport: null, archived: false };
 
     const reg = await pool.query(
-      "SELECT passport_type FROM passport_registry WHERE guid = $1 LIMIT 1",
-      [normalizedGuid]
+      "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
+      [normalizedDppId]
     );
     if (!reg.rows.length) return { passport: null, archived: false };
 
@@ -564,7 +592,7 @@ module.exports = function createPassportService({
     const tableName = getTable(passportType);
 
     if (versionNumber !== null && versionNumber !== undefined) {
-      const lineageContext = await getPassportLineageContext({ guid: normalizedGuid, passportType });
+      const lineageContext = await getPassportLineageContext({ dppId: normalizedDppId, passportType });
       if (!lineageContext?.lineage_id) return { passport: null, archived: false };
 
       const liveRes = await pool.query(
@@ -583,9 +611,9 @@ module.exports = function createPassportService({
         const visibilityRes = await pool.query(
           `SELECT is_public
            FROM passport_history_visibility
-           WHERE passport_guid = $1 AND version_number = $2
+           WHERE passport_dpp_id = $1 AND version_number = $2
            LIMIT 1`,
-          [passport.guid, versionNumber]
+          [passport.dppId, versionNumber]
         );
         const isVisible = visibilityRes.rows.length
           ? !!visibilityRes.rows[0].is_public
@@ -613,9 +641,9 @@ module.exports = function createPassportService({
       const visibilityRes = await pool.query(
         `SELECT is_public
          FROM passport_history_visibility
-         WHERE passport_guid = $1 AND version_number = $2
+         WHERE passport_dpp_id = $1 AND version_number = $2
          LIMIT 1`,
-        [passport.guid, versionNumber]
+        [passport.dppId, versionNumber]
       );
       const isVisible = visibilityRes.rows.length
         ? !!visibilityRes.rows[0].is_public
@@ -623,7 +651,7 @@ module.exports = function createPassportService({
       return isVisible ? { passport, archived: true } : { passport: null, archived: false };
     }
 
-    return resolveReleasedPassportByGuid(normalizedGuid);
+    return resolveReleasedPassportByDppId(normalizedDppId);
   }
 
   async function resolveCompanyPreviewPassportByProductId(companyId, productId) {
@@ -701,7 +729,7 @@ module.exports = function createPassportService({
       const productMatch = await resolveCompanyPreviewPassportByProductId(companyId, normalizedPassportKey);
       if (productMatch?.passport) return productMatch;
     }
-    return fetchCompanyPassportRecord({ companyId, guid: passportKey });
+    return fetchCompanyPassportRecord({ companyId, dppId: passportKey });
   }
 
   async function updatePassportRowById({ tableName, rowId, userId, data, excluded = SYSTEM_PASSPORT_FIELDS }) {
@@ -720,7 +748,7 @@ module.exports = function createPassportService({
   }
 
   const buildPassportVersionHistory = async ({
-    guid,
+    dppId = null,
     passportType,
     companyId = null,
     publicOnly = false,
@@ -732,7 +760,7 @@ module.exports = function createPassportService({
     const typeRow = typeRes.rows[0] || null;
     const fieldDefs = getHistoryFieldDefs(typeRow);
 
-    const lineageContext = await getPassportLineageContext({ guid, passportType, companyId });
+    const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
     if (!lineageContext?.lineage_id) {
       return {
         passportType,
@@ -763,17 +791,17 @@ module.exports = function createPassportService({
       });
     }
 
-    const versionGuids = versions.map((row) => row.guid).filter(Boolean);
-    const visibilityRes = versionGuids.length
+    const versionDppIds = versions.map((row) => row.dppId).filter(Boolean);
+    const visibilityRes = versionDppIds.length
       ? await pool.query(
-          `SELECT passport_guid, version_number, is_public
+          `SELECT passport_dpp_id, version_number, is_public
            FROM passport_history_visibility
-           WHERE passport_guid = ANY($1::uuid[])`,
-          [versionGuids]
+           WHERE passport_dpp_id = ANY($1::text[])`,
+          [versionDppIds]
         )
       : { rows: [] };
     const visibilityMap = new Map(
-      visibilityRes.rows.map((row) => [`${row.passport_guid}:${Number(row.version_number)}`, !!row.is_public])
+      visibilityRes.rows.map((row) => [`${row.passport_dpp_id}:${Number(row.version_number)}`, !!row.is_public])
     );
 
     const ascending = [...versions].sort((a, b) => Number(a.version_number) - Number(b.version_number));
@@ -793,7 +821,7 @@ module.exports = function createPassportService({
         const previous = previousByVersion.get(versionNumber) || null;
         const normalizedStatus = normalizeReleaseStatus(version.release_status);
         const defaultPublic = isPublicHistoryStatus(normalizedStatus);
-        const visibilityKey = `${version.guid}:${versionNumber}`;
+        const visibilityKey = `${version.dppId}:${versionNumber}`;
         const isPublic = visibilityMap.has(visibilityKey)
           ? visibilityMap.get(visibilityKey)
           : defaultPublic;
@@ -821,7 +849,7 @@ module.exports = function createPassportService({
           updated_at: version.updated_at,
           created_by_name: creatorMap.get(version.created_by) || null,
           is_public: isPublic,
-          guid: version.guid,
+          dppId: version.dppId,
           public_path: buildCurrentPublicPassportPath({
             companyName: companyNameMap.get(String(version.company_id)) || "",
             manufacturerName: version.manufacturer,
@@ -867,9 +895,9 @@ module.exports = function createPassportService({
     );
   }
 
-  async function listActiveEditSessions(passportGuid, currentUserId = null) {
+  async function listActiveEditSessions(passportDppId, currentUserId = null) {
     await clearExpiredEditSessions();
-    const params = [passportGuid];
+    const params = [passportDppId];
     let currentUserFilter = "";
     if (currentUserId) {
       params.push(currentUserId);
@@ -884,7 +912,7 @@ module.exports = function createPassportService({
          u.email
        FROM passport_edit_sessions pes
        JOIN users u ON u.id = pes.user_id
-       WHERE pes.passport_guid = $1
+       WHERE pes.passport_dpp_id = $1
          AND pes.last_activity_at >= NOW() - INTERVAL '${EDIT_SESSION_TIMEOUT_SQL}'
          ${currentUserFilter}
        ORDER BY pes.last_activity_at DESC`,
@@ -900,10 +928,10 @@ module.exports = function createPassportService({
 
   // ─── MARK OBSOLETE ────────────────────────────────────────────────────────
 
-  async function markOlderVersionsObsolete(tableName, guid, newVersionNumber) {
+  async function markOlderVersionsObsolete(tableName, dppId, newVersionNumber) {
     try {
       const lineageRes = await pool.query(
-        `SELECT lineage_id FROM ${tableName} WHERE guid = $1 LIMIT 1`, [guid]
+        `SELECT lineage_id FROM ${tableName} WHERE dpp_id = $1 LIMIT 1`, [dppId]
       );
       if (!lineageRes.rows.length) return;
       const lineageId = lineageRes.rows[0].lineage_id;
@@ -964,8 +992,8 @@ module.exports = function createPassportService({
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ${tableName} (
         id             SERIAL       PRIMARY KEY,
-        guid           UUID         NOT NULL DEFAULT gen_random_uuid(),
-        lineage_id     UUID         NOT NULL DEFAULT gen_random_uuid(),
+        dpp_id         TEXT         NOT NULL,
+        lineage_id     TEXT         NOT NULL,
         company_id     INTEGER      NOT NULL,
         model_name     VARCHAR(255),
         product_id     VARCHAR(255) NOT NULL,
@@ -988,9 +1016,9 @@ module.exports = function createPassportService({
     `);
 
     await pool.query(`ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${tableName}_guid_key`);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_guid_version_unique ON ${tableName}(guid, version_number) WHERE deleted_at IS NULL`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_dpp_id_version_unique ON ${tableName}(dpp_id, version_number) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_company ON ${tableName}(company_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_guid ON ${tableName}(guid) WHERE deleted_at IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_dpp_id ON ${tableName}(dpp_id) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_lineage ON ${tableName}(lineage_id) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_status ON ${tableName}(release_status) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did ON ${tableName}(company_id, product_identifier_did) WHERE deleted_at IS NULL`);
@@ -1030,7 +1058,7 @@ module.exports = function createPassportService({
 
   async function submitPassportToWorkflow({
     companyId,
-    guid,
+    dppId = null,
     passportType,
     userId,
     reviewerId,
@@ -1046,27 +1074,27 @@ module.exports = function createPassportService({
 
     const pRes = await pool.query(
       `SELECT id, model_name, product_id, version_number, release_status FROM ${tableName}
-       WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+       WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
        ORDER BY version_number DESC LIMIT 1`,
-      [guid]
+      [dppId]
     );
     if (!pRes.rows.length) throw new Error("Editable passport not found");
     const passport = normalizePassportRow(pRes.rows[0]);
 
     await pool.query(
       `UPDATE ${tableName} SET release_status = 'in_review', updated_at = NOW()
-       WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
-      [guid]
+       WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
+      [dppId]
     );
 
     const wfRes = await pool.query(
       `INSERT INTO passport_workflow
-         (passport_guid, passport_type, company_id, submitted_by, reviewer_id, approver_id,
+         (passport_dpp_id, passport_type, company_id, submitted_by, reviewer_id, approver_id,
           review_status, approval_status, overall_status, previous_release_status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'in_progress',$9)
        RETURNING id`,
       [
-        guid,
+        dppId,
         passportType,
         companyId,
         userId,
@@ -1086,7 +1114,7 @@ module.exports = function createPassportService({
         "workflow_review",
         `Review requested: ${passport.product_id}`,
         `v${passport.version_number} needs your review`,
-        guid,
+        dppId,
         "/dashboard/workflow"
       );
       try {
@@ -1128,12 +1156,12 @@ module.exports = function createPassportService({
         "workflow_approval",
         `Approval requested: ${passport.product_id}`,
         `v${passport.version_number} needs your approval`,
-        guid,
+        dppId,
         "/dashboard/workflow"
       );
     }
 
-    await logAudit(companyId, userId, "SUBMIT_REVIEW", tableName, guid, null, {
+    await logAudit(companyId, userId, "SUBMIT_REVIEW", tableName, dppId, null, {
       reviewerId: resolvedReviewerId,
       approverId: resolvedApproverId,
       status: "in_review",
@@ -1160,9 +1188,9 @@ module.exports = function createPassportService({
     getCompanyNameMap,
     stripRestrictedFieldsForPublicView,
     fetchCompanyPassportRecord,
-    resolveReleasedPassportByGuid,
+    resolveReleasedPassportByDppId,
     resolveReleasedPassportByProductId,
-    resolvePublicPassportByGuid,
+    resolvePublicPassportByDppId,
     resolveCompanyPreviewPassportByProductId,
     resolveCompanyPreviewPassport,
     updatePassportRowById,

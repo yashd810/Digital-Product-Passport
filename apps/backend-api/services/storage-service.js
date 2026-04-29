@@ -40,7 +40,7 @@ function createLocalStorageService(options) {
     filesBaseDir,
     repoBaseDir,
     uploadsBaseDir,
-    serverBaseUrl,
+    serverBaseUrl
   } = options;
 
   function absolutePathForKey(key) {
@@ -71,7 +71,7 @@ function createLocalStorageService(options) {
         storageKey: key,
         path: absolutePath,
         url: publicUrlForKey(key),
-        contentType,
+        contentType
       };
     },
     async deleteObject(storageKey) {
@@ -99,11 +99,11 @@ function createLocalStorageService(options) {
             const normalized = String(name || "").toLowerCase();
             if (normalized === "content-length") return String(stats.size);
             return null;
-          },
+          }
         },
-        arrayBuffer: async () => buffer,
+        arrayBuffer: async () => buffer
       };
-    },
+    }
   };
 }
 
@@ -116,7 +116,7 @@ function createS3StorageService(options) {
     secretAccessKey,
     publicBaseUrl,
     forcePathStyle,
-    serverBaseUrl,
+    serverBaseUrl
   } = options;
 
   if (!endpoint || !bucket || !region || !accessKeyId || !secretAccessKey) {
@@ -125,18 +125,18 @@ function createS3StorageService(options) {
 
   const endpointUrl = new URL(endpoint);
   const appPublicBase = normalizeBaseUrl(serverBaseUrl);
-  const normalizedPublicBase = normalizeBaseUrl(publicBaseUrl)
-    || (forcePathStyle
-      ? `${endpointUrl.origin}/${bucket}`
-      : `${endpointUrl.protocol}//${bucket}.${endpointUrl.host}`);
+  const normalizedPublicBase = normalizeBaseUrl(publicBaseUrl) || (
+  forcePathStyle ?
+  `${endpointUrl.origin}/${bucket}` :
+  `${endpointUrl.protocol}//${bucket}.${endpointUrl.host}`);
   const s3 = new S3Client({
     region,
     endpoint,
     forcePathStyle,
     credentials: {
       accessKeyId,
-      secretAccessKey,
-    },
+      secretAccessKey
+    }
   });
 
   function buildHeaderReader(response) {
@@ -148,7 +148,7 @@ function createS3StorageService(options) {
     return {
       get(name) {
         return headers.get(String(name || "").toLowerCase()) || null;
-      },
+      }
     };
   }
 
@@ -177,78 +177,78 @@ function createS3StorageService(options) {
         Key: key,
         Body: buffer,
         ContentType: contentType,
-        CacheControl: cacheControl,
+        CacheControl: cacheControl
       }));
       return {
         provider: "s3",
         storageKey: key,
         path: null,
         url: joinUrl(normalizedPublicBase, key),
-        contentType,
+        contentType
       };
     },
     async deleteObject(storageKey) {
       if (!storageKey) return;
       await s3.send(new DeleteObjectCommand({
         Bucket: bucket,
-        Key: storageKey,
+        Key: storageKey
       }));
     },
     async deleteLegacyPath() {},
     async fetchObject(storageKey) {
       const response = await s3.send(new GetObjectCommand({
         Bucket: bucket,
-        Key: storageKey,
+        Key: storageKey
       }));
       return {
         headers: buildHeaderReader(response),
-        arrayBuffer: async () => bodyToBuffer(response.Body),
+        arrayBuffer: async () => bodyToBuffer(response.Body)
       };
     },
     getPublicUrl(storageKey) {
-      return appPublicBase
-        ? joinUrl(appPublicBase, `/storage/${storageKey}`)
-        : joinUrl(normalizedPublicBase, storageKey);
-    },
+      return appPublicBase ?
+      joinUrl(appPublicBase, `/storage/${storageKey}`) :
+      joinUrl(normalizedPublicBase, storageKey);
+    }
   };
 }
 
 function createStorageService(options) {
   const provider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
   const serverBaseUrl = normalizeBaseUrl(
-    process.env.PUBLIC_APP_URL
-    || process.env.APP_URL
-    || process.env.SERVER_URL
-    || options.serverBaseUrl
-    || "http://localhost:3001"
+    process.env.PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    process.env.SERVER_URL ||
+    options.serverBaseUrl ||
+    "http://localhost:3001"
   );
   const localStorageDir = path.resolve(options.localStorageDir);
   const filesBaseDir = path.resolve(options.filesBaseDir);
   const repoBaseDir = path.resolve(options.repoBaseDir);
   const uploadsBaseDir = path.resolve(options.uploadsBaseDir);
 
-  const service = provider === "s3"
-      ? createS3StorageService({
-        endpoint: process.env.STORAGE_S3_ENDPOINT,
-        region: process.env.STORAGE_S3_REGION,
-        bucket: process.env.STORAGE_S3_BUCKET,
-        accessKeyId: process.env.STORAGE_S3_ACCESS_KEY_ID,
-        secretAccessKey: process.env.STORAGE_S3_SECRET_ACCESS_KEY,
-        publicBaseUrl: process.env.STORAGE_S3_PUBLIC_BASE_URL,
-        forcePathStyle: String(process.env.STORAGE_S3_FORCE_PATH_STYLE || "true") !== "false",
-        serverBaseUrl,
-      })
-    : createLocalStorageService({
-        localStorageDir,
-        filesBaseDir,
-        repoBaseDir,
-        uploadsBaseDir,
-        serverBaseUrl,
-      });
+  const service = provider === "s3" ?
+  createS3StorageService({
+    endpoint: process.env.STORAGE_S3_ENDPOINT,
+    region: process.env.STORAGE_S3_REGION,
+    bucket: process.env.STORAGE_S3_BUCKET,
+    accessKeyId: process.env.STORAGE_S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.STORAGE_S3_SECRET_ACCESS_KEY,
+    publicBaseUrl: process.env.STORAGE_S3_PUBLIC_BASE_URL,
+    forcePathStyle: String(process.env.STORAGE_S3_FORCE_PATH_STYLE || "true") !== "false",
+    serverBaseUrl
+  }) :
+  createLocalStorageService({
+    localStorageDir,
+    filesBaseDir,
+    repoBaseDir,
+    uploadsBaseDir,
+    serverBaseUrl
+  });
 
-  function buildPassportFileKey({ guid, fieldKey, originalName }) {
+  function buildPassportFileKey({ dppId: dppId, fieldKey, originalName }) {
     const ext = safeExtension(originalName, ".pdf");
-    return path.posix.join("passport-files", String(guid), `${String(fieldKey)}-${Date.now()}${ext}`);
+    return path.posix.join("passport-files", String(dppId), `${String(fieldKey)}-${Date.now()}${ext}`);
   }
 
   function buildRepositoryFileKey({ companyId, originalName }) {
@@ -269,12 +269,12 @@ function createStorageService(options) {
   return {
     ...service,
     provider: service.name,
-    async savePassportFile({ guid, fieldKey, originalName, buffer, contentType }) {
+    async savePassportFile({ dppId: dppId, fieldKey, originalName, buffer, contentType }) {
       return service.saveObject({
-        key: buildPassportFileKey({ guid, fieldKey, originalName }),
+        key: buildPassportFileKey({ dppId: dppId, fieldKey, originalName }),
         buffer,
         contentType: guessContentType(originalName, contentType),
-        cacheControl: "public, max-age=31536000, immutable",
+        cacheControl: "public, max-age=31536000, immutable"
       });
     },
     async saveRepositoryFile({ companyId, originalName, buffer, contentType }) {
@@ -282,7 +282,7 @@ function createStorageService(options) {
         key: buildRepositoryFileKey({ companyId, originalName }),
         buffer,
         contentType: guessContentType(originalName, contentType),
-        cacheControl: "public, max-age=31536000, immutable",
+        cacheControl: "public, max-age=31536000, immutable"
       });
     },
     async saveRepositorySymbol({ companyId, originalName, buffer, contentType }) {
@@ -290,7 +290,7 @@ function createStorageService(options) {
         key: buildRepositorySymbolKey({ companyId, originalName }),
         buffer,
         contentType: guessContentType(originalName, contentType),
-        cacheControl: "public, max-age=31536000, immutable",
+        cacheControl: "public, max-age=31536000, immutable"
       });
     },
     async saveGlobalSymbol({ originalName, buffer, contentType }) {
@@ -298,7 +298,7 @@ function createStorageService(options) {
         key: buildGlobalSymbolKey({ originalName }),
         buffer,
         contentType: guessContentType(originalName, contentType),
-        cacheControl: "public, max-age=31536000, immutable",
+        cacheControl: "public, max-age=31536000, immutable"
       });
     },
     async deleteStoredFile({ storageKey, filePath }) {
@@ -308,7 +308,7 @@ function createStorageService(options) {
     getLocalAbsolutePath(storageKey) {
       if (!service.isLocal || !service.resolveAbsolutePath) return null;
       return service.resolveAbsolutePath(storageKey);
-    },
+    }
   };
 }
 

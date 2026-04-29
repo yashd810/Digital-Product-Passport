@@ -29,7 +29,7 @@ function test(name, fn) {
 }
 
 const typeDef = {
-  type_name: "din_spec_99100",
+  type_name: "generic_passport",
   fields_json: {
     sections: [
       {
@@ -46,10 +46,11 @@ const typeDef = {
 };
 
 const passport = {
-  guid: "fff9372d-6405-4207-9ed2-808426a3151c",
-  lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
-  passport_type: "din_spec_99100",
+  guid: "dpp_fff9372d-6405-4207-9ed2-808426a3151c",
+  lineage_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+  passport_type: "generic_passport",
   product_id: "PID-72b99c83",
+  product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:pid-72b99c83",
   release_status: "released",
   version_number: "3",
   updated_at: "2026-04-24T10:00:00.000Z",
@@ -70,14 +71,17 @@ const company = {
 console.log("\nbuildCanonicalPassportPayload()");
 test("preserves typed field values and required headers", () => {
   const payload = buildCanonicalPassportPayload(passport, typeDef, { company });
-  assert.strictEqual(payload.digitalProductPassportId, "https://www.claros-dpp.online/passports/fff9372d-6405-4207-9ed2-808426a3151c");
+  assert.strictEqual(payload.digitalProductPassportId, "dpp_fff9372d-6405-4207-9ed2-808426a3151c");
   assert.strictEqual(payload.uniqueProductIdentifier, "PID-72b99c83");
   assert.strictEqual(payload.granularity, "Item");
   assert.strictEqual(payload.dppStatus, "Active");
-  assert.strictEqual(payload.subjectDid, "did:web:www.claros-dpp.online:did:battery:item:72b99c83-952c-4179-96f6-54a513d39dbc");
-  assert.strictEqual(payload.dppDid, "did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc");
+  assert.strictEqual(payload.subjectDid, "did:web:www.claros-dpp.online:did:battery:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
+  assert.strictEqual(payload.dppDid, "did:web:www.claros-dpp.online:did:dpp:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
   assert.strictEqual(payload.companyDid, "did:web:www.claros-dpp.online:did:company:example-corp");
-  assert.strictEqual(payload.versionNumber, 3);
+  assert.strictEqual(payload.lastUpdated, "2026-04-24T10:00:00.000Z");
+  assert.strictEqual(payload.extensions.claros.versionNumber, 3);
+  assert.strictEqual(payload.extensions.claros.passportType, "generic_passport");
+  assert.strictEqual(payload.extensions.claros.internalId, "dpp_fff9372d-6405-4207-9ed2-808426a3151c");
   assert.strictEqual(typeof payload.fields.batteryMass, "number");
   assert.strictEqual(payload.fields.batteryMass, 250.5);
   assert.strictEqual(typeof payload.fields.isReplaceable, "boolean");

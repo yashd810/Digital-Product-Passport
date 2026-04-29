@@ -22,7 +22,7 @@ function sortPassportsByVersionDesc(a, b) {
 function getPassportGroupKey(passport) {
   if (passport?.lineage_id) return `lineage:${passport.lineage_id}`;
   if (passport?.product_id) return `product:${passport.passport_type || "passport"}:${passport.product_id}`;
-  return `guid:${passport?.guid || ""}`;
+  return `dppId:${passport?.dppId || ""}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ function ArchivedPassports({ user, companyId }) {
 
   // Archived public-path helpers
   const getArchivedPathCacheKey = useCallback((passport) => (
-    `${passport?.guid || ""}:${passport?.version_number || ""}:${passport?.public_version_number || ""}`
+    `${passport?.dppId || ""}:${passport?.version_number || ""}:${passport?.public_version_number || ""}`
   ), []);
   const getArchivedPublicVersionNumber = useCallback((passport) => {
     if (
@@ -77,7 +77,7 @@ function ArchivedPassports({ user, companyId }) {
 
   // Data loading
   const resolveArchivedPassportPath = useCallback(async (passport) => {
-    if (!passport?.guid) return null;
+    if (!passport?.dppId) return null;
 
     const cacheKey = getArchivedPathCacheKey(passport);
     if (historyPathCache[cacheKey]) return historyPathCache[cacheKey];
@@ -86,7 +86,7 @@ function ArchivedPassports({ user, companyId }) {
     if (!publicVersionNumber) return null;
 
     const response = await fetch(
-      `${API}/api/companies/${companyId}/passports/${passport.guid}/history`,
+      `${API}/api/companies/${companyId}/passports/${passport.dppId}/history`,
       { headers: authHeaders() }
     );
     if (!response.ok) return null;
@@ -134,10 +134,10 @@ function ArchivedPassports({ user, companyId }) {
   }, [companyId]);
 
   // Row and bulk actions
-  const handleUnarchive = async (guid) => {
+  const handleUnarchive = async (dppId) => {
     if (!window.confirm("Restore this passport from the archive?")) return;
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${guid}/unarchive`, {
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}/unarchive`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({}),
@@ -157,7 +157,7 @@ function ArchivedPassports({ user, companyId }) {
       const r = await fetch(`${API}/api/companies/${companyId}/passports/bulk-unarchive`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ guids: selected.map(p => p.guid) }),
+        body: JSON.stringify({ dppIds: selected.map(p => p.dppId) }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Failed");
@@ -173,22 +173,58 @@ function ArchivedPassports({ user, companyId }) {
     if (!selectedGroups.length) { showError("Select at least one passport."); return; }
     setBulkLoading(true);
     try {
-      const exported = selectedGroups.flatMap(group => group.versions).map(p => {
-        const rowData = typeof p.row_data === "string" ? JSON.parse(p.row_data) : p.row_data;
-        return { guid: p.guid, passport_type: p.passport_type, model_name: p.model_name, product_id: p.product_id, release_status: p.release_status, version_number: p.version_number, archived_at: p.archived_at, ...rowData };
-      });
-      const exportType = exported.length === 1 ? exported[0].passport_type : null;
-      const semanticModelKey = exportType
-        ? (passportTypes.find((type) => type.type_name === exportType)?.semantic_model_key || "")
-        : "";
-      const exportPayload = buildPassportJsonLdExport(exported, exportType, { semanticModelKey });
-      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `archived-passports-${new Date().toISOString().slice(0, 10)}.jsonld`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      showSuccess(`Exported ${exported.length} archived passport${exported.length !== 1 ? "s" : ""} as JSON-LD`);
+      const selectedVersions = selectedGroups.flatMap(group => group.versions);
+      const groupedByType = selectedVersions.reduce((acc, passport) => {
+        const passportType = passport.passport_type;
+        if (!acc[passportType]) acc[passportType] = [];
+        acc[passportType].push(passport);
+        return acc;
+      }, {});
+
+      let exportedCount = 0;
+      const fileCount = Object.keys(groupedByType).length;
+      for (const [passportType, passportsForType] of Object.entries(groupedByType)) {
+        const typeResponse = await fetch(`${API}/api/passport-types/${passportType}`);
+        if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
+        const typeData = await typeResponse.json();
+        const semanticModelKey = typeData.semantic_model_key || "";
+        const umbrellaCategory = typeData.umbrella_category || "";
+
+        const exported = [];
+        for (const passport of passportsForType) {
+          const query = new URLSearchParams({
+            passportType,
+            representation: "full",
+          });
+          if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
+            query.set("versionNumber", String(passport.version_number));
+          }
+          const response = await fetch(
+            `${API}/api/companies/${companyId}/passports/${passport.dppId}?${query.toString()}`,
+            { headers: authHeaders() }
+          );
+          if (!response.ok) continue;
+          exported.push(await response.json());
+        }
+
+        if (!exported.length) continue;
+
+        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, umbrellaCategory });
+        const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        const filenamePrefix = fileCount > 1 ? `${passportType}-` : "";
+        a.download = `${filenamePrefix}archived-passports-${new Date().toISOString().slice(0, 10)}.jsonld`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        exportedCount += exported.length;
+      }
+
+      if (!exportedCount) {
+        throw new Error("Could not fetch any archived passport data.");
+      }
+
+      showSuccess(`Exported ${exportedCount} archived passport${exportedCount !== 1 ? "s" : ""} as JSON-LD`);
     } catch (e) { showError(e.message); }
     finally { setBulkLoading(false); }
   };
@@ -217,7 +253,7 @@ function ArchivedPassports({ user, companyId }) {
         });
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
-        link.download = `archived_${p.product_id || p.guid}_v${getArchivedPublicVersionNumber(p)}.png`;
+        link.download = `archived_${p.product_id || p.dppId}_v${getArchivedPublicVersionNumber(p)}.png`;
         link.click();
         await new Promise(r => setTimeout(r, 100));
       }
@@ -235,7 +271,7 @@ function ArchivedPassports({ user, companyId }) {
     passports.forEach((passport) => {
       const groupKey = getPassportGroupKey(passport);
       if (!groupsByKey.has(groupKey)) {
-        const group = { key: groupKey, guid: passport.guid, versions: [] };
+        const group = { key: groupKey, dppId: passport.dppId, versions: [] };
         groupsByKey.set(groupKey, group);
         groups.push(group);
       }
@@ -342,7 +378,7 @@ function ArchivedPassports({ user, companyId }) {
     hasOlderVersions = false,
   }) => (
     <tr
-      key={`${passport.guid}-${passport.version_number}${isHistorical ? "-history" : ""}`}
+      key={`${passport.dppId}-${passport.version_number}${isHistorical ? "-history" : ""}`}
       className={`passport-row-clickable${isHistorical ? " passport-row-history" : ""}`}
       onClick={() => {
         if (selectionMode) toggleSelect(groupKey);
@@ -401,7 +437,7 @@ function ArchivedPassports({ user, companyId }) {
       {user?.role !== "viewer" && (
         <td className="options-cell" onClick={e => e.stopPropagation()}>
           {!isHistorical && (
-            <button className="archive-restore-btn" onClick={() => handleUnarchive(passport.guid)}>
+            <button className="archive-restore-btn" onClick={() => handleUnarchive(passport.dppId)}>
               Restore
             </button>
           )}

@@ -127,7 +127,7 @@ describe("signing service", () => {
     expect(signed.signatureAlgorithm).toBe("ES256");
 
     pool.state.signatures.set(`${PASSPORT.guid}:${PASSPORT.version_number}`, {
-      passport_guid: PASSPORT.guid,
+      passport_dpp_id: PASSPORT.guid,
       version_number: PASSPORT.version_number,
       data_hash: signed.dataHash,
       signature: signed.signature,
@@ -162,7 +162,7 @@ describe("signing service", () => {
     expect(signed.signatureAlgorithm).toBe("RS256");
 
     pool.state.signatures.set(`${PASSPORT.guid}:${PASSPORT.version_number}`, {
-      passport_guid: PASSPORT.guid,
+      passport_dpp_id: PASSPORT.guid,
       version_number: PASSPORT.version_number,
       data_hash: signed.dataHash,
       signature: signed.signature,

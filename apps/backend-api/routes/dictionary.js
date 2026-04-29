@@ -48,6 +48,12 @@ module.exports = function registerDictionaryRoutes(app, {
     sendPrettyJson(res, svc.getFieldMap());
   });
 
+  // ─── CATEGORY RULES / APPLICABILITY ──────────────────────────────────────
+  app.get(["/api/dictionary/battery/v1/category-rules", "/dictionary/battery/v1/category-rules.json"],
+    publicReadRateLimit, (_req, res) => {
+      sendPrettyJson(res, svc.getCategoryRules());
+    });
+
   // ─── TERMS (all, or filtered by category) ────────────────────────────────
   app.get("/api/dictionary/battery/v1/terms", publicReadRateLimit, (req, res) => {
     const { category, search } = req.query;

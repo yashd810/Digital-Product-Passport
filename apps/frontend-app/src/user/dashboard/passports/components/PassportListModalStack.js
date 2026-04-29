@@ -112,6 +112,7 @@ export function PassportListModalStack({
           selectedPassports={selectedPassports}
           activeType={activeType}
           allPassportTypes={allPassportTypes}
+          companyId={companyId}
           onClose={() => setExportModalOpen(false)}
           onDone={(msg) => {
             setExportModalOpen(false);
@@ -142,7 +143,7 @@ export function PassportListModalStack({
 
       {historyModal && (
         <PassportHistoryModal
-          guid={historyModal.guid}
+          dppId={historyModal.dppId}
           passportType={historyModal.passportType}
           companyId={companyId}
           mode="company"

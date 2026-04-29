@@ -50,7 +50,7 @@ function ResultSummary({ summary, details, onDone }) {
           {details.map((d, i) => (
             <div key={i} className={`upsert-detail-row upsert-detail-${d.status}`}>
               <span className="upsert-detail-status">{d.status}</span>
-              <span className="upsert-detail-id">{d.product_id || d.guid || d.model_name || `#${i+1}`}</span>
+              <span className="upsert-detail-id">{d.product_id || d.dppId || d.model_name || `#${i+1}`}</span>
               {d.reason && <span className="upsert-detail-reason">— {d.reason}</span>}
               {d.error  && <span className="upsert-detail-reason">— {d.error}</span>}
             </div>
@@ -325,15 +325,15 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               <h2>Update existing drafts via CSV</h2>
               <p>
                 Export your drafts from the <strong>Templates</strong> page using <em>"Export drafts CSV"</em>.
-                The file includes a <code>guid</code> row — <strong>keep it</strong>. Fill in the non-model fields
+                The file includes a <code>dppId</code> row — <strong>keep it</strong>. Fill in the non-model fields
                 in Excel or Google Sheets, then upload below.
               </p>
               <div className="upsert-info-box">
                 <strong>How it works:</strong>
                 <ul>
-                  <li>Row has a <code>guid</code> → the matching draft passport is <strong>updated</strong></li>
-                  <li>No <code>guid</code> but matching <code>product_id</code> on an editable passport → that passport is <strong>updated</strong></li>
-                  <li>New <code>product_id</code> with no <code>guid</code> → a <strong>new passport is created</strong></li>
+                  <li>Row has a <code>dppId</code> → the matching draft passport is <strong>updated</strong></li>
+                  <li>No <code>dppId</code> but matching <code>product_id</code> on an editable passport → that passport is <strong>updated</strong></li>
+                  <li>New <code>product_id</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
                   <li>If the matching passport is released or in review, the row is skipped so you can revise it first</li>
                 </ul>
               </div>
@@ -374,7 +374,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <strong>JSON format — array of objects:</strong>
                 <pre className="upsert-code">{`[
   {
-    "guid": "existing-passport-guid",
+    "dppId": "existing-passport-dppId",
     "product_id": "SKU-1001",
     "model_name": "Unit A",
     "serial_number": "SN-1001",
@@ -386,9 +386,9 @@ function CSVImportGuide({ user, companyId, activeTab }) {
   }
 ]`}</pre>
                 <ul>
-                  <li>Object has a <code>guid</code> → the matching draft is <strong>updated</strong></li>
-                  <li>No <code>guid</code> but matching <code>product_id</code> on an editable passport → that passport is <strong>updated</strong></li>
-                  <li>New <code>product_id</code> with no <code>guid</code> → a <strong>new passport is created</strong></li>
+                  <li>Object has a <code>dppId</code> → the matching draft is <strong>updated</strong></li>
+                  <li>No <code>dppId</code> but matching <code>product_id</code> on an editable passport → that passport is <strong>updated</strong></li>
+                  <li>New <code>product_id</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
                   <li>If the matching passport is released or in review, the object is skipped so you can revise it first</li>
                   <li>Only include fields you want to change — unspecified fields are left as-is</li>
                 </ul>

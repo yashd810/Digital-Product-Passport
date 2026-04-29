@@ -21,7 +21,7 @@ GET /api/passports/by-product/BAT-2026-001
 Example response:
 ```json
 {
-  "guid": "72b99c83-952c-4179-96f6-54a513d39dbc",
+  "dppId": "72b99c83-952c-4179-96f6-54a513d39dbc",
   "passport_type": "battery",
   "public_path": "/dpp/acme-energy/battery-pack-5000/BAT-2026-001"
 }

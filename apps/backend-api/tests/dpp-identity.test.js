@@ -240,7 +240,7 @@ test("builds correct slug structure", () => {
   assert.ok(url.includes("/dpp/tesla-energy/model-x/"), `Expected slug path in: ${url}`);
   assert.ok(url.endsWith("MODEL-X"), `Expected encoded productId at end: ${url}`);
 });
-test("falls back to /passport/:guid when no product_id", () => {
+test("falls back to /passport/:dppId when no product_id", () => {
   const passport = {
     guid:       "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     product_id: null,

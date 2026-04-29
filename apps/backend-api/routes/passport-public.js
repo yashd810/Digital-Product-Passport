@@ -15,15 +15,16 @@ module.exports = function registerPassportPublicRoutes(app, {
   stripRestrictedFieldsForPublicView,
   getCompanyNameMap,
   resolveReleasedPassportByProductId,
-  resolvePublicPassportByGuid,
+  resolvePublicPassportByDppId,
   buildPassportVersionHistory,
   resolvePublicPathToSubjects,
   verifyPassportSignature,
   buildJsonLdContext,
   buildBatteryPassJsonExport,
   buildCanonicalPassportPayload,
+  buildExpandedPassportPayload,
   signingService,
-  didService,
+  didService
 }) {
   const API_ORIGIN = didService.getApiOrigin();
   const DID_DOMAIN = didService.getDidDomain();
@@ -42,6 +43,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       granularity: "dpp:granularity",
       dppSchemaVersion: "dpp:dppSchemaVersion",
       dppStatus: "dpp:dppStatus",
+      lastUpdated: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
       lastUpdate: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
       economicOperatorId: "dpp:economicOperatorId",
       facilityId: "dpp:facilityId",
@@ -51,13 +53,18 @@ module.exports = function registerPassportPublicRoutes(app, {
       companyDid: "dpp:companyDid",
       passportType: "dpp:passportType",
       modelName: "dpp:modelName",
-      versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
-    },
+      versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" }
+    }
   };
 
   function wantsSemanticResponse(req) {
     const accept = String(req.headers.accept || "").toLowerCase();
     return String(req.query.format || "").toLowerCase() === "semantic" || accept.includes("application/ld+json");
+  }
+
+  function getRepresentation(req) {
+    const raw = String(req.query.representation || "").trim().toLowerCase();
+    return ["expanded", "full"].includes(raw) ? "expanded" : "compressed";
   }
 
   function wantsJsonResolution(req) {
@@ -146,7 +153,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   async function loadTypeDef(passportType) {
     const result = await pool.query(
-      `SELECT type_name, semantic_model_key, fields_json
+      `SELECT type_name, umbrella_category, semantic_model_key, fields_json
        FROM passport_types
        WHERE type_name = $1
        LIMIT 1`,
@@ -156,33 +163,33 @@ module.exports = function registerPassportPublicRoutes(app, {
   }
 
   function buildPublicPassportUrl(passport, companyName) {
-    const path = passport.release_status === "obsolete"
-      ? buildInactivePublicPassportPath({
-          companyName,
-          manufacturerName: passport.manufacturer,
-          manufacturedBy: passport.manufactured_by,
-          modelName: passport.model_name,
-          productId: passport.product_id,
-          versionNumber: passport.version_number,
-        })
-      : buildCurrentPublicPassportPath({
-          companyName,
-          manufacturerName: passport.manufacturer,
-          manufacturedBy: passport.manufactured_by,
-          modelName: passport.model_name,
-          productId: passport.product_id,
-        });
+    const path = passport.release_status === "obsolete" ?
+    buildInactivePublicPassportPath({
+      companyName,
+      manufacturerName: passport.manufacturer,
+      manufacturedBy: passport.manufactured_by,
+      modelName: passport.model_name,
+      productId: passport.product_id,
+      versionNumber: passport.version_number
+    }) :
+    buildCurrentPublicPassportPath({
+      companyName,
+      manufacturerName: passport.manufacturer,
+      manufacturedBy: passport.manufactured_by,
+      modelName: passport.model_name,
+      productId: passport.product_id
+    });
     return didService.buildPublicPassportUrl(path);
   }
 
   function buildDidServiceEndpoints(passport, companyName) {
     const publicUrl = buildPublicPassportUrl(passport, companyName);
     return [
-      { id: "#passport", type: "DigitalProductPassport", serviceEndpoint: publicUrl },
-      { id: "#canonical-json", type: "CanonicalJson", serviceEndpoint: didService.buildApiUrl(`/api/passports/${passport.guid}/canonical`) },
-      { id: "#jsonld", type: "JsonLd", serviceEndpoint: didService.buildApiUrl(`/api/passports/${passport.guid}?format=semantic`) },
-      { id: "#credential", type: "VerifiableCredential", serviceEndpoint: didService.buildApiUrl(`/api/passports/${passport.guid}/signature`) },
-    ].filter((service) => Boolean(service.serviceEndpoint));
+    { id: "#passport", type: "DigitalProductPassport", serviceEndpoint: publicUrl },
+    { id: "#canonical-json", type: "CanonicalJson", serviceEndpoint: didService.buildApiUrl(`/api/passports/${passport.dppId}/canonical`) },
+    { id: "#jsonld", type: "JsonLd", serviceEndpoint: didService.buildApiUrl(`/api/passports/${passport.dppId}?format=semantic`) },
+    { id: "#credential", type: "VerifiableCredential", serviceEndpoint: didService.buildApiUrl(`/api/passports/${passport.dppId}/signature`) }].
+    filter((service) => Boolean(service.serviceEndpoint));
   }
 
   function buildVerificationMethod() {
@@ -194,7 +201,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       id: `${PLATFORM_DID}#key-1`,
       type: "JsonWebKey2020",
       controller: PLATFORM_DID,
-      publicKeyJwk: { ...publicKeyJwk, kid: signingKey.keyId },
+      publicKeyJwk: { ...publicKeyJwk, kid: signingKey.keyId }
     }];
   }
 
@@ -204,34 +211,51 @@ module.exports = function registerPassportPublicRoutes(app, {
       id,
       controller: PLATFORM_DID,
       verificationMethod: buildVerificationMethod(),
-      ...(service.length ? { service } : {}),
+      ...(service.length ? { service } : {})
     };
   }
 
   function buildResolutionPayload(did, passport, company, typeDef) {
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, {
       company,
-      granularity: company?.default_granularity || company?.dpp_granularity || passport.granularity || "model",
+      granularity: company?.default_granularity || company?.dpp_granularity || passport.granularity || "model"
     });
     return {
       did,
       didDocument: didService.didToDocumentUrl(did),
       type: "DigitalProductPassport",
       publicUrl: buildPublicPassportUrl(passport, company?.company_name || ""),
-      canonicalJson: didService.buildApiUrl(`/api/passports/${passport.guid}/canonical`),
-      jsonLd: didService.buildApiUrl(`/api/passports/${passport.guid}?format=semantic`),
-      verification: didService.buildApiUrl(`/api/passports/${passport.guid}/signature`),
+      canonicalJson: didService.buildApiUrl(`/api/passports/${passport.dppId}/canonical`),
+      jsonLd: didService.buildApiUrl(`/api/passports/${passport.dppId}?format=semantic`),
+      verification: didService.buildApiUrl(`/api/passports/${passport.dppId}/signature`),
       subjectDid: canonicalPayload.subjectDid,
       dppDid: canonicalPayload.dppDid,
-      companyDid: canonicalPayload.companyDid,
+      companyDid: canonicalPayload.companyDid
     };
   }
 
+  function buildRequestedPassportPayload(req, passport, typeDef, company) {
+    const granularity = company?.default_granularity || company?.dpp_granularity || passport?.granularity || "model";
+    const serializerOptions = { company, granularity };
+    if (getRepresentation(req) === "expanded" && typeof buildExpandedPassportPayload === "function") {
+      return buildExpandedPassportPayload(passport, typeDef, serializerOptions);
+    }
+    return buildCanonicalPassportPayload(passport, typeDef, serializerOptions);
+  }
+
   function flattenSemanticPayload(canonicalPayload) {
+    if (Array.isArray(canonicalPayload?.elements)) {
+      return {
+        ...canonicalPayload,
+        "@type": "DigitalProductPassport"
+      };
+    }
+    const { fields = {}, extensions, ...rest } = canonicalPayload || {};
+    void extensions;
     const flattened = {
-      ...canonicalPayload,
-      ...(canonicalPayload.fields || {}),
-      "@type": "DigitalProductPassport",
+      ...rest,
+      ...fields,
+      "@type": "DigitalProductPassport"
     };
     delete flattened.fields;
     return flattened;
@@ -241,6 +265,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     const semanticSource = flattenSemanticPayload(canonicalPayload);
     const exported = buildBatteryPassJsonExport([semanticSource], passportType, {
       semanticModelKey: typeDef?.semantic_model_key,
+      umbrellaCategory: typeDef?.umbrella_category
     });
     const graphItem = { ...(exported?.["@graph"]?.[0] || semanticSource) };
     delete graphItem.passport_type;
@@ -257,14 +282,13 @@ module.exports = function registerPassportPublicRoutes(app, {
       semanticContexts.push(contextValue);
     };
 
-    pushContext(CANONICAL_BATTERY_CONTEXT_URL);
     pushContext(CANONICAL_DPP_CONTEXT_URL);
     exportedContexts.forEach(pushContext);
 
     res.setHeader("Content-Type", "application/ld+json");
     return res.json({
       "@context": semanticContexts,
-      ...graphItem,
+      ...graphItem
     });
   }
 
@@ -272,18 +296,18 @@ module.exports = function registerPassportPublicRoutes(app, {
     return company?.jsonld_export_enabled !== false;
   }
 
-  async function loadPublicPassportByGuid(guid, { versionNumber = null } = {}) {
-    const normalizedGuid = String(guid || "").trim();
+  async function loadPublicPassportByGuid(dppId, { versionNumber = null } = {}) {
+    const normalizedGuid = String(dppId || "").trim();
     if (!normalizedGuid) return null;
 
-    const resolved = await resolvePublicPassportByGuid(normalizedGuid, { versionNumber });
+    const resolved = await resolvePublicPassportByDppId(normalizedGuid, { versionNumber });
     let passport = resolved?.passport || null;
 
     if (!passport && versionNumber === null) {
       const registryRes = await pool.query(
         `SELECT passport_type
          FROM passport_registry
-         WHERE guid = $1
+         WHERE dpp_id = $1
          LIMIT 1`,
         [normalizedGuid]
       );
@@ -294,7 +318,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       const liveRes = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE guid = $1
+         WHERE dpp_id = $1
            AND deleted_at IS NULL
            AND release_status IN ('released', 'obsolete')
          ORDER BY version_number DESC, updated_at DESC
@@ -307,7 +331,7 @@ module.exports = function registerPassportPublicRoutes(app, {
         const archiveRes = await pool.query(
           `SELECT row_data
            FROM passport_archives
-           WHERE guid = $1
+           WHERE dpp_id = $1
              AND passport_type = $2
              AND release_status IN ('released', 'obsolete')
            ORDER BY version_number DESC, archived_at DESC
@@ -315,9 +339,9 @@ module.exports = function registerPassportPublicRoutes(app, {
           [normalizedGuid, passportType]
         );
         if (archiveRes.rows.length) {
-          const rowData = typeof archiveRes.rows[0].row_data === "string"
-            ? JSON.parse(archiveRes.rows[0].row_data)
-            : archiveRes.rows[0].row_data;
+          const rowData = typeof archiveRes.rows[0].row_data === "string" ?
+          JSON.parse(archiveRes.rows[0].row_data) :
+          archiveRes.rows[0].row_data;
           passport = { ...normalizePassportRow(rowData), passport_type: passportType, archived: true };
         }
       }
@@ -326,9 +350,9 @@ module.exports = function registerPassportPublicRoutes(app, {
     if (!passport) return null;
 
     const [typeDef, company] = await Promise.all([
-      loadTypeDef(passport.passport_type),
-      hydrateCompany(passport.company_id),
-    ]);
+    loadTypeDef(passport.passport_type),
+    hydrateCompany(passport.company_id)]
+    );
 
     return { passport, typeDef, company };
   }
@@ -336,7 +360,7 @@ module.exports = function registerPassportPublicRoutes(app, {
   async function loadPublicPassportByLineage(stableId) {
     const lineageId = didService.normalizeStableId(stableId);
     const registryRes = await pool.query(
-      `SELECT guid, company_id, passport_type, lineage_id
+      `SELECT dpp_id, company_id, passport_type, lineage_id
        FROM passport_registry
        WHERE lineage_id = $1
        ORDER BY created_at DESC
@@ -373,29 +397,29 @@ module.exports = function registerPassportPublicRoutes(app, {
         [lineageId, registryRow.passport_type]
       );
       if (!archiveRes.rows.length) return null;
-      const rowData = typeof archiveRes.rows[0].row_data === "string"
-        ? JSON.parse(archiveRes.rows[0].row_data)
-        : archiveRes.rows[0].row_data;
+      const rowData = typeof archiveRes.rows[0].row_data === "string" ?
+      JSON.parse(archiveRes.rows[0].row_data) :
+      archiveRes.rows[0].row_data;
       passport = { ...normalizePassportRow(rowData), passport_type: registryRow.passport_type, archived: true };
     }
 
     const [typeDef, company] = await Promise.all([
-      loadTypeDef(passport.passport_type),
-      hydrateCompany(passport.company_id),
-    ]);
+    loadTypeDef(passport.passport_type),
+    hydrateCompany(passport.company_id)]
+    );
 
     return { passport, typeDef, company };
   }
 
   function getFacilityFieldKeys(typeDef) {
-    return (typeDef?.fields_json?.sections || [])
-      .flatMap((section) => section.fields || [])
-      .filter((field) => field?.key && isSafeDbFieldKey(field.key))
-      .filter((field) => {
-        const compact = String(field.key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-        return compact.includes("facility");
-      })
-      .map((field) => field.key);
+    return (typeDef?.fields_json?.sections || []).
+    flatMap((section) => section.fields || []).
+    filter((field) => field?.key && isSafeDbFieldKey(field.key)).
+    filter((field) => {
+      const compact = String(field.key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      return compact.includes("facility");
+    }).
+    map((field) => field.key);
   }
 
   async function loadFacilitySubject(stableId) {
@@ -413,7 +437,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       const tableName = getTable(typeDef.type_name);
       const selectFields = facilityFieldKeys.join(", ");
       const candidateRes = await pool.query(
-        `SELECT guid, lineage_id, company_id, model_name, product_id, release_status, version_number, updated_at, created_at, ${selectFields}
+        `SELECT dpp_id, lineage_id, company_id, model_name, product_id, release_status, version_number, updated_at, created_at, ${selectFields}
          FROM ${tableName}
          WHERE deleted_at IS NULL
            AND release_status IN ('released', 'obsolete')
@@ -475,31 +499,32 @@ module.exports = function registerPassportPublicRoutes(app, {
 
       let resolved = await resolveReleasedPassportByProductId(productId, { versionNumber: version });
       if (!resolved?.passport) {
-        resolved = await resolvePublicPassportByGuid(req.params.productId, { versionNumber: version });
+        resolved = await resolvePublicPassportByDppId(req.params.productId, { versionNumber: version });
       }
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const passport = resolved.passport;
       const [sanitizedPassport, typeDef, company] = await Promise.all([
-        stripRestrictedFieldsForPublicView(passport, passport.passport_type),
-        loadTypeDef(passport.passport_type),
-        hydrateCompany(passport.company_id),
-      ]);
+      stripRestrictedFieldsForPublicView(passport, passport.passport_type),
+      loadTypeDef(passport.passport_type),
+      hydrateCompany(passport.company_id)]
+      );
       const companyName = company?.company_name || "";
       const publicPath = buildCurrentPublicPassportPath({
         companyName,
         manufacturerName: sanitizedPassport.manufacturer,
         manufacturedBy: sanitizedPassport.manufactured_by,
         modelName: sanitizedPassport.model_name,
-        productId: sanitizedPassport.product_id,
+        productId: sanitizedPassport.product_id
       });
-      const linkedSubjects = publicPath
-        ? await resolvePublicPathToSubjects({ pool, publicPath, getTable, didService })
-        : null;
+      const linkedSubjects = publicPath ?
+      await resolvePublicPathToSubjects({ pool, publicPath, getTable, didService }) :
+      null;
       const canonicalPayload = buildCanonicalPassportPayload(sanitizedPassport, typeDef, {
         company,
-        granularity: company?.default_granularity || company?.dpp_granularity || sanitizedPassport.granularity || "model",
+        granularity: company?.default_granularity || company?.dpp_granularity || sanitizedPassport.granularity || "model"
       });
+      const requestedPayload = buildRequestedPassportPayload(req, sanitizedPassport, typeDef, company);
 
       const basePayload = {
         ...sanitizedPassport,
@@ -510,21 +535,31 @@ module.exports = function registerPassportPublicRoutes(app, {
           manufacturedBy: sanitizedPassport.manufactured_by,
           modelName: sanitizedPassport.model_name,
           productId: sanitizedPassport.product_id,
-          versionNumber: sanitizedPassport.version_number,
+          versionNumber: sanitizedPassport.version_number
         }),
         inactive_public_version: version !== null && Number(version) === Number(sanitizedPassport.version_number),
         linked_data: {
           public_url: didService.buildPublicPassportUrl(publicPath),
-          canonical_json_url: didService.buildApiUrl(`/api/passports/${passport.guid}/canonical`),
+          canonical_json_url: didService.buildApiUrl(`/api/passports/${passport.dppId}/canonical`),
           related_subjects: linkedSubjects,
           canonical_subjects: {
             subjectDid: canonicalPayload.subjectDid,
             dppDid: canonicalPayload.dppDid,
             companyDid: canonicalPayload.companyDid,
-            facilityDid: linkedSubjects?.facilityDid || null,
-          },
-        },
+            facilityDid: linkedSubjects?.facilityDid || null
+          }
+        }
       };
+
+      if (getRepresentation(req) === "expanded") {
+        if (wantsSemanticResponse(req)) {
+          if (!ensureJsonLdExportEnabled(company)) {
+            return res.status(403).json({ error: "JSON-LD export is disabled for this company." });
+          }
+          return sendSemanticPassport(res, requestedPayload, passport.passport_type, typeDef);
+        }
+        return res.json(requestedPayload);
+      }
 
       if (wantsSemanticResponse(req)) {
         if (!ensureJsonLdExportEnabled(company)) {
@@ -534,11 +569,12 @@ module.exports = function registerPassportPublicRoutes(app, {
         delete semanticPayload.linked_data;
         const exported = buildBatteryPassJsonExport([semanticPayload], passport.passport_type, {
           semanticModelKey: typeDef?.semantic_model_key,
+          umbrellaCategory: typeDef?.umbrella_category
         });
         res.setHeader("Content-Type", "application/ld+json");
         return res.json({
-          "@context": [`${API_ORIGIN}/contexts/dpp/v1`, ...((exported?.["@context"] || []).slice(1))],
-          ...(exported?.["@graph"]?.[0] || basePayload),
+          "@context": [`${API_ORIGIN}/contexts/dpp/v1`, ...(exported?.["@context"] || []).slice(1)],
+          ...(exported?.["@graph"]?.[0] || basePayload)
         });
       }
 
@@ -560,9 +596,9 @@ module.exports = function registerPassportPublicRoutes(app, {
       if (!passport) return res.status(404).json({ error: "Passport not found" });
 
       const historyPayload = await buildPassportVersionHistory({
-        guid: passport.guid,
+        dppId: passport.dppId,
         passportType: passport.passport_type,
-        publicOnly: true,
+        publicOnly: true
       });
 
       res.json(historyPayload);
@@ -578,14 +614,11 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   async function handleCanonicalPassportRequest(req, res) {
     try {
-      const loaded = await loadPublicPassportByGuid(req.params.guid);
+      const loaded = await loadPublicPassportByGuid(req.params.dppId);
       if (!loaded?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const sanitizedPassport = await stripRestrictedFieldsForPublicView(loaded.passport, loaded.passport.passport_type);
-      const canonicalPayload = buildCanonicalPassportPayload(sanitizedPassport, loaded.typeDef, {
-        company: loaded.company,
-        granularity: loaded.company?.default_granularity || loaded.company?.dpp_granularity || sanitizedPassport.granularity || "model",
-      });
+      const canonicalPayload = buildRequestedPassportPayload(req, sanitizedPassport, loaded.typeDef, loaded.company);
 
       if (wantsSemanticResponse(req)) {
         if (!ensureJsonLdExportEnabled(loaded.company)) {
@@ -600,18 +633,18 @@ module.exports = function registerPassportPublicRoutes(app, {
     }
   }
 
-  app.get("/api/passports/:guid", publicReadRateLimit, handleCanonicalPassportRequest);
-  app.get("/api/passports/:guid/canonical", publicReadRateLimit, handleCanonicalPassportRequest);
+  app.get("/api/passports/:dppId", publicReadRateLimit, handleCanonicalPassportRequest);
+  app.get("/api/passports/:dppId/canonical", publicReadRateLimit, handleCanonicalPassportRequest);
 
-  app.get("/api/passports/:guid/history", publicReadRateLimit, async (req, res) => {
+  app.get("/api/passports/:dppId/history", publicReadRateLimit, async (req, res) => {
     try {
-      const loaded = await loadPublicPassportByGuid(req.params.guid);
+      const loaded = await loadPublicPassportByGuid(req.params.dppId);
       if (!loaded?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const historyPayload = await buildPassportVersionHistory({
-        guid: req.params.guid,
+        dppId: req.params.dppId,
         passportType: loaded.passport.passport_type,
-        publicOnly: true,
+        publicOnly: true
       });
 
       res.json(historyPayload);
@@ -622,9 +655,9 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   // ─── SIGNATURE (public verification) ───────────────────────────────────
 
-  app.get("/api/passports/:guid/signature", publicReadRateLimit, async (req, res) => {
+  app.get("/api/passports/:dppId/signature", publicReadRateLimit, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const versionNum = req.query.version ? parseInt(req.query.version, 10) : null;
 
       let version = versionNum;
@@ -632,19 +665,19 @@ module.exports = function registerPassportPublicRoutes(app, {
         const reg = await pool.query(
           `SELECT passport_type
            FROM passport_registry
-           WHERE guid = $1`,
-          [guid]
+           WHERE dpp_id = $1`,
+          [dppId]
         );
         if (reg.rows.length) {
           const tableName = getTable(reg.rows[0].passport_type);
           const liveVersion = await pool.query(
             `SELECT version_number
              FROM ${tableName}
-             WHERE guid = $1
+             WHERE dpp_id = $1
                AND release_status = 'released'
              ORDER BY version_number DESC
              LIMIT 1`,
-            [guid]
+            [dppId]
           );
           if (liveVersion.rows.length) {
             version = liveVersion.rows[0].version_number;
@@ -652,11 +685,11 @@ module.exports = function registerPassportPublicRoutes(app, {
             const archiveVersion = await pool.query(
               `SELECT version_number
                FROM passport_archives
-               WHERE guid = $1
+               WHERE dpp_id = $1
                  AND release_status = 'released'
                ORDER BY version_number DESC
                LIMIT 1`,
-              [guid]
+              [dppId]
             );
             version = archiveVersion.rows[0]?.version_number || 1;
           }
@@ -664,16 +697,16 @@ module.exports = function registerPassportPublicRoutes(app, {
         version = version || 1;
       }
 
-      const verifyResult = await verifyPassportSignature(guid, version);
+      const verifyResult = await verifyPassportSignature(dppId, version);
       let credential = null;
 
       if (verifyResult.status !== "unsigned" && verifyResult.status !== "not_found") {
         const vcRow = await pool.query(
           `SELECT vc_json
            FROM passport_signatures
-           WHERE passport_guid = $1
+           WHERE passport_dpp_id = $1
              AND version_number = $2`,
-          [guid, version]
+          [dppId, version]
         );
         if (vcRow.rows[0]?.vc_json) {
           credential = JSON.parse(vcRow.rows[0].vc_json);
@@ -738,8 +771,8 @@ module.exports = function registerPassportPublicRoutes(app, {
       return res.json(buildDidDocument({
         id: did,
         service: [
-          { id: "#profile", type: "CompanyProfile", serviceEndpoint: didService.buildApiUrl(`/api/companies/${company.id}/profile`) },
-        ],
+        { id: "#profile", type: "CompanyProfile", serviceEndpoint: didService.buildApiUrl(`/api/companies/${company.id}/profile`) }]
+
       }));
     } catch {
       return res.status(400).json({ error: "Invalid DID path" });
@@ -754,7 +787,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({
         id: did,
-        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || ""),
+        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || "")
       }));
     } catch {
       return res.status(400).json({ error: "Invalid DID path" });
@@ -769,7 +802,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({
         id: did,
-        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || ""),
+        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || "")
       }));
     } catch {
       return res.status(400).json({ error: "Invalid DID path" });
@@ -785,7 +818,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({
         id: did,
-        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || ""),
+        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || "")
       }));
     } catch {
       return res.status(400).json({ error: "Invalid DID path" });
@@ -800,7 +833,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({
         id: did,
-        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || ""),
+        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || "")
       }));
     } catch {
       return res.status(400).json({ error: "Invalid DID path" });
@@ -825,7 +858,7 @@ module.exports = function registerPassportPublicRoutes(app, {
           did,
           didDocument: didService.didToDocumentUrl(did),
           type: "Issuer",
-          publicUrl: didService.buildApiUrl("/.well-known/did.json"),
+          publicUrl: didService.buildApiUrl("/.well-known/did.json")
         });
       }
 
@@ -838,7 +871,7 @@ module.exports = function registerPassportPublicRoutes(app, {
           did,
           didDocument: didService.didToDocumentUrl(did),
           type: "Company",
-          publicUrl,
+          publicUrl
         });
       }
 
@@ -852,9 +885,9 @@ module.exports = function registerPassportPublicRoutes(app, {
           didDocument: didService.didToDocumentUrl(did),
           type: "Facility",
           publicUrl,
-          canonicalJson: didService.buildApiUrl(`/api/passports/${loaded.passport.guid}/canonical`),
-          jsonLd: didService.buildApiUrl(`/api/passports/${loaded.passport.guid}?format=semantic`),
-          verification: didService.buildApiUrl(`/api/passports/${loaded.passport.guid}/signature`),
+          canonicalJson: didService.buildApiUrl(`/api/passports/${loaded.passport.dppId}/canonical`),
+          jsonLd: didService.buildApiUrl(`/api/passports/${loaded.passport.dppId}?format=semantic`),
+          verification: didService.buildApiUrl(`/api/passports/${loaded.passport.dppId}/signature`)
         });
       }
 
@@ -881,51 +914,51 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   // ─── UNLOCK ──────────────────────────────────────────────────────────────
 
-  app.post("/api/passports/:guid/unlock", publicUnlockRateLimit, async (req, res) => {
+  app.post("/api/passports/:dppId/unlock", publicUnlockRateLimit, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const { accessKey } = req.body;
       if (!accessKey) return res.status(400).json({ error: "accessKey is required" });
 
       const reg = await pool.query(
         `SELECT passport_type, access_key_hash
          FROM passport_registry
-         WHERE guid = $1`,
-        [guid]
+         WHERE dpp_id = $1`,
+        [dppId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
       const suppliedHash = crypto.createHash("sha256").update(String(accessKey)).digest("hex");
       const storedHash = String(reg.rows[0].access_key_hash || "");
       if (!storedHash) return res.status(401).json({ error: "Access key is not configured for this passport" });
-      const keysMatch = storedHash.length === suppliedHash.length
-        && crypto.timingSafeEqual(Buffer.from(storedHash, "hex"), Buffer.from(suppliedHash, "hex"));
+      const keysMatch = storedHash.length === suppliedHash.length &&
+      crypto.timingSafeEqual(Buffer.from(storedHash, "hex"), Buffer.from(suppliedHash, "hex"));
       if (!keysMatch) return res.status(401).json({ error: "Invalid access key" });
 
       const tableName = getTable(reg.rows[0].passport_type);
       let row = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE guid = $1
+         WHERE dpp_id = $1
            AND deleted_at IS NULL
          ORDER BY version_number DESC
          LIMIT 1`,
-        [guid]
+        [dppId]
       );
 
       if (!row.rows.length) {
         const archiveRes = await pool.query(
           `SELECT row_data
            FROM passport_archives
-           WHERE guid = $1
+           WHERE dpp_id = $1
            ORDER BY version_number DESC
            LIMIT 1`,
-          [guid]
+          [dppId]
         );
         if (archiveRes.rows.length) {
-          const rowData = typeof archiveRes.rows[0].row_data === "string"
-            ? JSON.parse(archiveRes.rows[0].row_data)
-            : archiveRes.rows[0].row_data;
+          const rowData = typeof archiveRes.rows[0].row_data === "string" ?
+          JSON.parse(archiveRes.rows[0].row_data) :
+          archiveRes.rows[0].row_data;
           row = { rows: [rowData] };
         }
       }
@@ -936,8 +969,8 @@ module.exports = function registerPassportPublicRoutes(app, {
         passport: {
           ...normalizePassportRow(row.rows[0]),
           passport_type: reg.rows[0].passport_type,
-          archived: !!row.rows[0]?.archived,
-        },
+          archived: !!row.rows[0]?.archived
+        }
       });
     } catch {
       res.status(500).json({ error: "Failed to unlock passport" });

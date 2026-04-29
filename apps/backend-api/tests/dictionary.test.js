@@ -7,7 +7,12 @@ describe("battery dictionary service", () => {
     const service = createBatteryDictionaryService();
 
     expect(service.getManifest()).toHaveProperty("name");
+    expect(service.getManifest()).toHaveProperty("authority.normativeSource.title", "BatteryPass Data Attribute Longlist");
+    expect(service.getManifest()).toHaveProperty("governance.steward.did", "did:web:www.claros-dpp.online");
+    expect(service.getManifest()).toHaveProperty("versioning.sourceVersion", "BatteryPass Data Attribute Longlist v1.3");
+    expect(service.getManifest()).toHaveProperty("regulatoryTraceability.applicabilityModel");
     expect(service.getTerms().length).toBeGreaterThan(0);
+    expect(service.getCategoryRules()).toHaveProperty("requirementsByFieldKey");
     expect(service.resolveFieldKey("dpp_granularity")).toContain("dpp-granularity");
   });
 

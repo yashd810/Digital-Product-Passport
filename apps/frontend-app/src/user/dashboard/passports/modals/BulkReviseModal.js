@@ -52,7 +52,7 @@ export function BulkReviseModal({
   }, [companyId, user?.id]);
 
   const selectedSourcePassports = useMemo(
-    () => passports.filter((passport) => selectedPassports.has(`${passport.guid}-${passport.version_number}`)),
+    () => passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${passport.version_number}`)),
     [passports, selectedPassports]
   );
 
@@ -135,9 +135,9 @@ export function BulkReviseModal({
   const downloadResultsCsv = () => {
     if (!result?.details?.length) return;
     const rows = [
-      ["GUID", "Passport Type", "Status", "Source Version", "New Version", "Message"],
+      ["DPP ID", "Passport Type", "Status", "Source Version", "New Version", "Message"],
       ...result.details.map((item) => [
-        item.guid || "",
+        item.dppId || "",
         item.passport_type || "",
         item.status || "",
         item.source_version_number ?? "",
@@ -219,7 +219,7 @@ export function BulkReviseModal({
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           items: targetedPassports.map((passport) => ({
-            guid: passport.guid,
+            dppId: passport.dppId,
             passport_type: passport.passport_type || activeType,
           })),
           changes: parsedChanges,
@@ -323,9 +323,9 @@ export function BulkReviseModal({
 
       <div className="bulk-revise-result-list">
         {result.details?.map((item, index) => (
-          <div key={`${item.guid}-${index}`} className={`bulk-revise-result-item ${item.status || "default"}`}>
+          <div key={`${item.dppId}-${index}`} className={`bulk-revise-result-item ${item.status || "default"}`}>
             <div className="bulk-revise-result-topline">
-              <strong>{item.guid?.slice(0, 8)}…</strong>
+              <strong>{item.dppId?.slice(0, 8)}…</strong>
               <span>{item.passport_type}</span>
               <span className={`bulk-revise-result-status ${item.status || "default"}`}>
                 {item.status}
@@ -353,7 +353,7 @@ export function BulkReviseModal({
     <>
       <h3 className="dashboard-modal-title">Bulk Revise Released Passports</h3>
       <p className="dashboard-modal-subtitle">
-        Create new <strong>In Revision</strong> versions for many released passports at once. The latest released version for each GUID is used automatically.
+        Create new <strong>In Revision</strong> versions for many released passports at once. The latest released version for each DPP ID is used automatically.
       </p>
 
       <form onSubmit={handleSubmit} className="bulk-create-form">

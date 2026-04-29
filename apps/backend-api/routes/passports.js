@@ -1,7 +1,7 @@
 "use strict";
 
-const { v4: uuidv4 } = require("uuid");
 const logger = require("../services/logger");
+const { generateDppRecordId } = require("../services/dpp-record-id");
 
 module.exports = function registerPassportRoutes(app, {
   pool,
@@ -71,10 +71,11 @@ module.exports = function registerPassportRoutes(app, {
   accessRightsService,
   productIdentifierService,
   backupProviderService,
+  buildExpandedPassportPayload
 }) {
   const insertPassportRegistry = async ({
     client = pool,
-    guid,
+    dppId: dppId,
     lineageId,
     companyId,
     passportType,
@@ -83,26 +84,26 @@ module.exports = function registerPassportRoutes(app, {
     accessKeyLastRotatedAt = null,
     deviceApiKeyHash = null,
     deviceApiKeyPrefix = null,
-    deviceKeyLastRotatedAt = null,
+    deviceKeyLastRotatedAt = null
   }) => client.query(
     `INSERT INTO passport_registry
-       (guid, lineage_id, company_id, passport_type,
+       (dpp_id, lineage_id, company_id, passport_type,
         access_key_hash, access_key_prefix, access_key_last_rotated_at,
         device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     ON CONFLICT (guid) DO NOTHING`,
+     ON CONFLICT (dpp_id) DO NOTHING`,
     [
-      guid,
-      lineageId,
-      companyId,
-      passportType,
-      accessKeyHash,
-      accessKeyPrefix,
-      accessKeyLastRotatedAt,
-      deviceApiKeyHash,
-      deviceApiKeyPrefix,
-      deviceKeyLastRotatedAt,
-    ]
+    dppId,
+    lineageId,
+    companyId,
+    passportType,
+    accessKeyHash,
+    accessKeyPrefix,
+    accessKeyLastRotatedAt,
+    deviceApiKeyHash,
+    deviceApiKeyPrefix,
+    deviceKeyLastRotatedAt]
+
   );
 
   const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
@@ -114,18 +115,18 @@ module.exports = function registerPassportRoutes(app, {
       companyId,
       passportType,
       rawProductId: productId,
-      granularity,
+      granularity
     });
     return {
       product_id: normalized.productIdInput || null,
-      product_identifier_did: normalized.productIdentifierDid || null,
+      product_identifier_did: normalized.productIdentifierDid || null
     };
   }
 
   function parseApiKeyScopes(scopes) {
-    const normalized = Array.isArray(scopes)
-      ? scopes.map((scope) => String(scope || "").trim()).filter(Boolean)
-      : ["dpp:read"];
+    const normalized = Array.isArray(scopes) ?
+    scopes.map((scope) => String(scope || "").trim()).filter(Boolean) :
+    ["dpp:read"];
     const unique = [...new Set(normalized)];
     const invalid = unique.filter((scope) => !ALLOWED_API_KEY_SCOPES.has(scope));
     if (invalid.length) {
@@ -142,7 +143,7 @@ module.exports = function registerPassportRoutes(app, {
       keyPrefix: String(rawKey || "").slice(0, API_KEY_PREFIX_LENGTH),
       keySalt,
       hashAlgorithm: "hmac_sha256",
-      keyHash: crypto.createHmac("sha256", keySalt).update(String(rawKey || "")).digest("hex"),
+      keyHash: crypto.createHmac("sha256", keySalt).update(String(rawKey || "")).digest("hex")
     };
   }
 
@@ -214,22 +215,22 @@ module.exports = function registerPassportRoutes(app, {
       ),
       carrier_policy_key: requestedFields.carrier_policy_key || profile.defaultCarrierPolicyKey || null,
       economic_operator_id: requestedFields.economic_operator_id || companyIdentity?.economic_operator_identifier || null,
-      facility_id: resolvedFacilityId,
+      facility_id: resolvedFacilityId
     };
   }
 
-  async function loadLatestLivePassport({ companyId, guid, passportType, releaseStatusSql = null }) {
+  async function loadLatestLivePassport({ companyId, dppId: dppId, passportType, releaseStatusSql = null }) {
     const tableName = getTable(passportType);
     const result = await pool.query(
       `SELECT *
        FROM ${tableName}
-       WHERE guid = $1
+       WHERE dpp_id = $1
          AND company_id = $2
          ${releaseStatusSql ? `AND release_status IN ${releaseStatusSql}` : ""}
          AND deleted_at IS NULL
        ORDER BY version_number DESC
        LIMIT 1`,
-      [guid, companyId]
+      [dppId, companyId]
     );
     return result.rows[0] || null;
   }
@@ -246,9 +247,9 @@ module.exports = function registerPassportRoutes(app, {
     passportType = null,
     companyName = "",
     reason = "manual",
-    snapshotScope = "released_current",
+    snapshotScope = "released_current"
   }) {
-    if (!backupProviderService || !passport?.guid || !passport?.company_id) {
+    if (!backupProviderService || !passport?.dppId || !passport?.company_id) {
       return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
     }
 
@@ -258,24 +259,44 @@ module.exports = function registerPassportRoutes(app, {
     }
 
     const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
-    const resolvedCompanyName = companyName
-      || (await getCompanyNameMap([passport.company_id])).get(String(passport.company_id))
-      || "";
+    const resolvedCompanyName = companyName ||
+    (await getCompanyNameMap([passport.company_id])).get(String(passport.company_id)) ||
+    "";
 
     return backupProviderService.replicatePassportSnapshot({
       passport: { ...normalizePassportRow(passport), passport_type: resolvedPassportType },
       typeDef,
       companyName: resolvedCompanyName,
       reason,
-      snapshotScope,
+      snapshotScope
     });
+  }
+
+  function isFullRepresentationRequest(value) {
+    return ["expanded", "full"].includes(String(value || "").trim().toLowerCase());
+  }
+
+  async function loadCompanySerializationContext(companyId) {
+    const result = await pool.query(
+      `SELECT c.id,
+              c.company_name,
+              c.did_slug,
+              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS dpp_granularity,
+              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS default_granularity
+       FROM companies c
+       LEFT JOIN company_dpp_policies p ON p.company_id = c.id
+       WHERE c.id = $1
+       LIMIT 1`,
+      [companyId]
+    );
+    return result.rows[0] || null;
   }
 
   function resolveGranularityForCreate(companyPolicy, requestedGranularity) {
     const fallbackGranularity = String(companyPolicy?.default_granularity || "item").trim().toLowerCase();
-    const normalizedRequested = requestedGranularity === undefined || requestedGranularity === null || requestedGranularity === ""
-      ? null
-      : String(requestedGranularity).trim().toLowerCase();
+    const normalizedRequested = requestedGranularity === undefined || requestedGranularity === null || requestedGranularity === "" ?
+    null :
+    String(requestedGranularity).trim().toLowerCase();
 
     if (normalizedRequested && !VALID_GRANULARITIES.has(normalizedRequested)) {
       const error = new Error("granularity must be one of: model, batch, item");
@@ -291,9 +312,9 @@ module.exports = function registerPassportRoutes(app, {
       throw error;
     }
 
-    const effectiveGranularity = normalizedRequested && companyPolicy.allow_granularity_override
-      ? normalizedRequested
-      : fallbackGranularity;
+    const effectiveGranularity = normalizedRequested && companyPolicy.allow_granularity_override ?
+    normalizedRequested :
+    fallbackGranularity;
 
     if (effectiveGranularity === "model" && companyPolicy.mint_model_dids === false) {
       const error = new Error("Model-level DIDs are disabled for this company policy.");
@@ -320,7 +341,7 @@ module.exports = function registerPassportRoutes(app, {
         [req.params.companyId]
       );
       res.json(r.rows);
-    } catch (e) { res.status(500).json({ error: "Failed to fetch API keys" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to fetch API keys" });}
   });
 
   app.post("/api/companies/:companyId/api-keys", authenticateToken, checkCompanyAdmin, async (req, res) => {
@@ -339,7 +360,7 @@ module.exports = function registerPassportRoutes(app, {
         [req.params.companyId]
       );
       if (parseInt(count.rows[0].count) >= 10)
-        return res.status(400).json({ error: "Maximum of 10 active API keys per company" });
+      return res.status(400).json({ error: "Maximum of 10 active API keys per company" });
 
       const rawKey = "dpp_" + crypto.randomBytes(20).toString("hex");
       const keyRecord = buildApiKeyHashRecord(rawKey);
@@ -349,19 +370,19 @@ module.exports = function registerPassportRoutes(app, {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          RETURNING id, name, key_prefix, scopes, expires_at, created_at`,
         [
-          req.params.companyId,
-          name.trim(),
-          keyRecord.keyHash,
-          keyRecord.keyPrefix,
-          keyRecord.keySalt,
-          keyRecord.hashAlgorithm,
-          parsedScopes,
-          expiresAtValue,
-          req.user.userId,
-        ]
+        req.params.companyId,
+        name.trim(),
+        keyRecord.keyHash,
+        keyRecord.keyPrefix,
+        keyRecord.keySalt,
+        keyRecord.hashAlgorithm,
+        parsedScopes,
+        expiresAtValue,
+        req.user.userId]
+
       );
       res.status(201).json({ ...r.rows[0], key: rawKey });
-    } catch (e) { logger.error("Create API key error:", e.message); res.status(500).json({ error: "Failed to create API key" }); }
+    } catch (e) {logger.error("Create API key error:", e.message);res.status(500).json({ error: "Failed to create API key" });}
   });
 
   app.delete("/api/companies/:companyId/api-keys/:keyId", authenticateToken, checkCompanyAdmin, async (req, res) => {
@@ -372,13 +393,13 @@ module.exports = function registerPassportRoutes(app, {
       );
       if (!r.rows.length) return res.status(404).json({ error: "Key not found" });
       res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: "Failed to revoke API key" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to revoke API key" });}
   });
 
   // ─── PUBLIC API v1 ─────────────────────────────────────────────────────────
 
   app.use("/api/v1", (req, res, next) => {
-    res.header("Access-Control-Allow-Origin",  "*");
+    res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Headers", "X-API-Key, Content-Type");
     res.header("X-Content-Type-Options", "nosniff");
     if (req.method === "OPTIONS") return res.sendStatus(204);
@@ -406,7 +427,7 @@ module.exports = function registerPassportRoutes(app, {
       `;
       const params = [companyId];
       let i = 2;
-      if (status) { q += ` AND release_status = $${i++}`; params.push(status); }
+      if (status) {q += ` AND release_status = $${i++}`;params.push(status);}
       if (search) {
         q += ` AND (model_name ILIKE $${i} OR product_id ILIKE $${i} OR product_identifier_did ILIKE $${i})`;
         params.push(`%${search}%`);
@@ -421,30 +442,30 @@ module.exports = function registerPassportRoutes(app, {
         count: r.rows.length,
         limit: cap,
         offset: off,
-        passports: r.rows.map(p => ({ ...p, passport_type: type })),
+        passports: r.rows.map((p) => ({ ...p, passport_type: type }))
       });
-    } catch (e) { logger.error("API v1 list error:", e.message); res.status(500).json({ error: "Failed to fetch passports" }); }
+    } catch (e) {logger.error("API v1 list error:", e.message);res.status(500).json({ error: "Failed to fetch passports" });}
   });
 
-  app.get("/api/v1/passports/:guid", authenticateApiKey, requireApiKeyScope("dpp:read"), apiKeyReadRateLimit, async (req, res) => {
+  app.get("/api/v1/passports/:dppId", authenticateApiKey, requireApiKeyScope("dpp:read"), apiKeyReadRateLimit, async (req, res) => {
     try {
-      const { guid }  = req.params;
+      const { dppId: dppId } = req.params;
       const companyId = req.apiKey.companyId;
 
       const reg = await pool.query(
-        "SELECT passport_type FROM passport_registry WHERE guid = $1 AND company_id = $2",
-        [guid, companyId]
+        "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2",
+        [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
       const tableName = getTable(reg.rows[0].passport_type);
       const r = await pool.query(
-        `SELECT * FROM ${tableName} WHERE guid = $1 AND deleted_at IS NULL LIMIT 1`,
-        [guid]
+        `SELECT * FROM ${tableName} WHERE dpp_id = $1 AND deleted_at IS NULL LIMIT 1`,
+        [dppId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
       res.json({ ...r.rows[0], passport_type: reg.rows[0].passport_type });
-    } catch (e) { logger.error("API v1 get error:", e.message); res.status(500).json({ error: "Failed to fetch passport" }); }
+    } catch (e) {logger.error("API v1 get error:", e.message);res.status(500).json({ error: "Failed to fetch passport" });}
   });
 
   // ─── PASSPORT CRUD ─────────────────────────────────────────────────────────
@@ -474,16 +495,16 @@ module.exports = function registerPassportRoutes(app, {
 
       const resolvedPassportType = typeSchema.typeName;
       const tableName = getTable(resolvedPassportType);
-      const guid = uuidv4();
-      const lineageId = guid;
-      const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
+      const dppId = generateDppRecordId();
+      const lineageId = dppId;
+      const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(dppId);
       const companyPolicy = await getCompanyDppPolicy(companyId);
       const effectiveGranularity = resolveGranularityForCreate(companyPolicy, requestedGranularity);
       const storedProductIdentifiers = buildStoredProductIdentifiers({
         companyId,
         passportType: resolvedPassportType,
         productId: normalizedProductId,
-        granularity: effectiveGranularity,
+        granularity: effectiveGranularity
       });
       const complianceManagedFields = await buildComplianceManagedFields({
         companyId,
@@ -495,21 +516,21 @@ module.exports = function registerPassportRoutes(app, {
           content_specification_ids,
           carrier_policy_key,
           economic_operator_id,
-          facility_id,
-        },
+          facility_id
+        }
       });
 
       const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
       if (existingByProductId) {
         return res.status(409).json({
           error: `A passport with Serial Number "${normalizedProductId}" already exists.`,
-          existing_guid: existingByProductId.guid,
-          release_status: normalizeReleaseStatus(existingByProductId.release_status),
+          existing_dpp_id: existingByProductId.dppId,
+          release_status: normalizeReleaseStatus(existingByProductId.release_status)
         });
       }
 
-      const invalidFieldKeys = Object.keys(fields).filter(key =>
-        !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key)
+      const invalidFieldKeys = Object.keys(fields).filter((key) =>
+      !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key)
       );
       if (invalidFieldKeys.length) {
         return res.status(400).json({ error: "Unknown passport field(s) in request body", fields: invalidFieldKeys });
@@ -518,38 +539,38 @@ module.exports = function registerPassportRoutes(app, {
       const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
 
       const allCols = [
-        "guid",
-        "lineage_id",
-        "company_id",
-        "model_name",
-        "product_id",
-        "product_identifier_did",
-        "compliance_profile_key",
-        "content_specification_ids",
-        "carrier_policy_key",
-        "economic_operator_id",
-        "facility_id",
-        "granularity",
-        "created_by",
-        ...dataFields,
-      ];
+      "dppId",
+      "lineage_id",
+      "company_id",
+      "model_name",
+      "product_id",
+      "product_identifier_did",
+      "compliance_profile_key",
+      "content_specification_ids",
+      "carrier_policy_key",
+      "economic_operator_id",
+      "facility_id",
+      "granularity",
+      "created_by",
+      ...dataFields];
+
       const allVals = [
-        guid,
-        lineageId,
-        companyId,
-        model_name || null,
-        storedProductIdentifiers.product_id,
-        storedProductIdentifiers.product_identifier_did,
-        complianceManagedFields.compliance_profile_key,
-        complianceManagedFields.content_specification_ids,
-        complianceManagedFields.carrier_policy_key,
-        complianceManagedFields.economic_operator_id,
-        complianceManagedFields.facility_id,
-        effectiveGranularity,
-        userId,
-        ...dataFields.map(k => processedFields[k]),
-      ];
-      const places  = allCols.map((_, i) => `$${i + 1}`).join(", ");
+      dppId,
+      lineageId,
+      companyId,
+      model_name || null,
+      storedProductIdentifiers.product_id,
+      storedProductIdentifiers.product_identifier_did,
+      complianceManagedFields.compliance_profile_key,
+      complianceManagedFields.content_specification_ids,
+      complianceManagedFields.carrier_policy_key,
+      complianceManagedFields.economic_operator_id,
+      complianceManagedFields.facility_id,
+      effectiveGranularity,
+      userId,
+      ...dataFields.map((k) => processedFields[k])];
+
+      const places = allCols.map((_, i) => `$${i + 1}`).join(", ");
 
       const client = await pool.connect();
       let result;
@@ -561,10 +582,10 @@ module.exports = function registerPassportRoutes(app, {
         );
         await insertPassportRegistry({
           client,
-          guid,
+          dppId: dppId,
           lineageId,
           companyId,
-          passportType: resolvedPassportType,
+          passportType: resolvedPassportType
         });
         await client.query("COMMIT");
       } catch (e) {
@@ -573,13 +594,13 @@ module.exports = function registerPassportRoutes(app, {
       } finally {
         client.release();
       }
-      await logAudit(companyId, userId, "CREATE", tableName, guid, null, {
+      await logAudit(companyId, userId, "CREATE", tableName, dppId, null, {
         product_id: storedProductIdentifiers.product_id,
         product_identifier_did: storedProductIdentifiers.product_identifier_did,
         passport_type: resolvedPassportType,
         model_name,
         granularity: effectiveGranularity,
-        compliance_profile_key: complianceManagedFields.compliance_profile_key,
+        compliance_profile_key: complianceManagedFields.compliance_profile_key
       });
       res.status(201).json({ success: true, passport: result.rows[0] });
     } catch (e) {
@@ -606,7 +627,7 @@ module.exports = function registerPassportRoutes(app, {
       const tableName = getTable(resolvedPassportType);
       const companyPolicy = await getCompanyDppPolicy(companyId);
       const results = [];
-      let created = 0, skipped = 0, failed = 0;
+      let created = 0,skipped = 0,failed = 0;
 
       for (let i = 0; i < passports.length; i++) {
         const item = normalizePassportRequestBody(passports[i] || {});
@@ -621,27 +642,27 @@ module.exports = function registerPassportRoutes(app, {
           facility_id,
           ...fields
         } = item;
-        const guid = uuidv4();
-        const lineageId = guid;
-        const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(guid);
+        const dppId = generateDppRecordId();
+        const lineageId = dppId;
+        const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(dppId);
 
         try {
           const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
           if (existingByProductId) {
             results.push({ index: i, product_id: normalizedProductId, success: false, error: `A passport with Serial Number "${normalizedProductId}" already exists — skipped` });
-            skipped++; continue;
+            skipped++;continue;
           }
-          const invalidFieldKeys = Object.keys(fields).filter(key => !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key));
+          const invalidFieldKeys = Object.keys(fields).filter((key) => !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key));
           if (invalidFieldKeys.length) {
             results.push({ index: i, product_id: normalizedProductId, success: false, error: `Unknown passport field(s): ${invalidFieldKeys.join(", ")}` });
-            failed++; continue;
+            failed++;continue;
           }
           const effectiveGranularity = resolveGranularityForCreate(companyPolicy, requestedGranularity);
           const storedProductIdentifiers = buildStoredProductIdentifiers({
             companyId,
             passportType: resolvedPassportType,
             productId: normalizedProductId,
-            granularity: effectiveGranularity,
+            granularity: effectiveGranularity
           });
           const complianceManagedFields = await buildComplianceManagedFields({
             companyId,
@@ -653,61 +674,61 @@ module.exports = function registerPassportRoutes(app, {
               content_specification_ids,
               carrier_policy_key,
               economic_operator_id,
-              facility_id,
-            },
+              facility_id
+            }
           });
           const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
           const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
-          const allCols  = [
-            "guid","lineage_id","company_id","model_name","product_id","product_identifier_did",
-            "compliance_profile_key","content_specification_ids","carrier_policy_key","economic_operator_id","facility_id",
-            "granularity","created_by", ...dataFields,
-          ];
-          const allVals  = [
-            guid,
-            lineageId,
-            companyId,
-            model_name || null,
-            storedProductIdentifiers.product_id,
-            storedProductIdentifiers.product_identifier_did,
-            complianceManagedFields.compliance_profile_key,
-            complianceManagedFields.content_specification_ids,
-            complianceManagedFields.carrier_policy_key,
-            complianceManagedFields.economic_operator_id,
-            complianceManagedFields.facility_id,
-            effectiveGranularity,
-            userId,
-            ...dataFields.map(k => processedFields[k]),
-          ];
-          const places   = allCols.map((_, idx) => `$${idx + 1}`).join(", ");
+          const allCols = [
+          "dppId", "lineage_id", "company_id", "model_name", "product_id", "product_identifier_did",
+          "compliance_profile_key", "content_specification_ids", "carrier_policy_key", "economic_operator_id", "facility_id",
+          "granularity", "created_by", ...dataFields];
+
+          const allVals = [
+          dppId,
+          lineageId,
+          companyId,
+          model_name || null,
+          storedProductIdentifiers.product_id,
+          storedProductIdentifiers.product_identifier_did,
+          complianceManagedFields.compliance_profile_key,
+          complianceManagedFields.content_specification_ids,
+          complianceManagedFields.carrier_policy_key,
+          complianceManagedFields.economic_operator_id,
+          complianceManagedFields.facility_id,
+          effectiveGranularity,
+          userId,
+          ...dataFields.map((k) => processedFields[k])];
+
+          const places = allCols.map((_, idx) => `$${idx + 1}`).join(", ");
 
           const r = await pool.query(
-            `INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places}) RETURNING guid, model_name, product_id, product_identifier_did`,
+            `INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places}) RETURNING dpp_id, model_name, product_id, product_identifier_did`,
             allVals
           );
           await insertPassportRegistry({
-            guid,
+            dppId: dppId,
             lineageId,
             companyId,
-            passportType: resolvedPassportType,
+            passportType: resolvedPassportType
           });
-          await logAudit(companyId, userId, "CREATE", tableName, guid, null, {
+          await logAudit(companyId, userId, "CREATE", tableName, dppId, null, {
             product_id: storedProductIdentifiers.product_id,
             product_identifier_did: storedProductIdentifiers.product_identifier_did,
             passport_type: resolvedPassportType,
             model_name,
             granularity: effectiveGranularity,
-            bulk: true,
+            bulk: true
           });
           results.push({
             index: i,
             success: true,
-            guid,
+            dppId: dppId,
             product_id: storedProductIdentifiers.product_id,
             product_identifier_did: storedProductIdentifiers.product_identifier_did,
             model_name: model_name || null,
             granularity: effectiveGranularity,
-            compliance_profile_key: complianceManagedFields.compliance_profile_key,
+            compliance_profile_key: complianceManagedFields.compliance_profile_key
           });
           created++;
         } catch (e) {
@@ -734,7 +755,7 @@ module.exports = function registerPassportRoutes(app, {
                FROM ${tableName} p
                LEFT JOIN users u ON u.id = p.created_by
                WHERE p.deleted_at IS NULL AND p.company_id = $1`;
-      const params = [companyId]; let i = 2;
+      const params = [companyId];let i = 2;
 
       if (status) {
         const normalizedStatus = normalizeReleaseStatus(status);
@@ -753,8 +774,8 @@ module.exports = function registerPassportRoutes(app, {
       q += " ORDER BY p.lineage_id, p.version_number DESC";
 
       const r = await pool.query(q, params);
-      res.json(r.rows.map(row => ({ ...normalizePassportRow(row), passport_type: passportType })));
-    } catch (e) { res.status(500).json({ error: "Failed to fetch passports" }); }
+      res.json(r.rows.map((row) => ({ ...normalizePassportRow(row), passport_type: passportType })));
+    } catch (e) {res.status(500).json({ error: "Failed to fetch passports" });}
   });
 
   app.post("/api/companies/:companyId/passports/bulk-fetch", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -779,17 +800,17 @@ module.exports = function registerPassportRoutes(app, {
       const results = [];
 
       for (const item of identifiers) {
-        const raw = typeof item === "string" ? { product_id: item } : (item || {});
-        const guid = raw.guid;
+        const raw = typeof item === "string" ? { product_id: item } : item || {};
+        const dppId = raw.dppId;
         const productId = normalizeProductIdValue(raw.product_id || raw.productId);
         try {
           let row = null;
-          if (guid) {
+          if (dppId) {
             const r = await pool.query(
               `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
                FROM ${tableName} p LEFT JOIN users u ON u.id = p.created_by
-               WHERE p.guid = $1 AND p.company_id = $2 AND p.deleted_at IS NULL LIMIT 1`,
-              [guid, companyId]
+               WHERE p.dpp_id = $1 AND p.company_id = $2 AND p.deleted_at IS NULL LIMIT 1`,
+              [dppId, companyId]
             );
             row = r.rows[0];
           }
@@ -797,7 +818,7 @@ module.exports = function registerPassportRoutes(app, {
             const productIdCandidates = productIdentifierService.buildLookupCandidates({
               companyId,
               passportType: typeSchema.typeName,
-              productId,
+              productId
             });
             const r = await pool.query(
               `WITH latest AS (
@@ -818,13 +839,13 @@ module.exports = function registerPassportRoutes(app, {
           if (row) {
             results.push({ ...normalizePassportRow(row), passport_type: typeSchema.typeName, _status: "found" });
           } else {
-            results.push({ guid: guid || undefined, product_id: productId || undefined, _status: "not_found" });
+            results.push({ dppId: dppId || undefined, product_id: productId || undefined, _status: "not_found" });
           }
         } catch (e) {
-          results.push({ guid: guid || undefined, product_id: productId || undefined, _status: "error", error: e.message });
+          results.push({ dppId: dppId || undefined, product_id: productId || undefined, _status: "error", error: e.message });
         }
       }
-      res.json({ total: identifiers.length, found: results.filter(r => r._status === "found").length, results });
+      res.json({ total: identifiers.length, found: results.filter((r) => r._status === "found").length, results });
     } catch (e) {
       logger.error("Bulk fetch error:", e.message);
       res.status(500).json({ error: "Bulk fetch failed" });
@@ -840,14 +861,14 @@ module.exports = function registerPassportRoutes(app, {
 
       if (!passportType) return res.status(400).json({ error: "passportType is required" });
 
-      const typeRes = await pool.query("SELECT fields_json, semantic_model_key FROM passport_types WHERE type_name=$1", [passportType]);
+      const typeRes = await pool.query("SELECT fields_json, umbrella_category, semantic_model_key FROM passport_types WHERE type_name=$1", [passportType]);
       if (!typeRes.rows.length) return res.status(404).json({ error: "Passport type not found" });
 
       const sections = typeRes.rows[0]?.fields_json?.sections || [];
-      const schemaFields = sections.flatMap(s => s.fields || []);
+      const schemaFields = sections.flatMap((s) => s.fields || []);
       const tableName = getTable(passportType);
-      const cols = ["guid", "model_name", "product_id", "release_status", ...schemaFields.map(f => f.key)];
-      const safeColsSql = cols.map(c => /^[a-z][a-z0-9_]*$/.test(c) ? c : null).filter(Boolean);
+      const cols = ["dppId", "model_name", "product_id", "release_status", ...schemaFields.map((f) => f.key)];
+      const safeColsSql = cols.map((c) => /^[a-z][a-z0-9_]*$/.test(c) ? c : null).filter(Boolean);
 
       let statusSql;
       if (statusFilter === "all") {
@@ -873,22 +894,23 @@ module.exports = function registerPassportRoutes(app, {
         res.setHeader("Content-Disposition", `attachment; filename="${passportType}_export.jsonld"`);
         return res.json(buildBatteryPassJsonExport(rows, passportType, {
           semanticModelKey: typeRes.rows[0]?.semantic_model_key || null,
+          umbrellaCategory: typeRes.rows[0]?.umbrella_category || null
         }));
       }
 
       const escCell = (v) => {
-        const str = (Array.isArray(v) || (typeof v === "object" && v !== null)) ? JSON.stringify(v) : String(v ?? "");
+        const str = Array.isArray(v) || typeof v === "object" && v !== null ? JSON.stringify(v) : String(v ?? "");
         return `"${str.replace(/"/g, '""')}"`;
       };
       const fieldRows = [
-        ["guid",           ...rows.map(r => r.guid)],
-        ["model_name",     ...rows.map(r => r.model_name || "")],
-        ["product_id",     ...rows.map(r => r.product_id || "")],
-        ["release_status", ...rows.map(r => r.release_status || "")],
-        ...schemaFields.map(f => [f.label || f.key, ...rows.map(r => r[f.key] ?? "")]),
-      ];
+      ["dppId", ...rows.map((r) => r.dppId)],
+      ["model_name", ...rows.map((r) => r.model_name || "")],
+      ["product_id", ...rows.map((r) => r.product_id || "")],
+      ["release_status", ...rows.map((r) => r.release_status || "")],
+      ...schemaFields.map((f) => [f.label || f.key, ...rows.map((r) => r[f.key] ?? "")])];
+
       const headerRow = ["Field Name", ...rows.map((_, i) => `Passport ${i + 1}`)];
-      const csvLines = [headerRow, ...fieldRows].map(row => row.map(escCell).join(","));
+      const csvLines = [headerRow, ...fieldRows].map((row) => row.map(escCell).join(","));
 
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${passportType}_export.csv"`);
@@ -911,9 +933,9 @@ module.exports = function registerPassportRoutes(app, {
       const params = [companyId];
       let i = 2;
 
-      if (passportType) { q += ` AND pa.passport_type = $${i++}`; params.push(passportType); }
+      if (passportType) {q += ` AND pa.passport_type = $${i++}`;params.push(passportType);}
       if (search) {
-        q += ` AND (pa.model_name ILIKE $${i} OR pa.product_id ILIKE $${i} OR pa.product_identifier_did ILIKE $${i} OR pa.guid::text ILIKE $${i})`;
+        q += ` AND (pa.model_name ILIKE $${i} OR pa.product_id ILIKE $${i} OR pa.product_identifier_did ILIKE $${i} OR pa.dppId::text ILIKE $${i})`;
         params.push(`%${search}%`);
         i++;
       }
@@ -925,13 +947,13 @@ module.exports = function registerPassportRoutes(app, {
           public_version.version_number AS public_version_number
         FROM (${q}) sub
         LEFT JOIN passport_history_visibility phv
-          ON phv.passport_guid = sub.guid
+          ON phv.passport_dpp_id = sub.dpp_id
          AND phv.version_number = sub.version_number
         LEFT JOIN LATERAL (
           SELECT pa_public.version_number
           FROM passport_archives pa_public
           LEFT JOIN passport_history_visibility phv_public
-            ON phv_public.passport_guid = pa_public.guid
+            ON phv_public.passport_dpp_id = pa_public.dpp_id
            AND phv_public.version_number = pa_public.version_number
           WHERE pa_public.lineage_id = sub.lineage_id
             AND pa_public.company_id = sub.company_id
@@ -951,26 +973,52 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
-  app.get("/api/companies/:companyId/passports/:guid", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const { passportType } = req.query;
+      const versionNumber = req.query.versionNumber ? Number.parseInt(req.query.versionNumber, 10) : null;
       if (!passportType) return res.status(400).json({ error: "passportType query param required" });
+      if (req.query.versionNumber && !Number.isFinite(versionNumber)) {
+        return res.status(400).json({ error: "versionNumber must be a valid integer" });
+      }
 
-      const resolved = await fetchCompanyPassportRecord({ companyId, guid, passportType });
+      const resolved = await fetchCompanyPassportRecord({ companyId, dppId: dppId, passportType, versionNumber });
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
+      if (isFullRepresentationRequest(req.query.representation)) {
+        const [typeDef, company] = await Promise.all([
+        pool.query(
+          `SELECT type_name, umbrella_category, semantic_model_key, fields_json
+             FROM passport_types
+             WHERE type_name = $1
+             LIMIT 1`,
+          [resolved.passport.passport_type || passportType]
+        ),
+        loadCompanySerializationContext(companyId)]
+        );
+        if (!typeDef.rows.length) {
+          return res.status(404).json({ error: "Passport type not found" });
+        }
+        return res.json(
+          buildExpandedPassportPayload(resolved.passport, typeDef.rows[0], {
+            company,
+            granularity: company?.default_granularity || company?.dpp_granularity || resolved.passport.granularity || "model"
+          })
+        );
+      }
+
       res.json(resolved.passport);
-    } catch (e) { res.status(500).json({ error: "Failed to fetch passport" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to fetch passport" });}
   });
 
-  app.get("/api/companies/:companyId/passports/:guid/compliance", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/compliance", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const { passportType } = req.query;
       if (!passportType) return res.status(400).json({ error: "passportType query param required" });
 
-      const resolved = await fetchCompanyPassportRecord({ companyId, guid, passportType });
+      const resolved = await fetchCompanyPassportRecord({ companyId, dppId: dppId, passportType });
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const compliance = await complianceService.evaluatePassport(resolved.passport, passportType);
@@ -994,9 +1042,9 @@ module.exports = function registerPassportRoutes(app, {
       res.json({
         ...passport,
         preview_mode: true,
-        preview_path: buildPreviewPassportPath({ companyName, manufacturerName: passport.manufacturer, manufacturedBy: passport.manufactured_by, modelName: passport.model_name, productId: passport.product_id, fallbackGuid: passport.guid }),
+        preview_path: buildPreviewPassportPath({ companyName, manufacturerName: passport.manufacturer, manufacturedBy: passport.manufactured_by, modelName: passport.model_name, productId: passport.product_id, fallbackGuid: passport.dppId }),
         public_path: buildCurrentPublicPassportPath({ companyName, manufacturerName: passport.manufacturer, manufacturedBy: passport.manufactured_by, modelName: passport.model_name, productId: passport.product_id }),
-        inactive_path: buildInactivePublicPassportPath({ companyName, manufacturerName: passport.manufacturer, manufacturedBy: passport.manufactured_by, modelName: passport.model_name, productId: passport.product_id, versionNumber: passport.version_number }),
+        inactive_path: buildInactivePublicPassportPath({ companyName, manufacturerName: passport.manufacturer, manufacturedBy: passport.manufactured_by, modelName: passport.model_name, productId: passport.product_id, versionNumber: passport.version_number })
       });
     } catch (e) {
       if (e.code === "AMBIGUOUS_PRODUCT_ID") return res.status(409).json({ error: e.message });
@@ -1006,66 +1054,66 @@ module.exports = function registerPassportRoutes(app, {
 
   // ─── EDIT SESSIONS ─────────────────────────────────────────────────────────
 
-  app.get("/api/companies/:companyId/passports/:guid/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      const editors = await listActiveEditSessions(req.params.guid, req.user.userId);
+      const editors = await listActiveEditSessions(req.params.dppId, req.user.userId);
       res.json({ editors, timeoutHours: EDIT_SESSION_TIMEOUT_HOURS, serverTime: new Date().toISOString() });
-    } catch (e) { res.status(500).json({ error: "Failed to fetch edit session" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to fetch edit session" });}
   });
 
-  app.post("/api/companies/:companyId/passports/:guid/edit-session", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const { passportType } = req.body;
       if (!passportType) return res.status(400).json({ error: "passportType required" });
 
       await clearExpiredEditSessions();
       await pool.query(
-        `INSERT INTO passport_edit_sessions (passport_guid, company_id, passport_type, user_id, last_activity_at, updated_at)
+        `INSERT INTO passport_edit_sessions (passport_dpp_id, company_id, passport_type, user_id, last_activity_at, updated_at)
          VALUES ($1, $2, $3, $4, NOW(), NOW())
-         ON CONFLICT (passport_guid, user_id)
+         ON CONFLICT (passport_dpp_id, user_id)
          DO UPDATE SET company_id = EXCLUDED.company_id, passport_type = EXCLUDED.passport_type, last_activity_at = NOW(), updated_at = NOW()`,
-        [guid, companyId, passportType, req.user.userId]
+        [dppId, companyId, passportType, req.user.userId]
       );
 
-      const editors = await listActiveEditSessions(guid, req.user.userId);
+      const editors = await listActiveEditSessions(dppId, req.user.userId);
       res.json({ success: true, editors, timeoutHours: EDIT_SESSION_TIMEOUT_HOURS, lastActivityAt: new Date().toISOString() });
-    } catch (e) { res.status(500).json({ error: "Failed to update edit session" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to update edit session" });}
   });
 
-  app.delete("/api/companies/:companyId/passports/:guid/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.delete("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       await pool.query(
-        "DELETE FROM passport_edit_sessions WHERE passport_guid = $1 AND user_id = $2",
-        [req.params.guid, req.user.userId]
+        "DELETE FROM passport_edit_sessions WHERE passport_dpp_id = $1 AND user_id = $2",
+        [req.params.dppId, req.user.userId]
       );
       res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: "Failed to clear edit session" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to clear edit session" });}
   });
 
   // ─── ACCESS KEY ────────────────────────────────────────────────────────────
 
-  app.get("/api/companies/:companyId/passports/:guid/access-key", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/access-key", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(
         `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at
          FROM passport_registry
-         WHERE guid = $1 AND company_id = $2`,
-        [req.params.guid, req.params.companyId]
+         WHERE dpp_id = $1 AND company_id = $2`,
+        [req.params.dppId, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
       res.json({
         hasAccessKey: !!r.rows[0].access_key_hash,
         keyPrefix: r.rows[0].access_key_prefix || null,
         lastRotatedAt: r.rows[0].access_key_last_rotated_at || null,
-        revealable: false,
+        revealable: false
       });
-    } catch (e) { res.status(500).json({ error: "Failed to get access key" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to get access key" });}
   });
 
-  app.post("/api/companies/:companyId/passports/:guid/access-key/regenerate", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/access-key/regenerate", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { guid, companyId } = req.params;
+      const { dppId: dppId, companyId } = req.params;
       const material = createAccessKeyMaterial();
       const updated = await pool.query(
         `UPDATE passport_registry
@@ -1073,18 +1121,18 @@ module.exports = function registerPassportRoutes(app, {
              access_key_hash = $1,
              access_key_prefix = $2,
              access_key_last_rotated_at = NOW()
-         WHERE guid = $3 AND company_id = $4
+         WHERE dpp_id = $3 AND company_id = $4
          RETURNING access_key_prefix, access_key_last_rotated_at`,
-        [material.hash, material.prefix, guid, companyId]
+        [material.hash, material.prefix, dppId, companyId]
       );
       if (!updated.rows.length) return res.status(404).json({ error: "Passport not found" });
-      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passport_registry", guid, null, { key_prefix: material.prefix });
+      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passport_registry", dppId, null, { key_prefix: material.prefix });
       res.json({
         accessKey: material.rawKey,
         keyPrefix: updated.rows[0].access_key_prefix,
-        lastRotatedAt: updated.rows[0].access_key_last_rotated_at,
+        lastRotatedAt: updated.rows[0].access_key_last_rotated_at
       });
-    } catch (e) { res.status(500).json({ error: "Failed to rotate access key" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to rotate access key" });}
   });
 
   // ─── BULK UPDATE ALL ───────────────────────────────────────────────────────
@@ -1098,14 +1146,14 @@ module.exports = function registerPassportRoutes(app, {
       const requestedType = passport_type || passportType;
       if (!requestedType) return res.status(400).json({ error: "passport_type required" });
       if (!update || typeof update !== "object" || !Object.keys(update).length)
-        return res.status(400).json({ error: "update object with at least one field is required" });
+      return res.status(400).json({ error: "update object with at least one field is required" });
 
       const typeSchema = await getPassportTypeSchema(requestedType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(typeSchema.typeName);
 
       const invalidKeys = Object.keys(update).filter((key) =>
-        !typeSchema.allowedKeys.has(key) && key !== "model_name" && key !== "product_id"
+      !typeSchema.allowedKeys.has(key) && key !== "model_name" && key !== "product_id"
       );
       if (invalidKeys.length) return res.status(400).json({ error: `Unknown field(s): ${invalidKeys.join(", ")}` });
       if (update.product_id !== undefined) return res.status(400).json({ error: "Cannot bulk-update product_id — it must be unique per passport." });
@@ -1129,9 +1177,9 @@ module.exports = function registerPassportRoutes(app, {
         params.push(`%${filterObj.product_id_like}%`);
         filterSql += ` AND (product_id ILIKE $${params.length} OR product_identifier_did ILIKE $${params.length})`;
       }
-      if (filterObj.model_name_like) { params.push(`%${filterObj.model_name_like}%`); filterSql += ` AND model_name ILIKE $${params.length}`; }
-      if (filterObj.created_after)   { params.push(filterObj.created_after);  filterSql += ` AND created_at >= $${params.length}`; }
-      if (filterObj.created_before)  { params.push(filterObj.created_before); filterSql += ` AND created_at <= $${params.length}`; }
+      if (filterObj.model_name_like) {params.push(`%${filterObj.model_name_like}%`);filterSql += ` AND model_name ILIKE $${params.length}`;}
+      if (filterObj.created_after) {params.push(filterObj.created_after);filterSql += ` AND created_at >= $${params.length}`;}
+      if (filterObj.created_before) {params.push(filterObj.created_before);filterSql += ` AND created_at <= $${params.length}`;}
 
       const countRes = await pool.query(
         `SELECT COUNT(*) AS cnt FROM ${tableName} WHERE company_id = $1${filterSql} AND deleted_at IS NULL`,
@@ -1140,7 +1188,7 @@ module.exports = function registerPassportRoutes(app, {
       const matchCount = parseInt(countRes.rows[0].cnt, 10);
       if (matchCount === 0) return res.json({ summary: { matched: 0, updated: 0 }, message: "No passports matched the filter" });
       if (matchCount > 1000 && !req.body.confirm_large_update)
-        return res.status(400).json({ error: `This will update ${matchCount} passports. Send confirm_large_update: true to proceed.`, matched: matchCount });
+      return res.status(400).json({ error: `This will update ${matchCount} passports. Send confirm_large_update: true to proceed.`, matched: matchCount });
 
       const updateKeys = getWritablePassportColumns(update);
       if (!updateKeys.length) return res.status(400).json({ error: "No valid fields to update" });
@@ -1155,16 +1203,16 @@ module.exports = function registerPassportRoutes(app, {
         `UPDATE ${tableName}
          SET ${sets}, updated_by = $${updatedByIdx}, updated_at = NOW()
          WHERE company_id = $1${filterSql} AND deleted_at IS NULL
-         RETURNING guid`,
+         RETURNING dpp_id`,
         allParams
       );
-      const updatedGuids = updateRes.rows.map(r => r.guid);
+      const updatedGuids = updateRes.rows.map((r) => r.dppId);
 
       await logAudit(companyId, userId, "BULK_UPDATE_ALL", tableName, null, null, {
-        filter: filterObj, fields_updated: updateKeys, count: updatedGuids.length,
+        filter: filterObj, fields_updated: updateKeys, count: updatedGuids.length
       });
 
-      res.json({ summary: { matched: matchCount, updated: updatedGuids.length, fields_updated: updateKeys }, guids: updatedGuids });
+      res.json({ summary: { matched: matchCount, updated: updatedGuids.length, fields_updated: updateKeys }, dppIds: updatedGuids });
     } catch (e) {
       logger.error("Bulk update all error:", e.message);
       res.status(500).json({ error: "Bulk update all failed", detail: e.message });
@@ -1173,9 +1221,9 @@ module.exports = function registerPassportRoutes(app, {
 
   // ─── PATCH SINGLE ──────────────────────────────────────────────────────────
 
-  app.patch("/api/companies/:companyId/passports/:guid", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.patch("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const normalizedBody = normalizePassportRequestBody(req.body);
       const { passport_type, passportType, ...fields } = normalizedBody;
       const userId = req.user.userId;
@@ -1188,8 +1236,8 @@ module.exports = function registerPassportRoutes(app, {
 
       const current = await pool.query(
         `SELECT id, lineage_id, product_id, granularity FROM ${tableName}
-         WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL LIMIT 1`,
-        [guid]
+         WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL LIMIT 1`,
+        [dppId]
       );
       if (!current.rows.length) return res.status(404).json({ error: "Passport not found or not editable." });
       const rowId = current.rows[0].id;
@@ -1198,20 +1246,20 @@ module.exports = function registerPassportRoutes(app, {
         const normalizedProductId = normalizeProductIdValue(fields.product_id);
         if (!normalizedProductId) return res.status(400).json({ error: "product_id cannot be blank" });
         const existingByProductId = await findExistingPassportByProductId({
-          tableName, companyId, productId: normalizedProductId, excludeGuid: guid, excludeLineageId: current.rows[0].lineage_id,
+          tableName, companyId, productId: normalizedProductId, excludeGuid: dppId, excludeLineageId: current.rows[0].lineage_id
         });
         if (existingByProductId) {
           return res.status(409).json({
             error: `A passport with Serial Number "${normalizedProductId}" already exists.`,
-            existing_guid: existingByProductId.guid,
-            release_status: normalizeReleaseStatus(existingByProductId.release_status),
+            existing_dpp_id: existingByProductId.dppId,
+            release_status: normalizeReleaseStatus(existingByProductId.release_status)
           });
         }
         const storedProductIdentifiers = buildStoredProductIdentifiers({
           companyId,
           passportType: typeSchema.typeName,
           productId: normalizedProductId,
-          granularity: current.rows[0].granularity || "item",
+          granularity: current.rows[0].granularity || "item"
         });
         fields.product_id = storedProductIdentifiers.product_id;
         fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
@@ -1220,10 +1268,10 @@ module.exports = function registerPassportRoutes(app, {
       const updateFields = await updatePassportRowById({ tableName, rowId, userId, data: fields });
       if (!updateFields.length) return res.status(400).json({ error: "No fields to update" });
 
-      await logAudit(companyId, userId, "UPDATE", tableName, guid, null, { fields_updated: updateFields });
+      await logAudit(companyId, userId, "UPDATE", tableName, dppId, null, { fields_updated: updateFields });
       res.json({ success: true });
     } catch (e) {
-      logger.error("PATCH /passports/:guid error:", e.message);
+      logger.error("PATCH /passports/:dppId error:", e.message);
       res.status(500).json({ error: "Failed to update passport", detail: e.message });
     }
   });
@@ -1252,56 +1300,56 @@ module.exports = function registerPassportRoutes(app, {
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(typeSchema.typeName);
 
-      let updated = 0, skipped = 0, failed = 0;
+      let updated = 0,skipped = 0,failed = 0;
       const details = [];
 
       for (const item of passports) {
         const normalizedItem = normalizePassportRequestBody(item || {});
-        const { guid: incomingGuid, passport_type: _pt, passportType: _pt2, ...fields } = normalizedItem;
+        const { dppId: incomingGuid, passport_type: _pt, passportType: _pt2, ...fields } = normalizedItem;
         const normalizedProductId = normalizeProductIdValue(fields.product_id);
 
         try {
           if (!incomingGuid && !normalizedProductId) {
-            details.push({ status: "failed", error: "Each item needs a guid or product_id to match against" });
-            failed++; continue;
+            details.push({ status: "failed", error: "Each item needs a dppId or product_id to match against" });
+            failed++;continue;
           }
 
           const builtInCols = new Set(["product_id", "model_name"]);
           const invalidKeys = Object.keys(fields).filter((key) =>
-            !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key) && !builtInCols.has(key)
+          !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key) && !builtInCols.has(key)
           );
           if (invalidKeys.length) {
-            details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: `Unknown field(s): ${invalidKeys.join(", ")}` });
-            failed++; continue;
+            details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: `Unknown field(s): ${invalidKeys.join(", ")}` });
+            failed++;continue;
           }
 
-          let rowId, matchedGuid, matchedLineageId = null;
+          let rowId,matchedGuid,matchedLineageId = null;
           if (incomingGuid) {
             const byGuid = await pool.query(
-              `SELECT id, guid, lineage_id, granularity FROM ${tableName} WHERE guid=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
+              `SELECT id, dpp_id, lineage_id, granularity FROM ${tableName} WHERE dpp_id=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
               [incomingGuid, companyId]
             );
-            if (byGuid.rows.length) { rowId = byGuid.rows[0].id; matchedGuid = byGuid.rows[0].guid; matchedLineageId = byGuid.rows[0].lineage_id; }
+            if (byGuid.rows.length) {rowId = byGuid.rows[0].id;matchedGuid = byGuid.rows[0].dppId;matchedLineageId = byGuid.rows[0].lineage_id;}
           }
           if (!rowId && normalizedProductId) {
             const byProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
             if (byProductId && isEditablePassportStatus(normalizeReleaseStatus(byProductId.release_status))) {
-              rowId = byProductId.id; matchedGuid = byProductId.guid; matchedLineageId = byProductId.lineage_id;
+              rowId = byProductId.id;matchedGuid = byProductId.dppId;matchedLineageId = byProductId.lineage_id;
             }
           }
           if (!rowId) {
-            details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "No matching editable passport found" });
-            skipped++; continue;
+            details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "No matching editable passport found" });
+            skipped++;continue;
           }
           if (fields.product_id !== undefined) {
             if (!normalizedProductId) {
-              details.push({ guid: matchedGuid, status: "failed", error: "product_id cannot be blank" });
-              failed++; continue;
+              details.push({ dppId: matchedGuid, status: "failed", error: "product_id cannot be blank" });
+              failed++;continue;
             }
             const dup = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId, excludeGuid: matchedGuid, excludeLineageId: matchedLineageId });
             if (dup) {
-              details.push({ guid: matchedGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
-              failed++; continue;
+              details.push({ dppId: matchedGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
+              failed++;continue;
             }
             const matchedGranularityRes = await pool.query(
               `SELECT granularity FROM ${tableName} WHERE id = $1 LIMIT 1`,
@@ -1311,7 +1359,7 @@ module.exports = function registerPassportRoutes(app, {
               companyId,
               passportType: typeSchema.typeName,
               productId: normalizedProductId,
-              granularity: matchedGranularityRes.rows[0]?.granularity || "item",
+              granularity: matchedGranularityRes.rows[0]?.granularity || "item"
             });
             fields.product_id = storedProductIdentifiers.product_id;
             fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
@@ -1319,16 +1367,16 @@ module.exports = function registerPassportRoutes(app, {
 
           const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: fields });
           if (!updateCols.length) {
-            details.push({ guid: matchedGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "No changes detected" });
-            skipped++; continue;
+            details.push({ dppId: matchedGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "No changes detected" });
+            skipped++;continue;
           }
 
           await logAudit(companyId, userId, "UPDATE", tableName, matchedGuid, null, { source: "bulk_patch", fields_updated: updateCols });
-          details.push({ guid: matchedGuid, product_id: normalizedProductId || undefined, status: "updated", fields_updated: updateCols });
+          details.push({ dppId: matchedGuid, product_id: normalizedProductId || undefined, status: "updated", fields_updated: updateCols });
           updated++;
         } catch (e) {
           logger.error("Bulk PATCH item error:", e.message);
-          details.push({ guid: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: e.message });
+          details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: e.message });
           failed++;
         }
       }
@@ -1342,17 +1390,17 @@ module.exports = function registerPassportRoutes(app, {
 
   // ─── RELEASE ───────────────────────────────────────────────────────────────
 
-  app.patch("/api/companies/:companyId/passports/:guid/release", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.patch("/api/companies/:companyId/passports/:dppId/release", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const { passportType } = req.body;
       if (!passportType) return res.status(400).json({ error: "passportType required in body" });
 
       const currentPassport = await loadLatestLivePassport({
         companyId,
-        guid,
+        dppId: dppId,
         passportType,
-        releaseStatusSql: EDITABLE_RELEASE_STATUSES_SQL,
+        releaseStatusSql: EDITABLE_RELEASE_STATUSES_SQL
       });
       if (!currentPassport) return res.status(404).json({ error: "Passport not found or already released" });
 
@@ -1362,22 +1410,22 @@ module.exports = function registerPassportRoutes(app, {
           return res.status(409).json({
             error: "Passport is incomplete. Assign at least a reviewer or approver before it can be released.",
             code: "WORKFLOW_REQUIRED_FOR_INCOMPLETE_PASSPORT",
-            compliance,
+            compliance
           });
         }
         return res.status(422).json({
           error: "Passport failed compliance validation. Fix the blocking issues before release.",
           code: "PASSPORT_COMPLIANCE_FAILED",
-          compliance,
+          compliance
         });
       }
 
       const tableName = getTable(passportType);
       const r = await pool.query(
         `UPDATE ${tableName} SET release_status = 'released', updated_at = NOW()
-         WHERE guid = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}
+         WHERE dpp_id = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}
          RETURNING *`,
-        [guid, companyId]
+        [dppId, companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found or already released" });
       const released = r.rows[0];
@@ -1386,34 +1434,34 @@ module.exports = function registerPassportRoutes(app, {
       const sigData = await signPassport({ ...released, passport_type: passportType }, typeDef || null);
       if (sigData) {
         await pool.query(
-          `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
-          [guid, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+          `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
+          [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
         );
       }
 
-      await markOlderVersionsObsolete(tableName, guid, released.version_number);
+      await markOlderVersionsObsolete(tableName, dppId, released.version_number);
       // Make all attachments for this passport publicly accessible now that it is released
       await pool.query(
-        "UPDATE passport_attachments SET is_public = true WHERE passport_guid = $1",
-        [guid]
+        "UPDATE passport_attachments SET is_public = true WHERE passport_dpp_id = $1",
+        [dppId]
       ).catch(() => {});
-      await logAudit(companyId, req.user.userId, "RELEASE", tableName, guid, { release_status: "draft_or_in_revision" }, { release_status: "released" });
+      await logAudit(companyId, req.user.userId, "RELEASE", tableName, dppId, { release_status: "draft_or_in_revision" }, { release_status: "released" });
       await replicatePassportToBackup({
         passport: { ...released, passport_type: passportType },
         passportType,
         reason: "release",
-        snapshotScope: "released_current",
+        snapshotScope: "released_current"
       }).catch(() => {});
       res.json({ success: true, passport: normalizePassportRow(released), compliance });
-    } catch (e) { res.status(500).json({ error: "Failed to release passport" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to release passport" });}
   });
 
   // ─── REVISE ────────────────────────────────────────────────────────────────
 
-  app.post("/api/companies/:companyId/passports/:guid/revise", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/revise", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const { passportType } = req.body;
       const userId = req.user.userId;
 
@@ -1421,8 +1469,8 @@ module.exports = function registerPassportRoutes(app, {
       const tableName = getTable(passportType);
 
       const current = await pool.query(
-        `SELECT * FROM ${tableName} WHERE guid = $1 AND release_status = 'released' LIMIT 1`,
-        [guid]
+        `SELECT * FROM ${tableName} WHERE dpp_id = $1 AND release_status = 'released' LIMIT 1`,
+        [dppId]
       );
       if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 
@@ -1433,34 +1481,34 @@ module.exports = function registerPassportRoutes(app, {
       );
       if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
 
-      const newGuid    = uuidv4();
+      const newGuid = generateDppRecordId();
       const newVersion = src.version_number + 1;
-      const excluded   = new Set(["id","guid","created_at","updated_at","updated_by","qr_code","lineage_id"]);
-      const cols       = Object.keys(src).filter(k => !excluded.has(k));
-      const vals       = cols.map(k => {
+      const excluded = new Set(["id", "dppId", "created_at", "updated_at", "updated_by", "qr_code", "lineage_id"]);
+      const cols = Object.keys(src).filter((k) => !excluded.has(k));
+      const vals = cols.map((k) => {
         if (k === "version_number") return newVersion;
         if (k === "release_status") return IN_REVISION_STATUS;
-        if (k === "created_by")     return userId;
-        if (k === "deleted_at")     return null;
+        if (k === "created_by") return userId;
+        if (k === "deleted_at") return null;
         return src[k];
       });
 
-      const allCols = ["guid", "lineage_id", ...cols];
+      const allCols = ["dppId", "lineage_id", ...cols];
       const allVals = [newGuid, src.lineage_id, ...vals];
-      const places  = allCols.map((_, i) => `$${i + 1}`).join(", ");
+      const places = allCols.map((_, i) => `$${i + 1}`).join(", ");
       await pool.query(`INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places})`, allVals);
 
       const sourceRegistry = await pool.query(
         `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
                 device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
          FROM passport_registry
-         WHERE guid = $1 AND company_id = $2
+         WHERE dpp_id = $1 AND company_id = $2
          LIMIT 1`,
-        [guid, companyId]
+        [dppId, companyId]
       );
       const sourceKeys = sourceRegistry.rows[0] || {};
       await insertPassportRegistry({
-        guid: newGuid,
+        dppId: newGuid,
         lineageId: src.lineage_id,
         companyId,
         passportType,
@@ -1469,12 +1517,12 @@ module.exports = function registerPassportRoutes(app, {
         accessKeyLastRotatedAt: sourceKeys.access_key_last_rotated_at || null,
         deviceApiKeyHash: sourceKeys.device_api_key_hash || null,
         deviceApiKeyPrefix: sourceKeys.device_api_key_prefix || null,
-        deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null,
+        deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null
       });
 
       await logAudit(companyId, userId, "REVISE", tableName, newGuid, { version_number: src.version_number }, { version_number: newVersion });
-      res.json({ success: true, guid: newGuid, newVersion, release_status: IN_REVISION_STATUS });
-    } catch (e) { res.status(500).json({ error: "Failed to revise passport" }); }
+      res.json({ success: true, dppId: newGuid, newVersion, release_status: IN_REVISION_STATUS });
+    } catch (e) {res.status(500).json({ error: "Failed to revise passport" });}
   });
 
   // ─── BULK REVISE ───────────────────────────────────────────────────────────
@@ -1486,34 +1534,34 @@ module.exports = function registerPassportRoutes(app, {
       const {
         items, changes, revisionNote = "", submitToWorkflow = false,
         reviewerId = null, approverId = null,
-        scopeType = "selected", scopeMeta = {},
+        scopeType = "selected", scopeMeta = {}
       } = req.body || {};
 
       if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items must be a non-empty array" });
       if (items.length > 500) return res.status(400).json({ error: "Maximum 500 passports per bulk revise request" });
       if (!changes || typeof changes !== "object" || Array.isArray(changes) || !Object.keys(changes).length)
-        return res.status(400).json({ error: "changes must be a non-empty object" });
+      return res.status(400).json({ error: "changes must be a non-empty object" });
       if (submitToWorkflow && !reviewerId && !approverId)
-        return res.status(400).json({ error: "Select at least one reviewer or approver to auto-submit revisions to workflow." });
+      return res.status(400).json({ error: "Select at least one reviewer or approver to auto-submit revisions to workflow." });
       if (reviewerId && approverId && String(reviewerId) === String(approverId))
-        return res.status(400).json({ error: "Reviewer and approver must be different users." });
+      return res.status(400).json({ error: "Reviewer and approver must be different users." });
 
-      const uniqueGuids = [...new Set(items.map(item => String(item?.guid || "").trim()).filter(Boolean))];
+      const uniqueGuids = [...new Set(items.map((item) => String(item?.dppId || "").trim()).filter(Boolean))];
       if (!uniqueGuids.length) return res.status(400).json({ error: "No valid passport GUIDs were provided." });
 
       const registryRes = await pool.query(
-        `SELECT guid, passport_type FROM passport_registry WHERE company_id = $1 AND guid = ANY($2::uuid[])`,
+        `SELECT dpp_id, passport_type FROM passport_registry WHERE company_id = $1 AND dpp_id = ANY($2::text[])`,
         [companyId, uniqueGuids]
       );
 
-      const registryByGuid = new Map(registryRes.rows.map(row => [row.guid, row.passport_type]));
-      const resolvedItems = uniqueGuids
-        .map(guid => ({ guid, passport_type: registryByGuid.get(guid) || null }))
-        .filter(item => item.passport_type);
+      const registryByGuid = new Map(registryRes.rows.map((row) => [row.dppId, row.passport_type]));
+      const resolvedItems = uniqueGuids.
+      map((dppId) => ({ dppId: dppId, passport_type: registryByGuid.get(dppId) || null })).
+      filter((item) => item.passport_type);
 
       if (!resolvedItems.length) return res.status(404).json({ error: "No matching passports were found for this company." });
 
-      const passportTypes = [...new Set(resolvedItems.map(item => item.passport_type))];
+      const passportTypes = [...new Set(resolvedItems.map((item) => item.passport_type))];
       const batchPassportType = passportTypes.length === 1 ? passportTypes[0] : null;
 
       const batchRes = await pool.query(
@@ -1522,24 +1570,24 @@ module.exports = function registerPassportRoutes(app, {
             submit_to_workflow, reviewer_id, approver_id, total_targeted)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, created_at`,
         [companyId, batchPassportType, userId, scopeType, JSON.stringify(scopeMeta || {}), revisionNote || null, JSON.stringify(changes), !!submitToWorkflow,
-         reviewerId ? parseInt(reviewerId, 10) : null, approverId ? parseInt(approverId, 10) : null, resolvedItems.length]
+        reviewerId ? parseInt(reviewerId, 10) : null, approverId ? parseInt(approverId, 10) : null, resolvedItems.length]
       );
       const batch = batchRes.rows[0];
 
       const details = [];
-      let revised = 0, skipped = 0, failed = 0;
+      let revised = 0,skipped = 0,failed = 0;
 
       const groupedItems = resolvedItems.reduce((acc, item) => {
         if (!acc[item.passport_type]) acc[item.passport_type] = [];
-        acc[item.passport_type].push(item.guid);
+        acc[item.passport_type].push(item.dppId);
         return acc;
       }, {});
 
-      for (const [passportType, guids] of Object.entries(groupedItems)) {
+      for (const [passportType, dppIds] of Object.entries(groupedItems)) {
         const tableName = getTable(passportType);
         const typeRes = await pool.query("SELECT fields_json, display_name FROM passport_types WHERE type_name = $1", [passportType]);
         const sections = typeRes.rows[0]?.fields_json?.sections || [];
-        const fieldMap = new Map(sections.flatMap(section => section.fields || []).map(field => [field.key, field]));
+        const fieldMap = new Map(sections.flatMap((section) => section.fields || []).map((field) => [field.key, field]));
         fieldMap.set("model_name", { key: "model_name", label: "Model Name", type: "text" });
         fieldMap.set("product_id", { key: "product_id", label: "Serial Number", type: "text" });
 
@@ -1547,32 +1595,32 @@ module.exports = function registerPassportRoutes(app, {
 
         const releasedRes = await pool.query(
           `SELECT * FROM ${tableName}
-           WHERE company_id = $1 AND guid = ANY($2::uuid[]) AND release_status = 'released' AND deleted_at IS NULL`,
-          [companyId, guids]
+           WHERE company_id = $1 AND dpp_id = ANY($2::text[]) AND release_status = 'released' AND deleted_at IS NULL`,
+          [companyId, dppIds]
         );
-        const releasedByGuid = new Map(releasedRes.rows.map(row => [row.guid, row]));
+        const releasedByGuid = new Map(releasedRes.rows.map((row) => [row.dppId, row]));
 
-        for (const guid of guids) {
+        for (const dppId of dppIds) {
           const insertBatchItem = async (status, message, sourceVersion = null, newVersion = null) => {
             await pool.query(
               `INSERT INTO passport_revision_batch_items
-                 (batch_id, passport_guid, passport_type, source_version_number, new_version_number, status, message)
+                 (batch_id, passport_dpp_id, passport_type, source_version_number, new_version_number, status, message)
                VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-              [batch.id, guid, passportType, sourceVersion, newVersion, status, message || null]
+              [batch.id, dppId, passportType, sourceVersion, newVersion, status, message || null]
             );
           };
 
-          const source = releasedByGuid.get(guid);
+          const source = releasedByGuid.get(dppId);
           if (!source) {
             const message = "No released passport version was found for this GUID.";
-            details.push({ guid, passport_type: passportType, status: "skipped", message });
+            details.push({ dppId: dppId, passport_type: passportType, status: "skipped", message });
             skipped++;
             await insertBatchItem("skipped", message);
             continue;
           }
 
           const blockerRes = await pool.query(
-            `SELECT guid, version_number, release_status FROM ${tableName}
+            `SELECT dpp_id, version_number, release_status FROM ${tableName}
              WHERE company_id = $1 AND lineage_id = $2 AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL} AND deleted_at IS NULL
              ORDER BY version_number DESC LIMIT 1`,
             [companyId, source.lineage_id]
@@ -1580,10 +1628,10 @@ module.exports = function registerPassportRoutes(app, {
           const blocker = blockerRes.rows[0];
           if (blocker) {
             const blockerStatus = normalizeReleaseStatus(blocker.release_status);
-            const message = blockerStatus === "in_review"
-              ? "A revision is already in workflow for this passport."
-              : "An editable revision already exists for this passport.";
-            details.push({ guid, passport_type: passportType, status: "skipped", source_version_number: source.version_number, message });
+            const message = blockerStatus === "in_review" ?
+            "A revision is already in workflow for this passport." :
+            "An editable revision already exists for this passport.";
+            details.push({ dppId: dppId, passport_type: passportType, status: "skipped", source_version_number: source.version_number, message });
             skipped++;
             await insertBatchItem("skipped", message, source.version_number, blocker.version_number || null);
             continue;
@@ -1591,7 +1639,7 @@ module.exports = function registerPassportRoutes(app, {
 
           if (!applicableChanges.length) {
             const message = "None of the requested change fields apply to this passport type.";
-            details.push({ guid, passport_type: passportType, status: "skipped", source_version_number: source.version_number, message });
+            details.push({ dppId: dppId, passport_type: passportType, status: "skipped", source_version_number: source.version_number, message });
             skipped++;
             await insertBatchItem("skipped", message, source.version_number, null);
             continue;
@@ -1600,9 +1648,9 @@ module.exports = function registerPassportRoutes(app, {
           try {
             const sourceVersion = parseInt(source.version_number, 10) || 1;
             const newVersion = sourceVersion + 1;
-            const newGuid = uuidv4();
-            const excluded = new Set(["id", "guid", "created_at", "updated_at", "updated_by", "qr_code", "lineage_id"]);
-            const columns = Object.keys(source).filter(key => !excluded.has(key));
+            const newGuid = generateDppRecordId();
+            const excluded = new Set(["id", "dppId", "created_at", "updated_at", "updated_by", "qr_code", "lineage_id"]);
+            const columns = Object.keys(source).filter((key) => !excluded.has(key));
             const mappedChanges = Object.fromEntries(
               applicableChanges.map(([key, value]) => [key, coerceBulkFieldValue(fieldMap.get(key), value)])
             );
@@ -1616,8 +1664,8 @@ module.exports = function registerPassportRoutes(app, {
               return source[key];
             });
 
-            const allColumns = ["guid", "lineage_id", ...columns];
-            const allValues  = [newGuid, source.lineage_id, ...values];
+            const allColumns = ["dppId", "lineage_id", ...columns];
+            const allValues = [newGuid, source.lineage_id, ...values];
             const placeholders = allColumns.map((_, index) => `$${index + 1}`).join(", ");
             await pool.query(`INSERT INTO ${tableName} (${allColumns.join(", ")}) VALUES (${placeholders})`, allValues);
 
@@ -1625,13 +1673,13 @@ module.exports = function registerPassportRoutes(app, {
               `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
                       device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
                FROM passport_registry
-               WHERE guid = $1 AND company_id = $2
+               WHERE dpp_id = $1 AND company_id = $2
                LIMIT 1`,
-              [guid, companyId]
+              [dppId, companyId]
             );
             const sourceKeys = sourceRegistry.rows[0] || {};
             await insertPassportRegistry({
-              guid: newGuid,
+              dppId: newGuid,
               lineageId: source.lineage_id,
               companyId,
               passportType,
@@ -1640,7 +1688,7 @@ module.exports = function registerPassportRoutes(app, {
               accessKeyLastRotatedAt: sourceKeys.access_key_last_rotated_at || null,
               deviceApiKeyHash: sourceKeys.device_api_key_hash || null,
               deviceApiKeyPrefix: sourceKeys.device_api_key_prefix || null,
-              deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null,
+              deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null
             });
 
             let detailStatus = submitToWorkflow ? "submitted" : "revised";
@@ -1648,27 +1696,27 @@ module.exports = function registerPassportRoutes(app, {
 
             if (submitToWorkflow) {
               try {
-                await submitPassportToWorkflow({ companyId, guid: newGuid, passportType, userId, reviewerId, approverId });
+                await submitPassportToWorkflow({ companyId, dppId: newGuid, passportType, userId, reviewerId, approverId });
                 detailMessage = detailMessage ? `${detailMessage} Submitted to workflow.` : "Revision created and submitted to workflow.";
               } catch (workflowError) {
                 detailStatus = "revised";
-                detailMessage = detailMessage
-                  ? `${detailMessage} Workflow submission failed: ${workflowError.message}`
-                  : `Revision created, but workflow submission failed: ${workflowError.message}`;
+                detailMessage = detailMessage ?
+                `${detailMessage} Workflow submission failed: ${workflowError.message}` :
+                `Revision created, but workflow submission failed: ${workflowError.message}`;
               }
             }
 
             await logAudit(companyId, userId, "BULK_REVISE", tableName, newGuid,
-              { version_number: sourceVersion, release_status: source.release_status },
-              { version_number: newVersion, release_status: submitToWorkflow ? "in_review" : IN_REVISION_STATUS, batch_id: batch.id, revision_note: revisionNote || null, fields_updated: Object.keys(mappedChanges) }
+            { version_number: sourceVersion, release_status: source.release_status },
+            { version_number: newVersion, release_status: submitToWorkflow ? "in_review" : IN_REVISION_STATUS, batch_id: batch.id, revision_note: revisionNote || null, fields_updated: Object.keys(mappedChanges) }
             );
 
-            details.push({ guid: newGuid, passport_type: passportType, status: detailStatus, source_version_number: sourceVersion, new_version_number: newVersion, message: detailMessage });
+            details.push({ dppId: newGuid, passport_type: passportType, status: detailStatus, source_version_number: sourceVersion, new_version_number: newVersion, message: detailMessage });
             revised++;
             await insertBatchItem(detailStatus, detailMessage, sourceVersion, newVersion);
           } catch (e) {
             const message = e.message || "Bulk revise failed for this passport.";
-            details.push({ guid, passport_type: passportType, status: "failed", source_version_number: source.version_number || null, message });
+            details.push({ dppId: dppId, passport_type: passportType, status: "failed", source_version_number: source.version_number || null, message });
             failed++;
             await insertBatchItem("failed", message, source.version_number || null, null);
           }
@@ -1684,7 +1732,7 @@ module.exports = function registerPassportRoutes(app, {
         success: true,
         batch: { id: batch.id, created_at: batch.created_at, passport_type: batchPassportType, scope_type: scopeType },
         summary: { targeted: resolvedItems.length, revised, skipped, failed },
-        details,
+        details
       });
     } catch (e) {
       logger.error("Bulk revise error:", e.message);
@@ -1694,23 +1742,23 @@ module.exports = function registerPassportRoutes(app, {
 
   // ─── DELETE ────────────────────────────────────────────────────────────────
 
-  app.delete("/api/companies/:companyId/passports/:guid", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.delete("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const { passportType } = req.body;
       if (!passportType) return res.status(400).json({ error: "passportType required in body" });
 
       const tableName = getTable(passportType);
       const r = await pool.query(
         `UPDATE ${tableName} SET deleted_at = NOW()
-         WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
-         RETURNING guid`,
-        [guid]
+         WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+         RETURNING dpp_id`,
+        [dppId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found or cannot delete a released passport" });
-      await logAudit(companyId, req.user.userId, "DELETE", tableName, guid, { guid }, null);
+      await logAudit(companyId, req.user.userId, "DELETE", tableName, dppId, { dppId: dppId }, null);
       res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: "Failed to delete passport" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to delete passport" });}
   });
 
   app.delete("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -1735,41 +1783,41 @@ module.exports = function registerPassportRoutes(app, {
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(typeSchema.typeName);
 
-      let deleted = 0, skipped = 0, failed = 0;
+      let deleted = 0,skipped = 0,failed = 0;
       const details = [];
 
       for (const item of identifiers) {
-        const raw = typeof item === "string" ? { product_id: item } : (item || {});
-        const guid = raw.guid;
+        const raw = typeof item === "string" ? { product_id: item } : item || {};
+        const dppId = raw.dppId;
         const productId = normalizeProductIdValue(raw.product_id || raw.productId);
         try {
-          if (!guid && !productId) { details.push({ status: "failed", error: "Each item needs a guid or product_id" }); failed++; continue; }
+          if (!dppId && !productId) {details.push({ status: "failed", error: "Each item needs a dppId or product_id" });failed++;continue;}
           let matchedGuid = null;
-          if (guid) {
+          if (dppId) {
             const r = await pool.query(
               `UPDATE ${tableName} SET deleted_at = NOW()
-               WHERE guid = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
-               RETURNING guid`,
-              [guid, companyId]
+               WHERE dpp_id = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+               RETURNING dpp_id`,
+              [dppId, companyId]
             );
-            if (r.rows.length) matchedGuid = r.rows[0].guid;
+            if (r.rows.length) matchedGuid = r.rows[0].dppId;
           }
           if (!matchedGuid && productId) {
             const existing = await findExistingPassportByProductId({ tableName, companyId, productId });
             if (existing && isEditablePassportStatus(normalizeReleaseStatus(existing.release_status))) {
-              const r = await pool.query(`UPDATE ${tableName} SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING guid`, [existing.id]);
-              if (r.rows.length) matchedGuid = r.rows[0].guid;
+              const r = await pool.query(`UPDATE ${tableName} SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING dpp_id`, [existing.id]);
+              if (r.rows.length) matchedGuid = r.rows[0].dppId;
             }
           }
           if (!matchedGuid) {
-            details.push({ guid: guid || undefined, product_id: productId || undefined, status: "skipped", reason: "Not found or not deletable" });
-            skipped++; continue;
+            details.push({ dppId: dppId || undefined, product_id: productId || undefined, status: "skipped", reason: "Not found or not deletable" });
+            skipped++;continue;
           }
-          await logAudit(companyId, userId, "DELETE", tableName, matchedGuid, { guid: matchedGuid }, null);
-          details.push({ guid: matchedGuid, product_id: productId || undefined, status: "deleted" });
+          await logAudit(companyId, userId, "DELETE", tableName, matchedGuid, { dppId: matchedGuid }, null);
+          details.push({ dppId: matchedGuid, product_id: productId || undefined, status: "deleted" });
           deleted++;
         } catch (e) {
-          details.push({ guid: guid || undefined, product_id: productId || undefined, status: "failed", error: e.message });
+          details.push({ dppId: dppId || undefined, product_id: productId || undefined, status: "failed", error: e.message });
           failed++;
         }
       }
@@ -1789,45 +1837,45 @@ module.exports = function registerPassportRoutes(app, {
       const userId = req.user.userId;
       const { items } = req.body || {};
 
-      if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items must be a non-empty array of { guid, passportType }" });
+      if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items must be a non-empty array of { dppId, passportType }" });
       if (items.length > 500) return res.status(400).json({ error: "Maximum 500 passports per bulk release request" });
 
-      const invalid = items.filter(i => !i?.guid || !i?.passportType && !i?.passport_type);
-      if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing guid or passportType` });
+      const invalid = items.filter((i) => !i?.dppId || !i?.passportType && !i?.passport_type);
+      if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing dppId or passportType` });
 
-      let released = 0, skipped = 0, failed = 0;
+      let released = 0,skipped = 0,failed = 0;
       const details = [];
 
       for (const item of items) {
-        const guid = item?.guid;
+        const dppId = item?.dppId;
         const passportType = item?.passportType || item?.passport_type;
-        if (!guid || !passportType) { details.push({ guid, status: "failed", message: "Missing guid or passportType" }); failed++; continue; }
+        if (!dppId || !passportType) {details.push({ dppId: dppId, status: "failed", message: "Missing dppId or passportType" });failed++;continue;}
         try {
           const tableName = getTable(passportType);
           const r = await pool.query(
             `UPDATE ${tableName} SET release_status = 'released', updated_at = NOW()
-             WHERE guid = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+             WHERE dpp_id = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
              RETURNING *`,
-            [guid, companyId]
+            [dppId, companyId]
           );
-          if (!r.rows.length) { details.push({ guid, status: "skipped", message: "Not found or already released" }); skipped++; continue; }
+          if (!r.rows.length) {details.push({ dppId: dppId, status: "skipped", message: "Not found or already released" });skipped++;continue;}
           const releasedRow = r.rows[0];
 
           const typeRes = await pool.query("SELECT * FROM passport_types WHERE type_name = $1", [passportType]);
           const sigData = await signPassport({ ...releasedRow, passport_type: passportType }, typeRes.rows[0] || null);
           if (sigData) {
             await pool.query(
-              `INSERT INTO passport_signatures (passport_guid, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_guid, version_number) DO NOTHING`,
-              [guid, releasedRow.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+              `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
+              [dppId, releasedRow.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
           }
 
-          await markOlderVersionsObsolete(tableName, guid, releasedRow.version_number);
-          await logAudit(companyId, userId, "RELEASE", tableName, guid, { release_status: "draft_or_in_revision" }, { release_status: "released" });
-          details.push({ guid, status: "released", version: releasedRow.version_number });
+          await markOlderVersionsObsolete(tableName, dppId, releasedRow.version_number);
+          await logAudit(companyId, userId, "RELEASE", tableName, dppId, { release_status: "draft_or_in_revision" }, { release_status: "released" });
+          details.push({ dppId: dppId, status: "released", version: releasedRow.version_number });
           released++;
-        } catch (e) { details.push({ guid, status: "failed", message: e.message }); failed++; }
+        } catch (e) {details.push({ dppId: dppId, status: "failed", message: e.message });failed++;}
       }
 
       res.json({ summary: { released, skipped, failed, total: items.length }, details });
@@ -1845,25 +1893,25 @@ module.exports = function registerPassportRoutes(app, {
       const userId = req.user.userId;
       const { items, reviewerId, approverId } = req.body || {};
 
-      if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items must be a non-empty array of { guid, passportType }" });
+      if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items must be a non-empty array of { dppId, passportType }" });
       if (items.length > 500) return res.status(400).json({ error: "Maximum 500 passports per bulk workflow request" });
       if (!reviewerId && !approverId) return res.status(400).json({ error: "Select at least one reviewer or approver." });
 
-      const invalid = items.filter(i => !i?.guid || !i?.passportType && !i?.passport_type);
-      if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing guid or passportType` });
+      const invalid = items.filter((i) => !i?.dppId || !i?.passportType && !i?.passport_type);
+      if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing dppId or passportType` });
 
-      let submitted = 0, skipped = 0, failed = 0;
+      let submitted = 0,skipped = 0,failed = 0;
       const details = [];
 
       for (const item of items) {
-        const guid = item?.guid;
+        const dppId = item?.dppId;
         const passportType = item?.passportType || item?.passport_type;
-        if (!guid || !passportType) { details.push({ guid, status: "failed", message: "Missing guid or passportType" }); failed++; continue; }
+        if (!dppId || !passportType) {details.push({ dppId: dppId, status: "failed", message: "Missing dppId or passportType" });failed++;continue;}
         try {
-          await submitPassportToWorkflow({ companyId, guid, passportType, userId, reviewerId, approverId });
-          details.push({ guid, status: "submitted" });
+          await submitPassportToWorkflow({ companyId, dppId: dppId, passportType, userId, reviewerId, approverId });
+          details.push({ dppId: dppId, status: "submitted" });
           submitted++;
-        } catch (e) { details.push({ guid, status: "skipped", message: e.message }); skipped++; }
+        } catch (e) {details.push({ dppId: dppId, status: "skipped", message: e.message });skipped++;}
       }
 
       res.json({ summary: { submitted, skipped, failed, total: items.length }, details });
@@ -1875,15 +1923,15 @@ module.exports = function registerPassportRoutes(app, {
 
   // ─── ARCHIVE ───────────────────────────────────────────────────────────────
 
-  app.post("/api/companies/:companyId/passports/:guid/archive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/archive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const { passportType } = req.body;
       const userId = req.user.userId;
       if (!passportType) return res.status(400).json({ error: "passportType required" });
 
       const tableName = getTable(passportType);
-      const lineageContext = await getPassportLineageContext({ guid, passportType, companyId });
+      const lineageContext = await getPassportLineageContext({ dppId: dppId, passportType, companyId });
       if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
 
       const rows = await pool.query(
@@ -1895,9 +1943,9 @@ module.exports = function registerPassportRoutes(app, {
       for (const row of rows.rows) {
         const { id, deleted_at, ...rowData } = row;
         await pool.query(
-          `INSERT INTO passport_archives (guid, lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, row_data, archived_by)
+          `INSERT INTO passport_archives (dpp_id, lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, row_data, archived_by)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-          [row.guid, row.lineage_id, companyId, passportType, row.version_number, row.model_name, row.product_id, row.product_identifier_did || null, row.release_status, JSON.stringify(rowData), userId]
+          [row.dppId, row.lineage_id, companyId, passportType, row.version_number, row.model_name, row.product_id, row.product_identifier_did || null, row.release_status, JSON.stringify(rowData), userId]
         );
       }
       await pool.query(
@@ -1909,11 +1957,11 @@ module.exports = function registerPassportRoutes(app, {
           passport: { ...row, passport_type: passportType },
           passportType,
           reason: "archive",
-          snapshotScope: "archived_history",
+          snapshotScope: "archived_history"
         }).catch(() => {});
       }
 
-      await logAudit(companyId, userId, "ARCHIVE", tableName, guid, null, { versions_archived: rows.rows.length });
+      await logAudit(companyId, userId, "ARCHIVE", tableName, dppId, null, { versions_archived: rows.rows.length });
       res.json({ success: true, versions_archived: rows.rows.length });
     } catch (e) {
       logger.error("Archive error:", e.message);
@@ -1929,29 +1977,29 @@ module.exports = function registerPassportRoutes(app, {
       if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items required" });
       if (items.length > 500) return res.status(400).json({ error: "Max 500 per request" });
 
-      const invalid = items.filter(i => !i?.guid || !i?.passportType && !i?.passport_type);
-      if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing guid or passportType` });
+      const invalid = items.filter((i) => !i?.dppId || !i?.passportType && !i?.passport_type);
+      if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing dppId or passportType` });
 
-      let archived = 0, skipped = 0;
+      let archived = 0,skipped = 0;
       for (const item of items) {
-        const guid = item?.guid;
+        const dppId = item?.dppId;
         const passportType = item?.passportType || item?.passport_type;
-        if (!guid || !passportType) { skipped++; continue; }
+        if (!dppId || !passportType) {skipped++;continue;}
         try {
           const tableName = getTable(passportType);
-          const lineageContext = await getPassportLineageContext({ guid, passportType, companyId });
-          if (!lineageContext?.lineage_id) { skipped++; continue; }
+          const lineageContext = await getPassportLineageContext({ dppId: dppId, passportType, companyId });
+          if (!lineageContext?.lineage_id) {skipped++;continue;}
           const rows = await pool.query(
             `SELECT * FROM ${tableName} WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
             [lineageContext.lineage_id, companyId]
           );
-          if (!rows.rows.length) { skipped++; continue; }
+          if (!rows.rows.length) {skipped++;continue;}
           for (const row of rows.rows) {
             const { id, deleted_at, ...rowData } = row;
             await pool.query(
-              `INSERT INTO passport_archives (guid, lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, row_data, archived_by)
+              `INSERT INTO passport_archives (dpp_id, lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, row_data, archived_by)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-              [row.guid, row.lineage_id, companyId, passportType, row.version_number, row.model_name, row.product_id, row.product_identifier_did || null, row.release_status, JSON.stringify(rowData), userId]
+              [row.dppId, row.lineage_id, companyId, passportType, row.version_number, row.model_name, row.product_id, row.product_identifier_did || null, row.release_status, JSON.stringify(rowData), userId]
             );
           }
           await pool.query(
@@ -1963,12 +2011,12 @@ module.exports = function registerPassportRoutes(app, {
               passport: { ...row, passport_type: passportType },
               passportType,
               reason: "bulk_archive",
-              snapshotScope: "archived_history",
+              snapshotScope: "archived_history"
             }).catch(() => {});
           }
-          await logAudit(companyId, userId, "ARCHIVE", tableName, guid, null, { versions_archived: rows.rows.length });
+          await logAudit(companyId, userId, "ARCHIVE", tableName, dppId, null, { versions_archived: rows.rows.length });
           archived++;
-        } catch { skipped++; }
+        } catch {skipped++;}
       }
       res.json({ summary: { archived, skipped, total: items.length } });
     } catch (e) {
@@ -1977,14 +2025,14 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:guid/unarchive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/unarchive", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const userId = req.user.userId;
 
       const archiveContext = await pool.query(
-        `SELECT lineage_id FROM passport_archives WHERE (guid = $1 OR lineage_id = $1) AND company_id = $2 ORDER BY version_number DESC LIMIT 1`,
-        [guid, companyId]
+        `SELECT lineage_id FROM passport_archives WHERE (dpp_id = $1 OR lineage_id = $1) AND company_id = $2 ORDER BY version_number DESC LIMIT 1`,
+        [dppId, companyId]
       );
       if (!archiveContext.rows.length) return res.status(404).json({ error: "Archived passport not found" });
 
@@ -1999,11 +2047,11 @@ module.exports = function registerPassportRoutes(app, {
 
       for (const ar of archiveRows.rows) {
         const existing = await pool.query(
-          `SELECT id FROM ${tableName} WHERE guid = $1 AND version_number = $2`,
-          [ar.guid, ar.version_number]
+          `SELECT id FROM ${tableName} WHERE dpp_id = $1 AND version_number = $2`,
+          [ar.dppId, ar.version_number]
         );
         if (existing.rows.length) {
-          await pool.query(`UPDATE ${tableName} SET deleted_at = NULL WHERE guid = $1 AND version_number = $2`, [ar.guid, ar.version_number]);
+          await pool.query(`UPDATE ${tableName} SET deleted_at = NULL WHERE dpp_id = $1 AND version_number = $2`, [ar.dppId, ar.version_number]);
         }
       }
       await pool.query(
@@ -2012,7 +2060,7 @@ module.exports = function registerPassportRoutes(app, {
       );
       await pool.query(`DELETE FROM passport_archives WHERE lineage_id = $1 AND company_id = $2`, [archiveRows.rows[0].lineage_id, companyId]);
 
-      await logAudit(companyId, userId, "UNARCHIVE", tableName, guid, null, { versions_restored: archiveRows.rows.length });
+      await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versions_restored: archiveRows.rows.length });
       res.json({ success: true, versions_restored: archiveRows.rows.length });
     } catch (e) {
       logger.error("Unarchive error:", e.message);
@@ -2024,30 +2072,30 @@ module.exports = function registerPassportRoutes(app, {
     try {
       const { companyId } = req.params;
       const userId = req.user.userId;
-      const { guids } = req.body || {};
-      if (!Array.isArray(guids) || !guids.length) return res.status(400).json({ error: "guids required" });
-      if (guids.length > 500) return res.status(400).json({ error: "Max 500 per request" });
+      const { dppIds } = req.body || {};
+      if (!Array.isArray(dppIds) || !dppIds.length) return res.status(400).json({ error: "dppIds required" });
+      if (dppIds.length > 500) return res.status(400).json({ error: "Max 500 per request" });
 
-      let restored = 0, skipped = 0;
-      for (const guid of guids) {
+      let restored = 0,skipped = 0;
+      for (const dppId of dppIds) {
         try {
           const contextRes = await pool.query(
-            `SELECT lineage_id, passport_type FROM passport_archives WHERE (guid = $1 OR lineage_id = $1) AND company_id = $2 ORDER BY version_number DESC LIMIT 1`,
-            [guid, companyId]
+            `SELECT lineage_id, passport_type FROM passport_archives WHERE (dpp_id = $1 OR lineage_id = $1) AND company_id = $2 ORDER BY version_number DESC LIMIT 1`,
+            [dppId, companyId]
           );
-          if (!contextRes.rows.length) { skipped++; continue; }
+          if (!contextRes.rows.length) {skipped++;continue;}
           const lineageId = contextRes.rows[0].lineage_id;
           const archiveRows = await pool.query(`SELECT * FROM passport_archives WHERE lineage_id = $1 AND company_id = $2`, [lineageId, companyId]);
-          if (!archiveRows.rows.length) { skipped++; continue; }
+          if (!archiveRows.rows.length) {skipped++;continue;}
           const passportType = archiveRows.rows[0].passport_type;
           const tableName = getTable(passportType);
           await pool.query(`UPDATE ${tableName} SET deleted_at = NULL WHERE lineage_id = $1 AND company_id = $2`, [lineageId, companyId]);
           await pool.query(`DELETE FROM passport_archives WHERE lineage_id = $1 AND company_id = $2`, [lineageId, companyId]);
-          await logAudit(companyId, userId, "UNARCHIVE", tableName, guid, null, { versions_restored: archiveRows.rows.length });
+          await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versions_restored: archiveRows.rows.length });
           restored++;
-        } catch { skipped++; }
+        } catch {skipped++;}
       }
-      res.json({ summary: { restored, skipped, total: guids.length } });
+      res.json({ summary: { restored, skipped, total: dppIds.length } });
     } catch (e) {
       logger.error("Bulk unarchive error:", e.message);
       res.status(500).json({ error: "Bulk unarchive failed" });
@@ -2056,37 +2104,37 @@ module.exports = function registerPassportRoutes(app, {
 
   // ─── DIFF & HISTORY ────────────────────────────────────────────────────────
 
-  app.get("/api/companies/:companyId/passports/:guid/diff", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/diff", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const { passportType } = req.query;
       if (!passportType) return res.status(400).json({ error: "passportType required" });
 
-      const lineageContext = await getPassportLineageContext({ guid, passportType, companyId: req.params.companyId });
+      const lineageContext = await getPassportLineageContext({ dppId: dppId, passportType, companyId: req.params.companyId });
       if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
       const versions = await getPassportVersionsByLineage({ lineageId: lineageContext.lineage_id, passportType, companyId: req.params.companyId });
       res.json({ versions: [...versions].sort((a, b) => Number(a.version_number || 0) - Number(b.version_number || 0)), passportType });
-    } catch (e) { res.status(500).json({ error: "Failed" }); }
+    } catch (e) {res.status(500).json({ error: "Failed" });}
   });
 
-  app.get("/api/companies/:companyId/passports/:guid/history", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/history", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      const { companyId, guid } = req.params;
+      const { companyId, dppId: dppId } = req.params;
       const reg = await pool.query(
-        `SELECT passport_type FROM passport_registry WHERE guid = $1 AND company_id = $2`,
-        [guid, companyId]
+        `SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2`,
+        [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
       const passportType = reg.rows[0].passport_type;
-      const historyPayload = await buildPassportVersionHistory({ guid, passportType, companyId, publicOnly: false });
+      const historyPayload = await buildPassportVersionHistory({ dppId: dppId, passportType, companyId, publicOnly: false });
       res.json(historyPayload);
-    } catch (e) { res.status(500).json({ error: "Failed to fetch passport history" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to fetch passport history" });}
   });
 
-  app.patch("/api/companies/:companyId/passports/:guid/history/:versionNumber", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.patch("/api/companies/:companyId/passports/:dppId/history/:versionNumber", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { companyId, guid, versionNumber } = req.params;
+      const { companyId, dppId: dppId, versionNumber } = req.params;
       const { isPublic } = req.body || {};
       const parsedVersion = parseInt(versionNumber, 10);
 
@@ -2094,18 +2142,18 @@ module.exports = function registerPassportRoutes(app, {
       if (typeof isPublic !== "boolean") return res.status(400).json({ error: "isPublic must be true or false." });
 
       const reg = await pool.query(
-        `SELECT passport_type FROM passport_registry WHERE guid = $1 AND company_id = $2`,
-        [guid, companyId]
+        `SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2`,
+        [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
       const passportType = reg.rows[0].passport_type;
-      const lineageContext = await getPassportLineageContext({ guid, passportType, companyId });
+      const lineageContext = await getPassportLineageContext({ dppId: dppId, passportType, companyId });
       if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
 
       const tableName = getTable(passportType);
       const versionRes = await pool.query(
-        `SELECT guid, version_number, release_status FROM ${tableName}
+        `SELECT dpp_id, version_number, release_status FROM ${tableName}
          WHERE lineage_id = $1 AND company_id = $2 AND version_number = $3 AND deleted_at IS NULL LIMIT 1`,
         [lineageContext.lineage_id, companyId, parsedVersion]
       );
@@ -2113,40 +2161,40 @@ module.exports = function registerPassportRoutes(app, {
 
       const versionRow = normalizePassportRow(versionRes.rows[0]);
       if (!isPublicHistoryStatus(versionRow.release_status) && isPublic)
-        return res.status(400).json({ error: "Only released or obsolete versions can be shown publicly." });
+      return res.status(400).json({ error: "Only released or obsolete versions can be shown publicly." });
 
       const existingVisibilityRes = await pool.query(
-        `SELECT is_public FROM passport_history_visibility WHERE passport_guid = $1 AND version_number = $2`,
-        [versionRow.guid, parsedVersion]
+        `SELECT is_public FROM passport_history_visibility WHERE passport_dpp_id = $1 AND version_number = $2`,
+        [versionRow.dppId, parsedVersion]
       );
-      const previousVisibility = existingVisibilityRes.rows.length
-        ? !!existingVisibilityRes.rows[0].is_public
-        : isPublicHistoryStatus(versionRow.release_status);
+      const previousVisibility = existingVisibilityRes.rows.length ?
+      !!existingVisibilityRes.rows[0].is_public :
+      isPublicHistoryStatus(versionRow.release_status);
 
       await pool.query(
-        `INSERT INTO passport_history_visibility (passport_guid, version_number, is_public, updated_by, created_at, updated_at)
+        `INSERT INTO passport_history_visibility (passport_dpp_id, version_number, is_public, updated_by, created_at, updated_at)
          VALUES ($1,$2,$3,$4,NOW(),NOW())
-         ON CONFLICT (passport_guid, version_number) DO UPDATE SET is_public = EXCLUDED.is_public, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
-        [versionRow.guid, parsedVersion, isPublic, req.user.userId]
+         ON CONFLICT (passport_dpp_id, version_number) DO UPDATE SET is_public = EXCLUDED.is_public, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+        [versionRow.dppId, parsedVersion, isPublic, req.user.userId]
       );
 
-      await logAudit(companyId, req.user.userId, "UPDATE_HISTORY_VISIBILITY", tableName, guid,
-        { version_number: parsedVersion, is_public: previousVisibility },
-        { version_number: parsedVersion, is_public: isPublic }
+      await logAudit(companyId, req.user.userId, "UPDATE_HISTORY_VISIBILITY", tableName, dppId,
+      { version_number: parsedVersion, is_public: previousVisibility },
+      { version_number: parsedVersion, is_public: isPublic }
       );
 
       res.json({ success: true, version_number: parsedVersion, is_public: isPublic });
-    } catch (e) { res.status(500).json({ error: "Failed to update history visibility" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to update history visibility" });}
   });
 
   // ─── FILE UPLOAD ───────────────────────────────────────────────────────────
 
   app.post(
-    "/api/companies/:companyId/passports/:guid/upload",
+    "/api/companies/:companyId/passports/:dppId/upload",
     authenticateToken, checkCompanyAccess, requireEditor, upload.single("file"),
     async (req, res) => {
       try {
-        const { companyId, guid } = req.params;
+        const { companyId, dppId: dppId } = req.params;
         const { fieldKey, passportType } = req.body;
         if (!req.file) return res.status(400).json({ error: "No file received" });
         if (!fieldKey || !passportType) {
@@ -2156,21 +2204,21 @@ module.exports = function registerPassportRoutes(app, {
           return res.status(400).json({ error: "Invalid fieldKey" });
         }
 
-        const tableName  = getTable(passportType);
+        const tableName = getTable(passportType);
         const stored = await storageService.savePassportFile({
-          guid,
+          dppId: dppId,
           fieldKey,
           originalName: req.file.originalname,
           buffer: req.file.buffer,
-          contentType: req.file.mimetype,
+          contentType: req.file.mimetype
         });
         const fileUrl = stored.url;
 
         const row = await pool.query(
           `SELECT id FROM ${tableName}
-           WHERE guid = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+           WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
            ORDER BY version_number DESC LIMIT 1`,
-          [guid]
+          [dppId]
         );
         if (!row.rows.length) {
           return res.status(404).json({ error: "Editable passport not found" });
@@ -2182,25 +2230,25 @@ module.exports = function registerPassportRoutes(app, {
         const publicFileUrl = `${appUrl}/public-files/${publicId}`;
         await pool.query(
           `INSERT INTO passport_attachments
-             (public_id, company_id, passport_guid, field_key, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, is_public)
+             (public_id, company_id, passport_dpp_id, field_key, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, is_public)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
            ON CONFLICT (public_id) DO NOTHING`,
           [
-            publicId, companyId, guid, fieldKey,
-            stored.path || null,
-            stored.storageKey || null,
-            stored.provider || null,
-            fileUrl,
-            req.file.mimetype || "application/octet-stream",
-            req.file.size || null,
-          ]
+          publicId, companyId, dppId, fieldKey,
+          stored.path || null,
+          stored.storageKey || null,
+          stored.provider || null,
+          fileUrl,
+          req.file.mimetype || "application/octet-stream",
+          req.file.size || null]
+
         ).catch(() => {});
 
         await pool.query(
           `UPDATE ${tableName} SET ${fieldKey} = $1, updated_at = NOW() WHERE id = $2`,
           [publicFileUrl, row.rows[0].id]
         );
-        await logAudit(companyId, req.user.userId, "UPLOAD", tableName, guid, null, { fieldKey, publicFileUrl });
+        await logAudit(companyId, req.user.userId, "UPLOAD", tableName, dppId, null, { fieldKey, publicFileUrl });
         res.json({ success: true, url: publicFileUrl, fieldKey });
       } catch (e) {
         if (e.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "File too large. Max 20 MB." });
@@ -2258,7 +2306,7 @@ module.exports = function registerPassportRoutes(app, {
           if (!trendSeriesMap[umbrella_category]) {
             trendSeriesMap[umbrella_category] = {
               umbrella_category, umbrella_icon, baseline: 0,
-              monthlyCounts: Object.fromEntries(trendMonths.map((month) => [month.toISOString().slice(0, 7), 0])),
+              monthlyCounts: Object.fromEntries(trendMonths.map((month) => [month.toISOString().slice(0, 7), 0]))
             };
           }
           trendSeriesMap[umbrella_category].baseline += parseInt(baselineRes.rows[0]?.count || 0, 10);
@@ -2266,17 +2314,17 @@ module.exports = function registerPassportRoutes(app, {
             const key = new Date(row.month_bucket).toISOString().slice(0, 7);
             trendSeriesMap[umbrella_category].monthlyCounts[key] = (trendSeriesMap[umbrella_category].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
           });
-        } catch (e) { logger.error(`Analytics error for ${companyId}/${type_name}:`, e.message); }
+        } catch (e) {logger.error(`Analytics error for ${companyId}/${type_name}:`, e.message);}
       }
 
       const scanRes = await pool.query(
-        `SELECT COUNT(DISTINCT (pse.passport_guid, pse.viewer_user_id)) FROM passport_scan_events pse
-         JOIN passport_registry pr ON pr.guid = pse.passport_guid
+        `SELECT COUNT(DISTINCT (pse.passport_dpp_id, pse.viewer_user_id)) FROM passport_scan_events pse
+         JOIN passport_registry pr ON pr.dpp_id = pse.passport_dpp_id
          WHERE pr.company_id = $1 AND pse.viewer_user_id IS NOT NULL`,
         [companyId]
       );
       const scanStats = parseInt(scanRes.rows[0].count) || 0;
-      const archivedRes = await pool.query(`SELECT COUNT(DISTINCT guid) FROM passport_archives WHERE company_id = $1`, [companyId]);
+      const archivedRes = await pool.query(`SELECT COUNT(DISTINCT dpp_id) FROM passport_archives WHERE company_id = $1`, [companyId]);
       const archivedCount = parseInt(archivedRes.rows[0].count) || 0;
       totalPassports += archivedCount;
 
@@ -2287,13 +2335,13 @@ module.exports = function registerPassportRoutes(app, {
           return {
             umbrella_category: series.umbrella_category,
             umbrella_icon: series.umbrella_icon,
-            values: trendMonths.map((month) => { const key = month.toISOString().slice(0, 7); running += series.monthlyCounts[key] || 0; return running; }),
+            values: trendMonths.map((month) => {const key = month.toISOString().slice(0, 7);running += series.monthlyCounts[key] || 0;return running;})
           };
-        }),
+        })
       };
 
       res.json({ totalPassports, analytics, scanStats, archivedCount, trend });
-    } catch (e) { res.status(500).json({ error: "Failed to fetch analytics" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to fetch analytics" });}
   });
 
   app.get("/api/companies/:companyId/activity", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -2306,12 +2354,12 @@ module.exports = function registerPassportRoutes(app, {
         [req.params.companyId, limit]
       );
       res.json(r.rows);
-    } catch { res.status(500).json({ error: "Failed" }); }
+    } catch {res.status(500).json({ error: "Failed" });}
   });
 
   app.get("/api/companies/:companyId/audit-logs", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      const limit  = Math.min(Math.max(parseInt(req.query.limit)  || 200, 1), 500);
+      const limit = Math.min(Math.max(parseInt(req.query.limit) || 200, 1), 500);
       const offset = Math.max(parseInt(req.query.offset) || 0, 0);
       const r = await pool.query(
         `SELECT al.*, u.email AS user_email, u.first_name AS user_first_name, u.last_name AS user_last_name FROM audit_logs al
@@ -2320,7 +2368,7 @@ module.exports = function registerPassportRoutes(app, {
         [req.params.companyId, limit, offset]
       );
       res.json(r.rows);
-    } catch { res.status(500).json({ error: "Failed to fetch audit logs" }); }
+    } catch {res.status(500).json({ error: "Failed to fetch audit logs" });}
   });
 
   app.get("/api/companies/:companyId/audit-logs/integrity", authenticateToken, checkCompanyAdmin, async (req, res) => {
@@ -2373,13 +2421,13 @@ module.exports = function registerPassportRoutes(app, {
            updated_at = NOW()
          RETURNING id, audience, reason, expires_at, is_active, created_at, updated_at`,
         [
-          req.params.userId,
-          req.params.companyId,
-          audience,
-          req.user.userId,
-          req.body?.reason || null,
-          expiresAt,
-        ]
+        req.params.userId,
+        req.params.companyId,
+        audience,
+        req.user.userId,
+        req.body?.reason || null,
+        expiresAt]
+
       );
 
       await logAudit(
@@ -2435,7 +2483,7 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
-  app.get("/api/companies/:companyId/passports/:guid/access-grants", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/access-grants", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const result = await pool.query(
         `SELECT pag.id, pag.audience, pag.element_id_path, pag.grantee_user_id, pag.granted_by, pag.reason,
@@ -2444,9 +2492,9 @@ module.exports = function registerPassportRoutes(app, {
          FROM passport_access_grants pag
          LEFT JOIN users u ON u.id = pag.grantee_user_id
          WHERE pag.company_id = $1
-           AND pag.passport_guid = $2
+           AND pag.passport_dpp_id = $2
          ORDER BY pag.created_at DESC`,
-        [req.params.companyId, req.params.guid]
+        [req.params.companyId, req.params.dppId]
       );
       res.json(result.rows);
     } catch {
@@ -2454,7 +2502,7 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:guid/access-grants", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/access-grants", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const audience = String(req.body?.audience || "").trim();
       if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
@@ -2471,10 +2519,10 @@ module.exports = function registerPassportRoutes(app, {
 
       const result = await pool.query(
         `INSERT INTO passport_access_grants (
-           passport_guid, company_id, audience, element_id_path, grantee_user_id, granted_by, reason, expires_at, is_active, updated_at
+           passport_dpp_id, company_id, audience, element_id_path, grantee_user_id, granted_by, reason, expires_at, is_active, updated_at
          )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
-         ON CONFLICT (passport_guid, audience, grantee_user_id, element_id_path)
+         ON CONFLICT (passport_dpp_id, audience, grantee_user_id, element_id_path)
          DO UPDATE SET
            granted_by = EXCLUDED.granted_by,
            reason = EXCLUDED.reason,
@@ -2483,15 +2531,15 @@ module.exports = function registerPassportRoutes(app, {
            updated_at = NOW()
          RETURNING *`,
         [
-          req.params.guid,
-          req.params.companyId,
-          audience,
-          req.body?.element_id_path || null,
-          granteeUserId,
-          req.user.userId,
-          req.body?.reason || null,
-          expiresAt,
-        ]
+        req.params.dppId,
+        req.params.companyId,
+        audience,
+        req.body?.element_id_path || null,
+        granteeUserId,
+        req.user.userId,
+        req.body?.reason || null,
+        expiresAt]
+
       );
 
       await logAudit(
@@ -2499,13 +2547,13 @@ module.exports = function registerPassportRoutes(app, {
         req.user.userId,
         "GRANT_PASSPORT_AUDIENCE",
         "passport_access_grants",
-        req.params.guid,
+        req.params.dppId,
         null,
         {
           audience,
           grantee_user_id: granteeUserId,
           element_id_path: req.body?.element_id_path || null,
-          expires_at: expiresAt ? expiresAt.toISOString() : null,
+          expires_at: expiresAt ? expiresAt.toISOString() : null
         },
         { audience }
       );
@@ -2516,7 +2564,7 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
-  app.delete("/api/companies/:companyId/passports/:guid/access-grants/:grantId", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.delete("/api/companies/:companyId/passports/:dppId/access-grants/:grantId", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const result = await pool.query(
         `UPDATE passport_access_grants
@@ -2524,9 +2572,9 @@ module.exports = function registerPassportRoutes(app, {
              updated_at = NOW()
          WHERE id = $1
            AND company_id = $2
-           AND passport_guid = $3
+           AND passport_dpp_id = $3
          RETURNING id, audience, grantee_user_id, element_id_path`,
-        [req.params.grantId, req.params.companyId, req.params.guid]
+        [req.params.grantId, req.params.companyId, req.params.dppId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Grant not found" });
 
@@ -2535,7 +2583,7 @@ module.exports = function registerPassportRoutes(app, {
         req.user.userId,
         "REVOKE_PASSPORT_AUDIENCE",
         "passport_access_grants",
-        req.params.guid,
+        req.params.dppId,
         result.rows[0],
         { revoked: true },
         { audience: result.rows[0].audience }
@@ -2570,7 +2618,7 @@ module.exports = function registerPassportRoutes(app, {
         supportsPublicHandover: req.body?.supports_public_handover !== false && req.body?.supportsPublicHandover !== false,
         config: req.body?.config_json || req.body?.config || {},
         createdBy: req.user.userId,
-        isActive: req.body?.is_active !== false && req.body?.isActive !== false,
+        isActive: req.body?.is_active !== false && req.body?.isActive !== false
       });
       await logAudit(
         req.params.companyId,
@@ -2607,12 +2655,12 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
-  app.get("/api/companies/:companyId/passports/:guid/backup-replications", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/backup-replications", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       if (!backupProviderService) return res.json([]);
       const replications = await backupProviderService.listReplications({
         companyId: req.params.companyId,
-        passportGuid: req.params.guid,
+        passportDppId: req.params.dppId
       });
       res.json(replications);
     } catch {
@@ -2620,7 +2668,7 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:guid/backup-replications", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/backup-replications", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
       const passportType = req.body?.passportType || req.body?.passport_type;
@@ -2628,9 +2676,9 @@ module.exports = function registerPassportRoutes(app, {
 
       const currentPassport = await loadLatestLivePassport({
         companyId: req.params.companyId,
-        guid: req.params.guid,
+        dppId: req.params.dppId,
         passportType,
-        releaseStatusSql: "('released','obsolete')",
+        releaseStatusSql: "('released','obsolete')"
       });
       if (!currentPassport) return res.status(404).json({ error: "Released passport not found" });
 
@@ -2638,7 +2686,7 @@ module.exports = function registerPassportRoutes(app, {
         passport: { ...currentPassport, passport_type: passportType },
         passportType,
         reason: "manual_replication",
-        snapshotScope: req.body?.snapshotScope || req.body?.snapshot_scope || "released_current",
+        snapshotScope: req.body?.snapshotScope || req.body?.snapshot_scope || "released_current"
       });
 
       await logAudit(
@@ -2646,7 +2694,7 @@ module.exports = function registerPassportRoutes(app, {
         req.user.userId,
         "REPLICATE_PASSPORT_BACKUP",
         "passport_backup_replications",
-        req.params.guid,
+        req.params.dppId,
         null,
         { passportType, resultCount: result.results?.length || 0 }
       );
@@ -2657,7 +2705,7 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:guid/backup-replications/verify", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/backup-replications/verify", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
       const replicationId = req.body?.replicationId ?? req.body?.replication_id ?? null;
@@ -2666,8 +2714,8 @@ module.exports = function registerPassportRoutes(app, {
       }
       const result = await backupProviderService.verifyReplications({
         companyId: req.params.companyId,
-        passportGuid: req.params.guid,
-        replicationId,
+        passportDppId: req.params.dppId,
+        replicationId
       });
 
       await logAudit(
@@ -2675,12 +2723,12 @@ module.exports = function registerPassportRoutes(app, {
         req.user.userId,
         "VERIFY_PASSPORT_BACKUP",
         "passport_backup_replications",
-        req.params.guid,
+        req.params.dppId,
         null,
         {
           replicationId: replicationId || null,
           verified: result.verified || 0,
-          failed: result.failed || 0,
+          failed: result.failed || 0
         }
       );
 
@@ -2695,7 +2743,7 @@ module.exports = function registerPassportRoutes(app, {
 
   // ─── QR CODE ───────────────────────────────────────────────────────────────
 
-  app.post("/api/passports/:guid/qrcode", authenticateToken, requireEditor, async (req, res) => {
+  app.post("/api/passports/:dppId/qrcode", authenticateToken, requireEditor, async (req, res) => {
     try {
       const { qrCode, passportType } = req.body;
       if (!qrCode || !passportType) return res.status(400).json({ error: "qrCode and passportType required" });
@@ -2705,7 +2753,7 @@ module.exports = function registerPassportRoutes(app, {
         return res.status(400).json({ error: "QR code must be an HTTPS URL" });
       }
 
-      const reg = await pool.query("SELECT company_id FROM passport_registry WHERE guid = $1", [req.params.guid]);
+      const reg = await pool.query("SELECT company_id FROM passport_registry WHERE dpp_id = $1", [req.params.dppId]);
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found in registry" });
 
       // Enforce company ownership — editors can only update passports in their own company
@@ -2715,43 +2763,43 @@ module.exports = function registerPassportRoutes(app, {
       }
 
       const tableName = getTable(passportType);
-      await pool.query(`UPDATE ${tableName} SET qr_code = $1, updated_at = NOW() WHERE guid = $2`, [qrCode, req.params.guid]);
+      await pool.query(`UPDATE ${tableName} SET qr_code = $1, updated_at = NOW() WHERE dpp_id = $2`, [qrCode, req.params.dppId]);
       res.json({ success: true });
-    } catch { res.status(500).json({ error: "Failed to save QR code" }); }
+    } catch {res.status(500).json({ error: "Failed to save QR code" });}
   });
 
-  app.get("/api/passports/:guid/qrcode", publicReadRateLimit, async (req, res) => {
+  app.get("/api/passports/:dppId/qrcode", publicReadRateLimit, async (req, res) => {
     try {
-      const { guid } = req.params;
-      const reg = await pool.query("SELECT passport_type FROM passport_registry WHERE guid = $1", [guid]);
+      const { dppId: dppId } = req.params;
+      const reg = await pool.query("SELECT passport_type FROM passport_registry WHERE dpp_id = $1", [dppId]);
       if (!reg.rows.length) return res.status(404).json({ error: "QR code not found" });
 
       const { passport_type } = reg.rows[0];
       const tableName = getTable(passport_type);
-      const r = await pool.query(`SELECT qr_code FROM ${tableName} WHERE guid = $1 AND deleted_at IS NULL LIMIT 1`, [guid]);
+      const r = await pool.query(`SELECT qr_code FROM ${tableName} WHERE dpp_id = $1 AND deleted_at IS NULL LIMIT 1`, [dppId]);
       if (!r.rows.length || !r.rows[0].qr_code) return res.status(404).json({ error: "QR code not found" });
 
       res.json({ qrCode: r.rows[0].qr_code });
-    } catch { res.status(500).json({ error: "Failed to fetch QR code" }); }
+    } catch {res.status(500).json({ error: "Failed to fetch QR code" });}
   });
 
   // ─── SCAN ──────────────────────────────────────────────────────────────────
 
-  app.post("/api/passports/:guid/scan", (req, res, next) => {
+  app.post("/api/passports/:dppId/scan", (req, res, next) => {
     // dynamic rate limit - imported as assetWriteRateLimit equiv for scans
     next();
   }, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const { userAgent, referrer, userId } = req.body || {};
 
-      const reg = await pool.query("SELECT passport_type FROM passport_registry WHERE guid = $1", [guid]);
+      const reg = await pool.query("SELECT passport_type FROM passport_registry WHERE dpp_id = $1", [dppId]);
       if (!reg.rows.length) return res.json({ success: true });
 
       const tbl = getTable(reg.rows[0].passport_type);
       const check = await pool.query(
-        `SELECT 1 FROM ${tbl} WHERE guid = $1 AND release_status = 'released' AND deleted_at IS NULL`,
-        [guid]
+        `SELECT 1 FROM ${tbl} WHERE dpp_id = $1 AND release_status = 'released' AND deleted_at IS NULL`,
+        [dppId]
       );
       if (!check.rows.length) return res.json({ success: true });
 
@@ -2759,69 +2807,69 @@ module.exports = function registerPassportRoutes(app, {
       if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return res.json({ success: true });
 
       await pool.query(
-        `INSERT INTO passport_scan_events (passport_guid, viewer_user_id, user_agent, referrer)
+        `INSERT INTO passport_scan_events (passport_dpp_id, viewer_user_id, user_agent, referrer)
          VALUES ($1,$2,$3,$4)
-         ON CONFLICT (passport_guid, viewer_user_id) WHERE viewer_user_id IS NOT NULL DO NOTHING`,
-        [guid, parsedUserId, userAgent || null, referrer || null]
+         ON CONFLICT (passport_dpp_id, viewer_user_id) WHERE viewer_user_id IS NOT NULL DO NOTHING`,
+        [dppId, parsedUserId, userAgent || null, referrer || null]
       );
       res.json({ success: true });
-    } catch { res.json({ success: true }); }
+    } catch {res.json({ success: true });}
   });
 
-  app.get("/api/passports/:guid/scan-stats", publicReadRateLimit, async (req, res) => {
+  app.get("/api/passports/:dppId/scan-stats", publicReadRateLimit, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const total = await pool.query(
-        `SELECT COUNT(DISTINCT viewer_user_id) FROM passport_scan_events WHERE passport_guid = $1 AND viewer_user_id IS NOT NULL`,
-        [guid]
+        `SELECT COUNT(DISTINCT viewer_user_id) FROM passport_scan_events WHERE passport_dpp_id = $1 AND viewer_user_id IS NOT NULL`,
+        [dppId]
       );
       const byDay = await pool.query(
         `SELECT DATE(scanned_at) AS day, COUNT(DISTINCT viewer_user_id) AS count
-         FROM passport_scan_events WHERE passport_guid = $1 AND viewer_user_id IS NOT NULL
+         FROM passport_scan_events WHERE passport_dpp_id = $1 AND viewer_user_id IS NOT NULL
          GROUP BY DATE(scanned_at) ORDER BY day DESC LIMIT 30`,
-        [guid]
+        [dppId]
       );
       res.json({ total: parseInt(total.rows[0].count), byDay: byDay.rows });
-    } catch { res.status(500).json({ error: "Failed" }); }
+    } catch {res.status(500).json({ error: "Failed" });}
   });
 
   // ─── DYNAMIC VALUES ────────────────────────────────────────────────────────
 
-  app.get("/api/passports/:guid/dynamic-values", publicReadRateLimit, async (req, res) => {
+  app.get("/api/passports/:dppId/dynamic-values", publicReadRateLimit, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const r = await pool.query(
         `SELECT DISTINCT ON (field_key) field_key, value, updated_at
-         FROM passport_dynamic_values WHERE passport_guid = $1 ORDER BY field_key, updated_at DESC`,
-        [guid]
+         FROM passport_dynamic_values WHERE passport_dpp_id = $1 ORDER BY field_key, updated_at DESC`,
+        [dppId]
       );
       const values = {};
-      for (const row of r.rows) { values[row.field_key] = { value: row.value, updatedAt: row.updated_at }; }
+      for (const row of r.rows) {values[row.field_key] = { value: row.value, updatedAt: row.updated_at };}
       res.json({ values });
-    } catch (e) { res.status(500).json({ error: "Failed to fetch dynamic values" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to fetch dynamic values" });}
   });
 
-  app.get("/api/passports/:guid/dynamic-values/:fieldKey/history", publicReadRateLimit, async (req, res) => {
+  app.get("/api/passports/:dppId/dynamic-values/:fieldKey/history", publicReadRateLimit, async (req, res) => {
     try {
-      const { guid, fieldKey } = req.params;
+      const { dppId: dppId, fieldKey } = req.params;
       const limit = Math.min(parseInt(req.query.limit) || 500, 2000);
       const r = await pool.query(
-        `SELECT value, updated_at FROM passport_dynamic_values WHERE passport_guid = $1 AND field_key = $2 ORDER BY updated_at ASC LIMIT $3`,
-        [guid, fieldKey, limit]
+        `SELECT value, updated_at FROM passport_dynamic_values WHERE passport_dpp_id = $1 AND field_key = $2 ORDER BY updated_at ASC LIMIT $3`,
+        [dppId, fieldKey, limit]
       );
-      res.json({ history: r.rows.map(row => ({ value: row.value, updatedAt: row.updated_at })) });
-    } catch (e) { res.status(500).json({ error: "Failed to fetch history" }); }
+      res.json({ history: r.rows.map((row) => ({ value: row.value, updatedAt: row.updated_at })) });
+    } catch (e) {res.status(500).json({ error: "Failed to fetch history" });}
   });
 
-  app.post("/api/passports/:guid/dynamic-values", async (req, res) => {
+  app.post("/api/passports/:dppId/dynamic-values", async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const deviceKey = req.headers["x-device-key"];
       if (!deviceKey) return res.status(401).json({ error: "x-device-key header required" });
 
       const reg = await pool.query(
-        "SELECT device_api_key_hash FROM passport_registry WHERE guid = $1",
-        [guid]
+        "SELECT device_api_key_hash FROM passport_registry WHERE dpp_id = $1",
+        [dppId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
       const storedHash = String(reg.rows[0].device_api_key_hash || "");
@@ -2830,11 +2878,11 @@ module.exports = function registerPassportRoutes(app, {
       const storedBuf = Buffer.from(storedHash, "hex");
       const submittedBuf = Buffer.from(submittedHash, "hex");
       if (storedBuf.length !== submittedBuf.length || !crypto.timingSafeEqual(storedBuf, submittedBuf))
-        return res.status(403).json({ error: "Invalid device key" });
+      return res.status(403).json({ error: "Invalid device key" });
 
       const updates = req.body;
       if (!updates || typeof updates !== "object" || Array.isArray(updates))
-        return res.status(400).json({ error: "Body must be an object of { fieldKey: value }" });
+      return res.status(400).json({ error: "Body must be an object of { fieldKey: value }" });
 
       const entries = Object.entries(updates).filter(([k]) => /^[a-z0-9_]{1,100}$/.test(k));
       if (!entries.length) return res.status(400).json({ error: "No valid field keys provided" });
@@ -2842,41 +2890,41 @@ module.exports = function registerPassportRoutes(app, {
       for (const [fieldKey, value] of entries) {
         let storedValue = value;
         if (value !== null && value !== undefined) {
-          if (Array.isArray(value) || typeof value === "object") storedValue = JSON.stringify(value);
-          else storedValue = String(value);
+          if (Array.isArray(value) || typeof value === "object") storedValue = JSON.stringify(value);else
+          storedValue = String(value);
         }
         await pool.query(
-          `INSERT INTO passport_dynamic_values (passport_guid, field_key, value, updated_at) VALUES ($1, $2, $3, NOW())`,
-          [guid, fieldKey, storedValue]
+          `INSERT INTO passport_dynamic_values (passport_dpp_id, field_key, value, updated_at) VALUES ($1, $2, $3, NOW())`,
+          [dppId, fieldKey, storedValue]
         );
       }
 
       res.json({ success: true, updated: entries.map(([k]) => k) });
-    } catch (e) { res.status(500).json({ error: "Failed to update dynamic values" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to update dynamic values" });}
   });
 
-  app.get("/api/companies/:companyId/passports/:guid/device-key", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/device-key", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const r = await pool.query(
         `SELECT device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
          FROM passport_registry
-         WHERE guid = $1 AND company_id = $2`,
-        [guid, req.params.companyId]
+         WHERE dpp_id = $1 AND company_id = $2`,
+        [dppId, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
       res.json({
         hasDeviceKey: !!r.rows[0].device_api_key_hash,
         keyPrefix: r.rows[0].device_api_key_prefix || null,
         lastRotatedAt: r.rows[0].device_key_last_rotated_at || null,
-        revealable: false,
+        revealable: false
       });
-    } catch (e) { res.status(500).json({ error: "Failed to fetch device key" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to fetch device key" });}
   });
 
-  app.post("/api/companies/:companyId/passports/:guid/device-key/regenerate", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/device-key/regenerate", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const material = createDeviceKeyMaterial();
       const r = await pool.query(
         `UPDATE passport_registry
@@ -2884,38 +2932,38 @@ module.exports = function registerPassportRoutes(app, {
              device_api_key_hash = $1,
              device_api_key_prefix = $2,
              device_key_last_rotated_at = NOW()
-         WHERE guid = $3 AND company_id = $4
+         WHERE dpp_id = $3 AND company_id = $4
          RETURNING device_api_key_prefix, device_key_last_rotated_at`,
-        [material.hash, material.prefix, guid, req.params.companyId]
+        [material.hash, material.prefix, dppId, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-      await logAudit(req.params.companyId, req.user.userId, "ROTATE_DEVICE_KEY", "passport_registry", guid, null, { key_prefix: material.prefix });
+      await logAudit(req.params.companyId, req.user.userId, "ROTATE_DEVICE_KEY", "passport_registry", dppId, null, { key_prefix: material.prefix });
       res.json({
         deviceKey: material.rawKey,
         keyPrefix: r.rows[0].device_api_key_prefix,
-        lastRotatedAt: r.rows[0].device_key_last_rotated_at,
+        lastRotatedAt: r.rows[0].device_key_last_rotated_at
       });
-    } catch (e) { res.status(500).json({ error: "Failed to regenerate device key" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to regenerate device key" });}
   });
 
-  app.patch("/api/companies/:companyId/passports/:guid/dynamic-values", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.patch("/api/companies/:companyId/passports/:dppId/dynamic-values", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { guid } = req.params;
+      const { dppId: dppId } = req.params;
       const updates = req.body;
       if (!updates || typeof updates !== "object" || Array.isArray(updates))
-        return res.status(400).json({ error: "Body must be an object of { fieldKey: value }" });
+      return res.status(400).json({ error: "Body must be an object of { fieldKey: value }" });
 
       const entries = Object.entries(updates).filter(([k]) => /^[a-z0-9_]{1,100}$/.test(k));
       if (!entries.length) return res.status(400).json({ error: "No valid field keys provided" });
 
       for (const [fieldKey, value] of entries) {
         await pool.query(
-          `INSERT INTO passport_dynamic_values (passport_guid, field_key, value, updated_at) VALUES ($1, $2, $3, NOW())`,
-          [guid, fieldKey, value === null || value === undefined ? null : String(value)]
+          `INSERT INTO passport_dynamic_values (passport_dpp_id, field_key, value, updated_at) VALUES ($1, $2, $3, NOW())`,
+          [dppId, fieldKey, value === null || value === undefined ? null : String(value)]
         );
       }
       res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: "Failed to update dynamic values" }); }
+    } catch (e) {res.status(500).json({ error: "Failed to update dynamic values" });}
   });
 
   // ─── PASSPORT TYPES PER COMPANY ────────────────────────────────────────────
@@ -2931,6 +2979,6 @@ module.exports = function registerPassportRoutes(app, {
         ORDER BY pt.umbrella_category, pt.display_name
       `, [req.params.companyId]);
       res.json(r.rows);
-    } catch (e) { logger.error("passport-types fetch error:", e.message); res.status(500).json({ error: "Failed to fetch passport types" }); }
+    } catch (e) {logger.error("passport-types fetch error:", e.message);res.status(500).json({ error: "Failed to fetch passport types" });}
   });
 };

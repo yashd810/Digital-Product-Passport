@@ -145,7 +145,7 @@ function App() {
         <Route path="/passport/:productId" element={<ConsumerPage />} />
 
         {/* Version diff — needs token for API */}
-        <Route path="/passport/:guid/diff" element={
+        <Route path="/passport/:dppId/diff" element={
           <ProtectedRoute token={token} authReady={authReady}>
             <VersionDiff companyId={companyId} />
           </ProtectedRoute>
@@ -232,7 +232,7 @@ function App() {
             <CreatePassportRoute user={user} companyId={companyId} />
           </ProtectedRoute>
         } />
-        <Route path="/edit/:guid" element={
+        <Route path="/edit/:dppId" element={
           <ProtectedRoute token={token} authReady={authReady}>
             <EditPassportRoute user={user} companyId={companyId} />
           </ProtectedRoute>

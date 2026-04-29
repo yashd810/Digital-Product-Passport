@@ -131,7 +131,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Choose 'Import from CSV' to go directly to the import guide for the selected type.",
             "Download the template CSV, fill in one column per passport, then upload to create all records at once.",
-            "Choose 'Import / update via JSON or CSV' when you already have draft GUIDs and want to update existing records: any row with a GUID patches the matching draft, rows without GUIDs create new ones.",
+            "Choose 'Import / update via JSON or CSV' when you already have draft DPP IDs and want to update existing records: any row with a DPP ID patches the matching draft, rows without DPP IDs create new ones.",
             "Best for: teams with data already in spreadsheets or ERP exports, or when updating a previously bulk-created batch.",
           ],
         },
@@ -142,7 +142,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "In the Create Hub, choose that template and bulk create the quantity you need  -  all pre-filled with model data.",
             "Open the passport list for that type or My Passports and export the newly created drafts as CSV or JSON.",
             "Open the file in Excel or Sheets, fill in the unit-specific columns (serial number, manufacture date, etc.).",
-            "Upload through 'Import / update via JSON or CSV' in Update mode  -  each row with a GUID updates the matching draft, while rows without GUIDs can create new drafts.",
+            "Upload through 'Import / update via JSON or CSV' in Update mode  -  each row with a DPP ID updates the matching draft, while rows without DPP IDs can create new drafts.",
           ],
         },
       ],
@@ -228,7 +228,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Bulk edit and update draft data",
           items: [
             "Use 'Import / update via JSON or CSV' from the Create Hub when you want to patch many drafts in one upload.",
-            "Include a GUID when a row should update an existing draft passport instead of creating a new one.",
+            "Include a DPP ID when a row should update an existing draft passport instead of creating a new one.",
             "Use the per-row 'Update data via CSV' action when you want to edit one draft outside the form but still keep the update structured.",
             "Draft and In Revision records remain editable directly in the form, with auto-save and live edit-session presence shown to teammates.",
           ],
@@ -539,9 +539,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       title: "Use Asset Management for safe bulk updates on existing passports",
       summary: "Asset Management is a separate operational layer for editing many already existing passports at once. It is best when you need to stage updates from CSV, JSON, or an ERP/API source, check the result before writing anything, and then push or schedule the changes in a controlled way.",
       facts: [
-        { label: "Best use case", value: "Bulk updates on existing passports, especially when rows already have guid or product_id" },
+        { label: "Best use case", value: "Bulk updates on existing passports, especially when rows already have dppId or product_id" },
         { label: "Launch path", value: "Open from the company dashboard. The tool authenticates automatically from the dashboard launch." },
-        { label: "Matching rule", value: "guid is safest. product_id works as the fallback match key for ERP and spreadsheet updates." },
+        { label: "Matching rule", value: "dppId is safest. product_id works as the fallback match key for ERP and spreadsheet updates." },
         { label: "Safety rule", value: "Unknown columns are rejected. Nothing changes until Push to Backend is used." },
       ],
       journeys: [
@@ -565,10 +565,10 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Work in the Asset Grid",
           items: [
-            "The grid behaves like a simple spreadsheet. Row, Passport GUID, and Serial Number stay visible while you scroll.",
+            "The grid behaves like a simple spreadsheet. Row, Passport DPP ID, and Serial Number stay visible while you scroll.",
             "Use Add Blank Row when you want to stage a new row manually before previewing it.",
-            "Use Export CSV to create a safe base file. Filtered columns export still keeps `guid` and `product_id` so the file can be matched on import.",
-            "Keep `guid` whenever possible. If your incoming data does not have `guid`, make sure `product_id` is present and stable.",
+            "Use Export CSV to create a safe base file. Filtered columns export still keeps `dppId` and `product_id` so the file can be matched on import.",
+            "Keep `dppId` whenever possible. If your incoming data does not have `dppId`, make sure `product_id` is present and stable.",
           ],
         },
         {
@@ -583,12 +583,12 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
       table: ASSET_MANAGEMENT_TERMS_TABLE,
       tips: [
-        "If your ERP does not store guid, map a stable ERP field to `product_id` so the tool can find the right passport.",
+        "If your ERP does not store dppId, map a stable ERP field to `product_id` so the tool can find the right passport.",
         "Export a template first when non-technical users need to edit a spreadsheet safely.",
       ],
       warnings: [
         "Asset Management writes into the same backend passport records used by the main dashboard. Treat it as a production update tool.",
-        "Rows without guid and without product_id cannot be matched to an existing passport.",
+        "Rows without dppId and without product_id cannot be matched to an existing passport.",
       ],
     },
     {
@@ -630,8 +630,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Simple create or update pattern",
           items: [
             "For one new record, send `passport_type` plus the normal field keys to `POST /api/companies/:companyId/passports`.",
-            "For one existing editable record, send the same fields to `PATCH /api/companies/:companyId/passports/:guid` and include `passportType` or `passport_type` in the body.",
-            "For many existing editable records, use `PATCH /api/companies/:companyId/passports` and give each row a `guid` or `product_id` so the backend can match it safely.",
+            "For one existing editable record, send the same fields to `PATCH /api/companies/:companyId/passports/:dppId` and include `passportType` or `passport_type` in the body.",
+            "For many existing editable records, use `PATCH /api/companies/:companyId/passports` and give each row a `dppId` or `product_id` so the backend can match it safely.",
           ],
         },
         {
@@ -660,7 +660,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Read auth", value: "Bearer token with company access" },
         { label: "Best use case", value: "Internal tools, controlled exports, compare/history pages, and support diagnostics" },
         { label: "Export formats", value: "CSV and JSON-LD from the draft export endpoint" },
-        { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by guid or product_id in one request" },
+        { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by dppId or product_id in one request" },
       ],
       table: READ_EXPORT_API_TABLE,
       tips: [
@@ -677,8 +677,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       facts: [
         { label: "Read-only external partner path", value: "/api/v1/passports with X-API-Key" },
         { label: "Public passport path", value: "/api/passports/by-product/:productId without login" },
-        { label: "Restricted-field path", value: "POST /api/passports/:guid/unlock with an access key in the body" },
-        { label: "Live device path", value: "POST /api/passports/:guid/dynamic-values with x-device-key" },
+        { label: "Restricted-field path", value: "POST /api/passports/:dppId/unlock with an access key in the body" },
+        { label: "Live device path", value: "POST /api/passports/:dppId/dynamic-values with x-device-key" },
       ],
       journeys: [
         {
@@ -686,7 +686,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Use `/api/v1/passports` when an outside organization needs a company-approved read-only API with its own revocable key.",
             "Use `/api/passports/by-product/:productId` when you simply need the public passport view that a QR code or public link would show.",
-            "Use `/api/passports/:guid/unlock` only when the viewer should see restricted fields and has the correct passport access key.",
+            "Use `/api/passports/:dppId/unlock` only when the viewer should see restricted fields and has the correct passport access key.",
             "Use the dynamic-value endpoints when the problem is live measurements rather than normal passport authoring.",
           ],
         },

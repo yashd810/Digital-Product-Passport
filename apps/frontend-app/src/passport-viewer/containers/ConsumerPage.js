@@ -58,7 +58,7 @@ function inferIcon(section, index) {
 function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} }) {
   const pType = passport.passport_type || "battery";
   const theme = getConsumerTheme(pType, company?.branding_json);
-  const isPreviewView = !!passport?.preview_mode || (!!passport?.guid && !!passport?.previewId);
+  const isPreviewView = !!passport?.preview_mode || (!!passport?.dppId && !!passport?.previewId);
   const technicalPassportPath = isPreviewView
     ? buildPreviewTechnicalPassportPath({
         companyName: company?.company_name,
@@ -66,7 +66,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
         manufacturedBy: passport?.manufactured_by,
         modelName: passport?.model_name,
         productId: passport?.product_id,
-        previewId: passport?.guid,
+        previewId: passport?.dppId,
       })
     : buildTechnicalPassportPath({
         companyName: company?.company_name,
@@ -231,7 +231,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
 
         <div className="cp-footer">
           <div className="cp-footer-brand">🌍 Digital Product Passport System</div>
-          <div className="cp-footer-guid">Product ID: {passport.product_id || "—"}</div>
+          <div className="cp-footer-dppId">Product ID: {passport.product_id || "—"}</div>
           <ViewerDomainIndicator />
           {theme.companyWebsite && (
             <a className="cp-footer-company-link" href={theme.companyWebsite} target="_blank" rel="noopener noreferrer">
@@ -251,7 +251,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
 // ─────────────────────────────────────────────────────────────────────────────
 function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
   const [expanded, setExpanded] = useState(null);
-  const isPreviewView = !!passport?.preview_mode || (!!passport?.guid && !!passport?.previewId);
+  const isPreviewView = !!passport?.preview_mode || (!!passport?.dppId && !!passport?.previewId);
   const technicalPassportPath = isPreviewView
     ? buildPreviewTechnicalPassportPath({
         companyName: company?.company_name,
@@ -259,7 +259,7 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
         manufacturedBy: passport?.manufactured_by,
         modelName: passport?.model_name,
         productId: passport?.product_id,
-        previewId: passport?.guid,
+        previewId: passport?.dppId,
       })
     : buildTechnicalPassportPath({
         companyName: company?.company_name,
@@ -377,7 +377,7 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
 
         <div className="cp-footer">
           <div className="cp-footer-brand">🌍 Digital Product Passport System</div>
-          <div className="cp-footer-guid">Product ID: {passport.product_id || "—"}</div>
+          <div className="cp-footer-dppId">Product ID: {passport.product_id || "—"}</div>
           <ViewerDomainIndicator />
           {theme.companyWebsite && (
             <a className="cp-footer-company-link" href={theme.companyWebsite} target="_blank" rel="noopener noreferrer">
@@ -422,12 +422,12 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
       .then(r => r.ok ? r.json() : Promise.reject("not found"))
       .then(async data => {
         const resolvedPassport = previewMode && data
-          ? { ...data, preview_mode: true, previewId: previewId || data.guid }
+          ? { ...data, preview_mode: true, previewId: previewId || data.dppId }
           : data;
         setPassport(resolvedPassport);
-        if (resolvedPassport?.guid && !previewMode) {
+        if (resolvedPassport?.dppId && !previewMode) {
           const viewerUserId = getViewerUserId();
-          fetch(`${API}/api/passports/${resolvedPassport.guid}/scan`, {
+          fetch(`${API}/api/passports/${resolvedPassport.dppId}/scan`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -440,9 +440,9 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
         const [companyRes, typeRes, dynamicRes, canonicalRes] = await Promise.all([
           resolvedPassport.company_id   ? fetch(`${API}/api/companies/${resolvedPassport.company_id}/profile`)     : Promise.resolve(null),
           resolvedPassport.passport_type ? fetch(`${API}/api/passport-types/${resolvedPassport.passport_type}`)    : Promise.resolve(null),
-          resolvedPassport.inactive_public_version || !resolvedPassport.guid
+          resolvedPassport.inactive_public_version || !resolvedPassport.dppId
             ? Promise.resolve(null)
-            : fetch(`${API}/api/passports/${resolvedPassport.guid}/dynamic-values`),
+            : fetch(`${API}/api/passports/${resolvedPassport.dppId}/dynamic-values`),
           previewMode || !resolvedPassport.linked_data?.canonical_json_url
             ? Promise.resolve(null)
             : fetch(resolvedPassport.linked_data.canonical_json_url),
@@ -489,7 +489,7 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
         ],
         "@type": "WebPage",
         url: passport.linked_data.public_url,
-        identifier: passport.guid,
+        identifier: passport.dppId,
         name: passport.model_name || passport.product_id || "Digital Product Passport",
         subjectDid: passport.linked_data?.canonical_subjects?.subjectDid || passport.linked_data?.related_subjects?.productDid || null,
         dppDid: passport.linked_data?.canonical_subjects?.dppDid || passport.linked_data?.related_subjects?.dppDid || null,

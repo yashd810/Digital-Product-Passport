@@ -38,14 +38,14 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${(passport.model_name || passport.guid).replace(/\s+/g, "_")}_update.csv`;
+    link.download = `${(passport.model_name || passport.dppId).replace(/\s+/g, "_")}_update.csv`;
     link.click();
   };
 
   const doApply = async (data) => {
     setPhase("applying");
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.guid}`, {
+      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}`, {
         method: "PATCH",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ passportType, ...data }),

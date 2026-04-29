@@ -9,6 +9,7 @@ export function TypeIdentityCard({
   setUmbrellaIcon,
   semanticModelKey,
   setSemanticModelKey,
+  isBatteryUmbrellaCategory,
   semanticModelOptions,
   umbrellaOptions,
   typeName,
@@ -114,7 +115,7 @@ export function TypeIdentityCard({
         </div>
 
         <div className="acpt-field-group acpt-span2">
-          <label>Semantic Model</label>
+          <label>Semantic Model {isBatteryUmbrellaCategory ? "*" : ""}</label>
           <select
             value={semanticModelKey}
             onChange={e => {
@@ -122,16 +123,23 @@ export function TypeIdentityCard({
               setError("");
               setInvalidFields([]);
             }}
-            className="acpt-input"
+            className={`acpt-input${hasInvalid("semanticModelKey") ? " acpt-input-error" : ""}`}
+            disabled={isBatteryUmbrellaCategory}
           >
             {semanticModelOptions.map((option) => (
-              <option key={option.key || "none"} value={option.key}>
+              <option
+                key={option.key || "none"}
+                value={option.key}
+                disabled={isBatteryUmbrellaCategory && option.key !== semanticModelKey}
+              >
                 {option.label}
               </option>
             ))}
           </select>
           <span className="acpt-hint">
-            {(semanticModelOptions.find((option) => option.key === semanticModelKey) || semanticModelOptions[0])?.description}
+            {isBatteryUmbrellaCategory
+              ? "Battery passport types are locked to the Claros battery dictionary semantic model."
+              : (semanticModelOptions.find((option) => option.key === semanticModelKey) || semanticModelOptions[0])?.description}
           </span>
         </div>
       </div>

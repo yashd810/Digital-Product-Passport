@@ -8,11 +8,11 @@ const API = import.meta.env.VITE_API_URL || "";
 
 const SKIP = new Set([
   "id","company_id","created_at","updated_at","qr_code","deleted_at",
-  "guid","created_by","updated_by","release_status","version_number",
+  "dppId","created_by","updated_by","release_status","version_number",
 ]);
 
 function VersionDiff({ companyId }) {
-  const { guid }         = useParams();
+  const { dppId }         = useParams();
   const navigate         = useNavigate();
   const [searchParams]   = useSearchParams();
 
@@ -38,7 +38,7 @@ function VersionDiff({ companyId }) {
       .then(data => setTypeDef(data))
       .catch(() => setTypeDef(null));
 
-    fetch(`${API}/api/companies/${companyId}/passports/${guid}/diff?passportType=${pt}`, {
+    fetch(`${API}/api/companies/${companyId}/passports/${dppId}/diff?passportType=${pt}`, {
       headers: { ...authHeaders() },
     })
     .then(r => r.ok ? r.json() : Promise.reject("Failed to load"))
@@ -50,7 +50,7 @@ function VersionDiff({ companyId }) {
     })
     .catch(e => setError(String(e)))
     .finally(() => setLoading(false));
-  }, [guid, companyId, searchParams]);
+  }, [dppId, companyId, searchParams]);
 
   if (loading) return <div className="loading" style={{ padding:60 }}>Loading version history…</div>;
   if (error)   return <div style={{ padding:40 }}><div className="alert alert-error">{error}</div><button className="diff-back-btn" onClick={() => navigate(-1)} style={{ marginTop:16 }}>← Go back</button></div>;
@@ -85,7 +85,7 @@ function VersionDiff({ companyId }) {
         <button className="diff-back-btn" onClick={() => navigate(-1)}>← Back</button>
         <div>
           <h2 className="diff-title">🔀 Version Comparison</h2>
-          <p className="diff-subtitle">{vA?.model_name || guid} · {pType}</p>
+          <p className="diff-subtitle">{vA?.model_name || dppId} · {pType}</p>
         </div>
       </div>
 

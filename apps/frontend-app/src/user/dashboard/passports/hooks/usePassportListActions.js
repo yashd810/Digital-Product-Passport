@@ -28,8 +28,8 @@ export function usePassportListActions({
   user,
   navigate,
 }) {
-  const handleRevise = useCallback(async (guid, versionNumber, passportType) => {
-    const response = await fetch(`${API}/api/companies/${companyId}/passports/${guid}/revise`, {
+  const handleRevise = useCallback(async (dppId, versionNumber, passportType) => {
+    const response = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}/revise`, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ passportType }),
@@ -46,7 +46,7 @@ export function usePassportListActions({
   const handleClone = useCallback(async (passport, passportType) => {
     try {
       const response = await fetch(
-        `${API}/api/companies/${companyId}/passports/${passport.guid}?passportType=${passportType}`,
+        `${API}/api/companies/${companyId}/passports/${passport.dppId}?passportType=${passportType}`,
         { headers: authHeaders() }
       );
       if (!response.ok) throw new Error("Failed to fetch passport data");
@@ -57,10 +57,10 @@ export function usePassportListActions({
     }
   }, [companyId, navigate, showError]);
 
-  const handleDelete = useCallback(async (guid, passportType) => {
+  const handleDelete = useCallback(async (dppId, passportType) => {
     if (!window.confirm("Delete this passport?")) return;
 
-    const response = await fetch(`${API}/api/companies/${companyId}/passports/${guid}`, {
+    const response = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}`, {
       method: "DELETE",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ passportType }),
@@ -76,8 +76,8 @@ export function usePassportListActions({
     showError(data.error || "Delete failed");
   }, [companyId, fetchPassports, showError, showSuccess]);
 
-  const handleArchive = useCallback((guid, passportType) => {
-    setArchiveConfirm({ mode: "single", guid, pType: passportType });
+  const handleArchive = useCallback((dppId, passportType) => {
+    setArchiveConfirm({ mode: "single", dppId, pType: passportType });
   }, [setArchiveConfirm]);
 
   const downloadQrCodes = useCallback(async ({ widthMm, heightMm, format }) => {
@@ -148,13 +148,13 @@ export function usePassportListActions({
 
         context.font = `600 ${guidFontSize}px monospace`;
         context.fillStyle = isBlackAndWhite ? "#000000" : (format === "jpeg" ? "#35586a" : "#b8ccd9");
-        context.fillText(passport.product_id || passport.guid, widthPx / 2, heightPx - bottomPadding);
+        context.fillText(passport.product_id || passport.dppId, widthPx / 2, heightPx - bottomPadding);
 
         const dataUrl = canvas.toDataURL(mimeType, format === "jpeg" ? 0.95 : undefined);
         const link = document.createElement("a");
         const safeType = (passport.passport_type || activeType || "passport").replace(/[^a-z0-9-_]+/gi, "_").toLowerCase();
         link.href = dataUrl;
-        link.download = `${safeType}_${passport.product_id || passport.guid}.${format}`;
+        link.download = `${safeType}_${passport.product_id || passport.dppId}.${format}`;
         link.click();
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
@@ -180,7 +180,7 @@ export function usePassportListActions({
 
     setBulkActionLoading(true);
     try {
-      const items = editable.map((passport) => ({ guid: passport.guid, passportType: passport.passport_type || activeType }));
+      const items = editable.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || activeType }));
       const response = await fetch(`${API}/api/companies/${companyId}/passports/bulk-release`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
@@ -215,7 +215,7 @@ export function usePassportListActions({
     try {
       for (const passport of editable) {
         const passportType = passport.passport_type || activeType;
-        const response = await fetch(`${API}/api/companies/${companyId}/passports/${passport.guid}`, {
+        const response = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}`, {
           method: "DELETE",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ passportType }),
@@ -241,38 +241,66 @@ export function usePassportListActions({
 
     setBulkActionLoading(true);
     try {
-      const exported = [];
-      for (const passport of selectedPassportList) {
+      const grouped = selectedPassportList.reduce((acc, passport) => {
         const passportType = passport.passport_type || activeType;
-        const response = await fetch(`${API}/api/companies/${companyId}/passports/${passport.guid}?passportType=${passportType}`, {
-          headers: authHeaders(),
-        });
-        if (response.ok) {
+        if (!acc[passportType]) acc[passportType] = [];
+        acc[passportType].push(passport);
+        return acc;
+      }, {});
+
+      let exportedCount = 0;
+      const fileCount = Object.keys(grouped).length;
+      for (const [passportType, passportsForType] of Object.entries(grouped)) {
+        const typeResponse = await fetch(`${API}/api/passport-types/${passportType}`);
+        if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
+        const typeData = await typeResponse.json();
+        const semanticModelKey = typeData.semantic_model_key || "";
+        const umbrellaCategory = typeData.umbrella_category || "";
+
+        const exported = [];
+        for (const passport of passportsForType) {
+          const query = new URLSearchParams({
+            passportType,
+            representation: "full",
+          });
+          if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
+            query.set("versionNumber", String(passport.version_number));
+          }
+          const response = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}?${query.toString()}`, {
+            headers: authHeaders(),
+          });
+          if (!response.ok) continue;
           const data = await response.json();
           exported.push(data);
         }
+
+        if (!exported.length) {
+          continue;
+        }
+
+        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, umbrellaCategory });
+        const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        const filenamePrefix = fileCount > 1 ? `${passportType}-` : "";
+        link.download = `${filenamePrefix}passports-export-${new Date().toISOString().slice(0, 10)}.jsonld`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        exportedCount += exported.length;
       }
 
-      if (!exported.length) {
+      if (!exportedCount) {
         showError("Could not fetch any passport data.");
         return;
       }
 
-      const semanticModelKey = allPassportTypes.find((type) => type.type_name === activeType)?.semantic_model_key || "";
-      const exportPayload = buildPassportJsonLdExport(exported, activeType, { semanticModelKey });
-      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `passports-export-${new Date().toISOString().slice(0, 10)}.jsonld`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-      showSuccess(`Exported ${exported.length} passport${exported.length !== 1 ? "s" : ""} as JSON-LD`);
+      showSuccess(`Exported ${exportedCount} passport${exportedCount !== 1 ? "s" : ""} as JSON-LD`);
     } catch (error) {
       showError(error.message);
     } finally {
       setBulkActionLoading(false);
     }
-  }, [activeType, allPassportTypes, companyId, selectedPassportList, setBulkActionLoading, showError, showSuccess]);
+  }, [activeType, companyId, selectedPassportList, setBulkActionLoading, showError, showSuccess]);
 
   const bulkArchive = useCallback(() => {
     if (!selectedPassportList.length) return;
@@ -285,7 +313,7 @@ export function usePassportListActions({
     if (archiveConfirm.mode === "single") {
       try {
         setBulkActionLoading(true);
-        const response = await fetch(`${API}/api/companies/${companyId}/passports/${archiveConfirm.guid}/archive`, {
+        const response = await fetch(`${API}/api/companies/${companyId}/passports/${archiveConfirm.dppId}/archive`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ passportType: archiveConfirm.pType }),
@@ -305,7 +333,7 @@ export function usePassportListActions({
 
     try {
       setBulkActionLoading(true);
-      const items = selectedPassportList.map((passport) => ({ guid: passport.guid, passportType: passport.passport_type || activeType }));
+      const items = selectedPassportList.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || activeType }));
       const response = await fetch(`${API}/api/companies/${companyId}/passports/bulk-archive`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),

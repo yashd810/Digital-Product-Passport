@@ -42,10 +42,10 @@ module.exports = function registerNotificationRoutes(app, {
            us.email                                  AS submitter_email
          FROM notifications n
          LEFT JOIN passport_workflow pw
-           ON pw.passport_guid = n.passport_guid
+           ON pw.passport_dpp_id = n.passport_dpp_id
            AND pw.created_at = (
              SELECT MAX(pw2.created_at) FROM passport_workflow pw2
-             WHERE pw2.passport_guid = n.passport_guid
+             WHERE pw2.passport_dpp_id = n.passport_dpp_id
            )
          LEFT JOIN users ur ON ur.id = pw.reviewer_id
          LEFT JOIN users ua ON ua.id = pw.approver_id

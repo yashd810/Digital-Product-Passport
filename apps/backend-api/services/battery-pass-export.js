@@ -2,6 +2,13 @@
 
 const fs = require("fs");
 const path = require("path");
+const {
+  BATTERY_DICTIONARY_MODEL_KEY,
+  LEGACY_BATTERY_PASSPORT_TYPE,
+  normalizeSemanticModelKey,
+  isBatteryUmbrellaCategory,
+  shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
+} = require("./battery-dictionary-targeting");
 
 const batteryDictionaryManifest = require("../resources/semantics/battery/v1/manifest.json");
 const batteryDictionaryTerms = require("../resources/semantics/battery/v1/terms.json");
@@ -9,8 +16,8 @@ const clarosBatteryContext = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../resources/semantics/battery/v1/context.jsonld"), "utf8")
 );
 
-const BATTERY_PASS_PASSPORT_TYPE = "din_spec_99100";
-const BATTERY_PASS_MODEL_KEY = "claros_battery_dictionary_v1";
+const BATTERY_PASS_PASSPORT_TYPE = LEGACY_BATTERY_PASSPORT_TYPE;
+const BATTERY_PASS_MODEL_KEY = BATTERY_DICTIONARY_MODEL_KEY;
 const BATTERY_CONTEXT_URL = batteryDictionaryManifest.contextUrl || "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld";
 const CLAROS_CONTEXT_ENTRIES = clarosBatteryContext?.["@context"] || {};
 
@@ -23,6 +30,7 @@ const DPP_CONTEXT = {
   granularity: "dpp:granularity",
   dppSchemaVersion: "dpp:dppSchemaVersion",
   dppStatus: "dpp:dppStatus",
+  lastUpdated: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
   lastUpdate: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
   economicOperatorId: "dpp:economicOperatorId",
   facilityId: "dpp:facilityId",
@@ -30,7 +38,7 @@ const DPP_CONTEXT = {
   subjectDid: "dpp:subjectDid",
   dppDid: "dpp:dppDid",
   companyDid: "dpp:companyDid",
-  guid: "dpp:guid",
+  dppId: "dpp:dppId",
   passport_type: "dpp:passportType",
   passportType: "dpp:passportType",
   semantic_model: "dpp:semanticModel",
@@ -80,10 +88,6 @@ function getSemanticIdForFieldKey(fieldKey) {
   return SEMANTIC_ID_BY_INTERNAL_KEY[fieldKey] || null;
 }
 
-function normalizeSemanticModelKey(modelKey) {
-  return String(modelKey || "").trim().toLowerCase();
-}
-
 function resolveRequestedBatteryModelKey(options = {}, typeDef = null) {
   const explicitModelKey = normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semantic_model_key);
   return explicitModelKey || BATTERY_PASS_MODEL_KEY;
@@ -98,9 +102,10 @@ function isBatteryPassExportType(passportType) {
 }
 
 function shouldUseBatteryDictionary(passportType, options = {}, typeDef = null) {
-  if (!isBatteryPassExportType(passportType)) return false;
-  const modelKey = resolveRequestedBatteryModelKey(options, typeDef);
-  return isSupportedBatterySemanticModel(modelKey);
+  if (!shouldTargetBatteryDictionary({ passportType, typeDef, options })) return false;
+  if (isBatteryUmbrellaCategory(options.umbrellaCategory || typeDef?.umbrella_category)) return true;
+  const explicitModelKey = normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semantic_model_key);
+  return !explicitModelKey || isSupportedBatterySemanticModel(resolveRequestedBatteryModelKey(options, typeDef));
 }
 
 function resolveDictionaryTermIri(fieldKey, semanticId = null, options = {}, typeDef = null) {
@@ -202,7 +207,7 @@ function buildPassportJsonLdExport(passports, passportType) {
     "@graph": graph,
     ...(shouldUseBatteryDictionary(resolvedType, options)
       ? {
-          passport_type: BATTERY_PASS_PASSPORT_TYPE,
+          passport_type: resolvedType || graph[0]?.passport_type || null,
           semantic_model: {
             semanticModelKey: BATTERY_PASS_MODEL_KEY,
             contextUrl: batteryDictionaryManifest.contextUrl,
