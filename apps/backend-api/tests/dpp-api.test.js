@@ -172,6 +172,15 @@ function createTestApp(options = {}) {
     updated_at: "2026-04-27T10:00:00.000Z",
     granularity: "item",
     manufacturer: "Acme Energy",
+    battery_profile: {
+      chemistry: {
+        code: "LFP",
+        display: "Lithium Iron Phosphate",
+      },
+      modules: [
+        { massKg: 10, supplier: { name: "ModuleCo" } },
+      ],
+    },
   };
   let editablePassport = options.includeEditable === false
     ? null
@@ -211,6 +220,7 @@ function createTestApp(options = {}) {
                 fields: [
                   { key: "manufacturer", type: "text", semanticId: "urn:test:manufacturer", access: ["notified_bodies"], confidentiality: "regulated", updateAuthority: ["economic_operator"] },
                   { key: "public_summary", type: "text", semanticId: "urn:test:public-summary", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+                  { key: "battery_profile", type: "textarea", semanticId: "urn:test:battery-profile", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
                 ],
               }],
             },
@@ -228,6 +238,7 @@ function createTestApp(options = {}) {
                 fields: [
                   { key: "manufacturer", type: "text", semanticId: "urn:test:manufacturer", access: ["notified_bodies"], confidentiality: "regulated", updateAuthority: ["economic_operator"] },
                   { key: "public_summary", type: "text", semanticId: "urn:test:public-summary", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+                  { key: "battery_profile", type: "textarea", semanticId: "urn:test:battery-profile", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
                 ],
               }],
             },
@@ -378,6 +389,15 @@ function createTestApp(options = {}) {
       fields: {
         manufacturer: passport.manufacturer || "Acme Energy",
         public_summary: passport.public_summary || "Public battery summary",
+        battery_profile: passport.battery_profile || {
+          chemistry: {
+            code: "LFP",
+            display: "Lithium Iron Phosphate",
+          },
+          modules: [
+            { massKg: 10, supplier: { name: "ModuleCo" } },
+          ],
+        },
       },
     }),
     buildExpandedPassportPayload: (passport) => ({
@@ -410,6 +430,22 @@ function createTestApp(options = {}) {
           dictionaryReference: "urn:test:public-summary",
           valueDataType: "String",
           value: passport.public_summary || "Public battery summary",
+          elements: [],
+        },
+        {
+          elementId: "battery_profile",
+          objectType: "DataElementCollection",
+          dictionaryReference: "urn:test:battery-profile",
+          valueDataType: "Object",
+          value: passport.battery_profile || {
+            chemistry: {
+              code: "LFP",
+              display: "Lithium Iron Phosphate",
+            },
+            modules: [
+              { massKg: 10, supplier: { name: "ModuleCo" } },
+            ],
+          },
           elements: [],
         },
       ],
@@ -501,7 +537,7 @@ function createTestApp(options = {}) {
     toStoredPassportValue: (value) => value,
     getPassportTypeSchema: async () => ({
       typeName: "battery",
-      allowedKeys: new Set(["manufacturer", "public_summary"]),
+      allowedKeys: new Set(["manufacturer", "public_summary", "battery_profile"]),
     }),
     findExistingPassportByProductId: async () => null,
     complianceService: {
@@ -514,6 +550,7 @@ function createTestApp(options = {}) {
             fields: [
               { key: "manufacturer", type: "text", semanticId: "urn:test:manufacturer", access: ["notified_bodies"], confidentiality: "regulated", updateAuthority: ["economic_operator"] },
               { key: "public_summary", type: "text", semanticId: "urn:test:public-summary", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
+              { key: "battery_profile", type: "textarea", semanticId: "urn:test:battery-profile", access: ["public"], confidentiality: "public", updateAuthority: ["economic_operator"] },
             ],
           }],
         },
@@ -901,6 +938,32 @@ describe("DPP standards API", () => {
     });
   });
 
+  test("PATCH /api/v1/dpps/:dppId/elements/:elementIdPath updates a nested structured element path", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        elementIdPath: "battery_profile.modules[0].massKg",
+      },
+      body: {
+        value: 11.5,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      elementIdPath: "battery_profile.modules[0].massKg",
+      elementId: "massKg",
+      objectType: "SingleValuedDataElement",
+      valueDataType: "String",
+      value: 11.5,
+      elements: [],
+    });
+  });
+
   test("PATCH /api/v1/dpps/:dppId/elements/:elementIdPath rejects mismatched DataElement metadata", async () => {
     const app = createTestApp();
 
@@ -1158,6 +1221,29 @@ describe("DPP standards API", () => {
       dictionaryReference: "urn:test:public-summary",
       valueDataType: "String",
       value: "Public battery summary",
+      elements: [],
+    });
+  });
+
+  test("GET /api/v1/dpps/:dppId/elements/:elementIdPath reads a nested structured element path", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dpps/:dppId/elements/:elementIdPath",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        elementIdPath: "$.fields.battery_profile.chemistry.code",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      elementIdPath: "battery_profile.chemistry.code",
+      elementId: "code",
+      objectType: "SingleValuedDataElement",
+      valueDataType: "String",
+      value: "LFP",
       elements: [],
     });
   });

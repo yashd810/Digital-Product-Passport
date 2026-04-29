@@ -243,6 +243,11 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       <div className="guide-container">
         <h1>📊 Import / Update Passports — {passportType}</h1>
 
+        <div className="upsert-info-box">
+          <strong>Governance note:</strong> `access`, `confidentiality`, and `updateAuthority` belong to the passport type schema,
+          not to individual passport rows. Set those in the admin passport-type builder. CSV and JSON imports here are only for field values.
+        </div>
+
         {/* Tab switcher */}
         <div className="upsert-tabs">
           <NavLink to={`/csv-import/${passportType}/create`}

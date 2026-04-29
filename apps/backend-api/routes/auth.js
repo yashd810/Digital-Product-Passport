@@ -30,7 +30,61 @@ module.exports = function registerAuthRoutes(app, {
   authenticateToken,
   checkCompanyAccess,
   oauthService,
+  backupProviderService,
 }) {
+  function buildAuthIdentityPayload(row = {}) {
+    const operatorIdentifier = row.economic_operator_identifier || row.economicOperatorIdentifier || row.economicOperatorId || null;
+    const operatorIdentifierScheme = row.economic_operator_identifier_scheme || row.economicOperatorIdentifierScheme || row.operatorIdentifierScheme || null;
+    return {
+      actorIdentifier: operatorIdentifier,
+      actorIdentifierScheme: operatorIdentifierScheme,
+      operatorIdentifier,
+      operatorIdentifierScheme,
+      economicOperatorId: operatorIdentifier,
+      economicOperatorIdentifier: operatorIdentifier,
+      economicOperatorIdentifierScheme: operatorIdentifierScheme,
+    };
+  }
+
+  function buildAuthUserResponse(row = {}) {
+    return {
+      id: row.id,
+      email: row.email,
+      companyId: row.company_id,
+      role: row.role,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      company_name: row.company_name || null,
+      ...buildAuthIdentityPayload(row),
+    };
+  }
+
+  async function replicateAccessControlEventToBackup({
+    companyId,
+    eventType,
+    severity = "normal",
+    actorUserId = null,
+    actorIdentifier = null,
+    affectedUserId = null,
+    revocationMode = "standard",
+    reason = null,
+    metadata = {},
+  }) {
+    if (!backupProviderService || !companyId || !backupProviderService.replicateAccessControlEvent) {
+      return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
+    }
+    return backupProviderService.replicateAccessControlEvent({
+      companyId,
+      eventType,
+      severity,
+      actorUserId,
+      actorIdentifier,
+      affectedUserId,
+      revocationMode,
+      reason,
+      metadata,
+    });
+  }
 
   // ─── REGISTER ──────────────────────────────────────────────────────────────
   app.post("/api/auth/register", authRateLimit, async (req, res) => {
@@ -42,7 +96,7 @@ module.exports = function registerAuthRoutes(app, {
       if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
 
       const tokenRow = await pool.query(
-        `SELECT it.*, c.company_name FROM invite_tokens it
+        `SELECT it.*, c.company_name, c.economic_operator_identifier, c.economic_operator_identifier_scheme
          LEFT JOIN companies c ON c.id = it.company_id
          WHERE it.token = $1 AND it.used = false AND it.expires_at > NOW()`,
         [token]
@@ -71,8 +125,12 @@ module.exports = function registerAuthRoutes(app, {
       setAuthCookie(res, sessionToken);
       res.status(201).json({
         success: true,
-        user: { id: u.id, email: u.email, companyId: u.company_id, role: u.role,
-                first_name: u.first_name, last_name: u.last_name, company_name: invite.company_name || null },
+        user: buildAuthUserResponse({
+          ...u,
+          company_name: invite.company_name || null,
+          economic_operator_identifier: invite.economic_operator_identifier || null,
+          economic_operator_identifier_scheme: invite.economic_operator_identifier_scheme || null,
+        }),
       });
     } catch (e) { logger.error("Register error:", e.message); res.status(500).json({ error: "Registration failed" }); }
   });
@@ -118,7 +176,7 @@ module.exports = function registerAuthRoutes(app, {
       }
 
       const result = await pool.query(
-        `SELECT u.*, c.company_name FROM users u
+        `SELECT u.*, c.company_name, c.economic_operator_identifier, c.economic_operator_identifier_scheme FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.email = $1 AND u.is_active = true`,
         [email]
@@ -181,8 +239,7 @@ module.exports = function registerAuthRoutes(app, {
       res.json({
         success: true,
         token: sessionToken,
-        user: { id: u.id, email: u.email, companyId: u.company_id, role: u.role,
-                first_name: u.first_name, last_name: u.last_name, company_name: u.company_name },
+        user: buildAuthUserResponse(u),
       });
     } catch (e) { logger.error("Login error:", e.message); res.status(500).json({ error: "Login failed" }); }
   });
@@ -199,7 +256,7 @@ module.exports = function registerAuthRoutes(app, {
       if (!payload.pre_auth) return res.status(401).json({ error: "Invalid session token" });
 
       const result = await pool.query(
-        `SELECT u.*, c.company_name FROM users u
+        `SELECT u.*, c.company_name, c.economic_operator_identifier, c.economic_operator_identifier_scheme FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.id = $1 AND u.is_active = true`,
         [payload.userId]
@@ -228,8 +285,7 @@ module.exports = function registerAuthRoutes(app, {
       res.json({
         success: true,
         token: sessionToken,
-        user: { id: u.id, email: u.email, companyId: u.company_id, role: u.role,
-                first_name: u.first_name, last_name: u.last_name, company_name: u.company_name },
+        user: buildAuthUserResponse(u),
       });
     } catch (e) { logger.error("OTP verify error:", e.message); res.status(500).json({ error: "Verification failed" }); }
   });
@@ -453,14 +509,18 @@ module.exports = function registerAuthRoutes(app, {
         `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.company_id, u.avatar_url, u.phone, u.job_title, u.bio,
                 u.auth_source, u.sso_only,
                 u.preferred_language, u.default_reviewer_id, u.default_approver_id, u.created_at, u.last_login_at,
-                u.two_factor_enabled, c.company_name, c.asset_management_enabled
+                u.two_factor_enabled, c.company_name, c.asset_management_enabled,
+                c.economic_operator_identifier, c.economic_operator_identifier_scheme
          FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.id = $1`,
         [req.user.userId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Not found" });
-      res.json(r.rows[0]);
+      res.json({
+        ...r.rows[0],
+        ...buildAuthIdentityPayload(r.rows[0]),
+      });
     } catch { res.status(500).json({ error: "Failed" }); }
   });
 
@@ -556,8 +616,31 @@ module.exports = function registerAuthRoutes(app, {
       const { role } = req.body;
       if (!["company_admin","editor","viewer"].includes(role))
         return res.status(400).json({ error: "Invalid role" });
-      await pool.query("UPDATE users SET role = $1, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $2 AND company_id = $3",
+      const updated = await pool.query("UPDATE users SET role = $1, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $2 AND company_id = $3 RETURNING id, role, session_version, is_active",
         [role, req.params.userId, req.params.companyId]);
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "CHANGE_USER_ROLE",
+        "users",
+        String(req.params.userId),
+        null,
+        { role, session_version: updated.rows[0]?.session_version || null },
+        {
+          actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
+          audience: "company_admin",
+        }
+      );
+      await replicateAccessControlEventToBackup({
+        companyId: req.params.companyId,
+        eventType: "USER_ROLE_CHANGED",
+        severity: "high",
+        actorUserId: req.user.userId,
+        actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
+        affectedUserId: req.params.userId,
+        revocationMode: "role_change",
+        metadata: { role },
+      }).catch(() => {});
       res.json({ success: true });
     } catch { res.status(500).json({ error: "Failed" }); }
   });
@@ -566,9 +649,103 @@ module.exports = function registerAuthRoutes(app, {
     try {
       if (req.user.role !== "company_admin" && req.user.role !== "super_admin")
         return res.status(403).json({ error: "Admin only" });
-      await pool.query("UPDATE users SET is_active = false, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $1 AND company_id = $2",
+      const deactivated = await pool.query("UPDATE users SET is_active = false, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $1 AND company_id = $2 RETURNING id, role, session_version, is_active",
         [req.params.userId, req.params.companyId]);
+      await pool.query(
+        `UPDATE user_access_audiences
+         SET is_active = false,
+             updated_at = NOW()
+         WHERE user_id = $1
+           AND (company_id = $2 OR company_id IS NULL)`,
+        [req.params.userId, req.params.companyId]
+      ).catch(() => {});
+      await pool.query(
+        `UPDATE passport_access_grants
+         SET is_active = false,
+             updated_at = NOW()
+         WHERE grantee_user_id = $1
+           AND company_id = $2`,
+        [req.params.userId, req.params.companyId]
+      ).catch(() => {});
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "DEACTIVATE_USER_ACCESS",
+        "users",
+        String(req.params.userId),
+        null,
+        { is_active: false, session_version: deactivated.rows[0]?.session_version || null },
+        {
+          actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
+          audience: "company_admin",
+        }
+      );
+      await replicateAccessControlEventToBackup({
+        companyId: req.params.companyId,
+        eventType: "USER_DEACTIVATED",
+        severity: "critical",
+        actorUserId: req.user.userId,
+        actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
+        affectedUserId: req.params.userId,
+        revocationMode: "emergency",
+        metadata: {
+          sessionVersion: deactivated.rows[0]?.session_version || null,
+          revokedDelegatedAudiences: true,
+          revokedPassportGrants: true,
+        },
+      }).catch(() => {});
       res.json({ success: true });
     } catch { res.status(500).json({ error: "Failed" }); }
+  });
+
+  app.post("/api/companies/:companyId/users/:userId/revoke-sessions", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      if (req.user.role !== "company_admin" && req.user.role !== "super_admin")
+        return res.status(403).json({ error: "Admin only" });
+      const reason = req.body?.reason || "User sessions revoked";
+      const updated = await pool.query(
+        `UPDATE users
+         SET session_version = COALESCE(session_version, 1) + 1,
+             updated_at = NOW()
+         WHERE id = $1 AND company_id = $2
+         RETURNING id, role, session_version, is_active`,
+        [req.params.userId, req.params.companyId]
+      );
+      if (!updated.rows.length) return res.status(404).json({ error: "User not found" });
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "REVOKE_USER_SESSIONS",
+        "users",
+        String(req.params.userId),
+        null,
+        { session_version: updated.rows[0].session_version, reason },
+        {
+          actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
+          audience: "company_admin",
+        }
+      );
+      await replicateAccessControlEventToBackup({
+        companyId: req.params.companyId,
+        eventType: "USER_SESSIONS_REVOKED",
+        severity: "critical",
+        actorUserId: req.user.userId,
+        actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
+        affectedUserId: req.params.userId,
+        revocationMode: "emergency",
+        reason,
+        metadata: { sessionVersion: updated.rows[0].session_version },
+      }).catch(() => {});
+
+      res.json({
+        success: true,
+        revoked: true,
+        emergency: true,
+        sessionVersion: updated.rows[0].session_version,
+      });
+    } catch {
+      res.status(500).json({ error: "Failed to revoke user sessions" });
+    }
   });
 };

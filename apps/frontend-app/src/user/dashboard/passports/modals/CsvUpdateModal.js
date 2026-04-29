@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders } from "../../../../shared/api/authHeaders";
 import { parseCsvText } from "../utils/passportListHelpers";
@@ -12,6 +12,8 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
   const [conflicts, setConflicts] = useState([]);
   const [err, setErr] = useState("");
   const fileRef = useRef(null);
+  const dialogTitleId = useId();
+  const dialogDescriptionId = useId();
 
   useEffect(() => {
     fetch(`${API}/api/passport-types/${passportType}`)
@@ -23,6 +25,16 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
       })
       .catch(() => { setErr("Failed to load passport type definition"); setPhase("upload"); });
   }, [passportType]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && phase !== "applying") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, phase]);
 
   const getLabel = (key) => allFields.find((field) => field.key === key)?.label || key;
 
@@ -134,9 +146,47 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
 
   return createPortal(
     <div className="dashboard-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="dashboard-modal-card dashboard-modal-card-compact">
+      <div
+        className="dashboard-modal-card dashboard-modal-card-compact"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        aria-describedby={dialogDescriptionId}
+      >
+        <h2
+          id={dialogTitleId}
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          Update passport data from CSV
+        </h2>
+        <p
+          id={dialogDescriptionId}
+          style={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+            border: 0,
+          }}
+        >
+          Upload a CSV file, compare conflicting values, and apply the update to this passport.
+        </p>
         {phase === "loading" && (
-          <p className="dashboard-modal-status">Loading…</p>
+          <p className="dashboard-modal-status" role="status" aria-live="polite">Loading…</p>
         )}
 
         {(phase === "upload" || (phase === "loading" && err)) && phase !== "loading" && (
@@ -144,14 +194,19 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
             <h3 className="dashboard-modal-title">Update data via CSV</h3>
             <p className="dashboard-modal-subtitle">Passport: <strong>{passport.model_name}</strong></p>
 
-            {err && <div className="dashboard-inline-error">{err}</div>}
+            {err && <div className="dashboard-inline-error" role="alert">{err}</div>}
 
             <div className="dashboard-info-panel">
               <strong className="dashboard-info-title">How it works:</strong> Only fields you include in the CSV (with a value)
               will be updated. Fields not in the CSV remain unchanged. You can start from the current data below.
             </div>
 
-            <button className="dashboard-btn dashboard-btn-secondary dashboard-btn-block-spaced" onClick={downloadCurrent}>
+            <div className="dashboard-info-panel">
+              <strong className="dashboard-info-title">Governance:</strong> `access`, `confidentiality`, and `updateAuthority`
+              are passport-type controls managed by admins. They are not valid passport-row CSV columns in this update flow.
+            </div>
+
+            <button type="button" className="dashboard-btn dashboard-btn-secondary dashboard-btn-block-spaced" onClick={downloadCurrent}>
               📥 Download current data as CSV
             </button>
 
@@ -164,7 +219,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
             </div>
 
             <div className="dashboard-modal-actions dashboard-modal-actions-end">
-              <button className="dashboard-btn dashboard-btn-ghost" onClick={onClose}>Cancel</button>
+              <button type="button" className="dashboard-btn dashboard-btn-ghost" onClick={onClose}>Cancel</button>
             </div>
           </>
         )}
@@ -194,7 +249,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
               })}
             </div>
 
-            {err && <div className="dashboard-inline-error">{err}</div>}
+            {err && <div className="dashboard-inline-error" role="alert">{err}</div>}
 
             <div className="dashboard-note-panel">
               <strong>Overwrite all</strong> — replaces the existing values shown above with the new CSV data.<br />
@@ -202,15 +257,15 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
             </div>
 
             <div className="dashboard-modal-actions">
-              <button className="dashboard-btn dashboard-btn-danger" onClick={() => doApply(parsed)}>Overwrite all</button>
-              <button className="dashboard-btn dashboard-btn-secondary" onClick={handleSkipExisting}>Skip existing</button>
-              <button className="dashboard-btn dashboard-btn-ghost" onClick={onClose}>Cancel</button>
+              <button type="button" className="dashboard-btn dashboard-btn-danger" onClick={() => doApply(parsed)}>Overwrite all</button>
+              <button type="button" className="dashboard-btn dashboard-btn-secondary" onClick={handleSkipExisting}>Skip existing</button>
+              <button type="button" className="dashboard-btn dashboard-btn-ghost" onClick={onClose}>Cancel</button>
             </div>
           </>
         )}
 
         {phase === "applying" && (
-          <p className="dashboard-modal-status">Updating passport data…</p>
+          <p className="dashboard-modal-status" role="status" aria-live="polite">Updating passport data…</p>
         )}
       </div>
     </div>,

@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { PASSPORT_SECTIONS_MAP } from "../config/PassportFields";
 import { authHeaders } from "../../shared/api/authHeaders";
+import {
+  ACCESS_LEVEL_LABELS,
+  CONFIDENTIALITY_LEVEL_LABELS,
+  UPDATE_AUTHORITY_LABELS,
+} from "../../admin/passport-types/builderHelpers";
 import RepositoryPicker from "./components/RepositoryPicker";
 import "../../assets/styles/CreatePass.css";
 
@@ -9,6 +14,12 @@ const API = import.meta.env.VITE_API_URL || "";
 const EDIT_SESSION_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const EDIT_HEARTBEAT_MS = 60 * 1000;
 const AUTOSAVE_DEBOUNCE_MS = 2000;
+
+function describeGovernanceList(values = [], labelMap = {}) {
+  return (Array.isArray(values) ? values : [])
+    .map((value) => labelMap[value] || value)
+    .join(", ");
+}
 
 function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
@@ -679,20 +690,31 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
               </span>
             </div>
           )}
-          {error   && <div className="alert alert-error">{error}</div>}
-          {success && <div className="alert alert-success">{success}</div>}
+          <div className="pf-governance-panel">
+            Field confidentiality, access audiences, and update authority are set on the passport type by admins.
+            This form shows those governance rules for each field, but editors cannot change them per passport record.
+          </div>
+          {error && <div className="alert alert-error" role="alert">{error}</div>}
+          {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}
 
           <form onSubmit={handleSubmit} className="createpass-form">
             {sectionKeys.map(sk => {
               const section = SECTIONS[sk];
+              const sectionContentId = `passport-section-${sk}`;
               return (
                 <div key={sk} className="form-section">
-                  <div className="section-header" onClick={() => toggle(sk)}>
+                  <button
+                    type="button"
+                    className="section-header"
+                    onClick={() => toggle(sk)}
+                    aria-expanded={!!expanded[sk]}
+                    aria-controls={sectionContentId}
+                  >
                     <span className="section-title">{section.label}</span>
                     <span className={`toggle-icon${expanded[sk]?" expanded":""}`}>▼</span>
-                  </div>
+                  </button>
                   {expanded[sk] && (
-                    <div className="section-content">
+                    <div id={sectionContentId} className="section-content">
                       {sk==="compliance" && (
                         <p className="section-hint">
                           Upload official PDF documents. Stored securely and shown in the passport viewer.
@@ -710,6 +732,17 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                                   {isLocked && <span className="pf-model-badge">📌 Model data</span>}
                                 </label>
                               )}
+                              <div className="pf-governance-row">
+                                <span className={`pf-governance-badge pf-governance-badge-${f.confidentiality || "public"}`}>
+                                  {CONFIDENTIALITY_LEVEL_LABELS[f.confidentiality] || f.confidentiality || "Public"}
+                                </span>
+                                <span className="pf-governance-copy">
+                                  Access: {describeGovernanceList(f.access || ["public"], ACCESS_LEVEL_LABELS) || "Public"}
+                                </span>
+                                <span className="pf-governance-copy">
+                                  Update: {describeGovernanceList(f.updateAuthority || f.update_authority || ["economic_operator"], UPDATE_AUTHORITY_LABELS) || "Economic Operators"}
+                                </span>
+                              </div>
                               {renderField(f)}
                             </div>
                           );
@@ -751,10 +784,10 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       {/* ── Symbol Picker ── */}
       {symbolPicker && (
         <div className="rp-overlay" onClick={e => e.target === e.currentTarget && setSymbolPicker(null)}>
-          <div className="rp-modal">
+          <div className="rp-modal" role="dialog" aria-modal="true" aria-labelledby="symbol-picker-title">
             <div className="rp-modal-header">
-              <h3>🔣 Pick a Symbol</h3>
-              <button className="rp-close-btn" onClick={() => setSymbolPicker(null)}>✕</button>
+              <h3 id="symbol-picker-title">🔣 Pick a Symbol</h3>
+              <button type="button" className="rp-close-btn" onClick={() => setSymbolPicker(null)} aria-label="Close symbol picker">✕</button>
             </div>
             <div className="pf-symbol-grid">
               {symbols.length === 0 ? (
@@ -773,7 +806,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
               ))}
             </div>
             <div className="rp-footer">
-              <button className="rp-cancel-btn" onClick={() => setSymbolPicker(null)}>Cancel</button>
+              <button type="button" className="rp-cancel-btn" onClick={() => setSymbolPicker(null)}>Cancel</button>
             </div>
           </div>
         </div>

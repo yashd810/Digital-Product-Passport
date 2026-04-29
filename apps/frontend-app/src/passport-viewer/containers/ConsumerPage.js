@@ -352,12 +352,18 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
 
         {sections.map((sec, i) => (
           <div key={i} className="cp-section">
-            <button className="cp-section-header" onClick={() => setExpanded(expanded === i ? null : i)}>
+            <button
+              type="button"
+              className="cp-section-header"
+              onClick={() => setExpanded(expanded === i ? null : i)}
+              aria-expanded={expanded === i}
+              aria-controls={`consumer-section-${i}`}
+            >
               <span>{sec.icon} {sec.title}</span>
               <span className="cp-toggle">{expanded === i ? "▲" : "▼"}</span>
             </button>
             {expanded === i && (
-              <div className="cp-section-body">
+              <div id={`consumer-section-${i}`} className="cp-section-body">
                 {sec.fields.map((f, fi) => (
                   <div key={fi} className="cp-field-row">
                     <span className="cp-field-label">{f.label}</span>

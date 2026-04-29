@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import {
+  ACCESS_LEVEL_LABELS,
+  CONFIDENTIALITY_LEVEL_LABELS,
+  UPDATE_AUTHORITY_LABELS,
+} from "./builderHelpers";
 import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -43,6 +48,10 @@ function AdminPassportTypeFields() {
 
   const sections = typeDef.fields_json?.sections || []; 
   const fieldCount = sections.reduce((sum, s) => sum + (s.fields?.length || 0), 0);
+  const describeList = (values = [], labelMap = {}) =>
+    (Array.isArray(values) ? values : [])
+      .map((value) => labelMap[value] || value)
+      .join(", ") || "—";
 
   return (
     <div className="apt-page">
@@ -65,11 +74,17 @@ function AdminPassportTypeFields() {
             <div key={section.key} className="apt-fv-section apt-fv-section-spaced">
               <div className="apt-fv-section-title apt-fv-section-title-strong">{section.label}</div>
               <table className="apt-fv-table apt-fv-table-full">
+                <caption className="apt-sr-only">
+                  {section.label} fields with access audience, confidentiality, and update authority rules.
+                </caption>
                 <thead>
                   <tr>
                     <th>Label</th>
                     <th>Key</th>
                     <th>Type</th>
+                    <th>Access</th>
+                    <th>Confidentiality</th>
+                    <th>Update Authority</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -78,6 +93,9 @@ function AdminPassportTypeFields() {
                       <td>{field.label}</td>
                       <td><code>{field.key}</code></td>
                       <td><span className={`apt-fv-type apt-fv-type-${field.type}`}>{field.type}</span></td>
+                      <td>{describeList(field.access, ACCESS_LEVEL_LABELS)}</td>
+                      <td>{CONFIDENTIALITY_LEVEL_LABELS[field.confidentiality] || field.confidentiality || "—"}</td>
+                      <td>{describeList(field.updateAuthority || field.update_authority, UPDATE_AUTHORITY_LABELS)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -33,6 +33,11 @@ function normalizeHash(value) {
   return normalizeText(value || "").toLowerCase();
 }
 
+function normalizeStorageSegment(value, fallback = "event") {
+  const normalized = normalizeText(value, fallback).replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
+  return normalized || fallback;
+}
+
 module.exports = function createBackupProviderService({
   pool,
   storageService,
@@ -129,6 +134,69 @@ module.exports = function createBackupProviderService({
       `passport-${lineageId}`,
       `v${versionNumber}`,
       `${snapshotScope}.json`
+    );
+  }
+
+  function buildAccessControlEventEnvelope({
+    companyId,
+    eventType,
+    severity = "normal",
+    actorUserId = null,
+    actorIdentifier = null,
+    affectedUserId = null,
+    affectedApiKeyId = null,
+    affectedGrantId = null,
+    passportDppId = null,
+    audience = null,
+    elementIdPath = null,
+    revocationMode = "standard",
+    reason = null,
+    metadata = {},
+    provider
+  }) {
+    return {
+      backupProvider: {
+        providerKey: provider.provider_key,
+        providerType: provider.provider_type,
+        displayName: provider.display_name,
+        supportsPublicHandover: provider.supports_public_handover !== false,
+      },
+      eventCategory: "access_control",
+      eventType: normalizeText(eventType, "ACCESS_CONTROL_CHANGE"),
+      severity: normalizeText(severity, "normal"),
+      recordedAt: new Date().toISOString(),
+      revocationMode: normalizeText(revocationMode, "standard"),
+      reason: reason || null,
+      source: {
+        companyId: companyId ? Number.parseInt(companyId, 10) : null,
+        passportDppId: passportDppId || null,
+        actorUserId: actorUserId || null,
+        actorIdentifier: actorIdentifier || null,
+      },
+      target: {
+        affectedUserId: affectedUserId || null,
+        affectedApiKeyId: affectedApiKeyId || null,
+        affectedGrantId: affectedGrantId || null,
+        audience: audience || null,
+        elementIdPath: elementIdPath || null,
+      },
+      metadata: metadata && typeof metadata === "object" ? metadata : {},
+    };
+  }
+
+  function buildAccessControlEventStorageKey({ provider, companyId, eventType, severity }) {
+    const now = new Date();
+    const datePrefix = [
+      now.getUTCFullYear(),
+      String(now.getUTCMonth() + 1).padStart(2, "0"),
+      String(now.getUTCDate()).padStart(2, "0"),
+    ].join("/");
+    return path.posix.join(
+      normalizeObjectPrefix(provider.object_prefix),
+      `company-${companyId || "unknown"}`,
+      "security-events",
+      datePrefix,
+      `${normalizeStorageSegment(eventType)}-${normalizeStorageSegment(severity)}-${Date.now()}.json`
     );
   }
 
@@ -264,6 +332,95 @@ module.exports = function createBackupProviderService({
     return {
       success: results.every((row) => row.replication_status === "synced"),
       results
+    };
+  }
+
+  async function replicateAccessControlEvent({
+    companyId,
+    eventType,
+    severity = "normal",
+    actorUserId = null,
+    actorIdentifier = null,
+    affectedUserId = null,
+    affectedApiKeyId = null,
+    affectedGrantId = null,
+    passportDppId = null,
+    audience = null,
+    elementIdPath = null,
+    revocationMode = "standard",
+    reason = null,
+    metadata = {},
+    providerKey = null,
+  }) {
+    if (!companyId) {
+      return { success: false, error: "companyId is required for access-control event replication", results: [] };
+    }
+
+    const providers = (await listProviders({ companyId })).
+      filter((provider) => !providerKey || provider.provider_key === providerKey);
+
+    if (!providers.length) {
+      return { success: true, skipped: true, reason: "NO_BACKUP_PROVIDER", results: [] };
+    }
+
+    const results = [];
+    for (const provider of providers) {
+      const envelope = buildAccessControlEventEnvelope({
+        companyId,
+        eventType,
+        severity,
+        actorUserId,
+        actorIdentifier,
+        affectedUserId,
+        affectedApiKeyId,
+        affectedGrantId,
+        passportDppId,
+        audience,
+        elementIdPath,
+        revocationMode,
+        reason,
+        metadata,
+        provider,
+      });
+
+      let replicationStatus = "synced";
+      let storageKey = null;
+      let publicUrl = null;
+      let errorMessage = null;
+
+      try {
+        if (!storageService?.saveObject) {
+          throw new Error("Configured storage service does not support backup writes");
+        }
+        const stored = await storageService.saveObject({
+          key: buildAccessControlEventStorageKey({ provider, companyId, eventType, severity }),
+          buffer: Buffer.from(JSON.stringify(envelope, null, 2), "utf8"),
+          contentType: "application/json",
+          cacheControl: "private, max-age=0, no-store",
+        });
+        storageKey = stored?.storageKey || null;
+        publicUrl = stored?.url || null;
+      } catch (error) {
+        replicationStatus = "failed";
+        errorMessage = error.message;
+      }
+
+      results.push({
+        backup_provider_key: provider.provider_key,
+        event_type: envelope.eventType,
+        severity: envelope.severity,
+        revocation_mode: envelope.revocationMode,
+        replication_status: replicationStatus,
+        storage_provider: storageService?.provider || storageService?.name || null,
+        storage_key: storageKey,
+        public_url: publicUrl,
+        error_message: errorMessage,
+      });
+    }
+
+    return {
+      success: results.every((row) => row.replication_status === "synced"),
+      results,
     };
   }
 
@@ -474,6 +631,7 @@ module.exports = function createBackupProviderService({
     listReplications,
     upsertProvider,
     revokeProvider,
+    replicateAccessControlEvent,
     replicatePassportSnapshot,
     verifyReplications
   };

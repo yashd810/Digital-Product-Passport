@@ -18,9 +18,11 @@ function createMockPool() {
     async query(sql, params) {
       if (sql.includes("INSERT INTO passport_signing_keys")) {
         state.keys.set(params[0], {
+          key_id: params[0],
           public_key: params[1],
           algorithm: params[2],
           algorithm_version: params[3],
+          created_at: "2026-04-29T10:00:00.000Z",
         });
         return { rows: [] };
       }
@@ -48,6 +50,10 @@ function createMockPool() {
 
       if (sql.startsWith("SELECT public_key, algorithm, algorithm_version FROM passport_signing_keys")) {
         return { rows: state.keys.has(params[0]) ? [state.keys.get(params[0])] : [] };
+      }
+
+      if (sql.includes("FROM passport_signing_keys") && sql.includes("ORDER BY created_at DESC")) {
+        return { rows: Array.from(state.keys.values()) };
       }
 
       throw new Error(`Unhandled mock query: ${sql}`);
@@ -81,6 +87,8 @@ const TYPE_DEF = {
         fields: [
           { key: "facility_id" },
           { key: "capacity_wh", dataType: "integer" },
+          { key: "dynamic_metrics", dataType: "json" },
+          { key: "battery_materials", dataType: "json" },
         ],
       },
     ],
@@ -89,6 +97,7 @@ const TYPE_DEF = {
 
 const PASSPORT = {
   guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
+  dppId: "72b99c83-952c-4179-96f6-54a513d39dbc",
   lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
   company_id: 7,
   passport_type: "battery",
@@ -176,5 +185,34 @@ describe("signing service", () => {
     const verification = await signingService.verifyPassportSignature(PASSPORT.guid, PASSPORT.version_number);
     expect(verification.status).toBe("valid");
     expect(verification.algorithm).toBe("RS256");
+  });
+
+  test("produces the same canonical hash for logically identical passport payloads", async () => {
+    delete process.env.SIGNING_PRIVATE_KEY;
+    delete process.env.SIGNING_PUBLIC_KEY;
+
+    const pool = createMockPool();
+    const { signingService } = buildTestHarness(pool);
+    await signingService.loadOrGenerateSigningKey();
+
+    const passportVariantA = {
+      ...PASSPORT,
+      dynamic_metrics: JSON.parse("{\"stateOfHealth\":97,\"telemetry\":{\"cycles\":12,\"alerts\":[\"ok\",\"nominal\"]}}"),
+      battery_materials: JSON.parse("{\"nickel\":0.4,\"lithium\":0.2,\"cobalt\":0.1}"),
+    };
+    const passportVariantB = {
+      battery_materials: JSON.parse("{\n  \"cobalt\": 0.1,\n  \"lithium\": 0.2,\n  \"nickel\": 0.4\n}"),
+      dynamic_metrics: JSON.parse("{\n  \"telemetry\": {\n    \"alerts\": [\"ok\", \"nominal\"],\n    \"cycles\": 12\n  },\n  \"stateOfHealth\": 97\n}"),
+      ...PASSPORT,
+    };
+
+    const vcA = await signingService.buildVC(passportVariantA, TYPE_DEF, "2026-04-29T10:00:00.000Z");
+    const vcB = await signingService.buildVC(passportVariantB, TYPE_DEF, "2026-04-29T10:00:00.000Z");
+
+    const hashA = crypto.createHash("sha256").update(signingService.canonicalJSON(vcA)).digest("hex");
+    const hashB = crypto.createHash("sha256").update(signingService.canonicalJSON(vcB)).digest("hex");
+
+    expect(hashA).toBe(hashB);
+    expect(signingService.canonicalJSON(vcA)).toBe(signingService.canonicalJSON(vcB));
   });
 });

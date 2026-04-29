@@ -160,6 +160,27 @@ function createTestApp() {
       if (String(sql).includes("FROM companies c") && params[0] === 5) {
         return { rows: [company] };
       }
+      if (String(sql).includes("FROM passport_signing_keys") && String(sql).includes("LIMIT 1")) {
+        return {
+          rows: [{
+            key_id: "test-key-001",
+            public_key: "-----BEGIN PUBLIC KEY-----\nTEST\n-----END PUBLIC KEY-----",
+            algorithm: "ECDSA-SHA256",
+            algorithm_version: "ES256",
+            created_at: "2026-04-29T10:00:00.000Z",
+          }],
+        };
+      }
+      if (String(sql).includes("FROM passport_signing_keys") && String(sql).includes("ORDER BY created_at DESC")) {
+        return {
+          rows: [{
+            key_id: "test-key-001",
+            algorithm: "ECDSA-SHA256",
+            algorithm_version: "ES256",
+            created_at: "2026-04-29T10:00:00.000Z",
+          }],
+        };
+      }
       throw new Error(`Unexpected query: ${sql}`);
     }),
   };
@@ -193,6 +214,16 @@ function createTestApp() {
     buildExpandedPassportPayload: serializer.buildExpandedPassportPayload,
     signingService: {
       getSigningKey: () => null,
+      getSigningTrustMetadata: () => ({
+        issuerDid: didService.getPlatformDid(),
+        signingKeyOwner: "Claros DPP platform operator",
+        operatorIdentifier: "EORI-ACME-001",
+        operatorIdentifierScheme: "EORI",
+        identityProofing: "Identity verified through company onboarding records.",
+        certificateProfile: "application-managed-signing-key",
+        trustFramework: "Internal trust framework",
+        keyRetentionPolicy: "Historical public keys are retained after rotation.",
+      }),
     },
     didService,
   });
@@ -264,6 +295,38 @@ describe("passport public routes", () => {
           objectType: "SingleValuedDataElement",
         }),
       ])
+    );
+  });
+
+  test("GET /api/signing-key returns trust metadata and retained historical keys", async () => {
+    const { app } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/signing-key",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        key_id: "test-key-001",
+        algorithm_version: "ES256",
+        issuerDid: "did:web:www.claros-dpp.online",
+        trustMetadata: expect.objectContaining({
+          signingKeyOwner: "Claros DPP platform operator",
+          operatorIdentifier: "EORI-ACME-001",
+          operatorIdentifierScheme: "EORI",
+        }),
+        historicalKeys: expect.arrayContaining([
+          expect.objectContaining({
+            keyId: "test-key-001",
+            algorithm: "ES256",
+          }),
+        ]),
+        verification: expect.objectContaining({
+          oldKeysRetained: true,
+        }),
+      })
     );
   });
 });

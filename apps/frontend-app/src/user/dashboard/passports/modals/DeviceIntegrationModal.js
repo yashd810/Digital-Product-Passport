@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders } from "../../../../shared/api/authHeaders";
 
@@ -15,6 +15,8 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const apiBase = import.meta.env.VITE_API_URL || "";
+  const dialogTitleId = useId();
+  const dialogDescriptionId = useId();
 
   useEffect(() => {
     fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key`, { headers: authHeaders() })
@@ -43,6 +45,14 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
       })
       .catch(() => {});
   }, [companyId, passport.dppId, passportType]);
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
   const handleRegenerate = async () => {
     if (!window.confirm("Regenerate the device key? The old key will stop working immediately.")) return;
@@ -97,13 +107,36 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
 
   return createPortal(
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-box device-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-box device-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        aria-describedby={dialogDescriptionId}
+      >
         <div className="modal-header">
-          <span className="modal-title">Device Integration — {passport.model_name}</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <span id={dialogTitleId} className="modal-title">Device Integration — {passport.model_name}</span>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close device integration modal">✕</button>
         </div>
 
         <div className="device-modal-body">
+          <p
+            id={dialogDescriptionId}
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: "hidden",
+              clip: "rect(0, 0, 0, 0)",
+              whiteSpace: "nowrap",
+              border: 0,
+            }}
+          >
+            Issue a device key, review the push endpoint, and override dynamic field values for this passport.
+          </p>
           <section className="device-section">
             <h4 className="device-section-title">Device API Key</h4>
             <p className="device-section-desc">
@@ -114,10 +147,10 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
             ) : (
               <div className="device-key-row">
                 <code className="device-key-code">{deviceKey || deviceKeyMeta?.keyPrefix || "Not issued yet"}</code>
-                <button className="device-copy-btn" onClick={copyKey} disabled={!deviceKey}>
+                <button type="button" className="device-copy-btn" onClick={copyKey} disabled={!deviceKey}>
                   {copied ? "✓ Copied" : "Copy"}
                 </button>
-                <button className="device-regen-btn" onClick={handleRegenerate} disabled={regenerating}>
+                <button type="button" className="device-regen-btn" onClick={handleRegenerate} disabled={regenerating}>
                   {regenerating ? "…" : deviceKeyMeta?.hasDeviceKey ? "Regenerate" : "Issue Key"}
                 </button>
               </div>
@@ -147,8 +180,9 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
               <div className="device-manual-grid">
                 {dynFields.map((field) => (
                   <div key={field.key} className="device-manual-row">
-                    <label className="device-manual-label">{field.label}</label>
+                    <label className="device-manual-label" htmlFor={`device-manual-${field.key}`}>{field.label}</label>
                     <input
+                      id={`device-manual-${field.key}`}
                       type="text"
                       className="device-manual-input"
                       value={manualVals[field.key] ?? ""}
@@ -159,10 +193,10 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
                 ))}
               </div>
               <div className="device-manual-actions">
-                <button className="submit-btn" onClick={handleSaveManual} disabled={saving}>
+                <button type="button" className="submit-btn" onClick={handleSaveManual} disabled={saving}>
                   {saving ? "Saving…" : "Save Values"}
                 </button>
-                {saveMsg && <span className="device-save-msg">{saveMsg}</span>}
+                {saveMsg && <span className="device-save-msg" role="status" aria-live="polite">{saveMsg}</span>}
               </div>
             </section>
           )}

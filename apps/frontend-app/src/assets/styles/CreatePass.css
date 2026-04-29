@@ -288,6 +288,12 @@
   transition: all 0.25s ease;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  text-align: left;
+  font: inherit;
 }
 
 [data-theme="light"] .section-header { background: #f0faf6; }
@@ -296,6 +302,11 @@
   background: var(--jet);
   color: var(--mint);
   border-bottom-color: var(--jet);
+}
+
+.section-header:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: -2px;
 }
 
 .section-title { font-weight: 700; font-size: 14px; letter-spacing: 0.3px; }
@@ -711,6 +722,76 @@
   background: rgba(28,55,56,0.06);
   border-left: 3px solid var(--jet);
   border-radius: 0 6px 6px 0;
+}
+
+.pf-governance-panel {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  padding: 10px 14px;
+  background: rgba(13,181,176,0.08);
+  border: 1px solid rgba(13,181,176,0.2);
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+.pf-governance-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 10px 0;
+}
+
+.pf-governance-badge,
+.pf-governance-copy {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.pf-governance-badge {
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.pf-governance-copy {
+  color: var(--text-secondary);
+  background: rgba(28,55,56,0.06);
+  border: 1px solid var(--border);
+}
+
+.pf-governance-badge-public {
+  color: #0a6f50;
+  background: rgba(16,185,129,0.14);
+  border-color: rgba(16,185,129,0.2);
+}
+
+.pf-governance-badge-restricted {
+  color: #8a5a00;
+  background: rgba(245,158,11,0.16);
+  border-color: rgba(245,158,11,0.22);
+}
+
+.pf-governance-badge-confidential {
+  color: #8f2f5d;
+  background: rgba(236,72,153,0.14);
+  border-color: rgba(236,72,153,0.2);
+}
+
+.pf-governance-badge-trade_secret {
+  color: #7c2d12;
+  background: rgba(249,115,22,0.15);
+  border-color: rgba(249,115,22,0.2);
+}
+
+.pf-governance-badge-regulated {
+  color: #1d4ed8;
+  background: rgba(59,130,246,0.15);
+  border-color: rgba(59,130,246,0.22);
 }
 
 /* Existing file link */

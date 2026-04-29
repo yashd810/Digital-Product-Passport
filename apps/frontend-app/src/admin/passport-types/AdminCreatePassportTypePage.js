@@ -942,8 +942,9 @@ function AdminCreatePassportType() {
             <div className="alert alert-error admin-alert-inline-wide">{csvError}</div>
           )}
           <div className="acpt-csv-hint">
-            CSV format: <strong>Column A</strong> = field label &nbsp;|&nbsp; <strong>Column B</strong> = section name.
-            Importing replaces the current field builder.
+            CSV format supports <strong>Field Label</strong>, <strong>Section</strong>, <strong>Type</strong>,
+            <strong>Access</strong>, <strong>Confidentiality</strong>, and <strong>Update Authority</strong>.
+            Use <code>|</code>, comma, or semicolon to separate multiple audiences or authorities. Importing replaces the current field builder.
           </div>
 
           {sections.map((section, si) => (

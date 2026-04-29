@@ -725,13 +725,36 @@ module.exports = function registerPassportPublicRoutes(app, {
   app.get("/api/signing-key", publicReadRateLimit, async (_req, res) => {
     try {
       const result = await pool.query(
-        `SELECT key_id, public_key, algorithm, created_at
+        `SELECT key_id, public_key, algorithm, algorithm_version, created_at
          FROM passport_signing_keys
          ORDER BY created_at DESC
          LIMIT 1`
       );
       if (!result.rows.length) return res.status(404).json({ error: "No signing key found" });
-      res.json(result.rows[0]);
+      const historicalKeys = await pool.query(
+        `SELECT key_id, algorithm, algorithm_version, created_at
+         FROM passport_signing_keys
+         ORDER BY created_at DESC`
+      );
+      const trustMetadata = typeof signingService?.getSigningTrustMetadata === "function" ?
+      signingService.getSigningTrustMetadata() :
+      { issuerDid: PLATFORM_DID };
+      res.json({
+        ...result.rows[0],
+        issuerDid: trustMetadata.issuerDid || PLATFORM_DID,
+        trustMetadata,
+        historicalKeys: historicalKeys.rows.map((row) => ({
+          keyId: row.key_id,
+          algorithm: row.algorithm_version || row.algorithm || null,
+          createdAt: row.created_at
+        })),
+        verification: {
+          verificationMethod: "JsonWebSignature2020 detached JWS proof",
+          verificationEndpoint: `${API_ORIGIN}/api/passports/{dppId}/signature`,
+          didDocument: `https://${DID_DOMAIN}/.well-known/did.json`,
+          oldKeysRetained: true
+        }
+      });
     } catch {
       res.status(500).json({ error: "Failed to retrieve signing key" });
     }

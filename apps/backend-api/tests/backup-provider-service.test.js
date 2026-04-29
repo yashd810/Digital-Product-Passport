@@ -55,6 +55,7 @@ describe("backup provider service", () => {
 
     const result = await service.replicatePassportSnapshot({
       passport: {
+        dppId: "dpp_test_1",
         guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
         lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
         company_id: 5,
@@ -150,6 +151,61 @@ describe("backup provider service", () => {
     expect(result.results[0]).toMatchObject({
       verification_status: "verified",
       verified_payload_hash: storedPayloadHash,
+    });
+  });
+
+  test("replicates an access-control revocation event through the configured storage layer", async () => {
+    process.env.BACKUP_PROVIDER_ENABLED = "true";
+    process.env.BACKUP_PROVIDER_KEY = "oci-primary";
+    process.env.BACKUP_PROVIDER_OBJECT_PREFIX = "oci-backups";
+
+    const pool = {
+      query: jest.fn(async (sql) => {
+        if (String(sql).includes("FROM backup_service_providers")) {
+          return { rows: [] };
+        }
+        throw new Error(`Unexpected query: ${sql}`);
+      }),
+    };
+
+    const storageService = {
+      provider: "s3",
+      saveObject: jest.fn(async ({ key }) => ({
+        provider: "s3",
+        storageKey: key,
+        url: `https://objectstorage.example/${key}`,
+      })),
+    };
+
+    const service = createBackupProviderService({
+      pool,
+      storageService,
+      buildCanonicalPassportPayload: () => ({
+        digitalProductPassportId: "dpp_test_1",
+      }),
+    });
+
+    const result = await service.replicateAccessControlEvent({
+      companyId: 5,
+      eventType: "USER_AUDIENCE_EMERGENCY_REVOKED",
+      severity: "critical",
+      actorUserId: 9,
+      actorIdentifier: "did:web:www.example.test:did:company:5",
+      affectedUserId: 42,
+      revocationMode: "emergency",
+      reason: "Incident response",
+      metadata: { sessionsRevoked: true },
+    });
+
+    expect(result.success).toBe(true);
+    expect(storageService.saveObject).toHaveBeenCalledTimes(1);
+    expect(storageService.saveObject.mock.calls[0][0].key).toContain("security-events");
+    expect(result.results[0]).toMatchObject({
+      backup_provider_key: "oci-primary",
+      event_type: "USER_AUDIENCE_EMERGENCY_REVOKED",
+      severity: "critical",
+      revocation_mode: "emergency",
+      replication_status: "synced",
     });
   });
 });

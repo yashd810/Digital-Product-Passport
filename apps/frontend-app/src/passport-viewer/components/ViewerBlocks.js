@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { LANGUAGES, translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
@@ -468,6 +468,7 @@ export function FileCell({ url, label }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err,     setErr]     = useState(null);
+  const previewId = useId();
 
   const handleToggle = async () => {
     if (open) { setOpen(false); return; }
@@ -493,13 +494,20 @@ export function FileCell({ url, label }) {
         <a href={url} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
           Open document
         </a>
-        <button type="button" className="pdf-preview-btn" onClick={handleToggle} disabled={loading}>
+        <button
+          type="button"
+          className="pdf-preview-btn"
+          onClick={handleToggle}
+          disabled={loading}
+          aria-expanded={open}
+          aria-controls={previewId}
+        >
           {loading ? "Loading…" : open ? "▲ Hide preview" : "▼ Show preview"}
         </button>
       </div>
-      {err && <div className="pdf-err">{err}</div>}
+      {err && <div className="pdf-err" role="alert">{err}</div>}
       {open && blobUrl && (
-        <iframe src={blobUrl} title={label} className="pdf-iframe" />
+        <iframe id={previewId} src={blobUrl} title={label} className="pdf-iframe" />
       )}
     </div>
   );
@@ -526,9 +534,13 @@ export function PassportTabRail({ tabs, activeSectionKey, onSelect }) {
 // ─── Language selector ────────────────────────────────────────
 export function ViewerLangSelector({ lang, setLang }) {
   return (
-    <div className="viewer-lang-selector">
+    <div className="viewer-lang-selector" role="group" aria-label="Passport language selector">
       {LANGUAGES.map(l => (
-        <button key={l.code} onClick={() => { setLang(l.code); localStorage.setItem("dpp_lang", l.code); }}
+        <button
+          key={l.code}
+          type="button"
+          onClick={() => { setLang(l.code); localStorage.setItem("dpp_lang", l.code); }}
+          aria-pressed={lang === l.code}
           className={`viewer-lang-btn${lang === l.code ? " active" : ""}`}>
           {l.flag} {l.code.toUpperCase()}
         </button>

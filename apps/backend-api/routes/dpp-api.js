@@ -242,13 +242,46 @@ module.exports = function registerDppApiRoutes(app, {
     return undefined;
   }
 
+  function isPlainObject(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function isSimpleIdentifier(value) {
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || ""));
+  }
+
+  function encodeElementPath(segments) {
+    return segments.map((segment, index) => {
+      if (segment.type === "index") return `[${segment.value}]`;
+      if (index === 0 && isSimpleIdentifier(segment.value)) return segment.value;
+      if (isSimpleIdentifier(segment.value)) return `.${segment.value}`;
+      const escaped = String(segment.value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      return `['${escaped}']`;
+    }).join("");
+  }
+
+  function normalizeStructuredElementValue(value) {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) return value;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return value;
+    }
+  }
+
+  function cloneStructuredElementValue(value) {
+    if (Array.isArray(value) || isPlainObject(value)) {
+      return JSON.parse(JSON.stringify(value));
+    }
+    return value;
+  }
+
   function normalizeSupportedElementIdPath(elementIdPath) {
     const raw = String(elementIdPath || "").trim();
     if (!raw) {
       return { error: "elementIdPath is required" };
-    }
-    if (!raw.startsWith("$")) {
-      return { path: raw };
     }
     if (raw.includes("*") || raw.includes("?") || raw.includes("..") || raw.includes("[?") || raw.includes(",")) {
       return {
@@ -256,20 +289,198 @@ module.exports = function registerDppApiRoutes(app, {
       };
     }
 
-    let normalized = raw.
-    replace(/^\$\./, "").
-    replace(/^\$/, "").
-    replace(/\[['"]([^'"]+)['"]\]/g, ".$1").
-    replace(/^\./, "");
-    if (normalized.startsWith("fields.")) {
-      normalized = normalized.slice("fields.".length);
+    let expression = raw;
+    if (expression.startsWith("$")) {
+      expression = expression.slice(1);
+      if (expression.startsWith(".")) expression = expression.slice(1);
     }
-    if (!normalized || normalized.includes(".")) {
+
+    const segments = [];
+    let index = 0;
+    while (index < expression.length) {
+      const current = expression[index];
+      if (current === ".") {
+        index += 1;
+        continue;
+      }
+      if (current === "[") {
+        const next = expression[index + 1];
+        if (next === "'" || next === "\"") {
+          const quote = next;
+          index += 2;
+          let value = "";
+          let closed = false;
+          while (index < expression.length) {
+            const ch = expression[index];
+            if (ch === "\\") {
+              index += 1;
+              if (index < expression.length) value += expression[index];
+              index += 1;
+              continue;
+            }
+            if (ch === quote) {
+              if (expression[index + 1] !== "]") {
+                return {
+                  error: "Only simple DPP element paths are supported; full RFC 9535 JSONPath expressions are not supported"
+                };
+              }
+              index += 2;
+              closed = true;
+              break;
+            }
+            value += ch;
+            index += 1;
+          }
+          if (!closed) {
+            return {
+              error: "Only simple DPP element paths are supported; full RFC 9535 JSONPath expressions are not supported"
+            };
+          }
+          segments.push({ type: "key", value });
+          continue;
+        }
+
+        const remainder = expression.slice(index);
+        const indexMatch = remainder.match(/^\[(\d+)\]/);
+        if (!indexMatch) {
+          return {
+            error: "Only simple DPP element paths are supported; full RFC 9535 JSONPath expressions are not supported"
+          };
+        }
+        segments.push({ type: "index", value: Number.parseInt(indexMatch[1], 10) });
+        index += indexMatch[0].length;
+        continue;
+      }
+
+      const remainder = expression.slice(index);
+      const keyMatch = remainder.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+      if (!keyMatch) {
+        return {
+          error: "Only simple DPP element paths are supported; full RFC 9535 JSONPath expressions are not supported"
+        };
+      }
+      segments.push({ type: "key", value: keyMatch[0] });
+      index += keyMatch[0].length;
+    }
+
+    if (!segments.length) {
+      return { error: "elementIdPath is required" };
+    }
+    if (segments[0]?.type === "key" && segments[0].value === "fields") {
+      segments.shift();
+    }
+    if (!segments.length || segments[0]?.type !== "key") {
       return {
         error: "Only simple DPP element paths are supported; full RFC 9535 JSONPath expressions are not supported"
       };
     }
-    return { path: normalized };
+
+    return {
+      path: encodeElementPath(segments),
+      segments,
+      rootElementIdPath: segments[0].value,
+      childSegments: segments.slice(1),
+      leafElementId: segments[segments.length - 1]?.value,
+    };
+  }
+
+  function readValueAtStructuredPath(value, segments) {
+    let current = normalizeStructuredElementValue(value);
+    for (const segment of segments || []) {
+      current = normalizeStructuredElementValue(current);
+      if (segment.type === "index") {
+        if (!Array.isArray(current)) return undefined;
+        current = current[segment.value];
+        continue;
+      }
+      if (!isPlainObject(current)) return undefined;
+      current = current[segment.value];
+    }
+    return normalizeStructuredElementValue(current);
+  }
+
+  function extractElementValue(payload, normalizedPath) {
+    if (!payload || !normalizedPath?.rootElementIdPath) return undefined;
+    const rootValue = extractCanonicalElementValue(payload, normalizedPath.rootElementIdPath);
+    if (!normalizedPath.childSegments?.length) {
+      return normalizeStructuredElementValue(rootValue);
+    }
+    return readValueAtStructuredPath(rootValue, normalizedPath.childSegments);
+  }
+
+  function setStructuredElementValue(rootValue, childSegments, nextValue) {
+    if (!childSegments?.length) {
+      return { value: nextValue };
+    }
+
+    const firstContainer = childSegments[0]?.type === "index" ? [] : {};
+    let working = normalizeStructuredElementValue(rootValue);
+    if (working === undefined || working === null || working === "") {
+      working = firstContainer;
+    }
+    if (!Array.isArray(working) && !isPlainObject(working)) {
+      return {
+        error: "This element path does not point to a structured data element"
+      };
+    }
+
+    working = cloneStructuredElementValue(working);
+    let current = working;
+
+    for (let index = 0; index < childSegments.length; index += 1) {
+      const segment = childSegments[index];
+      const isLast = index === childSegments.length - 1;
+      const nextSegment = childSegments[index + 1] || null;
+
+      if (segment.type === "index") {
+        if (!Array.isArray(current)) {
+          return {
+            error: "This element path does not point to a structured data element"
+          };
+        }
+        if (isLast) {
+          current[segment.value] = nextValue;
+          break;
+        }
+
+        let branch = normalizeStructuredElementValue(current[segment.value]);
+        if (branch === undefined || branch === null || branch === "") {
+          branch = nextSegment?.type === "index" ? [] : {};
+        }
+        if (!Array.isArray(branch) && !isPlainObject(branch)) {
+          return {
+            error: "This element path does not point to a structured data element"
+          };
+        }
+        current[segment.value] = cloneStructuredElementValue(branch);
+        current = current[segment.value];
+        continue;
+      }
+
+      if (!isPlainObject(current)) {
+        return {
+          error: "This element path does not point to a structured data element"
+        };
+      }
+      if (isLast) {
+        current[segment.value] = nextValue;
+        break;
+      }
+
+      let branch = normalizeStructuredElementValue(current[segment.value]);
+      if (branch === undefined || branch === null || branch === "") {
+        branch = nextSegment?.type === "index" ? [] : {};
+      }
+      if (!Array.isArray(branch) && !isPlainObject(branch)) {
+        return {
+          error: "This element path does not point to a structured data element"
+        };
+      }
+      current[segment.value] = cloneStructuredElementValue(branch);
+      current = current[segment.value];
+    }
+
+    return { value: working };
   }
 
   function getSchemaFieldDefinitions(typeDef) {
@@ -279,17 +490,36 @@ module.exports = function registerDppApiRoutes(app, {
   }
 
   function findSchemaFieldDefinition(typeDef, elementIdPath) {
+    const normalizedPath = normalizeSupportedElementIdPath(elementIdPath);
+    const exactPath = normalizedPath.error ? String(elementIdPath || "").trim() : normalizedPath.path;
+    const rootPath = normalizedPath.error ? String(elementIdPath || "").trim() : normalizedPath.rootElementIdPath;
+
     return getSchemaFieldDefinitions(typeDef).find((field) =>
-    field.key === elementIdPath ||
-    field.semanticId === elementIdPath ||
-    field.semantic_id === elementIdPath ||
-    field.elementId === elementIdPath ||
-    field.element_id === elementIdPath
-    ) || null;
+    field.key === exactPath ||
+    field.semanticId === exactPath ||
+    field.semantic_id === exactPath ||
+    field.elementId === exactPath ||
+    field.element_id === exactPath ||
+    field.key === rootPath ||
+    field.semanticId === rootPath ||
+    field.semantic_id === rootPath ||
+    field.elementId === rootPath ||
+    field.element_id === rootPath ||
+    (
+      rootPath &&
+      (
+        field.key === rootPath ||
+        field.semanticId === rootPath ||
+        field.semantic_id === rootPath ||
+        field.elementId === rootPath ||
+        field.element_id === rootPath
+      )
+    )) || null;
   }
 
-  function buildElementEnvelope(passport, typeDef, elementIdPath, value) {
-    const fieldDef = findSchemaFieldDefinition(typeDef, elementIdPath);
+  function buildElementEnvelope(passport, typeDef, normalizedPath, value) {
+    const elementIdPath = normalizedPath?.path || String(normalizedPath || "");
+    const fieldDef = normalizedPath?.childSegments?.length ? null : findSchemaFieldDefinition(typeDef, elementIdPath);
     const granularity = String(passport?.granularity || "item").trim().toLowerCase() || "item";
     const derivedProductIdentifier = passport?.product_id ?
     productIdentifierService?.buildCanonicalProductDid?.({
@@ -312,22 +542,30 @@ module.exports = function registerDppApiRoutes(app, {
       elementIdPath,
       ...buildExpandedDataElement({
         typeDef,
-        elementIdPath,
+        elementIdPath: fieldDef ? elementIdPath : normalizedPath?.leafElementId || elementIdPath,
         value,
         fieldDef
       })
     };
   }
 
-  function parseElementUpdatePayload({ body, elementIdPath, typeDef }) {
+  function parseElementUpdatePayload({ body, normalizedPath, typeDef }) {
     const payload = body && typeof body === "object" ? body : {};
     if (!Object.prototype.hasOwnProperty.call(payload, "value")) {
       return { error: "value is required" };
     }
 
+    const elementIdPath = normalizedPath?.path || "";
     const fieldDef = findSchemaFieldDefinition(typeDef, elementIdPath);
     const allowedElementIds = new Set(
-      [fieldDef?.elementId, fieldDef?.element_id, fieldDef?.key, elementIdPath].
+      [
+        fieldDef?.elementId,
+        fieldDef?.element_id,
+        fieldDef?.key,
+        elementIdPath,
+        normalizedPath?.leafElementId,
+        normalizedPath?.rootElementIdPath,
+      ].
       filter(Boolean).
       map((value) => String(value))
     );
@@ -344,6 +582,7 @@ module.exports = function registerDppApiRoutes(app, {
     payload.dictionaryReference !== undefined &&
     payload.dictionaryReference !== null &&
     expectedDictionaryReference &&
+    !normalizedPath?.childSegments?.length &&
     String(payload.dictionaryReference) !== String(expectedDictionaryReference))
     {
       return { error: "dictionaryReference does not match the target elementIdPath" };
@@ -792,7 +1031,7 @@ module.exports = function registerDppApiRoutes(app, {
     return matches[0];
   }
 
-  async function updateEditableElement({ editable, elementIdPath, value, user }) {
+  async function updateEditableElement({ editable, normalizedPath, value, user }) {
     const headerFieldMap = {
       dppSchemaVersion: "dpp_schema_version",
       facilityId: "facility_id",
@@ -801,8 +1040,10 @@ module.exports = function registerDppApiRoutes(app, {
       carrierPolicyKey: "carrier_policy_key",
       contentSpecificationIds: "content_specification_ids"
     };
-    const schemaField = findSchemaFieldDefinition(editable.typeDef, elementIdPath);
-    const targetColumn = schemaField?.key || headerFieldMap[elementIdPath] || null;
+    const targetElementIdPath = normalizedPath?.path || "";
+    const rootElementIdPath = normalizedPath?.rootElementIdPath || targetElementIdPath;
+    const schemaField = findSchemaFieldDefinition(editable.typeDef, rootElementIdPath);
+    const targetColumn = schemaField?.key || headerFieldMap[rootElementIdPath] || null;
     if (!targetColumn) {
       return {
         statusCode: 400,
@@ -813,7 +1054,7 @@ module.exports = function registerDppApiRoutes(app, {
     const writeDecision = await accessRightsService.canWriteElement({
       passportDppId: editable.passport.dppId,
       typeDef: editable.typeDef,
-      elementIdPath,
+      elementIdPath: targetElementIdPath,
       user,
       passportCompanyId: editable.passport.company_id
     });
@@ -828,11 +1069,23 @@ module.exports = function registerDppApiRoutes(app, {
       };
     }
 
+    let storedValue = value;
+    if (normalizedPath?.childSegments?.length) {
+      const nestedWrite = setStructuredElementValue(editable.passport[targetColumn], normalizedPath.childSegments, value);
+      if (nestedWrite.error) {
+        return {
+          statusCode: 400,
+          body: { error: nestedWrite.error }
+        };
+      }
+      storedValue = nestedWrite.value;
+    }
+
     await updatePassportRowById({
       tableName: editable.tableName,
       rowId: editable.passport.id,
       userId: user.userId,
-      data: { [targetColumn]: value }
+      data: { [targetColumn]: storedValue }
     });
 
     await logAudit(
@@ -842,22 +1095,22 @@ module.exports = function registerDppApiRoutes(app, {
       editable.tableName,
       editable.passport.dppId,
       { [targetColumn]: editable.passport[targetColumn] ?? null },
-      { [targetColumn]: value },
+      { [targetColumn]: storedValue },
       {
         actorIdentifier: user.actorIdentifier || user.email || `user:${user.userId}`,
         audience: writeDecision.matchedAuthority || "economic_operator"
       }
     );
 
-    const sourcePassport = { ...editable.passport, [targetColumn]: value };
+    const sourcePassport = { ...editable.passport, [targetColumn]: storedValue };
     const canonicalPayload = buildCanonicalPassportPayload(sourcePassport, editable.typeDef, { companyName: "" });
     return {
       statusCode: 200,
       body: buildElementEnvelope(
         sourcePassport,
         editable.typeDef,
-        elementIdPath,
-        extractCanonicalElementValue(canonicalPayload, elementIdPath)
+        normalizedPath,
+        extractElementValue(canonicalPayload, normalizedPath)
       )
     };
   }
@@ -1753,7 +2006,6 @@ module.exports = function registerDppApiRoutes(app, {
       if (normalizedPath.error) {
         return res.status(400).json({ error: normalizedPath.error });
       }
-      const elementIdPath = normalizedPath.path;
 
       const result = await resolveReleasedPassportByDppId(dppId);
       if (!result) return res.status(404).json({ error: "Passport not found or not released" });
@@ -1761,7 +2013,7 @@ module.exports = function registerDppApiRoutes(app, {
       const accessDecision = await accessRightsService.canReadElement({
         passportDppId: result.passport.dppId,
         typeDef: result.typeDef,
-        elementIdPath,
+        elementIdPath: normalizedPath.path,
         user: null
       });
       if (!accessDecision.allowed) {
@@ -1773,10 +2025,10 @@ module.exports = function registerDppApiRoutes(app, {
       }
 
       const payload = buildCanonicalPassportPayload(result.passport, result.typeDef, { companyName: result.companyName });
-      const value = extractCanonicalElementValue(payload, elementIdPath);
+      const value = extractElementValue(payload, normalizedPath);
       if (value === undefined) return res.status(404).json({ error: "Data element not found" });
 
-      return res.json(buildElementEnvelope(result.passport, result.typeDef, elementIdPath, value));
+      return res.json(buildElementEnvelope(result.passport, result.typeDef, normalizedPath, value));
     } catch (e) {
       if (e.code === "AMBIGUOUS_DPP_ID") {
         return res.status(409).json({
@@ -1804,7 +2056,6 @@ module.exports = function registerDppApiRoutes(app, {
       if (normalizedPath.error) {
         return res.status(400).json({ error: normalizedPath.error });
       }
-      const elementIdPath = normalizedPath.path;
 
       const result = await resolveReleasedPassportByDppId(dppId);
       if (!result) return res.status(404).json({ error: "Passport not found or not released" });
@@ -1812,7 +2063,7 @@ module.exports = function registerDppApiRoutes(app, {
       const accessDecision = await accessRightsService.canReadElement({
         passportDppId: result.passport.dppId,
         typeDef: result.typeDef,
-        elementIdPath,
+        elementIdPath: normalizedPath.path,
         user: req.user
       });
       if (!accessDecision.allowed) {
@@ -1824,11 +2075,11 @@ module.exports = function registerDppApiRoutes(app, {
       }
 
       const payload = buildCanonicalPassportPayload(result.passport, result.typeDef, { companyName: result.companyName });
-      const value = extractCanonicalElementValue(payload, elementIdPath);
+      const value = extractElementValue(payload, normalizedPath);
       if (value === undefined) return res.status(404).json({ error: "Data element not found" });
 
       return res.json({
-        ...buildElementEnvelope(result.passport, result.typeDef, elementIdPath, value),
+        ...buildElementEnvelope(result.passport, result.typeDef, normalizedPath, value),
         access: {
           audience: accessDecision.matchedAudience,
           confidentiality: accessDecision.confidentiality
@@ -1849,11 +2100,11 @@ module.exports = function registerDppApiRoutes(app, {
   app.patch("/api/v1/dpps/:dppId/elements/:elementIdPath", authenticateToken, requireEditor, async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
-      const elementIdPath = decodeURIComponent(req.params.elementIdPath || "");
+      const requestedElementIdPath = decodeURIComponent(req.params.elementIdPath || "");
       const companyId = req.user.role === "super_admin" ?
       req.query.companyId ? Number.parseInt(req.query.companyId, 10) : null :
       Number.parseInt(req.user.companyId, 10);
-      if (!dppId || !elementIdPath) {
+      if (!dppId || !requestedElementIdPath) {
         return res.status(400).json({ error: "dppId and elementIdPath are required" });
       }
       if (req.query.companyId && !Number.isFinite(companyId) && req.user.role === "super_admin") {
@@ -1861,6 +2112,10 @@ module.exports = function registerDppApiRoutes(app, {
       }
       if (!parseDppIdentifier(dppId)) {
         return res.status(400).json({ error: "dppId must be a valid DPP identifier" });
+      }
+      const normalizedPath = normalizeSupportedElementIdPath(requestedElementIdPath);
+      if (normalizedPath.error) {
+        return res.status(400).json({ error: normalizedPath.error });
       }
 
       const editable = await resolveEditablePassportByDppId(dppId);
@@ -1875,7 +2130,7 @@ module.exports = function registerDppApiRoutes(app, {
       }
       const parsedPayload = parseElementUpdatePayload({
         body: req.body,
-        elementIdPath,
+        normalizedPath,
         typeDef: editable.typeDef
       });
       if (parsedPayload.error) {
@@ -1884,7 +2139,7 @@ module.exports = function registerDppApiRoutes(app, {
 
       const result = await updateEditableElement({
         editable,
-        elementIdPath,
+        normalizedPath,
         value: parsedPayload.value,
         user: req.user
       });

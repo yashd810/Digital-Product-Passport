@@ -815,14 +815,6 @@ module.exports = function registerAdminRoutes(app, {
       passportDppIds = regRes.rows.map((row) => row.dppId);
       const passportTypes = [...new Set(regRes.rows.map((row) => row.passport_type).filter(Boolean))];
 
-      await client.query(
-        `INSERT INTO audit_logs (company_id, user_id, action, table_name, passport_dpp_id, old_values, new_values)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [null, req.user.userId, "DELETE_COMPANY", "companies", null,
-        JSON.stringify({ company }),
-        JSON.stringify({ deleted_company_id: company.id, deleted_company_name: company.company_name })]
-      );
-
       if (passportDppIds.length) {
         await client.query("DELETE FROM passport_dynamic_values WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
         await client.query("DELETE FROM passport_signatures WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
@@ -845,7 +837,6 @@ module.exports = function registerAdminRoutes(app, {
       await client.query("DELETE FROM company_repository WHERE company_id = $1", [companyId]);
       await client.query("DELETE FROM company_passport_access WHERE company_id = $1", [companyId]);
       await client.query("DELETE FROM passport_workflow WHERE company_id = $1", [companyId]);
-      await client.query("DELETE FROM audit_logs WHERE company_id = $1", [companyId]);
 
       if (userIds.length) {
         await client.query("DELETE FROM notifications WHERE user_id = ANY($1::int[])", [userIds]);
@@ -856,6 +847,20 @@ module.exports = function registerAdminRoutes(app, {
       await client.query("DELETE FROM companies WHERE id = $1", [companyId]);
 
       await client.query("COMMIT");
+
+      await logAudit(
+        null,
+        req.user.userId,
+        "DELETE_COMPANY",
+        "companies",
+        String(company.id),
+        { company },
+        { deletedCompanyId: company.id, deletedCompanyName: company.company_name },
+        {
+          actorIdentifier: req.user?.actorIdentifier || `user:${req.user.userId}`,
+          audience: req.user?.role || null,
+        }
+      );
 
       await Promise.all(repoFiles.rows.map((row) => storageService.deleteStoredFile({
         storageKey: row.storage_key,

@@ -28,6 +28,38 @@ module.exports = function registerCompanyRoutes(app, {
   complianceService,
   accessRightsService
 }) {
+  const GOVERNANCE_IMPORT_TOKENS = new Set([
+    "access",
+    "audience",
+    "audiences",
+    "fieldaccess",
+    "confidentiality",
+    "classification",
+    "fieldconfidentiality",
+    "updateauthority",
+    "updateauthorities",
+    "update_authority",
+    "fieldupdateauthority",
+  ]);
+
+  function normalizeGovernanceToken(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+  }
+
+  function isSchemaGovernanceKey(rawKey, typeSchema) {
+    const key = String(rawKey || "").trim();
+    if (!key) return false;
+    if (typeSchema?.allowedKeys?.has?.(key) || SYSTEM_PASSPORT_FIELDS.has(key)) return false;
+    return GOVERNANCE_IMPORT_TOKENS.has(normalizeGovernanceToken(key));
+  }
+
+  function buildGovernanceImportErrorMessage(keys = []) {
+    return `Schema governance fields (${keys.join(", ")}) cannot be imported as passport row data. Configure access, confidentiality, and updateAuthority on the passport type in admin instead.`;
+  }
+
   function buildStoredProductIdentifiers({ companyId, passportType, productId, granularity = "item" }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
@@ -427,6 +459,18 @@ module.exports = function registerCompanyRoutes(app, {
 
       const numPassports = rows[0].length - 1;
       const fieldRows = rows.slice(1);
+      const governanceRowLabels = [...new Set(
+        fieldRows
+          .map((row) => String(row[0] || "").trim())
+          .filter(Boolean)
+          .filter((label) => isSchemaGovernanceKey(label, typeSchema))
+      )];
+      if (governanceRowLabels.length) {
+        return res.status(400).json({
+          error: buildGovernanceImportErrorMessage(governanceRowLabels),
+          governanceFields: governanceRowLabels,
+        });
+      }
 
       const tableName = getTable(resolvedPassportType);
       const userId = req.user.userId;
@@ -629,11 +673,22 @@ module.exports = function registerCompanyRoutes(app, {
         const normalizedItem = normalizePassportRequestBody(item || {});
         const { dppId: incomingGuid, model_name, product_id, ...fields } = normalizedItem;
         const normalizedProductId = normalizeProductIdValue(product_id);
+        const governanceFieldKeys = Object.keys(fields).filter((key) => isSchemaGovernanceKey(key, typeSchema));
         const invalidFieldKeys = Object.keys(fields).filter((key) =>
         !SYSTEM_PASSPORT_FIELDS.has(key) &&
         !typeSchema.allowedKeys.has(key)
         );
         try {
+          if (governanceFieldKeys.length) {
+            details.push({
+              dppId: incomingGuid || undefined,
+              product_id: normalizedProductId || undefined,
+              status: "failed",
+              error: buildGovernanceImportErrorMessage(governanceFieldKeys)
+            });
+            failed++;
+            continue;
+          }
           if (invalidFieldKeys.length) {
             details.push({
               dppId: incomingGuid || undefined,

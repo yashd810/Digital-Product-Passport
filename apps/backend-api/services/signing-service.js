@@ -7,6 +7,11 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
   let _signingKey = null; // { privateKey, publicKey, keyId }
 
+  function normalizeOptionalText(value) {
+    const normalized = String(value || "").trim();
+    return normalized || null;
+  }
+
   function inferKeyAlgorithmVersion(publicKeyPem) {
     const publicKey = crypto.createPublicKey(publicKeyPem);
     if (publicKey.asymmetricKeyType === "rsa") return "RS256";
@@ -71,6 +76,26 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
   function issuerDid() {
     return didService?.getPlatformDid?.() || "did:web:www.claros-dpp.online";
+  }
+
+  function getSigningTrustMetadata() {
+    return {
+      issuerDid: issuerDid(),
+      signingKeyOwner: normalizeOptionalText(process.env.SIGNING_KEY_OWNER) || "Claros DPP platform operator",
+      operatorIdentifier: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID) || null,
+      operatorIdentifierScheme: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME) || null,
+      identityProofing: normalizeOptionalText(process.env.SIGNING_IDENTITY_PROOFING)
+        || "Application-managed signing key. External certificate-backed proofing must be configured separately for regulated trust-service alignment.",
+      certificateProfile: normalizeOptionalText(process.env.SIGNING_CERTIFICATE_PROFILE) || "application-managed-signing-key",
+      electronicSealType: normalizeOptionalText(process.env.SIGNING_ELECTRONIC_SEAL_TYPE) || null,
+      certificateUrl: normalizeOptionalText(process.env.SIGNING_CERTIFICATE_URL) || null,
+      revocationCheckUrl: normalizeOptionalText(process.env.SIGNING_REVOCATION_CHECK_URL) || null,
+      trustedListUrl: normalizeOptionalText(process.env.SIGNING_TRUSTED_LIST_URL) || null,
+      trustFramework: normalizeOptionalText(process.env.SIGNING_TRUST_FRAMEWORK)
+        || "Platform-managed JWS/VC proof; configure a certificate or electronic seal profile for formal external trust-list validation.",
+      keyRetentionPolicy: normalizeOptionalText(process.env.SIGNING_KEY_RETENTION_POLICY)
+        || "Historical public keys are retained in passport_signing_keys so previously issued signatures remain verifiable after rotation.",
+    };
   }
 
   async function loadCompanyForPassport(companyId) {
@@ -297,6 +322,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     loadOrGenerateSigningKey,
     canonicalJSON,
     issuerDid,
+    getSigningTrustMetadata,
     buildVC,
     createJws,
     signPassport,

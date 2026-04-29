@@ -668,6 +668,9 @@ const {
   EDIT_SESSION_TIMEOUT_HOURS, EDIT_SESSION_TIMEOUT_SQL,
   logAudit, createNotification,
   verifyAuditLogChain,
+  buildAuditLogRootSummary,
+  listAuditLogAnchors,
+  anchorAuditLogRoot,
   getPassportTypeSchema, findExistingPassportByProductId,
   getPassportLineageContext, getPassportVersionsByLineage,
   getCompanyNameMap, stripRestrictedFieldsForPublicView,
@@ -912,7 +915,7 @@ registerAuthRoutes(app, {
   SESSION_COOKIE_NAME,
   setAuthCookie, clearAuthCookie, sendOtpEmail, createTransporter, brandedEmail,
   logAudit, authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
-  authenticateToken, checkCompanyAccess, oauthService,
+  authenticateToken, checkCompanyAccess, oauthService, backupProviderService,
 });
 
 registerAdminRoutes(app, {
@@ -950,6 +953,7 @@ registerPassportRoutes(app, {
   updatePassportRowById, buildPassportVersionHistory,
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
   verifyAuditLogChain,
+  buildAuditLogRootSummary, listAuditLogAnchors, anchorAuditLogRoot,
   stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
   submitPassportToWorkflow, signPassport,
   buildBatteryPassJsonExport, storageService, complianceService, accessRightsService, productIdentifierService,

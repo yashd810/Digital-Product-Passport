@@ -69,6 +69,9 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   const buildActorIdentity = (row = {}) => ({
     actorIdentifier: row.economic_operator_identifier || null,
     actorIdentifierScheme: row.economic_operator_identifier_scheme || null,
+    operatorIdentifier: row.economic_operator_identifier || null,
+    operatorIdentifierScheme: row.economic_operator_identifier_scheme || null,
+    economicOperatorId: row.economic_operator_identifier || null,
     economicOperatorIdentifier: row.economic_operator_identifier || null,
     economicOperatorIdentifierScheme: row.economic_operator_identifier_scheme || null,
   });

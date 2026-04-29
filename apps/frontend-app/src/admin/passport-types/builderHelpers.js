@@ -54,6 +54,18 @@ export const UPDATE_AUTHORITIES = [
   { value: "system", label: "System" },
 ];
 
+export const ACCESS_LEVEL_LABELS = Object.fromEntries(
+  ACCESS_LEVELS.map((entry) => [entry.value, entry.label])
+);
+
+export const CONFIDENTIALITY_LEVEL_LABELS = Object.fromEntries(
+  CONFIDENTIALITY_LEVELS.map((entry) => [entry.value, entry.label])
+);
+
+export const UPDATE_AUTHORITY_LABELS = Object.fromEntries(
+  UPDATE_AUTHORITIES.map((entry) => [entry.value, entry.label])
+);
+
 export const FIELD_TYPES = [
   { value: "text",     label: "Text (single line)" },
   { value: "textarea", label: "Text (multi-line)" },
@@ -91,6 +103,39 @@ export const rekeySection = (sec) => ({
   })(),
 });
 
+function normalizeToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function parseDelimitedValues(value) {
+  return String(value || "")
+    .split(/[|;,]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function parseGovernanceList(rawValue, validEntries, fallbackValues) {
+  const requested = parseDelimitedValues(rawValue)
+    .map((entry) => normalizeToken(entry));
+  const matched = [...new Set(
+    requested
+      .map((token) => validEntries.find((entry) => normalizeToken(entry.value) === token)?.value || null)
+      .filter(Boolean)
+  )];
+  return matched.length ? matched : fallbackValues;
+}
+
+function parseHeaderIndexMap(headerRow = []) {
+  const indexMap = new Map();
+  headerRow.forEach((column, index) => {
+    indexMap.set(normalizeToken(column), index);
+  });
+  return indexMap;
+}
+
 export const parseCSV = (text) => {
   const lines = text.trim().split(/\r?\n/);
   const rows = lines.map((line) => {
@@ -111,56 +156,103 @@ export const parseCSV = (text) => {
     return cols;
   });
 
-  const headerWords = /^(field|label|name|section|column|col|header)$/i;
-  const start = headerWords.test(rows[0]?.[0] || "") ? 1 : 0;
+  const headerIndexMap = parseHeaderIndexMap(rows[0] || []);
+  const hasStructuredHeader = headerIndexMap.has("fieldlabel")
+    || headerIndexMap.has("field")
+    || headerIndexMap.has("label")
+    || headerIndexMap.has("fieldname");
+  const start = hasStructuredHeader ? 1 : 0;
   const validTypes = new Set(["text", "textarea", "boolean", "date", "url", "file", "table", "symbol"]);
+  const fieldIndex = hasStructuredHeader
+    ? (headerIndexMap.get("fieldlabel")
+      ?? headerIndexMap.get("fieldname")
+      ?? headerIndexMap.get("field")
+      ?? headerIndexMap.get("label")
+      ?? 0)
+    : 0;
+  const sectionIndex = hasStructuredHeader
+    ? (headerIndexMap.get("sectionlabel")
+      ?? headerIndexMap.get("section")
+      ?? 1)
+    : 1;
+  const typeIndex = hasStructuredHeader
+    ? (headerIndexMap.get("fieldtype")
+      ?? headerIndexMap.get("type")
+      ?? 2)
+    : 2;
+  const accessIndex = hasStructuredHeader
+    ? (headerIndexMap.get("access")
+      ?? headerIndexMap.get("audience")
+      ?? headerIndexMap.get("audiences"))
+    : undefined;
+  const confidentialityIndex = hasStructuredHeader
+    ? (headerIndexMap.get("confidentiality")
+      ?? headerIndexMap.get("classification"))
+    : undefined;
+  const updateAuthorityIndex = hasStructuredHeader
+    ? (headerIndexMap.get("updateauthority")
+      ?? headerIndexMap.get("updateauthorities")
+      ?? headerIndexMap.get("authority"))
+    : undefined;
 
   return rows.slice(start)
-    .filter((row) => row[0])
+    .filter((row) => row[fieldIndex])
     .map((row) => {
-      const rawType = row[2]?.trim().toLowerCase() || "";
+      const rawType = row[typeIndex]?.trim().toLowerCase() || "";
       return {
-        fieldLabel: row[0],
-        sectionLabel: row[1]?.trim() || "General",
+        fieldLabel: row[fieldIndex],
+        sectionLabel: row[sectionIndex]?.trim() || "General",
         fieldType: validTypes.has(rawType) ? rawType : "text",
+        access: parseGovernanceList(row[accessIndex], ACCESS_LEVELS, ["public"]),
+        confidentiality: parseGovernanceList(row[confidentialityIndex], CONFIDENTIALITY_LEVELS, ["public"])[0] || "public",
+        updateAuthority: parseGovernanceList(row[updateAuthorityIndex], UPDATE_AUTHORITIES, ["economic_operator"]),
       };
     });
 };
 
 export const buildSectionsFromCSV = (rows) => {
   const map = new Map();
-  for (const { fieldLabel, sectionLabel, fieldType } of rows) {
+  for (const { fieldLabel, sectionLabel, fieldType, access, confidentiality, updateAuthority } of rows) {
     if (!map.has(sectionLabel)) map.set(sectionLabel, []);
-    map.get(sectionLabel).push({ label: fieldLabel, type: fieldType });
+    map.get(sectionLabel).push({
+      label: fieldLabel,
+      type: fieldType,
+      access,
+      confidentiality,
+      updateAuthority,
+    });
   }
   return [...map.entries()].map(([sectionLabel, fields]) => ({
     _id: Math.random().toString(36).slice(2),
     key: toSlug(sectionLabel),
     label: sectionLabel,
-    fields: fields.map(({ label, type }) => ({
+    fields: fields.map(({ label, type, access, confidentiality, updateAuthority }) => ({
       _id: Math.random().toString(36).slice(2),
       key: toSlug(label),
       label,
       type,
+      access: Array.isArray(access) && access.length ? access : ["public"],
+      confidentiality: confidentiality || "public",
+      updateAuthority: Array.isArray(updateAuthority) && updateAuthority.length ? updateAuthority : ["economic_operator"],
     })),
   }));
 };
 
 export const downloadTemplate = () => {
   const csv = [
-    "Field Label,Section,Type",
-    "Manufacturer,General,text",
-    "Model Number,General,text",
-    "Serial Number,General,text",
-    "Weight (kg),Technical Specifications,text",
-    "Dimensions,Technical Specifications,text",
-    "Material Composition,Technical Specifications,textarea",
-    "Is Recyclable,Sustainability,boolean",
-    "Manufacture Date,General,date",
-    "Product URL,General,url",
-    "Recycled Content (%),Sustainability,text",
-    "Carbon Footprint,Sustainability,text",
-    "Compliance Certificate,Compliance Documents,file",
+    "Field Label,Section,Type,Access,Confidentiality,Update Authority",
+    "Manufacturer,General,text,manufacturer|market_surveillance,regulated,economic_operator|market_surveillance",
+    "Model Number,General,text,public,public,economic_operator",
+    "Serial Number,General,text,public,public,economic_operator",
+    "Weight (kg),Technical Specifications,text,public,public,economic_operator",
+    "Dimensions,Technical Specifications,text,public,public,economic_operator",
+    "Material Composition,Technical Specifications,textarea,public,public,economic_operator",
+    "Is Recyclable,Sustainability,boolean,public,public,economic_operator",
+    "Manufacture Date,General,date,public,public,economic_operator",
+    "Product URL,General,url,public,public,economic_operator",
+    "Recycled Content (%),Sustainability,text,public,public,economic_operator",
+    "Carbon Footprint,Sustainability,text,legitimate_interest,restricted,economic_operator",
+    "Compliance Certificate,Compliance Documents,file,notified_bodies|market_surveillance,regulated,economic_operator|notified_bodies",
   ].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const anchor = document.createElement("a");

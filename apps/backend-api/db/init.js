@@ -491,7 +491,7 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS audit_logs (
       id               SERIAL PRIMARY KEY,
-      company_id       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      company_id       INTEGER REFERENCES companies(id) ON DELETE SET NULL,
       user_id          INTEGER REFERENCES users(id) ON DELETE SET NULL,
       action           VARCHAR(100) NOT NULL,
       table_name       VARCHAR(100),
@@ -520,6 +520,76 @@ async function initDb(pool, {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_audit_logs_company_created
       ON audit_logs(company_id, created_at DESC, id DESC)
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'audit_logs_company_id_fkey'
+      ) THEN
+        ALTER TABLE audit_logs DROP CONSTRAINT audit_logs_company_id_fkey;
+      END IF;
+      ALTER TABLE audit_logs
+        ADD CONSTRAINT audit_logs_company_id_fkey
+        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL;
+    END $$;
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_log_anchors (
+      id                   SERIAL PRIMARY KEY,
+      company_id           INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+      log_count            INTEGER NOT NULL DEFAULT 0,
+      first_log_id         INTEGER,
+      latest_log_id        INTEGER,
+      root_event_hash      VARCHAR(64),
+      previous_anchor_hash VARCHAR(64),
+      anchor_hash          VARCHAR(64) NOT NULL,
+      anchor_type          VARCHAR(80) NOT NULL DEFAULT 'internal_record',
+      anchor_reference     TEXT,
+      notes                TEXT,
+      metadata_json        JSONB NOT NULL DEFAULT '{}'::jsonb,
+      anchored_by          INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      anchored_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_audit_log_anchors_hash
+      ON audit_log_anchors(anchor_hash)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_audit_log_anchors_company_anchored
+      ON audit_log_anchors(company_id, anchored_at DESC, id DESC)
+  `);
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION reject_append_only_mutation()
+    RETURNS trigger
+    AS $$
+    BEGIN
+      RAISE EXCEPTION '% is append-only; % operations are not allowed', TG_TABLE_NAME, TG_OP
+        USING ERRCODE = '55000';
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+  await pool.query(`
+    DROP TRIGGER IF EXISTS trg_audit_logs_reject_mutation ON audit_logs
+  `);
+  await pool.query(`
+    CREATE TRIGGER trg_audit_logs_reject_mutation
+    BEFORE UPDATE OR DELETE ON audit_logs
+    FOR EACH ROW
+    EXECUTE FUNCTION reject_append_only_mutation()
+  `);
+  await pool.query(`
+    DROP TRIGGER IF EXISTS trg_audit_log_anchors_reject_mutation ON audit_log_anchors
+  `);
+  await pool.query(`
+    CREATE TRIGGER trg_audit_log_anchors_reject_mutation
+    BEFORE UPDATE OR DELETE ON audit_log_anchors
+    FOR EACH ROW
+    EXECUTE FUNCTION reject_append_only_mutation()
   `);
 
   await pool.query(`
