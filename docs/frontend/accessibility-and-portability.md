@@ -1,6 +1,6 @@
 # Accessibility And Portability
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## What is implemented in code
 
@@ -12,6 +12,10 @@ The frontend now explicitly supports several baseline accessibility and portabil
 - `aria-expanded` and `aria-controls` wiring for collapsible viewer and preview sections
 - `aria-live` / status roles for save, loading, and update feedback
 - semantic table captions for admin governance tables
+- a global skip link to `#app-main-content`
+- a dedicated trusted-entry panel with labeled report action and live feedback states
+- frontend automated accessibility tests with Vitest, Testing Library, and axe
+- CI contrast checks for the main viewer and trusted-entry color pairs
 - no dependency on vendor-specific desktop or mobile apps for core verification and data-entry flows
 
 ## Low-bandwidth and portability position
@@ -45,3 +49,11 @@ For release readiness, run:
 3. Automated browser audits with Lighthouse and axe on the main public and authenticated pages.
 4. Contrast checks for default themes plus at least one branded company theme.
 5. Network throttling checks for public viewer, JSON export, and PDF preview/open flows.
+
+## CI coverage now in place
+
+The frontend CI job now runs:
+
+1. `npm test`
+2. `npm run test:contrast`
+3. `npm run build`

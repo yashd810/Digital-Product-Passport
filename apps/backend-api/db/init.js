@@ -475,6 +475,7 @@ async function initDb(pool, {
       "passport_registry",
       "passport_revision_batch_items",
       "passport_scan_events",
+      "passport_security_events",
       "passport_signatures",
       "passport_workflow",
       "company_passport_access",
@@ -516,6 +517,10 @@ async function initDb(pool, {
   await pool.query(`
     ALTER TABLE audit_logs
     ADD COLUMN IF NOT EXISTS event_hash VARCHAR(64)
+  `);
+  await pool.query(`
+    ALTER TABLE audit_logs
+    ADD COLUMN IF NOT EXISTS hash_version SMALLINT NOT NULL DEFAULT 2
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_audit_logs_company_created
@@ -918,6 +923,27 @@ async function initDb(pool, {
       WHERE viewer_user_id IS NOT NULL
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_security_events (
+      id SERIAL PRIMARY KEY,
+      passport_dpp_id TEXT NOT NULL,
+      company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+      event_type VARCHAR(80) NOT NULL,
+      severity VARCHAR(32) NOT NULL DEFAULT 'info',
+      source VARCHAR(32) NOT NULL DEFAULT 'system',
+      details JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_security_events_passport
+      ON passport_security_events(passport_dpp_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_security_events_company
+      ON passport_security_events(company_id, created_at DESC)
+  `);
+
   // Company-managed branding for public passport viewer and consumer pages
   await pool.query(`
     ALTER TABLE companies
@@ -1183,6 +1209,14 @@ async function initDb(pool, {
     ADD COLUMN IF NOT EXISTS product_identifier_did TEXT
   `);
   await pool.query(`
+    ALTER TABLE passport_archives
+    ADD COLUMN IF NOT EXISTS actor_identifier TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE passport_archives
+    ADD COLUMN IF NOT EXISTS snapshot_reason VARCHAR(100)
+  `);
+  await pool.query(`
     UPDATE passport_archives
     SET lineage_id = dpp_id
     WHERE lineage_id IS NULL
@@ -1231,6 +1265,10 @@ async function initDb(pool, {
       await pool.query(`
         ALTER TABLE ${tableName}
         ADD COLUMN IF NOT EXISTS carrier_policy_key VARCHAR(120)
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS carrier_authenticity JSONB
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
@@ -1312,6 +1350,7 @@ async function initDb(pool, {
     const constrainedTables = [
       ["passport_access_grants", "passport_access_grants_passport_dpp_id_fkey"],
       ["passport_scan_events", "passport_scan_events_passport_dpp_id_fkey"],
+      ["passport_security_events", "passport_security_events_passport_dpp_id_fkey"],
       ["passport_backup_replications", "passport_backup_replications_passport_dpp_id_fkey"],
       ["passport_dynamic_values", "passport_dynamic_values_passport_dpp_id_fkey"],
       ["passport_attachments", "passport_attachments_passport_dpp_id_fkey"],
@@ -1328,6 +1367,7 @@ async function initDb(pool, {
       ["passport_registry", ["dpp_id", "lineage_id"]],
       ["passport_access_grants", ["passport_dpp_id"]],
       ["passport_scan_events", ["passport_dpp_id"]],
+      ["passport_security_events", ["passport_dpp_id"]],
       ["passport_dynamic_values", ["passport_dpp_id"]],
       ["passport_signatures", ["passport_dpp_id"]],
       ["passport_edit_sessions", ["passport_dpp_id"]],
@@ -1598,6 +1638,18 @@ async function initDb(pool, {
       ) THEN
         ALTER TABLE passport_dynamic_values
           ADD CONSTRAINT passport_dynamic_values_passport_dpp_id_fkey
+          FOREIGN KEY (passport_dpp_id) REFERENCES passport_registry(dpp_id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `).catch(() => {});
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'passport_security_events_passport_dpp_id_fkey'
+      ) THEN
+        ALTER TABLE passport_security_events
+          ADD CONSTRAINT passport_security_events_passport_dpp_id_fkey
           FOREIGN KEY (passport_dpp_id) REFERENCES passport_registry(dpp_id) ON DELETE CASCADE;
       END IF;
     END $$;

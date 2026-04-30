@@ -494,8 +494,15 @@ function createTestApp(options = {}) {
       }),
       buildLookupCandidates: ({ productId }) => [productId, releasedPassport.product_identifier_did],
     },
-    updatePassportRowById: async ({ data }) => {
+    archivePassportSnapshot: jest.fn(async () => {}),
+    updatePassportRowById: async ({ data, includeUpdatedRow }) => {
       editablePassport = { ...editablePassport, ...data };
+      if (includeUpdatedRow) {
+        return {
+          updateCols: Object.keys(data),
+          updatedRow: { ...editablePassport },
+        };
+      }
       return Object.keys(data);
     },
     isEditablePassportStatus: (status) => ["draft", "in_revision", "revised"].includes(status),

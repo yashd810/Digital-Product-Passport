@@ -46,10 +46,146 @@ export function ViewerDomainIndicator({ compact = false }) {
   );
 }
 
+function buildSuspiciousCarrierReportPayload(carrierAuthenticity) {
+  if (typeof window === "undefined") return {};
+  return {
+    category: "suspicious_carrier",
+    severity: "warning",
+    observedHost: window.location.host || "",
+    expectedHost: carrierAuthenticity?.trustedViewerHost || "",
+    suspectedUrl: window.location.href,
+    referrer: document.referrer || "",
+    userAgent: navigator.userAgent || "",
+  };
+}
+
+export function TrustedEntryPanel({
+  passport,
+  carrierAuthenticity = null,
+  onReportSuspiciousCarrier = null,
+  securityReportState = {},
+}) {
+  const trustedHost = carrierAuthenticity?.trustedViewerHost || "";
+  const trustedOrigin = carrierAuthenticity?.trustedViewerOrigin || "";
+  const printSpec = carrierAuthenticity?.qrPrintSpecification || null;
+  const safetyWarnings = carrierAuthenticity?.safetyWarnings || [];
+  const antiCounterfeitInstructions = carrierAuthenticity?.antiCounterfeitInstructions || [];
+  const canReport = typeof onReportSuspiciousCarrier === "function";
+
+  return (
+    <section className="trusted-entry-panel" aria-labelledby="trusted-entry-title">
+      <div className="trusted-entry-panel-head">
+        <div>
+          <p className="trusted-entry-kicker">Trusted Entry Guidance</p>
+          <h3 id="trusted-entry-title">Check the QR code before you trust the page</h3>
+        </div>
+        <ViewerDomainIndicator compact />
+      </div>
+
+      <div className="trusted-entry-grid">
+        <div className="trusted-entry-card">
+          <span className="trusted-entry-label">Trusted viewer host</span>
+          <strong>{trustedHost || "Configured public viewer host"}</strong>
+          {trustedOrigin && <p className="trusted-entry-copy">{trustedOrigin}</p>}
+        </div>
+        <div className="trusted-entry-card">
+          <span className="trusted-entry-label">Carrier protection</span>
+          <strong>{carrierAuthenticity?.carrierAuthenticationMethod || "Verified HTTPS viewer"}</strong>
+          <p className="trusted-entry-copy">{carrierAuthenticity?.carrierSecurityStatus || "trusted_public_entry"}</p>
+        </div>
+        <div className="trusted-entry-card">
+          <span className="trusted-entry-label">Counterfeit risk</span>
+          <strong>{carrierAuthenticity?.counterfeitRiskLevel || "medium"}</strong>
+          <p className="trusted-entry-copy">Product ID: {passport?.product_id || "—"}</p>
+        </div>
+        <div className="trusted-entry-card">
+          <span className="trusted-entry-label">Protected verification</span>
+          <strong>{carrierAuthenticity?.issuerCertificateId || "No certificate metadata"}</strong>
+          <p className="trusted-entry-copy">
+            {carrierAuthenticity?.signedCarrierPayload ? "Signed carrier payload available" : "No signed carrier binding stored"}
+          </p>
+        </div>
+      </div>
+
+      {printSpec && (
+        <div className="trusted-entry-specs" aria-label="QR code print specification">
+          <span>QR spec: {printSpec.symbology} · v{printSpec.version} · ECC {printSpec.errorCorrectionLevel}</span>
+          <span>Quiet zone: {printSpec.quietZoneModules} modules</span>
+          <span>Minimum print width: {printSpec.minimumRecommendedPrintWidthMm} mm</span>
+          <span>HRI text: {printSpec.hriText || "Not set"}</span>
+          <span>Marker: {printSpec.dppGraphicalMarking || "None"}</span>
+        </div>
+      )}
+
+      {(antiCounterfeitInstructions.length > 0 || safetyWarnings.length > 0) && (
+        <div className="trusted-entry-guidance-grid">
+          {antiCounterfeitInstructions.length > 0 && (
+            <div className="trusted-entry-guidance-card">
+              <h4>Verification steps</h4>
+              <ul>
+                {antiCounterfeitInstructions.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+          )}
+          {safetyWarnings.length > 0 && (
+            <div className="trusted-entry-guidance-card warning">
+              <h4>Phishing and quishing warnings</h4>
+              <ul>
+                {safetyWarnings.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {carrierAuthenticity?.carrierVerificationInstructions && (
+        <p className="trusted-entry-verification-note">
+          {carrierAuthenticity.carrierVerificationInstructions}
+        </p>
+      )}
+
+      {canReport && (
+        <div className="trusted-entry-actions">
+          <button
+            type="button"
+            className="pv-secondary-btn"
+            onClick={() => onReportSuspiciousCarrier(buildSuspiciousCarrierReportPayload(carrierAuthenticity))}
+            disabled={!!securityReportState?.submitting}
+            aria-label="Report a suspicious or counterfeit QR code"
+          >
+            {securityReportState?.submitting ? "Reporting…" : "Report suspicious QR or label"}
+          </button>
+          {securityReportState?.success && (
+            <span className="trusted-entry-feedback success" role="status" aria-live="polite">
+              Report sent. The passport provider can now review this carrier.
+            </span>
+          )}
+          {securityReportState?.error && (
+            <span className="trusted-entry-feedback error" role="alert">
+              {securityReportState.error}
+            </span>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Viewer UI Blocks
 // ─────────────────────────────────────────────────────────────────────────────
-export function PassportIntro({ passport, companyData, displayName, qrCode, qrLoading, onPrint, onOpenHistory }) {
+export function PassportIntro({
+  passport,
+  companyData,
+  displayName,
+  qrCode,
+  qrLoading,
+  carrierAuthenticity = null,
+  onReportSuspiciousCarrier = null,
+  securityReportState = {},
+  onPrint,
+  onOpenHistory,
+}) {
   if (!passport) return null;
   const activityState = getPassportActivityState(passport);
   const manufacturingDate =
@@ -151,6 +287,13 @@ export function PassportIntro({ passport, companyData, displayName, qrCode, qrLo
             {activityState === "archived" ? "Archived" : activityState === "obsolete" ? "Obsolete" : "Active"}
           </div>
         </div>
+
+        <TrustedEntryPanel
+          passport={passport}
+          carrierAuthenticity={carrierAuthenticity}
+          onReportSuspiciousCarrier={onReportSuspiciousCarrier}
+          securityReportState={securityReportState}
+        />
       </aside>
     </section>
   );

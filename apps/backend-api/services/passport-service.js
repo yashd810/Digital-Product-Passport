@@ -39,6 +39,7 @@ module.exports = function createPassportService({
   // ─── AUDIT / NOTIFICATION ────────────────────────────────────────────────
 
   function buildAuditEventPayload({
+    createdAt = null,
     companyId = null,
     userId = null,
     action,
@@ -50,6 +51,7 @@ module.exports = function createPassportService({
     audience = null,
   }) {
     return {
+      createdAt,
       companyId,
       userId,
       action,
@@ -69,8 +71,38 @@ module.exports = function createPassportService({
       .digest("hex");
   }
 
+  function buildHashPayloadVersion({ hashVersion = 1, createdAt = null, companyId, userId, action, tableName, recordId, oldData, newData, actorIdentifier, audience }) {
+    if (Number(hashVersion) >= 2) {
+      return buildAuditEventPayload({
+        createdAt,
+        companyId,
+        userId,
+        action,
+        tableName,
+        recordId,
+        oldData,
+        newData,
+        actorIdentifier,
+        audience,
+      });
+    }
+    return buildAuditEventPayload({
+      companyId,
+      userId,
+      action,
+      tableName,
+      recordId,
+      oldData,
+      newData,
+      actorIdentifier,
+      audience,
+    });
+  }
+
   async function logAudit(companyId, userId, action, tableName, passportDppId, oldData, newData, options = {}) {
     try {
+      const createdAt = options.createdAt || new Date().toISOString();
+      const hashVersion = 2;
       const previousHashRes = await pool.query(
         `SELECT event_hash
          FROM audit_logs
@@ -83,7 +115,17 @@ module.exports = function createPassportService({
         [companyId || null]
       ).catch(() => ({ rows: [] }));
       const previousEventHash = previousHashRes.rows[0]?.event_hash || null;
-      const payload = buildAuditEventPayload({
+      const actorIdentifier =
+          options.actorIdentifier
+          || options.globallyUniqueOperatorId
+          || options.globallyUniqueOperatorIdentifier
+          || options.operatorIdentifier
+          || options.economicOperatorId
+          || options.economicOperatorIdentifier
+          || (userId ? `user:${userId}` : null);
+      const payload = buildHashPayloadVersion({
+        hashVersion,
+        createdAt,
         companyId: companyId || null,
         userId: userId || null,
         action,
@@ -91,12 +133,7 @@ module.exports = function createPassportService({
         recordId: passportDppId || null,
         oldData: oldData || null,
         newData: newData || null,
-        actorIdentifier:
-          options.actorIdentifier
-          || options.operatorIdentifier
-          || options.economicOperatorId
-          || options.economicOperatorIdentifier
-          || (userId ? `user:${userId}` : null),
+        actorIdentifier,
         audience: options.audience || null,
       });
       const eventHash = computeHashChainValue(previousEventHash, payload);
@@ -104,9 +141,9 @@ module.exports = function createPassportService({
       await pool.query(
         `INSERT INTO audit_logs (
            company_id,user_id,action,table_name,record_id,old_values,new_values,
-           actor_identifier,audience,previous_event_hash,event_hash
+           actor_identifier,audience,previous_event_hash,event_hash,created_at,hash_version
          )
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           companyId || null,
           userId || null,
@@ -115,10 +152,12 @@ module.exports = function createPassportService({
           passportDppId || null,
           oldData ? JSON.stringify(oldData) : null,
           newData ? JSON.stringify(newData) : null,
-          payload.actorIdentifier,
+          actorIdentifier,
           options.audience || null,
           previousEventHash,
           eventHash,
+          createdAt,
+          hashVersion,
         ]
       );
     } catch (e) { logger.error("Audit log error (non-fatal):", e.message); }
@@ -127,7 +166,7 @@ module.exports = function createPassportService({
   async function verifyAuditLogChain(companyId = null) {
     const result = await pool.query(
       `SELECT id, company_id, user_id, action, table_name, record_id, old_values, new_values,
-              actor_identifier, audience, previous_event_hash, event_hash
+              actor_identifier, audience, previous_event_hash, event_hash, created_at, hash_version
        FROM audit_logs
        WHERE (
          ($1::int IS NULL AND company_id IS NULL)
@@ -141,7 +180,10 @@ module.exports = function createPassportService({
     const failures = [];
 
     for (const row of result.rows) {
-      const payload = buildAuditEventPayload({
+      const hashVersion = Number.parseInt(row.hash_version, 10) || 1;
+      const payload = buildHashPayloadVersion({
+        hashVersion,
+        createdAt: row.created_at || null,
         companyId: row.company_id || null,
         userId: row.user_id || null,
         action: row.action,
@@ -157,6 +199,7 @@ module.exports = function createPassportService({
       if (row.previous_event_hash !== previousHash || row.event_hash !== expectedHash) {
         failures.push({
           id: row.id,
+          hashVersion,
           expectedPreviousEventHash: previousHash,
           storedPreviousEventHash: row.previous_event_hash,
           expectedEventHash: expectedHash,
@@ -390,6 +433,78 @@ module.exports = function createPassportService({
       archiveParams
     );
     return archiveRes.rows[0] || null;
+  }
+
+  function buildArchiveSnapshotRow(passport) {
+    if (!passport || typeof passport !== "object") return null;
+    const rowData = { ...passport };
+    delete rowData.id;
+    return rowData;
+  }
+
+  async function archivePassportSnapshot({
+    passport,
+    passportType,
+    archivedBy = null,
+    actorIdentifier = null,
+    snapshotReason = "state_snapshot",
+    client = pool,
+  }) {
+    const rowData = buildArchiveSnapshotRow(passport);
+    if (!rowData || !passportType) return null;
+
+    const dppId = rowData.dpp_id || rowData.dppId || null;
+    const lineageId = rowData.lineage_id || dppId || null;
+    if (!dppId || !lineageId) return null;
+
+    await client.query(
+      `INSERT INTO passport_archives
+         (dpp_id, lineage_id, company_id, passport_type, version_number, model_name,
+          product_id, product_identifier_did, release_status, row_data, archived_by,
+          actor_identifier, snapshot_reason)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      [
+        dppId,
+        lineageId,
+        rowData.company_id || null,
+        passportType,
+        Number.isFinite(Number(rowData.version_number)) ? Number(rowData.version_number) : 1,
+        rowData.model_name || null,
+        rowData.product_id || null,
+        rowData.product_identifier_did || null,
+        rowData.release_status || null,
+        JSON.stringify(rowData),
+        archivedBy || null,
+        actorIdentifier || null,
+        snapshotReason || "state_snapshot",
+      ]
+    );
+
+    return rowData;
+  }
+
+  async function archivePassportSnapshots({
+    passports,
+    passportType,
+    archivedBy = null,
+    actorIdentifier = null,
+    snapshotReason = "state_snapshot",
+    client = pool,
+  }) {
+    if (!Array.isArray(passports) || !passports.length || !passportType) return 0;
+    let count = 0;
+    for (const passport of passports) {
+      await archivePassportSnapshot({
+        passport,
+        passportType,
+        archivedBy,
+        actorIdentifier,
+        snapshotReason,
+        client,
+      });
+      count += 1;
+    }
+    return count;
   }
 
   async function getPassportVersionsByLineage({ lineageId, passportType, companyId = null }) {
@@ -875,18 +990,25 @@ module.exports = function createPassportService({
     return fetchCompanyPassportRecord({ companyId, dppId: passportKey });
   }
 
-  async function updatePassportRowById({ tableName, rowId, userId, data, excluded = SYSTEM_PASSPORT_FIELDS }) {
+  async function updatePassportRowById({ tableName, rowId, userId, data, excluded = SYSTEM_PASSPORT_FIELDS, includeUpdatedRow = false }) {
     const updateCols = getWritablePassportColumns(data, excluded);
     if (!updateCols.length) return [];
 
     const vals = getStoredPassportValues(updateCols, data);
     const sets = updateCols.map((col, i) => `${col} = $${i + 1}`).join(", ");
-    await pool.query(
+    const result = await pool.query(
       `UPDATE ${tableName}
        SET ${sets}, updated_by = $${vals.length + 1}, updated_at = NOW()
-       WHERE id = $${vals.length + 2}`,
+       WHERE id = $${vals.length + 2}
+       ${includeUpdatedRow ? "RETURNING *" : ""}`,
       [...vals, userId, rowId]
     );
+    if (includeUpdatedRow) {
+      return {
+        updateCols,
+        updatedRow: result.rows[0] || null,
+      };
+    }
     return updateCols;
   }
 
@@ -1071,22 +1193,56 @@ module.exports = function createPassportService({
 
   // ─── MARK OBSOLETE ────────────────────────────────────────────────────────
 
-  async function markOlderVersionsObsolete(tableName, dppId, newVersionNumber) {
+  async function markOlderVersionsObsolete(tableName, dppId, newVersionNumber, passportType = null) {
     try {
       const lineageRes = await pool.query(
         `SELECT lineage_id FROM ${tableName} WHERE dpp_id = $1 LIMIT 1`, [dppId]
       );
       if (!lineageRes.rows.length) return;
       const lineageId = lineageRes.rows[0].lineage_id;
-      await pool.query(
-        `UPDATE ${tableName}
-         SET release_status = 'obsolete', updated_at = NOW()
+      const resolvedPassportType = passportType || tableName.replace(/^passports_/, "");
+      const affectedRes = await pool.query(
+        `SELECT *
+         FROM ${tableName}
          WHERE lineage_id = $1
            AND version_number < $2
            AND release_status = 'released'
            AND deleted_at IS NULL`,
         [lineageId, newVersionNumber]
       );
+      if (affectedRes.rows.length) {
+        await archivePassportSnapshots({
+          passports: affectedRes.rows,
+          passportType: resolvedPassportType,
+          snapshotReason: "before_mark_obsolete",
+        });
+      }
+      await pool.query(
+        `UPDATE ${tableName}
+         SET release_status = 'obsolete', updated_at = NOW()
+         WHERE lineage_id = $1
+           AND version_number < $2
+           AND release_status = 'released'
+           AND deleted_at IS NULL
+         RETURNING *`,
+        [lineageId, newVersionNumber]
+      );
+      const updatedRes = await pool.query(
+        `SELECT *
+         FROM ${tableName}
+         WHERE lineage_id = $1
+           AND version_number < $2
+           AND release_status = 'obsolete'
+           AND deleted_at IS NULL`,
+        [lineageId, newVersionNumber]
+      );
+      if (updatedRes.rows.length) {
+        await archivePassportSnapshots({
+          passports: updatedRes.rows,
+          passportType: resolvedPassportType,
+          snapshotReason: "after_mark_obsolete",
+        });
+      }
     } catch (e) {
       logger.error("Mark obsolete error (non-fatal):", e.message);
     }
@@ -1144,6 +1300,7 @@ module.exports = function createPassportService({
         compliance_profile_key VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1',
         content_specification_ids TEXT,
         carrier_policy_key VARCHAR(120),
+        carrier_authenticity JSONB,
         economic_operator_id TEXT,
         facility_id TEXT,
         granularity    VARCHAR(20)  NOT NULL DEFAULT 'model',
@@ -1216,7 +1373,7 @@ module.exports = function createPassportService({
     }
 
     const pRes = await pool.query(
-      `SELECT id, model_name, product_id, version_number, release_status FROM ${tableName}
+      `SELECT * FROM ${tableName}
        WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
        ORDER BY version_number DESC LIMIT 1`,
       [dppId]
@@ -1224,11 +1381,34 @@ module.exports = function createPassportService({
     if (!pRes.rows.length) throw new Error("Editable passport not found");
     const passport = normalizePassportRow(pRes.rows[0]);
 
+    await archivePassportSnapshot({
+      passport: pRes.rows[0],
+      passportType,
+      archivedBy: userId,
+      snapshotReason: "before_submit_review",
+    });
+
     await pool.query(
       `UPDATE ${tableName} SET release_status = 'in_review', updated_at = NOW()
        WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
       [dppId]
     );
+
+    const updatedRes = await pool.query(
+      `SELECT *
+       FROM ${tableName}
+       WHERE dpp_id = $1
+       ORDER BY version_number DESC LIMIT 1`,
+      [dppId]
+    );
+    if (updatedRes.rows.length) {
+      await archivePassportSnapshot({
+        passport: updatedRes.rows[0],
+        passportType,
+        archivedBy: userId,
+        snapshotReason: "after_submit_review",
+      });
+    }
 
     const wfRes = await pool.query(
       `INSERT INTO passport_workflow
@@ -1339,6 +1519,8 @@ module.exports = function createPassportService({
     resolvePublicPassportByDppId,
     resolveCompanyPreviewPassportByProductId,
     resolveCompanyPreviewPassport,
+    archivePassportSnapshot,
+    archivePassportSnapshots,
     updatePassportRowById,
     buildPassportVersionHistory,
     clearExpiredEditSessions,

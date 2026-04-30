@@ -5,10 +5,19 @@ import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i
 import { formatPassportStatus, isReleasedPassportStatus } from "../../passports/utils/passportStatus";
 import { authHeaders } from "../../shared/api/authHeaders";
 import { buildPreviewTechnicalPassportPath, buildTechnicalPassportPath } from "../../passports/utils/passportRoutes";
-import { ViewerDomainIndicator } from "../components/ViewerBlocks";
+import { TrustedEntryPanel, ViewerDomainIndicator } from "../components/ViewerBlocks";
 import "../styles/PassportViewer.css";
 
 const API = import.meta.env.VITE_API_URL || "";
+
+async function reportSuspiciousCarrier(dppId, report) {
+  const response = await fetch(`${API}/api/passports/${dppId}/security-report`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(report),
+  });
+  if (!response.ok) throw new Error("Failed to report suspicious carrier");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Viewer Session Helpers
@@ -56,6 +65,7 @@ function inferIcon(section, index) {
 // Battery Consumer View
 // ─────────────────────────────────────────────────────────────────────────────
 function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} }) {
+  const [securityReportState, setSecurityReportState] = useState({ submitting: false, success: false, error: "" });
   const pType = passport.passport_type || "battery";
   const theme = getConsumerTheme(pType, company?.branding_json);
   const isPreviewView = !!passport?.preview_mode || (!!passport?.dppId && !!passport?.previewId);
@@ -103,6 +113,17 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
   const stateOfCharge    = getFieldVal([/state.of.charge/i,          "state_of_charge"]);
   const symbolLead       = getFieldVal([/symbol.*lead|lead.*symbol/i, "symbols_for_lead"])        || passport.symbols_for_lead;
   const symbolCadmium    = getFieldVal([/symbol.*cadmium|cadmium.*symbol/i, "symbols_for_cadmium"]) || passport.symbols_for_cadmium;
+
+  const handleReportSuspiciousCarrier = async (report) => {
+    if (!passport?.dppId) return;
+    setSecurityReportState({ submitting: true, success: false, error: "" });
+    try {
+      await reportSuspiciousCarrier(passport.dppId, report);
+      setSecurityReportState({ submitting: false, success: true, error: "" });
+    } catch (error) {
+      setSecurityReportState({ submitting: false, success: false, error: error.message || "Failed to report suspicious carrier" });
+    }
+  };
 
   return (
     <div
@@ -159,10 +180,17 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
       </div>
 
       {/* ── Body: 3 cards ── */}
-      <div className="cp-body">
+      <main className="cp-body">
         {company?.introduction_text && (
           <div className="cp-intro-text"><p>{company.introduction_text}</p></div>
         )}
+
+        <TrustedEntryPanel
+          passport={passport}
+          carrierAuthenticity={passport?.carrier_authenticity || null}
+          onReportSuspiciousCarrier={handleReportSuspiciousCarrier}
+          securityReportState={securityReportState}
+        />
 
         <div className="cp-cards-row">
 
@@ -241,7 +269,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
           <div className="cp-footer-note">Powered by ClarosDPP, digital passport provider via software as a service.</div>
           <a className="cp-footer-support" href="mailto:digitalproductpass@gmail.com">Contact information</a>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -251,6 +279,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
 // ─────────────────────────────────────────────────────────────────────────────
 function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
   const [expanded, setExpanded] = useState(null);
+  const [securityReportState, setSecurityReportState] = useState({ submitting: false, success: false, error: "" });
   const isPreviewView = !!passport?.preview_mode || (!!passport?.dppId && !!passport?.previewId);
   const technicalPassportPath = isPreviewView
     ? buildPreviewTechnicalPassportPath({
@@ -287,6 +316,17 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
       return { title: translateSchemaLabel("en", section), fields, icon: inferIcon(section, index) };
     })
     .filter(s => s.fields.length > 0);
+
+  const handleReportSuspiciousCarrier = async (report) => {
+    if (!passport?.dppId) return;
+    setSecurityReportState({ submitting: true, success: false, error: "" });
+    try {
+      await reportSuspiciousCarrier(passport.dppId, report);
+      setSecurityReportState({ submitting: false, success: true, error: "" });
+    } catch (error) {
+      setSecurityReportState({ submitting: false, success: false, error: error.message || "Failed to report suspicious carrier" });
+    }
+  };
 
   return (
     <div
@@ -345,10 +385,17 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
       </div>
 
       {/* Body */}
-      <div className="cp-body">
+      <main className="cp-body">
         {company?.introduction_text && (
           <div className="cp-intro-text"><p>{company.introduction_text}</p></div>
         )}
+
+        <TrustedEntryPanel
+          passport={passport}
+          carrierAuthenticity={passport?.carrier_authenticity || null}
+          onReportSuspiciousCarrier={handleReportSuspiciousCarrier}
+          securityReportState={securityReportState}
+        />
 
         {sections.map((sec, i) => (
           <div key={i} className="cp-section">
@@ -393,7 +440,7 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
           <div className="cp-footer-note">Powered by ClarosDPP, digital passport provider via software as a service.</div>
           <a className="cp-footer-support" href="mailto:digitalproductpass@gmail.com">Contact information</a>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

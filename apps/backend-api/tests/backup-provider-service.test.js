@@ -208,4 +208,60 @@ describe("backup provider service", () => {
       replication_status: "synced",
     });
   });
+
+  test("replicates an audit-anchor evidence record through the configured storage layer", async () => {
+    process.env.BACKUP_PROVIDER_ENABLED = "true";
+    process.env.BACKUP_PROVIDER_KEY = "oci-primary";
+    process.env.BACKUP_PROVIDER_OBJECT_PREFIX = "oci-backups";
+
+    const pool = {
+      query: jest.fn(async (sql) => {
+        if (String(sql).includes("FROM backup_service_providers")) {
+          return { rows: [] };
+        }
+        throw new Error(`Unexpected query: ${sql}`);
+      }),
+    };
+
+    const storageService = {
+      provider: "s3",
+      saveObject: jest.fn(async ({ key }) => ({
+        provider: "s3",
+        storageKey: key,
+        url: `https://objectstorage.example/${key}`,
+      })),
+    };
+
+    const service = createBackupProviderService({
+      pool,
+      storageService,
+      buildCanonicalPassportPayload: () => ({
+        digitalProductPassportId: "dpp_test_1",
+      }),
+    });
+
+    const result = await service.replicateAuditAnchorEvent({
+      companyId: 5,
+      actorUserId: 9,
+      actorIdentifier: "did:web:www.example.test:did:company:5",
+      anchor: {
+        id: 4,
+        root_event_hash: "root_hash_16",
+      },
+      summary: {
+        latestEventHash: "root_hash_16",
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(storageService.saveObject).toHaveBeenCalledTimes(1);
+    expect(storageService.saveObject.mock.calls[0][0].key).toContain("audit-anchors");
+    expect(result.results[0]).toMatchObject({
+      backup_provider_key: "oci-primary",
+      event_category: "audit_anchor",
+      anchor_id: 4,
+      root_event_hash: "root_hash_16",
+      replication_status: "synced",
+    });
+  });
 });

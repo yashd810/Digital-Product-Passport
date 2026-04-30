@@ -20,6 +20,13 @@ function createResponse() {
 }
 
 describe("auth middleware API key migration", () => {
+  const originalRequireMfa = process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA;
+
+  afterEach(() => {
+    if (originalRequireMfa === undefined) delete process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA;
+    else process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA = originalRequireMfa;
+  });
+
   test("attaches the company economic operator identifier to authenticated JWT users", async () => {
     const pool = {
       query: jest.fn(async (sql, params = []) => {
@@ -29,12 +36,13 @@ describe("auth middleware API key migration", () => {
               id: 9,
               email: "editor@example.test",
               company_id: 5,
-              role: "company_admin",
-              is_active: true,
-              session_version: 3,
-              economic_operator_identifier: "did:web:www.example.test:did:company:5",
-              economic_operator_identifier_scheme: "did",
-            }],
+            role: "company_admin",
+            is_active: true,
+            session_version: 3,
+            two_factor_enabled: true,
+            economic_operator_identifier: "did:web:www.example.test:did:company:5",
+            economic_operator_identifier_scheme: "did",
+          }],
           };
         }
         if (String(sql).includes("FROM user_access_audiences")) {
@@ -46,7 +54,7 @@ describe("auth middleware API key migration", () => {
 
     const { authenticateToken } = createAuthMiddleware({
       jwt: {
-        verify: jest.fn(() => ({ userId: 9, sessionVersion: 3 })),
+        verify: jest.fn(() => ({ userId: 9, sessionVersion: 3, mfaVerifiedAt: "2026-04-30T12:00:00.000Z", amr: ["pwd", "otp"] })),
       },
       crypto,
       pool,
@@ -71,8 +79,14 @@ describe("auth middleware API key migration", () => {
       userId: 9,
       companyId: 5,
       role: "company_admin",
+      mfaEnabled: true,
+      mfaVerifiedAt: "2026-04-30T12:00:00.000Z",
+      authenticationMethods: ["pwd", "otp"],
       actorIdentifier: "did:web:www.example.test:did:company:5",
       actorIdentifierScheme: "did",
+      globallyUniqueOperatorId: "did:web:www.example.test:did:company:5",
+      globallyUniqueOperatorIdentifier: "did:web:www.example.test:did:company:5",
+      globallyUniqueOperatorIdentifierScheme: "did",
       operatorIdentifier: "did:web:www.example.test:did:company:5",
       operatorIdentifierScheme: "did",
       economicOperatorId: "did:web:www.example.test:did:company:5",
@@ -146,6 +160,9 @@ describe("auth middleware API key migration", () => {
       scopes: ["dpp:read"],
       actorIdentifier: "did:web:www.example.test:did:company:5",
       actorIdentifierScheme: "did",
+      globallyUniqueOperatorId: "did:web:www.example.test:did:company:5",
+      globallyUniqueOperatorIdentifier: "did:web:www.example.test:did:company:5",
+      globallyUniqueOperatorIdentifierScheme: "did",
       operatorIdentifier: "did:web:www.example.test:did:company:5",
       operatorIdentifierScheme: "did",
       economicOperatorId: "did:web:www.example.test:did:company:5",
@@ -159,5 +176,37 @@ describe("auth middleware API key migration", () => {
     expect(upgradeCall.params[2]).toMatch(/^[a-f0-9]{32}$/);
     expect(upgradeCall.params[3]).toBe("hmac_sha256");
     expect(upgradeCall.params[5]).toBe(legacyHash);
+  });
+
+  test("requireEditor blocks controlled-data changes when MFA is required but not verified", async () => {
+    process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA = "true";
+
+    const { requireEditor } = createAuthMiddleware({
+      jwt: {},
+      crypto,
+      pool: { query: jest.fn() },
+      JWT_SECRET: "test",
+      SESSION_COOKIE_NAME: "sid",
+    });
+
+    const req = {
+      user: {
+        role: "company_admin",
+        mfaEnabled: true,
+        mfaVerifiedAt: null,
+      },
+    };
+    const res = createResponse();
+    let nextCalled = false;
+
+    requireEditor(req, res, () => {
+      nextCalled = true;
+    });
+
+    expect(nextCalled).toBe(false);
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual(expect.objectContaining({
+      code: "MFA_REQUIRED",
+    }));
   });
 });

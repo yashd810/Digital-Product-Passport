@@ -1,5 +1,7 @@
 "use strict";
 
+const { buildCarrierAuthenticityResponseFields } = require("../helpers/carrier-authenticity");
+
 module.exports = function createPassportRepresentationService({
   productIdentifierService = null,
   buildCanonicalPassportPayload = null,
@@ -163,6 +165,7 @@ module.exports = function createPassportRepresentationService({
         : (Array.isArray(contentSpecificationIds) ? contentSpecificationIds : []),
       complianceProfileKey:      canonicalPayload?.complianceProfileKey || passport.compliance_profile_key || null,
       carrierPolicyKey:          canonicalPayload?.carrierPolicyKey || passport.carrier_policy_key || null,
+      ...buildCarrierAuthenticityResponseFields(passport.carrier_authenticity || canonicalPayload),
       ...(companyName ? { economicOperatorName: companyName } : {}),
 
       // DID-based identifiers (product-id-based, not record-id-based)

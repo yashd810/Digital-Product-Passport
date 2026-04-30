@@ -11,6 +11,7 @@ const logger = require("../services/logger");
  */
 
 module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, SESSION_COOKIE_NAME }) {
+  const requireMfaForControlledData = String(process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA || "").trim().toLowerCase() === "true";
   const normalizeScopes = (scopes) => Array.isArray(scopes)
     ? scopes.map((scope) => String(scope || "").trim()).filter(Boolean)
     : [];
@@ -69,6 +70,9 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   const buildActorIdentity = (row = {}) => ({
     actorIdentifier: row.economic_operator_identifier || null,
     actorIdentifierScheme: row.economic_operator_identifier_scheme || null,
+    globallyUniqueOperatorId: row.economic_operator_identifier || null,
+    globallyUniqueOperatorIdentifier: row.economic_operator_identifier || null,
+    globallyUniqueOperatorIdentifierScheme: row.economic_operator_identifier_scheme || null,
     operatorIdentifier: row.economic_operator_identifier || null,
     operatorIdentifierScheme: row.economic_operator_identifier_scheme || null,
     economicOperatorId: row.economic_operator_identifier || null,
@@ -83,7 +87,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     try {
       const payload = jwt.verify(token, JWT_SECRET);
       const currentUserRes = await pool.query(
-        `SELECT u.id, u.email, u.company_id, u.role, u.is_active, u.session_version,
+        `SELECT u.id, u.email, u.company_id, u.role, u.is_active, u.session_version, u.two_factor_enabled,
                 c.economic_operator_identifier, c.economic_operator_identifier_scheme
          FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
@@ -117,6 +121,9 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
         companyId: currentUser.company_id,
         role: currentUser.role,
         sessionVersion: currentSessionVersion,
+        mfaEnabled: !!currentUser.two_factor_enabled,
+        mfaVerifiedAt: payload.mfaVerifiedAt || null,
+        authenticationMethods: Array.isArray(payload.amr) ? payload.amr : ["pwd"],
         accessAudiences: audienceRes.rows.map((row) => String(row.audience || "").trim()).filter(Boolean),
         ...buildActorIdentity(currentUser),
       };
@@ -140,6 +147,20 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   const requireEditor = (req, res, next) => {
     if (req.user?.role === "viewer")
       return res.status(403).json({ error: "Viewers do not have permission to perform this action." });
+    if (requireMfaForControlledData) {
+      if (!req.user?.mfaEnabled) {
+        return res.status(403).json({
+          error: "Multi-factor authentication must be enabled for controlled-data changes.",
+          code: "MFA_ENROLLMENT_REQUIRED"
+        });
+      }
+      if (!req.user?.mfaVerifiedAt) {
+        return res.status(403).json({
+          error: "A multi-factor authenticated session is required for controlled-data changes.",
+          code: "MFA_REQUIRED"
+        });
+      }
+    }
     next();
   };
 
@@ -201,6 +222,9 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
         companyId: String(matchedRow.company_id),
         scopes: normalizeScopes(matchedRow.scopes),
         expiresAt: matchedRow.expires_at || null,
+        mfaEnabled: false,
+        mfaVerifiedAt: null,
+        authenticationMethods: ["api_key"],
         ...buildActorIdentity(matchedRow),
       };
       next();
@@ -225,5 +249,6 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     checkCompanyAdmin,
     authenticateApiKey,
     requireApiKeyScope,
+    requireMfaForControlledData,
   };
 };

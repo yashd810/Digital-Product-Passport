@@ -125,6 +125,14 @@ function createTestApp() {
     updated_at: "2026-04-27T10:00:00.000Z",
     granularity: "item",
     battery_mass: "450",
+    carrier_authenticity: {
+      carrierSecurityStatus: "signed_payload",
+      carrierAuthenticationMethod: "signed_qr_payload",
+      carrierVerificationInstructions: "Scan the public carrier and verify the signed binding payload.",
+      issuerCertificateId: "qsealc-cert-001",
+      carrierCompatibilityProfiles: ["VDS", "DigSig"],
+      physicalCarrierSecurityFeatures: ["tamper_evident_label"],
+    },
   };
 
   const typeDef = {
@@ -245,6 +253,14 @@ describe("passport public routes", () => {
     expect(response.body.fields).toEqual(
       expect.objectContaining({
         battery_mass: 450,
+      })
+    );
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        carrierSecurityStatus: "signed_payload",
+        carrierAuthenticationMethod: "signed_qr_payload",
+        issuerCertificateId: "qsealc-cert-001",
+        carrierCompatibilityProfiles: ["VDS", "DigSig"],
       })
     );
     expect(response.body.elements).toBeUndefined();

@@ -13,8 +13,17 @@ module.exports = function registerWorkflowRoutes(app, {
   logAudit,
   buildCurrentPublicPassportPath,
   createNotification,
-  complianceService
+  complianceService,
+  archivePassportSnapshot
 }) {
+  const getActorIdentifier = (user) =>
+    user?.actorIdentifier ||
+    user?.globallyUniqueOperatorId ||
+    user?.operatorIdentifier ||
+    user?.economicOperatorId ||
+    user?.email ||
+    (user?.userId ? `user:${user.userId}` : null);
+
   const loadLivePassportRow = async ({ companyId, dppId: dppId, passportType, status = null }) => {
     const tableName = getTable(passportType);
     const params = [dppId];
@@ -146,10 +155,30 @@ module.exports = function registerWorkflowRoutes(app, {
       if (passportType) {
         const tableName = getTable(passportType);
         const originalStatus = wf.previous_release_status || "in_revision";
+        const currentPassport = await loadLivePassportRow({ dppId, passportType });
+        if (currentPassport) {
+          await archivePassportSnapshot({
+            passport: currentPassport,
+            passportType,
+            archivedBy: userId,
+            actorIdentifier: getActorIdentifier(req.user),
+            snapshotReason: "before_workflow_remove_revert",
+          });
+        }
         await pool.query(
           `UPDATE ${tableName} SET release_status=$1, updated_at=NOW() WHERE dpp_id=$2`,
           [originalStatus, dppId]
         );
+        const revertedPassport = await loadLivePassportRow({ dppId, passportType });
+        if (revertedPassport) {
+          await archivePassportSnapshot({
+            passport: revertedPassport,
+            passportType,
+            archivedBy: userId,
+            actorIdentifier: getActorIdentifier(req.user),
+            snapshotReason: "after_workflow_remove_revert",
+          });
+        }
       }
 
       await pool.query("DELETE FROM passport_workflow WHERE id = $1", [wf.id]);
@@ -192,6 +221,7 @@ module.exports = function registerWorkflowRoutes(app, {
       }
 
       const tableName = getTable(resolvedPassportType);
+      const currentPassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType });
       const pRes = await pool.query(
         `SELECT p.model_name, p.product_id, p.version_number, c.company_name
          FROM ${tableName} p
@@ -210,12 +240,31 @@ module.exports = function registerWorkflowRoutes(app, {
           `UPDATE passport_workflow SET ${col}='rejected', ${commentCol}=$1, rejected_at=NOW(), overall_status='rejected', updated_at=NOW() WHERE id=$2`,
           [comment || null, wf.id]
         );
+        if (currentPassport) {
+          await archivePassportSnapshot({
+            passport: currentPassport,
+            passportType: resolvedPassportType,
+            archivedBy: userId,
+            actorIdentifier: getActorIdentifier(req.user),
+            snapshotReason: "before_workflow_reject_revert",
+          });
+        }
         await pool.query(
           `UPDATE ${tableName}
            SET release_status = $2, updated_at = NOW()
            WHERE dpp_id=$1 AND release_status='in_review'`,
           [dppId, pInfo.version_number > 1 ? IN_REVISION_STATUS : "draft"]
         );
+        const revertedPassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType });
+        if (revertedPassport) {
+          await archivePassportSnapshot({
+            passport: revertedPassport,
+            passportType: resolvedPassportType,
+            archivedBy: userId,
+            actorIdentifier: getActorIdentifier(req.user),
+            snapshotReason: "after_workflow_reject_revert",
+          });
+        }
         if (wf.submitted_by) {
           const actor = await pool.query("SELECT first_name, last_name FROM users WHERE id=$1", [userId]);
           const actorName = `${actor.rows[0]?.first_name || ""} ${actor.rows[0]?.last_name || ""}`.trim() || "Reviewer";
@@ -256,12 +305,29 @@ module.exports = function registerWorkflowRoutes(app, {
           [comment || null, wf.id]
         );
         if (!wf.approver_id || wf.approval_status === "skipped") {
+          const beforeReleasePassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType, status: "in_review" });
+          if (beforeReleasePassport) {
+            await archivePassportSnapshot({
+              passport: beforeReleasePassport,
+              passportType: resolvedPassportType,
+              archivedBy: userId,
+              actorIdentifier: getActorIdentifier(req.user),
+              snapshotReason: "before_workflow_review_release",
+            });
+          }
           const relRes = await pool.query(
             `UPDATE ${tableName} SET release_status='released', updated_at=NOW() WHERE dpp_id=$1 AND release_status='in_review' RETURNING *`,
             [dppId]
           );
           if (relRes.rows.length) {
             const released = relRes.rows[0];
+            await archivePassportSnapshot({
+              passport: released,
+              passportType: resolvedPassportType,
+              archivedBy: userId,
+              actorIdentifier: getActorIdentifier(req.user),
+              snapshotReason: "after_workflow_review_release",
+            });
             const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
             const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null);
             if (sigData) {
@@ -270,8 +336,22 @@ module.exports = function registerWorkflowRoutes(app, {
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
                 [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
               );
+              await logAudit(
+                wf.company_id,
+                userId,
+                "SIGN_PASSPORT",
+                "passport_signatures",
+                dppId,
+                null,
+                {
+                  version_number: released.version_number,
+                  signing_key_id: sigData.keyId,
+                  signature_algorithm: sigData.signatureAlgorithm,
+                  via: "workflow_review"
+                }
+              );
             }
-            await markOlderVersionsObsolete(tableName, dppId, released.version_number);
+            await markOlderVersionsObsolete(tableName, dppId, released.version_number, resolvedPassportType);
             await logAudit(
               wf.company_id,
               userId,
@@ -330,12 +410,29 @@ module.exports = function registerWorkflowRoutes(app, {
           "UPDATE passport_workflow SET approval_status='approved', approver_comment=$1, approved_at=NOW(), overall_status='approved', updated_at=NOW() WHERE id=$2",
           [comment || null, wf.id]
         );
+        const beforeReleasePassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType, status: "in_review" });
+        if (beforeReleasePassport) {
+          await archivePassportSnapshot({
+            passport: beforeReleasePassport,
+            passportType: resolvedPassportType,
+            archivedBy: userId,
+            actorIdentifier: getActorIdentifier(req.user),
+            snapshotReason: "before_workflow_approval_release",
+          });
+        }
         const relRes = await pool.query(
           `UPDATE ${tableName} SET release_status='released', updated_at=NOW() WHERE dpp_id=$1 AND release_status='in_review' RETURNING *`,
           [dppId]
         );
         if (relRes.rows.length) {
           const released = relRes.rows[0];
+          await archivePassportSnapshot({
+            passport: released,
+            passportType: resolvedPassportType,
+            archivedBy: userId,
+            actorIdentifier: getActorIdentifier(req.user),
+            snapshotReason: "after_workflow_approval_release",
+          });
           const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
           const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null);
           if (sigData) {
@@ -344,8 +441,22 @@ module.exports = function registerWorkflowRoutes(app, {
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
               [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
+            await logAudit(
+              wf.company_id,
+              userId,
+              "SIGN_PASSPORT",
+              "passport_signatures",
+              dppId,
+              null,
+              {
+                version_number: released.version_number,
+                signing_key_id: sigData.keyId,
+                signature_algorithm: sigData.signatureAlgorithm,
+                via: "workflow_approval"
+              }
+            );
           }
-          await markOlderVersionsObsolete(tableName, dppId, released.version_number);
+          await markOlderVersionsObsolete(tableName, dppId, released.version_number, resolvedPassportType);
           await logAudit(
             wf.company_id,
             userId,

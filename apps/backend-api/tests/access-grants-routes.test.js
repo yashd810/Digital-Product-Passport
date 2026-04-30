@@ -333,6 +333,8 @@ function createTestApp() {
     getPassportVersionsByLineage: jest.fn(async () => []),
     fetchCompanyPassportRecord: jest.fn(async () => null),
     resolveCompanyPreviewPassport: jest.fn(async () => null),
+    archivePassportSnapshot: jest.fn(async () => {}),
+    archivePassportSnapshots: jest.fn(async () => 0),
     updatePassportRowById: jest.fn(async () => []),
     buildPassportVersionHistory: jest.fn(async () => ({ history: [] })),
     clearExpiredEditSessions: jest.fn(async () => {}),

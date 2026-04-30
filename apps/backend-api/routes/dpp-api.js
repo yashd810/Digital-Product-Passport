@@ -2,6 +2,10 @@
 const logger = require("../services/logger");
 const { randomUUID } = require("crypto");
 const {
+  extractCarrierAuthenticityMutation,
+  applyCarrierAuthenticityMutation,
+} = require("../helpers/carrier-authenticity");
+const {
   generateDppRecordId,
   isDppRecordId
 } = require("../services/dpp-record-id");
@@ -31,6 +35,7 @@ module.exports = function registerDppApiRoutes(app, {
   didService,
   dppIdentity, // the dpp-identity-service module
   productIdentifierService,
+  archivePassportSnapshot,
   updatePassportRowById,
   isEditablePassportStatus,
   logAudit,
@@ -65,6 +70,17 @@ module.exports = function registerDppApiRoutes(app, {
 
   function getAppUrl() {
     return process.env.APP_URL || "http://localhost:3001";
+  }
+
+  function getActorIdentifier(user) {
+    return (
+      user?.actorIdentifier ||
+      user?.globallyUniqueOperatorId ||
+      user?.operatorIdentifier ||
+      user?.economicOperatorId ||
+      user?.email ||
+      (user?.userId ? `user:${user.userId}` : null)
+    );
   }
 
   function getStandardResultCode(httpStatus) {
@@ -1081,12 +1097,30 @@ module.exports = function registerDppApiRoutes(app, {
       storedValue = nestedWrite.value;
     }
 
-    await updatePassportRowById({
+    await archivePassportSnapshot({
+      passport: editable.passport,
+      passportType: editable.passport.passport_type,
+      archivedBy: user.userId,
+      actorIdentifier: getActorIdentifier(user),
+      snapshotReason: "before_patch_element",
+    });
+
+    const updateResult = await updatePassportRowById({
       tableName: editable.tableName,
       rowId: editable.passport.id,
       userId: user.userId,
-      data: { [targetColumn]: storedValue }
+      data: { [targetColumn]: storedValue },
+      includeUpdatedRow: true,
     });
+    if (updateResult?.updatedRow) {
+      await archivePassportSnapshot({
+        passport: updateResult.updatedRow,
+        passportType: editable.passport.passport_type,
+        archivedBy: user.userId,
+        actorIdentifier: getActorIdentifier(user),
+        snapshotReason: "after_patch_element",
+      });
+    }
 
     await logAudit(
       editable.passport.company_id,
@@ -1353,6 +1387,7 @@ module.exports = function registerDppApiRoutes(app, {
         compliance_profile_key,
         content_specification_ids,
         carrier_policy_key,
+        carrier_authenticity,
         economic_operator_id,
         facility_id,
         ...fields
@@ -1389,6 +1424,11 @@ module.exports = function registerDppApiRoutes(app, {
       });
       const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
       const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
+      const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
+        ...normalizedBody,
+        carrier_authenticity,
+      });
+      const carrierAuthenticity = applyCarrierAuthenticityMutation(null, carrierAuthenticityMutation);
       const allColumns = [
       "dppId",
       "lineage_id",
@@ -1399,6 +1439,7 @@ module.exports = function registerDppApiRoutes(app, {
       "compliance_profile_key",
       "content_specification_ids",
       "carrier_policy_key",
+      "carrier_authenticity",
       "economic_operator_id",
       "facility_id",
       "granularity",
@@ -1415,6 +1456,7 @@ module.exports = function registerDppApiRoutes(app, {
       complianceManagedFields.compliance_profile_key,
       complianceManagedFields.content_specification_ids,
       complianceManagedFields.carrier_policy_key,
+      carrierAuthenticity ? JSON.stringify(carrierAuthenticity) : null,
       complianceManagedFields.economic_operator_id,
       complianceManagedFields.facility_id,
       requestedGranularity,
@@ -1454,6 +1496,13 @@ module.exports = function registerDppApiRoutes(app, {
         product_id: storedProductIdentifiers.productIdInput,
         product_identifier_did: storedProductIdentifiers.productIdentifierDid,
         granularity: requestedGranularity
+      });
+      await archivePassportSnapshot({
+        passport: insertResult.rows[0],
+        passportType: resolvedPassportType,
+        archivedBy: req.user.userId,
+        actorIdentifier: getActorIdentifier(req.user),
+        snapshotReason: "after_standards_create",
       });
       await replicatePassportToBackup({
         passport: createdPassport,
@@ -1720,6 +1769,7 @@ module.exports = function registerDppApiRoutes(app, {
         compliance_profile_key,
         content_specification_ids,
         carrier_policy_key,
+        carrier_authenticity,
         economic_operator_id,
         facility_id,
         ...fields
@@ -1747,6 +1797,17 @@ module.exports = function registerDppApiRoutes(app, {
         updateData.content_specification_ids = serializeProfileDefaultValue(content_specification_ids);
       }
       if (carrier_policy_key !== undefined) updateData.carrier_policy_key = carrier_policy_key || null;
+      const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
+        ...normalizedBody,
+        carrier_authenticity,
+      });
+      if (carrierAuthenticityMutation.provided) {
+        const nextCarrierAuthenticity = applyCarrierAuthenticityMutation(
+          editable.passport.carrier_authenticity,
+          carrierAuthenticityMutation
+        );
+        updateData.carrier_authenticity = nextCarrierAuthenticity ? JSON.stringify(nextCarrierAuthenticity) : null;
+      }
       if (economic_operator_id !== undefined) updateData.economic_operator_id = economic_operator_id || null;
       if (facility_id !== undefined || extractExplicitFacilityId(fields)) {
         updateData.facility_id = await resolveManagedFacilityId({
@@ -1788,13 +1849,32 @@ module.exports = function registerDppApiRoutes(app, {
       const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
       Object.assign(updateData, processedFields);
 
-      const updatedFields = await updatePassportRowById({
+      await archivePassportSnapshot({
+        passport: editable.passport,
+        passportType: editable.passport.passport_type,
+        archivedBy: req.user.userId,
+        actorIdentifier: getActorIdentifier(req.user),
+        snapshotReason: "before_standards_patch",
+      });
+
+      const updateResult = await updatePassportRowById({
         tableName: editable.tableName,
         rowId: editable.passport.id,
         userId: req.user.userId,
-        data: updateData
+        data: updateData,
+        includeUpdatedRow: true,
       });
+      const updatedFields = updateResult.updateCols || [];
       if (!updatedFields.length) return res.status(400).json({ error: "No fields to update" });
+      if (updateResult.updatedRow) {
+        await archivePassportSnapshot({
+          passport: updateResult.updatedRow,
+          passportType: editable.passport.passport_type,
+          archivedBy: req.user.userId,
+          actorIdentifier: getActorIdentifier(req.user),
+          snapshotReason: "after_standards_patch",
+        });
+      }
 
       const companyName = (await getCompanyNameMap([editable.passport.company_id])).get(String(editable.passport.company_id)) || "";
       const updatedPassport = {
@@ -1866,6 +1946,14 @@ module.exports = function registerDppApiRoutes(app, {
         return res.status(409).json({ error: "Passport is not editable" });
       }
 
+      await archivePassportSnapshot({
+        passport: editable.passport,
+        passportType: editable.passport.passport_type,
+        archivedBy: req.user.userId,
+        actorIdentifier: getActorIdentifier(req.user),
+        snapshotReason: "before_standards_delete",
+      });
+
       await replicatePassportToBackup({
         passport: editable.passport,
         typeDef: editable.typeDef,
@@ -1929,24 +2017,13 @@ module.exports = function registerDppApiRoutes(app, {
       }
 
       for (const row of lineageRows.rows) {
-        const { id, deleted_at, ...rowData } = row;
-        await pool.query(
-          `INSERT INTO passport_archives (dpp_id, lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, row_data, archived_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-          [
-          row.dppId,
-          row.lineage_id,
-          released.passport.company_id,
-          released.passport.passport_type,
-          row.version_number,
-          row.model_name,
-          row.product_id,
-          row.product_identifier_did || null,
-          row.release_status,
-          JSON.stringify(rowData),
-          req.user.userId]
-
-        );
+        await archivePassportSnapshot({
+          passport: row,
+          passportType: released.passport.passport_type,
+          archivedBy: req.user.userId,
+          actorIdentifier: getActorIdentifier(req.user),
+          snapshotReason: "before_standards_archive_delete",
+        });
       }
 
       await pool.query(

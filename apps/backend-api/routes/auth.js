@@ -38,6 +38,9 @@ module.exports = function registerAuthRoutes(app, {
     return {
       actorIdentifier: operatorIdentifier,
       actorIdentifierScheme: operatorIdentifierScheme,
+      globallyUniqueOperatorId: operatorIdentifier,
+      globallyUniqueOperatorIdentifier: operatorIdentifier,
+      globallyUniqueOperatorIdentifierScheme: operatorIdentifierScheme,
       operatorIdentifier,
       operatorIdentifierScheme,
       economicOperatorId: operatorIdentifier,
@@ -234,7 +237,10 @@ module.exports = function registerAuthRoutes(app, {
       }
 
       await pool.query("UPDATE users SET last_login_at = NOW() WHERE id = $1", [u.id]).catch(() => {});
-      const sessionToken = generateToken(u);
+      const sessionToken = generateToken(u, undefined, undefined, undefined, undefined, {
+        mfaVerifiedAt: new Date().toISOString(),
+        amr: ["pwd", "otp"]
+      });
       setAuthCookie(res, sessionToken);
       res.json({
         success: true,
@@ -526,7 +532,10 @@ module.exports = function registerAuthRoutes(app, {
 
   app.post("/api/users/me/token", authenticateToken, async (req, res) => {
     try {
-      const freshToken = generateToken(req.user);
+      const freshToken = generateToken(req.user, undefined, undefined, undefined, undefined, {
+        mfaVerifiedAt: req.user?.mfaVerifiedAt || null,
+        amr: req.user?.authenticationMethods || ["pwd"]
+      });
       setAuthCookie(res, freshToken);
       res.json({ token: freshToken });
     } catch {
@@ -587,7 +596,10 @@ module.exports = function registerAuthRoutes(app, {
          RETURNING id, email, company_id, role, session_version`,
         [hash, pepperVersion, req.user.userId]
       );
-      const freshToken = generateToken(updated.rows[0]);
+      const freshToken = generateToken(updated.rows[0], undefined, undefined, undefined, undefined, {
+        mfaVerifiedAt: enable ? new Date().toISOString() : null,
+        amr: enable ? ["pwd", "otp"] : ["pwd"]
+      });
       setAuthCookie(res, freshToken);
       res.json({ success: true, min_password_length: PASSWORD_MIN_LENGTH });
     } catch { res.status(500).json({ error: "Failed" }); }

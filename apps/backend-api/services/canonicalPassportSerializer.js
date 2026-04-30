@@ -3,6 +3,7 @@
 const batteryDictionaryFieldMap = require("../resources/semantics/battery/v1/field-map.json");
 const batteryDictionaryTerms = require("../resources/semantics/battery/v1/terms.json");
 const batteryCategoryRules = require("../resources/semantics/battery/v1/category-rules.json");
+const { buildCarrierAuthenticityResponseFields } = require("../helpers/carrier-authenticity");
 const {
   BATTERY_DICTIONARY_MODEL_KEY,
   LEGACY_BATTERY_PASSPORT_TYPE,
@@ -1055,6 +1056,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       contentSpecificationIds: Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],
       complianceProfileKey: passport.compliance_profile_key || null,
       carrierPolicyKey: passport.carrier_policy_key || null,
+      ...buildCarrierAuthenticityResponseFields(passport.carrier_authenticity),
       subjectDid,
       dppDid,
       companyDid,

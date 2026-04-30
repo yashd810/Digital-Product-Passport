@@ -1,27 +1,41 @@
 {
 	# prEN 18216 requires HTTP/2 as the minimum public transport version.
 	# Restrict the HTTPS listener to HTTP/2+ so HTTP/1.1 is not negotiated at the edge.
+	# When OCI Always Free Network Load Balancer is used in TCP/TLS passthrough mode,
+	# Caddy remains the TLS terminator and still enforces HTTP/2+ and HTTP/3 here.
 	servers :443 {
 		protocols h2 h3
 	}
 }
 
+(production_tls_policy) {
+	# Only allow modern TLS versions on the public edge.
+	tls {
+		protocols tls1.2 tls1.3
+	}
+}
+
 claros-dpp.online, www.claros-dpp.online {
+	import production_tls_policy
 	reverse_proxy 127.0.0.1:8080
 }
 
 app.claros-dpp.online {
+	import production_tls_policy
 	reverse_proxy 127.0.0.1:3000
 }
 
 api.claros-dpp.online {
+	import production_tls_policy
 	reverse_proxy 127.0.0.1:3001
 }
 
 viewer.claros-dpp.online {
+	import production_tls_policy
 	reverse_proxy 127.0.0.1:3004
 }
 
 assets.claros-dpp.online {
+	import production_tls_policy
 	reverse_proxy 127.0.0.1:3003
 }

@@ -135,6 +135,10 @@ function createTestApp() {
       latestEventHash: "root_hash_16",
     },
   }));
+  const replicateAuditAnchorEvent = jest.fn(async () => ({
+    success: true,
+    results: [{ backup_provider_key: "oci-primary", event_category: "audit_anchor", replication_status: "synced" }],
+  }));
 
   const noopMiddleware = (_req, _res, next) => next();
   const noopAsync = jest.fn(async () => []);
@@ -189,6 +193,8 @@ function createTestApp() {
     getPassportVersionsByLineage: jest.fn(async () => []),
     fetchCompanyPassportRecord: jest.fn(async () => null),
     resolveCompanyPreviewPassport: jest.fn(async () => null),
+    archivePassportSnapshot: jest.fn(async () => {}),
+    archivePassportSnapshots: jest.fn(async () => 0),
     updatePassportRowById: jest.fn(async () => []),
     buildPassportVersionHistory: jest.fn(async () => ({ history: [] })),
     clearExpiredEditSessions: jest.fn(async () => {}),
@@ -217,11 +223,13 @@ function createTestApp() {
       }),
       buildLookupCandidates: ({ productId }) => [productId],
     },
-    backupProviderService: null,
+    backupProviderService: {
+      replicateAuditAnchorEvent,
+    },
     buildExpandedPassportPayload: jest.fn(() => ({})),
   });
 
-  return { app, buildAuditLogRootSummary, listAuditLogAnchors, anchorAuditLogRoot };
+  return { app, buildAuditLogRootSummary, listAuditLogAnchors, anchorAuditLogRoot, replicateAuditAnchorEvent };
 }
 
 describe("audit log routes", () => {
@@ -266,7 +274,7 @@ describe("audit log routes", () => {
   });
 
   test("POST /api/companies/:companyId/audit-logs/anchors creates an anchor", async () => {
-    const { app, anchorAuditLogRoot } = createTestApp();
+    const { app, anchorAuditLogRoot, replicateAuditAnchorEvent } = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "post",
@@ -299,5 +307,10 @@ describe("audit log routes", () => {
       notes: "Daily compliance export",
       metadata: { ticket: "COMP-42" },
     });
+    expect(replicateAuditAnchorEvent).toHaveBeenCalledWith(expect.objectContaining({
+      companyId: 5,
+      actorUserId: 9,
+      actorIdentifier: "operator:se-123",
+    }));
   });
 });

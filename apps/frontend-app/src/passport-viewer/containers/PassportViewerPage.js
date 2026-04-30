@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { translateSchemaLabel } from "../../app/providers/i18n";
-import { generateQRCode, saveQRCodeToDatabase } from "../utils/QRcode";
+import { generateQRCodeBundle, saveQRCodeToDatabase } from "../utils/QRcode";
 import { getViewerBrandTheme } from "../../app/providers/ThemeContext";
 import { isObsoletePassportStatus, isReleasedPassportStatus } from "../../passports/utils/passportStatus";
 import { authHeaders } from "../../shared/api/authHeaders";
@@ -32,6 +32,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [companyData,      setCompanyData]      = useState(null);
   const [typeDef,          setTypeDef]          = useState(null);
   const [qrCode,           setQrCode]           = useState(null);
+  const [carrierAuthenticity, setCarrierAuthenticity] = useState(null);
   const [qrLoading,        setQrLoading]        = useState(true);
   const [loading,          setLoading]          = useState(true);
   const [error,            setError]            = useState("");
@@ -54,6 +55,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [keyCopied,         setKeyCopied]         = useState(false);
   const [showHistoryModal,  setShowHistoryModal]  = useState(false);
   const [activeSectionKey,  setActiveSectionKey]  = useState("");
+  const [securityReportState, setSecurityReportState] = useState({ submitting: false, success: false, error: "" });
   const encodedProductId = encodeURIComponent(productId || "");
   const encodedPreviewId = encodeURIComponent(previewId || "");
   const isPreviewMode = !!previewMode && !!previewId;
@@ -115,7 +117,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     (async () => {
       setQrLoading(true);
       try {
-        const generated = await generateQRCode({
+        const generatedBundle = await generateQRCodeBundle({
           productId: passport.product_id,
           companyName: companyData?.company_name,
           manufacturerName: passport.manufacturer,
@@ -123,14 +125,21 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           modelName: passport.model_name,
           granularity: passport.granularity || "item",
         });
-        if (generated) {
-          setQrCode(generated);
+        if (generatedBundle?.qrCodeDataUrl) {
+          setQrCode(generatedBundle.qrCodeDataUrl);
+          setCarrierAuthenticity(generatedBundle.carrierAuthenticity || null);
           try {
-            await saveQRCodeToDatabase(passport.dppId, generated, passport.passport_type);
+            await saveQRCodeToDatabase(
+              passport.dppId,
+              generatedBundle.qrCodeDataUrl,
+              passport.passport_type,
+              generatedBundle.carrierAuthenticity
+            );
           } catch {}
         }
       } catch (e) {
         setQrCode(null);
+        setCarrierAuthenticity(null);
       } finally {
         setQrLoading(false);
       }
@@ -308,6 +317,25 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   if (error)   return <div className="alert alert-error">{error}</div>;
   if (!passport) return null;
 
+  const handleReportSuspiciousCarrier = async (report) => {
+    if (!passport?.dppId) return;
+    setSecurityReportState({ submitting: true, success: false, error: "" });
+    try {
+      const response = await fetch(`${API}/api/passports/${passport.dppId}/security-report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(report),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to report suspicious carrier");
+      }
+      setSecurityReportState({ submitting: false, success: true, error: "" });
+    } catch (error) {
+      setSecurityReportState({ submitting: false, success: false, error: error.message || "Failed to report suspicious carrier" });
+    }
+  };
+
   return (
     <div
       data-theme="light"
@@ -317,7 +345,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       <div className="no-print">
         <Header displayName={displayName} lang={lang} setLang={setLang} dppId={passport.dppId} companyData={companyData} brandTheme={brandTheme} />
 
-        <div className="viewer-content">
+        <main id="viewer-main-content" className="viewer-content">
           <div className="viewer-shell">
             <div className="viewer-topbar">
               <div className="viewer-title">
@@ -427,6 +455,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
               displayName={displayName}
               qrCode={qrCode}
               qrLoading={qrLoading}
+              carrierAuthenticity={passport?.carrier_authenticity || carrierAuthenticity}
+              onReportSuspiciousCarrier={handleReportSuspiciousCarrier}
+              securityReportState={securityReportState}
               onOpenHistory={() => setShowHistoryModal(true)}
               onPrint={() => { setTimeout(() => window.print(), 300); }}
             />
@@ -454,7 +485,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
               )}
             </div>
           </div>
-        </div>
+        </main>
 
         <Footer brandTheme={brandTheme} />
       </div>

@@ -114,6 +114,14 @@ const PASSPORT = {
 describe("signing service", () => {
   const originalPrivate = process.env.SIGNING_PRIVATE_KEY;
   const originalPublic = process.env.SIGNING_PUBLIC_KEY;
+  const originalRequireCert = process.env.REQUIRE_CERTIFICATE_BACKED_SIGNING;
+  const originalCertProfile = process.env.SIGNING_CERTIFICATE_PROFILE;
+  const originalCertId = process.env.SIGNING_CERTIFICATE_ID;
+  const originalCertUrl = process.env.SIGNING_CERTIFICATE_URL;
+  const originalRevocationUrl = process.env.SIGNING_REVOCATION_CHECK_URL;
+  const originalTrustedListUrl = process.env.SIGNING_TRUSTED_LIST_URL;
+  const originalOperatorId = process.env.SIGNING_ECONOMIC_OPERATOR_ID;
+  const originalOperatorScheme = process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME;
 
   afterEach(() => {
     if (originalPrivate === undefined) delete process.env.SIGNING_PRIVATE_KEY;
@@ -121,6 +129,23 @@ describe("signing service", () => {
 
     if (originalPublic === undefined) delete process.env.SIGNING_PUBLIC_KEY;
     else process.env.SIGNING_PUBLIC_KEY = originalPublic;
+
+    if (originalRequireCert === undefined) delete process.env.REQUIRE_CERTIFICATE_BACKED_SIGNING;
+    else process.env.REQUIRE_CERTIFICATE_BACKED_SIGNING = originalRequireCert;
+    if (originalCertProfile === undefined) delete process.env.SIGNING_CERTIFICATE_PROFILE;
+    else process.env.SIGNING_CERTIFICATE_PROFILE = originalCertProfile;
+    if (originalCertId === undefined) delete process.env.SIGNING_CERTIFICATE_ID;
+    else process.env.SIGNING_CERTIFICATE_ID = originalCertId;
+    if (originalCertUrl === undefined) delete process.env.SIGNING_CERTIFICATE_URL;
+    else process.env.SIGNING_CERTIFICATE_URL = originalCertUrl;
+    if (originalRevocationUrl === undefined) delete process.env.SIGNING_REVOCATION_CHECK_URL;
+    else process.env.SIGNING_REVOCATION_CHECK_URL = originalRevocationUrl;
+    if (originalTrustedListUrl === undefined) delete process.env.SIGNING_TRUSTED_LIST_URL;
+    else process.env.SIGNING_TRUSTED_LIST_URL = originalTrustedListUrl;
+    if (originalOperatorId === undefined) delete process.env.SIGNING_ECONOMIC_OPERATOR_ID;
+    else process.env.SIGNING_ECONOMIC_OPERATOR_ID = originalOperatorId;
+    if (originalOperatorScheme === undefined) delete process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME;
+    else process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME = originalOperatorScheme;
   });
 
   test("issues and verifies new ES256 credentials", async () => {
@@ -151,6 +176,10 @@ describe("signing service", () => {
     expect(verification.status).toBe("valid");
     expect(verification.algorithm).toBe("ES256");
     expect(verification.proofType).toBe("JsonWebSignature2020");
+    const parsedVc = JSON.parse(signed.vcJson);
+    expect(parsedVc.proof).toEqual(expect.objectContaining({
+      certificateProfile: "application-managed-signing-key",
+    }));
   });
 
   test("keeps legacy RSA credentials verifiable", async () => {
@@ -214,5 +243,90 @@ describe("signing service", () => {
 
     expect(hashA).toBe(hashB);
     expect(signingService.canonicalJSON(vcA)).toBe(signingService.canonicalJSON(vcB));
+  });
+
+  test("refuses production signing when certificate-backed mode is required but not configured", async () => {
+    delete process.env.SIGNING_PRIVATE_KEY;
+    delete process.env.SIGNING_PUBLIC_KEY;
+    process.env.REQUIRE_CERTIFICATE_BACKED_SIGNING = "true";
+
+    const pool = createMockPool();
+    const { signingService } = buildTestHarness(pool);
+
+    await expect(signingService.loadOrGenerateSigningKey()).rejects.toThrow(
+      /Certificate-backed signing is required/
+    );
+  });
+
+  test("publishes globally unique operator and certificate metadata when configured", async () => {
+    delete process.env.SIGNING_PRIVATE_KEY;
+    delete process.env.SIGNING_PUBLIC_KEY;
+    process.env.SIGNING_CERTIFICATE_PROFILE = "eidas-qsealc";
+    process.env.SIGNING_CERTIFICATE_ID = "qsealc-cert-001";
+    process.env.SIGNING_CERTIFICATE_URL = "https://example.test/certs/qsealc-cert-001";
+    process.env.SIGNING_REVOCATION_CHECK_URL = "https://example.test/ocsp";
+    process.env.SIGNING_TRUSTED_LIST_URL = "https://example.test/trusted-list";
+    process.env.SIGNING_ECONOMIC_OPERATOR_ID = "EORI-ACME-001";
+    process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME = "EORI";
+
+    const pool = createMockPool();
+    const { signingService } = buildTestHarness(pool);
+    await signingService.loadOrGenerateSigningKey();
+
+    const signed = await signingService.signPassport(PASSPORT, TYPE_DEF);
+    const parsedVc = JSON.parse(signed.vcJson);
+
+    expect(signingService.getSigningTrustMetadata()).toEqual(expect.objectContaining({
+      globallyUniqueOperatorId: "EORI-ACME-001",
+      issuerCertificateId: "qsealc-cert-001",
+      certificateProfile: "eidas-qsealc",
+    }));
+    expect(parsedVc.proof).toEqual(expect.objectContaining({
+      globallyUniqueOperatorId: "EORI-ACME-001",
+      issuerCertificateId: "qsealc-cert-001",
+      certificateProfile: "eidas-qsealc",
+    }));
+  });
+
+  test("signs portable carrier binding constructs with issuer trust metadata", async () => {
+    delete process.env.SIGNING_PRIVATE_KEY;
+    delete process.env.SIGNING_PUBLIC_KEY;
+    process.env.SIGNING_CERTIFICATE_ID = "qsealc-cert-001";
+    process.env.SIGNING_ECONOMIC_OPERATOR_ID = "gxx:operator:12345";
+    process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME = "gxx";
+
+    const pool = createMockPool();
+    const { signingService } = buildTestHarness(pool);
+
+    await signingService.loadOrGenerateSigningKey();
+    const signed = await signingService.signPortableDataConstruct({
+      type: "DataCarrierBindingCredential",
+      id: "https://www.claros-dpp.online/dpp/acme-energy/battery-pack/BAT-2026-001#carrier-binding",
+      subjectId: "https://www.claros-dpp.online/dpp/acme-energy/battery-pack/BAT-2026-001#carrier",
+      payload: {
+        digitalProductPassportId: PASSPORT.dppId,
+        uniqueProductIdentifier: PASSPORT.product_id,
+        publicAccessUrl: "https://www.claros-dpp.online/dpp/acme-energy/battery-pack/BAT-2026-001",
+      },
+    });
+
+    expect(signed).toEqual(
+      expect.objectContaining({
+        dataHash: expect.any(String),
+        keyId: expect.any(String),
+        signatureAlgorithm: expect.any(String),
+        document: expect.objectContaining({
+          type: ["VerifiableCredential", "DataCarrierBindingCredential"],
+          credentialSubject: expect.objectContaining({
+            digitalProductPassportId: PASSPORT.dppId,
+            uniqueProductIdentifier: PASSPORT.product_id,
+          }),
+          proof: expect.objectContaining({
+            issuerCertificateId: "qsealc-cert-001",
+            globallyUniqueOperatorId: "gxx:operator:12345",
+          }),
+        }),
+      })
+    );
   });
 });

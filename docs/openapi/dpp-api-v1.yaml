@@ -6,7 +6,13 @@ info:
     Standards-facing Digital Product Passport API aligned to the repository's
     current JTC24-oriented route surface. Supports product identifier lookup,
     version reads, fine-grained element reads, batch lookup, and registry-style
-    registration of released passports.
+    registration of released passports. Content negotiation uses
+    `Accept: application/json` for JSON payloads and
+    `Accept: application/ld+json` for JSON-LD payloads. Query
+    `representation=compressed` selects the compressed payload form, while
+    `representation=expanded` selects the prEN 18223-style header plus
+    `elements[]` payload. The legacy `representation=full` value remains
+    accepted as an alias for `expanded`.
 servers:
   - url: https://www.claros-dpp.online
     description: Production
@@ -378,8 +384,10 @@ paths:
       description: >
         Standards-conformant productId lookup route. Use `representation=expanded`
         to receive the prEN 18223-style expanded payload with a Digital Product
-        Passport header plus `elements[]`. The legacy `representation=full`
-        value remains accepted as a backward-compatible alias.
+        Passport header plus `elements[]`. `Accept: application/json` returns
+        JSON, while `Accept: application/ld+json` returns JSON-LD. The legacy
+        `representation=full` value remains accepted as a backward-compatible
+        alias.
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/RepresentationQuery'
@@ -435,6 +443,8 @@ paths:
       description: >
         Standards-conformant productId-and-date lookup route. This route accepts
         only the raw `productId` value plus a required ISO 8601 `date` query.
+        `Accept: application/json` returns JSON, while
+        `Accept: application/ld+json` returns JSON-LD.
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - name: date

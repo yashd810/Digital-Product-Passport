@@ -1,6 +1,6 @@
 # Passport Representations
 
-Last updated: 2026-04-24
+Last updated: 2026-04-30
 
 Code/files:
 - `apps/backend-api/routes/passport-public.js`
@@ -14,6 +14,23 @@ Supported representations:
 - Standards expanded JSON from `GET /api/v1/dppsByProductId/:productId?representation=expanded`
 - JSON-LD from `GET /api/passports/:dppId?format=semantic`
 - VC with proof metadata from `GET /api/passports/:dppId/signature`
+
+Content negotiation matrix:
+- Public payload routes such as `GET /api/passports/:dppId`, `GET /api/passports/:dppId/canonical`, and `GET /api/passports/by-product/:productId`:
+  - `Accept: application/json` -> JSON payload
+  - `Accept: application/ld+json` -> JSON-LD payload when JSON-LD export is enabled for the company
+  - `?representation=compressed` -> compressed operational/public DPP shape
+  - `?representation=expanded` -> prEN 18223-style expanded payload with DPP header plus `elements[]`
+  - `?representation=full` -> accepted as a backward-compatible alias for `expanded`
+- Standards routes such as `GET /api/v1/dppsByProductId/:productId` and `GET /api/v1/dppsByProductIdAndDate/:productId`:
+  - `Accept: application/json` -> JSON payload
+  - `Accept: application/ld+json` -> JSON-LD payload
+  - `?representation=compressed` -> compressed standards payload
+  - `?representation=expanded` -> expanded standards payload
+  - `?representation=full` -> accepted as a backward-compatible alias for `expanded`
+- Browser/resolver entrypoints such as `GET /resolve?did=...` and the public DID resolution routes:
+  - `Accept: text/html` -> redirect to the public passport HTML page or company page
+  - `Accept: application/json` or `Accept: application/did+ld+json` -> DID document or JSON resolution target
 
 Example request:
 ```http

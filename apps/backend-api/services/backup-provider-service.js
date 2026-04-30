@@ -200,6 +200,49 @@ module.exports = function createBackupProviderService({
     );
   }
 
+  function buildAuditAnchorEnvelope({
+    companyId,
+    actorUserId = null,
+    actorIdentifier = null,
+    anchor,
+    summary,
+    provider
+  }) {
+    return {
+      backupProvider: {
+        providerKey: provider.provider_key,
+        providerType: provider.provider_type,
+        displayName: provider.display_name,
+        supportsPublicHandover: provider.supports_public_handover !== false,
+      },
+      eventCategory: "audit_anchor",
+      recordedAt: new Date().toISOString(),
+      source: {
+        companyId: companyId ? Number.parseInt(companyId, 10) : null,
+        actorUserId: actorUserId || null,
+        actorIdentifier: actorIdentifier || null,
+      },
+      anchor: anchor || null,
+      summary: summary || null,
+    };
+  }
+
+  function buildAuditAnchorStorageKey({ provider, companyId, anchorId }) {
+    const now = new Date();
+    const datePrefix = [
+      now.getUTCFullYear(),
+      String(now.getUTCMonth() + 1).padStart(2, "0"),
+      String(now.getUTCDate()).padStart(2, "0"),
+    ].join("/");
+    return path.posix.join(
+      normalizeObjectPrefix(provider.object_prefix),
+      `company-${companyId || "unknown"}`,
+      "audit-anchors",
+      datePrefix,
+      `anchor-${normalizeStorageSegment(anchorId || Date.now(), "anchor")}.json`
+    );
+  }
+
   async function recordReplication({
     provider,
     passport,
@@ -424,6 +467,77 @@ module.exports = function createBackupProviderService({
     };
   }
 
+  async function replicateAuditAnchorEvent({
+    companyId,
+    actorUserId = null,
+    actorIdentifier = null,
+    anchor,
+    summary,
+    providerKey = null,
+  }) {
+    if (!companyId) {
+      return { success: false, error: "companyId is required for audit-anchor replication", results: [] };
+    }
+
+    const providers = (await listProviders({ companyId })).
+      filter((provider) => !providerKey || provider.provider_key === providerKey);
+
+    if (!providers.length) {
+      return { success: true, skipped: true, reason: "NO_BACKUP_PROVIDER", results: [] };
+    }
+
+    const results = [];
+    for (const provider of providers) {
+      const envelope = buildAuditAnchorEnvelope({
+        companyId,
+        actorUserId,
+        actorIdentifier,
+        anchor,
+        summary,
+        provider,
+      });
+
+      let replicationStatus = "synced";
+      let storageKey = null;
+      let publicUrl = null;
+      let errorMessage = null;
+
+      try {
+        if (!storageService?.saveObject) {
+          throw new Error("Configured storage service does not support backup writes");
+        }
+        const stored = await storageService.saveObject({
+          key: buildAuditAnchorStorageKey({ provider, companyId, anchorId: anchor?.id }),
+          buffer: Buffer.from(JSON.stringify(envelope, null, 2), "utf8"),
+          contentType: "application/json",
+          cacheControl: "private, max-age=0, no-store",
+        });
+        storageKey = stored?.storageKey || null;
+        publicUrl = stored?.url || null;
+      } catch (error) {
+        replicationStatus = "failed";
+        errorMessage = error.message;
+      }
+
+      results.push({
+        backup_provider_key: provider.provider_key,
+        event_category: "audit_anchor",
+        anchor_id: anchor?.id || null,
+        root_event_hash: anchor?.root_event_hash || anchor?.rootEventHash || summary?.latestEventHash || null,
+        replication_status: replicationStatus,
+        storage_provider: storageService?.provider || storageService?.name || null,
+        storage_key: storageKey,
+        public_url: publicUrl,
+        error_message: errorMessage,
+      });
+    }
+
+    return {
+      success: results.every((row) => row.replication_status === "synced"),
+      results,
+    };
+  }
+
   async function updateVerificationResult({
     id,
     verificationStatus,
@@ -632,6 +746,7 @@ module.exports = function createBackupProviderService({
     upsertProvider,
     revokeProvider,
     replicateAccessControlEvent,
+    replicateAuditAnchorEvent,
     replicatePassportSnapshot,
     verifyReplications
   };

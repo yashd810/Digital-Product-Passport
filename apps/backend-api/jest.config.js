@@ -24,6 +24,7 @@ module.exports = {
     "<rootDir>/tests/security-service.test.js",
     "<rootDir>/tests/canonical-json.test.js",
     "<rootDir>/tests/passport-public.test.js",
+    "<rootDir>/tests/passport-qrcode.test.js",
     "<rootDir>/tests/signing.test.js",
   ],
 };

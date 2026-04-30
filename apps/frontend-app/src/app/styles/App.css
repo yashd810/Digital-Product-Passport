@@ -2,6 +2,25 @@
    PASSPORT VIEWER TABLE STYLES — theme aware
    ============================================ */
 
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -48px;
+  z-index: 10000;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0b1826;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 10px 30px rgba(11, 24, 38, 0.24);
+  transition: top 0.16s ease;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
 .battery-table {
   width: min(100%, 980px);
   margin: 24px auto;

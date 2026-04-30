@@ -373,7 +373,7 @@ const passwordService = createPasswordService({
   currentPepperVersion: CURRENT_PEPPER_VERSION,
 });
 const { hashPassword, verifyPassword, verifyPasswordAndUpgrade } = passwordService;
-const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1) => {
+const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, extraClaims = {}) => {
   const user = typeof userOrId === "object" && userOrId !== null
     ? userOrId
     : { id: userOrId, email, company_id: companyId, role, session_version: sessionVersion };
@@ -383,6 +383,8 @@ const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1) =>
     companyId: user.company_id !== undefined ? user.company_id : (user.companyId ?? null),
     role: user.role,
     sessionVersion: user.session_version !== undefined ? user.session_version : (user.sessionVersion ?? 1),
+    mfaVerifiedAt: extraClaims.mfaVerifiedAt || null,
+    amr: Array.isArray(extraClaims.amr) && extraClaims.amr.length ? extraClaims.amr : ["pwd"],
   }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
 };
 const hashOpaqueToken = (value) => crypto.createHash("sha256").update(String(value)).digest("hex");
@@ -676,6 +678,7 @@ const {
   getCompanyNameMap, stripRestrictedFieldsForPublicView,
   fetchCompanyPassportRecord, resolveReleasedPassportByProductId,
   resolvePublicPassportByDppId, resolveCompanyPreviewPassport,
+  archivePassportSnapshot, archivePassportSnapshots,
   updatePassportRowById, buildPassportVersionHistory,
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
   getLatestCompanyPassports, createPassportTable, queryTableStats, submitPassportToWorkflow,
@@ -906,7 +909,7 @@ registerWorkflowRoutes(app, {
   pool, authenticateToken, checkCompanyAccess, requireEditor,
   submitPassportToWorkflow, getTable, IN_REVISION_STATUS,
   signPassport, markOlderVersionsObsolete, logAudit, buildCurrentPublicPassportPath,
-  createNotification, complianceService,
+  createNotification, complianceService, archivePassportSnapshot,
 });
 
 registerAuthRoutes(app, {
@@ -950,12 +953,13 @@ registerPassportRoutes(app, {
   logAudit, getPassportTypeSchema, findExistingPassportByProductId,
   getPassportLineageContext, getPassportVersionsByLineage,
   fetchCompanyPassportRecord, resolveCompanyPreviewPassport,
+  archivePassportSnapshot, archivePassportSnapshots,
   updatePassportRowById, buildPassportVersionHistory,
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
   verifyAuditLogChain,
   buildAuditLogRootSummary, listAuditLogAnchors, anchorAuditLogRoot,
   stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
-  submitPassportToWorkflow, signPassport,
+  submitPassportToWorkflow, signPassport, signPortableDataConstruct: signingService.signPortableDataConstruct,
   buildBatteryPassJsonExport, storageService, complianceService, accessRightsService, productIdentifierService,
   backupProviderService, buildExpandedPassportPayload,
 });
@@ -968,6 +972,7 @@ registerPassportPublicRoutes(app, {
   resolveReleasedPassportByProductId, resolvePublicPassportByDppId, buildPassportVersionHistory,
   resolvePublicPathToSubjects,
   verifyPassportSignature,
+  logAudit,
   buildJsonLdContext: buildPassportJsonLdContext,
   buildBatteryPassJsonExport,
   buildCanonicalPassportPayload,
@@ -1001,6 +1006,7 @@ registerDppApiRoutes(app, {
   didService,
   dppIdentity,
   productIdentifierService,
+  archivePassportSnapshot,
   updatePassportRowById,
   isEditablePassportStatus,
   logAudit,

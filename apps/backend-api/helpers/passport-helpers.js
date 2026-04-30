@@ -18,6 +18,21 @@ const SYSTEM_PASSPORT_FIELDS = new Set([
   "release_status",
   "deleted_at",
   "qr_code",
+  "carrier_authenticity",
+  "carrier_security_status",
+  "carrier_authentication_method",
+  "carrier_verification_instructions",
+  "signed_carrier_payload",
+  "issuer_certificate_id",
+  "carrier_compatibility_profiles",
+  "physical_carrier_security_features",
+  "trusted_viewer_origin",
+  "trusted_viewer_host",
+  "counterfeit_risk_level",
+  "anti_counterfeit_instructions",
+  "safety_warnings",
+  "qr_print_specification",
+  "sign_carrier_payload",
   "created_by_email",
   "first_name",
   "last_name",
@@ -81,10 +96,70 @@ const normalizePassportRequestBody = (body = {}) => {
   if (normalized.dpp_id === undefined) {
     if (normalized.dppId !== undefined) normalized.dpp_id = normalized.dppId;
   }
+  if (normalized.carrier_authenticity === undefined && normalized.carrierAuthenticity !== undefined) {
+    normalized.carrier_authenticity = normalized.carrierAuthenticity;
+  }
+  if (normalized.carrier_security_status === undefined && normalized.carrierSecurityStatus !== undefined) {
+    normalized.carrier_security_status = normalized.carrierSecurityStatus;
+  }
+  if (normalized.carrier_authentication_method === undefined && normalized.carrierAuthenticationMethod !== undefined) {
+    normalized.carrier_authentication_method = normalized.carrierAuthenticationMethod;
+  }
+  if (normalized.carrier_verification_instructions === undefined && normalized.carrierVerificationInstructions !== undefined) {
+    normalized.carrier_verification_instructions = normalized.carrierVerificationInstructions;
+  }
+  if (normalized.signed_carrier_payload === undefined && normalized.signedCarrierPayload !== undefined) {
+    normalized.signed_carrier_payload = normalized.signedCarrierPayload;
+  }
+  if (normalized.issuer_certificate_id === undefined && normalized.issuerCertificateId !== undefined) {
+    normalized.issuer_certificate_id = normalized.issuerCertificateId;
+  }
+  if (normalized.carrier_compatibility_profiles === undefined && normalized.carrierCompatibilityProfiles !== undefined) {
+    normalized.carrier_compatibility_profiles = normalized.carrierCompatibilityProfiles;
+  }
+  if (normalized.physical_carrier_security_features === undefined && normalized.physicalCarrierSecurityFeatures !== undefined) {
+    normalized.physical_carrier_security_features = normalized.physicalCarrierSecurityFeatures;
+  }
+  if (normalized.trusted_viewer_origin === undefined && normalized.trustedViewerOrigin !== undefined) {
+    normalized.trusted_viewer_origin = normalized.trustedViewerOrigin;
+  }
+  if (normalized.trusted_viewer_host === undefined && normalized.trustedViewerHost !== undefined) {
+    normalized.trusted_viewer_host = normalized.trustedViewerHost;
+  }
+  if (normalized.counterfeit_risk_level === undefined && normalized.counterfeitRiskLevel !== undefined) {
+    normalized.counterfeit_risk_level = normalized.counterfeitRiskLevel;
+  }
+  if (normalized.anti_counterfeit_instructions === undefined && normalized.antiCounterfeitInstructions !== undefined) {
+    normalized.anti_counterfeit_instructions = normalized.antiCounterfeitInstructions;
+  }
+  if (normalized.safety_warnings === undefined && normalized.safetyWarnings !== undefined) {
+    normalized.safety_warnings = normalized.safetyWarnings;
+  }
+  if (normalized.qr_print_specification === undefined && normalized.qrPrintSpecification !== undefined) {
+    normalized.qr_print_specification = normalized.qrPrintSpecification;
+  }
+  if (normalized.sign_carrier_payload === undefined && normalized.signCarrierPayload !== undefined) {
+    normalized.sign_carrier_payload = normalized.signCarrierPayload;
+  }
   delete normalized.passportType;
   delete normalized.modelName;
   delete normalized.productId;
   delete normalized.dppId;
+  delete normalized.carrierAuthenticity;
+  delete normalized.carrierSecurityStatus;
+  delete normalized.carrierAuthenticationMethod;
+  delete normalized.carrierVerificationInstructions;
+  delete normalized.signedCarrierPayload;
+  delete normalized.issuerCertificateId;
+  delete normalized.carrierCompatibilityProfiles;
+  delete normalized.physicalCarrierSecurityFeatures;
+  delete normalized.trustedViewerOrigin;
+  delete normalized.trustedViewerHost;
+  delete normalized.counterfeitRiskLevel;
+  delete normalized.antiCounterfeitInstructions;
+  delete normalized.safetyWarnings;
+  delete normalized.qrPrintSpecification;
+  delete normalized.signCarrierPayload;
   return normalized;
 };
 

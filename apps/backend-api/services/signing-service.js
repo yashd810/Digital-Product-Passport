@@ -12,6 +12,10 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     return normalized || null;
   }
 
+  function isTrueEnv(value) {
+    return String(value || "").trim().toLowerCase() === "true";
+  }
+
   function inferKeyAlgorithmVersion(publicKeyPem) {
     const publicKey = crypto.createPublicKey(publicKeyPem);
     if (publicKey.asymmetricKeyType === "rsa") return "RS256";
@@ -57,6 +61,8 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       logger.info({ keyId }, "[Signing] Ephemeral ES256 key generated");
     }
 
+    assertCertificateBackedSigningConfiguration();
+
     // Persist public key to DB so it survives key rotation look-ups
     await pool.query(
       `INSERT INTO passport_signing_keys (key_id, public_key, algorithm, algorithm_version)
@@ -82,11 +88,15 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     return {
       issuerDid: issuerDid(),
       signingKeyOwner: normalizeOptionalText(process.env.SIGNING_KEY_OWNER) || "Claros DPP platform operator",
+      globallyUniqueOperatorId: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID) || null,
+      globallyUniqueOperatorIdentifier: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID) || null,
+      globallyUniqueOperatorIdentifierScheme: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME) || null,
       operatorIdentifier: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID) || null,
       operatorIdentifierScheme: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME) || null,
       identityProofing: normalizeOptionalText(process.env.SIGNING_IDENTITY_PROOFING)
         || "Application-managed signing key. External certificate-backed proofing must be configured separately for regulated trust-service alignment.",
       certificateProfile: normalizeOptionalText(process.env.SIGNING_CERTIFICATE_PROFILE) || "application-managed-signing-key",
+      issuerCertificateId: normalizeOptionalText(process.env.SIGNING_CERTIFICATE_ID) || null,
       electronicSealType: normalizeOptionalText(process.env.SIGNING_ELECTRONIC_SEAL_TYPE) || null,
       certificateUrl: normalizeOptionalText(process.env.SIGNING_CERTIFICATE_URL) || null,
       revocationCheckUrl: normalizeOptionalText(process.env.SIGNING_REVOCATION_CHECK_URL) || null,
@@ -96,6 +106,26 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       keyRetentionPolicy: normalizeOptionalText(process.env.SIGNING_KEY_RETENTION_POLICY)
         || "Historical public keys are retained in passport_signing_keys so previously issued signatures remain verifiable after rotation.",
     };
+  }
+
+  function assertCertificateBackedSigningConfiguration() {
+    if (!isTrueEnv(process.env.REQUIRE_CERTIFICATE_BACKED_SIGNING)) return;
+    const trust = getSigningTrustMetadata();
+    const missing = [];
+    if (!trust.globallyUniqueOperatorId) missing.push("SIGNING_ECONOMIC_OPERATOR_ID");
+    if (!trust.globallyUniqueOperatorIdentifierScheme) missing.push("SIGNING_ECONOMIC_OPERATOR_ID_SCHEME");
+    if (!trust.issuerCertificateId) missing.push("SIGNING_CERTIFICATE_ID");
+    if (!trust.certificateUrl) missing.push("SIGNING_CERTIFICATE_URL");
+    if (!trust.revocationCheckUrl) missing.push("SIGNING_REVOCATION_CHECK_URL");
+    if (!trust.trustedListUrl) missing.push("SIGNING_TRUSTED_LIST_URL");
+    if (trust.certificateProfile === "application-managed-signing-key") {
+      missing.push("SIGNING_CERTIFICATE_PROFILE (must not be application-managed-signing-key)");
+    }
+    if (missing.length) {
+      throw new Error(
+        `[Signing] Certificate-backed signing is required but incomplete. Missing or invalid: ${missing.join(", ")}`
+      );
+    }
   }
 
   async function loadCompanyForPassport(companyId) {
@@ -172,6 +202,64 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     };
   }
 
+  async function signPortableDataConstruct({
+    type = "PortableDataConstruct",
+    id = null,
+    subjectId = null,
+    payload = {},
+    contexts = [],
+  } = {}) {
+    if (!_signingKey) return null;
+
+    const issuedAt = new Date().toISOString();
+    const did = issuerDid();
+    const normalizedContexts = Array.isArray(contexts) ? contexts.filter(Boolean) : [];
+    const unsignedDocument = {
+      "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/security/suites/jws-2020/v1",
+        ...normalizedContexts,
+      ],
+      id: id || `${did}#${String(type || "portable-data-construct").toLowerCase()}`,
+      type: ["VerifiableCredential", type],
+      issuer: did,
+      validFrom: issuedAt,
+      issuanceDate: issuedAt,
+      credentialSubject: {
+        id: subjectId || `${did}#subject`,
+        ...(payload || {}),
+      },
+    };
+
+    const dataHash = crypto.createHash("sha256").update(canonicalJSON(unsignedDocument)).digest("hex");
+    const jws = createJws(unsignedDocument, _signingKey);
+    const trustMetadata = getSigningTrustMetadata();
+    const signedDocument = {
+      ...unsignedDocument,
+      proof: {
+        type: "JsonWebSignature2020",
+        created: issuedAt,
+        verificationMethod: `${did}#key-1`,
+        proofPurpose: "assertionMethod",
+        jws,
+        issuerCertificateId: trustMetadata.issuerCertificateId,
+        globallyUniqueOperatorId: trustMetadata.globallyUniqueOperatorId,
+        trustFramework: trustMetadata.trustFramework,
+        certificateProfile: trustMetadata.certificateProfile,
+      },
+    };
+
+    return {
+      dataHash,
+      keyId: _signingKey.keyId,
+      signatureAlgorithm: _signingKey.algorithmVersion,
+      legacyAlgorithm: toLegacySignatureAlgorithm(_signingKey.algorithmVersion),
+      signedAt: issuedAt,
+      document: signedDocument,
+      trustMetadata,
+    };
+  }
+
   function createJws(vcWithoutProof, { privateKey, algorithmVersion }) {
     const headerObj = { alg: algorithmVersion, b64: false, crit: ["b64"] };
     const headerB64 = Buffer.from(JSON.stringify(headerObj)).toString("base64url");
@@ -196,6 +284,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     const vc = await buildVC(passport, typeDef, releasedAt);
     const dataHash = crypto.createHash("sha256").update(canonicalJSON(vc)).digest("hex");
     const jws = createJws(vc, _signingKey);
+    const trustMetadata = getSigningTrustMetadata();
 
     const vcWithProof = {
       ...vc,
@@ -204,7 +293,11 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
         created: releasedAt,
         verificationMethod: `${did}#key-1`,
         proofPurpose: "assertionMethod",
-        jws
+        jws,
+        issuerCertificateId: trustMetadata.issuerCertificateId,
+        globallyUniqueOperatorId: trustMetadata.globallyUniqueOperatorId,
+        trustFramework: trustMetadata.trustFramework,
+        certificateProfile: trustMetadata.certificateProfile
       }
     };
 
@@ -325,6 +418,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     getSigningTrustMetadata,
     buildVC,
     createJws,
+    signPortableDataConstruct,
     signPassport,
     verifyPassportSignature,
     getSigningKey

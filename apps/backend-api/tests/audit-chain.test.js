@@ -74,6 +74,8 @@ describe("passport-service audit chain", () => {
     expect(params[9]).toBe("prev_hash_1");
     expect(typeof params[10]).toBe("string");
     expect(params[10]).toHaveLength(64);
+    expect(params[11]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(params[12]).toBe(2);
   });
 
   test("anchorAuditLogRoot stores a chained anchor record", async () => {
@@ -97,6 +99,8 @@ describe("passport-service audit chain", () => {
                 audience: "economic_operator",
                 previous_event_hash: null,
                 event_hash: "root_hash_11",
+                created_at: "2026-04-29T12:00:00.000Z",
+                hash_version: 2,
               },
             ],
           };

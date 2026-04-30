@@ -5,6 +5,7 @@ import { I18nProvider } from "../providers/i18n";
 import { useSessionAuth } from "../hooks/useSessionAuth";
 import { AdminRoute, ProtectedRoute } from "../routes/RouteGuards";
 import { applyTheme, getStoredTheme } from "../providers/ThemeContext";
+import AppSkipLink from "../components/AppSkipLink";
 
 // Auth
 const Login = lazy(() => import("../../auth/containers/Login"));
@@ -99,6 +100,8 @@ function App() {
   return (
     <I18nProvider>
       <Suspense fallback={<RouteFallback />}>
+      <AppSkipLink />
+      <main id="app-main-content">
       <Routes>
         {/* Public */}
         <Route path="/"                element={<Landing token={token} user={user} onLogout={handleLogout} />} />
@@ -245,6 +248,7 @@ function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </main>
       </Suspense>
     </I18nProvider>
   );

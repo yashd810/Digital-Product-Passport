@@ -19,6 +19,7 @@ module.exports = function registerPassportPublicRoutes(app, {
   buildPassportVersionHistory,
   resolvePublicPathToSubjects,
   verifyPassportSignature,
+  logAudit,
   buildJsonLdContext,
   buildBatteryPassJsonExport,
   buildCanonicalPassportPayload,
@@ -710,6 +711,37 @@ module.exports = function registerPassportPublicRoutes(app, {
         );
         if (vcRow.rows[0]?.vc_json) {
           credential = JSON.parse(vcRow.rows[0].vc_json);
+        }
+      }
+
+      if (["invalid", "tampered", "key_missing"].includes(String(verifyResult.status || "")) && typeof logAudit === "function") {
+        const registryRow = await pool.query(
+          `SELECT company_id
+           FROM passport_registry
+           WHERE dpp_id = $1
+           LIMIT 1`,
+          [dppId]
+        ).catch(() => ({ rows: [] }));
+        const companyId = registryRow.rows[0]?.company_id || null;
+        if (companyId) {
+        await logAudit(
+          companyId,
+          null,
+          "VERIFY_SIGNATURE_FAILURE",
+          "passport_signatures",
+          dppId,
+          null,
+          {
+            version_number: version,
+            verification_status: verifyResult.status,
+            key_id: verifyResult.keyId || null,
+            algorithm: verifyResult.algorithm || null
+          },
+          {
+            actorIdentifier: "public:signature-verifier",
+            audience: "public",
+          }
+        ).catch(() => {});
         }
       }
 

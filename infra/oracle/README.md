@@ -119,3 +119,30 @@ This means:
 - HTTP/1.1 is not negotiated for public TLS traffic
 - HTTP/2 is the minimum supported public transport version
 - HTTP/3 is allowed as a stricter, newer transport on clients that support it
+
+## TLS policy for public delivery
+
+The same Caddy edge also pins public TLS to `TLS 1.2` and `TLS 1.3`.
+
+This means:
+
+- `TLS 1.0` and `TLS 1.1` are rejected at the public edge
+- only modern cipher negotiation paths are allowed through the reverse proxy
+- the backend containers are not exposed directly; they stay behind loopback reverse-proxying
+
+## Post-deploy verification
+
+Use the helper script after the host is live:
+
+```bash
+./infra/oracle/check-edge-tls.sh api.example.com
+```
+
+That checks:
+
+- `TLS 1.0` rejected
+- `TLS 1.1` rejected
+- `TLS 1.2` accepted
+- `HTTP/2` reachable with `curl --http2`
+
+For third-party evidence, also run an external scan such as SSL Labs or `testssl.sh` against the production hostname.
