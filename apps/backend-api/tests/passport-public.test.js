@@ -102,7 +102,7 @@ async function invokeRoute(app, { method, path, body = {}, params = {}, query = 
   return res;
 }
 
-function createTestApp() {
+function createTestApp(options = {}) {
   const app = express();
   app.use(express.json());
 
@@ -158,6 +158,7 @@ function createTestApp() {
     default_granularity: "item",
     jsonld_export_enabled: true,
     is_active: true,
+    ...(options.company || {}),
   };
 
   const pool = {
@@ -205,11 +206,11 @@ function createTestApp() {
     buildInactivePublicPassportPath: () => "/passport/acme-energy/bat-2026-001/v/2",
     stripRestrictedFieldsForPublicView: async (row) => row,
     getCompanyNameMap: async () => new Map([["5", "Acme Energy"]]),
-    resolveReleasedPassportByProductId: async () => ({ passport }),
-    resolvePublicPassportByDppId: async (dppId) => {
+    resolveReleasedPassportByProductId: options.resolveReleasedPassportByProductId || (async () => ({ passport })),
+    resolvePublicPassportByDppId: options.resolvePublicPassportByDppId || (async (dppId) => {
       if (dppId !== passport.guid) return null;
       return { passport };
-    },
+    }),
     buildPassportVersionHistory: async () => ({ versions: [] }),
     resolvePublicPathToSubjects: async () => null,
     verifyPassportSignature: async () => ({ status: "unsigned" }),
@@ -220,6 +221,7 @@ function createTestApp() {
     }),
     buildCanonicalPassportPayload: serializer.buildCanonicalPassportPayload,
     buildExpandedPassportPayload: serializer.buildExpandedPassportPayload,
+    backupProviderService: options.backupProviderService,
     signingService: {
       getSigningKey: () => null,
       getSigningTrustMetadata: () => ({
@@ -342,6 +344,59 @@ describe("passport public routes", () => {
         verification: expect.objectContaining({
           oldKeysRetained: true,
         }),
+      })
+    );
+  });
+
+  test("GET /api/passports/:dppId/canonical serves the backup handover snapshot when the company is inactive", async () => {
+    const handoverPassport = {
+      dppId: "dpp_handover_001",
+      guid: "dpp_handover_001",
+      lineage_id: "dpp_handover_001",
+      company_id: 5,
+      passport_type: "battery",
+      product_id: "BAT-2026-001",
+      release_status: "released",
+      version_number: 2,
+      granularity: "item",
+      battery_mass: "455",
+      manufacturer: "Backup Copy Manufacturer",
+    };
+
+    const { app } = createTestApp({
+      company: { is_active: false },
+      backupProviderService: {
+        getActivePublicHandover: jest.fn(async ({ passportDppId }) => {
+          if (passportDppId !== "dpp_handover_001") return null;
+          return {
+            company_id: 5,
+            passport_dpp_id: "dpp_handover_001",
+            lineage_id: "dpp_handover_001",
+            passport_type: "battery",
+            product_id: "BAT-2026-001",
+            version_number: 2,
+            public_url: "https://backup.example/passports/dpp_handover_001",
+            backup_provider_key: "oci-primary",
+            source_replication_id: 73,
+            verification_status: "verified",
+            public_row_data: handoverPassport,
+          };
+        }),
+      },
+      resolvePublicPassportByDppId: async () => null,
+    });
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/passports/:dppId/canonical",
+      params: { dppId: "dpp_handover_001" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.digitalProductPassportId).toBe("dpp_handover_001");
+    expect(response.body.fields).toEqual(
+      expect.objectContaining({
+        battery_mass: 455,
       })
     );
   });

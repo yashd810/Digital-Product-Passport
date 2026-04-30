@@ -43,7 +43,8 @@ describe("passport representation service", () => {
       }
     );
 
-    expect(payload.uniqueProductIdentifier).toBe("BAT-2026-001");
+    expect(payload.uniqueProductIdentifier).toBe("did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456");
+    expect(payload.localProductId).toBe("BAT-2026-001");
     expect(payload.dppSchemaVersion).toBe("prEN 18223:2025");
     expect(payload.contentSpecificationIds).toEqual(["claros_battery_dictionary_v1"]);
     expect(payload.facilityId).toBe("FAC-01");

@@ -145,16 +145,20 @@ module.exports = function createPassportRepresentationService({
     const extensions = buildClarosExtensions({
       passportType: passport.passport_type || null,
       versionNumber: Number.isFinite(resolvedVersionNumber) ? resolvedVersionNumber : passport.version_number,
-      internalId: passport.dppId || passport.dpp_id || null,
+      internalId: passport.dppId || passport.dpp_id || passport.guid || null,
     });
     if (extensions?.claros && !canonicalPayload?.extensions?.claros?.validation) {
       extensions.claros.validation = buildValidationSummary();
     }
 
+    const localProductId = passport.product_id || null;
+    const uniqueProductIdentifier = canonicalPayload?.uniqueProductIdentifier || passport.product_identifier_did || productDid || localProductId || null;
+
     return {
       // JTC 18223 canonical header fields
       digitalProductPassportId:  passport.dppId || passport.dpp_id || canonicalPayload?.digitalProductPassportId || dppDidValue || null,
-      uniqueProductIdentifier:   canonicalPayload?.uniqueProductIdentifier || passport.product_id || productDid || null,
+      uniqueProductIdentifier,
+      localProductId,
       granularity:               resolvedGranularity,
       dppSchemaVersion:          passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
       dppStatus:                 canonicalPayload?.dppStatus || toStandardDppStatus(passport.release_status),

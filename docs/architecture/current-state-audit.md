@@ -12,6 +12,7 @@ Current architecture:
 - `backend-api` serves operational APIs, public passport routes, DID documents, dictionary assets, signing, and workflow.
 - `frontend-app` serves the authenticated dashboard and the public consumer/technical views.
 - Passport content is stored in one table per passport type plus shared registry, archive, signature, attachment, workflow, and policy tables.
+- The OAIS-style archive mapping for those shared registry/archive/backup components is documented in [oais-archive-mapping.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/architecture/oais-archive-mapping.md:1).
 
 Example request:
 ```http

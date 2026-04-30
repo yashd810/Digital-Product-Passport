@@ -72,7 +72,8 @@ console.log("\nbuildCanonicalPassportPayload()");
 test("preserves typed field values and required headers", () => {
   const payload = buildCanonicalPassportPayload(passport, typeDef, { company });
   assert.strictEqual(payload.digitalProductPassportId, "dpp_fff9372d-6405-4207-9ed2-808426a3151c");
-  assert.strictEqual(payload.uniqueProductIdentifier, "PID-72b99c83");
+  assert.strictEqual(payload.uniqueProductIdentifier, "did:web:www.claros-dpp.online:did:battery:item:pid-72b99c83");
+  assert.strictEqual(payload.localProductId, "PID-72b99c83");
   assert.strictEqual(payload.granularity, "Item");
   assert.strictEqual(payload.dppStatus, "Active");
   assert.strictEqual(payload.subjectDid, "did:web:www.claros-dpp.online:did:battery:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");

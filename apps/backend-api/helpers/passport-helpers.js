@@ -93,6 +93,13 @@ const normalizePassportRequestBody = (body = {}) => {
   if (normalized.product_id === undefined && normalized.productId !== undefined) {
     normalized.product_id = normalized.productId;
   }
+  if (normalized.product_id === undefined && normalized.localProductId !== undefined) {
+    normalized.product_id = normalized.localProductId;
+  }
+  if (normalized.product_identifier_did === undefined) {
+    if (normalized.uniqueProductIdentifier !== undefined) normalized.product_identifier_did = normalized.uniqueProductIdentifier;
+    else if (normalized.unique_product_identifier !== undefined) normalized.product_identifier_did = normalized.unique_product_identifier;
+  }
   if (normalized.dpp_id === undefined) {
     if (normalized.dppId !== undefined) normalized.dpp_id = normalized.dppId;
   }
@@ -144,6 +151,9 @@ const normalizePassportRequestBody = (body = {}) => {
   delete normalized.passportType;
   delete normalized.modelName;
   delete normalized.productId;
+  delete normalized.localProductId;
+  delete normalized.uniqueProductIdentifier;
+  delete normalized.unique_product_identifier;
   delete normalized.dppId;
   delete normalized.carrierAuthenticity;
   delete normalized.carrierSecurityStatus;

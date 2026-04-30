@@ -141,6 +141,25 @@ module.exports = function registerPassportRoutes(app, {
     };
   }
 
+  async function hasReleasedLineageVersion({ tableName, lineageId, excludeDppId = null }) {
+    const params = [lineageId];
+    let excludeSql = "";
+    if (excludeDppId) {
+      params.push(excludeDppId);
+      excludeSql = ` AND dpp_id <> $${params.length}`;
+    }
+    const result = await pool.query(
+      `SELECT 1
+       FROM ${tableName}
+       WHERE lineage_id = $1
+         AND release_status IN ('released', 'obsolete')
+         AND deleted_at IS NULL${excludeSql}
+       LIMIT 1`,
+      params
+    );
+    return result.rows.length > 0;
+  }
+
   function parseApiKeyScopes(scopes) {
     const normalized = Array.isArray(scopes) ?
     scopes.map((scope) => String(scope || "").trim()).filter(Boolean) :
@@ -1551,6 +1570,7 @@ module.exports = function registerPassportRoutes(app, {
       );
       if (invalidKeys.length) return res.status(400).json({ error: `Unknown field(s): ${invalidKeys.join(", ")}` });
       if (update.product_id !== undefined) return res.status(400).json({ error: "Cannot bulk-update product_id — it must be unique per passport." });
+      if (update.granularity !== undefined) return res.status(400).json({ error: "Cannot bulk-update granularity. Use the granularity transition workflow for linked successor identifiers." });
 
       const params = [companyId];
       let filterSql = "";
@@ -1640,7 +1660,7 @@ module.exports = function registerPassportRoutes(app, {
     try {
       const { companyId, dppId: dppId } = req.params;
       const normalizedBody = normalizePassportRequestBody(req.body);
-      const { passport_type, passportType, carrier_authenticity, ...fields } = normalizedBody;
+      const { passport_type, passportType, carrier_authenticity, granularity, ...fields } = normalizedBody;
       const userId = req.user.userId;
 
       const requestedPassportType = passport_type || passportType;
@@ -1656,6 +1676,42 @@ module.exports = function registerPassportRoutes(app, {
       );
       if (!current.rows.length) return res.status(404).json({ error: "Passport not found or not editable." });
       const rowId = current.rows[0].id;
+      const currentGranularity = String(current.rows[0].granularity || "item").trim().toLowerCase();
+
+      if (granularity !== undefined) {
+        const requestedGranularity = String(granularity || "").trim().toLowerCase();
+        if (!VALID_GRANULARITIES.has(requestedGranularity)) {
+          return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
+        }
+        if (requestedGranularity !== currentGranularity) {
+          const lineageAlreadyReleased = await hasReleasedLineageVersion({
+            tableName,
+            lineageId: current.rows[0].lineage_id,
+            excludeDppId: current.rows[0].dpp_id,
+          });
+          if (lineageAlreadyReleased) {
+            return res.status(409).json({
+              error: "GRANULARITY_CHANGE_REQUIRES_NEW_IDENTIFIER",
+              detail: "Released DPP granularity cannot be changed in place. Use the granularity transition workflow to mint a linked successor identifier.",
+              currentGranularity,
+              requestedGranularity,
+            });
+          }
+          fields.granularity = requestedGranularity;
+          const nextProductIdForGranularity = normalizeProductIdValue(fields.product_id || current.rows[0].product_id);
+          if (!nextProductIdForGranularity) {
+            return res.status(400).json({ error: "product_id cannot be blank when changing granularity" });
+          }
+          const storedProductIdentifiers = buildStoredProductIdentifiers({
+            companyId,
+            passportType: typeSchema.typeName,
+            productId: nextProductIdForGranularity,
+            granularity: requestedGranularity,
+          });
+          fields.product_id = storedProductIdentifiers.product_id;
+          fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+        }
+      }
 
       if (fields.product_id !== undefined) {
         const normalizedProductId = normalizeProductIdValue(fields.product_id);
@@ -1674,7 +1730,7 @@ module.exports = function registerPassportRoutes(app, {
           companyId,
           passportType: typeSchema.typeName,
           productId: normalizedProductId,
-          granularity: current.rows[0].granularity || "item"
+          granularity: fields.granularity || current.rows[0].granularity || "item"
         });
         fields.product_id = storedProductIdentifiers.product_id;
         fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
@@ -2062,6 +2118,155 @@ module.exports = function registerPassportRoutes(app, {
       await logAudit(companyId, userId, "REVISE", tableName, newGuid, { version_number: src.version_number }, { version_number: newVersion });
       res.json({ success: true, dppId: newGuid, newVersion, release_status: IN_REVISION_STATUS });
     } catch (e) {res.status(500).json({ error: "Failed to revise passport" });}
+  });
+
+  app.post("/api/companies/:companyId/passports/:dppId/granularity-transition", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+    try {
+      const { companyId, dppId } = req.params;
+      const { passportType, granularity, reason = null } = normalizePassportRequestBody(req.body || {});
+      const userId = req.user.userId;
+
+      if (!passportType) return res.status(400).json({ error: "passportType required in body" });
+      const requestedGranularity = String(granularity || "").trim().toLowerCase();
+      if (!VALID_GRANULARITIES.has(requestedGranularity)) {
+        return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
+      }
+
+      const tableName = getTable(passportType);
+      const current = await pool.query(
+        `SELECT * FROM ${tableName} WHERE dpp_id = $1 AND company_id = $2 AND release_status = 'released' AND deleted_at IS NULL LIMIT 1`,
+        [dppId, companyId]
+      );
+      if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
+
+      const src = current.rows[0];
+      const currentGranularity = String(src.granularity || "item").trim().toLowerCase();
+      if (requestedGranularity === currentGranularity) {
+        return res.status(400).json({ error: "granularity must change to create a linked successor identifier" });
+      }
+
+      const dup = await pool.query(
+        `SELECT id FROM ${tableName} WHERE lineage_id = $1 AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL} AND deleted_at IS NULL`,
+        [src.lineage_id]
+      );
+      if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
+
+      const requestedProductId = normalizeProductIdValue(
+        req.body?.localProductId ?? req.body?.productId ?? req.body?.product_id ?? src.product_id
+      );
+      if (!requestedProductId) return res.status(400).json({ error: "productId cannot be blank" });
+
+      const existingByProductId = await findExistingPassportByProductId({
+        tableName,
+        companyId,
+        productId: requestedProductId,
+        excludeGuid: dppId,
+        excludeLineageId: src.lineage_id,
+      });
+      if (existingByProductId) {
+        return res.status(409).json({
+          error: `A passport with Serial Number "${requestedProductId}" already exists.`,
+          existing_dpp_id: existingByProductId.dppId,
+          release_status: normalizeReleaseStatus(existingByProductId.release_status),
+        });
+      }
+
+      const nextIdentifiers = buildStoredProductIdentifiers({
+        companyId,
+        passportType,
+        productId: requestedProductId,
+        granularity: requestedGranularity,
+      });
+      const newGuid = generateDppRecordId();
+      const newVersion = src.version_number + 1;
+      const excluded = new Set(["id", "dppId", "created_at", "updated_at", "updated_by", "qr_code", "lineage_id"]);
+      const cols = Object.keys(src).filter((k) => !excluded.has(k));
+      const vals = cols.map((k) => {
+        if (k === "version_number") return newVersion;
+        if (k === "release_status") return IN_REVISION_STATUS;
+        if (k === "created_by") return userId;
+        if (k === "deleted_at") return null;
+        if (k === "granularity") return requestedGranularity;
+        if (k === "product_id") return nextIdentifiers.product_id;
+        if (k === "product_identifier_did") return nextIdentifiers.product_identifier_did;
+        return src[k];
+      });
+
+      const allCols = ["dppId", "lineage_id", ...cols];
+      const allVals = [newGuid, src.lineage_id, ...vals];
+      const places = allCols.map((_, i) => `$${i + 1}`).join(", ");
+      const insertRes = await pool.query(`INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places}) RETURNING *`, allVals);
+
+      const sourceRegistry = await pool.query(
+        `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
+                device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
+         FROM passport_registry
+         WHERE dpp_id = $1 AND company_id = $2
+         LIMIT 1`,
+        [dppId, companyId]
+      );
+      const sourceKeys = sourceRegistry.rows[0] || {};
+      await insertPassportRegistry({
+        dppId: newGuid,
+        lineageId: src.lineage_id,
+        companyId,
+        passportType,
+        accessKeyHash: sourceKeys.access_key_hash || null,
+        accessKeyPrefix: sourceKeys.access_key_prefix || null,
+        accessKeyLastRotatedAt: sourceKeys.access_key_last_rotated_at || null,
+        deviceApiKeyHash: sourceKeys.device_api_key_hash || null,
+        deviceApiKeyPrefix: sourceKeys.device_api_key_prefix || null,
+        deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null,
+      });
+
+      const lineageLink = await productIdentifierService.recordGranularityTransition({
+        companyId,
+        lineageId: src.lineage_id,
+        previousPassportDppId: src.dpp_id || src.dppId,
+        replacementPassportDppId: newGuid,
+        previousIdentifier: src.product_identifier_did || src.product_id,
+        replacementIdentifier: nextIdentifiers.product_identifier_did || nextIdentifiers.product_id,
+        previousLocalProductId: src.product_id || null,
+        replacementLocalProductId: nextIdentifiers.product_id || null,
+        previousGranularity: currentGranularity,
+        replacementGranularity: requestedGranularity,
+        transitionReason: reason || "granularity_change",
+        createdBy: userId,
+      });
+
+      await archivePassportSnapshot({
+        passport: insertRes.rows[0],
+        passportType,
+        archivedBy: userId,
+        actorIdentifier: getActorIdentifier(req.user),
+        snapshotReason: "after_granularity_transition_create",
+      });
+
+      await logAudit(companyId, userId, "TRANSITION_GRANULARITY", tableName, newGuid, {
+        previous_granularity: currentGranularity,
+        previous_identifier: src.product_identifier_did || src.product_id,
+      }, {
+        replacement_granularity: requestedGranularity,
+        replacement_identifier: nextIdentifiers.product_identifier_did || nextIdentifiers.product_id,
+        previous_dpp_id: src.dpp_id || src.dppId,
+      });
+
+      res.json({
+        success: true,
+        dppId: newGuid,
+        digitalProductPassportId: newGuid,
+        previousDppId: src.dpp_id || src.dppId,
+        lineageId: src.lineage_id,
+        currentGranularity,
+        requestedGranularity,
+        uniqueProductIdentifier: nextIdentifiers.product_identifier_did || null,
+        localProductId: nextIdentifiers.product_id || null,
+        identifierLineageLink: lineageLink,
+      });
+    } catch (e) {
+      logger.error("Granularity transition error:", e.message);
+      res.status(500).json({ error: "Failed to create granularity transition", detail: e.message });
+    }
   });
 
   // ─── BULK REVISE ───────────────────────────────────────────────────────────
@@ -2747,6 +2952,33 @@ module.exports = function registerPassportRoutes(app, {
       const historyPayload = await buildPassportVersionHistory({ dppId: dppId, passportType, companyId, publicOnly: false });
       res.json(historyPayload);
     } catch (e) {res.status(500).json({ error: "Failed to fetch passport history" });}
+  });
+
+  app.get("/api/companies/:companyId/passports/:dppId/identifier-lineage", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      const { companyId, dppId } = req.params;
+      const reg = await pool.query(
+        `SELECT passport_type, lineage_id FROM passport_registry WHERE dpp_id = $1 AND company_id = $2 LIMIT 1`,
+        [dppId, companyId]
+      );
+      if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+      const links = await productIdentifierService.listIdentifierLineage({
+        companyId,
+        lineageId: reg.rows[0].lineage_id,
+        dppId,
+      });
+      res.json({
+        dppId,
+        digitalProductPassportId: dppId,
+        lineageId: reg.rows[0].lineage_id,
+        passportType: reg.rows[0].passport_type,
+        identifierLineage: links,
+      });
+    } catch (e) {
+      logger.error("Identifier lineage error:", e.message);
+      res.status(500).json({ error: "Failed to fetch identifier lineage" });
+    }
   });
 
   app.patch("/api/companies/:companyId/passports/:dppId/history/:versionNumber", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -3894,6 +4126,32 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
+  app.get("/api/companies/:companyId/backup-policy", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService?.getContinuityPolicy) {
+        return res.status(503).json({ error: "Backup provider service is unavailable" });
+      }
+      const policy = backupProviderService.getContinuityPolicy({ companyId: req.params.companyId });
+      res.json(policy);
+    } catch {
+      res.status(500).json({ error: "Failed to fetch backup continuity policy" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/identifier-persistence-policy", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!productIdentifierService?.getIdentifierPersistencePolicy) {
+        return res.status(503).json({ error: "Product identifier service is unavailable" });
+      }
+      const policy = productIdentifierService.getIdentifierPersistencePolicy({
+        companyId: req.params.companyId,
+      });
+      return res.json(policy);
+    } catch {
+      return res.status(500).json({ error: "Failed to fetch identifier persistence policy" });
+    }
+  });
+
   app.post("/api/companies/:companyId/backup-providers", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
@@ -3954,6 +4212,139 @@ module.exports = function registerPassportRoutes(app, {
       res.json(replications);
     } catch {
       res.status(500).json({ error: "Failed to fetch backup replications" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/passports/:dppId/backup-handover", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      if (!backupProviderService) {
+        return res.status(503).json({ error: "Backup provider service is unavailable" });
+      }
+      const handovers = await backupProviderService.listPublicHandovers({
+        companyId: req.params.companyId,
+        passportDppId: req.params.dppId,
+      });
+      const active = handovers.find((row) => row.handover_status === "active") || null;
+      return res.json({
+        active,
+        history: handovers,
+      });
+    } catch {
+      return res.status(500).json({ error: "Failed to fetch backup public handover status" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/passports/:dppId/backup-handover/activate", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService) {
+        return res.status(503).json({ error: "Backup provider service is unavailable" });
+      }
+      const passportType = req.body?.passportType || req.body?.passport_type;
+      if (!passportType) return res.status(400).json({ error: "passportType required in body" });
+
+      const currentPassport = await loadLatestLivePassport({
+        companyId: req.params.companyId,
+        dppId: req.params.dppId,
+        passportType,
+        releaseStatusSql: "('released','obsolete')"
+      });
+      if (!currentPassport) return res.status(404).json({ error: "Released passport not found" });
+
+      const normalizedPassport = { ...normalizePassportRow(currentPassport), passport_type: passportType };
+      const publicRowData = await stripRestrictedFieldsForPublicView(normalizedPassport, passportType);
+      const companyName = (await getCompanyNameMap([req.params.companyId])).get(String(req.params.companyId)) || "";
+
+      const handover = await backupProviderService.activatePublicHandover({
+        companyId: req.params.companyId,
+        passportDppId: req.params.dppId,
+        lineageId: normalizedPassport.lineage_id || normalizedPassport.dppId,
+        passportType,
+        productId: normalizedPassport.product_id,
+        versionNumber: normalizedPassport.version_number,
+        publicRowData,
+        publicCompanyName: companyName,
+        activatedBy: req.user.userId,
+        actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || null,
+        notes: req.body?.notes || null,
+      });
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "ACTIVATE_BACKUP_PUBLIC_HANDOVER",
+        "backup_public_handovers",
+        req.params.dppId,
+        null,
+        {
+          passportType,
+          sourceReplicationId: handover?.source_replication_id || null,
+          backupProviderKey: handover?.backup_provider_key || null,
+          publicUrl: handover?.public_url || null,
+        },
+        {
+          actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || null,
+          audience: Array.isArray(req.user.accessAudiences) ? req.user.accessAudiences.join(",") : null,
+        }
+      );
+
+      return res.status(201).json({
+        success: true,
+        handover,
+      });
+    } catch (error) {
+      const message = error.message || "Failed to activate backup public handover";
+      if (
+        message.includes("inactive")
+        || message.includes("verified backup replication")
+        || message.includes("required")
+        || message.includes("Company not found")
+      ) {
+        return res.status(409).json({ error: message });
+      }
+      return res.status(500).json({ error: message });
+    }
+  });
+
+  app.post("/api/companies/:companyId/passports/:dppId/backup-handover/deactivate", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService) {
+        return res.status(503).json({ error: "Backup provider service is unavailable" });
+      }
+
+      const handover = await backupProviderService.deactivatePublicHandover({
+        companyId: req.params.companyId,
+        passportDppId: req.params.dppId,
+        deactivatedBy: req.user.userId,
+        notes: req.body?.notes || null,
+      });
+
+      if (!handover) {
+        return res.status(404).json({ error: "Active backup public handover not found" });
+      }
+
+      await logAudit(
+        req.params.companyId,
+        req.user.userId,
+        "DEACTIVATE_BACKUP_PUBLIC_HANDOVER",
+        "backup_public_handovers",
+        req.params.dppId,
+        null,
+        {
+          backupProviderKey: handover.backup_provider_key || null,
+          publicUrl: handover.public_url || null,
+        },
+        {
+          actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || null,
+          audience: Array.isArray(req.user.accessAudiences) ? req.user.accessAudiences.join(",") : null,
+        }
+      );
+
+      return res.json({
+        success: true,
+        handover,
+      });
+    } catch {
+      return res.status(500).json({ error: "Failed to deactivate backup public handover" });
     }
   });
 

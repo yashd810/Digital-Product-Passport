@@ -553,7 +553,8 @@ module.exports = function registerDppApiRoutes(app, {
     } catch {}
 
     return {
-      productIdentifier: passport?.product_id || passport?.product_identifier_did || derivedProductIdentifier || null,
+      productIdentifier: passport?.product_identifier_did || derivedProductIdentifier || passport?.product_id || null,
+      localProductId: passport?.product_id || null,
       dppId,
       elementIdPath,
       ...buildExpandedDataElement({
@@ -711,6 +712,17 @@ module.exports = function registerDppApiRoutes(app, {
     return {
       dppId: digitalProductPassportId,
       digitalProductPassportId
+    };
+  }
+
+  function buildIdentifierLineageEnvelope(passport, identifierLineage = []) {
+    return {
+      ...buildDppIdentifierFields(passport),
+      uniqueProductIdentifier: passport?.product_identifier_did || passport?.product_id || null,
+      localProductId: passport?.product_id || null,
+      granularity: passport?.granularity || "item",
+      lineageId: passport?.lineage_id || passport?.lineageId || null,
+      identifierLineage,
     };
   }
 
@@ -1217,6 +1229,15 @@ module.exports = function registerDppApiRoutes(app, {
     return parsedLimit;
   }
 
+  function usesConfiguredGlobalProductIdentifierScheme(value) {
+    const normalized = String(value || "").trim();
+    if (!normalized) return false;
+    if (typeof productIdentifierService?.isDidIdentifier === "function") {
+      return productIdentifierService.isDidIdentifier(normalized);
+    }
+    return normalized.startsWith("did:");
+  }
+
   /**
    * Build service endpoints array for a battery/product passport DID document.
    */
@@ -1340,9 +1361,13 @@ module.exports = function registerDppApiRoutes(app, {
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
 
       const productIdInput = normalizeProductIdValue(
-        normalizedBody.product_id || normalizedBody.productId || normalizedBody.productIdentifier
+        normalizedBody.product_id || normalizedBody.localProductId || normalizedBody.productId || normalizedBody.productIdentifier
       );
       if (!productIdInput) return res.status(400).json({ error: "productId is required" });
+      const explicitUniqueProductIdentifier = normalizedBody.product_identifier_did || normalizedBody.uniqueProductIdentifier || normalizedBody.unique_product_identifier || null;
+      if (explicitUniqueProductIdentifier && !usesConfiguredGlobalProductIdentifierScheme(explicitUniqueProductIdentifier)) {
+        return res.status(400).json({ error: "uniqueProductIdentifier must use the configured global DID-based identifier scheme" });
+      }
 
       const requestedGranularity = String(normalizedBody.granularity || "item").trim().toLowerCase() || "item";
       if (!VALID_GRANULARITIES.has(requestedGranularity)) {
@@ -1357,6 +1382,7 @@ module.exports = function registerDppApiRoutes(app, {
         companyId,
         passportType: resolvedPassportType,
         rawProductId: productIdInput,
+        uniqueProductIdentifier: explicitUniqueProductIdentifier,
         granularity: requestedGranularity
       });
       const existingByProductId = await findExistingPassportByProductId({
@@ -1379,6 +1405,7 @@ module.exports = function registerDppApiRoutes(app, {
         companyId: ignoredCompanyId,
         company_id,
         product_id,
+        product_identifier_did,
         productId,
         productIdentifier,
         model_name,
@@ -1398,6 +1425,7 @@ module.exports = function registerDppApiRoutes(app, {
       void ignoredCompanyId;
       void company_id;
       void product_id;
+      void product_identifier_did;
       void productId;
       void productIdentifier;
       void granularity;
@@ -1451,8 +1479,8 @@ module.exports = function registerDppApiRoutes(app, {
       lineageId,
       companyId,
       model_name || modelName || null,
-      storedProductIdentifiers.productIdInput,
-      storedProductIdentifiers.productIdentifierDid,
+        storedProductIdentifiers.productIdInput,
+        storedProductIdentifiers.productIdentifierDid,
       complianceManagedFields.compliance_profile_key,
       complianceManagedFields.content_specification_ids,
       complianceManagedFields.carrier_policy_key,
@@ -1762,6 +1790,7 @@ module.exports = function registerDppApiRoutes(app, {
         company_id,
         granularity,
         product_id,
+        product_identifier_did,
         productId,
         productIdentifier,
         model_name,
@@ -1779,7 +1808,36 @@ module.exports = function registerDppApiRoutes(app, {
       void requestedRepresentation;
       void companyId;
       void company_id;
-      void granularity;
+      void product_identifier_did;
+
+      let nextGranularity = String(editable.passport.granularity || "item").trim().toLowerCase();
+      if (granularity !== undefined) {
+        const requestedGranularity = String(granularity || "").trim().toLowerCase();
+        if (!["model", "batch", "item"].includes(requestedGranularity)) {
+          return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
+        }
+        if (requestedGranularity !== nextGranularity) {
+          const releasedLineageRes = await pool.query(
+            `SELECT 1
+             FROM ${editable.tableName}
+             WHERE lineage_id = $1
+               AND release_status IN ('released', 'obsolete')
+               AND deleted_at IS NULL
+               AND dpp_id <> $2
+             LIMIT 1`,
+            [editable.passport.lineage_id, editable.passport.dppId || editable.passport.dpp_id]
+          );
+          if (releasedLineageRes.rows.length) {
+            return res.status(409).json({
+              error: "GRANULARITY_CHANGE_REQUIRES_NEW_IDENTIFIER",
+              detail: "Released DPP granularity cannot be changed in place. Create a linked successor identifier instead.",
+              currentGranularity: nextGranularity,
+              requestedGranularity,
+            });
+          }
+          nextGranularity = requestedGranularity;
+        }
+      }
 
       const invalidFieldKeys = Object.keys(fields).filter((key) =>
       !SYSTEM_PASSPORT_FIELDS.has(key) && !editable.typeDef?.fields_json?.sections?.some((section) => (section.fields || []).some((field) => field.key === key))
@@ -1789,6 +1847,9 @@ module.exports = function registerDppApiRoutes(app, {
       }
 
       const updateData = {};
+      if (nextGranularity !== String(editable.passport.granularity || "item").trim().toLowerCase()) {
+        updateData.granularity = nextGranularity;
+      }
       if (model_name !== undefined || modelName !== undefined) {
         updateData.model_name = model_name ?? modelName ?? null;
       }
@@ -1816,8 +1877,12 @@ module.exports = function registerDppApiRoutes(app, {
         });
       }
 
-      const nextProductId = normalizeProductIdValue(product_id || productId || productIdentifier);
-      if (product_id !== undefined || productId !== undefined || productIdentifier !== undefined) {
+      const explicitUniqueProductIdentifier = normalizedBody.product_identifier_did || normalizedBody.uniqueProductIdentifier || normalizedBody.unique_product_identifier || null;
+      const nextProductId = normalizeProductIdValue(product_id || normalizedBody.localProductId || productId || productIdentifier);
+      if (explicitUniqueProductIdentifier && !usesConfiguredGlobalProductIdentifierScheme(explicitUniqueProductIdentifier)) {
+        return res.status(400).json({ error: "uniqueProductIdentifier must use the configured global DID-based identifier scheme" });
+      }
+      if (product_id !== undefined || normalizedBody.localProductId !== undefined || productId !== undefined || productIdentifier !== undefined || explicitUniqueProductIdentifier !== null) {
         if (!nextProductId) return res.status(400).json({ error: "productId cannot be blank" });
         const existingByProductId = await findExistingPassportByProductId({
           tableName: editable.tableName,
@@ -1837,9 +1902,19 @@ module.exports = function registerDppApiRoutes(app, {
           companyId: editable.passport.company_id,
           passportType: editable.passport.passport_type,
           rawProductId: nextProductId,
-          granularity: editable.passport.granularity || "item"
+          uniqueProductIdentifier: explicitUniqueProductIdentifier,
+          granularity: nextGranularity
         });
         updateData.product_id = normalizedProductIdentifiers.productIdInput;
+        updateData.product_identifier_did = normalizedProductIdentifiers.productIdentifierDid;
+      } else if (updateData.granularity !== undefined) {
+        const normalizedProductIdentifiers = productIdentifierService.normalizeProductIdentifiers({
+          companyId: editable.passport.company_id,
+          passportType: editable.passport.passport_type,
+          rawProductId: editable.passport.product_id,
+          uniqueProductIdentifier: explicitUniqueProductIdentifier,
+          granularity: nextGranularity
+        });
         updateData.product_identifier_did = normalizedProductIdentifiers.productIdentifierDid;
       }
 
@@ -1987,6 +2062,29 @@ module.exports = function registerDppApiRoutes(app, {
       }
       logger.error({ err: e }, "[Standards DPP DELETE API]");
       return res.status(500).json({ error: "Failed to delete DPP" });
+    }
+  });
+
+  app.get("/api/v1/dpps/:dppId/identifier-lineage", publicReadRateLimit, async (req, res) => {
+    try {
+      const dppId = decodeURIComponent(req.params.dppId || "");
+      if (!dppId) return res.status(400).json({ error: "dppId is required" });
+
+      const released = await resolveReleasedPassportByDppId(dppId);
+      if (!released?.passport) {
+        return res.status(404).json({ error: "Passport not found or not released" });
+      }
+
+      const identifierLineage = await productIdentifierService?.listIdentifierLineage?.({
+        companyId: released.passport.company_id,
+        lineageId: released.passport.lineage_id,
+        dppId: released.passport.dppId || released.passport.dpp_id,
+      }) || [];
+
+      return res.json(buildIdentifierLineageEnvelope(released.passport, identifierLineage));
+    } catch (e) {
+      logger.error({ err: e }, "[Standards DPP identifier lineage API]");
+      return res.status(500).json({ error: "Failed to fetch identifier lineage" });
     }
   });
 
@@ -2262,6 +2360,7 @@ module.exports = function registerDppApiRoutes(app, {
       const registrationPayload = {
         digitalProductPassportId: canonicalPayload.digitalProductPassportId,
         uniqueProductIdentifier: canonicalPayload.uniqueProductIdentifier,
+        localProductId: canonicalPayload.localProductId || result.passport.product_id || null,
         subjectDid: canonicalPayload.subjectDid,
         dppDid: canonicalPayload.dppDid,
         companyDid: canonicalPayload.companyDid,

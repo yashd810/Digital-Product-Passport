@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const fs = require("fs");
 const path = require("path");
 
 function toBoolean(value, fallback = false) {
@@ -38,11 +39,64 @@ function normalizeStorageSegment(value, fallback = "event") {
   return normalized || fallback;
 }
 
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function sha256Hex(buffer) {
+  return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
 module.exports = function createBackupProviderService({
   pool,
   storageService,
   buildCanonicalPassportPayload
 }) {
+  function parseStoredJson(value, fallback = null) {
+    if (value === null || value === undefined || value === "") return fallback;
+    if (typeof value === "object" && !Buffer.isBuffer(value)) return value;
+    try {
+      return JSON.parse(String(value));
+    } catch {
+      return fallback;
+    }
+  }
+
+  function getContinuityPolicy({ companyId = null } = {}) {
+    const rpoMinutes = parsePositiveInteger(process.env.BACKUP_POLICY_RPO_MINUTES, 15);
+    const rtoHours = parsePositiveInteger(process.env.BACKUP_POLICY_RTO_HOURS, 4);
+    const verificationFrequency = normalizeText(process.env.BACKUP_POLICY_VERIFICATION_FREQUENCY, "daily");
+    const restoreTestFrequency = normalizeText(process.env.BACKUP_POLICY_RESTORE_TEST_FREQUENCY, "quarterly");
+    const verificationMethod = normalizeText(
+      process.env.BACKUP_POLICY_VERIFICATION_METHOD,
+      "Replicated backup objects are hash-verified against recorded payload hashes."
+    );
+    const restoreTestMethod = normalizeText(
+      process.env.BACKUP_POLICY_RESTORE_TEST_METHOD,
+      "Perform a documented restore rehearsal from backup storage into a non-production environment."
+    );
+
+    return {
+      companyId: companyId !== null && companyId !== undefined ? Number.parseInt(companyId, 10) : null,
+      rpoMinutes,
+      rtoHours,
+      replicationTriggerPolicy: {
+        release: true,
+        archive: true,
+        controlledUpdate: true,
+        standardsDelete: true,
+        manualReplication: true,
+      },
+      verificationFrequency,
+      restoreTestFrequency,
+      verificationMethod,
+      restoreTestMethod,
+      backupProviderRequired: toBoolean(process.env.BACKUP_PROVIDER_ENABLED, false),
+      evidenceSource: "application_policy",
+    };
+  }
+
   function buildImplicitProvider(companyId = null) {
     if (!toBoolean(process.env.BACKUP_PROVIDER_ENABLED, false)) return null;
     return {
@@ -99,6 +153,7 @@ module.exports = function createBackupProviderService({
     companyName = "",
     reason = "manual",
     snapshotScope = "released_current",
+    documentation = null,
     provider
   }) {
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, { companyName });
@@ -121,6 +176,12 @@ module.exports = function createBackupProviderService({
         versionNumber: Number(passport.version_number) || 1,
         releaseStatus: passport.release_status || null
       },
+      documentation: documentation || {
+        includedByReference: [],
+        attachmentCopies: [],
+        mandatoryDocumentCount: 0,
+        publicDocumentCount: 0,
+      },
       passport: canonicalPayload
     };
   }
@@ -135,6 +196,173 @@ module.exports = function createBackupProviderService({
       `v${versionNumber}`,
       `${snapshotScope}.json`
     );
+  }
+
+  function buildAttachmentStorageKey({ provider, passport, attachment, fallbackFieldKey = "document" }) {
+    const lineageId = normalizeText(passport.lineage_id || passport.dppId || "unknown-lineage", "unknown-lineage");
+    const versionNumber = Number(passport.version_number) || 1;
+    const fieldKey = normalizeStorageSegment(attachment?.field_key || fallbackFieldKey, "document");
+    const publicId = normalizeStorageSegment(attachment?.public_id || Date.now(), "document");
+    const ext = path.extname(String(attachment?.storage_key || attachment?.file_path || attachment?.file_url || "")).toLowerCase();
+    const safeExt = ext && ext.length <= 10 ? ext.replace(/[^a-z0-9.]/g, "") : "";
+    return path.posix.join(
+      normalizeObjectPrefix(provider.object_prefix),
+      `company-${passport.company_id || "unknown"}`,
+      `passport-${lineageId}`,
+      `v${versionNumber}`,
+      "documents",
+      `${fieldKey}-${publicId}${safeExt || ""}`
+    );
+  }
+
+  function collectTypeFields(typeDef) {
+    return Array.isArray(typeDef?.fields_json?.sections) ?
+      typeDef.fields_json.sections.flatMap((section) => Array.isArray(section?.fields) ? section.fields : []) :
+      [];
+  }
+
+  function isFileLikeField(fieldDef) {
+    const candidates = [
+      fieldDef?.type,
+      fieldDef?.dataType,
+      fieldDef?.inputType,
+      fieldDef?.fieldType,
+    ].map((value) => String(value || "").trim().toLowerCase());
+    return candidates.includes("file") || candidates.includes("document");
+  }
+
+  function isMandatoryField(fieldDef) {
+    return fieldDef?.required === true || fieldDef?.mandatory === true;
+  }
+
+  async function loadPassportAttachments({ companyId, passportDppId }) {
+    const result = await pool.query(
+      `SELECT id, public_id, company_id, passport_dpp_id, field_key, file_path, storage_key, storage_provider,
+              file_url, mime_type, size_bytes, is_public, created_at
+       FROM passport_attachments
+       WHERE company_id = $1
+         AND passport_dpp_id = $2
+       ORDER BY created_at DESC, id DESC`,
+      [companyId, passportDppId]
+    ).catch(() => ({ rows: [] }));
+    return result.rows;
+  }
+
+  async function readAttachmentBuffer(attachment) {
+    if (attachment?.storage_key && storageService?.fetchObject) {
+      const objectResponse = await storageService.fetchObject(attachment.storage_key);
+      return Buffer.from(await objectResponse.arrayBuffer());
+    }
+    if (attachment?.file_path) {
+      return fs.promises.readFile(path.resolve(attachment.file_path));
+    }
+    return null;
+  }
+
+  async function buildDocumentationManifest({ passport, typeDef, provider }) {
+    const fieldDefs = collectTypeFields(typeDef);
+    const fileFieldMap = new Map(
+      fieldDefs
+        .filter((fieldDef) => fieldDef?.key && isFileLikeField(fieldDef))
+        .map((fieldDef) => [fieldDef.key, fieldDef])
+    );
+    const attachments = await loadPassportAttachments({
+      companyId: passport.company_id,
+      passportDppId: passport.dppId,
+    });
+    const appBaseUrl = normalizeText(
+      process.env.PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      process.env.SERVER_URL,
+      "http://localhost:3001"
+    ).replace(/\/+$/, "");
+
+    const attachmentCopies = [];
+    const includedByReference = [];
+
+    for (const attachment of attachments) {
+      const fieldDef = fileFieldMap.get(attachment.field_key) || null;
+      const publicDownloadUrl = attachment.public_id ? `${appBaseUrl}/public-files/${attachment.public_id}` : null;
+      const manifestEntry = {
+        fieldKey: attachment.field_key || null,
+        label: fieldDef?.label || attachment.field_key || "Attachment",
+        mandatory: isMandatoryField(fieldDef),
+        accessMode: attachment.is_public ? "public_download" : "controlled_private",
+        isPublic: attachment.is_public === true,
+        publicDownloadUrl: attachment.is_public ? publicDownloadUrl : null,
+        sourceReference: attachment.file_url || publicDownloadUrl || null,
+        sourceReferenceType: attachment.public_id ? "public_file_route" : "stored_attachment",
+        mimeType: attachment.mime_type || "application/octet-stream",
+        sizeBytes: attachment.size_bytes || null,
+      };
+
+      let backupCopy = null;
+      try {
+        const buffer = await readAttachmentBuffer(attachment);
+        if (buffer) {
+          const copied = await storageService.saveObject({
+            key: buildAttachmentStorageKey({ provider, passport, attachment, fallbackFieldKey: attachment.field_key }),
+            buffer,
+            contentType: attachment.mime_type || "application/octet-stream",
+            cacheControl: "private, max-age=0, no-store",
+          });
+          backupCopy = {
+            storageKey: copied?.storageKey || null,
+            publicUrl: copied?.url || null,
+            contentHash: sha256Hex(buffer),
+            contentType: attachment.mime_type || "application/octet-stream",
+            storedAt: new Date().toISOString(),
+          };
+        }
+      } catch (error) {
+        backupCopy = {
+          storageKey: null,
+          publicUrl: null,
+          contentHash: null,
+          contentType: attachment.mime_type || "application/octet-stream",
+          storedAt: new Date().toISOString(),
+          error: error.message,
+        };
+      }
+
+      attachmentCopies.push({
+        ...manifestEntry,
+        backupCopyStatus: backupCopy?.storageKey ? "copied" : "copy_failed",
+        backupCopy,
+      });
+    }
+
+    for (const [fieldKey, fieldDef] of fileFieldMap.entries()) {
+      const matchingAttachment = attachments.find((attachment) => attachment.field_key === fieldKey);
+      const fieldValue = passport?.[fieldKey];
+      if (matchingAttachment) continue;
+      if (!normalizeText(fieldValue)) continue;
+
+      includedByReference.push({
+        fieldKey,
+        label: fieldDef?.label || fieldKey,
+        mandatory: isMandatoryField(fieldDef),
+        referenceUrl: String(fieldValue),
+        referenceType: String(fieldValue).includes("/public-files/") ? "public_file_route" : "external_reference",
+        downloadable: /^https?:\/\//i.test(String(fieldValue)),
+        preservedAccessMode: "reference_only",
+        backupCopyStatus: isMandatoryField(fieldDef) ? "reference_only_unbacked" : "reference_only",
+      });
+    }
+
+    const mandatoryCopyFailures = [
+      ...attachmentCopies.filter((item) => item.mandatory && item.backupCopyStatus !== "copied"),
+      ...includedByReference.filter((item) => item.mandatory),
+    ].map((item) => item.fieldKey || item.label || "document");
+
+    return {
+      includedByReference,
+      attachmentCopies,
+      mandatoryDocumentCount: [...attachmentCopies, ...includedByReference].filter((item) => item.mandatory).length,
+      publicDocumentCount: attachmentCopies.filter((item) => item.isPublic).length,
+      mandatoryBackupSatisfied: mandatoryCopyFailures.length === 0,
+      mandatoryCopyFailures,
+    };
   }
 
   function buildAccessControlEventEnvelope({
@@ -322,12 +550,18 @@ module.exports = function createBackupProviderService({
 
     const results = [];
     for (const provider of providers) {
+      const documentation = await buildDocumentationManifest({
+        passport,
+        typeDef,
+        provider,
+      });
       const envelope = buildBackupEnvelope({
         passport,
         typeDef,
         companyName,
         reason,
         snapshotScope,
+        documentation,
         provider
       });
 
@@ -338,6 +572,9 @@ module.exports = function createBackupProviderService({
       let errorMessage = null;
 
       try {
+        if (documentation.mandatoryBackupSatisfied === false) {
+          throw new Error(`Mandatory document backup is incomplete for field(s): ${documentation.mandatoryCopyFailures.join(", ")}`);
+        }
         if (!storageService?.saveObject) {
           throw new Error("Configured storage service does not support backup writes");
         }
@@ -568,6 +805,26 @@ module.exports = function createBackupProviderService({
     return crypto.createHash("sha256").update(payloadJson).digest("hex");
   }
 
+  async function verifyBackupDocumentCopies(documentation) {
+    const copies = Array.isArray(documentation?.attachmentCopies) ? documentation.attachmentCopies : [];
+    for (const entry of copies) {
+      const storageKey = entry?.backupCopy?.storageKey || null;
+      const expectedHash = normalizeHash(entry?.backupCopy?.contentHash || "");
+      if (!storageKey || !expectedHash) {
+        if (entry?.mandatory) {
+          throw new Error(`Mandatory backup document for field "${entry.fieldKey || "document"}" is missing a verified copy`);
+        }
+        continue;
+      }
+      const objectResponse = await storageService.fetchObject(storageKey);
+      const buffer = Buffer.from(await objectResponse.arrayBuffer());
+      const actualHash = normalizeHash(sha256Hex(buffer));
+      if (expectedHash !== actualHash) {
+        throw new Error(`Backup document hash mismatch for field "${entry.fieldKey || "document"}"`);
+      }
+    }
+  }
+
   async function verifyReplicationRecord(row) {
     if (!storageService?.fetchObject) {
       return updateVerificationResult({
@@ -601,6 +858,7 @@ module.exports = function createBackupProviderService({
       if (expectedPayloadHash && expectedPayloadHash !== actualPayloadHash) {
         throw new Error("Backup payload hash does not match the recorded replication hash");
       }
+      await verifyBackupDocumentCopies(parsed.documentation);
 
       return updateVerificationResult({
         id: row.id,
@@ -620,7 +878,7 @@ module.exports = function createBackupProviderService({
     const result = await pool.query(
       `SELECT id, backup_provider_id, backup_provider_key, passport_dpp_id, lineage_id, company_id, passport_type,
               version_number, dpp_id, snapshot_scope, replication_status, storage_provider, storage_key, public_url,
-              payload_hash, error_message, verification_status, verification_error_message,
+              payload_hash, payload_json, error_message, verification_status, verification_error_message,
               verified_payload_hash, last_verified_at, created_at, updated_at
        FROM passport_backup_replications
        WHERE company_id = $1
@@ -628,7 +886,296 @@ module.exports = function createBackupProviderService({
        ORDER BY version_number DESC, updated_at DESC, id DESC`,
       [companyId, passportDppId]
     ).catch(() => ({ rows: [] }));
-    return result.rows;
+    return result.rows.map((row) => {
+      const payloadJson = parseStoredJson(row.payload_json, {});
+      const documentation = payloadJson?.documentation || {};
+      return {
+        ...row,
+        documentation_summary: {
+          mandatoryDocumentCount: Number(documentation.mandatoryDocumentCount) || 0,
+          publicDocumentCount: Number(documentation.publicDocumentCount) || 0,
+          mandatoryBackupSatisfied: documentation.mandatoryBackupSatisfied !== false,
+          mandatoryCopyFailures: Array.isArray(documentation.mandatoryCopyFailures) ? documentation.mandatoryCopyFailures : [],
+          attachmentCopyCount: Array.isArray(documentation.attachmentCopies) ? documentation.attachmentCopies.length : 0,
+          referenceOnlyCount: Array.isArray(documentation.includedByReference) ? documentation.includedByReference.length : 0,
+        },
+      };
+    });
+  }
+
+  async function findLatestVerifiedPublicReplication({
+    companyId,
+    passportDppId = null,
+    lineageId = null
+  }) {
+    const normalizedCompanyId = Number.parseInt(companyId, 10);
+    if (!Number.isFinite(normalizedCompanyId)) {
+      throw new Error("companyId is required");
+    }
+
+    const params = [normalizedCompanyId];
+    const filters = ["company_id = $1", "replication_status = 'synced'", "verification_status = 'verified'"];
+
+    if (passportDppId) {
+      params.push(normalizeText(passportDppId));
+      filters.push(`passport_dpp_id = $${params.length}`);
+    }
+    if (lineageId) {
+      params.push(normalizeText(lineageId));
+      filters.push(`lineage_id = $${params.length}`);
+    }
+
+    const result = await pool.query(
+      `SELECT id, backup_provider_id, backup_provider_key, passport_dpp_id, lineage_id, company_id, passport_type,
+              version_number, dpp_id, snapshot_scope, replication_status, storage_provider, storage_key, public_url,
+              payload_hash, payload_json, verification_status, verified_payload_hash, updated_at
+       FROM passport_backup_replications
+       WHERE ${filters.join(" AND ")}
+       ORDER BY version_number DESC, updated_at DESC, id DESC
+       LIMIT 25`,
+      params
+    ).catch(() => ({ rows: [] }));
+
+    if (!result.rows.length) return null;
+
+    const providers = await listProviders({ companyId: normalizedCompanyId, activeOnly: true });
+    const providerMap = new Map(providers.map((provider) => [provider.provider_key, provider]));
+
+    for (const row of result.rows) {
+      const provider = providerMap.get(row.backup_provider_key) || null;
+      const supportsPublicHandover = provider ? provider.supports_public_handover !== false : true;
+      if (!supportsPublicHandover) continue;
+      return {
+        ...row,
+        payload_json: parseStoredJson(row.payload_json, {}),
+        provider: provider || null,
+      };
+    }
+
+    return null;
+  }
+
+  async function listPublicHandovers({
+    companyId,
+    passportDppId = null
+  }) {
+    const normalizedCompanyId = Number.parseInt(companyId, 10);
+    if (!Number.isFinite(normalizedCompanyId)) {
+      throw new Error("companyId is required");
+    }
+
+    const params = [normalizedCompanyId];
+    let passportFilterSql = "";
+    if (passportDppId) {
+      params.push(normalizeText(passportDppId));
+      passportFilterSql = ` AND passport_dpp_id = $${params.length}`;
+    }
+
+    const result = await pool.query(
+      `SELECT id, company_id, passport_dpp_id, lineage_id, passport_type, product_id, version_number,
+              backup_provider_id, backup_provider_key, source_replication_id, storage_key, public_url,
+              public_company_name, public_row_data, handover_status, verification_status, notes,
+              activated_by, deactivated_by, activated_at, deactivated_at, created_at, updated_at
+       FROM backup_public_handovers
+       WHERE company_id = $1${passportFilterSql}
+       ORDER BY activated_at DESC, id DESC`,
+      params
+    ).catch(() => ({ rows: [] }));
+
+    return result.rows.map((row) => ({
+      ...row,
+      public_row_data: parseStoredJson(row.public_row_data, {}),
+    }));
+  }
+
+  async function getActivePublicHandover({
+    companyId = null,
+    passportDppId = null,
+    productId = null,
+    versionNumber = null
+  }) {
+    const params = [];
+    const filters = ["handover_status = 'active'"];
+
+    if (companyId !== null && companyId !== undefined) {
+      params.push(Number.parseInt(companyId, 10));
+      filters.push(`company_id = $${params.length}`);
+    }
+    if (passportDppId) {
+      params.push(normalizeText(passportDppId));
+      filters.push(`passport_dpp_id = $${params.length}`);
+    }
+    if (productId) {
+      params.push(normalizeText(productId));
+      filters.push(`product_id = $${params.length}`);
+    }
+    if (versionNumber !== null && versionNumber !== undefined) {
+      params.push(Number.parseInt(versionNumber, 10));
+      filters.push(`version_number = $${params.length}`);
+    }
+
+    if (!passportDppId && !productId) return null;
+
+    const result = await pool.query(
+      `SELECT id, company_id, passport_dpp_id, lineage_id, passport_type, product_id, version_number,
+              backup_provider_id, backup_provider_key, source_replication_id, storage_key, public_url,
+              public_company_name, public_row_data, handover_status, verification_status, notes,
+              activated_by, deactivated_by, activated_at, deactivated_at, created_at, updated_at
+       FROM backup_public_handovers
+       WHERE ${filters.join(" AND ")}
+       ORDER BY activated_at DESC, id DESC`,
+      params
+    ).catch(() => ({ rows: [] }));
+
+    if (!result.rows.length) return null;
+    if (productId && !passportDppId && result.rows.length > 1) {
+      const error = new Error("Multiple backup public handovers match this product identifier.");
+      error.code = "AMBIGUOUS_PRODUCT_ID";
+      throw error;
+    }
+
+    const row = result.rows[0];
+    return {
+      ...row,
+      public_row_data: parseStoredJson(row.public_row_data, {}),
+    };
+  }
+
+  async function activatePublicHandover({
+    companyId,
+    passportDppId,
+    lineageId = null,
+    passportType,
+    productId,
+    versionNumber = 1,
+    publicRowData,
+    publicCompanyName = "",
+    activatedBy = null,
+    actorIdentifier = null,
+    notes = null
+  }) {
+    const normalizedCompanyId = Number.parseInt(companyId, 10);
+    if (!Number.isFinite(normalizedCompanyId)) {
+      throw new Error("companyId is required");
+    }
+    const normalizedPassportDppId = normalizeText(passportDppId);
+    if (!normalizedPassportDppId) {
+      throw new Error("passportDppId is required");
+    }
+    if (!normalizeText(passportType)) {
+      throw new Error("passportType is required");
+    }
+    if (!normalizeText(productId)) {
+      throw new Error("productId is required");
+    }
+    if (!publicRowData || typeof publicRowData !== "object") {
+      throw new Error("publicRowData is required");
+    }
+
+    const companyResult = await pool.query(
+      `SELECT id, company_name, is_active
+       FROM companies
+       WHERE id = $1
+       LIMIT 1`,
+      [normalizedCompanyId]
+    );
+    const company = companyResult.rows[0] || null;
+    if (!company) {
+      throw new Error("Company not found");
+    }
+    if (company.is_active !== false) {
+      throw new Error("Backup public handover can only be activated when the economic operator is inactive");
+    }
+
+    const replication = await findLatestVerifiedPublicReplication({
+      companyId: normalizedCompanyId,
+      passportDppId: normalizedPassportDppId,
+      lineageId,
+    });
+    if (!replication) {
+      throw new Error("A verified backup replication that supports public handover is required");
+    }
+
+    await pool.query(
+      `UPDATE backup_public_handovers
+       SET handover_status = 'inactive',
+           deactivated_by = COALESCE($3, deactivated_by),
+           deactivated_at = NOW(),
+           updated_at = NOW()
+       WHERE company_id = $1
+         AND passport_dpp_id = $2
+         AND handover_status = 'active'`,
+      [normalizedCompanyId, normalizedPassportDppId, activatedBy || null]
+    ).catch(() => {});
+
+    const result = await pool.query(
+      `INSERT INTO backup_public_handovers (
+         company_id, passport_dpp_id, lineage_id, passport_type, product_id, version_number,
+         backup_provider_id, backup_provider_key, source_replication_id, storage_key, public_url,
+         public_company_name, public_row_data, handover_status, verification_status, notes,
+         activated_by, activated_at, created_at, updated_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, 'active', 'verified', $14, $15, NOW(), NOW(), NOW())
+       RETURNING *`,
+      [
+        normalizedCompanyId,
+        normalizedPassportDppId,
+        normalizeText(lineageId || normalizedPassportDppId),
+        normalizeText(passportType),
+        normalizeText(productId),
+        Number.parseInt(versionNumber, 10) || 1,
+        replication.backup_provider_id || null,
+        replication.backup_provider_key,
+        replication.id,
+        replication.storage_key || null,
+        replication.public_url || null,
+        normalizeText(publicCompanyName, company.company_name || ""),
+        JSON.stringify(publicRowData),
+        notes || null,
+        activatedBy || null,
+      ]
+    );
+
+    return {
+      ...(result.rows[0] || null),
+      actor_identifier: actorIdentifier || null,
+      public_row_data: parseStoredJson(result.rows[0]?.public_row_data, {}),
+      source_replication: replication,
+    };
+  }
+
+  async function deactivatePublicHandover({
+    companyId,
+    passportDppId,
+    deactivatedBy = null,
+    notes = null
+  }) {
+    const normalizedCompanyId = Number.parseInt(companyId, 10);
+    const normalizedPassportDppId = normalizeText(passportDppId);
+    if (!Number.isFinite(normalizedCompanyId) || !normalizedPassportDppId) {
+      throw new Error("companyId and passportDppId are required");
+    }
+
+    const result = await pool.query(
+      `UPDATE backup_public_handovers
+       SET handover_status = 'inactive',
+           notes = COALESCE($4, notes),
+           deactivated_by = $3,
+           deactivated_at = NOW(),
+           updated_at = NOW()
+       WHERE company_id = $1
+         AND passport_dpp_id = $2
+         AND handover_status = 'active'
+       RETURNING *`,
+      [normalizedCompanyId, normalizedPassportDppId, deactivatedBy || null, notes || null]
+    );
+
+    const row = result.rows[0] || null;
+    if (!row) return null;
+    return {
+      ...row,
+      public_row_data: parseStoredJson(row.public_row_data, {}),
+    };
   }
 
   async function verifyReplications({
@@ -741,6 +1288,12 @@ module.exports = function createBackupProviderService({
   }
 
   return {
+    activatePublicHandover,
+    deactivatePublicHandover,
+    findLatestVerifiedPublicReplication,
+    getActivePublicHandover,
+    getContinuityPolicy,
+    listPublicHandovers,
     listProviders,
     listReplications,
     upsertProvider,

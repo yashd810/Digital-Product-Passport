@@ -24,6 +24,7 @@ module.exports = function registerPassportPublicRoutes(app, {
   buildBatteryPassJsonExport,
   buildCanonicalPassportPayload,
   buildExpandedPassportPayload,
+  backupProviderService,
   signingService,
   didService
 }) {
@@ -301,6 +302,12 @@ module.exports = function registerPassportPublicRoutes(app, {
     const normalizedGuid = String(dppId || "").trim();
     if (!normalizedGuid) return null;
 
+    const handoverLoaded = await loadBackupHandoverPassport({
+      passportDppId: normalizedGuid,
+      versionNumber,
+    });
+    if (handoverLoaded) return handoverLoaded;
+
     const resolved = await resolvePublicPassportByDppId(normalizedGuid, { versionNumber });
     let passport = resolved?.passport || null;
 
@@ -356,6 +363,50 @@ module.exports = function registerPassportPublicRoutes(app, {
     );
 
     return { passport, typeDef, company };
+  }
+
+  async function loadBackupHandoverPassport({
+    passportDppId = null,
+    productId = null,
+    versionNumber = null
+  }) {
+    if (!backupProviderService?.getActivePublicHandover) return null;
+
+    const handover = await backupProviderService.getActivePublicHandover({
+      passportDppId,
+      productId,
+      versionNumber,
+    });
+    if (!handover) return null;
+
+    const rawRow = typeof handover.public_row_data === "string" ?
+    JSON.parse(handover.public_row_data) :
+    handover.public_row_data;
+
+    const passport = {
+      ...normalizePassportRow(rawRow || {}),
+      dppId: rawRow?.dppId || rawRow?.dpp_id || handover.passport_dpp_id,
+      guid: rawRow?.guid || rawRow?.dppId || rawRow?.dpp_id || handover.passport_dpp_id,
+      lineage_id: rawRow?.lineage_id || rawRow?.lineageId || handover.lineage_id || handover.passport_dpp_id,
+      company_id: rawRow?.company_id || rawRow?.companyId || handover.company_id,
+      passport_type: rawRow?.passport_type || rawRow?.passportType || handover.passport_type,
+      product_id: rawRow?.product_id || rawRow?.productId || handover.product_id,
+      version_number: rawRow?.version_number || rawRow?.versionNumber || handover.version_number,
+      backup_public_handover: true,
+      backup_public_url: handover.public_url || null,
+      backup_handover_source: {
+        providerKey: handover.backup_provider_key || null,
+        sourceReplicationId: handover.source_replication_id || null,
+        verificationStatus: handover.verification_status || null,
+      },
+    };
+
+    const [typeDef, company] = await Promise.all([
+      loadTypeDef(passport.passport_type),
+      hydrateCompany(passport.company_id),
+    ]);
+
+    return { passport, typeDef, company, handover };
   }
 
   async function loadPublicPassportByLineage(stableId) {
@@ -498,7 +549,10 @@ module.exports = function registerPassportPublicRoutes(app, {
         return res.status(400).json({ error: "version must be a valid integer" });
       }
 
-      let resolved = await resolveReleasedPassportByProductId(productId, { versionNumber: version });
+      let resolved = await loadBackupHandoverPassport({ productId, versionNumber: version });
+      if (!resolved?.passport) {
+        resolved = await resolveReleasedPassportByProductId(productId, { versionNumber: version });
+      }
       if (!resolved?.passport) {
         resolved = await resolvePublicPassportByDppId(req.params.productId, { versionNumber: version });
       }
@@ -506,9 +560,9 @@ module.exports = function registerPassportPublicRoutes(app, {
 
       const passport = resolved.passport;
       const [sanitizedPassport, typeDef, company] = await Promise.all([
-      stripRestrictedFieldsForPublicView(passport, passport.passport_type),
-      loadTypeDef(passport.passport_type),
-      hydrateCompany(passport.company_id)]
+      passport.backup_public_handover ? passport : stripRestrictedFieldsForPublicView(passport, passport.passport_type),
+      resolved.typeDef || loadTypeDef(passport.passport_type),
+      resolved.company || hydrateCompany(passport.company_id)]
       );
       const companyName = company?.company_name || "";
       const publicPath = buildCurrentPublicPassportPath({
@@ -542,6 +596,8 @@ module.exports = function registerPassportPublicRoutes(app, {
         linked_data: {
           public_url: didService.buildPublicPassportUrl(publicPath),
           canonical_json_url: didService.buildApiUrl(`/api/passports/${passport.dppId}/canonical`),
+          backup_public_url: sanitizedPassport.backup_public_url || null,
+          public_source_mode: sanitizedPassport.backup_public_handover ? "backup_handover" : "economic_operator",
           related_subjects: linkedSubjects,
           canonical_subjects: {
             subjectDid: canonicalPayload.subjectDid,
@@ -618,7 +674,9 @@ module.exports = function registerPassportPublicRoutes(app, {
       const loaded = await loadPublicPassportByGuid(req.params.dppId);
       if (!loaded?.passport) return res.status(404).json({ error: "Passport not found" });
 
-      const sanitizedPassport = await stripRestrictedFieldsForPublicView(loaded.passport, loaded.passport.passport_type);
+      const sanitizedPassport = loaded.passport.backup_public_handover ?
+      loaded.passport :
+      await stripRestrictedFieldsForPublicView(loaded.passport, loaded.passport.passport_type);
       const canonicalPayload = buildRequestedPassportPayload(req, sanitizedPassport, loaded.typeDef, loaded.company);
 
       if (wantsSemanticResponse(req)) {

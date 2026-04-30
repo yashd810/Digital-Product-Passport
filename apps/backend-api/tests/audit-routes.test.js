@@ -224,6 +224,13 @@ function createTestApp() {
       buildLookupCandidates: ({ productId }) => [productId],
     },
     backupProviderService: {
+      getContinuityPolicy: jest.fn(({ companyId }) => ({
+        companyId: Number(companyId),
+        rpoMinutes: 15,
+        rtoHours: 4,
+        verificationFrequency: "daily",
+        restoreTestFrequency: "quarterly",
+      })),
       replicateAuditAnchorEvent,
     },
     buildExpandedPassportPayload: jest.fn(() => ({})),
@@ -271,6 +278,25 @@ describe("audit log routes", () => {
       ],
     });
     expect(listAuditLogAnchors).toHaveBeenCalledWith(5);
+  });
+
+  test("GET /api/companies/:companyId/backup-policy returns the continuity policy", async () => {
+    const { app } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/companies/:companyId/backup-policy",
+      params: { companyId: "5" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      companyId: 5,
+      rpoMinutes: 15,
+      rtoHours: 4,
+      verificationFrequency: "daily",
+      restoreTestFrequency: "quarterly",
+    });
   });
 
   test("POST /api/companies/:companyId/audit-logs/anchors creates an anchor", async () => {

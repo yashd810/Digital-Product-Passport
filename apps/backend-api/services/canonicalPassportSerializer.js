@@ -918,7 +918,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const company = options.company || null;
     const passportType = String(passport?.passport_type || typeDef?.type_name || options.passportType || "battery").trim().toLowerCase() || "battery";
     const didPassportType = "battery";
-    const stableId = didService?.normalizeStableId?.(passport?.lineage_id || passport?.dppId || passport?.dpp_id);
+    const stableId = didService?.normalizeStableId?.(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.guid);
     const resolvedGranularity = String(
       options.granularity
       || findHeaderAliasValue(passport || {}, HEADER_FIELD_ALIASES.granularity)
@@ -1028,7 +1028,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const extensions = buildClarosExtensions({
       passportType,
       versionNumber: resolvedVersionNumber,
-      internalId: passport?.dppId || passport?.dpp_id || null,
+      internalId: passport?.dppId || passport?.dpp_id || passport?.guid || null,
     });
     if (extensions?.claros) {
       extensions.claros.validation = summarizeValidationIssues(validationIssues);
@@ -1044,9 +1044,13 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       }
     }
 
+    const localProductId = passport.product_id || null;
+    const uniqueProductIdentifier = passport.product_identifier_did || derivedProductIdentifierDid || localProductId;
+
     return {
-      digitalProductPassportId: passport?.dppId || passport?.dpp_id || dppDid,
-      uniqueProductIdentifier: passport.product_id || passport.product_identifier_did || derivedProductIdentifierDid || null,
+      digitalProductPassportId: passport?.dppId || passport?.dpp_id || passport?.guid || dppDid,
+      uniqueProductIdentifier,
+      localProductId,
       granularity: toTitleCaseGranularity(resolvedGranularity),
       dppSchemaVersion,
       dppStatus,

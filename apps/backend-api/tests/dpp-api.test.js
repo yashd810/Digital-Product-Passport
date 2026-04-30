@@ -3,7 +3,7 @@
 const express = require("express");
 
 const registerDppApiRoutes = require("../routes/dpp-api");
-const { extractExplicitFacilityId } = require("../helpers/passport-helpers");
+const { extractExplicitFacilityId, normalizePassportRequestBody } = require("../helpers/passport-helpers");
 
 function createMockResponse() {
   return {
@@ -191,6 +191,21 @@ function createTestApp(options = {}) {
         version_number: 3,
         manufacturer: "Draft Manufacturer",
       };
+  const identifierLineage = [{
+    id: 1,
+    companyId: 5,
+    lineageId: releasedPassport.lineage_id,
+    previousDppId: "dpp_legacy_model",
+    replacementDppId: releasedPassport.dppId,
+    previousIdentifier: "did:web:www.example.test:did:battery:model:c5-bat-2026-001-abcdef123456",
+    replacementIdentifier: releasedPassport.product_identifier_did,
+    previousLocalProductId: "BAT-2026-001",
+    replacementLocalProductId: "BAT-2026-001",
+    previousGranularity: "model",
+    replacementGranularity: "item",
+    transitionReason: "granularity_change",
+    createdAt: "2026-04-29T12:00:00.000Z",
+  }];
   const backupProviderService = {
     replicatePassportSnapshot: jest.fn(async () => ({ success: true, results: [] })),
   };
@@ -368,12 +383,14 @@ function createTestApp(options = {}) {
     signingService: {},
     buildOperationalDppPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_id,
+      uniqueProductIdentifier: passport.product_identifier_did || passport.product_id,
+      localProductId: passport.product_id,
       product_id: passport.product_id,
     }),
     buildCanonicalPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_id,
+      uniqueProductIdentifier: passport.product_identifier_did || passport.product_id,
+      localProductId: passport.product_id,
       subjectDid: "did:web:www.example.test:did:battery:item:legacy",
       dppDid: "did:web:www.example.test:did:dpp:item:legacy",
       companyDid: "did:web:www.example.test:did:company:5",
@@ -402,7 +419,8 @@ function createTestApp(options = {}) {
     }),
     buildExpandedPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_id,
+      uniqueProductIdentifier: passport.product_identifier_did || passport.product_id,
+      localProductId: passport.product_id,
       subjectDid: "did:web:www.example.test:did:battery:item:legacy",
       dppDid: "did:web:www.example.test:did:dpp:item:legacy",
       companyDid: "did:web:www.example.test:did:company:5",
@@ -488,11 +506,13 @@ function createTestApp(options = {}) {
       didToDocumentUrl: () => null,
     },
     productIdentifierService: {
-      normalizeProductIdentifiers: ({ rawProductId }) => ({
+      isDidIdentifier: (value) => String(value || "").startsWith("did:"),
+      normalizeProductIdentifiers: ({ rawProductId, uniqueProductIdentifier }) => ({
         productIdInput: rawProductId,
-        productIdentifierDid: `did:web:www.example.test:did:battery:item:c5-${String(rawProductId).toLowerCase()}`,
+        productIdentifierDid: uniqueProductIdentifier || `did:web:www.example.test:did:battery:item:c5-${String(rawProductId).toLowerCase()}`,
       }),
       buildLookupCandidates: ({ productId }) => [productId, releasedPassport.product_identifier_did],
+      listIdentifierLineage: jest.fn(async () => identifierLineage),
     },
     archivePassportSnapshot: jest.fn(async () => {}),
     updatePassportRowById: async ({ data, includeUpdatedRow }) => {
@@ -530,7 +550,7 @@ function createTestApp(options = {}) {
         confidentiality: "regulated",
       })),
     },
-    normalizePassportRequestBody: (body) => body,
+    normalizePassportRequestBody,
     SYSTEM_PASSPORT_FIELDS: new Set([
       "company_id",
       "created_by",
@@ -593,7 +613,8 @@ describe("DPP standards API", () => {
     expect(response.body.digitalProductPassportId).toMatch(/^dpp_[0-9a-f-]{36}$/i);
     expect(response.body.dppId).toBe(response.body.digitalProductPassportId);
     expect(response.body.passport.digitalProductPassportId).toBe(response.body.digitalProductPassportId);
-    expect(response.body.passport.uniqueProductIdentifier).toBe("BAT-NEW-001");
+    expect(response.body.passport.uniqueProductIdentifier).toMatch(/^did:/);
+    expect(response.body.passport.localProductId).toBe("BAT-NEW-001");
   });
 
   test("POST /api/v1/dpps returns expanded elements when representation=expanded is requested", async () => {
@@ -622,6 +643,49 @@ describe("DPP standards API", () => {
         }),
       ])
     );
+  });
+
+  test("POST /api/v1/dpps accepts explicit localProductId and uniqueProductIdentifier", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dpps",
+      body: {
+        passportType: "battery",
+        localProductId: "BAT-NEW-003",
+        uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-new-003-explicit",
+        public_summary: "Explicit identifier battery passport",
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.passport).toMatchObject({
+      uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-new-003-explicit",
+      localProductId: "BAT-NEW-003",
+    });
+  });
+
+  test("POST /api/v1/dpps rejects non-DID uniqueProductIdentifier values", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dpps",
+      body: {
+        passportType: "battery",
+        localProductId: "BAT-NEW-004",
+        uniqueProductIdentifier: "BAT-NEW-004",
+      },
+    });
+
+    expectStandardError(response, {
+      httpStatus: 400,
+      statusCode: "ClientErrorBadRequest",
+      error: "uniqueProductIdentifier must use the configured global DID-based identifier scheme",
+      text: "uniqueProductIdentifier must use the configured global DID-based identifier scheme",
+      code: "400",
+    });
   });
 
   test("GET /api/v1/dppsByProductId/:productId returns the current released passport by productId", async () => {
@@ -719,7 +783,8 @@ describe("DPP standards API", () => {
     expect(response.body).toMatchObject({
       statusCode: "Success",
       digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-      uniqueProductIdentifier: "BAT-2026-001",
+      uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+      localProductId: "BAT-2026-001",
     });
     expect(response.body.fields).toBeUndefined();
     expect(response.body.elements).toEqual(
@@ -884,7 +949,8 @@ describe("DPP standards API", () => {
     });
     expect(response.body.payload).toMatchObject({
       digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-      uniqueProductIdentifier: "BAT-2026-001",
+      uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+      localProductId: "BAT-2026-001",
     });
   });
 
@@ -1017,6 +1083,34 @@ describe("DPP standards API", () => {
     expect(response.body.digitalProductPassportId).toBe("dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
     expect(response.body.updatedFields).toContain("manufacturer");
     expect(response.body.passport.fields.manufacturer).toBe("Whole Passport Update");
+  });
+
+  test("PATCH /api/v1/dpps/:dppId rejects in-place granularity changes", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/v1/dpps/:dppId",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      },
+      body: {
+        granularity: "model",
+      },
+    });
+
+    expectStandardError(response, {
+      httpStatus: 409,
+      statusCode: "ClientResourceConflict",
+      error: "GRANULARITY_CHANGE_REQUIRES_NEW_IDENTIFIER",
+      text: "Released DPP granularity cannot be changed in place. Create a linked successor identifier instead.",
+      code: "GRANULARITY_CHANGE_REQUIRES_NEW_IDENTIFIER",
+      detail: "Released DPP granularity cannot be changed in place. Create a linked successor identifier instead.",
+      extra: {
+        currentGranularity: "item",
+        requestedGranularity: "model",
+      },
+    });
   });
 
   test("PATCH /api/v1/dpps/:dppId returns expanded elements when representation=full is requested", async () => {
@@ -1159,6 +1253,35 @@ describe("DPP standards API", () => {
         digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
         archiveEndpoint: "/api/v1/dpps/dpp_72b99c83-952c-4179-96f6-54a513d39dbc/archive",
       },
+    });
+  });
+
+  test("GET /api/v1/dpps/:dppId/identifier-lineage returns linked predecessor and successor identifiers", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/v1/dpps/:dppId/identifier-lineage",
+      params: {
+        dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toMatchObject({
+      statusCode: "Success",
+      dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+      uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+      localProductId: "BAT-2026-001",
+      granularity: "item",
+      identifierLineage: [
+        expect.objectContaining({
+          previousGranularity: "model",
+          replacementGranularity: "item",
+          replacementDppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+        }),
+      ],
     });
   });
 

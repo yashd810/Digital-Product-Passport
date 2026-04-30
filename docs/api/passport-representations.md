@@ -41,7 +41,8 @@ Example response:
 ```json
 {
   "digitalProductPassportId": "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-  "uniqueProductIdentifier": "BAT-2026-001",
+  "uniqueProductIdentifier": "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
+  "localProductId": "BAT-2026-001",
   "granularity": "Item",
   "elements": [
     {
@@ -63,6 +64,8 @@ Configuration requirements:
 
 Migration notes:
 - Canonical JSON preserves numeric, boolean, object, and array typing.
+- `uniqueProductIdentifier` is the globally unique public identifier, currently represented by the canonical DID-based product identifier.
+- `localProductId` is the company/business-scoped product serial previously exposed as `product_id`.
 - `representation=expanded` is the preferred standards-facing query option for the prEN 18223-style `elements[]` export on `/api/v1/dppsByProductId/:productId`.
 - `representation=full` is still accepted as a backward-compatible alias where expanded payloads were previously exposed.
 - Public page responses now include `linked_data` pointers used to emit hidden JSON-LD metadata on the consumer page.

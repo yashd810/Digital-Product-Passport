@@ -619,7 +619,7 @@ const didService = createDidService({
   publicOrigin: process.env.PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000",
   apiOrigin: process.env.SERVER_URL || `http://localhost:${PORT}`,
 });
-const productIdentifierService = createProductIdentifierService({ didService });
+const productIdentifierService = createProductIdentifierService({ didService, pool });
 const canonicalPassportSerializer = createCanonicalPassportSerializer({ didService, productIdentifierService });
 const {
   buildCanonicalPassportPayload,
@@ -977,6 +977,7 @@ registerPassportPublicRoutes(app, {
   buildBatteryPassJsonExport,
   buildCanonicalPassportPayload,
   buildExpandedPassportPayload,
+  backupProviderService,
   signingService,
   didService,
 });

@@ -302,6 +302,46 @@ async function initDb(pool, {
     ALTER TABLE passport_backup_replications
     ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS backup_public_handovers (
+      id                    SERIAL PRIMARY KEY,
+      company_id            INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      passport_dpp_id       TEXT NOT NULL REFERENCES passport_registry(dpp_id) ON DELETE CASCADE,
+      lineage_id            TEXT,
+      passport_type         VARCHAR(100) NOT NULL,
+      product_id            TEXT NOT NULL,
+      version_number        INTEGER NOT NULL DEFAULT 1,
+      backup_provider_id    INTEGER REFERENCES backup_service_providers(id) ON DELETE SET NULL,
+      backup_provider_key   VARCHAR(100) NOT NULL,
+      source_replication_id INTEGER REFERENCES passport_backup_replications(id) ON DELETE SET NULL,
+      storage_key           TEXT,
+      public_url            TEXT,
+      public_company_name   TEXT,
+      public_row_data       JSONB NOT NULL DEFAULT '{}'::jsonb,
+      handover_status       VARCHAR(32) NOT NULL DEFAULT 'active',
+      verification_status   VARCHAR(32) NOT NULL DEFAULT 'verified',
+      notes                 TEXT,
+      activated_by          INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      deactivated_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      activated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      deactivated_at        TIMESTAMPTZ,
+      created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_backup_public_handovers_company
+      ON backup_public_handovers(company_id, activated_at DESC, id DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_backup_public_handovers_product
+      ON backup_public_handovers(product_id, handover_status, activated_at DESC, id DESC)
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_backup_public_handovers_active_passport
+      ON backup_public_handovers(passport_dpp_id)
+      WHERE handover_status = 'active'
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -644,6 +684,41 @@ async function initDb(pool, {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_registry_lineage
       ON passport_registry(lineage_id)
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_identifier_lineage (
+      id                           SERIAL PRIMARY KEY,
+      company_id                   INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      lineage_id                   TEXT    NOT NULL,
+      previous_passport_dpp_id     TEXT    NOT NULL,
+      replacement_passport_dpp_id  TEXT    NOT NULL,
+      previous_identifier          TEXT    NOT NULL,
+      replacement_identifier       TEXT    NOT NULL,
+      previous_local_product_id    TEXT,
+      replacement_local_product_id TEXT,
+      previous_granularity         VARCHAR(20) NOT NULL CHECK (previous_granularity IN ('model', 'batch', 'item')),
+      replacement_granularity      VARCHAR(20) NOT NULL CHECK (replacement_granularity IN ('model', 'batch', 'item')),
+      transition_reason            TEXT,
+      created_by                   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at                   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (previous_passport_dpp_id, replacement_passport_dpp_id)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_company
+      ON product_identifier_lineage(company_id)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_lineage
+      ON product_identifier_lineage(lineage_id)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_previous_identifier
+      ON product_identifier_lineage(previous_identifier)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_replacement_identifier
+      ON product_identifier_lineage(replacement_identifier)
   `);
   await pool.query(`
     ALTER TABLE passport_registry
