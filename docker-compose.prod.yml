@@ -83,9 +83,9 @@ services:
       - path: ${DPP_ENV_FILE:-.env.prod}
         required: false
     environment:
-      POSTGRES_DB: "${DB_NAME}"
-      POSTGRES_USER: "${DB_USER}"
-      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_NAME:-dpp}"
+      POSTGRES_USER: "${DB_USER:-postgres}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-postgres_temp_restore}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
