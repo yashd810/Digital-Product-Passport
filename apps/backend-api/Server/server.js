@@ -405,8 +405,38 @@ const authCookieOptions = {
   httpOnly: true, secure: COOKIE_SECURE, sameSite: COOKIE_SAME_SITE,
   domain: COOKIE_DOMAIN || undefined, path: "/", maxAge: 7 * 24 * 60 * 60 * 1000,
 };
+const legacyCookieClearOptions = (() => {
+  const clearDomains = new Set();
+  const maybeAddDerivedDomains = (rawUrl) => {
+    if (!rawUrl) return;
+    try {
+      const hostname = new URL(rawUrl).hostname;
+      const parts = hostname.split(".").filter(Boolean);
+      if (parts.length < 2) return;
+      const apexDomain = parts.slice(-2).join(".");
+      clearDomains.add(apexDomain);
+      clearDomains.add(`.${apexDomain}`);
+    } catch {}
+  };
+
+  if (COOKIE_DOMAIN) clearDomains.add(COOKIE_DOMAIN);
+  maybeAddDerivedDomains(process.env.APP_URL);
+  maybeAddDerivedDomains(process.env.SERVER_URL);
+
+  return [...clearDomains]
+    .filter(Boolean)
+    .filter((domain) => domain !== authCookieOptions.domain)
+    .map((domain) => ({
+      ...authCookieOptions,
+      domain,
+    }));
+})();
 const setAuthCookie   = (res, token) => res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE_NAME, token, authCookieOptions));
-const clearAuthCookie = (res) => res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE_NAME, "", { ...authCookieOptions, maxAge: 0, expires: new Date(0) }));
+const clearAuthCookie = (res) => res.setHeader(
+  "Set-Cookie",
+  [{ ...authCookieOptions, maxAge: 0, expires: new Date(0) }, ...legacyCookieClearOptions]
+    .map((options) => serializeCookie(SESSION_COOKIE_NAME, "", options))
+);
 
 // ─── SHARED SERVICES ────────────────────────────────────────────────────────
 const cache = createCacheService();

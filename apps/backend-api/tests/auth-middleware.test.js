@@ -96,6 +96,63 @@ describe("auth middleware API key migration", () => {
     });
   });
 
+  test("accepts a later valid session cookie when a stale duplicate cookie is also present", async () => {
+    const pool = {
+      query: jest.fn(async (sql) => {
+        if (String(sql).includes("FROM users u") && String(sql).includes("LEFT JOIN companies c")) {
+          return {
+            rows: [{
+              id: 9,
+              email: "editor@example.test",
+              company_id: 5,
+              role: "company_admin",
+              is_active: true,
+              session_version: 3,
+              two_factor_enabled: false,
+              economic_operator_identifier: null,
+              economic_operator_identifier_scheme: null,
+            }],
+          };
+        }
+        if (String(sql).includes("FROM user_access_audiences")) {
+          return { rows: [] };
+        }
+        throw new Error(`Unexpected query: ${sql}`);
+      }),
+    };
+
+    const verify = jest.fn((token) => {
+      if (token === "stale-token") throw new Error("jwt malformed");
+      if (token === "fresh-token") return { userId: 9, sessionVersion: 3 };
+      throw new Error(`Unexpected token: ${token}`);
+    });
+
+    const { authenticateToken } = createAuthMiddleware({
+      jwt: { verify },
+      crypto,
+      pool,
+      JWT_SECRET: "test",
+      SESSION_COOKIE_NAME: "sid",
+    });
+
+    const req = {
+      headers: {
+        cookie: "sid=stale-token; sid=fresh-token",
+      },
+    };
+    const res = createResponse();
+    let nextCalled = false;
+
+    await authenticateToken(req, res, () => {
+      nextCalled = true;
+    });
+
+    expect(nextCalled).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(verify).toHaveBeenNthCalledWith(1, "stale-token", "test");
+    expect(verify).toHaveBeenNthCalledWith(2, "fresh-token", "test");
+  });
+
   test("upgrades legacy SHA-256 API keys to salted HMAC-SHA256 after a successful auth", async () => {
     const rawKey = "dpp_legacy_key_for_tests";
     const legacyHash = crypto.createHash("sha256").update(rawKey).digest("hex");

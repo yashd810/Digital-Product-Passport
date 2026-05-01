@@ -6,7 +6,7 @@ export function authHeaders(headers = {}) {
  * Fetch wrapper that automatically includes credentials for cookie-based auth
  */
 export function fetchWithAuth(url, options = {}) {
-  return fetchWithAuth(url, {
+  return fetch(url, {
     credentials: "include", // Always send cookies
     ...options,
   });

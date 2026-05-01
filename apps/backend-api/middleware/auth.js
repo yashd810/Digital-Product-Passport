@@ -66,6 +66,37 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       return acc;
     }, {});
   };
+  const parseCookieValues = (req, cookieName) => {
+    const raw = String(req.headers.cookie || "");
+    if (!raw) return [];
+    return raw
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .flatMap((part) => {
+        const [name, ...rest] = part.split("=");
+        if (name !== cookieName) return [];
+        const value = rest.join("=");
+        if (!value) return [];
+        try {
+          return [decodeURIComponent(value)];
+        } catch {
+          return [value];
+        }
+      });
+  };
+  const parseBearerToken = (req) => {
+    const authHeader = String(req.headers["authorization"] || "");
+    if (!authHeader.startsWith("Bearer ")) return "";
+    return authHeader.slice(7).trim();
+  };
+  const getCandidateSessionTokens = (req) => {
+    const tokens = [];
+    const bearerToken = parseBearerToken(req);
+    if (bearerToken) tokens.push(bearerToken);
+    tokens.push(...parseCookieValues(req, SESSION_COOKIE_NAME));
+    return [...new Set(tokens.filter(Boolean))];
+  };
 
   const buildActorIdentity = (row = {}) => ({
     actorIdentifier: row.economic_operator_identifier || null,
@@ -81,11 +112,19 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   });
 
   const authenticateToken = async (req, res, next) => {
-    const cookies = parseCookies(req);
-    const token = cookies[SESSION_COOKIE_NAME] || (req.headers["authorization"] || "").split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Access token required" });
+    const candidateTokens = getCandidateSessionTokens(req);
+    if (!candidateTokens.length) return res.status(401).json({ error: "Access token required" });
     try {
-      const payload = jwt.verify(token, JWT_SECRET);
+      let payload = null;
+      for (const token of candidateTokens) {
+        try {
+          payload = jwt.verify(token, JWT_SECRET);
+          break;
+        } catch {}
+      }
+      if (!payload) {
+        return res.status(403).json({ error: "Invalid or expired token" });
+      }
       const currentUserRes = await pool.query(
         `SELECT u.id, u.email, u.company_id, u.role, u.is_active, u.session_version, u.two_factor_enabled,
                 c.economic_operator_identifier, c.economic_operator_identifier_scheme

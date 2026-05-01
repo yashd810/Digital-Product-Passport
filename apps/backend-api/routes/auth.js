@@ -301,19 +301,28 @@ module.exports = function registerAuthRoutes(app, {
     try {
       const authHeader = String(req.headers.authorization || "");
       const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-      const sessionCookie = String(req.headers.cookie || "")
+      const cookieTokens = String(req.headers.cookie || "")
         .split(";")
         .map((part) => part.trim())
-        .find((part) => part.startsWith(`${SESSION_COOKIE_NAME}=`));
-      const cookieToken = sessionCookie ? decodeURIComponent(sessionCookie.slice(`${SESSION_COOKIE_NAME}=`.length)) : "";
-      const token = bearerToken || cookieToken;
-      if (token) {
+        .filter((part) => part.startsWith(`${SESSION_COOKIE_NAME}=`))
+        .map((part) => {
+          const rawValue = part.slice(`${SESSION_COOKIE_NAME}=`.length);
+          try {
+            return decodeURIComponent(rawValue);
+          } catch {
+            return rawValue;
+          }
+        })
+        .filter(Boolean);
+      const candidateTokens = [...new Set([bearerToken, ...cookieTokens].filter(Boolean))];
+      for (const token of candidateTokens) {
         try {
           const payload = jwt.verify(token, JWT_SECRET);
           await pool.query(
             "UPDATE users SET session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $1",
             [payload.userId]
           );
+          break;
         } catch {}
       }
     } finally {
