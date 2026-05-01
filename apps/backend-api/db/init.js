@@ -1676,6 +1676,28 @@ async function initDb(pool, {
     WHERE device_api_key IS NOT NULL
   `).catch(() => {});
 
+  // ── Fix admin role access ────────────────────────────────────────────────
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "yashd810@gmail.com";
+  await runMigration(pool, "2026-05-02.ensure-admin-super-role", async () => {
+    const adminUser = await pool.query(
+      "SELECT id, email, role FROM users WHERE email = $1",
+      [ADMIN_EMAIL]
+    );
+    
+    if (adminUser.rows.length > 0) {
+      const user = adminUser.rows[0];
+      if (user.role !== "super_admin") {
+        await pool.query(
+          "UPDATE users SET role = $1, updated_at = NOW() WHERE email = $2",
+          ["super_admin", ADMIN_EMAIL]
+        );
+        logger.info(`[initDb] Promoted admin user (${ADMIN_EMAIL}) to super_admin role`);
+      }
+    } else {
+      logger.info(`[initDb] Admin email user not found: ${ADMIN_EMAIL}. User must be created via registration first.`);
+    }
+  });
+
   // ── Passport attachments (opaque public IDs for app-mediated file serving) ─
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_attachments (
