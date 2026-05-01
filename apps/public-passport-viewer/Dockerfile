@@ -13,5 +13,6 @@ ENV VITE_PUBLIC_VIEWER_URL=${VITE_PUBLIC_VIEWER_URL}
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine
-COPY infra/docker/public-passport-viewer/nginx.conf /etc/nginx/conf.d/default.conf
+COPY infra/docker/public-passport-viewer/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build --chown=101:101 /app/dist /usr/share/nginx/html
+CMD ["/bin/sh", "-c", "export BACKEND_API_UPSTREAM=\"${BACKEND_API_UPSTREAM:-http://backend-api:3001}\" && envsubst '$BACKEND_API_UPSTREAM' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]

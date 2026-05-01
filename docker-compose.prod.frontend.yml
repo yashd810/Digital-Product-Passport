@@ -1,0 +1,46 @@
+services:
+  frontend-app:
+    build:
+      context: .
+      dockerfile: apps/frontend-app/Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL}"
+        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL}"
+    environment:
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
+    ports:
+      - "${FRONTEND_PORT:-3000}:8080"
+    restart: unless-stopped
+
+  public-passport-viewer:
+    build:
+      context: .
+      dockerfile: apps/public-passport-viewer/Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL}"
+        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL}"
+    environment:
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
+    ports:
+      - "${PUBLIC_VIEWER_PORT:-3004}:8080"
+    restart: unless-stopped
+
+  asset-management:
+    build:
+      context: .
+      dockerfile: apps/asset-management/Dockerfile
+    environment:
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
+    ports:
+      - "${ASSET_MANAGEMENT_PORT:-3003}:8080"
+    restart: unless-stopped
+
+  marketing-site:
+    build:
+      context: .
+      dockerfile: apps/marketing-site/Dockerfile
+    environment:
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
+    ports:
+      - "${MARKETING_PORT:-8080}:8080"
+    restart: unless-stopped

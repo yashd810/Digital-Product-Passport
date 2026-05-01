@@ -5,6 +5,7 @@ APP_DIR="${APP_DIR:-/opt/dpp}"
 REPO_URL="${REPO_URL:-https://github.com/yashd810/Digital-Product-Passport.git}"
 BRANCH="${BRANCH:-main}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
+DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-all}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required but not installed."
@@ -27,5 +28,4 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 cd "$APP_DIR"
-DPP_ENV_FILE="$ENV_FILE" docker compose -f docker-compose.prod.yml --env-file "$ENV_FILE" up --build -d
-DPP_ENV_FILE="$ENV_FILE" docker compose -f docker-compose.prod.yml --env-file "$ENV_FILE" ps
+DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" ./infra/oracle/deploy-prod.sh

@@ -6,7 +6,11 @@ Code/files:
 - `apps/backend-api/services/did-service.js`
 - `apps/backend-api/Server/server.js`
 - `docker-compose.prod.yml`
+- `docker-compose.prod.frontend.yml`
+- `docker-compose.prod.backend.yml`
 - `infra/oracle/Caddyfile`
+- `infra/oracle/Caddyfile.frontend`
+- `infra/oracle/Caddyfile.backend`
 - `infra/oracle/check-edge-tls.sh`
 - `infra/oracle/oci.env.example`
 
@@ -60,6 +64,25 @@ Recommended domain layout:
 - app UI: `https://app.example.com`
 - public passport UI: `https://www.example.com`
 - backend API / DID resolver: `https://api.example.com` or the same host behind reverse proxy rules
+
+Recommended OCI two-host split:
+- frontend/public host:
+  - `claros-dpp.online`
+  - `www.claros-dpp.online`
+  - `app.claros-dpp.online`
+  - `viewer.claros-dpp.online`
+  - `assets.claros-dpp.online`
+  - compose target: `DPP_DEPLOY_TARGET=frontend`
+  - Caddy config: `infra/oracle/Caddyfile.frontend`
+- backend/data host:
+  - `api.claros-dpp.online`
+  - compose target: `DPP_DEPLOY_TARGET=backend`
+  - Caddy config: `infra/oracle/Caddyfile.backend`
+
+In that split layout:
+- frontend env should point `VITE_API_URL` and `BACKEND_API_UPSTREAM` at `https://api.example.com`
+- backend env should keep `DB_HOST=postgres` unless you move Postgres again later
+- DNS for the API subdomain must point to the backend host, while the app/viewer/public subdomains continue to point to the frontend host
 
 Example DID document URL:
 ```text

@@ -15,7 +15,7 @@ This keeps the stack very close to your current Docker setup and avoids a larger
 - [bootstrap.sh](./bootstrap.sh)
   Server-side deployment helper. Run this on the VM after your `.env.prod` is in place.
 - [deploy-prod.sh](./deploy-prod.sh)
-  Rebuild/start helper that reads secrets from an external env file such as `/etc/dpp/dpp.env`.
+  Rebuild/start helper that reads secrets from an external env file such as `/etc/dpp/dpp.env` and supports `DPP_DEPLOY_TARGET=all|frontend|backend`.
 - [oci.env.example](./oci.env.example)
   Example production env values tailored for OCI Object Storage.
 
@@ -83,6 +83,57 @@ That will:
 - verify `/etc/dpp/dpp.env` exists
 - start the production stack with `docker compose -f docker-compose.prod.yml --env-file /etc/dpp/dpp.env up --build -d`
 
+## Two-host OCI split
+
+If you want to split the stack across two OCI Always Free instances:
+
+- frontend host:
+  - run `frontend-app`
+  - run `public-passport-viewer`
+  - run `asset-management`
+  - run `marketing-site`
+  - recommended Caddy config: [Caddyfile.frontend](./Caddyfile.frontend)
+- backend host:
+  - run `backend-api`
+  - run `postgres`
+  - run `local-storage`
+  - recommended Caddy config: [Caddyfile.backend](./Caddyfile.backend)
+
+Use:
+
+```bash
+cd /opt/dpp
+DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=frontend ./infra/oracle/deploy-prod.sh
+```
+
+or:
+
+```bash
+cd /opt/dpp
+DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=backend ./infra/oracle/deploy-prod.sh
+```
+
+The matching compose files are:
+
+- `docker-compose.prod.frontend.yml`
+- `docker-compose.prod.backend.yml`
+
+For the frontend host env file, set:
+
+```env
+VITE_API_URL=https://api.example.com
+BACKEND_API_UPSTREAM=https://api.example.com
+DPP_DEPLOY_TARGET=frontend
+```
+
+For the backend host env file, set:
+
+```env
+SERVER_URL=https://api.example.com
+DB_HOST=postgres
+DPP_DEPLOY_TARGET=backend
+```
+
 ## Secret handling recommendation
 
 Do not keep production secrets inside `/opt/dpp` on the server.
@@ -103,6 +154,7 @@ This keeps the checked-out repo clean while still letting Docker Compose read th
 ## Notes
 
 - This setup keeps Postgres inside Docker on the VM. If later you move DB off-instance, only `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME` need to change.
+- In the split-host layout, the frontend containers no longer require a local backend container. They proxy fallback `/api` requests to `BACKEND_API_UPSTREAM`, while the built apps should still use `VITE_API_URL=https://api.example.com`.
 - The app is already prepared for S3-compatible object storage, so OCI Object Storage works through the same `STORAGE_S3_*` config surface.
 - For a cleaner public setup later, add a reverse proxy and TLS on `80/443` with subdomains such as:
   - `app.example.com`

@@ -1,0 +1,16 @@
+{
+	servers :443 {
+		protocols h2 h3
+	}
+}
+
+(production_tls_policy) {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+}
+
+api.claros-dpp.online {
+	import production_tls_policy
+	reverse_proxy 127.0.0.1:3001
+}
