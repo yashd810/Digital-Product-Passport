@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { authHeaders } from "../../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { parseCsvText } from "../utils/passportListHelpers";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -16,7 +16,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
   const dialogDescriptionId = useId();
 
   useEffect(() => {
-    fetch(`${API}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${API}/api/passport-types/${passportType}`)
       .then((r) => r.json())
       .then((d) => {
         const sections = d.fields_json?.sections || [];
@@ -57,7 +57,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
   const doApply = async (data) => {
     setPhase("applying");
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}`, {
         method: "PATCH",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ passportType, ...data }),

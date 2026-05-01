@@ -386,7 +386,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     if (!history[fieldKey]) {
       setHistory(p => ({ ...p, [fieldKey]: { data: [], loading: true } }));
       try {
-        const r = await fetch(`${API}/api/passports/${passport.dppId}/dynamic-values/${fieldKey}/history?limit=500`);
+        const r = await fetchWithAuth(`${API}/api/passports/${passport.dppId}/dynamic-values/${fieldKey}/history?limit=500`);
         const d = r.ok ? await r.json() : null;
         setHistory(p => ({ ...p, [fieldKey]: { data: d?.history || [], loading: false } }));
       } catch {
@@ -619,7 +619,7 @@ export function FileCell({ url, label }) {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(url);
+      const res = await fetchWithAuth(url);
       if (!res.ok) throw new Error(`Could not load PDF (${res.status})`);
       const blob = await res.blob();
       setBlobUrl(URL.createObjectURL(blob));
@@ -720,7 +720,7 @@ export function SignatureBadge({ verification }) {
 export function ScanBadge({ dppId }) {
   const [count, setCount] = useState(null);
   useEffect(() => {
-    fetch(`${API}/api/passports/${dppId}/scan-stats`)
+    fetchWithAuth(`${API}/api/passports/${dppId}/scan-stats`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d && d.total > 0) setCount(d.total); })
       .catch(() => {});

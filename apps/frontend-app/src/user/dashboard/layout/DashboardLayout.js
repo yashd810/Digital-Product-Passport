@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import NotificationsPanel from "../notifications/NotificationsPanel";
 import { applyTheme, getStoredTheme } from "../../../app/providers/ThemeContext";
 import { useI18n } from "../../../app/providers/i18n";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -33,7 +33,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
   useEffect(() => {
     if (!companyId) { navigate("/login"); return; }
-    fetch(`${API}/api/companies/${companyId}/passport-types`,
+    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`,
       { headers: authHeaders() })
       .then(r => r.json())
       .then(data => {
@@ -45,7 +45,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
   useEffect(() => {
     const fetchMsgUnread = () => {
-      fetch(`${API}/api/messaging/unread`, { headers: authHeaders() })
+      fetchWithAuth(`${API}/api/messaging/unread`, { headers: authHeaders() })
         .then(r => r.ok ? r.json() : { count: 0 })
         .then(d => setMsgUnread(typeof d?.count === "number" ? d.count : 0))
         .catch(() => setMsgUnread(0));
@@ -81,7 +81,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
     if (!companyId || openingAssetManagement) return;
     try {
       setOpeningAssetManagement(true);
-      const response = await fetch(`${API}/api/companies/${companyId}/asset-management/launch`, {
+      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/asset-management/launch`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
       });

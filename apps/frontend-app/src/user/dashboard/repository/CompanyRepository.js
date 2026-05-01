@@ -58,7 +58,7 @@ function SymbolsTab({ token, companyId }) {
   const fetchSymbols = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/repository/symbols`,
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols`,
         { headers: { Authorization: `Bearer ${token}` } });
       if (r.ok) setSymbols(await r.json());
     } catch {}
@@ -86,7 +86,7 @@ function SymbolsTab({ token, companyId }) {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("name", name.trim());
-      const r = await fetch(`${API}/api/companies/${companyId}/repository/symbols/upload`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -107,7 +107,7 @@ function SymbolsTab({ token, companyId }) {
   const handleRename = async (symId) => {
     if (!renameValue.trim()) return;
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/repository/${symId}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${symId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: renameValue.trim() }),
@@ -120,7 +120,7 @@ function SymbolsTab({ token, companyId }) {
   const handleDelete = async (sym) => {
     setDeletingId(sym.id);
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/repository/${sym.id}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${sym.id}`, {
         method: "DELETE", headers: { Authorization: `Bearer ${token}` },
       });
       if (!r.ok) throw new Error((await r.json()).error || "Failed");
@@ -310,7 +310,7 @@ function FilesTab({ token, companyId }) {
     setLoading(true);
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetch(`${API}/api/companies/${companyId}/repository${qs}`,
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository${qs}`,
         { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) throw new Error();
       // Exclude image files (those are shown in Symbols tab)
@@ -345,7 +345,7 @@ function FilesTab({ token, companyId }) {
     if (!folderName.trim()) return;
     setFolderSaving(true);
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/repository/folder`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/folder`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: folderName.trim(), parentId: currentFolder }),
@@ -370,7 +370,7 @@ function FilesTab({ token, companyId }) {
       fd.append("file", file);
       fd.append("displayName", file.name);
       if (currentFolder != null) fd.append("parentId", currentFolder);
-      const r = await fetch(`${API}/api/companies/${companyId}/repository/upload`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -389,7 +389,7 @@ function FilesTab({ token, companyId }) {
   const handleRename = async (itemId) => {
     if (!renameValue.trim()) return;
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/repository/${itemId}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: renameValue.trim() }),
@@ -402,7 +402,7 @@ function FilesTab({ token, companyId }) {
 
   const handleDelete = async (item) => {
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/repository/${item.id}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${item.id}`, {
         method: "DELETE", headers: { Authorization: `Bearer ${token}` },
       });
       if (!r.ok) throw new Error((await r.json()).error || "Failed");

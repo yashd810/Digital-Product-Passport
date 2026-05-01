@@ -1,6 +1,7 @@
 // ForgotPassword.js
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/Landing.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -17,7 +18,7 @@ export function ForgotPassword() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const r = await fetch(`${API}/api/auth/forgot-password`, {
+      const r = await fetchWithAuth(`${API}/api/auth/forgot-password`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ email: email.trim() }),
@@ -112,7 +113,7 @@ export function ResetPassword() {
 
   React.useEffect(() => {
     if (!token) { setTokenOk(false); return; }
-    fetch(`${API}/api/auth/validate-reset-token?token=${token}`)
+    fetchWithAuth(`${API}/api/auth/validate-reset-token?token=${token}`)
       .then(r => r.json())
       .then(d => { if (!d.valid) setTokenOk(false); })
       .catch(() => setTokenOk(false));
@@ -128,7 +129,7 @@ export function ResetPassword() {
     if (password !== confirm)  { setError("Passwords do not match"); return; }
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/auth/reset-password`, {
+      const r = await fetchWithAuth(`${API}/api/auth/reset-password`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ token, newPassword: password }),

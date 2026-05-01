@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -45,7 +45,7 @@ function AdminSecurity({ user }) {
   const loadSuperAdmins = async () => {
     try {
       setAdminsLoading(true);
-      const response = await fetch(`${API}/api/admin/super-admins`, {
+      const response = await fetchWithAuth(`${API}/api/admin/super-admins`, {
         headers: authHeaders(),
       });
       const data = await response.json();
@@ -75,7 +75,7 @@ function AdminSecurity({ user }) {
     }
     try {
       setInviting(true);
-      const response = await fetch(`${API}/api/admin/super-admins/invite`, {
+      const response = await fetchWithAuth(`${API}/api/admin/super-admins/invite`, {
         method: "POST",
         headers: authHeaders({
           "Content-Type": "application/json",
@@ -109,7 +109,7 @@ function AdminSecurity({ user }) {
 
     try {
       setTogglingId(admin.id);
-      const response = await fetch(`${API}/api/admin/super-admins/${admin.id}/access`, {
+      const response = await fetchWithAuth(`${API}/api/admin/super-admins/${admin.id}/access`, {
         method: "PATCH",
         headers: authHeaders({
           "Content-Type": "application/json",

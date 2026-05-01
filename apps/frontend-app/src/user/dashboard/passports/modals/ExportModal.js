@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { authHeaders } from "../../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -35,7 +35,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   const exportList = scopePassports[scope] || [];
 
   const exportTypeToCSV = async (type, list) => {
-    const r = await fetch(`${API}/api/passport-types/${type}`);
+    const r = await fetchWithAuth(`${API}/api/passport-types/${type}`);
     if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
     const data = await r.json();
     const allFields = (data.fields_json?.sections || []).flatMap((section) => section.fields || []);
@@ -58,7 +58,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   };
 
   const exportTypeToJsonLd = async (type, list) => {
-    const r = await fetch(`${API}/api/passport-types/${type}`);
+    const r = await fetchWithAuth(`${API}/api/passport-types/${type}`);
     if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
     const data = await r.json();
     const semanticModelKey = data.semantic_model_key || allPassportTypes.find((item) => item.type_name === type)?.semantic_model_key || "";
@@ -76,7 +76,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
       if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
         query.set("versionNumber", String(passport.version_number));
       }
-      const payloadResponse = await fetch(
+      const payloadResponse = await fetchWithAuth(
         `${API}/api/companies/${targetCompanyId}/passports/${passport.dppId}?${query.toString()}`,
         { headers: authHeaders() }
       );

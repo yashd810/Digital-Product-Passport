@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useI18n } from "../../app/providers/i18n";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import "../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -40,7 +40,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
 
   const fetchProfile = async () => {
     try {
-      const r = await fetch(`${API}/api/users/me`, {
+      const r = await fetchWithAuth(`${API}/api/users/me`, {
         headers: { ...authHeaders() },
       });
       if (!r.ok) throw new Error();
@@ -61,7 +61,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
   const fetchTeam = async () => {
     if (!companyId) return;
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/users`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
         headers: { ...authHeaders() },
       });
       if (r.ok) {
@@ -92,7 +92,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
         default_reviewer_id: defReviewer ? parseInt(defReviewer) : null,
         default_approver_id: defApprover ? parseInt(defApprover) : null,
       };
-      const r = await fetch(`${API}/api/users/me`, {
+      const r = await fetchWithAuth(`${API}/api/users/me`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(body),
@@ -121,7 +121,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
     }
     setSavingPw(true);
     try {
-      const r = await fetch(`${API}/api/users/me/password`, {
+      const r = await fetchWithAuth(`${API}/api/users/me/password`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ currentPassword: curPw, newPassword: newPw }),
@@ -146,7 +146,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
     }
     setSaving2FA(true);
     try {
-      const response = await fetch(`${API}/api/users/me/2fa`, {
+      const response = await fetchWithAuth(`${API}/api/users/me/2fa`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ enable: !twoFaEnabled, currentPassword: twoFaPassword }),

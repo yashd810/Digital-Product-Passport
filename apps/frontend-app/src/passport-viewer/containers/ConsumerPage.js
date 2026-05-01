@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { getConsumerTheme } from "../../app/providers/ThemeContext";
 import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
 import { formatPassportStatus, isReleasedPassportStatus } from "../../passports/utils/passportStatus";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildPreviewTechnicalPassportPath, buildTechnicalPassportPath } from "../../passports/utils/passportRoutes";
 import { TrustedEntryPanel, ViewerDomainIndicator } from "../components/ViewerBlocks";
 import "../styles/PassportViewer.css";
@@ -11,7 +11,7 @@ import "../styles/PassportViewer.css";
 const API = import.meta.env.VITE_API_URL || "";
 
 async function reportSuspiciousCarrier(dppId, report) {
-  const response = await fetch(`${API}/api/passports/${dppId}/security-report`, {
+  const response = await fetchWithAuth(`${API}/api/passports/${dppId}/security-report`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(report),
@@ -471,7 +471,7 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
     setLoading(true);
     setError("");
     setCanonicalJson(null);
-    fetch(endpoint, requestInit)
+    fetchWithAuth(endpoint, requestInit)
       .then(r => r.ok ? r.json() : Promise.reject("not found"))
       .then(async data => {
         const resolvedPassport = previewMode && data
@@ -480,7 +480,7 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
         setPassport(resolvedPassport);
         if (resolvedPassport?.dppId && !previewMode) {
           const viewerUserId = getViewerUserId();
-          fetch(`${API}/api/passports/${resolvedPassport.dppId}/scan`, {
+          fetchWithAuth(`${API}/api/passports/${resolvedPassport.dppId}/scan`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -491,14 +491,14 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
           }).catch(() => {});
         }
         const [companyRes, typeRes, dynamicRes, canonicalRes] = await Promise.all([
-          resolvedPassport.company_id   ? fetch(`${API}/api/companies/${resolvedPassport.company_id}/profile`)     : Promise.resolve(null),
-          resolvedPassport.passport_type ? fetch(`${API}/api/passport-types/${resolvedPassport.passport_type}`)    : Promise.resolve(null),
+          resolvedPassport.company_id   ? fetchWithAuth(`${API}/api/companies/${resolvedPassport.company_id}/profile`)     : Promise.resolve(null),
+          resolvedPassport.passport_type ? fetchWithAuth(`${API}/api/passport-types/${resolvedPassport.passport_type}`)    : Promise.resolve(null),
           resolvedPassport.inactive_public_version || !resolvedPassport.dppId
             ? Promise.resolve(null)
-            : fetch(`${API}/api/passports/${resolvedPassport.dppId}/dynamic-values`),
+            : fetchWithAuth(`${API}/api/passports/${resolvedPassport.dppId}/dynamic-values`),
           previewMode || !resolvedPassport.linked_data?.canonical_json_url
             ? Promise.resolve(null)
-            : fetch(resolvedPassport.linked_data.canonical_json_url),
+            : fetchWithAuth(resolvedPassport.linked_data.canonical_json_url),
         ]);
         if (companyRes?.ok)  setCompany(await companyRes.json());
         if (typeRes?.ok)     setTypeDef(await typeRes.json());

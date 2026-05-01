@@ -5,7 +5,7 @@ const slugify = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")
 import { PieChart } from "../../passport-viewer/components/PieChart";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { STATUS_COLORS } from "../../shared/utils/statusColors";
 import "../styles/AdminDashboard.css";
 import "../../assets/styles/Dashboard.css";
@@ -251,7 +251,7 @@ function AdminCompanyAnalytics() {
       load(companyId);
     } else {
       // Resolve slug → ID via companies list (direct URL access)
-      fetch(`${API}/api/admin/companies`, { headers: authHeaders() })
+      fetchWithAuth(`${API}/api/admin/companies`, { headers: authHeaders() })
         .then(r => r.json())
         .then(companies => {
           const found = companies.find(c => slugify(c.company_name) === companySlug);
@@ -270,7 +270,7 @@ function AdminCompanyAnalytics() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`${API}/api/admin/companies/${id}/analytics`, {
+      const response = await fetchWithAuth(`${API}/api/admin/companies/${id}/analytics`, {
         headers: authHeaders(),
       });
       if (!response.ok) throw new Error("Failed to load");
@@ -290,7 +290,7 @@ function AdminCompanyAnalytics() {
   const handleRoleChange = async (userId) => {
     setSaving(true);
     try {
-      const response = await fetch(`${API}/api/admin/users/${userId}/role`, {
+      const response = await fetchWithAuth(`${API}/api/admin/users/${userId}/role`, {
         method: "PATCH",
         headers: authHeaders({
           "Content-Type": "application/json",

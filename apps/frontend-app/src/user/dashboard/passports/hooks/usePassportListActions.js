@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { authHeaders } from "../../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
 import {
   isEditablePassportStatus,
@@ -29,7 +29,7 @@ export function usePassportListActions({
   navigate,
 }) {
   const handleRevise = useCallback(async (dppId, versionNumber, passportType) => {
-    const response = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}/revise`, {
+    const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/revise`, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ passportType }),
@@ -45,7 +45,7 @@ export function usePassportListActions({
 
   const handleClone = useCallback(async (passport, passportType) => {
     try {
-      const response = await fetch(
+      const response = await fetchWithAuth(
         `${API}/api/companies/${companyId}/passports/${passport.dppId}?passportType=${passportType}`,
         { headers: authHeaders() }
       );
@@ -60,7 +60,7 @@ export function usePassportListActions({
   const handleDelete = useCallback(async (dppId, passportType) => {
     if (!window.confirm("Delete this passport?")) return;
 
-    const response = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}`, {
+    const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}`, {
       method: "DELETE",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ passportType }),
@@ -181,7 +181,7 @@ export function usePassportListActions({
     setBulkActionLoading(true);
     try {
       const items = editable.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || activeType }));
-      const response = await fetch(`${API}/api/companies/${companyId}/passports/bulk-release`, {
+      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-release`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ items }),
@@ -215,7 +215,7 @@ export function usePassportListActions({
     try {
       for (const passport of editable) {
         const passportType = passport.passport_type || activeType;
-        const response = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}`, {
+        const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}`, {
           method: "DELETE",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ passportType }),
@@ -251,7 +251,7 @@ export function usePassportListActions({
       let exportedCount = 0;
       const fileCount = Object.keys(grouped).length;
       for (const [passportType, passportsForType] of Object.entries(grouped)) {
-        const typeResponse = await fetch(`${API}/api/passport-types/${passportType}`);
+        const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
         const semanticModelKey = typeData.semantic_model_key || "";
@@ -266,7 +266,7 @@ export function usePassportListActions({
           if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
             query.set("versionNumber", String(passport.version_number));
           }
-          const response = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}?${query.toString()}`, {
+          const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}?${query.toString()}`, {
             headers: authHeaders(),
           });
           if (!response.ok) continue;
@@ -313,7 +313,7 @@ export function usePassportListActions({
     if (archiveConfirm.mode === "single") {
       try {
         setBulkActionLoading(true);
-        const response = await fetch(`${API}/api/companies/${companyId}/passports/${archiveConfirm.dppId}/archive`, {
+        const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${archiveConfirm.dppId}/archive`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ passportType: archiveConfirm.pType }),
@@ -334,7 +334,7 @@ export function usePassportListActions({
     try {
       setBulkActionLoading(true);
       const items = selectedPassportList.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || activeType }));
-      const response = await fetch(`${API}/api/companies/${companyId}/passports/bulk-archive`, {
+      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-archive`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ items }),

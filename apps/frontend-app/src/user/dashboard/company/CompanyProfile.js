@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import IntroductionUpload from "./IntroductionUpload";
 import { DEFAULT_COMPANY_BRANDING, normalizeCompanyBranding } from "../../../app/providers/ThemeContext";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -26,7 +26,7 @@ function CompanyProfile({ companyId, user }) {
 
   const fetchCompanyProfile = async () => {
     try {
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/profile`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`, {
         headers: authHeaders(),
       });
       if (r.ok) {
@@ -47,7 +47,7 @@ function CompanyProfile({ companyId, user }) {
       setSavingProfile(true);
       setMessage({ type: "", text: "" });
 
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/profile`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

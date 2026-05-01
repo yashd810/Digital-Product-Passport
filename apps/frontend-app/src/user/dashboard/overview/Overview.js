@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PieChart } from "../../../passport-viewer/components/PieChart";
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "../../../shared/utils/analyticsPrintExport";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { STATUS_COLORS } from "../../../shared/utils/statusColors";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -284,13 +284,13 @@ function Overview({ companyId }) {
 
   const fetchAnalytics = async () => {
     try {
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/analytics`,{ headers:{ ...authHeaders() } });
+      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/analytics`,{ headers:{ ...authHeaders() } });
       if(r.ok) setAnalytics(await r.json());
     } catch {}
   };
   const fetchActivity = async () => {
     try {
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/activity?limit=5`,{ headers:{ ...authHeaders() } });
+      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/activity?limit=5`,{ headers:{ ...authHeaders() } });
       if(r.ok) {
         const data = await r.json();
         setActivity(Array.isArray(data) ? data.slice(0, 5) : []);

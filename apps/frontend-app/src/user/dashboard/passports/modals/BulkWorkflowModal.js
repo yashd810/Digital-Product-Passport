@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { authHeaders } from "../../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isEditablePassportStatus } from "../../../../passports/utils/passportStatus";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -13,14 +13,14 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`${API}/api/companies/${companyId}/users`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/companies/${companyId}/users`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
         setTeamUsers(data.filter((member) => (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id));
       })
       .catch(() => {});
 
-    fetch(`${API}/api/users/me`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => {
         if (d.default_reviewer_id) setReviewerId(String(d.default_reviewer_id));
@@ -38,7 +38,7 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
     setError("");
     try {
       const items = selectedList.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || passport.passportType }));
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/bulk-workflow`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-workflow`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

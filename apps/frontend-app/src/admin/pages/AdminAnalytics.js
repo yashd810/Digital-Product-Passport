@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PieChart } from "../../passport-viewer/components/PieChart";
 import { openAnalyticsPrintReport, renderClusteredBarChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { STATUS_COLORS } from "../../shared/utils/statusColors";
 import "../styles/AdminDashboard.css";
 import "../../assets/styles/Dashboard.css";
@@ -143,7 +143,7 @@ function AdminAnalytics() {
     (async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API}/api/admin/analytics`, {
+        const response = await fetchWithAuth(`${API}/api/admin/analytics`, {
           headers: authHeaders(),
         });
         if (!response.ok) throw new Error("Failed to fetch analytics");

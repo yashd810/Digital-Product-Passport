@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
@@ -35,7 +35,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
 
   useEffect(() => {
     // Load eligible users (editors + admins)
-    fetch(`${API}/api/companies/${companyId}/users`, {
+    fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
       headers: authHeaders()
     })
     .then(r => r.json())
@@ -48,7 +48,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     .catch(() => {});
 
     // Pre-fill from user defaults
-    fetch(`${API}/api/users/me`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
     .then(r => r.json())
     .then(d => {
       if (d.default_reviewer_id) setReviewerId(String(d.default_reviewer_id));
@@ -63,7 +63,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     try {
       if (hasWorkflow) {
         // Submit to workflow
-        const r = await fetch(
+        const r = await fetchWithAuth(
           `${API}/api/companies/${companyId}/passports/${passport.dppId}/submit-review`,
           {
             method: "POST",
@@ -80,7 +80,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
         onDone("Submitted for review/approval");
       } else {
         // Direct release (no workflow)
-        const r = await fetch(
+        const r = await fetchWithAuth(
           `${API}/api/companies/${companyId}/passports/${passport.dppId}/release`,
           {
             method: "PATCH",
@@ -178,7 +178,7 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
   const handle = async () => {
     setSubmitting(true); setError("");
     try {
-      const r = await fetch(`${API}/api/passports/${wf.passport_guid}/workflow/${action}`, {
+      const r = await fetchWithAuth(`${API}/api/passports/${wf.passport_guid}/workflow/${action}`, {
         method: "POST",
         headers: authHeaders({ "Content-Type":"application/json" }),
         body: JSON.stringify({ comment, passportType: wf.passport_type }),
@@ -239,10 +239,10 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     setLoading(true);
     try {
       const [wfRes, blRes] = await Promise.all([
-        fetch(`${API}/api/companies/${companyId}/workflow`, {
+        fetchWithAuth(`${API}/api/companies/${companyId}/workflow`, {
           headers: authHeaders()
         }),
-        fetch(`${API}/api/users/me/backlog`, {
+        fetchWithAuth(`${API}/api/users/me/backlog`, {
           headers: authHeaders()
         }),
       ]);
@@ -268,7 +268,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
 
   const handleRemove = async (wf) => {
     try {
-      const r = await fetch(`${API}/api/passports/${wf.passport_guid}/workflow`, {
+      const r = await fetchWithAuth(`${API}/api/passports/${wf.passport_guid}/workflow`, {
         method: "DELETE",
         headers: authHeaders()
       });

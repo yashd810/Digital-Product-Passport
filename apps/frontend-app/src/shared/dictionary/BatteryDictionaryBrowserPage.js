@@ -19,7 +19,7 @@ function buildDictionaryBasePath(pathname) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url);
+  const response = await fetchWithAuth(url);
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || `Request failed (${response.status})`);

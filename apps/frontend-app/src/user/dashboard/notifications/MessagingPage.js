@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -67,7 +67,7 @@ export default function MessagingPage({ user }) {
   // ── Load conversations ──
   const fetchConversations = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/api/messaging/conversations`, { headers: authHeaders() });
+      const r = await fetchWithAuth(`${API}/api/messaging/conversations`, { headers: authHeaders() });
       if (r.ok) setConversations(await r.json());
     } catch {}
     finally { setLoadingConvs(false); }
@@ -77,7 +77,7 @@ export default function MessagingPage({ user }) {
 
   // ── Load company users for new-chat modal ──
   useEffect(() => {
-    fetch(`${API}/api/messaging/users`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/messaging/users`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setCompanyUsers)
       .catch(() => {});
@@ -88,7 +88,7 @@ export default function MessagingPage({ user }) {
     if (!convId) return;
     setLoadingMsgs(true);
     try {
-      const r = await fetch(`${API}/api/messaging/conversations/${convId}/messages?limit=50`, {
+      const r = await fetchWithAuth(`${API}/api/messaging/conversations/${convId}/messages?limit=50`, {
         headers: authHeaders(),
       });
       if (r.ok) setMessages(await r.json());
@@ -109,7 +109,7 @@ export default function MessagingPage({ user }) {
     pollRef.current = setInterval(async () => {
       if (!activeRef.current) return;
       try {
-        const r = await fetch(`${API}/api/messaging/conversations/${activeRef.current}/messages?limit=50`, {
+        const r = await fetchWithAuth(`${API}/api/messaging/conversations/${activeRef.current}/messages?limit=50`, {
           headers: authHeaders(),
         });
         if (r.ok) setMessages(await r.json());
@@ -127,7 +127,7 @@ export default function MessagingPage({ user }) {
     setSending(true);
     setDraft("");
     try {
-      const r = await fetch(`${API}/api/messaging/conversations/${activeConvId}/messages`, {
+      const r = await fetchWithAuth(`${API}/api/messaging/conversations/${activeConvId}/messages`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
@@ -150,7 +150,7 @@ export default function MessagingPage({ user }) {
     setShowNewModal(false);
     setUserSearch("");
     try {
-      const r = await fetch(`${API}/api/messaging/conversations`, {
+      const r = await fetchWithAuth(`${API}/api/messaging/conversations`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ otherUserId }),

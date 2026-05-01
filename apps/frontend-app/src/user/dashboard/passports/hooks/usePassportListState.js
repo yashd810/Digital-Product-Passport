@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { applyTableControls, getNextSortDirection } from "../../../../shared/table/tableControls";
-import { authHeaders } from "../../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../../passports/utils/passportStatus";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUrl";
@@ -151,7 +151,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   useEffect(() => {
     if (!companyId) return;
 
-    fetch(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then((response) => response.ok ? response.json() : [])
       .then((data) => setAllPassportTypes(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -172,7 +172,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
           if (searchText) params.append("search", searchText);
           if (filterStatus) params.append("status", filterStatus);
 
-          const response = await fetch(`${API}/api/companies/${companyId}/passports?${params}`, {
+          const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports?${params}`, {
             headers: authHeaders(),
           });
           if (response.ok) {
@@ -185,7 +185,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       };
 
       if (filterByUser) {
-        const typeResponse = await fetch(`${API}/api/companies/${companyId}/passport-types`, {
+        const typeResponse = await fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, {
           headers: authHeaders(),
         });
         const types = typeResponse.ok ? await typeResponse.json() : [];
@@ -197,7 +197,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       }
 
       if (activeProductCategory) {
-        const typeResponse = await fetch(`${API}/api/companies/${companyId}/passport-types`, {
+        const typeResponse = await fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, {
           headers: authHeaders(),
         });
         const types = typeResponse.ok ? await typeResponse.json() : [];
@@ -213,7 +213,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       if (searchText) params.append("search", searchText);
       if (filterStatus) params.append("status", filterStatus);
 
-      const response = await fetch(`${API}/api/companies/${companyId}/passports?${params}`, {
+      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports?${params}`, {
         headers: authHeaders(),
       });
       if (!response.ok) throw new Error();

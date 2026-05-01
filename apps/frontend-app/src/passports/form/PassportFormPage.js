@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { PASSPORT_SECTIONS_MAP } from "../config/PassportFields";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import {
   ACCESS_LEVEL_LABELS,
   CONFIDENTIALITY_LEVEL_LABELS,
@@ -79,7 +79,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   // Load symbols from company repository
   useEffect(() => {
     if (!companyId) return;
-    fetch(`${API}/api/companies/${companyId}/repository/symbols`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setSymbols)
       .catch(() => {});
@@ -94,7 +94,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     }
     // Try fetching from server
     setLoadingType(true);
-    fetch(`${API}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${API}/api/passport-types/${passportType}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fields_json?.sections) {
@@ -128,7 +128,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   // Load template pre-fill on create mode
   useEffect(() => {
     if (mode !== "create" || !templateId || !companyId) return;
-    fetch(`${API}/api/companies/${companyId}/templates/${templateId}`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/companies/${companyId}/templates/${templateId}`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(tmpl => {
         if (!tmpl) return;
@@ -149,7 +149,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     if (mode !== "edit" || !dppId || !passportType) return;
     (async () => {
       try {
-        const r = await fetch(
+        const r = await fetchWithAuth(
           `${API}/api/companies/${companyId}/passports/${dppId}?passportType=${passportType}`,
           { headers: authHeaders() }
         );
@@ -184,7 +184,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const fd = new FormData();
     fd.append("file", file); fd.append("fieldKey", key); fd.append("passportType", passportType);
     setUploadProgress(p => ({ ...p, [key]: "uploading" }));
-    const r = await fetch(
+    const r = await fetchWithAuth(
       `${API}/api/companies/${companyId}/passports/${guidToUse}/upload`,
       { method:"POST", headers: authHeaders(), body:fd }
     );
@@ -226,7 +226,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           method,
           headers: authHeaders(),
         };
-    const r = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}/edit-session`, init);
+    const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/edit-session`, init);
     if (!r.ok) throw new Error("Failed to update edit presence");
     const data = await r.json();
     if (mountedRef.current) {
@@ -239,7 +239,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const releaseEditPresence = async () => {
     if (mode !== "edit" || !dppId || !companyId || !sessionActiveRef.current) return;
     try {
-      await fetch(`${API}/api/companies/${companyId}/passports/${dppId}/edit-session`, {
+      await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/edit-session`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -255,7 +255,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
     try {
       const body = buildEditableBody();
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${dppId}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}`, {
         method:"PATCH",
         headers: authHeaders({ "Content-Type":"application/json" }),
         body: JSON.stringify(body),
@@ -374,7 +374,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           product_id: trimmedProductId,
           ...serializedData,
         };
-        const r = await fetch(`${API}/api/companies/${companyId}/passports`, {
+        const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
           body: JSON.stringify(body),
         });

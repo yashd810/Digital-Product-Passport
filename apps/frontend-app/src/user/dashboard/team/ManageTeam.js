@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -54,7 +54,7 @@ function ManageTeam({ user, companyId }) {
   const fetchMembers = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/users`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
         headers: { ...authHeaders() },
       });
       if (!r.ok) throw new Error();
@@ -86,7 +86,7 @@ function ManageTeam({ user, companyId }) {
     const roleToSend = isAdmin ? inviteRole : "viewer";
     setInviteLoading(true);
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/invite`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ inviteeEmail: inviteEmail.trim(), roleToAssign: roleToSend }),
@@ -105,7 +105,7 @@ function ManageTeam({ user, companyId }) {
   // Change role
   const handleRoleChange = async (userId) => {
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/users/${userId}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ role: editRole }),
@@ -123,7 +123,7 @@ function ManageTeam({ user, companyId }) {
   const handleDeactivate = async (userId, name) => {
     if (!window.confirm(`Deactivate ${name}? They will no longer be able to log in.`)) return;
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/users/${userId}/deactivate`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/users/${userId}/deactivate`, {
         method: "PATCH",
         headers: { ...authHeaders() },
       });

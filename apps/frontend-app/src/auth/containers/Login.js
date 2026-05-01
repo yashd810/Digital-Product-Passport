@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/Landing.css";
 
 function Login({ setToken, setUser, setCompanyId }) {
@@ -26,7 +27,7 @@ function Login({ setToken, setUser, setCompanyId }) {
   }, []);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/auth/sso/providers`, { credentials: "include" })
+    fetchWithAuth(`${API_BASE_URL}/api/auth/sso/providers`, { credentials: "include" })
       .then((response) => response.json())
       .then((data) => setSsoProviders(Array.isArray(data.providers) ? data.providers : []))
       .catch(() => setSsoProviders([]));
@@ -58,7 +59,7 @@ function Login({ setToken, setUser, setCompanyId }) {
     setError("");
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -87,7 +88,7 @@ function Login({ setToken, setUser, setCompanyId }) {
     setError("");
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -107,7 +108,7 @@ function Login({ setToken, setUser, setCompanyId }) {
     if (resendCooldown > 0) return;
     setError("");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/resend-otp`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

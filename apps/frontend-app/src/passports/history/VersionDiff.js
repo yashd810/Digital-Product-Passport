@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { formatPassportStatus } from "../utils/passportStatus";
 import "../../assets/styles/Dashboard.css";
 
@@ -33,12 +33,12 @@ function VersionDiff({ companyId }) {
     setPType(pt);
 
     // Fetch dynamic type definition
-    fetch(`${API}/api/passport-types/${pt}`)
+    fetchWithAuth(`${API}/api/passport-types/${pt}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => setTypeDef(data))
       .catch(() => setTypeDef(null));
 
-    fetch(`${API}/api/companies/${companyId}/passports/${dppId}/diff?passportType=${pt}`, {
+    fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/diff?passportType=${pt}`, {
       headers: { ...authHeaders() },
     })
     .then(r => r.ok ? r.json() : Promise.reject("Failed to load"))

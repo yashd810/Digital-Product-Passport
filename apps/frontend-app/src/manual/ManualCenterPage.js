@@ -1,7 +1,7 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { authHeaders } from "../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../shared/api/authHeaders";
 import { CORE_DATABASE_TABLES } from "./manualData";
 import { buildAdminSections, buildUserSections, collectSearchTerms, prettifyName } from "./manualBuilders";
 import { ManualSection } from "./manualComponents";
@@ -36,20 +36,20 @@ function ManualCenter({ mode = "user", user, companyId }) {
             return;
           }
 
-          const response = await fetch(`${API}/api/companies/${companyId}/passport-types`, {
+          const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, {
             headers: authHeaders(),
           });
           const data = response.ok ? await response.json() : [];
           if (!cancelled) setPassportTypes(Array.isArray(data) ? data : []);
         } else {
           const [companiesResponse, typesResponse, categoriesResponse] = await Promise.all([
-            fetch(`${API}/api/admin/companies`, {
+            fetchWithAuth(`${API}/api/admin/companies`, {
               headers: authHeaders(),
             }).catch(() => null),
-            fetch(`${API}/api/admin/passport-types`, {
+            fetchWithAuth(`${API}/api/admin/passport-types`, {
               headers: authHeaders(),
             }).catch(() => null),
-            fetch(`${API}/api/admin/umbrella-categories`, {
+            fetchWithAuth(`${API}/api/admin/umbrella-categories`, {
               headers: authHeaders(),
             }).catch(() => null),
           ]);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -93,7 +93,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, onSave, onC
   useEffect(() => {
     if (!passportType) { setSections(null); return; }
     setLoadingFields(true);
-    fetch(`${API}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${API}/api/passport-types/${passportType}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fields_json?.sections) {
@@ -154,7 +154,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, onSave, onC
         ? `${API}/api/companies/${companyId}/templates/${editingTemplate.id}`
         : `${API}/api/companies/${companyId}/templates`;
       const method = isEdit ? "PUT" : "POST";
-      const r = await fetch(url, {
+      const r = await fetchWithAuth(url, {
         method,
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ passport_type: passportType, name, description, fields }),
@@ -284,7 +284,7 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
         if (f.field_value) prefill[f.field_key] = f.field_value;
       }
 
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/bulk`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -384,7 +384,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/templates`, { headers: authHeaders() });
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates`, { headers: authHeaders() });
       if (r.ok) setTemplates(await r.json());
     } catch {}
     finally { setLoading(false); }
@@ -393,7 +393,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
   useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
 
   useEffect(() => {
-    fetch(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setPassportTypes)
       .catch(() => {});
@@ -402,7 +402,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
   // Load template for editing when routed to edit view
   useEffect(() => {
     if (view === "edit" && editTemplateId && !editingTemplate) {
-      fetch(`${API}/api/companies/${companyId}/templates/${editTemplateId}`, { headers: authHeaders() })
+      fetchWithAuth(`${API}/api/companies/${companyId}/templates/${editTemplateId}`, { headers: authHeaders() })
         .then(r => r.ok ? r.json() : null)
         .then(data => { if (data) setEditingTemplate(data); else navigate("/dashboard/templates"); })
         .catch(() => navigate("/dashboard/templates"));
@@ -416,7 +416,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
 
   const openBulk = async (tmpl) => {
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
       if (r.ok) setBulkModal(await r.json());
     } catch {}
   };
@@ -425,7 +425,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
     if (!window.confirm("Delete this template? This cannot be undone.")) return;
     setDeleting(id);
     try {
-      await fetch(`${API}/api/companies/${companyId}/templates/${id}`, {
+      await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${id}`, {
         method: "DELETE", headers: authHeaders(),
       });
       setTemplates(prev => prev.filter(t => t.id !== id));

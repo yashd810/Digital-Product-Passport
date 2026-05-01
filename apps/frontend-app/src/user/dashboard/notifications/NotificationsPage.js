@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -69,7 +69,7 @@ export default function NotificationsPage({ user }) {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${API}/api/users/me/notifications/full?limit=100`, {
+        const r = await fetchWithAuth(`${API}/api/users/me/notifications/full?limit=100`, {
           headers: authHeaders(),
         });
         if (r.ok) setNotifs(await r.json());
@@ -79,14 +79,14 @@ export default function NotificationsPage({ user }) {
   }, []);
 
   const markAllRead = async () => {
-    await fetch(`${API}/api/users/me/notifications/read-all`, {
+    await fetchWithAuth(`${API}/api/users/me/notifications/read-all`, {
       method: "PATCH", headers: authHeaders(),
     });
     setNotifs(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const markRead = async (id) => {
-    await fetch(`${API}/api/users/me/notifications/${id}/read`, {
+    await fetchWithAuth(`${API}/api/users/me/notifications/${id}/read`, {
       method: "PATCH", headers: authHeaders(),
     });
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));

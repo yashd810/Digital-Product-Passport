@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
-import { authHeaders } from "../../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -19,13 +19,13 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
   const dialogDescriptionId = useId();
 
   useEffect(() => {
-    fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d) setDeviceKeyMeta(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    fetch(`${API}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${API}/api/passport-types/${passportType}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (!d) return;
@@ -34,7 +34,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
       })
       .catch(() => {});
 
-    fetch(`${API}/api/passports/${passport.dppId}/dynamic-values`)
+    fetchWithAuth(`${API}/api/passports/${passport.dppId}/dynamic-values`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (d?.values) {
@@ -58,7 +58,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     if (!window.confirm("Regenerate the device key? The old key will stop working immediately.")) return;
     setRegenerating(true);
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key/regenerate`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key/regenerate`, {
         method: "POST",
         headers: authHeaders(),
       });
@@ -79,7 +79,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     setSaving(true);
     setSaveMsg("");
     try {
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/${passport.dppId}/dynamic-values`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}/dynamic-values`, {
         method: "PATCH",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(manualVals),

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/Landing.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -36,7 +37,7 @@ function Register({ setToken, setUser, setCompanyId }) {
 
     (async () => {
       try {
-        const r = await fetch(`${API}/api/invite/validate?token=${inviteToken}`);
+        const r = await fetchWithAuth(`${API}/api/invite/validate?token=${inviteToken}`);
         const data = await r.json();
         if (r.ok && data.valid) {
           setTokenData(data);
@@ -75,7 +76,7 @@ function Register({ setToken, setUser, setCompanyId }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API}/api/auth/register`, {
+      const response = await fetchWithAuth(`${API}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

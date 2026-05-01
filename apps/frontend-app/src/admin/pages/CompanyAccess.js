@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
 function CompanyAccess() {
@@ -24,10 +24,10 @@ function CompanyAccess() {
 
         // Fetch all active passport types from the dynamic system
         const [typesRes, companiesRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/admin/passport-types`, {
+          fetchWithAuth(`${API_BASE_URL}/api/admin/passport-types`, {
             headers: authHeaders(),
           }),
-          fetch(`${API_BASE_URL}/api/admin/companies`, {
+          fetchWithAuth(`${API_BASE_URL}/api/admin/companies`, {
             headers: authHeaders(),
           }),
         ]);
@@ -61,7 +61,7 @@ function CompanyAccess() {
       setError("");
 
       if (isGranted) {
-        const r = await fetch(
+        const r = await fetchWithAuth(
           `${API_BASE_URL}/api/admin/company-access/${companyId}/${typeId}`,
           { method: "DELETE", headers: authHeaders() }
         );
@@ -69,7 +69,7 @@ function CompanyAccess() {
         setGrantedTypeIds(ids => ids.filter(id => id !== typeId));
         setSuccessMessage(`Revoked: ${displayName}`);
       } else {
-        const r = await fetch(`${API_BASE_URL}/api/admin/company-access`, {
+        const r = await fetchWithAuth(`${API_BASE_URL}/api/admin/company-access`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ companyId: parseInt(companyId), passportTypeId: parseInt(typeId) }),

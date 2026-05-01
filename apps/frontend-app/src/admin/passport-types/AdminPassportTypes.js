@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
 function TypeKebabMenu({ pos, onClose, children }) {
@@ -76,7 +76,7 @@ function AdminPassportTypes() {
     if (!deletePassword) return setDeleteError("Password is required.");
     setDeleting(true);
     try {
-      const r = await fetch(`${API}/api/admin/passport-types/${deleteTarget.id}`, {
+      const r = await fetchWithAuth(`${API}/api/admin/passport-types/${deleteTarget.id}`, {
         method: "DELETE",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ password: deletePassword }),
@@ -105,9 +105,9 @@ function AdminPassportTypes() {
     try {
       setLoading(true);
       const [typesRes, umbRes, draftRes] = await Promise.all([
-        fetch(`${API}/api/admin/passport-types`,       { headers: authHeaders() }),
-        fetch(`${API}/api/admin/umbrella-categories`,  { headers: authHeaders() }),
-        fetch(`${API}/api/admin/passport-type-draft`,  { headers: authHeaders() }),
+        fetchWithAuth(`${API}/api/admin/passport-types`,       { headers: authHeaders() }),
+        fetchWithAuth(`${API}/api/admin/umbrella-categories`,  { headers: authHeaders() }),
+        fetchWithAuth(`${API}/api/admin/passport-type-draft`,  { headers: authHeaders() }),
       ]);
       if (!typesRes.ok) throw new Error("Failed to fetch passport types");
       setTypes(await typesRes.json());
@@ -132,7 +132,7 @@ function AdminPassportTypes() {
   const handleToggle = async (type) => {
     const action = type.is_active ? "deactivate" : "activate";
     try {
-      const r = await fetch(`${API}/api/admin/passport-types/${type.id}/${action}`, {
+      const r = await fetchWithAuth(`${API}/api/admin/passport-types/${type.id}/${action}`, {
         method: "PATCH",
         headers: authHeaders(),
       });
@@ -150,7 +150,7 @@ function AdminPassportTypes() {
     if (!newUmbName.trim()) return setUmbError("Name is required.");
     setUmbSaving(true);
     try {
-      const r = await fetch(`${API}/api/admin/umbrella-categories`, {
+      const r = await fetchWithAuth(`${API}/api/admin/umbrella-categories`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ name: newUmbName.trim(), icon: newUmbIcon }),
@@ -180,7 +180,7 @@ function AdminPassportTypes() {
     if (!deleteCategoryPassword) return setDeleteCategoryError("Password is required.");
     try {
       setDeletingCategory(true);
-      const r = await fetch(`${API}/api/admin/umbrella-categories/${deleteCategoryTarget.id}`, {
+      const r = await fetchWithAuth(`${API}/api/admin/umbrella-categories/${deleteCategoryTarget.id}`, {
         method: "DELETE",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ password: deleteCategoryPassword }),
@@ -201,7 +201,7 @@ function AdminPassportTypes() {
   const handleDiscardDraft = async () => {
     try {
       setDiscardingDraft(true);
-      const r = await fetch(`${API}/api/admin/passport-type-draft`, {
+      const r = await fetchWithAuth(`${API}/api/admin/passport-type-draft`, {
         method: "DELETE",
         headers: authHeaders(),
       });

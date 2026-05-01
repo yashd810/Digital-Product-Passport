@@ -21,7 +21,7 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
     setLoading(true); setError("");
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetch(`${API}/api/companies/${companyId}/repository${qs}`,
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository${qs}`,
         { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) throw new Error();
       setItems(await r.json());

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 
 function AuditLogs({ companyId }) {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ function AuditLogs({ companyId }) {
     try {
       setIsLoading(true);
       setError("");
-      const r = await fetch(
+      const r = await fetchWithAuth(
         `${API_BASE_URL}/api/companies/${companyId}/audit-logs?limit=1000`,
         { headers: authHeaders() }
       );

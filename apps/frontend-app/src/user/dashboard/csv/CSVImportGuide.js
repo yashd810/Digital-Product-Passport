@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -88,7 +88,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
   // ─────────────────────────────────────────────
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetch(`${API}/api/passport-types/${passportType}`);
+      const response = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
       if (!response.ok) { setCreateError("Failed to fetch passport type definition"); return; }
       const passportTypeData = await response.json();
       const sections = passportTypeData.fields_json?.sections || [];
@@ -118,7 +118,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
     setIsImporting(true);
     setCreateError("");
     try {
-      const typeResponse = await fetch(`${API}/api/passport-types/${passportType}`);
+      const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
       if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
       const passportTypeData = await typeResponse.json();
       const sections = passportTypeData.fields_json?.sections || [];
@@ -156,7 +156,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
         let successCount = 0;
         for (const passportData of createdPassports) {
           try {
-            const response = await fetch(`${API}/api/companies/${companyId}/passports`, {
+            const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports`, {
               method: "POST",
               headers: authHeaders({ "Content-Type": "application/json" }),
               body: JSON.stringify({ passport_type: passportType, ...passportData }),
@@ -188,7 +188,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
     setUpdateResult(null);
     try {
       const csv = await file.text();
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/upsert-csv`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/upsert-csv`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ passport_type: passportType, csv }),
@@ -218,7 +218,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       let passports;
       try { passports = JSON.parse(text); } catch { throw new Error("Invalid JSON file"); }
       if (!Array.isArray(passports)) throw new Error("JSON must be an array of passport objects");
-      const r = await fetch(`${API}/api/companies/${companyId}/passports/upsert-json`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/upsert-json`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({ passport_type: passportType, passports }),

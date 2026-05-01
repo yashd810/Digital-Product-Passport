@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -45,7 +45,7 @@ function SecurityCenter({ user, companyId }) {
     if (bearerToken && !forceRefresh) return;
     setLoadingBearerToken(true);
     try {
-      const r = await fetch(`${API}/api/users/me/token`, {
+      const r = await fetchWithAuth(`${API}/api/users/me/token`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
       });
@@ -80,7 +80,7 @@ function SecurityCenter({ user, companyId }) {
   const fetchApiKeys = async () => {
     setLoadingKeys(true);
     try {
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/api-keys`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/api-keys`, {
         headers: authHeaders(),
       });
       if (!r.ok) throw new Error("Failed to fetch company API keys");
@@ -97,7 +97,7 @@ function SecurityCenter({ user, companyId }) {
     if (!keyName.trim()) return;
     setGeneratingKey(true);
     try {
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/api-keys`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/api-keys`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ name: keyName.trim() }),
@@ -120,7 +120,7 @@ function SecurityCenter({ user, companyId }) {
     if (!window.confirm(`Revoke "${name}"? Any integrations using it will stop working immediately.`)) return;
     setRevokingId(keyId);
     try {
-      const r = await fetch(`${API}/api/companies/${resolvedCompanyId}/api-keys/${keyId}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/api-keys/${keyId}`, {
         method: "DELETE",
         headers: authHeaders(),
       });

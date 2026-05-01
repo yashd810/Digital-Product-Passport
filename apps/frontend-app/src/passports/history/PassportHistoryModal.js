@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { formatPassportStatus } from "../utils/passportStatus";
 import "../../passport-viewer/styles/PassportViewer.css";
 
@@ -43,7 +43,7 @@ function PassportHistoryModal({
         const endpoint = isCompanyMode
           ? `${API}/api/companies/${companyId}/passports/${dppId}/history`
           : `${API}/api/passports/by-product/${encodeURIComponent(productId)}/history`;
-        const response = await fetch(endpoint, isCompanyMode ? { headers: authHeaders() } : undefined);
+        const response = await fetchWithAuth(endpoint, isCompanyMode ? { headers: authHeaders() } : undefined);
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Failed to load passport history");
         if (active) setPayload(data);
@@ -63,7 +63,7 @@ function PassportHistoryModal({
     setSavingVersion(entry.version_number);
     setError("");
     try {
-      const response = await fetch(
+      const response = await fetchWithAuth(
         `${API}/api/companies/${companyId}/passports/${dppId}/history/${entry.version_number}`,
         {
           method: "PATCH",

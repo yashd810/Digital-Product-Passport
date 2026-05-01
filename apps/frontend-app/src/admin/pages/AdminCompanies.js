@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
 function CompanyKebabMenu({ pos, onClose, children }) {
@@ -86,7 +86,7 @@ function AdminCompanies() {
 
   const fetchCompanies = async () => {
     try {
-      const r = await fetch(`${API}/api/admin/companies`,
+      const r = await fetchWithAuth(`${API}/api/admin/companies`,
         { headers: { ...authHeaders() } });
       if (!r.ok) throw new Error("Failed to fetch companies");
       setCompanies(await r.json());
@@ -98,7 +98,7 @@ function AdminCompanies() {
     setError(""); setSuccessMsg(""); setIsLoading(true);
     if (!newCompanyName.trim()) { setError("Company name is required"); setIsLoading(false); return; }
     try {
-      const r = await fetch(`${API}/api/admin/companies`, {
+      const r = await fetchWithAuth(`${API}/api/admin/companies`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ companyName: newCompanyName }),
@@ -132,7 +132,7 @@ function AdminCompanies() {
 
     try {
       setIsDeletingId(deleteTarget.id);
-      const r = await fetch(`${API}/api/admin/companies/${deleteTarget.id}`, {
+      const r = await fetchWithAuth(`${API}/api/admin/companies/${deleteTarget.id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -167,7 +167,7 @@ function AdminCompanies() {
       setSuccessMsg("");
       setIsTogglingAssetId(company.id);
       const nextEnabled = !company.asset_management_enabled;
-      const r = await fetch(`${API}/api/admin/companies/${company.id}/asset-management`, {
+      const r = await fetchWithAuth(`${API}/api/admin/companies/${company.id}/asset-management`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ enabled: nextEnabled }),
@@ -192,7 +192,7 @@ function AdminCompanies() {
       setPolicyTarget(company);
       setPolicyError("");
       setPolicyLoading(true);
-      const response = await fetch(`${API}/api/admin/companies/${company.id}/dpp-policy`, {
+      const response = await fetchWithAuth(`${API}/api/admin/companies/${company.id}/dpp-policy`, {
         headers: { ...authHeaders() },
       });
       const data = await response.json().catch(() => ({}));
@@ -224,7 +224,7 @@ function AdminCompanies() {
     if (!policyTarget || !policyForm) return;
     try {
       setPolicySaving(true);
-      const response = await fetch(`${API}/api/admin/companies/${policyTarget.id}/dpp-policy`, {
+      const response = await fetchWithAuth(`${API}/api/admin/companies/${policyTarget.id}/dpp-policy`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(policyForm),

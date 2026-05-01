@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
 
 function OAuthCallback({ setToken, setUser, setCompanyId }) {
   const API_BASE_URL = import.meta.env.VITE_API_URL || "";
@@ -13,7 +14,7 @@ function OAuthCallback({ setToken, setUser, setCompanyId }) {
 
     (async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/users/me`, {
           credentials: "include",
         });
         const data = await response.json().catch(() => ({}));

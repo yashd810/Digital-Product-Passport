@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { authHeaders } from "../../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { dedupeLatestReleasedPassports } from "../utils/passportListHelpers";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -30,7 +30,7 @@ export function BulkReviseModal({
   const [result, setResult] = useState(null);
 
   useEffect(() => {
-    fetch(`${API}/api/companies/${companyId}/users`, {
+    fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
       headers: authHeaders(),
     })
       .then((r) => r.ok ? r.json() : [])
@@ -42,7 +42,7 @@ export function BulkReviseModal({
       })
       .catch(() => {});
 
-    fetch(`${API}/api/users/me`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.default_reviewer_id) setReviewerId(String(data.default_reviewer_id));
@@ -214,7 +214,7 @@ export function BulkReviseModal({
 
     setSubmitting(true);
     try {
-      const response = await fetch(`${API}/api/companies/${companyId}/passports/bulk-revise`, {
+      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-revise`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

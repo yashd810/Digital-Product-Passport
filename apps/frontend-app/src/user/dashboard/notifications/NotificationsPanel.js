@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { authHeaders } from "../../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -39,7 +39,7 @@ function NotificationsPanel({ user }) {
   const fetchNotifs = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/users/me/notifications?limit=25`, {
+      const r = await fetchWithAuth(`${API}/api/users/me/notifications?limit=25`, {
         headers: { ...authHeaders() },
       });
       if (r.ok) {
@@ -71,7 +71,7 @@ function NotificationsPanel({ user }) {
 
   const markAllRead = async () => {
     try {
-      await fetch(`${API}/api/users/me/notifications/read-all`, {
+      await fetchWithAuth(`${API}/api/users/me/notifications/read-all`, {
         method: "PATCH",
         headers: { ...authHeaders() },
       });
@@ -82,7 +82,7 @@ function NotificationsPanel({ user }) {
 
   const markRead = async (id) => {
     try {
-      await fetch(`${API}/api/users/me/notifications/${id}/read`, {
+      await fetchWithAuth(`${API}/api/users/me/notifications/${id}/read`, {
         method: "PATCH",
         headers: { ...authHeaders() },
       });

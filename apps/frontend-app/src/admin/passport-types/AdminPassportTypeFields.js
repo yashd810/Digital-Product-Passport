@@ -29,7 +29,7 @@ function AdminPassportTypeFields() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`${API}/api/passport-types/${typeName}`);
+        const res = await fetchWithAuth(`${API}/api/passport-types/${typeName}`);
         if (!res.ok) throw new Error("Passport type not found");
         const data = await res.json();
         setTypeDef({ ...data, type_name: typeName });

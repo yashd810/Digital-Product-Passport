@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { authHeaders } from "../../shared/api/authHeaders";
+import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import batteryDictionaryTerms from "../../shared/semantics/battery-dictionary-terms.generated.json";
 import {
   ACCESS_LEVELS,
@@ -359,7 +359,7 @@ function AdminCreatePassportType() {
   // Load draft only when the user explicitly chooses to continue it
   useEffect(() => {
     if (!draftEnabled || !resumeDraftRequested) return;
-    fetch(DRAFT_API, { headers: authHeaders() })
+    fetchWithAuth(DRAFT_API, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(row => { if (row?.draft_json) applyDraft(row.draft_json); })
       .catch(() => {});
@@ -372,7 +372,7 @@ function AdminCreatePassportType() {
     if (!hasContent || !umbrella.trim()) return;
     clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
-      fetch(DRAFT_API, {
+      fetchWithAuth(DRAFT_API, {
         method: "PUT",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, semanticModelKey, typeName, typeNameManual, sections } }),
@@ -389,7 +389,7 @@ function AdminCreatePassportType() {
       return;
     }
     setError("");
-    fetch(DRAFT_API, {
+    fetchWithAuth(DRAFT_API, {
       method: "PUT",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, semanticModelKey, typeName, typeNameManual, sections } }),
@@ -426,7 +426,7 @@ function AdminCreatePassportType() {
   // Fetch umbrella categories from API
   const [umbrellaOptions, setUmbrellaOptions] = useState([]);
   useEffect(() => {
-    fetch(`${API}/api/admin/umbrella-categories`, {
+    fetchWithAuth(`${API}/api/admin/umbrella-categories`, {
       headers: authHeaders(),
     })
       .then(r => r.ok ? r.json() : [])
@@ -825,7 +825,7 @@ function AdminCreatePassportType() {
         ? `${API}/api/admin/passport-types/${editTypeId}`
         : `${API}/api/admin/passport-types`;
       const method = editMode ? "PATCH" : "POST";
-      const r = await fetch(url, {
+      const r = await fetchWithAuth(url, {
         method,
         headers: authHeaders({
           "Content-Type": "application/json",
@@ -844,7 +844,7 @@ function AdminCreatePassportType() {
       if (!r.ok) throw new Error(data.error || (editMode ? "Failed to update passport type" : "Failed to create passport type"));
 
       setSuccess(editMode ? "Passport type updated successfully!" : "Passport type created successfully!");
-      if (draftEnabled) fetch(DRAFT_API, { method: "DELETE", headers: authHeaders() }).catch(() => {});
+      if (draftEnabled) fetchWithAuth(DRAFT_API, { method: "DELETE", headers: authHeaders() }).catch(() => {});
       setError("");
       setInvalidFields([]);
       if (!editMode) {
