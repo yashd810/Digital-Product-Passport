@@ -32,9 +32,11 @@ services:
       - backend-api
 
   backend-api:
-    image: node:20-alpine
+    build:
+      context: .
+      dockerfile: apps/backend-api/Dockerfile
     working_dir: /app
-    command: sh -c "npm install && node Server/server.js"
+    command: node Server/server.js
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     env_file:

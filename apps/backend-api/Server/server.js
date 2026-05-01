@@ -268,7 +268,7 @@ const PEPPER                 = process.env.PEPPER_V1  || "change-this-pepper-in-
 const CURRENT_PEPPER_VERSION = 1;
 const SESSION_COOKIE_NAME    = process.env.SESSION_COOKIE_NAME || "dpp_session";
 const COOKIE_SECURE          = IS_PRODUCTION ? process.env.COOKIE_SECURE !== "false" : process.env.COOKIE_SECURE === "true";
-const COOKIE_SAME_SITE       = process.env.COOKIE_SAME_SITE || (IS_PRODUCTION ? "strict" : "lax");
+const COOKIE_SAME_SITE       = process.env.COOKIE_SAME_SITE || (IS_PRODUCTION ? "None" : "lax");
 const COOKIE_DOMAIN          = process.env.COOKIE_DOMAIN || "";
 const ASSET_SHARED_SECRET    = process.env.ASSET_MANAGEMENT_SHARED_SECRET || "";
 const ASSET_SOURCE_ALLOWED_HOSTS = new Set(

@@ -303,6 +303,52 @@ async function initDb(pool, {
     ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ
   `);
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_registry (
+      dpp_id                     TEXT        PRIMARY KEY,
+      lineage_id                 TEXT        NOT NULL,
+      company_id                 INTEGER     NOT NULL,
+      passport_type              VARCHAR(50) NOT NULL,
+      access_key                 VARCHAR(255),
+      access_key_hash            VARCHAR(64),
+      access_key_prefix          VARCHAR(24),
+      access_key_last_rotated_at TIMESTAMPTZ,
+      device_api_key             VARCHAR(255),
+      device_api_key_hash        VARCHAR(64),
+      device_api_key_prefix      VARCHAR(24),
+      device_key_last_rotated_at TIMESTAMPTZ,
+      created_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_registry_company
+      ON passport_registry(company_id)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_registry_lineage
+      ON passport_registry(lineage_id)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id               SERIAL PRIMARY KEY,
+      email            VARCHAR(255) NOT NULL UNIQUE,
+      password_hash    VARCHAR(255) NOT NULL,
+      first_name       VARCHAR(100),
+      last_name        VARCHAR(100),
+      company_id       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      role             VARCHAR(50) NOT NULL DEFAULT 'viewer',
+      is_active        BOOLEAN NOT NULL DEFAULT true,
+      otp_code         VARCHAR(6),
+      otp_expires_at   TIMESTAMPTZ,
+      two_factor_enabled BOOLEAN NOT NULL DEFAULT false,
+      last_login_at    TIMESTAMPTZ,
+      pepper_version   INTEGER NOT NULL DEFAULT 1,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS backup_public_handovers (
       id                    SERIAL PRIMARY KEY,
       company_id            INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,

@@ -2,7 +2,9 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY apps/backend-api/package.json apps/backend-api/package-lock.json ./
-RUN npm ci --omit=dev
+RUN apk add --no-cache --virtual .build-deps python3 build-base \
+  && npm ci --omit=dev \
+  && apk del .build-deps
 
 COPY apps/backend-api/ ./
 COPY apps/frontend-app/src/assets/styles/email-styles.css /app/shared/email-styles.css
