@@ -106,7 +106,13 @@ Response: 200 OK with notifications ✅
 
 ---
 
-## 📦 Deployment Package
+## 📦 Infrastructure
+
+Your deployment is distributed:
+- **82.70.54.173** ⭐ Backend API + Postgres + Local Storage
+- **79.72.16.68** - Frontend + Asset Management + Marketing
+
+**This fix deploys to**: `82.70.54.173` (backend server)
 
 ### Files Modified/Created
 
@@ -128,11 +134,11 @@ e6f3c60 docs(deploy): Add comprehensive deployment instructions for JWT and cook
 
 ## 🚀 How to Deploy
 
-### Option 1: Automated Deployment (Recommended)
+### Automated Deployment (Easiest)
 
 ```bash
 # From the repository root
-./deploy-oci.sh 79.76.53.122 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
+./deploy-oci.sh 82.70.54.173 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
 ```
 
 This script automatically:
@@ -142,9 +148,12 @@ This script automatically:
 - ✓ Restarts backend service
 - ✓ Verifies deployment success
 
-### Option 2: Manual Deployment
+### Option 2: Manual SSH
 
-See `DEPLOYMENT_INSTRUCTIONS.md` for step-by-step SSH commands
+```bash
+ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
+# Then follow DEPLOYMENT_INSTRUCTIONS.md
+```
 
 ---
 
@@ -212,7 +221,7 @@ Expected results:
 ### Check Backend Logs
 
 ```bash
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.76.53.122
+ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
 
 docker logs backend-api | grep -E "JWT|token|403|auth|cookie"
 ```
@@ -267,9 +276,9 @@ curl -b cookies.txt https://api.claros-dpp.online/api/users/me/notifications
 
 ### For You
 
-1. **When OCI server is available**:
+1. **Deploy to backend server**:
    ```bash
-   ./deploy-oci.sh 79.76.53.122 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
+   ./deploy-oci.sh 82.70.54.173 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
    ```
 
 2. **Test the fix**:
@@ -284,7 +293,7 @@ curl -b cookies.txt https://api.claros-dpp.online/api/users/me/notifications
 ### Rollback Plan (If Needed)
 
 ```bash
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.76.53.122
+ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
 
 # Revert to previous backup
 sudo cp /etc/dpp/dpp.env.backup.* /etc/dpp/dpp.env
@@ -308,4 +317,4 @@ If you encounter issues:
 
 **Status**: ✅ READY FOR DEPLOYMENT  
 **Last Updated**: May 2, 2026  
-**Commits**: 3 total (554b258...9b82448)
+**Target Server**: 82.70.54.173 (Backend + Postgres + Storage)

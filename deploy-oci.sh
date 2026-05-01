@@ -3,9 +3,9 @@ set -e
 
 # Automated Deployment Script - JWT & Cookie Domain Fix
 # Usage: ./deploy-oci.sh [OCI_IP] [SSH_KEY_PATH]
-# Example: ./deploy-oci.sh 79.76.53.122 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
+# Example: ./deploy-oci.sh 82.70.54.173 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
 
-OCI_IP=${1:-79.76.53.122}
+OCI_IP=${1:-82.70.54.173}
 SSH_KEY=${2:-~/Desktop/AMD\ keys/ssh-key-2026-04-27.key}
 SSH_USER="ubuntu"
 ENV_FILE="/etc/dpp/dpp.env"
@@ -110,5 +110,5 @@ echo "3. Confirm 200 OK responses (not 403 Forbidden)"
 echo ""
 echo "If issues occur, rollback with:"
 echo "  ssh -i '$SSH_KEY' $SSH_USER@$OCI_IP"
-echo "  sudo cp ${ENV_FILE}.backup.* $ENV_FILE"
-echo "  cd /opt/dpp && docker-compose -f $DOCKER_COMPOSE restart backend-api"
+echo "  sudo cp \${ENV_FILE}.backup.* \$ENV_FILE"
+echo "  cd /opt/dpp && docker-compose -f \$DOCKER_COMPOSE restart backend-api"

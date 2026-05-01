@@ -16,13 +16,23 @@ All API requests from the frontend (`app.claros-dpp.online`) to the backend (`ap
 
 ---
 
+## Infrastructure Setup
+
+Your system is distributed across two instances:
+- **82.70.54.173** - Backend API + Postgres + Local Storage ⭐ **DEPLOY HERE**
+- **79.72.16.68** - Frontend + Asset Management + Marketing Site
+
+This fix must be deployed on **82.70.54.173** (backend server) only.
+
+---
+
 ## How to Deploy
 
-### Option 1: Manual SSH Deployment (Recommended for immediate fix)
+### Option 1: Automated SSH Deployment (Recommended)
 
-#### Step 1: SSH into OCI Server
+#### Step 1: SSH into Backend Server
 ```bash
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.76.53.122
+ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
 ```
 
 #### Step 2: Update Environment Configuration
@@ -90,7 +100,18 @@ Expected response: `200 OK` with notifications array (not 403)
 
 ---
 
-### Option 2: Docker Deployment (Using .env.prod)
+### Option 2: Automated Deployment (Using script)
+
+```bash
+# From your local machine, in the repository root:
+./deploy-oci.sh 82.70.54.173 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
+```backend server
+scp -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key \
+    /Users/yashdesai/Desktop/Passport/Claude/files/files/.env.prod \
+    ubuntu@82.70.54.173:/etc/dpp/dpp.env
+
+# 2. SSH and restart
+ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
 
 If you're deploying from this repository:
 
