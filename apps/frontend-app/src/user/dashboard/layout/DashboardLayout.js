@@ -50,8 +50,6 @@ function DashboardLayout({ user, companyId, onLogout }) {
         .then(d => setMsgUnread(typeof d?.count === "number" ? d.count : 0))
         .catch(() => setMsgUnread(0));
     };
-        .catch(() => {});
-    };
     fetchMsgUnread();
     const iv = setInterval(fetchMsgUnread, 15000);
     return () => clearInterval(iv);
