@@ -35,14 +35,21 @@ function DashboardLayout({ user, companyId, onLogout }) {
     if (!companyId) { navigate("/login"); return; }
     fetch(`${API}/api/companies/${companyId}/passport-types`,
       { headers: authHeaders() })
-      .then(r => r.json()).then(setPassportTypes).catch(() => {});
+      .then(r => r.json())
+      .then(data => {
+        // Ensure data is an array; handle API errors gracefully
+        setPassportTypes(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setPassportTypes([]));
   }, [companyId]);
 
   useEffect(() => {
     const fetchMsgUnread = () => {
       fetch(`${API}/api/messaging/unread`, { headers: authHeaders() })
         .then(r => r.ok ? r.json() : { count: 0 })
-        .then(d => setMsgUnread(d.count || 0))
+        .then(d => setMsgUnread(typeof d?.count === "number" ? d.count : 0))
+        .catch(() => setMsgUnread(0));
+    };
         .catch(() => {});
     };
     fetchMsgUnread();
