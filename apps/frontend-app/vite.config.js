@@ -8,7 +8,11 @@ export default defineConfig({
       enforce: 'pre',
       async transform(code, id) {
         if (!id.match(/\/src\/.*\.js$/)) return null;
-        return transformWithEsbuild(code, id, { loader: 'jsx' });
+        return transformWithEsbuild(code, id, {
+          loader: 'jsx',
+          jsx: 'automatic',
+          jsxImportSource: 'react',
+        });
       },
     },
     react(),
@@ -20,6 +24,8 @@ export default defineConfig({
   },
   optimizeDeps: {
     esbuildOptions: {
+      jsx: 'automatic',
+      jsxImportSource: 'react',
       loader: {
         '.js': 'jsx',
       },
