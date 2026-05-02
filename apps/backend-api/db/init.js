@@ -1351,7 +1351,7 @@ async function initDb(pool, {
   const ptRows = await pool.query("SELECT type_name FROM passport_types");
   for (const { type_name } of ptRows.rows) {
     await createPassportTable(type_name).catch(e =>
-      console.warn(`[initDb] Could not create table for ${type_name}:`, e.message)
+      logger.warn({ err: e }, `Could not create table for ${type_name}`)
     );
   }
 
@@ -1463,7 +1463,7 @@ async function initDb(pool, {
         });
       }
     } catch (e) {
-      console.warn(`[initDb] Could not normalize revision status for ${type_name}:`, e.message);
+      logger.warn({ err: e }, `Could not normalize revision status for ${type_name}`);
     }
   }
 
@@ -1561,7 +1561,7 @@ async function initDb(pool, {
       `);
     });
   } catch (e) {
-    console.warn("[initDb] Could not finalize DIN SPEC carbon footprint label/performance-class migration:", e.message);
+    logger.warn({ err: e }, "Could not finalize DIN SPEC carbon footprint label/performance-class migration");
   }
 
   await runMigration(pool, "2026-04-27.normalize-workflow-revision-status", async () => {
@@ -1571,7 +1571,7 @@ async function initDb(pool, {
        WHERE previous_release_status = $2`,
       [IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS]
     ).catch((e) => {
-      console.warn("[initDb] Could not normalize workflow revision status:", e.message);
+      logger.warn({ err: e }, "Could not normalize workflow revision status");
     });
   });
 

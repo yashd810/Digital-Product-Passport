@@ -159,6 +159,21 @@ app.set("trust proxy", 1);
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 if (IS_PRODUCTION) app.set("env", "production");
 
+// Validate required environment variables in production
+if (IS_PRODUCTION) {
+  const requiredEnvVars = ["JWT_SECRET", "DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME"];
+  const missingEnvVars = requiredEnvVars.filter(v => !process.env[v]);
+  if (missingEnvVars.length > 0) {
+    logger.error({ missing: missingEnvVars }, "Missing required environment variables in production");
+    process.exit(1);
+  }
+  
+  if (!process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS.trim() === "") {
+    logger.error("ALLOWED_ORIGINS must be configured in production");
+    process.exit(1);
+  }
+}
+
 const defaultAllowedOrigins = IS_PRODUCTION ? [] : [
   "http://localhost:3000", "http://127.0.0.1:3000",
   "http://localhost:5173", "http://127.0.0.1:5173",
@@ -172,7 +187,7 @@ const cspConnectSrc = ["'self'", ...allowedOriginSet];
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || allowedOriginSet.has(origin)) return cb(null, true);
-    cb(new Error("Not allowed by CORS"));
+    cb(new Error("Forbidden"));
   },
   credentials: true,
 }));
@@ -1136,7 +1151,7 @@ app.get("/public-files/:publicId", publicReadRateLimit, async (req, res) => {
   }
 });
 
-registerHealthRoutes(app);
+registerHealthRoutes(app, pool);
 
 // ─── CONTACT FORM ────────────────────────────────────────────────────────────
 app.post("/api/contact", publicReadRateLimit, async (req, res) => {
@@ -1149,7 +1164,7 @@ app.post("/api/contact", publicReadRateLimit, async (req, res) => {
 
     const adminEmail = process.env.ADMIN_EMAIL;
     if (!adminEmail) {
-      console.warn("[Contact] ADMIN_EMAIL not set — contact form submission not forwarded");
+      logger.warn("ADMIN_EMAIL not configured - contact form submission not forwarded");
       return res.json({ ok: true });
     }
 
@@ -1183,4 +1198,29 @@ app.post("/api/contact", publicReadRateLimit, async (req, res) => {
 
 app.listen(PORT, () => {
   logger.info(`[Server] Listening on port ${PORT}`);
+});
+
+// Graceful shutdown handler
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM received: starting graceful shutdown");
+  pool.end()
+    .then(() => logger.info("Database pool closed"))
+    .catch((err) => logger.error({ err }, "Error closing database pool"));
+});
+
+process.on("SIGINT", () => {
+  logger.info("SIGINT received: starting graceful shutdown");
+  pool.end()
+    .then(() => logger.info("Database pool closed"))
+    .catch((err) => logger.error({ err }, "Error closing database pool"));
+});
+
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception");
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "Unhandled rejection");
+  process.exit(1);
 });

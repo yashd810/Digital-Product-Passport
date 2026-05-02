@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20.11-alpine
 WORKDIR /app
 
 COPY apps/backend-api/package.json apps/backend-api/package-lock.json ./

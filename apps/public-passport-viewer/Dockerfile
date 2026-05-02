@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:20.11-alpine AS build
 WORKDIR /app
 
 COPY apps/public-passport-viewer/package.json apps/public-passport-viewer/package-lock.json ./
@@ -12,7 +12,7 @@ ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_PUBLIC_VIEWER_URL=${VITE_PUBLIC_VIEWER_URL}
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.27.0-alpine
 COPY infra/docker/public-passport-viewer/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build --chown=101:101 /app/dist /usr/share/nginx/html
 CMD ["/bin/sh", "-c", "export BACKEND_API_UPSTREAM=\"${BACKEND_API_UPSTREAM:-http://backend-api:3001}\" && envsubst '$BACKEND_API_UPSTREAM' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]

@@ -119,22 +119,9 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       for (const token of candidateTokens) {
         try {
           payload = jwt.verify(token, JWT_SECRET);
-          logger.info({ 
-            verified: true,
-            payload: {
-              userId: payload.userId,
-              sessionVersion: payload.sessionVersion,
-              email: payload.email,
-            },
-            msg: "[TOKEN_VERIFIED] JWT verification succeeded"
-          });
           break;
         } catch (verifyErr) {
-          logger.error({
-            error: verifyErr.message,
-            tokenStart: token.substring(0, 30),
-            msg: "[TOKEN_VERIFY_FAIL] JWT verification failed"
-          });
+          // Token verification failed, try next candidate
         }
       }
       if (!payload) {
@@ -165,16 +152,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       ).catch(() => ({ rows: [] }));
       const tokenSessionVersion = Number.parseInt(payload.sessionVersion, 10);
       const currentSessionVersion = Number.parseInt(currentUser.session_version, 10) || 1;
-      logger.info({ 
-        userId: currentUser.id,
-        tokenVersion: tokenSessionVersion,
-        dbVersion: currentSessionVersion,
-        isFinite: Number.isFinite(tokenSessionVersion),
-        versionsMatch: tokenSessionVersion === currentSessionVersion,
-        msg: "[SESSION_CHECK] Session version verification" 
-      });
       if (!Number.isFinite(tokenSessionVersion) || tokenSessionVersion !== currentSessionVersion) {
-        logger.error({ userId: currentUser.id, tokenVersion: tokenSessionVersion, dbVersion: currentSessionVersion, msg: "[AUTH_FAIL] Session version mismatch" });
         return res.status(401).json({ error: "Session has been revoked. Please sign in again." });
       }
 
@@ -192,7 +170,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       };
       next();
     } catch (err) {
-      logger.error({ error: err.message, stack: err.stack, msg: "[AUTH_ERROR] Unexpected error in authenticateToken" });
+      logger.error({ error: err.message, stack: err.stack }, "Authentication error");
       return res.status(403).json({ error: "Invalid or expired token" });
     }
   };
