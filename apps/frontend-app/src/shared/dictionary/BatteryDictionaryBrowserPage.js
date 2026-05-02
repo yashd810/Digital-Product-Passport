@@ -1,5 +1,6 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "./BatteryDictionaryBrowserPage.css";
 
 const API = import.meta.env.VITE_API_URL || "";
