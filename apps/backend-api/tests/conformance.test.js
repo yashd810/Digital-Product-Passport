@@ -60,7 +60,8 @@ function createConformanceFixture() {
     typeDef,
     expectedHeader: {
       digitalProductPassportId: passport.guid,
-      uniqueProductIdentifier: passport.product_id,
+      uniqueProductIdentifier: passport.product_identifier_did,
+      localProductId: passport.product_id,
       dppSchemaVersion: "prEN 18223:2025",
       dppStatus: "Active",
       lastUpdated: passport.updated_at,
@@ -94,6 +95,7 @@ describe("battery DPP conformance", () => {
       expect.objectContaining({
         digitalProductPassportId: expectedHeader.digitalProductPassportId,
         uniqueProductIdentifier: expectedHeader.uniqueProductIdentifier,
+        localProductId: expectedHeader.localProductId,
         granularity: "item",
         dppSchemaVersion: expectedHeader.dppSchemaVersion,
         dppStatus: expectedHeader.dppStatus,
@@ -122,6 +124,7 @@ describe("battery DPP conformance", () => {
       expect.objectContaining({
         digitalProductPassportId: expectedHeader.digitalProductPassportId,
         uniqueProductIdentifier: expectedHeader.uniqueProductIdentifier,
+        localProductId: expectedHeader.localProductId,
         granularity: "Item",
         dppSchemaVersion: expectedHeader.dppSchemaVersion,
         dppStatus: expectedHeader.dppStatus,
