@@ -306,12 +306,11 @@
     /* ══════════════════════════════════════════════
        BACKEND URL
        Development : http://localhost:3001
-       Production  : update to your server's URL,
-                     e.g. https://api.clarosdpp.com
+       Production  : https://api.claros-dpp.online
     ══════════════════════════════════════════════ */
     const BACKEND_URL = (!window.location.hostname || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
       ? 'http://localhost:3001'
-      : '';
+      : 'https://api.claros-dpp.online';
 
     const form      = document.getElementById('contact-form');
     const submitBtn = document.getElementById('submit-btn');
