@@ -113,14 +113,6 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
 
   const authenticateToken = async (req, res, next) => {
     const candidateTokens = getCandidateSessionTokens(req);
-    logger.info({
-      path: req.path,
-      method: req.method,
-      hasCookieHeader: Boolean(req.headers.cookie),
-      cookieHeader: req.headers.cookie ? req.headers.cookie.substring(0, 100) : "none",
-      origin: req.headers.origin,
-      msg: "[AUTH] Token check"
-    });
     if (!candidateTokens.length) return res.status(401).json({ error: "Access token required" });
     try {
       let payload = null;

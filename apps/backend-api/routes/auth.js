@@ -242,12 +242,6 @@ module.exports = function registerAuthRoutes(app, {
         amr: ["pwd", "otp"]
       });
       setAuthCookie(res, sessionToken);
-      logger.info({
-        origin: req.headers.origin,
-        cookieName: process.env.SESSION_COOKIE_NAME,
-        userId: u.id,
-        msg: "[LOGIN] Set auth cookie"
-      });
       res.json({
         success: true,
         token: sessionToken,
