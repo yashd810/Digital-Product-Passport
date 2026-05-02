@@ -241,6 +241,7 @@ module.exports = function registerAuthRoutes(app, {
         mfaVerifiedAt: new Date().toISOString(),
         amr: ["pwd", "otp"]
       });
+      logger.info({ userId: u.id, session_version: u.session_version, msg: "[LOGIN_TOKEN] Generated token with session version" });
       setAuthCookie(res, sessionToken);
       res.json({
         success: true,

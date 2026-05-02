@@ -151,6 +151,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       const tokenSessionVersion = Number.parseInt(payload.sessionVersion, 10);
       const currentSessionVersion = Number.parseInt(currentUser.session_version, 10) || 1;
       if (!Number.isFinite(tokenSessionVersion) || tokenSessionVersion !== currentSessionVersion) {
+        logger.error({ userId: currentUser.id, tokenVersion: tokenSessionVersion, dbVersion: currentSessionVersion, msg: "[AUTH_FAIL] Session version mismatch" });
         return res.status(401).json({ error: "Session has been revoked. Please sign in again." });
       }
 
