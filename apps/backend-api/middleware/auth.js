@@ -145,7 +145,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
                 c.economic_operator_identifier, c.economic_operator_identifier_scheme
          FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
-         WHERE id = $1
+         WHERE u.id = $1
          LIMIT 1`,
         [payload.userId]
       );
