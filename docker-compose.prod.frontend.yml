@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: apps/frontend-app/Dockerfile
       args:
-        VITE_API_URL: "${VITE_API_URL}"
-        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL}"
+        VITE_API_URL: "${VITE_API_URL:-https://api.claros-dpp.online}"
+        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:-https://viewer.claros-dpp.online}"
     environment:
       BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
     ports:
