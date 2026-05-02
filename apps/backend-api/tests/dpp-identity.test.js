@@ -89,6 +89,12 @@ test("returns correct product item DID", () => {
     "did:web:www.claros-dpp.online:did:battery:item:5:ACME-001"
   );
 });
+test("returns correct product batch DID", () => {
+  assert.strictEqual(
+    dppIdentity.productBatchDid(5, "BATCH-001"),
+    "did:web:www.claros-dpp.online:did:battery:batch:5:BATCH-001"
+  );
+});
 
 // ─── dppDid ──────────────────────────────────────────────────────────────────
 console.log("\ndppDid()");
@@ -102,6 +108,12 @@ test("returns correct DPP DID for item granularity", () => {
   assert.strictEqual(
     dppIdentity.dppDid("item", 5, "ACME-001"),
     "did:web:www.claros-dpp.online:did:dpp:item:5:ACME-001"
+  );
+});
+test("returns correct DPP DID for batch granularity", () => {
+  assert.strictEqual(
+    dppIdentity.dppDid("batch", 5, "ACME-001"),
+    "did:web:www.claros-dpp.online:did:dpp:batch:5:ACME-001"
   );
 });
 test("throws for null granularity", () => {
@@ -158,6 +170,14 @@ test("parses battery item DID", () => {
   assert.strictEqual(parsed.type, "battery");
   assert.strictEqual(parsed.level, "item");
 });
+test("parses battery batch DID", () => {
+  const parsed = dppIdentity.parseDid("did:web:www.claros-dpp.online:did:battery:batch:5:BATCH-001");
+  assert.ok(parsed);
+  assert.strictEqual(parsed.type, "battery");
+  assert.strictEqual(parsed.level, "batch");
+  assert.strictEqual(parsed.companyId, "5");
+  assert.strictEqual(parsed.productId, "BATCH-001");
+});
 test("parses DPP DID", () => {
   const parsed = dppIdentity.parseDid("did:web:www.claros-dpp.online:did:dpp:model:5:ACME-001");
   assert.ok(parsed);
@@ -197,6 +217,12 @@ test("maps battery model DID to /did/battery/model/.../did.json", () => {
   assert.strictEqual(
     dppIdentity.didToDocumentUrl("did:web:www.claros-dpp.online:did:battery:model:5:ACME-001"),
     "https://www.claros-dpp.online/did/battery/model/5/ACME-001/did.json"
+  );
+});
+test("maps battery batch DID to /did/battery/batch/.../did.json", () => {
+  assert.strictEqual(
+    dppIdentity.didToDocumentUrl("did:web:www.claros-dpp.online:did:battery:batch:5:BATCH-001"),
+    "https://www.claros-dpp.online/did/battery/batch/5/BATCH-001/did.json"
   );
 });
 test("maps DPP DID to /did/dpp/model/.../did.json", () => {

@@ -68,6 +68,10 @@ export function TrustedEntryPanel({
   const trustedHost = carrierAuthenticity?.trustedViewerHost || "";
   const trustedOrigin = carrierAuthenticity?.trustedViewerOrigin || "";
   const printSpec = carrierAuthenticity?.qrPrintSpecification || null;
+  const verificationEvidence = Array.isArray(carrierAuthenticity?.dataCarrierVerificationEvidence)
+    ? carrierAuthenticity.dataCarrierVerificationEvidence
+    : [];
+  const latestVerification = verificationEvidence[0] || null;
   const safetyWarnings = carrierAuthenticity?.safetyWarnings || [];
   const antiCounterfeitInstructions = carrierAuthenticity?.antiCounterfeitInstructions || [];
   const canReport = typeof onReportSuspiciousCarrier === "function";
@@ -114,6 +118,12 @@ export function TrustedEntryPanel({
           <span>Minimum print width: {printSpec.minimumRecommendedPrintWidthMm} mm</span>
           <span>HRI text: {printSpec.hriText || "Not set"}</span>
           <span>Marker: {printSpec.dppGraphicalMarking || "None"}</span>
+          {latestVerification && (
+            <span>
+              Latest verification: {latestVerification.printGrade || "recorded"}
+              {latestVerification.verifiedAt ? ` · ${new Date(latestVerification.verifiedAt).toLocaleDateString()}` : ""}
+            </span>
+          )}
         </div>
       )}
 

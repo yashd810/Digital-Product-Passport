@@ -70,11 +70,25 @@ test("maps item DID to stable-id route", () => {
   );
 });
 
+test("maps batch DID to stable-id route", () => {
+  assert.strictEqual(
+    didService.didToDocumentPath("did:web:www.claros-dpp.online:did:battery:batch:BATCH-2026-001"),
+    "/did/battery/batch/BATCH-2026-001/did.json"
+  );
+});
+
 console.log("\npublicUrlToSubjects()");
 test("converts did document paths back to DIDs", () => {
   assert.deepStrictEqual(
     didService.publicUrlToSubjects("https://www.claros-dpp.online/did/dpp/model/BAT-2026-001/did.json"),
     ["did:web:www.claros-dpp.online:did:dpp:model:BAT-2026-001"]
+  );
+});
+
+test("converts batch did document paths back to DIDs", () => {
+  assert.deepStrictEqual(
+    didService.publicUrlToSubjects("https://www.claros-dpp.online/did/battery/batch/BATCH-2026-001/did.json"),
+    ["did:web:www.claros-dpp.online:did:battery:batch:BATCH-2026-001"]
   );
 });
 

@@ -76,6 +76,14 @@ module.exports = function createBackupProviderService({
       process.env.BACKUP_POLICY_RESTORE_TEST_METHOD,
       "Perform a documented restore rehearsal from backup storage into a non-production environment."
     );
+    const archivalStorageMode = normalizeText(
+      process.env.BACKUP_ARCHIVAL_STORAGE_MODE,
+      ""
+    );
+    const archivalRetentionDays = parsePositiveInteger(
+      process.env.BACKUP_ARCHIVAL_RETENTION_DAYS,
+      0
+    );
 
     return {
       companyId: companyId !== null && companyId !== undefined ? Number.parseInt(companyId, 10) : null,
@@ -92,8 +100,85 @@ module.exports = function createBackupProviderService({
       restoreTestFrequency,
       verificationMethod,
       restoreTestMethod,
+      archivalStorage: {
+        mode: archivalStorageMode || null,
+        retentionDays: archivalRetentionDays || null,
+        immutabilityEvidenceUri: normalizeText(process.env.BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI, "") || null,
+      },
       backupProviderRequired: toBoolean(process.env.BACKUP_PROVIDER_ENABLED, false),
       evidenceSource: "application_policy",
+    };
+  }
+
+  function evidenceStatus(condition) {
+    return condition ? "proven" : "not_proven";
+  }
+
+  async function getContinuityEvidence({ companyId } = {}) {
+    const normalizedCompanyId = Number.parseInt(companyId, 10);
+    if (!Number.isFinite(normalizedCompanyId)) {
+      throw new Error("companyId is required");
+    }
+
+    const policy = getContinuityPolicy({ companyId: normalizedCompanyId });
+    const result = await pool.query(
+      `SELECT
+         COUNT(*)::int AS replication_count,
+         COUNT(*) FILTER (WHERE replication_status = 'synced')::int AS synced_replication_count,
+         COUNT(*) FILTER (WHERE replication_status = 'failed')::int AS failed_replication_count,
+         COUNT(*) FILTER (WHERE verification_status = 'verified')::int AS verified_replication_count,
+         COUNT(*) FILTER (WHERE verification_status = 'failed')::int AS failed_verification_count,
+         MAX(replicated_at) AS latest_replication_at,
+         MAX(last_verified_at) AS latest_verification_at
+       FROM passport_backup_replications
+       WHERE company_id = $1`,
+      [normalizedCompanyId]
+    ).catch(() => ({ rows: [] }));
+
+    const row = result.rows[0] || {};
+    const latestReplicationAt = row.latest_replication_at ? new Date(row.latest_replication_at) : null;
+    const latestVerificationAt = row.latest_verification_at ? new Date(row.latest_verification_at) : null;
+    const now = new Date();
+    const observedReplicationAgeMinutes = latestReplicationAt ?
+      Math.max(0, Math.round((now.getTime() - latestReplicationAt.getTime()) / 60000)) :
+      null;
+    const restoreDrillEvidenceUri = normalizeText(process.env.BACKUP_RESTORE_DRILL_EVIDENCE_URI, "");
+    const lastRestoreDrillAt = normalizeText(process.env.BACKUP_LAST_RESTORE_DRILL_AT, "");
+    const immutableEvidenceUri = normalizeText(process.env.BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI, "");
+    const archivalStorageMode = normalizeText(process.env.BACKUP_ARCHIVAL_STORAGE_MODE, "");
+
+    return {
+      companyId: normalizedCompanyId,
+      policy,
+      replicationEvidence: {
+        status: evidenceStatus(Number(row.synced_replication_count) > 0 && observedReplicationAgeMinutes !== null && observedReplicationAgeMinutes <= policy.rpoMinutes),
+        rpoMinutes: policy.rpoMinutes,
+        observedReplicationAgeMinutes,
+        latestReplicationAt: latestReplicationAt ? latestReplicationAt.toISOString() : null,
+        replicationCount: Number(row.replication_count) || 0,
+        syncedReplicationCount: Number(row.synced_replication_count) || 0,
+        failedReplicationCount: Number(row.failed_replication_count) || 0,
+      },
+      verificationEvidence: {
+        status: evidenceStatus(Number(row.verified_replication_count) > 0 && latestVerificationAt),
+        verificationFrequency: policy.verificationFrequency,
+        latestVerificationAt: latestVerificationAt ? latestVerificationAt.toISOString() : null,
+        verifiedReplicationCount: Number(row.verified_replication_count) || 0,
+        failedVerificationCount: Number(row.failed_verification_count) || 0,
+      },
+      restoreDrillEvidence: {
+        status: evidenceStatus(Boolean(lastRestoreDrillAt && restoreDrillEvidenceUri)),
+        rtoHours: policy.rtoHours,
+        restoreTestFrequency: policy.restoreTestFrequency,
+        lastRestoreDrillAt: lastRestoreDrillAt || null,
+        evidenceUri: restoreDrillEvidenceUri || null,
+      },
+      immutableArchivalEvidence: {
+        status: evidenceStatus(Boolean(archivalStorageMode && immutableEvidenceUri)),
+        mode: archivalStorageMode || null,
+        retentionDays: policy.archivalStorage.retentionDays,
+        evidenceUri: immutableEvidenceUri || null,
+      },
     };
   }
 
@@ -1292,6 +1377,7 @@ module.exports = function createBackupProviderService({
     deactivatePublicHandover,
     findLatestVerifiedPublicReplication,
     getActivePublicHandover,
+    getContinuityEvidence,
     getContinuityPolicy,
     listPublicHandovers,
     listProviders,

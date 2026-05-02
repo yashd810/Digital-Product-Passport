@@ -9,6 +9,30 @@ const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','in_revision','revised')`;
 const REVISION_BLOCKING_STATUSES_SQL = `('draft','in_revision','revised','in_review')`;
 const EDIT_SESSION_TIMEOUT_HOURS     = 12;
 const EDIT_SESSION_TIMEOUT_SQL       = `${EDIT_SESSION_TIMEOUT_HOURS} hours`;
+const LIVE_PASSPORT_SYSTEM_COLUMNS = new Set([
+  "id",
+  "dpp_id",
+  "lineage_id",
+  "company_id",
+  "model_name",
+  "product_id",
+  "product_identifier_did",
+  "compliance_profile_key",
+  "content_specification_ids",
+  "carrier_policy_key",
+  "carrier_authenticity",
+  "economic_operator_id",
+  "facility_id",
+  "granularity",
+  "release_status",
+  "version_number",
+  "qr_code",
+  "created_by",
+  "updated_by",
+  "created_at",
+  "updated_at",
+  "deleted_at",
+]);
 
 module.exports = function createPassportService({
   pool,
@@ -1269,7 +1293,138 @@ module.exports = function createPassportService({
     });
   }
 
-  async function createPassportTable(typeName) {
+  function normalizePassportTypeSchema({ sections = [], currentSchemaVersion = 0 } = {}) {
+    const parsedVersion = Number.parseInt(currentSchemaVersion, 10);
+    return {
+      schemaVersion: Number.isFinite(parsedVersion) && parsedVersion > 0 ? parsedVersion : 1,
+      sections: Array.isArray(sections) ? sections : [],
+    };
+  }
+
+  function getTypeSchemaVersion(fieldsJson) {
+    const parsedVersion = Number.parseInt(fieldsJson?.schemaVersion, 10);
+    return Number.isFinite(parsedVersion) && parsedVersion > 0 ? parsedVersion : 1;
+  }
+
+  function flattenTypeFields(fieldsJsonOrSections) {
+    const sections = Array.isArray(fieldsJsonOrSections)
+      ? fieldsJsonOrSections
+      : fieldsJsonOrSections?.sections;
+    return (Array.isArray(sections) ? sections : [])
+      .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
+      .filter((field) => field?.key);
+  }
+
+  function isStructuredPassportField(field) {
+    const storageType = String(field?.storageType || field?.storage_type || field?.valueType || "").trim().toLowerCase();
+    return field?.type === "table"
+      || field?.repeated === true
+      || field?.structured === true
+      || ["json", "jsonb", "object", "array"].includes(storageType);
+  }
+
+  function getPassportFieldColumnType(field) {
+    if (field?.type === "boolean") return "BOOLEAN DEFAULT false";
+    if (isStructuredPassportField(field)) return "JSONB";
+    return "TEXT";
+  }
+
+  function getPassportFieldDataType(field) {
+    if (field?.type === "boolean") return "boolean";
+    if (isStructuredPassportField(field)) return "jsonb";
+    return "text";
+  }
+
+  function buildPassportTypeSchemaChange({ currentFieldsJson = {}, nextSections = [] } = {}) {
+    const currentFields = new Map(flattenTypeFields(currentFieldsJson).map((field) => [field.key, field]));
+    const nextFields = new Map(flattenTypeFields(nextSections).map((field) => [field.key, field]));
+    const added = [];
+    const removed = [];
+    const typeChanged = [];
+
+    for (const [key, nextField] of nextFields.entries()) {
+      const currentField = currentFields.get(key);
+      if (!currentField) {
+        added.push(key);
+        continue;
+      }
+      if (getPassportFieldDataType(currentField) !== getPassportFieldDataType(nextField)) {
+        typeChanged.push({
+          key,
+          from: getPassportFieldDataType(currentField),
+          to: getPassportFieldDataType(nextField),
+        });
+      }
+    }
+
+    for (const key of currentFields.keys()) {
+      if (!nextFields.has(key)) removed.push(key);
+    }
+
+    return {
+      added,
+      removed,
+      typeChanged,
+      additive: removed.length === 0 && typeChanged.length === 0,
+    };
+  }
+
+  async function passportTypeHasStoredRecords(typeName) {
+    const tableName = getTable(typeName);
+    const liveCount = await pool.query(`SELECT COUNT(*)::int AS count FROM ${tableName}`)
+      .then((result) => Number(result.rows[0]?.count) || 0)
+      .catch(() => 0);
+    if (liveCount > 0) return true;
+
+    const archivedCount = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM passport_archives WHERE passport_type = $1",
+      [typeName]
+    ).then((result) => Number(result.rows[0]?.count) || 0).catch(() => 0);
+    return archivedCount > 0;
+  }
+
+  async function recordPassportTypeSchemaEvent({
+    typeName,
+    tableName,
+    schemaVersion = 1,
+    eventType,
+    changeSummary = {},
+    createdBy = null,
+  }) {
+    const typeRes = await pool.query("SELECT id FROM passport_types WHERE type_name = $1", [typeName]).catch(() => ({ rows: [] }));
+    await pool.query(
+      `INSERT INTO passport_type_schema_events
+         (passport_type_id, type_name, table_name, schema_version, event_type, change_summary, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+      [
+        typeRes.rows[0]?.id || null,
+        typeName,
+        tableName,
+        Number.parseInt(schemaVersion, 10) || 1,
+        eventType,
+        JSON.stringify(changeSummary || {}),
+        createdBy || null,
+      ]
+    ).catch((error) => logger.warn({ err: error }, "[Passport type schema event]"));
+  }
+
+  function buildQueryableIndexName(tableName, fieldKey) {
+    const digest = nodeCrypto.createHash("sha1").update(`${tableName}:${fieldKey}`).digest("hex").slice(0, 10);
+    return `idx_${digest}_${fieldKey}`.slice(0, 60);
+  }
+
+  async function ensureQueryableFieldIndex({ tableName, field }) {
+    if (field?.queryable !== true && field?.indexed !== true) return null;
+    const indexName = buildQueryableIndexName(tableName, field.key);
+    if (getPassportFieldDataType(field) === "jsonb") {
+      await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} USING GIN (${field.key})`);
+    } else {
+      await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} (${field.key}) WHERE deleted_at IS NULL`);
+    }
+    return indexName;
+  }
+
+  async function createPassportTable(typeName, { createdBy = null, eventType = "create_or_reconcile_table" } = {}) {
     const tableName = getTable(typeName);
     const typeRes = await pool.query(
       "SELECT fields_json FROM passport_types WHERE type_name = $1",
@@ -1282,7 +1437,7 @@ module.exports = function createPassportService({
     const ddlCols = [];
     for (const section of sections) {
       for (const field of (section.fields || [])) {
-        const colType = field.type === "boolean" ? "BOOLEAN DEFAULT false" : "TEXT";
+        const colType = getPassportFieldColumnType(field);
         ddlCols.push(`    ${field.key} ${colType}`);
       }
     }
@@ -1322,6 +1477,100 @@ module.exports = function createPassportService({
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_lineage ON ${tableName}(lineage_id) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_status ON ${tableName}(release_status) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did ON ${tableName}(company_id, product_identifier_did) WHERE deleted_at IS NULL`);
+
+    const addedColumns = [];
+    const indexedColumns = [];
+    for (const field of flattenTypeFields(typeRes.rows[0].fields_json)) {
+      await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${field.key} ${getPassportFieldColumnType(field)}`);
+      addedColumns.push({
+        key: field.key,
+        dataType: getPassportFieldDataType(field),
+      });
+      const indexName = await ensureQueryableFieldIndex({ tableName, field });
+      if (indexName) indexedColumns.push({ key: field.key, indexName });
+    }
+
+    await recordPassportTypeSchemaEvent({
+      typeName,
+      tableName,
+      schemaVersion: getTypeSchemaVersion(typeRes.rows[0].fields_json),
+      eventType,
+      changeSummary: { ensuredColumns: addedColumns, indexedColumns },
+      createdBy,
+    });
+  }
+
+  async function validatePassportTypeStorage({ repair = false } = {}) {
+    const typeRows = await pool.query("SELECT id, type_name, fields_json FROM passport_types ORDER BY type_name");
+    const results = [];
+
+    for (const typeRow of typeRows.rows) {
+      const tableName = getTable(typeRow.type_name);
+      const tableExists = await pool.query(
+        `SELECT 1
+         FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = $1
+         LIMIT 1`,
+        [tableName]
+      ).then((result) => result.rows.length > 0);
+
+      if (!tableExists) {
+        if (repair) {
+          await createPassportTable(typeRow.type_name);
+          results.push({ typeName: typeRow.type_name, tableName, status: "repaired_missing_table", issues: [] });
+        } else {
+          results.push({ typeName: typeRow.type_name, tableName, status: "failed", issues: [{ type: "missing_table" }] });
+        }
+        continue;
+      }
+
+      const columns = await pool.query(
+        `SELECT column_name, data_type
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1`,
+        [tableName]
+      );
+      const columnMap = new Map(columns.rows.map((row) => [row.column_name, row.data_type]));
+      const issues = [];
+      const expectedFieldKeys = new Set();
+
+      for (const field of flattenTypeFields(typeRow.fields_json)) {
+        expectedFieldKeys.add(field.key);
+        const actualDataType = columnMap.get(field.key);
+        const expectedDataType = getPassportFieldDataType(field);
+        if (!actualDataType) {
+          issues.push({ type: "missing_column", field: field.key, expectedDataType });
+          continue;
+        }
+        const normalizedActual = actualDataType === "boolean" ? "boolean" : actualDataType === "jsonb" ? "jsonb" : "text";
+        if (normalizedActual !== expectedDataType) {
+          issues.push({ type: "column_type_mismatch", field: field.key, expectedDataType, actualDataType });
+        }
+      }
+
+      for (const columnName of columnMap.keys()) {
+        if (LIVE_PASSPORT_SYSTEM_COLUMNS.has(columnName) || expectedFieldKeys.has(columnName)) continue;
+        issues.push({ type: "extra_column", field: columnName });
+      }
+
+      if (repair && issues.some((issue) => issue.type === "missing_column")) {
+        await createPassportTable(typeRow.type_name);
+      }
+
+      results.push({
+        typeName: typeRow.type_name,
+        tableName,
+        schemaVersion: getTypeSchemaVersion(typeRow.fields_json),
+        status: issues.length ? "failed" : "ok",
+        issues,
+      });
+    }
+
+    return {
+      success: results.every((result) => result.status === "ok" || result.status === "repaired_missing_table"),
+      checked: results.length,
+      results,
+    };
   }
 
   async function queryTableStats(typeName, companyId = null) {
@@ -1527,7 +1776,12 @@ module.exports = function createPassportService({
     listActiveEditSessions,
     markOlderVersionsObsolete,
     getLatestCompanyPassports,
+    normalizePassportTypeSchema,
+    getTypeSchemaVersion,
+    buildPassportTypeSchemaChange,
+    passportTypeHasStoredRecords,
     createPassportTable,
+    validatePassportTypeStorage,
     queryTableStats,
     submitPassportToWorkflow,
   };

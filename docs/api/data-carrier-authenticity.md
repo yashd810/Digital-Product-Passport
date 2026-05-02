@@ -17,6 +17,8 @@ Supported fields:
 - `antiCounterfeitInstructions`
 - `safetyWarnings`
 - `qrPrintSpecification`
+- `dataCarrierPlacementRules`
+- `dataCarrierVerificationEvidence`
 
 These fields are stored per passport in `carrier_authenticity` and are exposed in:
 
@@ -61,6 +63,51 @@ The QR generation flow also records a `qrPrintSpecification` so the carrier meta
 - HRI text
 - graphical DPP marking
 - source-image quality checks
+- print asset expectations, including 300 DPI monochrome PNG guidance
+- placement, HRI, durability, and representative scanner-test policies
+
+If a supplied `qrPrintSpecification` fails the minimum source rules, `POST /api/passports/:dppId/qrcode` rejects it. Current enforced checks include:
+
+- quiet zone must be at least 4 modules
+- source image module size must be at least 4 pixels when `modulePixelSize` is supplied
+- every supplied `qualityChecks[]` item must pass
+
+## Physical verification evidence
+
+The platform stores the results of physical checks; it does not replace the physical verification itself.
+
+Record evidence with:
+
+```http
+POST /api/companies/:companyId/passports/:dppId/data-carrier-verifications
+```
+
+Example request:
+
+```json
+{
+  "printGrade": "A",
+  "gradingStandard": "ISO/IEC 15415",
+  "verifierDevice": "Axicon 15000",
+  "verifierSerialNumber": "AX-12345",
+  "labelSpecificationId": "LBL-BAT-QR-01",
+  "hriPlacement": "below_qr",
+  "scannerTests": [
+    { "device": "iPhone camera", "result": "pass", "distanceMm": 250 },
+    { "device": "warehouse handheld scanner", "result": "pass", "angleDegrees": 35 }
+  ],
+  "durabilityTests": [
+    { "method": "abrasion", "result": "pass", "cycles": 100 }
+  ],
+  "placementChecks": [
+    { "rule": "primary_packaging_front_panel", "result": "pass" }
+  ],
+  "evidenceUris": ["repository://label-verification/report-001.pdf"],
+  "notes": "Initial production label run."
+}
+```
+
+The response returns the stored `verification` record and the updated carrier metadata. The same record is also logged as a `data_carrier_verification` security event and exposed through the existing security-events endpoint for authenticated company users.
 
 ## Compatibility profiles
 

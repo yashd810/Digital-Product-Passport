@@ -1,51 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- ClarosDPP Sitemap — update https://clarosdpp.com to your domain before deployment -->
+<!-- ClarosDPP Sitemap — update https://claros-dpp.online to your domain before deployment -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
   <url>
-    <loc>https://clarosdpp.com/</loc>
+    <loc>https://claros-dpp.online/</loc>
     <lastmod>2026-04-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
-    <loc>https://clarosdpp.com/product.html</loc>
+    <loc>https://claros-dpp.online/product.html</loc>
     <lastmod>2026-04-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.92</priority>
   </url>
 
   <url>
-    <loc>https://clarosdpp.com/services.html</loc>
+    <loc>https://claros-dpp.online/services.html</loc>
     <lastmod>2026-04-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://clarosdpp.com/timeline.html</loc>
+    <loc>https://claros-dpp.online/timeline.html</loc>
     <lastmod>2026-04-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://clarosdpp.com/about.html</loc>
+    <loc>https://claros-dpp.online/about.html</loc>
     <lastmod>2026-04-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://clarosdpp.com/sample-passport.html</loc>
+    <loc>https://claros-dpp.online/sample-passport.html</loc>
     <lastmod>2026-04-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
   </url>
 
   <url>
-    <loc>https://clarosdpp.com/contact.html</loc>
+    <loc>https://claros-dpp.online/contact.html</loc>
     <lastmod>2025-03-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

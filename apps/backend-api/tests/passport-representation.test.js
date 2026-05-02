@@ -48,7 +48,7 @@ describe("passport representation service", () => {
     expect(payload.dppSchemaVersion).toBe("prEN 18223:2025");
     expect(payload.contentSpecificationIds).toEqual(["claros_battery_dictionary_v1"]);
     expect(payload.facilityId).toBe("FAC-01");
-    expect(payload.lastUpdated).toBe("2026-04-27T10:00:00.000Z");
+    expect(payload.lastUpdate).toBe("2026-04-27T10:00:00.000Z");
     expect(payload.extensions).toMatchObject({
       claros: {
         passportType: "battery",

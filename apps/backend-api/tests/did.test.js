@@ -79,4 +79,26 @@ describe("DID routes", () => {
       "did:web:www.claros-dpp.online:did:dpp:model:BAT-2026-001",
     ]);
   });
+
+  test("supports batch subject DID document URLs", async () => {
+    const didService = createDidService({
+      didDomain: "www.claros-dpp.online",
+      publicOrigin: "https://www.claros-dpp.online",
+      apiOrigin: "https://api.claros.test",
+    });
+
+    const did = didService.generateBatchDid("battery", "BATCH-2026-001");
+    expect(did).toBe("did:web:www.claros-dpp.online:did:battery:batch:BATCH-2026-001");
+    expect(didService.parseDid(did)).toMatchObject({
+      entityType: "batch",
+      passportType: "battery",
+      stableId: "BATCH-2026-001",
+    });
+    expect(didService.didToDocumentUrl(did)).toBe(
+      "https://www.claros-dpp.online/did/battery/batch/BATCH-2026-001/did.json"
+    );
+    expect(didService.publicUrlToSubjects("https://www.claros-dpp.online/did/battery/batch/BATCH-2026-001/did.json")).toEqual([
+      "did:web:www.claros-dpp.online:did:battery:batch:BATCH-2026-001",
+    ]);
+  });
 });

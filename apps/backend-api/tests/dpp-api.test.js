@@ -395,7 +395,7 @@ function createTestApp(options = {}) {
       dppDid: "did:web:www.example.test:did:dpp:item:legacy",
       companyDid: "did:web:www.example.test:did:company:5",
       contentSpecificationIds: ["claros_battery_dictionary_v1"],
-      lastUpdated: passport.updated_at || passport.created_at || "2026-04-27T10:00:00.000Z",
+      lastUpdate: passport.updated_at || passport.created_at || "2026-04-27T10:00:00.000Z",
       extensions: {
         claros: {
           passportType: "battery",
@@ -425,7 +425,7 @@ function createTestApp(options = {}) {
       dppDid: "did:web:www.example.test:did:dpp:item:legacy",
       companyDid: "did:web:www.example.test:did:company:5",
       contentSpecificationIds: ["claros_battery_dictionary_v1"],
-      lastUpdated: passport.updated_at || passport.created_at || "2026-04-27T10:00:00.000Z",
+      lastUpdate: passport.updated_at || passport.created_at || "2026-04-27T10:00:00.000Z",
       extensions: {
         claros: {
           passportType: "battery",
@@ -868,6 +868,23 @@ describe("DPP standards API", () => {
     });
   });
 
+  test("POST /api/v1/dppsByProductIds requires canonical productId request key", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dppsByProductIds",
+      body: {
+        productIdentifiers: ["BAT-2026-001"],
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toMatchObject({
+      error: "productId must be a non-empty array",
+    });
+  });
+
   test("POST /api/v1/dppsByProductIds supports cursor pagination", async () => {
     const app = createTestApp();
 
@@ -912,6 +929,23 @@ describe("DPP standards API", () => {
       productIdentifier: "UNKNOWN-001",
       found: false,
       error: "NOT_FOUND",
+    });
+  });
+
+  test("POST /api/v1/dppsByProductIds/search requires canonical productId request key", async () => {
+    const app = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/v1/dppsByProductIds/search",
+      body: {
+        productIdentifiers: ["BAT-2026-001"],
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toMatchObject({
+      error: "productId must be a non-empty array",
     });
   });
 

@@ -30,7 +30,6 @@ const DPP_CONTEXT = {
   granularity: "dpp:granularity",
   dppSchemaVersion: "dpp:dppSchemaVersion",
   dppStatus: "dpp:dppStatus",
-  lastUpdated: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
   lastUpdate: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
   economicOperatorId: "dpp:economicOperatorId",
   facilityId: "dpp:facilityId",

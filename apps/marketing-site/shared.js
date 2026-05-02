@@ -129,7 +129,7 @@
       </div>
       <div class="footer-bottom">
         <p>© 2025 ClarosDPP. All rights reserved. Registered in the European Union.</p>
-        <p>hello@clarosdpp.com &nbsp;|&nbsp; +xx xxxx xxxx</p>
+        <p>hello@claros-dpp.online &nbsp;|&nbsp; +xx xxxx xxxx</p>
       </div>
     </div>
   </footer>`;

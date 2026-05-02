@@ -1634,7 +1634,7 @@ module.exports = function registerDppApiRoutes(app, {
 
   app.post("/api/v1/dppsByProductIds/search", publicReadRateLimit, async (req, res) => {
     try {
-      const productIdentifiers = normalizeRequestedProductIds(req.body);
+      const productIds = normalizeRequestedProductIds(req.body);
       const companyId = req.body?.companyId !== undefined ? Number.parseInt(req.body.companyId, 10) : null;
       const versionNumber = req.body?.versionNumber !== undefined ? Number.parseInt(req.body.versionNumber, 10) : null;
       const representation = getRepresentationFromValue(req.body?.representation);
@@ -1642,10 +1642,10 @@ module.exports = function registerDppApiRoutes(app, {
       const limit = parseBatchLimit(req.body?.limit);
       const offset = decodeBatchCursor(req.body?.cursor);
 
-      if (!productIdentifiers.length) {
+      if (!productIds.length) {
         return res.status(400).json({ error: "productId must be a non-empty array" });
       }
-      if (productIdentifiers.length > 1000) {
+      if (productIds.length > 1000) {
         return res.status(400).json({ error: "productId may contain at most 1000 entries" });
       }
       if (req.body?.companyId !== undefined && !Number.isFinite(companyId)) {
@@ -1662,9 +1662,9 @@ module.exports = function registerDppApiRoutes(app, {
       }
 
       const results = [];
-      const pageProductIdentifiers = productIdentifiers.slice(offset, offset + limit);
-      for (const productIdentifier of pageProductIdentifiers) {
-        results.push(await buildBatchLookupResult(productIdentifier, {
+      const pageProductIds = productIds.slice(offset, offset + limit);
+      for (const productId of pageProductIds) {
+        results.push(await buildBatchLookupResult(productId, {
           companyId,
           versionNumber,
           representation,
@@ -1678,7 +1678,7 @@ module.exports = function registerDppApiRoutes(app, {
         format: wantsJsonLd ? "jsonld" : "json",
         limit,
         cursor: req.body?.cursor || null,
-        nextCursor: offset + limit < productIdentifiers.length ? encodeBatchCursor(offset + limit) : null,
+        nextCursor: offset + limit < productIds.length ? encodeBatchCursor(offset + limit) : null,
         results
       });
     } catch (e) {
@@ -2475,6 +2475,25 @@ module.exports = function registerDppApiRoutes(app, {
       return res.redirect(301, `/did/battery/item/${encodeURIComponent(target.stableId)}/did.json`);
     } catch (e) {
       logger.error({ err: e }, "[Battery Item DID]");
+      res.status(500).json({ error: "Failed to resolve DID document" });
+    }
+  });
+
+  // ─── GET /did/battery/batch/:companyId/:productId/did.json ────────────────
+  // Legacy batch DID URL. Redirect to lineage-based DID doc.
+  app.get("/did/battery/batch/:companyId/:productId/did.json", async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const productId = decodeURIComponent(req.params.productId);
+      if (!productId) return res.status(400).json({ error: "productId is required" });
+
+      const target = await resolveLegacyPassportDidTarget(companyId, productId, "batch");
+      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
+      return res.redirect(301, `/did/battery/batch/${encodeURIComponent(target.stableId)}/did.json`);
+    } catch (e) {
+      logger.error({ err: e }, "[Battery Batch DID]");
       res.status(500).json({ error: "Failed to resolve DID document" });
     }
   });

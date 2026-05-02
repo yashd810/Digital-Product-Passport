@@ -132,7 +132,7 @@ export function usePassportListActions({
           url: passportUrl,
           granularity: passport.granularity || "item",
           width: qrSize,
-          margin: 1,
+          margin: 4,
           color: {
             dark: isBlackAndWhite ? "#000000" : (format === "jpeg" ? "#0b1826" : "#f0f6fa"),
             light: background,

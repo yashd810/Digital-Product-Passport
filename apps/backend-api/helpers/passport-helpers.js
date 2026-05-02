@@ -367,7 +367,9 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
           companyId: company.id,
           productDid: granularity === "item"
             ? didService.generateItemDid("battery", stableId)
-            : didService.generateModelDid("battery", stableId),
+            : granularity === "batch"
+              ? didService.generateBatchDid("battery", stableId)
+              : didService.generateModelDid("battery", stableId),
           dppDid: didService.generateDppDid(granularity, stableId),
           companyDid: didService.generateCompanyDid(companySlug),
           facilityDid: facilityStableId ? didService.generateFacilityDid(facilityStableId) : null,

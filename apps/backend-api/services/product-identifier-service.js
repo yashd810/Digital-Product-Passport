@@ -46,9 +46,13 @@ function createProductIdentifierService({ didService, pool = null }) {
     const normalizedPassportType = didService.normalizePassportTypeSegment(passportType || "battery");
     const normalizedGranularity = normalizeGranularity(granularity);
 
-    return normalizedGranularity === "model"
-      ? didService.generateModelDid(normalizedPassportType, stableId)
-      : didService.generateItemDid(normalizedPassportType, stableId);
+    if (normalizedGranularity === "model") {
+      return didService.generateModelDid(normalizedPassportType, stableId);
+    }
+    if (normalizedGranularity === "batch") {
+      return didService.generateBatchDid(normalizedPassportType, stableId);
+    }
+    return didService.generateItemDid(normalizedPassportType, stableId);
   }
 
   function normalizeProductIdentifiers({

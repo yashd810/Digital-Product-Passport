@@ -79,7 +79,7 @@ test("preserves typed field values and required headers", () => {
   assert.strictEqual(payload.subjectDid, "did:web:www.claros-dpp.online:did:battery:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
   assert.strictEqual(payload.dppDid, "did:web:www.claros-dpp.online:did:dpp:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
   assert.strictEqual(payload.companyDid, "did:web:www.claros-dpp.online:did:company:example-corp");
-  assert.strictEqual(payload.lastUpdated, "2026-04-24T10:00:00.000Z");
+  assert.strictEqual(payload.lastUpdate, "2026-04-24T10:00:00.000Z");
   assert.strictEqual(payload.extensions.claros.versionNumber, 3);
   assert.strictEqual(payload.extensions.claros.passportType, "generic_passport");
   assert.strictEqual(payload.extensions.claros.internalId, "dpp_fff9372d-6405-4207-9ed2-808426a3151c");

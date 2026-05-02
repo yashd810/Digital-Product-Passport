@@ -80,3 +80,11 @@ Lifecycle semantics:
 - `DELETE /api/v1/dpps/:dppId` is intentionally limited to editable draft/in-revision DPP rows.
 - Released live DPPs should use `POST /api/v1/dpps/:dppId/archive` as the standards-facing end-of-life lifecycle action.
 - The archive action preserves released history in `passport_archives` instead of treating active DPP retirement as a draft delete.
+
+Batch lookup semantics:
+- `POST /api/v1/dppsByProductIds` and `/api/v1/dppsByProductIds/search` use `productId` as the canonical request key.
+- A request can contain up to 1000 product IDs, while `limit` caps each response page to at most 100 returned identifiers or lookup results.
+
+Field naming:
+- Standards-facing DPP payloads use `lastUpdate` as the canonical external timestamp field.
+- Internal database rows still use `updated_at`; legacy `lastUpdated` inputs should be mapped to `lastUpdate` before leaving the API boundary.

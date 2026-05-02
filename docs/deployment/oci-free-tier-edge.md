@@ -135,4 +135,6 @@ This repo can document and prepare the deployment path, but the actual proof of 
 - backend health status
 - DNS and public HTTPS behavior
 
+Express/Node application code is not the compliance boundary for TLS or HTTP/2. The public ingress layer must terminate or pass through HTTPS in a way that enforces TLS `1.2+` and negotiates HTTP/2 or newer, then the live endpoint must be verified after deployment.
+
 So the codebase can support secure communication, but deployment evidence is still needed for a formal assessment.

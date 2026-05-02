@@ -50,7 +50,7 @@ describe("canonical passport JSON", () => {
     expect(payload.fields.is_remanufactured).toBe(true);
     expect(payload.fields.chemistry_breakdown).toEqual({ nickel: 60, manganese: 20, cobalt: 20 });
     expect(payload.fields.certifications).toEqual(["CE", "UL"]);
-    expect(payload.lastUpdated).toBe("2026-04-24T12:00:00.000Z");
+    expect(payload.lastUpdate).toBe("2026-04-24T12:00:00.000Z");
     expect(payload.extensions).toMatchObject({
       claros: {
         passportType: "battery",
@@ -92,6 +92,33 @@ describe("canonical passport JSON", () => {
     );
 
     expect(payload.dppStatus).toBe("Inactive");
+  });
+
+  test("uses batch subject DID for batch-granularity passports", () => {
+    const didService = createDidService({
+      didDomain: "www.claros-dpp.online",
+      publicOrigin: "https://www.claros-dpp.online",
+      apiOrigin: "https://api.claros.test",
+    });
+    const serializer = createCanonicalPassportSerializer({ didService });
+    const payload = serializer.buildCanonicalPassportPayload(
+      {
+        guid: "batch-passport-001",
+        lineage_id: "batch-lineage-001",
+        company_id: 5,
+        passport_type: "battery",
+        product_id: "BATCH-2026-001",
+        granularity: "batch",
+        release_status: "released",
+        updated_at: "2026-04-24T12:00:00.000Z",
+      },
+      { type_name: "battery", fields_json: { sections: [] } },
+      { company: { company_name: "Acme Energy", did_slug: "acme-energy" } }
+    );
+
+    expect(payload.granularity).toBe("Batch");
+    expect(payload.subjectDid).toBe("did:web:www.claros-dpp.online:did:battery:batch:batch-lineage-001");
+    expect(payload.dppDid).toBe("did:web:www.claros-dpp.online:did:dpp:batch:batch-lineage-001");
   });
 
   test("builds expanded Annex A-style elements for full representations", () => {

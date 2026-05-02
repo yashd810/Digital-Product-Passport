@@ -399,7 +399,7 @@ const MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS = {
   dpp_granularity: ({ canonicalPayload, passport }) =>
     canonicalPayload?.granularity || passport?.granularity || null,
   last_updated_at: ({ canonicalPayload, passport }) =>
-    canonicalPayload?.lastUpdated || canonicalPayload?.lastUpdate || passport?.updated_at || passport?.created_at || null,
+    canonicalPayload?.lastUpdate || canonicalPayload?.lastUpdated || passport?.updated_at || passport?.created_at || null,
   unique_dpp_identifier: ({ canonicalPayload }) =>
     canonicalPayload?.digitalProductPassportId || canonicalPayload?.dppDid || null,
   unique_passport_identifier: ({ canonicalPayload }) =>

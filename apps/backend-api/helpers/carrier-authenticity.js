@@ -14,6 +14,8 @@ const FIELD_MAPPINGS = [
   { canonical: "antiCounterfeitInstructions", snake: "anti_counterfeit_instructions", camel: "antiCounterfeitInstructions" },
   { canonical: "safetyWarnings", snake: "safety_warnings", camel: "safetyWarnings" },
   { canonical: "qrPrintSpecification", snake: "qr_print_specification", camel: "qrPrintSpecification" },
+  { canonical: "dataCarrierPlacementRules", snake: "data_carrier_placement_rules", camel: "dataCarrierPlacementRules" },
+  { canonical: "dataCarrierVerificationEvidence", snake: "data_carrier_verification_evidence", camel: "dataCarrierVerificationEvidence" },
 ];
 
 function isPlainObject(value) {
@@ -71,6 +73,50 @@ function normalizeSignedCarrierPayload(value) {
   return value;
 }
 
+function normalizeObjectArray(value) {
+  if (value === null || value === undefined) return null;
+  let items = value;
+  if (typeof items === "string") {
+    const parsed = parseJsonLikeString(items);
+    items = Array.isArray(parsed) ? parsed : [parsed];
+  }
+  if (!Array.isArray(items)) items = [items];
+  const normalized = items.filter(isPlainObject);
+  return normalized.length ? normalized : null;
+}
+
+function normalizePlacementRules(value) {
+  if (value === null || value === undefined) return null;
+  if (isPlainObject(value)) return value;
+  const parsed = parseJsonLikeString(value);
+  return isPlainObject(parsed) ? parsed : null;
+}
+
+function validateQrPrintSpecification(value) {
+  if (!isPlainObject(value)) return { valid: true, errors: [] };
+
+  const errors = [];
+  const quietZone = Number(value.quietZoneModules ?? value.quiet_zone_modules);
+  if (Number.isFinite(quietZone) && quietZone < 4) {
+    errors.push("qrPrintSpecification.quietZoneModules must be at least 4");
+  }
+
+  const modulePixels = Number(value.modulePixelSize ?? value.module_pixel_size);
+  if (Number.isFinite(modulePixels) && modulePixels < 4) {
+    errors.push("qrPrintSpecification.modulePixelSize must be at least 4 for print-source exports");
+  }
+
+  const qualityChecks = Array.isArray(value.qualityChecks) ? value.qualityChecks : [];
+  const failedChecks = qualityChecks
+    .filter((check) => isPlainObject(check) && check.passed === false)
+    .map((check) => normalizeOptionalText(check.key) || "quality_check");
+  if (failedChecks.length) {
+    errors.push(`qrPrintSpecification has failed quality checks: ${failedChecks.join(", ")}`);
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 function parseStoredCarrierAuthenticity(value) {
   if (!value) return null;
   if (isPlainObject(value)) return value;
@@ -122,6 +168,18 @@ function normalizeCarrierAuthenticityMetadata(value) {
         const parsed = parseJsonLikeString(rawValue);
         if (isPlainObject(parsed)) normalized[field.canonical] = parsed;
       }
+      continue;
+    }
+
+    if (field.canonical === "dataCarrierPlacementRules") {
+      const normalizedValue = normalizePlacementRules(rawValue);
+      if (normalizedValue) normalized[field.canonical] = normalizedValue;
+      continue;
+    }
+
+    if (field.canonical === "dataCarrierVerificationEvidence") {
+      const normalizedValue = normalizeObjectArray(rawValue);
+      if (normalizedValue) normalized[field.canonical] = normalizedValue;
       continue;
     }
 
@@ -186,6 +244,14 @@ function extractCarrierAuthenticityMutation(source = {}) {
       if (!isPlainObject(updates[field.canonical])) updates[field.canonical] = null;
       continue;
     }
+    if (field.canonical === "dataCarrierPlacementRules") {
+      updates[field.canonical] = normalizePlacementRules(rawValue);
+      continue;
+    }
+    if (field.canonical === "dataCarrierVerificationEvidence") {
+      updates[field.canonical] = normalizeObjectArray(rawValue);
+      continue;
+    }
 
     updates[field.canonical] = normalizeOptionalText(rawValue);
   }
@@ -227,6 +293,7 @@ module.exports = {
   FIELD_MAPPINGS,
   parseStoredCarrierAuthenticity,
   normalizeCarrierAuthenticityMetadata,
+  validateQrPrintSpecification,
   extractCarrierAuthenticityMutation,
   applyCarrierAuthenticityMutation,
   buildCarrierAuthenticityResponseFields,

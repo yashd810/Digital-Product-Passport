@@ -26,23 +26,76 @@ async function ensureSchemaMigrationsTable(pool) {
 }
 
 async function runMigration(pool, migrationId, handler) {
-  const existing = await pool.query(
-    `SELECT 1
-     FROM schema_migrations
-     WHERE id = $1
-     LIMIT 1`,
-    [migrationId]
-  );
-  if (existing.rows.length) return false;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const existing = await client.query(
+      `SELECT 1
+       FROM schema_migrations
+       WHERE id = $1
+       LIMIT 1
+       FOR UPDATE`,
+      [migrationId]
+    );
+    if (existing.rows.length) {
+      await client.query("COMMIT");
+      return false;
+    }
 
-  await handler();
-  await pool.query(
-    `INSERT INTO schema_migrations (id)
-     VALUES ($1)
-     ON CONFLICT (id) DO NOTHING`,
-    [migrationId]
-  );
-  return true;
+    await handler(client);
+    await client.query(
+      `INSERT INTO schema_migrations (id)
+       VALUES ($1)
+       ON CONFLICT (id) DO NOTHING`,
+      [migrationId]
+    );
+    await client.query("COMMIT");
+    return true;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function addPassportRegistryForeignKey(pool, {
+  tableName,
+  columnName = "passport_dpp_id",
+  constraintName,
+  nullable = false,
+  onDelete = "CASCADE",
+}) {
+  await pool.query(`
+    DO $$
+    DECLARE orphan_count INTEGER;
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = '${constraintName}'
+      ) THEN
+        SELECT COUNT(*) INTO orphan_count
+        FROM ${tableName} child
+        LEFT JOIN passport_registry parent ON parent.dpp_id = child.${columnName}
+        WHERE child.${columnName} IS NOT NULL
+          AND parent.dpp_id IS NULL;
+
+        IF orphan_count > 0 THEN
+          RAISE EXCEPTION 'Cannot add ${constraintName}: % orphan row(s) in ${tableName}.${columnName}', orphan_count;
+        END IF;
+
+        ALTER TABLE ${tableName}
+          ADD CONSTRAINT ${constraintName}
+          FOREIGN KEY (${columnName}) REFERENCES passport_registry(dpp_id) ON DELETE ${onDelete};
+      END IF;
+    END $$;
+  `);
+
+  if (!nullable) {
+    await pool.query(`
+      ALTER TABLE ${tableName}
+      ALTER COLUMN ${columnName} SET NOT NULL
+    `).catch(() => {});
+  }
 }
 
 async function truncateTableIfExists(pool, tableName) {
@@ -110,8 +163,8 @@ async function initDb(pool, {
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS economic_operator_identifier_scheme VARCHAR(80)
   `);
-    await runMigration(pool, "2026-04-27.backfill-company-did-slugs", async () => {
-      const companyRows = await pool.query(`
+    await runMigration(pool, "2026-04-27.backfill-company-did-slugs", async (db) => {
+      const companyRows = await db.query(`
         SELECT id, company_name, did_slug
         FROM companies
         ORDER BY id ASC
@@ -131,7 +184,7 @@ async function initDb(pool, {
           nextSlug = `${baseSlug}-${suffix++}`;
         }
         usedSlugs.add(nextSlug);
-        await pool.query(
+        await db.query(
           `UPDATE companies
            SET did_slug = $1,
                updated_at = NOW()
@@ -412,8 +465,8 @@ async function initDb(pool, {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS otp_code_hash TEXT
   `);
-  await runMigration(pool, "2026-04-27.backfill-otp-code-hash", async () => {
-    const otpRows = await pool.query(`
+  await runMigration(pool, "2026-04-27.backfill-otp-code-hash", async (db) => {
+    const otpRows = await db.query(`
       SELECT id, otp_code
       FROM users
       WHERE otp_code IS NOT NULL
@@ -425,7 +478,7 @@ async function initDb(pool, {
       const otpHash = /^[a-f0-9]{64}$/i.test(rawOtp)
         ? rawOtp.toLowerCase()
         : require("crypto").createHash("sha256").update(rawOtp).digest("hex");
-      await pool.query(
+      await db.query(
         `UPDATE users
          SET otp_code_hash = $1,
              updated_at = NOW()
@@ -513,6 +566,36 @@ async function initDb(pool, {
     )
   `);
   await pool.query(`
+    UPDATE passport_types
+    SET fields_json = jsonb_set(
+      CASE
+        WHEN jsonb_typeof(fields_json) = 'object' THEN fields_json
+        ELSE '{"sections":[]}'::jsonb
+      END,
+      '{schemaVersion}',
+      COALESCE(fields_json->'schemaVersion', '1'::jsonb),
+      true
+    )
+    WHERE fields_json->'schemaVersion' IS NULL
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_type_schema_events (
+      id                SERIAL PRIMARY KEY,
+      passport_type_id  INTEGER REFERENCES passport_types(id) ON DELETE SET NULL,
+      type_name         VARCHAR(100) NOT NULL,
+      table_name        VARCHAR(140) NOT NULL,
+      schema_version    INTEGER NOT NULL DEFAULT 1,
+      event_type        VARCHAR(60) NOT NULL,
+      change_summary    JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_type_schema_events_type
+      ON passport_type_schema_events(type_name, created_at DESC)
+  `);
+  await pool.query(`
     ALTER TABLE passport_types
     ADD COLUMN IF NOT EXISTS semantic_model_key VARCHAR(100)
   `);
@@ -536,8 +619,8 @@ async function initDb(pool, {
       OR semantic_model_key = '${BATTERY_DICTIONARY_MODEL_KEY}'
     )
   `);
-  await runMigration(pool, "2026-04-29.reset-passport-domain-data", async () => {
-    const typedPassportTables = await pool.query(`
+  await runMigration(pool, "2026-04-29.reset-passport-domain-data", async (db) => {
+    const typedPassportTables = await db.query(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
@@ -547,7 +630,7 @@ async function initDb(pool, {
     `).catch(() => ({ rows: [] }));
 
     for (const { table_name } of typedPassportTables.rows) {
-      await pool.query(`DROP TABLE IF EXISTS ${table_name} CASCADE`).catch(() => {});
+      await db.query(`DROP TABLE IF EXISTS ${table_name} CASCADE`).catch(() => {});
     }
 
     for (const tableName of [
@@ -569,10 +652,10 @@ async function initDb(pool, {
       "dpp_subject_registry",
       "passport_type_drafts",
     ]) {
-      await truncateTableIfExists(pool, tableName);
+      await truncateTableIfExists(db, tableName);
     }
 
-    await truncateTableIfExists(pool, "passport_types");
+    await truncateTableIfExists(db, "passport_types");
   });
 
   await pool.query(`
@@ -1074,8 +1157,8 @@ async function initDb(pool, {
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1
   `);
-  await runMigration(pool, "2026-04-27.backfill-user-session-version", async () => {
-    await pool.query(`
+  await runMigration(pool, "2026-04-27.backfill-user-session-version", async (db) => {
+    await db.query(`
       UPDATE users
       SET session_version = 1
       WHERE session_version IS NULL OR session_version < 1
@@ -1412,8 +1495,8 @@ async function initDb(pool, {
       );
 
       if (productIdentifierService) {
-        await runMigration(pool, `2026-04-27.backfill-product-identifier-did.${type_name}`, async () => {
-          const liveRows = await pool.query(
+        await runMigration(pool, `2026-04-27.backfill-product-identifier-did.${type_name}`, async (db) => {
+          const liveRows = await db.query(
             `SELECT id, company_id, product_id, granularity
              FROM ${tableName}
              WHERE deleted_at IS NULL
@@ -1428,7 +1511,7 @@ async function initDb(pool, {
               granularity: row.granularity || "item",
             });
             if (!canonicalDid) continue;
-            await pool.query(
+            await db.query(
               `UPDATE ${tableName}
                SET product_identifier_did = $1
                WHERE id = $2`,
@@ -1436,7 +1519,7 @@ async function initDb(pool, {
             );
           }
 
-          const archiveRows = await pool.query(
+          const archiveRows = await db.query(
             `SELECT id, company_id, product_id, row_data
              FROM passport_archives
              WHERE passport_type = $1
@@ -1453,7 +1536,7 @@ async function initDb(pool, {
               granularity: rowData?.granularity || "item",
             });
             if (!canonicalDid) continue;
-            await pool.query(
+            await db.query(
               `UPDATE passport_archives
                SET product_identifier_did = $1
                WHERE id = $2`,
@@ -1467,24 +1550,26 @@ async function initDb(pool, {
     }
   }
 
-  await runMigration(pool, "2026-04-28.textual-dpp-record-ids", async () => {
+  await runMigration(pool, "2026-04-28.textual-dpp-record-ids", async (db) => {
     const constrainedTables = [
       ["passport_access_grants", "passport_access_grants_passport_dpp_id_fkey"],
       ["passport_scan_events", "passport_scan_events_passport_dpp_id_fkey"],
       ["passport_security_events", "passport_security_events_passport_dpp_id_fkey"],
       ["passport_backup_replications", "passport_backup_replications_passport_dpp_id_fkey"],
+      ["backup_public_handovers", "backup_public_handovers_passport_dpp_id_fkey"],
       ["passport_dynamic_values", "passport_dynamic_values_passport_dpp_id_fkey"],
       ["passport_attachments", "passport_attachments_passport_dpp_id_fkey"],
     ];
     for (const [tableName, constraintName] of constrainedTables) {
-      await pool.query(
+      await db.query(
         `ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${constraintName}`
-      ).catch(() => {});
+      );
     }
 
     const sharedTables = [
       ["dpp_registry_registrations", ["passport_dpp_id"]],
       ["passport_backup_replications", ["passport_dpp_id", "lineage_id"]],
+      ["backup_public_handovers", ["passport_dpp_id", "lineage_id"]],
       ["passport_registry", ["dpp_id", "lineage_id"]],
       ["passport_access_grants", ["passport_dpp_id"]],
       ["passport_scan_events", ["passport_dpp_id"]],
@@ -1501,43 +1586,43 @@ async function initDb(pool, {
 
     for (const [tableName, columns] of sharedTables) {
       for (const columnName of columns) {
-        await pool.query(
+        await db.query(
           `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} DROP DEFAULT`
-        ).catch(() => {});
-        await pool.query(
+        );
+        await db.query(
           `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE TEXT USING ${columnName}::text`
-        ).catch(() => {});
+        );
       }
     }
 
-    const typedPassportRows = await pool.query("SELECT type_name FROM passport_types");
+    const typedPassportRows = await db.query("SELECT type_name FROM passport_types");
     for (const { type_name } of typedPassportRows.rows) {
       const tableName = getTable(type_name);
       for (const columnName of ["dpp_id", "lineage_id"]) {
-        await pool.query(
+        await db.query(
           `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} DROP DEFAULT`
-        ).catch(() => {});
-        await pool.query(
+        );
+        await db.query(
           `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE TEXT USING ${columnName}::text`
-        ).catch(() => {});
+        );
       }
     }
 
-    await pool.query(`
+    await db.query(`
       UPDATE passport_registry
       SET lineage_id = dpp_id
       WHERE lineage_id IS NULL OR TRIM(lineage_id) = ''
-    `).catch(() => {});
-    await pool.query(`
+    `);
+    await db.query(`
       UPDATE passport_archives
       SET lineage_id = dpp_id
       WHERE lineage_id IS NULL OR TRIM(lineage_id) = ''
-    `).catch(() => {});
+    `);
   });
 
   try {
-    await runMigration(pool, "2026-04-27.finalize-din-spec-carbon-footprint-column", async () => {
-      const legacyDinSpecCol = await pool.query(`
+    await runMigration(pool, "2026-04-27.finalize-din-spec-carbon-footprint-column", async (db) => {
+      const legacyDinSpecCol = await db.query(`
         SELECT 1
         FROM information_schema.columns
         WHERE table_schema = 'public'
@@ -1548,14 +1633,14 @@ async function initDb(pool, {
 
       if (!legacyDinSpecCol.rows.length) return;
 
-      await pool.query(`
+      await db.query(`
         UPDATE din_spec_99100_passports
         SET carbon_footprint_label_and_performance_class =
           COALESCE(NULLIF(TRIM(carbon_footprint_label_and_performance_class), ''), NULLIF(TRIM(carbon_footprint_performance_class), ''))
         WHERE carbon_footprint_performance_class IS NOT NULL
       `);
 
-      await pool.query(`
+      await db.query(`
         ALTER TABLE din_spec_99100_passports
         DROP COLUMN IF EXISTS carbon_footprint_performance_class
       `);
@@ -1564,8 +1649,8 @@ async function initDb(pool, {
     logger.warn({ err: e }, "Could not finalize DIN SPEC carbon footprint label/performance-class migration");
   }
 
-  await runMigration(pool, "2026-04-27.normalize-workflow-revision-status", async () => {
-    await pool.query(
+  await runMigration(pool, "2026-04-27.normalize-workflow-revision-status", async (db) => {
+    await db.query(
       `UPDATE passport_workflow
        SET previous_release_status = $1
        WHERE previous_release_status = $2`,
@@ -1678,8 +1763,8 @@ async function initDb(pool, {
 
   // ── Fix admin role access ────────────────────────────────────────────────
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "yashd810@gmail.com";
-  await runMigration(pool, "2026-05-02.ensure-admin-super-role", async () => {
-    const adminUser = await pool.query(
+  await runMigration(pool, "2026-05-02.ensure-admin-super-role", async (db) => {
+    const adminUser = await db.query(
       "SELECT id, email, role FROM users WHERE email = $1",
       [ADMIN_EMAIL]
     );
@@ -1687,7 +1772,7 @@ async function initDb(pool, {
     if (adminUser.rows.length > 0) {
       const user = adminUser.rows[0];
       if (user.role !== "super_admin") {
-        await pool.query(
+        await db.query(
           "UPDATE users SET role = $1, updated_at = NOW() WHERE email = $2",
           ["super_admin", ADMIN_EMAIL]
         );
@@ -1761,54 +1846,30 @@ async function initDb(pool, {
       END IF;
     END $$;
   `).catch(() => {});
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'passport_backup_replications_passport_dpp_id_fkey'
-      ) THEN
-        ALTER TABLE passport_backup_replications
-          ADD CONSTRAINT passport_backup_replications_passport_dpp_id_fkey
-          FOREIGN KEY (passport_dpp_id) REFERENCES passport_registry(dpp_id) ON DELETE CASCADE;
-      END IF;
-    END $$;
-  `).catch(() => {});
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'passport_dynamic_values_passport_dpp_id_fkey'
-      ) THEN
-        ALTER TABLE passport_dynamic_values
-          ADD CONSTRAINT passport_dynamic_values_passport_dpp_id_fkey
-          FOREIGN KEY (passport_dpp_id) REFERENCES passport_registry(dpp_id) ON DELETE CASCADE;
-      END IF;
-    END $$;
-  `).catch(() => {});
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'passport_security_events_passport_dpp_id_fkey'
-      ) THEN
-        ALTER TABLE passport_security_events
-          ADD CONSTRAINT passport_security_events_passport_dpp_id_fkey
-          FOREIGN KEY (passport_dpp_id) REFERENCES passport_registry(dpp_id) ON DELETE CASCADE;
-      END IF;
-    END $$;
-  `).catch(() => {});
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'passport_attachments_passport_dpp_id_fkey'
-      ) THEN
-        ALTER TABLE passport_attachments
-          ADD CONSTRAINT passport_attachments_passport_dpp_id_fkey
-          FOREIGN KEY (passport_dpp_id) REFERENCES passport_registry(dpp_id) ON DELETE CASCADE;
-      END IF;
-    END $$;
-  `).catch(() => {});
+  const passportRegistryReferences = [
+    ["dpp_subject_registry", "passport_dpp_id", "dpp_subject_registry_passport_dpp_id_fkey", false],
+    ["dpp_registry_registrations", "passport_dpp_id", "dpp_registry_registrations_passport_dpp_id_fkey", false],
+    ["passport_backup_replications", "passport_dpp_id", "passport_backup_replications_passport_dpp_id_fkey", false],
+    ["backup_public_handovers", "passport_dpp_id", "backup_public_handovers_passport_dpp_id_fkey", false],
+    ["passport_access_grants", "passport_dpp_id", "passport_access_grants_passport_dpp_id_fkey", false],
+    ["passport_scan_events", "passport_dpp_id", "passport_scan_events_passport_dpp_id_fkey", false],
+    ["passport_security_events", "passport_dpp_id", "passport_security_events_passport_dpp_id_fkey", false],
+    ["passport_dynamic_values", "passport_dpp_id", "passport_dynamic_values_passport_dpp_id_fkey", false],
+    ["passport_signatures", "passport_dpp_id", "passport_signatures_passport_dpp_id_fkey", false],
+    ["passport_edit_sessions", "passport_dpp_id", "passport_edit_sessions_passport_dpp_id_fkey", false],
+    ["notifications", "passport_dpp_id", "notifications_passport_dpp_id_fkey", true],
+    ["passport_revision_batch_items", "passport_dpp_id", "passport_revision_batch_items_passport_dpp_id_fkey", false],
+    ["passport_history_visibility", "passport_dpp_id", "passport_history_visibility_passport_dpp_id_fkey", false],
+    ["passport_attachments", "passport_dpp_id", "passport_attachments_passport_dpp_id_fkey", false],
+  ];
+  for (const [tableName, columnName, constraintName, nullable] of passportRegistryReferences) {
+    await addPassportRegistryForeignKey(pool, {
+      tableName,
+      columnName,
+      constraintName,
+      nullable,
+    });
+  }
   } finally {
     await pool.query(`SELECT pg_advisory_unlock($1)`, [SCHEMA_MIGRATION_LOCK_KEY]).catch(() => {});
   }

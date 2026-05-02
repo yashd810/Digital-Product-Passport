@@ -45,7 +45,6 @@ module.exports = function registerPassportPublicRoutes(app, {
       granularity: "dpp:granularity",
       dppSchemaVersion: "dpp:dppSchemaVersion",
       dppStatus: "dpp:dppStatus",
-      lastUpdated: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
       lastUpdate: { "@id": "dpp:lastUpdate", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
       economicOperatorId: "dpp:economicOperatorId",
       facilityId: "dpp:facilityId",
@@ -912,6 +911,21 @@ module.exports = function registerPassportPublicRoutes(app, {
       const loaded = await loadPublicPassportByLineage(req.params.stableId);
       if (!loaded?.passport) return res.status(404).json({ error: "DID not found" });
       const did = didService.generateItemDid("battery", loaded.passport.lineage_id);
+      res.setHeader("Content-Type", "application/did+ld+json");
+      return res.json(buildDidDocument({
+        id: did,
+        service: buildDidServiceEndpoints(loaded.passport, loaded.company?.company_name || "")
+      }));
+    } catch {
+      return res.status(400).json({ error: "Invalid DID path" });
+    }
+  });
+
+  app.get("/did/battery/batch/:stableId/did.json", publicReadRateLimit, async (req, res) => {
+    try {
+      const loaded = await loadPublicPassportByLineage(req.params.stableId);
+      if (!loaded?.passport) return res.status(404).json({ error: "DID not found" });
+      const did = didService.generateBatchDid("battery", loaded.passport.lineage_id);
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({
         id: did,

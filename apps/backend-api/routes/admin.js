@@ -45,7 +45,7 @@ const RESERVED_PASSPORT_FIELD_KEYS = [
 "uniqueProductIdentifier",
 "dppSchemaVersion",
 "dppStatus",
-"lastUpdated",
+"lastUpdate",
 "economicOperatorId",
 "facilityId",
 "contentSpecificationIds",
@@ -95,7 +95,15 @@ module.exports = function registerAdminRoutes(app, {
   verifyPassword,
   logAudit,
   getTable,
+  normalizePassportTypeSchema = ({ sections = [], currentSchemaVersion = 0 } = {}) => ({
+    schemaVersion: Number.parseInt(currentSchemaVersion, 10) > 0 ? Number.parseInt(currentSchemaVersion, 10) : 1,
+    sections: Array.isArray(sections) ? sections : [],
+  }),
+  getTypeSchemaVersion = (fieldsJson = {}) => Number.parseInt(fieldsJson.schemaVersion, 10) || 1,
+  buildPassportTypeSchemaChange = () => ({ added: [], removed: [], typeChanged: [], additive: true }),
+  passportTypeHasStoredRecords = async () => false,
   createPassportTable,
+  validatePassportTypeStorage = null,
   queryTableStats,
   publicReadRateLimit,
   GLOBAL_SYMBOLS_DIR,
@@ -143,6 +151,37 @@ module.exports = function registerAdminRoutes(app, {
       }
     }
     return conflicts;
+  }
+
+  function validatePassportTypeSections(sections) {
+    if (!Array.isArray(sections) || sections.length === 0) {
+      return "At least one section is required";
+    }
+    const seenFieldKeys = new Set();
+    for (const section of sections) {
+      if (!section.key || !section.label || !Array.isArray(section.fields)) {
+        return "Each section must have key, label, and fields array";
+      }
+      if (!/^[a-z][a-z0-9_]{0,199}$/.test(section.key)) {
+        return `Invalid section key: ${section.key}`;
+      }
+      for (const field of section.fields) {
+        if (!field.key || !field.label || !field.type) {
+          return "Each field must have key, label, and type";
+        }
+        if (!/^[a-z][a-z0-9_]{0,199}$/.test(field.key)) {
+          return `Invalid field key: ${field.key}. Field keys must be lowercase letters, numbers, and underscores, and start with a lowercase letter.`;
+        }
+        if (seenFieldKeys.has(field.key)) {
+          return `Duplicate field key: ${field.key}`;
+        }
+        seenFieldKeys.add(field.key);
+        if (!["text", "textarea", "boolean", "file", "table", "url", "date", "symbol"].includes(field.type)) {
+          return `Invalid field type: ${field.type}`;
+        }
+      }
+    }
+    return null;
   }
 
   async function ensureCompanyDppPolicy(companyId) {
@@ -351,7 +390,25 @@ module.exports = function registerAdminRoutes(app, {
             fields: reservedFieldConflicts
           });
         }
-        const fields_json = { sections };
+        const sectionValidationError = validatePassportTypeSections(sections);
+        if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
+        const schemaChange = buildPassportTypeSchemaChange({
+          currentFieldsJson: currentType.fields_json || {},
+          nextSections: sections,
+        });
+        const hasStoredRecords = await passportTypeHasStoredRecords(currentType.type_name);
+        if (hasStoredRecords && !schemaChange.additive) {
+          return res.status(409).json({
+            error: "PASSPORT_TYPE_SCHEMA_CHANGE_REQUIRES_NEW_VERSION",
+            detail: "Passport type fields are additive-only once passports or archives exist. Create a new passport type version for removed fields or storage type changes.",
+            removed: schemaChange.removed,
+            typeChanged: schemaChange.typeChanged,
+          });
+        }
+        const fields_json = normalizePassportTypeSchema({
+          sections,
+          currentSchemaVersion: getTypeSchemaVersion(currentType.fields_json || {}) + 1,
+        });
         updates.push(`fields_json = $${idx++}`);
         vals.push(JSON.stringify(fields_json));
       }
@@ -366,6 +423,13 @@ module.exports = function registerAdminRoutes(app, {
 
       await logAudit(null, req.user.userId, "UPDATE_PASSPORT_TYPE_METADATA", "passport_types", null, null,
       { type_name: existing.rows[0].type_name, updated_fields: updates });
+
+      if (sections !== undefined) {
+        await createPassportTable(currentType.type_name, {
+          createdBy: req.user.userId,
+          eventType: "admin_update_reconcile_table",
+        });
+      }
 
       res.json({ success: true, passportType: r.rows[0] });
     } catch (e) {
@@ -421,28 +485,10 @@ module.exports = function registerAdminRoutes(app, {
         error: "type_name must be lowercase letters/numbers/underscores, 2–100 chars, start with a letter"
       });
 
-      if (!Array.isArray(sections) || sections.length === 0)
-      return res.status(400).json({ error: "At least one section is required" });
-
       enforceBatterySemanticModel({
         umbrellaCategory: umbrella_category,
         semanticModelKey: semantic_model_key || null
       });
-
-      for (const section of sections) {
-        if (!section.key || !section.label || !Array.isArray(section.fields))
-        return res.status(400).json({ error: "Each section must have key, label, and fields array" });
-        if (!/^[a-z][a-z0-9_]{0,199}$/.test(section.key))
-        return res.status(400).json({ error: `Invalid section key: ${section.key}` });
-        for (const field of section.fields) {
-          if (!field.key || !field.label || !field.type)
-          return res.status(400).json({ error: "Each field must have key, label, and type" });
-          if (!/^[a-zA-Z][a-zA-Z0-9_]{0,199}$/.test(field.key))
-          return res.status(400).json({ error: `Invalid field key: ${field.key}` });
-          if (!["text", "textarea", "boolean", "file", "table", "url", "date", "symbol"].includes(field.type))
-          return res.status(400).json({ error: `Invalid field type: ${field.type}` });
-        }
-      }
 
       const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
       if (reservedFieldConflicts.length) {
@@ -452,7 +498,10 @@ module.exports = function registerAdminRoutes(app, {
         });
       }
 
-      const fields_json = { sections };
+      const sectionValidationError = validatePassportTypeSections(sections);
+      if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
+
+      const fields_json = normalizePassportTypeSchema({ sections, currentSchemaVersion: 1 });
 
       const r = await pool.query(
         `INSERT INTO passport_types (type_name, display_name, umbrella_category, umbrella_icon, semantic_model_key, fields_json, created_by)
@@ -466,7 +515,10 @@ module.exports = function registerAdminRoutes(app, {
         [umbrella_category, umbrella_icon || "📋"]
       );
 
-      await createPassportTable(type_name);
+      await createPassportTable(type_name, {
+        createdBy: req.user.userId,
+        eventType: "admin_create_table",
+      });
 
       await logAudit(null, req.user.userId, "CREATE_PASSPORT_TYPE", "passport_types", null, null,
       { type_name, display_name, umbrella_category, semantic_model_key: semantic_model_key || null });

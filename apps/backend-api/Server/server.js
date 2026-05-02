@@ -158,6 +158,9 @@ app.disable("x-powered-by");
 app.set("trust proxy", 1);
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 if (IS_PRODUCTION) app.set("env", "production");
+const RUN_SCHEMA_MIGRATIONS =
+  String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() === "true"
+  || (!IS_PRODUCTION && String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() !== "false");
 
 // Validate required environment variables in production
 if (IS_PRODUCTION) {
@@ -200,8 +203,10 @@ app.use(helmet({
       baseUri: ["'self'"],
       frameAncestors: ["'none'"],
       objectSrc: ["'none'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      scriptSrc: ["'self'"],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", "https:"],
+      styleSrcAttr: ["'none'"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       fontSrc: ["'self'", "data:", "https:"],
       connectSrc: cspConnectSrc,
@@ -256,7 +261,7 @@ app.use("/uploads/symbols", express.static(GLOBAL_SYMBOLS_DIR));
 app.use("/asset-management", (req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Content-Security-Policy", [
-    "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
+    "default-src 'self'", "script-src 'self'", "script-src-attr 'none'", "style-src 'self'", "style-src-attr 'none'",
     "img-src 'self' data:", "font-src 'self' data:", "connect-src 'self'",
     "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'",
   ].join("; "));
@@ -739,7 +744,9 @@ const {
   archivePassportSnapshot, archivePassportSnapshots,
   updatePassportRowById, buildPassportVersionHistory,
   clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
-  getLatestCompanyPassports, createPassportTable, queryTableStats, submitPassportToWorkflow,
+  getLatestCompanyPassports, normalizePassportTypeSchema, getTypeSchemaVersion,
+  buildPassportTypeSchemaChange, passportTypeHasStoredRecords,
+  createPassportTable, validatePassportTypeStorage, queryTableStats, submitPassportToWorkflow,
 } = passportService;
 
 // ─── ASSET SERVICE ───────────────────────────────────────────────────────────
@@ -927,18 +934,36 @@ const backfillLegacyPassportAttachmentLinks = async () => {
 // ─── STARTUP ─────────────────────────────────────────────────────────────────
 process.on("unhandledRejection", (reason) => logger.error({ err: reason }, "[Unhandled Rejection]"));
 
-pool.query("SELECT NOW()")
+async function verifySchemaReady() {
+  await pool.query(`
+    SELECT pr.dpp_id
+    FROM passport_registry pr
+    LIMIT 1
+  `);
+  await pool.query(`
+    SELECT id
+    FROM schema_migrations
+    LIMIT 1
+  `);
+}
+
+const startup = pool.query("SELECT NOW()")
   .then(async () => {
-    await initDb(pool, {
-      getTable,
-      createPassportTable,
-      IN_REVISION_STATUS,
-      LEGACY_IN_REVISION_STATUS,
-      productIdentifierService,
-    });
-    logger.info("[DB] Initialized successfully");
-    await migrateRepositoryFilePaths();
-    await backfillLegacyPassportAttachmentLinks();
+    if (RUN_SCHEMA_MIGRATIONS) {
+      await initDb(pool, {
+        getTable,
+        createPassportTable,
+        IN_REVISION_STATUS,
+        LEGACY_IN_REVISION_STATUS,
+        productIdentifierService,
+      });
+      logger.info("[DB] Initialized successfully");
+      await migrateRepositoryFilePaths();
+      await backfillLegacyPassportAttachmentLinks();
+    } else {
+      await verifySchemaReady();
+      logger.info("[DB] Schema migrations skipped; existing schema verified");
+    }
     await signingService.loadOrGenerateSigningKey();
     assetService.startAssetManagementScheduler();
   })
@@ -981,7 +1006,9 @@ registerAuthRoutes(app, {
 
 registerAdminRoutes(app, {
   pool, multer, authenticateToken, isSuperAdmin, checkCompanyAccess, verifyPassword,
-  logAudit, getTable, createPassportTable, queryTableStats, publicReadRateLimit,
+  logAudit, getTable, normalizePassportTypeSchema, getTypeSchemaVersion,
+  buildPassportTypeSchemaChange, passportTypeHasStoredRecords,
+  createPassportTable, validatePassportTypeStorage, queryTableStats, publicReadRateLimit,
   GLOBAL_SYMBOLS_DIR, REPO_BASE_DIR, FILES_BASE_DIR, IN_REVISION_STATUS, IN_REVISION_STATUSES_SQL,
   createTransporter, brandedEmail, storageService,
 });
@@ -1196,8 +1223,10 @@ app.post("/api/contact", publicReadRateLimit, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  logger.info(`[Server] Listening on port ${PORT}`);
+startup.then(() => {
+  app.listen(PORT, () => {
+    logger.info(`[Server] Listening on port ${PORT}`);
+  });
 });
 
 // Graceful shutdown handler

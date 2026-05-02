@@ -192,7 +192,7 @@ function buildCanonicalPassportPayload(passport, _typeDef, { company } = {}) {
     dppSchemaVersion: passport?.dpp_schema_version || "prEN 18223:2025",
     dppStatus: passport?.release_status || "Draft",
     granularity: passport?.granularity || "item",
-    lastUpdated: passport?.updated_at || passport?.created_at || "2026-04-27T10:00:00.000Z",
+    lastUpdate: passport?.updated_at || passport?.created_at || "2026-04-27T10:00:00.000Z",
     economicOperatorId: passport?.economic_operator_id || company?.economic_operator_identifier || "EORI-ACME-001",
     facilityId: passport?.facility_id || passport?.facility_identifier || null,
   };
@@ -551,7 +551,7 @@ describe("compliance service", () => {
         dppSchemaVersion: null,
         dppStatus: "Draft",
         granularity: "item",
-        lastUpdated: null,
+        lastUpdate: null,
         economicOperatorId: null,
         facilityId: null,
       }),

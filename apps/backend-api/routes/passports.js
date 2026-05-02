@@ -6,6 +6,8 @@ const {
   extractCarrierAuthenticityMutation,
   applyCarrierAuthenticityMutation,
   buildCarrierAuthenticityResponseFields,
+  normalizeCarrierAuthenticityMetadata,
+  validateQrPrintSpecification,
 } = require("../helpers/carrier-authenticity");
 
 module.exports = function registerPassportRoutes(app, {
@@ -324,6 +326,44 @@ module.exports = function registerPassportRoutes(app, {
        VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
       [dppId, companyId, eventType, severity, source, JSON.stringify(details || {})]
     ).catch(() => {});
+  }
+
+  function normalizeEvidenceItems(value) {
+    if (!value) return [];
+    const items = Array.isArray(value) ? value : [value];
+    return items
+      .map((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+        return Object.fromEntries(
+          Object.entries(item)
+            .filter(([, entryValue]) => entryValue !== undefined && entryValue !== null && String(entryValue).trim() !== "")
+            .map(([key, entryValue]) => [key, typeof entryValue === "string" ? entryValue.trim().slice(0, 1000) : entryValue])
+        );
+      })
+      .filter((item) => item && Object.keys(item).length);
+  }
+
+  function buildDataCarrierVerificationRecord(source = {}, actor = {}) {
+    const verifiedAt = source.verifiedAt || source.verified_at || new Date().toISOString();
+    return {
+      evidenceType: "physical_data_carrier_verification",
+      verifiedAt,
+      recordedAt: new Date().toISOString(),
+      recordedBy: actor.userId || null,
+      printGrade: String(source.printGrade || source.print_grade || "").trim().slice(0, 32) || null,
+      gradingStandard: String(source.gradingStandard || source.grading_standard || "ISO/IEC 15415 or ISO/IEC 15416").trim().slice(0, 160),
+      verifierDevice: String(source.verifierDevice || source.verifier_device || "").trim().slice(0, 160) || null,
+      verifierSerialNumber: String(source.verifierSerialNumber || source.verifier_serial_number || "").trim().slice(0, 160) || null,
+      labelSpecificationId: String(source.labelSpecificationId || source.label_specification_id || "").trim().slice(0, 160) || null,
+      hriPlacement: String(source.hriPlacement || source.hri_placement || "").trim().slice(0, 80) || null,
+      scannerTests: normalizeEvidenceItems(source.scannerTests || source.scanner_tests),
+      durabilityTests: normalizeEvidenceItems(source.durabilityTests || source.durability_tests),
+      placementChecks: normalizeEvidenceItems(source.placementChecks || source.placement_checks),
+      evidenceUris: (Array.isArray(source.evidenceUris || source.evidence_uris) ? (source.evidenceUris || source.evidence_uris) : [source.evidenceUri || source.evidence_uri])
+        .map((uri) => String(uri || "").trim().slice(0, 2000))
+        .filter(Boolean),
+      notes: String(source.notes || "").trim().slice(0, 2000) || null,
+    };
   }
 
   async function maybeSignCarrierPayload({
@@ -4138,6 +4178,21 @@ module.exports = function registerPassportRoutes(app, {
     }
   });
 
+  app.get("/api/companies/:companyId/backup-continuity-evidence", authenticateToken, checkCompanyAdmin, async (req, res) => {
+    try {
+      if (!backupProviderService?.getContinuityEvidence) {
+        return res.status(503).json({ error: "Backup provider service is unavailable" });
+      }
+      const evidence = await backupProviderService.getContinuityEvidence({ companyId: req.params.companyId });
+      return res.json(evidence);
+    } catch (error) {
+      if ((error.message || "").includes("companyId")) {
+        return res.status(400).json({ error: error.message });
+      }
+      return res.status(500).json({ error: "Failed to fetch backup continuity evidence" });
+    }
+  });
+
   app.get("/api/companies/:companyId/identifier-persistence-policy", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       if (!productIdentifierService?.getIdentifierPersistencePolicy) {
@@ -4466,6 +4521,14 @@ module.exports = function registerPassportRoutes(app, {
         ...normalizedBody,
         carrier_authenticity,
       });
+      const requestedPrintSpec = carrierAuthenticityMutation.updates?.qrPrintSpecification;
+      const printSpecValidation = validateQrPrintSpecification(requestedPrintSpec);
+      if (!printSpecValidation.valid) {
+        return res.status(400).json({
+          error: "QR print specification does not meet minimum print-source rules",
+          details: printSpecValidation.errors,
+        });
+      }
       const companyName = (await getCompanyNameMap([passportCompanyId])).get(String(passportCompanyId)) || "";
       const nextCarrierAuthenticity = await maybeSignCarrierPayload({
         passport: currentPassport,
@@ -4525,6 +4588,79 @@ module.exports = function registerPassportRoutes(app, {
         ...buildCarrierAuthenticityResponseFields(r.rows[0].carrier_authenticity),
       });
     } catch {res.status(500).json({ error: "Failed to fetch QR code" });}
+  });
+
+  app.post("/api/companies/:companyId/passports/:dppId/data-carrier-verifications", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+    try {
+      const { companyId, dppId } = req.params;
+      const reg = await pool.query(
+        "SELECT company_id, passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
+        [dppId]
+      );
+      if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
+      if (String(reg.rows[0].company_id) !== String(companyId)) return res.status(404).json({ error: "Passport not found" });
+
+      const tableName = getTable(reg.rows[0].passport_type);
+      const current = await pool.query(
+        `SELECT carrier_authenticity
+         FROM ${tableName}
+         WHERE dpp_id = $1 AND deleted_at IS NULL
+         LIMIT 1`,
+        [dppId]
+      );
+      if (!current.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+      const record = buildDataCarrierVerificationRecord(req.body || {}, req.user || {});
+      const existing = normalizeCarrierAuthenticityMetadata(current.rows[0].carrier_authenticity) || {};
+      const evidence = Array.isArray(existing.dataCarrierVerificationEvidence)
+        ? existing.dataCarrierVerificationEvidence
+        : [];
+      const nextCarrierAuthenticity = {
+        ...existing,
+        dataCarrierVerificationEvidence: [record, ...evidence].slice(0, 25),
+      };
+
+      await pool.query(
+        `UPDATE ${tableName}
+         SET carrier_authenticity = $1,
+             updated_at = NOW()
+         WHERE dpp_id = $2`,
+        [buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), dppId]
+      );
+
+      await recordPassportSecurityEvent({
+        dppId,
+        companyId,
+        eventType: "data_carrier_verification",
+        severity: "info",
+        source: "authenticated_user",
+        details: record,
+      });
+
+      await logAudit(
+        companyId,
+        req.user.userId,
+        "RECORD_DATA_CARRIER_VERIFICATION",
+        tableName,
+        dppId,
+        null,
+        {
+          printGrade: record.printGrade,
+          scannerTestCount: record.scannerTests.length,
+          durabilityTestCount: record.durabilityTests.length,
+          placementCheckCount: record.placementChecks.length,
+          evidenceUriCount: record.evidenceUris.length,
+        }
+      ).catch(() => {});
+
+      res.status(201).json({
+        success: true,
+        verification: record,
+        ...buildCarrierAuthenticityResponseFields(nextCarrierAuthenticity),
+      });
+    } catch {
+      res.status(500).json({ error: "Failed to record data-carrier verification" });
+    }
   });
 
   // ─── SCAN ──────────────────────────────────────────────────────────────────

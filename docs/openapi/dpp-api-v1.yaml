@@ -242,6 +242,11 @@ paths:
     post:
       tags: [DPP]
       summary: Resolve DPP IDs for multiple productId values
+      description: >
+        The request body uses the standards-facing `productId` array as the
+        canonical input name. Up to 1000 product IDs may be submitted in one
+        request, and `limit` controls pagination with at most 100 identifiers
+        returned per page.
       requestBody:
         required: true
         content:
@@ -252,12 +257,14 @@ paths:
               properties:
                 productId:
                   type: array
+                  description: Standards-facing canonical product ID inputs. `productIdentifiers` is not accepted as a request key.
                   minItems: 1
                   maxItems: 1000
                   items:
                     type: string
                 limit:
                   type: integer
+                  description: Maximum number of matched DPP IDs returned in this page. The request can contain up to 1000 product IDs, but each page returns at most 100 results.
                   minimum: 1
                   maximum: 100
                   default: 100
@@ -292,6 +299,11 @@ paths:
     post:
       tags: [DPP]
       summary: Extension batch search that returns full passport payload results
+      description: >
+        The request body uses the standards-facing `productId` array as the
+        canonical input name. Up to 1000 product IDs may be submitted in one
+        request, and `limit` controls pagination with at most 100 lookup
+        results returned per page.
       requestBody:
         required: true
         content:
@@ -302,6 +314,7 @@ paths:
               properties:
                 productId:
                   type: array
+                  description: Standards-facing canonical product ID inputs. `productIdentifiers` is not accepted as a request key.
                   minItems: 1
                   maxItems: 1000
                   items:
@@ -318,6 +331,7 @@ paths:
                   enum: [json, jsonld]
                 limit:
                   type: integer
+                  description: Maximum number of lookup results returned in this page. The request can contain up to 1000 product IDs, but each page returns at most 100 results.
                   minimum: 1
                   maximum: 100
                   default: 100
@@ -700,15 +714,39 @@ components:
   schemas:
     DppPayload:
       type: object
+      required:
+        - digitalProductPassportId
+        - uniqueProductIdentifier
+        - granularity
+        - dppSchemaVersion
+        - dppStatus
+        - lastUpdate
+        - economicOperatorId
+        - facilityId
+        - contentSpecificationIds
       properties:
         digitalProductPassportId:
           type: string
         uniqueProductIdentifier:
           type: string
+        granularity:
+          type: string
+          description: Standards-facing DPP granularity, for example `Item`, `Model`, or `Batch`.
         dppSchemaVersion:
           type: string
         dppStatus:
           type: string
+        lastUpdate:
+          type: string
+          format: date-time
+          description: Canonical standards-facing timestamp for the latest DPP update. Internal database fields may be named `updated_at`; legacy examples using `lastUpdated` should be mapped to this field at the API boundary.
+        economicOperatorId:
+          type: string
+          description: Economic operator identifier responsible for the DPP.
+        facilityId:
+          type: string
+          nullable: true
+          description: Facility identifier when required by the passport granularity/profile; present with `null` when not applicable.
         contentSpecificationIds:
           type: array
           items:
@@ -758,6 +796,7 @@ components:
       properties:
         productIdentifier:
           type: string
+          description: Echoes the requested `productId` value for backward-compatible response shape.
         found:
           type: boolean
         error:

@@ -932,7 +932,9 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const companyDid = didService.generateCompanyDid(companySlug);
     const subjectDid = resolvedGranularity === "item"
       ? didService.generateItemDid(didPassportType, stableId)
-      : didService.generateModelDid(didPassportType, stableId);
+      : resolvedGranularity === "batch"
+        ? didService.generateBatchDid(didPassportType, stableId)
+        : didService.generateModelDid(didPassportType, stableId);
     const dppDid = didService.generateDppDid(resolvedGranularity, stableId);
     const derivedProductIdentifierDid = passport?.product_id
       ? productIdentifierService?.buildCanonicalProductDid?.({
@@ -1054,7 +1056,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       granularity: toTitleCaseGranularity(resolvedGranularity),
       dppSchemaVersion,
       dppStatus,
-      lastUpdated: toIsoTimestamp(passport.updated_at || passport.created_at),
+      lastUpdate: toIsoTimestamp(passport.updated_at || passport.created_at),
       economicOperatorId,
       facilityId,
       contentSpecificationIds: Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],

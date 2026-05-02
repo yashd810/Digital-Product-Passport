@@ -86,7 +86,7 @@ describe("product identifier service", () => {
     });
 
     expect(service.normalizeGranularity("batch")).toBe("batch");
-    expect(did).toContain("did:web:www.example.test:did:battery:item:");
+    expect(did).toContain("did:web:www.example.test:did:battery:batch:");
   });
 
   test("records and lists identifier lineage links", async () => {

@@ -5,6 +5,9 @@
   "main": "Server/server.js",
   "scripts": {
     "start": "node Server/server.js",
+    "db:migrate": "node scripts/migrate-db.js",
+    "check:passport-storage": "node scripts/check-passport-storage.js",
+    "repair:passport-storage": "node scripts/check-passport-storage.js --repair",
     "dev": "nodemon Server/server.js",
     "test": "jest --runInBand",
     "generate:battery-dictionary": "node ../../scripts/generate-battery-dictionary.js"

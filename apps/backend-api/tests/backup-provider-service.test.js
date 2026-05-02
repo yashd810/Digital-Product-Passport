@@ -14,6 +14,9 @@ describe("backup provider service", () => {
     delete process.env.BACKUP_POLICY_RTO_HOURS;
     delete process.env.BACKUP_POLICY_VERIFICATION_FREQUENCY;
     delete process.env.BACKUP_POLICY_RESTORE_TEST_FREQUENCY;
+    delete process.env.BACKUP_ARCHIVAL_STORAGE_MODE;
+    delete process.env.BACKUP_ARCHIVAL_RETENTION_DAYS;
+    delete process.env.BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI;
 
     const service = createBackupProviderService({
       pool: { query: jest.fn() },
@@ -34,6 +37,102 @@ describe("backup provider service", () => {
         standardsDelete: true,
         manualReplication: true,
       },
+    });
+    expect(service.getContinuityPolicy({ companyId: 5 }).archivalStorage).toEqual({
+      mode: null,
+      retentionDays: null,
+      immutabilityEvidenceUri: null,
+    });
+  });
+
+  test("reports backup continuity evidence separately from policy targets", async () => {
+    process.env.BACKUP_POLICY_RPO_MINUTES = "15";
+    process.env.BACKUP_POLICY_RTO_HOURS = "4";
+    process.env.BACKUP_LAST_RESTORE_DRILL_AT = "2026-04-30T12:00:00.000Z";
+    process.env.BACKUP_RESTORE_DRILL_EVIDENCE_URI = "oci://evidence/restore-drill-2026-q2.pdf";
+    process.env.BACKUP_ARCHIVAL_STORAGE_MODE = "oci_object_storage_retention_rule";
+    process.env.BACKUP_ARCHIVAL_RETENTION_DAYS = "2555";
+    process.env.BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI = "oci://evidence/object-lock-config.json";
+
+    const latestReplication = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const pool = {
+      query: jest.fn(async () => ({
+        rows: [{
+          replication_count: 3,
+          synced_replication_count: 2,
+          failed_replication_count: 1,
+          verified_replication_count: 2,
+          failed_verification_count: 0,
+          latest_replication_at: latestReplication,
+          latest_verification_at: latestReplication,
+        }],
+      })),
+    };
+
+    const service = createBackupProviderService({
+      pool,
+      storageService: {},
+      buildCanonicalPassportPayload: () => ({}),
+    });
+
+    await expect(service.getContinuityEvidence({ companyId: 5 })).resolves.toMatchObject({
+      companyId: 5,
+      replicationEvidence: {
+        status: "proven",
+        rpoMinutes: 15,
+        replicationCount: 3,
+        syncedReplicationCount: 2,
+        failedReplicationCount: 1,
+      },
+      verificationEvidence: {
+        status: "proven",
+        verifiedReplicationCount: 2,
+      },
+      restoreDrillEvidence: {
+        status: "proven",
+        rtoHours: 4,
+        evidenceUri: "oci://evidence/restore-drill-2026-q2.pdf",
+      },
+      immutableArchivalEvidence: {
+        status: "proven",
+        mode: "oci_object_storage_retention_rule",
+        retentionDays: 2555,
+        evidenceUri: "oci://evidence/object-lock-config.json",
+      },
+    });
+  });
+
+  test("does not mark continuity evidence proven when proof artifacts are absent", async () => {
+    delete process.env.BACKUP_LAST_RESTORE_DRILL_AT;
+    delete process.env.BACKUP_RESTORE_DRILL_EVIDENCE_URI;
+    delete process.env.BACKUP_ARCHIVAL_STORAGE_MODE;
+    delete process.env.BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI;
+
+    const pool = {
+      query: jest.fn(async () => ({
+        rows: [{
+          replication_count: 0,
+          synced_replication_count: 0,
+          failed_replication_count: 0,
+          verified_replication_count: 0,
+          failed_verification_count: 0,
+          latest_replication_at: null,
+          latest_verification_at: null,
+        }],
+      })),
+    };
+
+    const service = createBackupProviderService({
+      pool,
+      storageService: {},
+      buildCanonicalPassportPayload: () => ({}),
+    });
+
+    await expect(service.getContinuityEvidence({ companyId: 5 })).resolves.toMatchObject({
+      replicationEvidence: { status: "not_proven" },
+      verificationEvidence: { status: "not_proven" },
+      restoreDrillEvidence: { status: "not_proven", evidenceUri: null },
+      immutableArchivalEvidence: { status: "not_proven", evidenceUri: null },
     });
   });
 

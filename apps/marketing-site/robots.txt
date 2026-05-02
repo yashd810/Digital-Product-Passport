@@ -1,5 +1,5 @@
 # ClarosDPP — robots.txt
-# Update https://clarosdpp.com to your actual domain before deployment.
+# Update https://claros-dpp.online to your actual domain before deployment.
 
 User-agent: *
 Allow: /
@@ -7,4 +7,4 @@ Allow: /
 # Block anything that shouldn't be indexed (none currently — all pages are public)
 # Disallow: /private/
 
-Sitemap: https://clarosdpp.com/sitemap.xml
+Sitemap: https://claros-dpp.online/sitemap.xml

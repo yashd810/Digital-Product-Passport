@@ -127,6 +127,12 @@ export function buildQrPrintSpecification({
     minimumRecommendedPrintWidthMm: recommendedMinWidthMm,
     hriText: productId || "",
     dppGraphicalMarking: shouldRenderIec61406Marker(granularity) ? DPP_GRAPHICAL_MARKING : null,
+    printAsset: {
+      format: "PNG",
+      colorMode: "monochrome",
+      recommendedDpi: 300,
+      minimumModuleSizeMm: MIN_MODULE_MM,
+    },
     labelLayout: {
       orientation: "portrait",
       title: "Digital Product Passport",
@@ -242,6 +248,13 @@ export const generateQRCodeBundle = async ({
       ],
       safetyWarnings,
       qrPrintSpecification,
+      dataCarrierPlacementRules: {
+        carrierPlacement: String(granularity || "item").toLowerCase() === "model" ? "packaging_or_documentation" : "product_or_primary_packaging",
+        hriPlacement: "below_qr",
+        quietZonePolicy: "Keep the clear area around the QR code at or above 4 modules on all sides.",
+        durabilityPolicy: "Verify the printed carrier against the expected product lifecycle environment before release.",
+        scannerTestPolicy: "Test with representative phone and industrial scanners under expected lighting, distance, and angle conditions.",
+      },
     },
   };
 }

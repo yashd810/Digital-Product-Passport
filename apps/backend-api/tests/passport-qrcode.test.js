@@ -137,6 +137,9 @@ function createTestApp() {
       if (text.includes("SELECT qr_code, carrier_authenticity")) {
         return { rows: [{ qr_code: state.passport.qr_code, carrier_authenticity: state.passport.carrier_authenticity }] };
       }
+      if (text.includes("SELECT carrier_authenticity")) {
+        return { rows: [{ carrier_authenticity: state.passport.carrier_authenticity }] };
+      }
       if (text.includes("INSERT INTO passport_security_events")) {
         state.securityEvents.push({
           passport_dpp_id: params[0],
@@ -155,8 +158,12 @@ function createTestApp() {
         };
       }
       if (text.includes("UPDATE battery_passports")) {
-        state.passport.qr_code = params[0];
-        state.passport.carrier_authenticity = params[1] ? JSON.parse(params[1]) : null;
+        if (text.includes("SET qr_code")) {
+          state.passport.qr_code = params[0];
+          state.passport.carrier_authenticity = params[1] ? JSON.parse(params[1]) : null;
+        } else {
+          state.passport.carrier_authenticity = params[0] ? JSON.parse(params[0]) : null;
+        }
         return { rows: [] };
       }
       return { rows: [] };
@@ -336,6 +343,81 @@ describe("passport qr-code routes", () => {
             observedHost: "evil.example.test",
             expectedHost: "www.claros-dpp.online",
           }),
+        }),
+      ])
+    );
+  });
+
+  test("rejects QR print specifications that fail source print rules", async () => {
+    const { app } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/passports/:dppId/qrcode",
+      params: { dppId: "dpp_test_qr_1" },
+      body: {
+        qrCode: "data:image/png;base64,AAAA",
+        passportType: "battery",
+        qrPrintSpecification: {
+          symbology: "QR_CODE_MODEL_2",
+          quietZoneModules: 1,
+          qualityChecks: [{ key: "quiet_zone", passed: false }],
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.error).toMatch(/QR print specification/);
+    expect(response.body.details).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("quietZoneModules"),
+        expect.stringContaining("quiet_zone"),
+      ])
+    );
+  });
+
+  test("stores physical data-carrier verification evidence", async () => {
+    const { app } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/companies/:companyId/passports/:dppId/data-carrier-verifications",
+      params: { companyId: "5", dppId: "dpp_test_qr_1" },
+      body: {
+        printGrade: "A",
+        gradingStandard: "ISO/IEC 15415",
+        verifierDevice: "Axicon 15000",
+        hriPlacement: "below_qr",
+        scannerTests: [{ device: "phone camera", result: "pass" }],
+        durabilityTests: [{ method: "abrasion", result: "pass" }],
+        placementChecks: [{ rule: "primary packaging", result: "pass" }],
+        evidenceUris: ["repository://carrier/report-001.pdf"],
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.verification).toEqual(
+      expect.objectContaining({
+        evidenceType: "physical_data_carrier_verification",
+        printGrade: "A",
+        hriPlacement: "below_qr",
+      })
+    );
+    expect(response.body.dataCarrierVerificationEvidence).toEqual([
+      expect.objectContaining({ printGrade: "A" }),
+    ]);
+
+    const eventsResponse = await invokeRoute(app, {
+      method: "get",
+      path: "/api/companies/:companyId/passports/:dppId/security-events",
+      params: { companyId: "5", dppId: "dpp_test_qr_1" },
+    });
+
+    expect(eventsResponse.body.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event_type: "data_carrier_verification",
+          details: expect.objectContaining({ printGrade: "A" }),
         }),
       ])
     );

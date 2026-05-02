@@ -99,6 +99,10 @@ function createDidService(options = {}) {
     return `${platformDid}:did:${normalizePassportTypeSegment(passportType)}:item:${normalizeStableId(stableId)}`;
   }
 
+  function generateBatchDid(passportType, stableId) {
+    return `${platformDid}:did:${normalizePassportTypeSegment(passportType)}:batch:${normalizeStableId(stableId)}`;
+  }
+
   function generateDppDid(granularity, stableId) {
     return `${platformDid}:did:dpp:${normalizeGranularity(granularity)}:${normalizeStableId(stableId)}`;
   }
@@ -160,7 +164,7 @@ function createDidService(options = {}) {
       }
     }
 
-    if (path.length === 4 && (path[2] === "model" || path[2] === "item")) {
+    if (path.length === 4 && (path[2] === "model" || path[2] === "batch" || path[2] === "item")) {
       try {
         const passportType = normalizePassportTypeSegment(path[1]);
         const stableId = normalizeStableId(path[3]);
@@ -185,7 +189,7 @@ function createDidService(options = {}) {
     if (parsed.entityType === "company") return `/did/company/${parsed.stableId}/did.json`;
     if (parsed.entityType === "facility") return `/did/facility/${parsed.stableId}/did.json`;
     if (parsed.entityType === "dpp") return `/did/dpp/${parsed.granularity}/${parsed.stableId}/did.json`;
-    if (parsed.entityType === "model" || parsed.entityType === "item") {
+    if (parsed.entityType === "model" || parsed.entityType === "batch" || parsed.entityType === "item") {
       return `/did/${parsed.passportType}/${parsed.entityType}/${parsed.stableId}/did.json`;
     }
     return null;
@@ -213,14 +217,12 @@ function createDidService(options = {}) {
     const facilityMatch = pathname.match(/^\/did\/facility\/([a-z0-9-]+)\/did\.json$/i);
     if (facilityMatch) return [generateFacilityDid(facilityMatch[1])];
 
-    const subjectMatch = pathname.match(/^\/did\/([a-z0-9_-]+)\/(model|item)\/([a-z0-9._-]+)\/did\.json$/i);
+    const subjectMatch = pathname.match(/^\/did\/([a-z0-9_-]+)\/(model|batch|item)\/([a-z0-9._-]+)\/did\.json$/i);
     if (subjectMatch) {
       const [, passportType, entityType, stableId] = subjectMatch;
-      return [
-        entityType === "model"
-          ? generateModelDid(passportType, stableId)
-          : generateItemDid(passportType, stableId),
-      ];
+      if (entityType === "model") return [generateModelDid(passportType, stableId)];
+      if (entityType === "batch") return [generateBatchDid(passportType, stableId)];
+      return [generateItemDid(passportType, stableId)];
     }
 
     const dppMatch = pathname.match(/^\/did\/dpp\/([a-z0-9_-]+)\/([a-z0-9._-]+)\/did\.json$/i);
@@ -255,6 +257,7 @@ function createDidService(options = {}) {
     normalizePassportTypeSegment,
     generateCompanyDid,
     generateModelDid,
+    generateBatchDid,
     generateItemDid,
     generateDppDid,
     generateFacilityDid,

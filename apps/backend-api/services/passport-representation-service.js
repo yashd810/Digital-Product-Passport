@@ -162,7 +162,7 @@ module.exports = function createPassportRepresentationService({
       granularity:               resolvedGranularity,
       dppSchemaVersion:          passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
       dppStatus:                 canonicalPayload?.dppStatus || toStandardDppStatus(passport.release_status),
-      lastUpdated:               canonicalPayload?.lastUpdated || toIsoTimestamp(passport.updated_at || passport.created_at),
+      lastUpdate:                canonicalPayload?.lastUpdate || canonicalPayload?.lastUpdated || toIsoTimestamp(passport.updated_at || passport.created_at),
       economicOperatorId:        canonicalPayload?.economicOperatorId || economicOperatorId,
       contentSpecificationIds:   Array.isArray(canonicalPayload?.contentSpecificationIds)
         ? canonicalPayload.contentSpecificationIds

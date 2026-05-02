@@ -84,6 +84,17 @@ function productItemDid(companyId, productId) {
 }
 
 /**
+ * Product batch DID.
+ * did:web:www.claros-dpp.online:did:battery:batch:<companyId>:<encodedProductId>
+ */
+function productBatchDid(companyId, productId) {
+  assertId(companyId, "companyId");
+  assertId(productId, "productId");
+  const encodedProductId = encodeURIComponent(String(productId));
+  return `did:web:${getDomain()}:did:battery:batch:${companyId}:${encodedProductId}`;
+}
+
+/**
  * DPP record DID.
  * did:web:www.claros-dpp.online:did:dpp:<granularity>:<companyId>:<encodedProductId>
  *
@@ -117,6 +128,7 @@ function facilityDid(facilityId) {
  *   did:web:<domain>                                         → { type: 'platform' }
  *   did:web:<domain>:did:company:<companyId>                 → { type: 'company', companyId }
  *   did:web:<domain>:did:battery:model:<cId>:<pId>           → { type: 'battery', level: 'model', companyId, productId }
+ *   did:web:<domain>:did:battery:batch:<cId>:<pId>           → { type: 'battery', level: 'batch', companyId, productId }
  *   did:web:<domain>:did:battery:item:<cId>:<pId>            → { type: 'battery', level: 'item',  companyId, productId }
  *   did:web:<domain>:did:dpp:<granularity>:<cId>:<pId>       → { type: 'dpp', granularity, companyId, productId }
  *   did:web:<domain>:did:facility:<facilityId>               → { type: 'facility', facilityId }
@@ -157,10 +169,10 @@ function parseDid(did) {
     };
   }
 
-  // Battery model/item: did:web:<domain>:did:battery:<level>:<companyId>:<encodedProductId>
+  // Battery model/batch/item: did:web:<domain>:did:battery:<level>:<companyId>:<encodedProductId>
   if (ns === "battery" && rest.length === 5) {
     const level = rest[2];
-    if (level !== "model" && level !== "item") return null;
+    if (level !== "model" && level !== "batch" && level !== "item") return null;
     return {
       type: "battery",
       domain,
@@ -204,8 +216,8 @@ function parseDid(did) {
  *   did:web:www.claros-dpp.online:did:company:5
  *     → https://www.claros-dpp.online/did/company/5/did.json
  *
- *   did:web:www.claros-dpp.online:did:battery:model:5:ACME-001
- *     → https://www.claros-dpp.online/did/battery/model/5/ACME-001/did.json
+ *   did:web:www.claros-dpp.online:did:battery:batch:5:ACME-001
+ *     → https://www.claros-dpp.online/did/battery/batch/5/ACME-001/did.json
  *
  *   did:web:www.claros-dpp.online:did:dpp:model:5:ACME-001
  *     → https://www.claros-dpp.online/did/dpp/model/5/ACME-001/did.json
@@ -263,7 +275,7 @@ function buildCanonicalPublicUrl(passport, companyName) {
   const productId = passport.product_id;
   if (!productId) {
     // Fallback: record-id-based URL when no product identifier is available
-    return `${appUrl}/passport/${passport.dppId || passport.dpp_id}`;
+    return `${appUrl}/passport/${passport.dppId || passport.dpp_id || passport.guid}`;
   }
 
   const manufacturerSlug = slugify(companyName || String(passport.company_id));
@@ -282,6 +294,7 @@ module.exports = {
   companyDid,
   productModelDid,
   productItemDid,
+  productBatchDid,
   dppDid,
   facilityDid,
   parseDid,
