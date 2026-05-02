@@ -377,7 +377,7 @@ const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, ex
   const user = typeof userOrId === "object" && userOrId !== null
     ? userOrId
     : { id: userOrId, email, company_id: companyId, role, session_version: sessionVersion };
-  return jwt.sign({
+  const payload = {
     userId: user.id || user.userId,
     email: user.email,
     companyId: user.company_id !== undefined ? user.company_id : (user.companyId ?? null),
@@ -385,7 +385,20 @@ const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, ex
     sessionVersion: user.session_version !== undefined ? user.session_version : (user.sessionVersion ?? 1),
     mfaVerifiedAt: extraClaims.mfaVerifiedAt || null,
     amr: Array.isArray(extraClaims.amr) && extraClaims.amr.length ? extraClaims.amr : ["pwd"],
-  }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+  };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+  logger.info({ 
+    userId: payload.userId, 
+    payload: { 
+      sessionVersion: payload.sessionVersion, 
+      userId: payload.userId,
+      email: payload.email,
+      role: payload.role,
+      mfaVerifiedAt: payload.mfaVerifiedAt,
+    },
+    msg: "[TOKEN_CREATED] JWT payload for token" 
+  });
+  return token;
 };
 const hashOpaqueToken = (value) => crypto.createHash("sha256").update(String(value)).digest("hex");
 
