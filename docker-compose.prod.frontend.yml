@@ -7,7 +7,7 @@ services:
         VITE_API_URL: "${VITE_API_URL:-https://api.claros-dpp.online}"
         VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:-https://viewer.claros-dpp.online}"
     environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"
     ports:
       - "${FRONTEND_PORT:-3000}:8080"
     restart: unless-stopped
@@ -20,7 +20,7 @@ services:
         VITE_API_URL: "${VITE_API_URL}"
         VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL}"
     environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"
     ports:
       - "${PUBLIC_VIEWER_PORT:-3004}:8080"
     restart: unless-stopped
@@ -30,7 +30,7 @@ services:
       context: .
       dockerfile: apps/asset-management/Dockerfile
     environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"
     ports:
       - "${ASSET_MANAGEMENT_PORT:-3003}:8080"
     restart: unless-stopped
@@ -40,7 +40,7 @@ services:
       context: .
       dockerfile: apps/marketing-site/Dockerfile
     environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-https://api.claros-dpp.online}"
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"
     ports:
       - "${MARKETING_PORT:-8080}:8080"
     restart: unless-stopped
