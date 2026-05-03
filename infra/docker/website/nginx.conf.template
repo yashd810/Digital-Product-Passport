@@ -17,6 +17,9 @@ server {
   }
 
   location / {
-    try_files $uri $uri/ /index.html;
+    # Try to serve the actual file if it exists
+    try_files $uri $uri/ =404;
+    # If it's a directory or doesn't exist, serve index.html for SPA routing
+    error_page 404 =200 /index.html;
   }
 }
