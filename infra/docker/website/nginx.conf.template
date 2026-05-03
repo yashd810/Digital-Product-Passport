@@ -5,6 +5,13 @@ server {
   root /usr/share/nginx/html;
   index index.html;
 
+  # Serve static files and legal pages directly
+  location ~ \.(html|css|js|json|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2)$ {
+    expires 1h;
+    add_header Cache-Control "public, immutable";
+    try_files $uri =404;
+  }
+
   location /api/ {
     proxy_pass ${BACKEND_API_UPSTREAM}/api/;
     proxy_ssl_server_name on;
@@ -16,10 +23,10 @@ server {
     proxy_set_header X-Forwarded-Host $host;
   }
 
+  # SPA routing fallback for root and dynamic routes
   location / {
-    # Try to serve the actual file if it exists
-    try_files $uri $uri/ =404;
-    # If it's a directory or doesn't exist, serve index.html for SPA routing
-    error_page 404 =200 /index.html;
+    try_files $uri /index.html;
   }
+
+  error_page 404 /index.html;
 }
