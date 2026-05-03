@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Privacy Policy for ClarosDPP, a Digital Product Passport platform for product data, compliance governance, and QR-linked passport experiences." />
+  <meta name="robots" content="index, follow" />
+  <meta name="author" content="ClarosDPP" />
+  <meta name="theme-color" content="#f5f8fb" />
+  <link rel="canonical" href="https://claros-dpp.online/privacy-policy.html" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ClarosDPP" />
+  <meta property="og:title" content="Privacy Policy — ClarosDPP" />
+  <meta property="og:description" content="Privacy Policy for ClarosDPP, a Digital Product Passport platform." />
+  <meta property="og:url" content="https://claros-dpp.online/privacy-policy.html" />
+  <meta property="og:locale" content="en_US" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Privacy Policy — ClarosDPP" />
+  <meta name="twitter:description" content="Privacy Policy for ClarosDPP" />
+  <title>Privacy Policy — ClarosDPP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body.page-body {
+      background:
+        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
+        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
+        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
+        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
+      background-size: 64px 64px, 64px 64px, auto, auto, auto;
+      color: #10243a;
+    }
+    .section,
+    .section-alt,
+    .section-dark {
+      background: transparent !important;
+    }
+
+    .legal-hero {
+      padding: var(--hero-pad-y) 0 clamp(40px, 5vw, 80px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .legal-hero::before {
+      content: "";
+      position: absolute;
+      top: -40%;
+      right: -20%;
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(13, 181, 176, 0.15) 0%, transparent 70%);
+      border-radius: 50%;
+      z-index: 0;
+    }
+
+    .legal-hero .container {
+      position: relative;
+      z-index: 1;
+    }
+
+    .legal-hero h1 {
+      font-family: var(--sans);
+      font-size: clamp(2.2rem, 4vw, 3.2rem);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.7px;
+      color: #071727;
+      margin: 0 0 1.2rem;
+      max-width: 800px;
+    }
+
+    .legal-hero p {
+      color: #2d4563;
+      font-size: 1.08rem;
+      line-height: 1.8;
+      max-width: 800px;
+      margin-bottom: 0;
+      font-weight: 500;
+    }
+
+    .legal-meta {
+      margin-top: 2.5rem;
+      padding: 2rem;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(13, 181, 176, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+    }
+
+    .legal-meta strong {
+      display: block;
+      color: var(--teal);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .legal-meta p {
+      font-size: 0.95rem;
+      color: #2d4563;
+      margin: 0;
+      line-height: 1.6;
+      font-weight: 500;
+    }
+
+    .legal-meta a {
+      color: var(--teal);
+      text-decoration: none;
+      font-weight: 700;
+      border-bottom: 2px solid var(--teal);
+      transition: all 0.3s ease;
+    }
+
+    .legal-meta a:hover {
+      color: #0a8b85;
+      border-bottom-color: #0a8b85;
+    }
+
+    .legal-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .legal-content {
+      padding: clamp(32px, 5vw, 56px);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(13, 181, 176, 0.15);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+      margin-bottom: 3rem;
+    }
+
+    .legal-content section {
+      padding: 2.5rem 0;
+      border-top: 1px solid rgba(13, 181, 176, 0.08);
+    }
+
+    .legal-content section:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .legal-content h2 {
+      font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+      font-weight: 700;
+      margin-bottom: 1.2rem;
+      letter-spacing: -0.4px;
+      color: #071727;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .legal-content h2::before {
+      content: "";
+      width: 4px;
+      height: 1.85rem;
+      background: var(--teal);
+      border-radius: 2px;
+    }
+
+    .legal-content h3 {
+      font-size: 1.12rem;
+      font-weight: 700;
+      margin: 1.8rem 0 0.9rem;
+      color: var(--teal);
+      letter-spacing: -0.2px;
+    }
+
+    .legal-content p {
+      margin: 0 0 1.1rem;
+      color: #3d5467;
+      line-height: 1.9;
+      font-size: 0.98rem;
+    }
+
+    .legal-content ul {
+      list-style: none;
+      display: grid;
+      gap: 0.9rem;
+      margin: 1.3rem 0 0;
+      padding: 0;
+    }
+
+    .legal-content li {
+      position: relative;
+      padding-left: 2rem;
+      color: #3d5467;
+      line-height: 1.85;
+      font-size: 0.98rem;
+    }
+
+    .legal-content li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: var(--teal);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .legal-note {
+      padding: 1.5rem;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(13, 181, 176, 0.1) 0%, rgba(13, 181, 176, 0.05) 100%);
+      border-left: 4px solid var(--teal);
+      color: #3d5467;
+      margin: 1.8rem 0;
+    }
+
+    .legal-note p {
+      margin: 0;
+      color: #3d5467;
+    }
+
+    @media (max-width: 768px) {
+      .legal-hero {
+        padding: clamp(48px, 8vw, 80px) 0 clamp(24px, 4vw, 48px);
+      }
+
+      .legal-content {
+        padding: 1.5rem;
+      }
+
+      .legal-content section {
+        padding: 1.5rem 0;
+      }
+    }
+  </style>
+</head>
+<body class="page-body">
+  <section class="section section-dark legal-hero">
+    <div class="container">
+      <h1>Privacy Policy</h1>
+      <p>This policy explains how ClarosDPP handles personal information when visitors use our website, contact us, request a demo, or interact with our Digital Product Passport services.</p>
+      <div class="legal-meta">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem;">
+          <div>
+            <strong>Last updated</strong>
+            <p>3 May 2026</p>
+          </div>
+          <div>
+            <strong>Applies to</strong>
+            <p>ClarosDPP website, demo requests, contact forms, and platform communications.</p>
+          </div>
+          <div>
+            <strong>Questions?</strong>
+            <p><a href="mailto:hello@claros-dpp.online">hello@claros-dpp.online</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container legal-layout">
+      <article class="legal-content">
+        <section id="who-we-are">
+          <h2>1. Who we are</h2>
+          <p>ClarosDPP is a Digital Product Passport platform and compliance governance service that helps organisations structure, manage, and publish product passport information.</p>
+          <p>For the purpose of this Privacy Policy, "ClarosDPP," "we," "our," or "us" means the operator of the ClarosDPP website and related services.</p>
+        </section>
+
+        <section id="information-we-collect">
+          <h2>2. Information we collect</h2>
+          <p>We collect only the information needed to operate the website, respond to enquiries, provide services, and improve the ClarosDPP experience.</p>
+          <h3>Information you provide</h3>
+          <ul>
+            <li>Contact details when you request a demo, submit a form, or email us</li>
+            <li>Account information if you create a workspace or use the platform</li>
+            <li>Product data, passport content, and compliance information you upload</li>
+            <li>Messages, feedback, or support requests</li>
+          </ul>
+          <h3>Website and technical information</h3>
+          <ul>
+            <li>Browser type, IP address, pages visited, and referrer information</li>
+            <li>Cookies and similar tracking technologies (where permitted)</li>
+            <li>Performance data to help us understand how the site is used</li>
+          </ul>
+          <h3>Platform and service information</h3>
+          <ul>
+            <li>Features used, workspace activity, and usage patterns</li>
+            <li>Device and browser information for compatibility and support</li>
+          </ul>
+        </section>
+
+        <section id="how-we-use-information">
+          <h2>3. How we use information</h2>
+          <p>We use information to run ClarosDPP responsibly and to provide a clear, secure, and useful Digital Product Passport experience.</p>
+          <ul>
+            <li>Provide, maintain, and improve the website and services</li>
+            <li>Respond to enquiries and process demo requests</li>
+            <li>Send service updates, security alerts, and account notifications</li>
+            <li>Analyse usage to improve features, performance, and user experience</li>
+            <li>Meet legal obligations and prevent fraud or abuse</li>
+            <li>With permission, send marketing communications about ClarosDPP and related services</li>
+          </ul>
+          <p>We do not sell personal information.</p>
+        </section>
+
+        <section id="legal-bases">
+          <h2>4. Legal bases for processing</h2>
+          <p>Where GDPR or similar data protection laws apply, we rely on one or more legal bases depending on the context.</p>
+          <ul>
+            <li><strong>Contractual necessity:</strong> Processing needed to provide services or fulfil your requests</li>
+            <li><strong>Legitimate interests:</strong> Operating, improving, and securing the platform</li>
+            <li><strong>Consent:</strong> Where you have explicitly agreed (for example, marketing communications)</li>
+            <li><strong>Legal obligation:</strong> Compliance with applicable laws and regulations</li>
+          </ul>
+        </section>
+
+        <section id="cookies">
+          <h2>5. Cookies and analytics</h2>
+          <p>Our website may use cookies and similar technologies for essential functionality, security, analytics, and performance measurement.</p>
+          <p>Where required, we will ask for consent before using non-essential cookies. You can usually control cookies through your browser settings. If you disable cookies, some parts of the website may not work as intended.</p>
+        </section>
+
+        <section id="marketing">
+          <h2>6. Marketing communications</h2>
+          <p>If you request a demo, contact us, or sign up for updates, we may send relevant business communications about ClarosDPP, Digital Product Passports, compliance readiness, and related services.</p>
+          <p>You can opt out of marketing emails at any time by using the unsubscribe option in an email or by contacting us at <a href="mailto:hello@claros-dpp.online">hello@claros-dpp.online</a>.</p>
+        </section>
+
+        <section id="sharing">
+          <h2>7. How we share information</h2>
+          <p>We may share information with trusted providers only when necessary to run the website, deliver services, or meet legal obligations.</p>
+          <ul>
+            <li>Service providers who host, support, or analyse the platform</li>
+            <li>Law enforcement or government agencies when required by law</li>
+            <li>Successor organisations in the event of a merger, acquisition, or sale</li>
+          </ul>
+          <p>Service providers may only process information for agreed purposes and must protect it appropriately.</p>
+        </section>
+
+        <section id="international-transfers">
+          <h2>8. International transfers</h2>
+          <p>Some service providers may process information in countries different from your own. Where required, we use appropriate safeguards such as contractual protections, adequacy decisions, or other lawful transfer mechanisms.</p>
+        </section>
+
+        <section id="retention">
+          <h2>9. Data retention</h2>
+          <p>We keep personal information only for as long as needed for the purpose it was collected, unless a longer period is required for legal, security, accounting, or contractual reasons.</p>
+          <ul>
+            <li>Account information: retained while your account is active, then deleted or anonymised</li>
+            <li>Contact and demo requests: kept for business and compliance purposes</li>
+            <li>Marketing preferences: retained until you opt out</li>
+            <li>Analytics data: typically retained for up to 13 months</li>
+          </ul>
+          <p>When information is no longer needed, we delete, anonymise, or securely archive it.</p>
+        </section>
+
+        <section id="security">
+          <h2>10. Security</h2>
+          <p>We use reasonable technical and organisational measures to protect information against unauthorised access, loss, misuse, alteration, or disclosure.</p>
+          <ul>
+            <li>Encryption for data in transit (HTTPS) and at rest</li>
+            <li>Regular security assessments and updates</li>
+            <li>Access controls and authentication protections</li>
+            <li>Staff training on data protection and privacy</li>
+          </ul>
+          <p>No online service can be guaranteed to be completely secure, but we work to protect information responsibly.</p>
+        </section>
+
+        <section id="rights">
+          <h2>11. Your rights</h2>
+          <p>Depending on where you live, you may have rights over your personal information.</p>
+          <ul>
+            <li>Right to access the information we hold about you</li>
+            <li>Right to correct inaccurate information</li>
+            <li>Right to request deletion of your information</li>
+            <li>Right to restrict how we process your information</li>
+            <li>Right to data portability (receive your data in a structured format)</li>
+            <li>Right to withdraw consent at any time</li>
+            <li>Right to lodge a complaint with your local data protection authority</li>
+          </ul>
+          <p>To exercise your rights, contact us at <a href="mailto:hello@claros-dpp.online">hello@claros-dpp.online</a>. We may need to verify your identity before responding.</p>
+        </section>
+
+        <section id="children">
+          <h2>12. Children's privacy</h2>
+          <p>ClarosDPP is intended for business and professional use. Our website and services are not directed at children, and we do not knowingly collect personal information from children.</p>
+        </section>
+
+        <section id="third-party-links">
+          <h2>13. Third-party links</h2>
+          <p>Our website may link to third-party websites or services. We are not responsible for their content, privacy practices, or security. You should review their policies before sharing information with them.</p>
+        </section>
+
+        <section id="changes">
+          <h2>14. Changes to this Privacy Policy</h2>
+          <p>We may update this Privacy Policy from time to time. When we do, we will update the "Last updated" date above. If changes are significant, we may provide additional notice where appropriate.</p>
+        </section>
+
+        <section id="contact-us">
+          <h2>15. Contact us</h2>
+          <p>For questions about this Privacy Policy or how ClarosDPP handles personal information, contact us at:</p>
+          <div class="legal-note">
+            <p><strong>Email:</strong> <a href="mailto:hello@claros-dpp.online">hello@claros-dpp.online</a></p>
+          </div>
+        </section>
+      </article>
+    </div>
+  </section>
+
+  <script src="shared.js?v=20260423"></script>
+</body>
+</html>
