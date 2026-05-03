@@ -118,7 +118,8 @@
 
 .dictionary-side-card {
   padding: 22px;
-  height: 100%;
+  height: auto;
+  align-self: start;
 }
 
 .dictionary-side-card h2 {
