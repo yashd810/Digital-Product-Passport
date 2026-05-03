@@ -122,8 +122,8 @@
             <li><a href="contact.html">Contact Us</a></li>
             <li><a href="product.html">Request a Demo</a></li>
             <li><a href="services.html">Get a Quote</a></li>
-            <li><a href="privacy.html">Privacy Policy</a></li>
-            <li><a href="terms.html">Terms of Service</a></li>
+            <li><a href="privacy-policy.html">Privacy Policy</a></li>
+            <li><a href="terms-of-service.html">Terms of Service</a></li>
           </ul>
         </div>
       </div>
