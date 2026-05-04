@@ -1,81 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Privacy Policy for ClarosDPP, a Digital Product Passport platform for product data, compliance governance, and QR-linked passport experiences." />
-  <meta name="robots" content="index, follow" />
-  <meta name="author" content="ClarosDPP" />
-  <meta name="theme-color" content="#f5f8fb" />
-  <link rel="canonical" href="https://claros-dpp.online/privacy-policy.html" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="ClarosDPP" />
-  <meta property="og:title" content="Privacy Policy — ClarosDPP" />
-  <meta property="og:description" content="Privacy Policy for ClarosDPP, a Digital Product Passport platform." />
-  <meta property="og:url" content="https://claros-dpp.online/privacy-policy.html" />
-  <meta property="og:locale" content="en_US" />
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="Privacy Policy — ClarosDPP" />
-  <meta name="twitter:description" content="Privacy Policy for ClarosDPP" />
-  <title>Privacy Policy — ClarosDPP</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Privacy Policy for Claros Digital Product Passport. Learn how we collect, use, and protect your personal data.">
+  <meta name="keywords" content="Privacy Policy, DPP, Digital Product Passport, Data Protection, GDPR">
+  <title>Privacy Policy - Claros DPP</title>
+  <link rel="canonical" href="https://claros-dpp.online/privacy-policy.html">
+  <meta property="og:title" content="Privacy Policy - Claros DPP">
+  <meta property="og:description" content="Our comprehensive privacy policy explaining data collection, processing, and protection practices.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://claros-dpp.online/privacy-policy.html">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Privacy Policy - Claros DPP">
+  <meta name="twitter:description" content="Learn how Claros DPP handles your personal data and privacy.">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  
   <style>
-    body.page-body {
-      background:
-        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
-        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
-        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
-        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
-      background-size: 64px 64px, 64px 64px, auto, auto, auto;
-      color: #10243a;
+    :root {
+      --teal: #0db5b0;
+      --teal-dark: #0a8b85;
+      --dark-text: #071727;
+      --gray-text: #2d4563;
+      --light-bg: rgba(255, 255, 255, 0.95);
     }
-    .section,
-    .section-alt,
-    .section-dark {
-      background: transparent !important;
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      line-height: 1.6;
+      color: var(--gray-text);
+      background: linear-gradient(135deg, rgba(13, 181, 176, 0.05) 0%, rgba(255, 255, 255, 1) 100%);
+      min-height: 100vh;
+    }
+
+    .legal-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      min-height: 100vh;
+      position: relative;
     }
 
     .legal-hero {
-      padding: var(--hero-pad-y) 0 clamp(40px, 5vw, 80px);
+      background: radial-gradient(circle at 20% 50%, rgba(13, 181, 176, 0.1) 0%, transparent 50%),
+                  linear-gradient(135deg, rgba(13, 181, 176, 0.08) 0%, rgba(255, 255, 255, 1) 100%);
+      padding: clamp(3rem, 8vw, 5rem) clamp(1.5rem, 5vw, 3rem);
       position: relative;
-      overflow: hidden;
-    }
-
-    .legal-hero::before {
-      content: "";
-      position: absolute;
-      top: -40%;
-      right: -20%;
-      width: 800px;
-      height: 800px;
-      background: radial-gradient(circle, rgba(13, 181, 176, 0.15) 0%, transparent 70%);
-      border-radius: 50%;
-      z-index: 0;
-    }
-
-    .legal-hero .container {
-      position: relative;
-      z-index: 1;
     }
 
     .legal-hero h1 {
-      font-family: var(--sans);
-      font-size: clamp(2.2rem, 4vw, 3.2rem);
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.5rem, 8vw, 4rem);
       font-weight: 700;
-      line-height: 1.1;
       letter-spacing: -0.7px;
-      color: #071727;
-      margin: 0 0 1.2rem;
+      color: var(--dark-text);
+      margin: 0 0 1.5rem;
       max-width: 800px;
     }
 
     .legal-hero p {
-      color: #2d4563;
+      color: var(--gray-text);
       font-size: 1.08rem;
       line-height: 1.8;
       max-width: 800px;
@@ -100,318 +94,509 @@
       margin-bottom: 0.5rem;
       font-size: 0.85rem;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
     }
 
     .legal-meta p {
+      margin: 0 0 1.5rem;
+      color: var(--gray-text);
       font-size: 0.95rem;
-      color: #2d4563;
-      margin: 0;
-      line-height: 1.6;
-      font-weight: 500;
     }
 
-    .legal-meta a {
-      color: var(--teal);
-      text-decoration: none;
-      font-weight: 700;
-      border-bottom: 2px solid var(--teal);
-      transition: all 0.3s ease;
-    }
-
-    .legal-meta a:hover {
-      color: #0a8b85;
-      border-bottom-color: #0a8b85;
-    }
-
-    .legal-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 2rem;
+    .legal-meta p:last-child {
+      margin-bottom: 0;
     }
 
     .legal-content {
-      padding: clamp(32px, 5vw, 56px);
-      border-radius: 28px;
-      background: rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(13, 181, 176, 0.15);
+      background: var(--light-bg);
+      padding: clamp(2rem, 8vw, 4rem) clamp(1.5rem, 5vw, 3rem);
+      border-radius: 24px;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
-      margin-bottom: 3rem;
-    }
-
-    .legal-content section {
-      padding: 2.5rem 0;
-      border-top: 1px solid rgba(13, 181, 176, 0.08);
-    }
-
-    .legal-content section:first-child {
-      padding-top: 0;
-      border-top: 0;
+      margin: clamp(2rem, 5vw, 3rem) clamp(1rem, 5vw, 2rem);
     }
 
     .legal-content h2 {
-      font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.8rem, 5vw, 2.4rem);
       font-weight: 700;
-      margin-bottom: 1.2rem;
-      letter-spacing: -0.4px;
-      color: #071727;
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
+      color: var(--dark-text);
+      margin: 2.5rem 0 1.2rem;
+      padding-left: 1.2rem;
+      position: relative;
+      letter-spacing: -0.5px;
     }
 
     .legal-content h2::before {
-      content: "";
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
       width: 4px;
-      height: 1.85rem;
+      height: 70%;
       background: var(--teal);
       border-radius: 2px;
     }
 
     .legal-content h3 {
-      font-size: 1.12rem;
-      font-weight: 700;
-      margin: 1.8rem 0 0.9rem;
-      color: var(--teal);
-      letter-spacing: -0.2px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: clamp(1.2rem, 3vw, 1.5rem);
+      font-weight: 600;
+      color: var(--dark-text);
+      margin: 1.8rem 0 0.8rem;
+      letter-spacing: -0.3px;
+    }
+
+    .legal-content section {
+      margin-bottom: 2rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid rgba(13, 181, 176, 0.1);
+    }
+
+    .legal-content section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
     }
 
     .legal-content p {
-      margin: 0 0 1.1rem;
-      color: #3d5467;
-      line-height: 1.9;
-      font-size: 0.98rem;
+      margin-bottom: 1.2rem;
+      color: var(--gray-text);
+      font-size: 0.95rem;
+      line-height: 1.8;
     }
 
-    .legal-content ul {
-      list-style: none;
-      display: grid;
-      gap: 0.9rem;
-      margin: 1.3rem 0 0;
-      padding: 0;
+    .legal-content p:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .legal-content ul,
+    .legal-content ol {
+      margin-left: 1.5rem;
+      margin-bottom: 1.2rem;
     }
 
     .legal-content li {
+      margin-bottom: 0.8rem;
+      color: var(--gray-text);
+      font-size: 0.95rem;
+      line-height: 1.6;
       position: relative;
-      padding-left: 2rem;
-      color: #3d5467;
-      line-height: 1.85;
-      font-size: 0.98rem;
+      padding-left: 1rem;
     }
 
     .legal-content li::before {
-      content: "→";
+      content: '→';
       position: absolute;
       left: 0;
-      top: 0;
       color: var(--teal);
-      font-weight: 700;
-      font-size: 1.1rem;
+      font-weight: bold;
     }
 
-    .legal-note {
-      padding: 1.5rem;
-      border-radius: 18px;
-      background: linear-gradient(135deg, rgba(13, 181, 176, 0.1) 0%, rgba(13, 181, 176, 0.05) 100%);
+    .legal-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.9rem;
+    }
+
+    .legal-content table th {
+      background: rgba(13, 181, 176, 0.1);
+      padding: 0.8rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--dark-text);
+      border-bottom: 2px solid var(--teal);
+    }
+
+    .legal-content table td {
+      padding: 0.8rem;
+      border-bottom: 1px solid rgba(13, 181, 176, 0.1);
+      color: var(--gray-text);
+    }
+
+    .legal-content table tr:nth-child(even) {
+      background: rgba(13, 181, 176, 0.03);
+    }
+
+    .legal-callout {
+      background: linear-gradient(135deg, rgba(13, 181, 176, 0.08) 0%, rgba(13, 181, 176, 0.04) 100%);
       border-left: 4px solid var(--teal);
-      color: #3d5467;
-      margin: 1.8rem 0;
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin: 1.5rem 0;
     }
 
-    .legal-note p {
+    .legal-callout p {
       margin: 0;
-      color: #3d5467;
+      color: var(--dark-text);
+      font-weight: 500;
+    }
+
+    .legal-callout strong {
+      color: var(--teal);
     }
 
     @media (max-width: 768px) {
       .legal-hero {
-        padding: clamp(48px, 8vw, 80px) 0 clamp(24px, 4vw, 48px);
+        padding: 2rem 1rem;
+      }
+
+      .legal-hero h1 {
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+      }
+
+      .legal-meta {
+        margin-top: 1.5rem;
+        padding: 1.2rem;
       }
 
       .legal-content {
         padding: 1.5rem;
+        margin: 1.5rem 0.5rem;
+        border-radius: 16px;
       }
 
-      .legal-content section {
-        padding: 1.5rem 0;
+      .legal-content h2 {
+        font-size: 1.3rem;
+        margin: 1.5rem 0 0.8rem;
+      }
+
+      .legal-content h3 {
+        font-size: 1.1rem;
       }
     }
   </style>
 </head>
-<body class="page-body">
-  <section class="section section-dark legal-hero">
-    <div class="container">
+<body>
+  <div class="legal-layout">
+    <div class="legal-hero">
       <h1>Privacy Policy</h1>
-      <p>This policy explains how ClarosDPP handles personal information when visitors use our website, contact us, request a demo, or interact with our Digital Product Passport services.</p>
+      <p>How we collect, use, and protect your personal data</p>
       <div class="legal-meta">
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem;">
-          <div>
-            <strong>Last updated</strong>
-            <p>3 May 2026</p>
-          </div>
-          <div>
-            <strong>Applies to</strong>
-            <p>ClarosDPP website, demo requests, contact forms, and platform communications.</p>
-          </div>
-          <div>
-            <strong>Questions?</strong>
-            <p><a href="mailto:hello@claros-dpp.online">hello@claros-dpp.online</a></p>
-          </div>
+        <div>
+          <strong>Effective Date</strong>
+          <p>May 4, 2026</p>
+        </div>
+        <div>
+          <strong>Last Updated</strong>
+          <p>May 4, 2026</p>
+        </div>
+        <div>
+          <strong>Service</strong>
+          <p>Claros Digital Product Passport (DPP)</p>
         </div>
       </div>
     </div>
-  </section>
 
-  <section class="section">
-    <div class="container legal-layout">
-      <article class="legal-content">
-        <section id="who-we-are">
-          <h2>1. Who we are</h2>
-          <p>ClarosDPP is a Digital Product Passport platform and compliance governance service that helps organisations structure, manage, and publish product passport information.</p>
-          <p>For the purpose of this Privacy Policy, "ClarosDPP," "we," "our," or "us" means the operator of the ClarosDPP website and related services.</p>
-        </section>
+    <article class="legal-content">
+      <section id="introduction">
+        <h2>1. Introduction</h2>
+        <p>This Privacy Policy explains how <strong>Claros Digital Product Passport</strong> ("Company," "we," "us," or "our") collects, uses, stores, shares, and protects personal data when you visit or use our platform, public Digital Product Passport viewer, APIs, dashboards, integrations, documentation, QR-code landing pages, support channels, and related services (collectively, the "Service").</p>
+        <p>The Service is a business-to-business SaaS platform for creating, managing, publishing, verifying, and accessing Digital Product Passports ("DPPs"). A DPP may include product, battery, facility, economic operator, compliance, lifecycle, circularity, sustainability, repairability, recycling, safety, technical, certification, and related documentation data.</p>
+        <p>Some DPP information may be intentionally made public through public passport pages, QR codes, public product identifiers, decentralized identifier documents, JSON-LD exports, verifiable credentials, public API endpoints, signatures, dictionary routes, or other standards-facing interfaces.</p>
+      </section>
 
-        <section id="information-we-collect">
-          <h2>2. Information we collect</h2>
-          <p>We collect only the information needed to operate the website, respond to enquiries, provide services, and improve the ClarosDPP experience.</p>
-          <h3>Information you provide</h3>
-          <ul>
-            <li>Contact details when you request a demo, submit a form, or email us</li>
-            <li>Account information if you create a workspace or use the platform</li>
-            <li>Product data, passport content, and compliance information you upload</li>
-            <li>Messages, feedback, or support requests</li>
-          </ul>
-          <h3>Website and technical information</h3>
-          <ul>
-            <li>Browser type, IP address, pages visited, and referrer information</li>
-            <li>Cookies and similar tracking technologies (where permitted)</li>
-            <li>Performance data to help us understand how the site is used</li>
-          </ul>
-          <h3>Platform and service information</h3>
-          <ul>
-            <li>Features used, workspace activity, and usage patterns</li>
-            <li>Device and browser information for compatibility and support</li>
-          </ul>
-        </section>
+      <section id="scope">
+        <h2>2. Scope</h2>
+        <p>This Privacy Policy applies to:</p>
+        <ul>
+          <li>Website visitors who browse our website, documentation, marketing pages, or public DPP pages</li>
+          <li>Customer administrators and users who create accounts, log in, manage workspaces, use dashboards, publish DPPs, use APIs, or configure integrations</li>
+          <li>Invitees who receive invitations to join a customer workspace or company account</li>
+          <li>Public DPP viewers who access public passport pages, QR-code links, public APIs, DID documents, JSON-LD files, signatures, or verifiable credentials</li>
+          <li>Customer personnel, supplier contacts, facility contacts, and other individuals whose personal data may be included in customer-submitted content</li>
+          <li>Prospects, partners, vendors, and support contacts who interact with us in a business context</li>
+        </ul>
+      </section>
 
-        <section id="how-we-use-information">
-          <h2>3. How we use information</h2>
-          <p>We use information to run ClarosDPP responsibly and to provide a clear, secure, and useful Digital Product Passport experience.</p>
-          <ul>
-            <li>Provide, maintain, and improve the website and services</li>
-            <li>Respond to enquiries and process demo requests</li>
-            <li>Send service updates, security alerts, and account notifications</li>
-            <li>Analyse usage to improve features, performance, and user experience</li>
-            <li>Meet legal obligations and prevent fraud or abuse</li>
-            <li>With permission, send marketing communications about ClarosDPP and related services</li>
-          </ul>
-          <p>We do not sell personal information.</p>
-        </section>
+      <section id="our-role">
+        <h2>3. Our Role: Controller and Processor</h2>
+        <h3>3.1 When We Act as Controller</h3>
+        <p>We act as a <strong>controller</strong> when we determine why and how personal data is processed. This includes personal data processed for:</p>
+        <ul>
+          <li>Account registration and user authentication</li>
+          <li>Website operation and analytics</li>
+          <li>Customer relationship management</li>
+          <li>Billing, subscription, and contract administration</li>
+          <li>Security monitoring and fraud prevention</li>
+          <li>Product analytics and service improvement</li>
+          <li>Marketing communications</li>
+          <li>Support and troubleshooting</li>
+        </ul>
+        <h3>3.2 When We Act as Processor</h3>
+        <p>We act as a <strong>processor</strong> when we process personal data on behalf of a customer through the Service. This may include personal data contained in Digital Product Passports, uploaded files, documents, and integration data.</p>
+      </section>
 
-        <section id="legal-bases">
-          <h2>4. Legal bases for processing</h2>
-          <p>Where GDPR or similar data protection laws apply, we rely on one or more legal bases depending on the context.</p>
-          <ul>
-            <li><strong>Contractual necessity:</strong> Processing needed to provide services or fulfil your requests</li>
-            <li><strong>Legitimate interests:</strong> Operating, improving, and securing the platform</li>
-            <li><strong>Consent:</strong> Where you have explicitly agreed (for example, marketing communications)</li>
-            <li><strong>Legal obligation:</strong> Compliance with applicable laws and regulations</li>
-          </ul>
-        </section>
+      <section id="personal-data-we-collect">
+        <h2>4. Personal Data We Collect</h2>
+        <h3>4.1 Account and User Profile Data</h3>
+        <p>We may collect name, business email address, password, company name, role and permission level, job title, phone number, avatar, bio, preferred language, and account status information.</p>
+        <h3>4.2 Company and Business Account Data</h3>
+        <p>We may collect company name, business identifiers, company configuration, subscription details, and business contact information.</p>
+        <h3>4.3 Authentication and Security Data</h3>
+        <p>We may collect password hashes, session cookies, authentication tokens, single sign-on metadata, login attempts, security events, IP addresses, and user agent information.</p>
+        <h3>4.4 Digital Product Passport Content</h3>
+        <p>Customers may submit DPP content that may include product identifiers, company details, technical documentation, battery data, DID documents, signatures, and contact information.</p>
+        <h3>4.5 Public DPP Viewer and API Data</h3>
+        <p>When someone accesses public DPP pages or APIs, we may process IP address, user agent, device metadata, timestamps, and requested content information.</p>
+        <h3>4.6 Uploaded Files and Documents</h3>
+        <p>Customers may upload documents such as certificates, manuals, compliance documentation, and technical files that may contain personal data.</p>
+        <h3>4.7 Payment and Billing Data</h3>
+        <p>If the Service is offered on a paid basis, we may collect billing contact information, company address, subscription plan, and limited payment metadata.</p>
+        <h3>4.8 Communications and Support Data</h3>
+        <p>When you contact us, we may collect name, contact details, company information, message contents, support tickets, and diagnostic data.</p>
+        <h3>4.9 Marketing and Events Data</h3>
+        <p>We may collect contact information, marketing preferences, event registration details, and interaction records.</p>
+        <h3>4.10 Cookies and Similar Technologies</h3>
+        <p>We may use cookies, local storage, session storage, pixels, and SDKs. See the Cookie Policy section below.</p>
+      </section>
 
-        <section id="cookies">
-          <h2>5. Cookies and analytics</h2>
-          <p>Our website may use cookies and similar technologies for essential functionality, security, analytics, and performance measurement.</p>
-          <p>Where required, we will ask for consent before using non-essential cookies. You can usually control cookies through your browser settings. If you disable cookies, some parts of the website may not work as intended.</p>
-        </section>
+      <section id="sources-of-data">
+        <h2>5. Sources of Personal Data</h2>
+        <p>We may collect personal data from:</p>
+        <ul>
+          <li>You directly, when you create an account, update a profile, or contact support</li>
+          <li>Your employer or administrator, when they invite you or configure your access</li>
+          <li>Customers and partners, when they enter DPP or workflow data</li>
+          <li>Public DPP viewers, through server logs and request metadata</li>
+          <li>Authentication and SSO providers</li>
+          <li>Service providers for hosting, email, analytics, and support</li>
+          <li>Third-party integrations and systems</li>
+        </ul>
+      </section>
 
-        <section id="marketing">
-          <h2>6. Marketing communications</h2>
-          <p>If you request a demo, contact us, or sign up for updates, we may send relevant business communications about ClarosDPP, Digital Product Passports, compliance readiness, and related services.</p>
-          <p>You can opt out of marketing emails at any time by using the unsubscribe option in an email or by contacting us at <a href="mailto:hello@claros-dpp.online">hello@claros-dpp.online</a>.</p>
-        </section>
+      <section id="purposes-and-lawful-bases">
+        <h2>6. Purposes and Lawful Bases for Processing</h2>
+        <p>We process personal data for the following purposes with appropriate lawful bases:</p>
+        <ul>
+          <li><strong>Account Management:</strong> Contract necessity; legitimate interests</li>
+          <li><strong>Authentication and Sessions:</strong> Contract necessity; legitimate interests</li>
+          <li><strong>Service Provision:</strong> Contract necessity; legitimate interests</li>
+          <li><strong>Support and Troubleshooting:</strong> Contract necessity; legitimate interests</li>
+          <li><strong>Payment Processing:</strong> Contract necessity; legal obligation</li>
+          <li><strong>Service Improvement:</strong> Legitimate interests</li>
+          <li><strong>Security and Fraud Prevention:</strong> Legitimate interests; legal obligation</li>
+          <li><strong>Legal Compliance:</strong> Legal obligation; legitimate interests</li>
+          <li><strong>Marketing Communications:</strong> Consent where required; legitimate interests where permitted</li>
+          <li><strong>Analytics:</strong> Consent where required</li>
+        </ul>
+      </section>
 
-        <section id="sharing">
-          <h2>7. How we share information</h2>
-          <p>We may share information with trusted providers only when necessary to run the website, deliver services, or meet legal obligations.</p>
-          <ul>
-            <li>Service providers who host, support, or analyse the platform</li>
-            <li>Law enforcement or government agencies when required by law</li>
-            <li>Successor organisations in the event of a merger, acquisition, or sale</li>
-          </ul>
-          <p>Service providers may only process information for agreed purposes and must protect it appropriately.</p>
-        </section>
+      <section id="customer-responsibility">
+        <h2>7. Customer Responsibility for DPP Content</h2>
+        <p>Customers are responsible for the DPP content they submit, import, generate, or publish through the Service. This includes responsibility for:</p>
+        <ul>
+          <li>Ensuring content is accurate, lawful, and not misleading</li>
+          <li>Ensuring the right to submit and publish content</li>
+          <li>Avoiding unnecessary personal data in public DPP fields</li>
+          <li>Avoiding special-category personal data</li>
+          <li>Providing required privacy notices to employees and contacts</li>
+          <li>Handling requests from individuals whose data is included in customer content</li>
+          <li>Ensuring uploaded documents do not contain excessive or unnecessary personal data</li>
+        </ul>
+      </section>
 
-        <section id="international-transfers">
-          <h2>8. International transfers</h2>
-          <p>Some service providers may process information in countries different from your own. Where required, we use appropriate safeguards such as contractual protections, adequacy decisions, or other lawful transfer mechanisms.</p>
-        </section>
+      <section id="public-passports">
+        <h2>8. Public Digital Product Passports</h2>
+        <p>The Service may allow customers to publish DPPs through public URLs, QR codes, APIs, DID documents, and similar features. Public DPP information may be accessed by anyone, including consumers, regulators, competitors, and third-party aggregators.</p>
+        <p>If customers publish DPP content, they understand that:</p>
+        <ul>
+          <li>Public content may be copied, downloaded, cached, indexed, or redistributed by third parties</li>
+          <li>We may not be able to remove copies held by third parties</li>
+          <li>Customers should not publish personal data unless necessary and lawful</li>
+        </ul>
+      </section>
 
-        <section id="retention">
-          <h2>9. Data retention</h2>
-          <p>We keep personal information only for as long as needed for the purpose it was collected, unless a longer period is required for legal, security, accounting, or contractual reasons.</p>
-          <ul>
-            <li>Account information: retained while your account is active, then deleted or anonymised</li>
-            <li>Contact and demo requests: kept for business and compliance purposes</li>
-            <li>Marketing preferences: retained until you opt out</li>
-            <li>Analytics data: typically retained for up to 13 months</li>
-          </ul>
-          <p>When information is no longer needed, we delete, anonymise, or securely archive it.</p>
-        </section>
+      <section id="special-category-data">
+        <h2>9. Special-Category Data and Sensitive Data</h2>
+        <p>The Service is not designed for collecting special-category personal data under GDPR, such as health data, biometric data, genetic data, political opinions, religious beliefs, or trade-union membership data.</p>
+        <p>The Service is also not intended for highly sensitive personal data such as national identity numbers, passport numbers, financial account details, or medical data, unless explicitly agreed in writing and legally permitted.</p>
+      </section>
 
-        <section id="security">
-          <h2>10. Security</h2>
-          <p>We use reasonable technical and organisational measures to protect information against unauthorised access, loss, misuse, alteration, or disclosure.</p>
-          <ul>
-            <li>Encryption for data in transit (HTTPS) and at rest</li>
-            <li>Regular security assessments and updates</li>
-            <li>Access controls and authentication protections</li>
-            <li>Staff training on data protection and privacy</li>
-          </ul>
-          <p>No online service can be guaranteed to be completely secure, but we work to protect information responsibly.</p>
-        </section>
+      <section id="childrens-privacy">
+        <h2>10. Children's Privacy</h2>
+        <p>The Service is intended for business and professional use. It is not directed to children. We do not knowingly collect personal data from children. If you believe a child has provided personal data to us, please contact us.</p>
+      </section>
 
-        <section id="rights">
-          <h2>11. Your rights</h2>
-          <p>Depending on where you live, you may have rights over your personal information.</p>
-          <ul>
-            <li>Right to access the information we hold about you</li>
-            <li>Right to correct inaccurate information</li>
-            <li>Right to request deletion of your information</li>
-            <li>Right to restrict how we process your information</li>
-            <li>Right to data portability (receive your data in a structured format)</li>
-            <li>Right to withdraw consent at any time</li>
-            <li>Right to lodge a complaint with your local data protection authority</li>
-          </ul>
-          <p>To exercise your rights, contact us at <a href="mailto:hello@claros-dpp.online">hello@claros-dpp.online</a>. We may need to verify your identity before responding.</p>
-        </section>
+      <section id="automated-decisions">
+        <h2>11. Automated Decision-Making and Profiling</h2>
+        <p>We do not intentionally use personal data to make decisions based solely on automated processing that produce legal or similarly significant effects. We may use automated tools for authentication, security monitoring, rate limiting, and fraud prevention.</p>
+      </section>
 
-        <section id="children">
-          <h2>12. Children's privacy</h2>
-          <p>ClarosDPP is intended for business and professional use. Our website and services are not directed at children, and we do not knowingly collect personal information from children.</p>
-        </section>
+      <section id="ai-analytics">
+        <h2>12. AI, Analytics, and Service Improvement</h2>
+        <p>We may use aggregated, anonymised, or de-identified data to understand usage, improve the Service, troubleshoot issues, and enhance security. We will not intentionally use customer DPP content containing personal data to train public AI models without a lawful basis and appropriate contractual permission.</p>
+      </section>
 
-        <section id="third-party-links">
-          <h2>13. Third-party links</h2>
-          <p>Our website may link to third-party websites or services. We are not responsible for their content, privacy practices, or security. You should review their policies before sharing information with them.</p>
-        </section>
+      <section id="how-we-share">
+        <h2>13. How We Share Personal Data</h2>
+        <h3>13.1 Customer Organizations and Administrators</h3>
+        <p>If your account is associated with a customer organization, administrators may access and manage certain data related to your use of that workspace.</p>
+        <h3>13.2 Public Viewers and API Users</h3>
+        <p>Public DPP content is shared with anyone who accesses the relevant public page, QR-code URL, or API endpoint.</p>
+        <h3>13.3 Service Providers and Subprocessors</h3>
+        <p>We may use trusted service providers for cloud hosting, database hosting, email delivery, authentication, monitoring, customer support, analytics, payment processing, and professional services.</p>
+        <h3>13.4 Customer Integrations</h3>
+        <p>Customers may connect the Service to third-party systems such as ERP, PLM, or compliance systems. Data shared with those systems is governed by the customer's configuration and the third party's terms.</p>
+        <h3>13.5 Legal, Regulatory, and Safety Purposes</h3>
+        <p>We may disclose personal data where necessary to comply with law, respond to regulatory requests, enforce agreements, protect security, or prevent fraud.</p>
+        <h3>13.6 Business Transfers</h3>
+        <p>If we are involved in a merger, acquisition, or sale of assets, personal data may be transferred as part of that transaction.</p>
+      </section>
 
-        <section id="changes">
-          <h2>14. Changes to this Privacy Policy</h2>
-          <p>We may update this Privacy Policy from time to time. When we do, we will update the "Last updated" date above. If changes are significant, we may provide additional notice where appropriate.</p>
-        </section>
+      <section id="international-transfers">
+        <h2>14. International Transfers</h2>
+        <p>We may process and store personal data in countries other than where you are located. Where GDPR applies and personal data is transferred outside the EEA, we will use appropriate safeguards such as:</p>
+        <ul>
+          <li>Standard Contractual Clauses</li>
+          <li>Data Processing Agreements with relevant transfer terms</li>
+          <li>Additional technical, organisational, or contractual safeguards</li>
+        </ul>
+      </section>
 
-        <section id="contact-us">
-          <h2>15. Contact us</h2>
-          <p>For questions about this Privacy Policy or how ClarosDPP handles personal information, contact us at:</p>
-          <div class="legal-note">
-            <p><strong>Email:</strong> <a href="mailto:hello@claros-dpp.online">hello@claros-dpp.online</a></p>
-          </div>
-        </section>
-      </article>
-    </div>
-  </section>
+      <section id="security-measures">
+        <h2>15. Security Measures</h2>
+        <p>We use technical and organisational measures designed to protect personal data against accidental or unlawful destruction, loss, alteration, unauthorised disclosure, or access. These measures may include:</p>
+        <ul>
+          <li>Password hashing and password policy enforcement</li>
+          <li>Session cookies and token-based authentication</li>
+          <li>Two-factor authentication where enabled</li>
+          <li>Rate limiting for authentication and public endpoints</li>
+          <li>Role-based access control</li>
+          <li>Audit logging for important events</li>
+          <li>Cryptographic signing for released passports</li>
+          <li>Secure transport using HTTPS in production</li>
+          <li>Logging, monitoring, and backup procedures</li>
+        </ul>
+        <div class="legal-callout">
+          <p><strong>Note:</strong> No online service is completely secure. Customers are responsible for maintaining secure passwords, restricting administrator access, and promptly notifying us of suspected security incidents.</p>
+        </div>
+      </section>
 
-  <script src="shared.js?v=20260423"></script>
+      <section id="data-breaches">
+        <h2>16. Personal Data Breaches</h2>
+        <p>If we become aware of a personal-data breach affecting personal data for which we are controller, we will assess the incident and notify affected individuals and supervisory authorities where required by law.</p>
+        <p>If we process personal data as processor for a customer, we will notify the customer without undue delay after becoming aware of a personal-data breach, in accordance with the applicable Data Processing Agreement.</p>
+      </section>
+
+      <section id="data-retention">
+        <h2>17. Data Retention</h2>
+        <p>We retain personal data only for as long as necessary for the purposes described in this Privacy Policy, unless a longer retention period is required or permitted by law.</p>
+        <p>Indicative retention periods are:</p>
+        <ul>
+          <li><strong>Account data:</strong> For the life of the account, then deleted or anonymised after a reasonable closure period</li>
+          <li><strong>Authentication and session data:</strong> For the period needed to maintain sessions and comply with audit requirements</li>
+          <li><strong>Customer DPP content:</strong> For the term of the customer subscription, plus any contractual retention period</li>
+          <li><strong>Support tickets:</strong> For the period necessary to provide support and maintain business records</li>
+          <li><strong>Billing and tax records:</strong> As required by accounting and tax obligations</li>
+          <li><strong>Security logs:</strong> For a security and audit period appropriate to the risk</li>
+          <li><strong>Marketing data:</strong> Until consent is withdrawn or no longer needed</li>
+          <li><strong>Cookie and analytics data:</strong> According to the cookie duration table and analytics configuration</li>
+        </ul>
+      </section>
+
+      <section id="your-rights">
+        <h2>18. Your GDPR Rights</h2>
+        <p>Where GDPR applies and subject to legal conditions, you may have the right to:</p>
+        <ul>
+          <li><strong>Access:</strong> Your personal data</li>
+          <li><strong>Rectify:</strong> Inaccurate or incomplete personal data</li>
+          <li><strong>Erase:</strong> Personal data in certain circumstances</li>
+          <li><strong>Restrict:</strong> Processing in certain circumstances</li>
+          <li><strong>Object:</strong> To processing based on legitimate interests or direct marketing</li>
+          <li><strong>Data portability:</strong> For data processed based on consent or contract</li>
+          <li><strong>Withdraw consent:</strong> At any time where applicable</li>
+          <li><strong>Lodge a complaint:</strong> With a supervisory authority</li>
+        </ul>
+        <p>We will respond to valid requests within the period required by law, generally within one month under GDPR unless an extension is permitted.</p>
+      </section>
+
+      <section id="exercise-rights">
+        <h2>19. How to Exercise Your Rights</h2>
+        <p>To exercise your rights, contact us at <strong>privacy@claros-dpp.online</strong>.</p>
+        <p>If your personal data is contained in a customer workspace, we may refer your request to the relevant customer because the customer is usually the controller of that data. We will assist customers with data-subject requests as required by applicable law and our Data Processing Agreement.</p>
+        <p>For security reasons, we may need to verify your identity before responding to a request. We may refuse or limit requests where permitted by law.</p>
+      </section>
+
+      <section id="marketing-communications">
+        <h2>20. Marketing Communications</h2>
+        <p>We may send marketing communications where permitted by law. You can opt out of marketing emails by using the unsubscribe link in the email or contacting us. Even if you opt out of marketing messages, we may still send service, security, billing, legal, or administrative messages.</p>
+      </section>
+
+      <section id="third-party-links">
+        <h2>21. Links to Third-Party Websites</h2>
+        <p>The Service may contain links to third-party websites, standards bodies, regulatory resources, or integration providers. We are not responsible for the privacy practices of third parties. You should review their privacy notices before providing personal data to them.</p>
+      </section>
+
+      <section id="changes-to-policy">
+        <h2>22. Changes to This Privacy Policy</h2>
+        <p>We may update this Privacy Policy from time to time. The updated version will be posted with a new "Last updated" date. If changes are material, we may provide additional notice through email, in-app notice, or other means. Your continued use of the Service after the effective date of an updated Privacy Policy means the updated Privacy Policy applies from that date.</p>
+      </section>
+
+      <section id="contact">
+        <h2>23. Contact</h2>
+        <p>For privacy questions or requests, contact:</p>
+        <div class="legal-callout">
+          <p><strong>Claros Digital Product Passport</strong><br>
+          Email: <strong>privacy@claros-dpp.online</strong><br>
+          Support: <strong>support@claros-dpp.online</strong><br>
+          Security: <strong>security@claros-dpp.online</strong></p>
+        </div>
+        <p>You may also contact your local data-protection supervisory authority. If your company is established in Sweden, the relevant supervisory authority is the Swedish Authority for Privacy Protection (Integritetsskyddsmyndigheten).</p>
+      </section>
+
+      <section id="cookie-policy">
+        <h2>Cookie Policy</h2>
+        <h3>1. What Are Cookies?</h3>
+        <p>Cookies are small text files stored on your device when you visit a website. Similar technologies include local storage, session storage, pixels, SDKs, and server-side tracking technologies. These technologies help websites work, remember preferences, maintain sessions, understand usage, and secure accounts.</p>
+
+        <h3>2. How We Use Cookies and Similar Technologies</h3>
+        <p>We may use cookies and similar technologies to:</p>
+        <ul>
+          <li>Keep you signed in</li>
+          <li>Maintain secure sessions</li>
+          <li>Remember cookie-consent choices</li>
+          <li>Remember language, display, and preference settings</li>
+          <li>Protect the Service from fraud, abuse, and unauthorised access</li>
+          <li>Measure performance and diagnose errors</li>
+          <li>Understand how visitors use the website and Service</li>
+          <li>Support customer support and troubleshooting</li>
+          <li>Provide analytics or marketing features, only where permitted and consented to if required</li>
+        </ul>
+
+        <h3>3. Cookie Categories</h3>
+        <h4>3.1 Strictly Necessary Cookies</h4>
+        <p>These cookies are required for the website and Service to function. They may include authentication cookies, session cookies, CSRF protection cookies, consent-management cookies, and security cookies. These cookies generally do not require consent under EU cookie rules.</p>
+
+        <h4>3.2 Preference Cookies</h4>
+        <p>Preference cookies remember choices such as language, region, layout, or saved settings. Where legally required, we request consent before using non-essential preference cookies.</p>
+
+        <h4>3.3 Analytics Cookies</h4>
+        <p>Analytics cookies help us understand how visitors use the website and Service. In the EU/EEA and UK, we request consent before using non-essential analytics cookies unless an applicable exemption applies.</p>
+
+        <h4>3.4 Marketing Cookies</h4>
+        <p>Marketing cookies may be used to measure campaigns, show relevant ads, or understand conversions. We only use marketing cookies where enabled and legally permitted, including obtaining consent where required.</p>
+
+        <h4>3.5 Third-Party Cookies</h4>
+        <p>Third-party cookies may be set by external services such as analytics providers, embedded content providers, payment processors, or customer-support tools.</p>
+
+        <h3>4. Cookie Consent</h3>
+        <p>Where required by law, we will not set non-essential cookies until you have given consent. You may accept or reject non-essential cookies through our cookie banner or cookie settings tool. Refusing non-essential cookies should not prevent you from using the core Service.</p>
+
+        <h3>5. Browser Controls</h3>
+        <p>Most browsers allow you to block, delete, or manage cookies. If you block strictly necessary cookies, parts of the Service may not function correctly, including login, security, and dashboard features.</p>
+
+        <h3>6. Do Not Track and Global Privacy Signals</h3>
+        <p>Some browsers send "Do Not Track" or other privacy signals. We will respond to legally required signals where applicable and technically feasible.</p>
+
+        <h3>7. Updates to This Cookie Policy</h3>
+        <p>We may update this Cookie Policy as our website, Service, cookies, providers, or legal requirements change. The updated version will be posted with a new "Last updated" date.</p>
+      </section>
+    </article>
+  </div>
+
+  <script src="shared.js?v=20260504"></script>
 </body>
 </html>
