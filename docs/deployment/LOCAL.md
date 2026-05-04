@@ -109,7 +109,7 @@ docker-compose ps
 **Port**: 3000 (Vite dev server)
 
 **Services**:
-- Vue.js development server
+- React/Vite development server
 - Hot module replacement (HMR)
 - Source maps for debugging
 
@@ -168,7 +168,7 @@ curl http://localhost:3001/api/health
 **Services**:
 - Public DPP viewer
 - No authentication required
-- Vue.js SPA
+- React/Vite SPA
 
 **Start alone**:
 ```bash
@@ -345,7 +345,7 @@ docker-compose exec backend-api node --inspect=0.0.0.0:9229 Server/server.js
 
 **Frontend Debugging**:
 
-1. Vue DevTools browser extension
+1. React Developer Tools browser extension
 2. Browser console (F12)
 3. VS Code debugger (launch.json config)
 
@@ -565,7 +565,7 @@ npm run build --profile
 **Extensions**:
 - Docker
 - Remote - Containers
-- Vue - Official
+- React - Official
 - Prettier
 - ESLint
 - REST Client

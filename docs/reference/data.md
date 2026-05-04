@@ -40,7 +40,7 @@ Detailed list of:
 ### Integration
 
 The data attributes from this file are mapped to:
-- Database schema in `/docs/DATABASE_SCHEMA.md`
+- Database schema in `/docs/database/DATABASE_SCHEMA.md`
 - API endpoints in `/docs/api/ENDPOINTS.md`
 - Passport data model in `/apps/backend-api/services/PassportService.js`
 

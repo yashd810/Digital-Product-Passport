@@ -52,8 +52,8 @@ Set in `../config/` directory:
 
 **Local Development** (docker-compose.yml):
 - backend-api (Node.js, port 3001)
-- frontend-app (Vue.js, port 3000)
-- public-passport-viewer (Vue.js, port 3004)
+- frontend-app (React/Vite, port 3000)
+- public-passport-viewer (React/Vite, port 3004)
 - marketing-site (Static, port 8080)
 - postgres (Database, port 5432)
 
@@ -101,4 +101,4 @@ kill -9 [PID]
 
 ---
 
-**[← Back to Docs](../docs/README.md)**
+**[← Back to Docs](../README.md)**

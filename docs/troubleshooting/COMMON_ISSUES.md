@@ -506,7 +506,7 @@ If you encounter an issue not covered here:
 2. **Review environment variables**: `echo $VARIABLE_NAME`
 3. **Test components individually**: Test API with curl, test DB with psql
 4. **Check documentation**: See [docs/README.md](../README.md)
-5. **Review architecture**: See [docs/ARCHITECTURE.md](../ARCHITECTURE.md)
+5. **Review architecture**: See [docs/architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md)
 
 ---
 

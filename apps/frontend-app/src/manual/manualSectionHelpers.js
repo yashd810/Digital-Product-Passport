@@ -41,6 +41,11 @@ export function collectSearchTerms(section) {
     section.table
       ? [section.table.title, ...(section.table.columns || []), ...(section.table.rows || []).flatMap((row) => row)]
       : [];
+  const tables = (section.tables || []).flatMap((tableEntry) => [
+    tableEntry.title,
+    ...(tableEntry.columns || []),
+    ...(tableEntry.rows || []).flatMap((row) => row),
+  ]);
   const catalogs = (section.tableCatalogs || []).flatMap((catalog) => [
     catalog.title,
     catalog.description,
@@ -60,6 +65,7 @@ export function collectSearchTerms(section) {
     ...links,
     ...previews,
     ...table,
+    ...tables,
     ...catalogs,
     ...endpointFamilies,
     ...flowCards,
@@ -68,4 +74,3 @@ export function collectSearchTerms(section) {
     .join(" ")
     .toLowerCase();
 }
-

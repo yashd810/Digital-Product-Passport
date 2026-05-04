@@ -7,11 +7,13 @@ import {
   BACKEND_OPERATION_FLOWS,
   COMPANY_WRITE_API_TABLE,
   CORE_DATABASE_TABLES,
+  DICTIONARY_API_TABLE,
+  GOVERNANCE_SECURITY_API_TABLE,
   PUBLIC_AND_LIVE_API_TABLE,
   READ_EXPORT_API_TABLE,
   SECURITY_KEY_TABLE,
 } from "./manualData";
-import { buildPreview, getCompanyLabel, getPassportTypeLabel } from "./manualSectionHelpers";
+import { buildPreview, getCompanyLabel, getPassportTypeLabel, prettifyName } from "./manualSectionHelpers";
 
 export function buildAdminSections({ user, companies, adminPassportTypes, categories }) {
   const firstCompany = companies[0];
@@ -20,7 +22,10 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
   const typesCount = adminPassportTypes.length;
   const categoriesCount = categories.length;
   const firstCompanyAccessRoute = firstCompany ? `/admin/company/${firstCompany.id}/access` : "";
-  const firstCompanyAnalyticsRoute = firstCompany ? `/admin/company/${firstCompany.id}/analytics` : "";
+  const firstCompanyAnalyticsSlug = firstCompany?.company_name
+    ? firstCompany.company_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    : "";
+  const firstCompanyAnalyticsRoute = firstCompanyAnalyticsSlug ? `/admin/analytics/${firstCompanyAnalyticsSlug}` : "";
   const firstCompanyProfileRoute = firstCompany ? `/admin/company/${firstCompany.id}/profile` : "";
   const firstTypeFieldsRoute = firstType ? `/admin/passport-types/${encodeURIComponent(firstType.type_name)}/fields` : "";
 
@@ -80,10 +85,11 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Companies",
       audience: "Super admins onboarding or supporting tenants",
       title: "Create companies and launch their initial setup",
-      summary: "The Companies page is the tenant entry point. From there you can create new companies, see granted passport types, jump into company-specific access or branding tools, invite users, and remove tenants when necessary.",
+      summary: "The Companies page is the tenant entry point. From there you can create new companies, set DPP issuance policy, see granted passport types, toggle Asset Management, jump into company-specific access or branding tools, invite users, and remove tenants when necessary.",
       facts: [
-        { label: "Company actions", value: "Access, Branding, Invite, and Delete" },
+        { label: "Company actions", value: "Access, DPP Policy, Asset Management, Branding, Invite, and Delete" },
         { label: "Creation outcome", value: "A new tenant record that can then receive passport-type access and user invites" },
+        { label: "DPP policy", value: "Default granularity, override permission, DID minting, VC issuance, JSON-LD export, and battery dictionary flags" },
         { label: "Delete protection", value: "Deletion requires confirmation and is designed as an intentional super-admin action" },
         { label: "Current example company", value: getCompanyLabel(firstCompany) || "First available company" },
       ],
@@ -92,6 +98,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           title: "Create a company cleanly",
           items: [
             "Open Companies and create the tenant with the company name that should appear across the product.",
+            "Open DPP Policy and choose the default granularity before the tenant begins standards/DID-heavy creation work.",
             "Immediately follow up by granting passport-type access so the tenant sees relevant content instead of an empty dashboard.",
             "Invite the initial company users only after the type catalog is ready enough for their onboarding.",
           ],
@@ -100,6 +107,8 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           title: "Use each company action intentionally",
           items: [
             "Access opens the company passport-type assignment screen.",
+            "DPP Policy controls default model/batch/item behavior, DID minting, VC issuance, JSON-LD export, and dictionary behavior.",
+            "Asset Management enables or revokes the separate bulk-update workspace for that tenant.",
             "Branding opens the company profile editor from the super-admin side so you can help with public-facing setup.",
             "Invite sends company-user invitation links without leaving the tenant-management workflow.",
             "Delete is reserved for real tenant removal and should be treated as an end-of-life operation.",
@@ -120,7 +129,58 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         ),
       ],
       warnings: [
-        "Do not invite users into a company before the correct passport-type access has been granted, or their first login will feel incomplete.",
+        "Do not invite users into a company before the correct passport-type access and DPP policy have been configured, or their first login can feel incomplete and standards exports may use the wrong defaults.",
+      ],
+    },
+    {
+      id: "dpp-policy-and-operator-identity",
+      icon: "🪪",
+      category: "Companies",
+      audience: "Super admins configuring standards, DID, VC, and operator behavior",
+      title: "Configure DPP policy, operator identity, granularity, and facility behavior",
+      summary: "The current platform has a standards-oriented identity layer. A company is not just a tenant name: it can have a DID slug, economic-operator identifier, operator identifier scheme, DPP granularity policy, DID minting switches, VC issuance control, JSON-LD export control, battery dictionary control, and managed facilities.",
+      facts: [
+        { label: "Policy endpoint", value: "GET, PUT, PATCH /api/admin/companies/:id/dpp-policy" },
+        { label: "Compliance identity endpoint", value: "GET/POST /api/companies/:companyId/compliance-identity" },
+        { label: "Facility endpoint", value: "POST /api/companies/:companyId/facilities" },
+        { label: "DID surfaces", value: "/.well-known/did.json, /did/company/:slug/did.json, /did/battery/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json, and /resolve?did=..." },
+      ],
+      journeys: [
+        {
+          title: "Set the company DPP policy first",
+          items: [
+            "Choose default granularity: item, batch, or model. This affects standards-oriented DPP creation and identifier generation.",
+            "Enable granularity override only for companies that understand when a passport should intentionally move between model, batch, and item levels.",
+            "Use the DID minting flags to control whether model, item, and facility DIDs should be issued for that tenant.",
+            "Keep VC issuance and JSON-LD export enabled for tenants that need verification, linked data, or Battery Pass interoperability.",
+          ],
+        },
+        {
+          title: "Understand operator identity",
+          items: [
+            "The company stores economic_operator_identifier and economic_operator_identifier_scheme.",
+            "Authenticated user responses include actor/operator identity fields when the company identity exists.",
+            "Standards APIs can also accept economicOperatorId/economic_operator_id and facilityId/facility_id in create or patch payloads.",
+            "Audit logs can record actor_identifier and audience, so operator-driven actions remain traceable.",
+          ],
+        },
+        {
+          title: "Handle facilities and DID resolution",
+          items: [
+            "Managed facilities are stored in company_facilities and must match a known active facility identifier before standards APIs accept them.",
+            "Facility DID documents are public at `/did/facility/:stableId/did.json`.",
+            "Legacy numeric company/product DID URLs redirect to the canonical stable-ID DID routes.",
+            "Browser requests to `/resolve?did=...` can redirect to public passport pages; API-style requests redirect to DID documents.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Companies", route: "/admin/companies", description: "Open the DPP Policy action from a company row." },
+        { label: "Open Company Branding", route: firstCompanyProfileRoute || "/admin/companies", description: "Support public presentation after identity policy is set." },
+      ],
+      tips: [
+        "For production onboarding, decide granularity and operator identifiers before the first bulk import. Correcting identifiers later is more sensitive than correcting display fields.",
+        "DID policy, company access, and passport type design should be reviewed together because they shape what external verifiers will see.",
       ],
     },
     {
@@ -233,12 +293,12 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Types",
       audience: "Super admins designing schemas",
       title: "Design passport types with the builder and field modeler",
-      summary: "The passport-type builder is where the product's authoring experience is defined. Every section, field type, translation, access level, table column, and dynamic-data flag shown to company users comes from decisions made here.",
+      summary: "The passport-type builder is where the product's authoring experience is defined. Every section, field type, translation, access level, table column, semantic model, Battery Dictionary mapping, and dynamic-data flag shown to company users comes from decisions made here.",
       facts: [
         { label: "Builder outputs", value: "Sections, fields, translations, field access, composition flags, Battery Pass mapping, and dynamic settings" },
         { label: "Input helpers", value: "Draft save/resume, clone workflows, and CSV import for builder definitions" },
         { label: "Field-level access", value: "Public, Notified Bodies, Market Surveillance, EU Commission, and Legitimate Interest" },
-        { label: "Special field flags", value: "Composition, Battery Pass mapping, and dynamic field behavior" },
+        { label: "Special field flags", value: "Composition, semantic IDs, Battery Dictionary mapping, dynamic field behavior, and field table configuration" },
       ],
       journeys: [
         {
@@ -255,7 +315,8 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "Use text and textarea for normal authored content, boolean for toggles, date and URL for typed values, table for multi-column structured rows, file for repository-backed PDFs, and symbol for image-based selections.",
             "Use the dynamic flag for values that will update later from devices or manual overrides.",
             "Use composition when a field should contribute to composition visuals in the public viewer.",
-            "Field labels are mapped to Battery Pass semantic IDs automatically for interoperable exports.",
+            "For battery passport types, the semantic model is locked to `claros_battery_dictionary_v1` and fields should be mapped to the correct Claros Battery Dictionary term.",
+            "For non-battery types, semantic mapping remains optional and should be used when exports or partner integrations need stable linked-data identifiers.",
           ],
         },
         {
@@ -292,15 +353,57 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       ],
     },
     {
+      id: "admin-battery-dictionary",
+      icon: "🔖",
+      category: "Types",
+      audience: "Super admins designing battery passport schemas and semantic exports",
+      title: "Use the Battery Dictionary when designing battery passport types",
+      summary: "The admin shell includes the same Battery Dictionary browser as the user dashboard, but the admin use case is schema design. It helps you choose the right semantic model, inspect canonical term IRIs, verify units and access-right expectations, and avoid stale field mappings before companies start authoring passports.",
+      facts: [
+        { label: "Admin route", value: "/admin/dictionary/battery/v1" },
+        { label: "Semantic model", value: "Battery umbrella categories are locked to claros_battery_dictionary_v1" },
+        { label: "Dictionary APIs", value: "Manifest, context, categories, units, field-map, category-rules, terms, and term details" },
+        { label: "Public availability", value: "The dictionary is also available at /dictionary/battery/v1 without dashboard login" },
+      ],
+      journeys: [
+        {
+          title: "Validate schema mappings before publishing",
+          items: [
+            "Open the Battery Dictionary while designing or editing a battery passport type.",
+            "Search by term label, definition, slug, app field key, or semantic identifier.",
+            "Confirm the expected data type, unit, access rights, static/dynamic behavior, element ID, and regulation references.",
+            "Map builder fields to dictionary terms intentionally so JSON-LD export uses the correct canonical identifiers.",
+          ],
+        },
+        {
+          title: "Use dictionary governance endpoints correctly",
+          items: [
+            "Use the manifest and category-rules endpoints to understand which dictionary pieces apply to battery categories.",
+            "Use the field-map endpoint when checking how app field keys connect to dictionary terms.",
+            "Use the JSON-LD context URL when explaining exported Battery Pass payloads to technical partners.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Admin Dictionary", route: "/admin/dictionary/battery/v1", description: "Inspect terms, units, IRIs, and category rules." },
+        { label: "Open Type Builder", route: "/admin/passport-types/new", description: "Apply dictionary mappings while designing a type." },
+      ],
+      table: DICTIONARY_API_TABLE,
+      tips: [
+        "Treat dictionary mapping as part of production schema review. Once companies author data against a type, changing semantic meaning is more sensitive than changing display text.",
+      ],
+    },
+    {
       id: "admin-security-and-people",
       icon: "👑",
       category: "Security",
       audience: "Super admins",
       title: "Manage super-admin access and support user-role operations",
-      summary: "Super-admin security is intentionally separate from company team management. Use Admin Management for super-admin lifecycle work and company analytics when you need to adjust roles inside a tenant during support or governance operations.",
+      summary: "Super-admin security is intentionally separate from company team management. Use Admin Management for super-admin lifecycle work and company analytics when you need to adjust roles inside a tenant during support or governance operations. The wider auth layer also supports invite registration, SSO identities, 2FA, password reset, and session revocation.",
       facts: [
         { label: "Super-admin actions", value: "Invite, revoke access, and restore access" },
         { label: "Tenant-user support", value: "Adjust company user roles from company analytics when necessary" },
+        { label: "Session control", value: "Company admins can revoke user sessions; login also tracks SSO-only and auth-source state" },
         { label: "Profile scope", value: "My Profile is available in the admin shell for personal account settings" },
         { label: "Audit mindset", value: "Keep super-admin access narrow and intentional because these actions affect the whole platform" },
       ],
@@ -318,6 +421,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           items: [
             "Use company analytics when a tenant needs help adjusting a user role from the super-admin side.",
             "Prefer tenant self-service through company admins when the issue is routine and does not need super-admin intervention.",
+            "When immediate access removal matters, make sure session revocation is part of the support playbook rather than only changing a role label.",
             "Use My Profile for your own password and account hygiene so personal admin security stays current too.",
           ],
         },
@@ -388,10 +492,12 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Security",
       audience: "Super admins who need to explain or support integrations",
       title: "Understand the platform's credential model before supporting any integration",
-      summary: "Super admins are often asked the same operational questions: which token should a human user use, which key should an outside reader use, how do device pushes work, and how is Asset Management protected. This section gives the simple answer: every credential has a narrow purpose, and mixing them is both confusing and unsafe.",
+      summary: "Super admins are often asked the same operational questions: which session or token should a human user use, which key should an outside reader use, how do device pushes work, how do delegated audiences work, and how is Asset Management protected. This section gives the simple answer: every credential has a narrow purpose, and mixing them is both confusing and unsafe.",
       facts: [
         { label: "Super-admin perspective", value: "You usually explain or govern these credentials rather than using all of them personally" },
-        { label: "Read-only external access", value: "Uses company API keys, not bearer tokens" },
+        { label: "Dashboard access", value: "Uses browser session cookies; bearer tokens are optional for scripts/tests" },
+        { label: "Read-only external access", value: "Uses company API keys, not dashboard sessions or bearer tokens" },
+        { label: "Controlled audiences", value: "Use user/passport access grants for regulated audience access" },
         { label: "Asset Management protection", value: "Uses a launch token and can require an additional shared secret" },
         { label: "Public-view restriction", value: "Restricted fields unlock with a passport access key, not with a company API key" },
       ],
@@ -399,10 +505,12 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Explain the credential model clearly",
           items: [
-            "Tell dashboard users to use bearer tokens only for protected internal APIs.",
+            "Tell dashboard users to rely on the browser session for normal UI use.",
+            "Tell integration testers to use bearer tokens only when a script cannot use the browser session.",
             "Tell external read-only partners to use company API keys only on `/api/v1/passports`.",
             "Tell device or IoT teams to use the passport's own device key on the dynamic-value push endpoint.",
             "Tell public-view stakeholders that restricted fields are unlocked with a passport access key, not by sharing a company API key.",
+            "Tell regulated-audience users that logged-in controlled access is governed by audience grants, not by public unlock keys.",
           ],
         },
         {
@@ -414,9 +522,9 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           ],
         },
       ],
-      table: SECURITY_KEY_TABLE,
+      tables: [SECURITY_KEY_TABLE, GOVERNANCE_SECURITY_API_TABLE],
       warnings: [
-        "There is no separate special backend key just for audiences such as the EU Commission in the current code. External read access is handled with company API keys and the public viewer model.",
+        "There is no separate special raw API key just for audiences such as the EU Commission. External read access is handled with company API keys, public viewer unlocks, or logged-in audience grants depending on the use case.",
       ],
     },
     {
@@ -464,8 +572,8 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       title: "Admin-side API map for platform setup, support, and governance",
       summary: "This section focuses on the APIs that super admins are most likely to explain, test, or monitor while operating the platform. It is not limited to one screen. Instead, it groups the endpoints that shape tenants, categories, passport types, super-admin access, and Asset Management availability.",
       facts: [
-        { label: "Auth model", value: "All admin endpoints use bearer authentication plus the super-admin role" },
-        { label: "Tenant controls", value: "Company creation, access grants, analytics, and Asset Management enablement" },
+        { label: "Auth model", value: "Admin endpoints use dashboard session or bearer authentication plus the super-admin role" },
+        { label: "Tenant controls", value: "Company creation, DPP policy, access grants, analytics, and Asset Management enablement" },
         { label: "Catalog controls", value: "Categories, type CRUD, activation, drafts, and builder operations" },
         { label: "Operator controls", value: "Super-admin invitations, revocation, and restoration" },
       ],
@@ -483,7 +591,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       title: "Backend picture for super admins: tables, APIs, and lifecycle flows",
       summary: "This section is intentionally deeper than the rest of the manual. It gives you the operational backend picture behind the UI so you can understand what data the platform stores, which API families drive each area, and how major product flows connect end to end.",
       facts: [
-        { label: "Core tables", value: "26 named tables discovered in the current public schema, plus generated `<type>_passports` tables" },
+        { label: "Core tables", value: "30+ named tables in the current public schema, plus generated `<type>_passports` tables" },
         { label: "Catalog pattern", value: "Passport types define fields in `passport_types`, then runtime records live in type-specific passport tables" },
         { label: "Key registry", value: "`passport_registry` connects DPP ID, company, passport type, and the hashed metadata for public access keys and device keys" },
         { label: "API families", value: `${BACKEND_API_FAMILIES.length} major endpoint families mapped in this manual` },

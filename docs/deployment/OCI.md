@@ -749,7 +749,7 @@ claros-dpp.online {
 
 For issues or questions:
 - Check logs: `docker-compose logs`
-- Review [TROUBLESHOOTING.md](../TROUBLESHOOTING.md)
+- Review [TROUBLESHOOTING.md](../troubleshooting/COMMON_ISSUES.md)
 - Check GitHub issues
-- Review [ARCHITECTURE.md](../ARCHITECTURE.md)
+- Review [ARCHITECTURE.md](../architecture/ARCHITECTURE.md)
 

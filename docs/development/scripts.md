@@ -146,4 +146,4 @@ curl https://viewer.claros-dpp.online
 
 ---
 
-**[← Back to Docs](../docs/README.md)**
+**[← Back to Docs](../README.md)**

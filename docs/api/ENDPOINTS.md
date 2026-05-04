@@ -833,7 +833,7 @@ GET /api/passports?page=2&limit=50
 
 ## Next Steps
 
-- See [ARCHITECTURE.md](../ARCHITECTURE.md) for system design
+- See [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for system design
 - See [development/DEVELOPMENT.md](../development/DEVELOPMENT.md) for coding guidelines
-- See [DATABASE_SCHEMA.md](../DATABASE_SCHEMA.md) for data model
+- See [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) for data model
 

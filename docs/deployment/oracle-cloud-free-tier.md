@@ -10,13 +10,13 @@ This keeps the stack very close to your current Docker setup and avoids a larger
 
 ## What this folder gives you
 
-- [cloud-init.yaml](./cloud-init.yaml)
+- [cloud-init.yaml](../../infra/oracle/cloud-init.yaml)
   Bootstraps an Ubuntu VM with Docker, Git, and the app folder.
-- [bootstrap.sh](./bootstrap.sh)
+- [bootstrap.sh](../../infra/oracle/bootstrap.sh)
   Server-side deployment helper. Run this on the VM after your `.env.prod` is in place.
-- [deploy-prod.sh](./deploy-prod.sh)
+- [deploy-prod.sh](../../infra/oracle/deploy-prod.sh)
   Rebuild/start helper that reads secrets from an external env file such as `/etc/dpp/dpp.env` and supports `DPP_DEPLOY_TARGET=all|frontend|backend`.
-- [oci.env.example](./oci.env.example)
+- [oci.env.example](../../infra/oracle/oci.env.example)
   Example production env values tailored for OCI Object Storage.
 
 ## Recommended OCI setup
@@ -60,7 +60,7 @@ STORAGE_S3_FORCE_PATH_STYLE=true
 ## Minimal deployment flow
 
 1. Create the VM in OCI.
-2. Use [cloud-init.yaml](./cloud-init.yaml) as the instance initialization script.
+2. Use [cloud-init.yaml](../../infra/oracle/cloud-init.yaml) as the instance initialization script.
 3. SSH into the VM.
 4. Store your production env file outside the repo on the VM:
 
@@ -92,12 +92,12 @@ If you want to split the stack across two OCI Always Free instances:
   - run `public-passport-viewer`
   - run `asset-management`
   - run `marketing-site`
-  - recommended Caddy config: [Caddyfile.frontend](./Caddyfile.frontend)
+  - recommended Caddy config: [Caddyfile.frontend](../../infra/oracle/Caddyfile.frontend)
 - backend host:
   - run `backend-api`
   - run `postgres`
   - run `local-storage`
-  - recommended Caddy config: [Caddyfile.backend](./Caddyfile.backend)
+  - recommended Caddy config: [Caddyfile.backend](../../infra/oracle/Caddyfile.backend)
 
 Use:
 
@@ -164,7 +164,7 @@ This keeps the checked-out repo clean while still letting Docker Compose read th
 
 ## HTTP/2 minimum for public delivery
 
-The production Caddy edge in [Caddyfile](./Caddyfile) explicitly restricts the public HTTPS listener to `h2` and `h3`.
+The production Caddy edge in [Caddyfile](../../infra/oracle/Caddyfile) explicitly restricts the public HTTPS listener to `h2` and `h3`.
 
 This means:
 

@@ -554,7 +554,7 @@ REINDEX TABLE digital_product_passports;
 
 ## Next Steps
 
-- See [ARCHITECTURE.md](./ARCHITECTURE.md) for system design
-- See [DATA_FLOW.md](./DATA_FLOW.md) for data movement
-- See [api/ENDPOINTS.md](./api/ENDPOINTS.md) for API reference
+- See [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for system design
+- See [DATA_FLOW.md](../architecture/DATA_FLOW.md) for data movement
+- See [api/ENDPOINTS.md](../api/ENDPOINTS.md) for API reference
 

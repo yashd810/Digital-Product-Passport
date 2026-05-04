@@ -435,6 +435,16 @@
   margin-top: 20px;
 }
 
+.manual-data-stack {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.manual-data-stack .manual-data-card {
+  margin-top: 0;
+}
+
 .manual-table-wrap {
   overflow-x: auto;
   max-width: 100%;

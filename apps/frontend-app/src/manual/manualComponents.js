@@ -106,6 +106,14 @@ export function ManualSection({ section }) {
 
       <ManualDataTable table={section.table} />
 
+      {section.tables?.length ? (
+        <div className="manual-data-stack">
+          {section.tables.map((table) => (
+            <ManualDataTable key={`${section.id}-${table.title}`} table={table} />
+          ))}
+        </div>
+      ) : null}
+
       {section.previews?.length ? (
         <div className="manual-preview-grid">
           {section.previews.map((preview) => (

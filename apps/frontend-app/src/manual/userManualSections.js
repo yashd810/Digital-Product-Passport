@@ -3,6 +3,8 @@ import {
   ASSET_MANAGEMENT_TERMS_TABLE,
   API_GETTING_STARTED_FLOWS,
   COMPANY_WRITE_API_TABLE,
+  DICTIONARY_API_TABLE,
+  GOVERNANCE_SECURITY_API_TABLE,
   PUBLIC_AND_LIVE_API_TABLE,
   READ_EXPORT_API_TABLE,
   SECURITY_KEY_TABLE,
@@ -273,7 +275,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       },
       links: [
         { label: "Open My Passports", route: "/dashboard/my-passports", description: "See records assigned to or created by you." },
-        { label: "Open Workflow", route: "/dashboard/workflow", description: "Monitor approvals and backlog items." },
+        { label: "Open Workflow", route: "/dashboard/workflow/inprogress", description: "Monitor approvals and backlog items." },
       ],
       previews: [
         buildPreview(
@@ -382,14 +384,14 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Workflow", route: "/dashboard/workflow", description: "Work through backlog, history, and in-progress approvals." },
+        { label: "Open Workflow", route: "/dashboard/workflow/inprogress", description: "Work through backlog, history, and in-progress approvals." },
         { label: "Open Notifications", route: "/dashboard/notifications", description: "Review action prompts tied to workflow events." },
       ],
       previews: [
         buildPreview(
           "user-workflow",
           "Workflow dashboard",
-          "/dashboard/workflow",
+          "/dashboard/workflow/inprogress",
           "This is where release approvals, backlog items, and history stay visible."
         ),
         buildPreview(
@@ -450,17 +452,58 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
     },
     {
+      id: "battery-dictionary",
+      icon: "🔖",
+      category: "Dictionary",
+      audience: "Company users working with battery passports or JSON-LD exports",
+      title: "Use the Battery Dictionary to check terms, units, access rights, and semantic IDs",
+      summary: "The dashboard includes a Battery Dictionary browser for DIN SPEC 99100 and Battery Pass style work. Use it to search terms, open detail pages, check canonical IRIs, see expected units and data formats, and understand which application field keys map to each dictionary element.",
+      facts: [
+        { label: "Dashboard route", value: "/dashboard/dictionary/battery/v1" },
+        { label: "Public route", value: "/dictionary/battery/v1" },
+        { label: "Term detail", value: "Each term has a slug page plus a raw JSON endpoint" },
+        { label: "Best use", value: "Validate field meaning before exporting JSON-LD or discussing Battery Pass data with partners" },
+      ],
+      journeys: [
+        {
+          title: "Find the right term before exporting",
+          items: [
+            "Open Battery Dictionary from the dashboard sidebar.",
+            "Search by label, definition, slug, or known application field key.",
+            "Open the term detail page to confirm data format, JSON type, XSD type, unit, access rights, static/dynamic status, internal key, element ID, and regulation references.",
+            "Use the dictionary reference URL when another system needs the canonical linked-data identifier.",
+          ],
+        },
+        {
+          title: "Use it with passport authoring",
+          items: [
+            "For battery passport fields, compare form field names with dictionary field keys so exports keep consistent semantics.",
+            "Check unit expectations before bulk imports or Asset Management updates so numeric battery values do not drift from the dictionary.",
+            "Use public dictionary links when external partners need term definitions without dashboard access.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Battery Dictionary", route: "/dashboard/dictionary/battery/v1", description: "Search terms, categories, units, and semantic identifiers." },
+      ],
+      table: DICTIONARY_API_TABLE,
+      tips: [
+        "When a battery JSON-LD export looks surprising, check the term's field keys and expected unit first. The dictionary is the shared vocabulary behind those exports.",
+      ],
+    },
+    {
       id: "branding-and-keys",
       icon: "🔐",
       category: "Security",
-      audience: "Company admins primarily, with bearer-token access available to all logged-in users",
+      audience: "Company admins primarily, with session and optional bearer-token access available to logged-in users",
       title: "Understand security, tokens, API keys, and who should use each one",
-      summary: "The product uses several different credentials because each one has a different purpose. Keeping them separate is part of the security model: bearer tokens are for logged-in users, company API keys are for read-only external integrations, device keys are for live sensor pushes, passport access keys are for restricted public fields, and Asset Management has its own launch credentials.",
+      summary: "The product uses several different credentials because each one has a different purpose. Keeping them separate is part of the security model: browser sessions are for the dashboard, optional bearer tokens are for controlled testing or scripts, company API keys are for read-only external integrations, device keys are for live sensor pushes, passport access keys are for restricted public fields, delegated audience grants are for controlled-data users, and Asset Management has its own launch credentials.",
       facts: [
         { label: "Company branding", value: "Managed in Company Profile with public viewer, introduction, and single consumer-route presentation controls" },
-        { label: "Bearer token", value: "Returned by login or refreshed from Dashboard > Security for protected company APIs" },
+        { label: "Browser session", value: "Created by login and sent automatically by the dashboard through cookie credentials" },
+        { label: "Bearer token", value: "Optional token from Dashboard > Security or /api/users/me/token for protected API testing/scripts" },
         { label: "Company API keys", value: "Created and revoked in Dashboard > Security for read-only external access" },
-        { label: "Device and access keys", value: "Managed per passport for live pushes and restricted public unlocking" },
+        { label: "Device, access, and audience controls", value: "Managed per passport or user for live pushes, restricted public unlocking, and controlled-data access" },
       ],
       journeys: [
         {
@@ -472,12 +515,12 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           ],
         },
         {
-          title: "Get a bearer token in the normal user flow",
+          title: "Understand dashboard session and optional bearer tokens",
           items: [
             "Log in through the app as normal. Under the hood, the backend uses `POST /api/auth/login`.",
             "If your account has two-factor authentication enabled, the backend returns a short-lived `pre_auth_token`. You then complete `POST /api/auth/verify-otp` with the email code.",
-            "After login, the returned bearer token is what protected APIs expect in the `Authorization: Bearer <token>` header.",
-            "If you are already signed in and simply need a fresh token for testing or integration work, the Security page uses `POST /api/users/me/token` to issue a new one.",
+            "After login, the backend sets the session cookie. The dashboard then calls protected APIs with `credentials: include`, so normal users do not paste tokens into the UI.",
+            "If you are already signed in and need a bearer token for testing or integration work, the Security page uses `POST /api/users/me/token` to issue one that can be sent as `Authorization: Bearer <token>`.",
           ],
         },
         {
@@ -496,13 +539,14 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Use the passport-specific device key only for live dynamic-value updates tied to one passport.",
             "Regenerate a device key if the integration endpoint has been shared too broadly or a device is replaced.",
             "Use the passport access key only in the public viewer unlock flow when restricted field groups must be revealed to an allowed audience.",
+            "Use delegated audience grants when a logged-in user needs controlled element access as an audience such as notified bodies, market surveillance, customs, EU Commission, recyclers, repairers, backup providers, or delegated operators.",
             "Use Asset Management launch credentials only inside the Asset Management tool or tightly controlled automation around that tool. They are not general-purpose API credentials.",
           ],
         },
       ],
       table: SECURITY_KEY_TABLE,
       links: [
-        { label: "Open Security", route: "/dashboard/security", description: "Manage bearer tokens and company API keys in one place." },
+        { label: "Open Security", route: "/dashboard/security", description: "Manage optional bearer tokens and company API keys in one place." },
         { label: "Open Company Profile", route: "/dashboard/company-profile", description: "Update branding, introduction copy, and public experience settings." },
         { label: "Open My Profile", route: "/dashboard/profile", description: "Manage password, 2FA, workflow defaults, and profile details." },
       ],
@@ -511,7 +555,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           "user-security",
           "Security",
           "/dashboard/security",
-          "Bearer-token access and company API-key management now live together on this page."
+          "Optional bearer-token access and company API-key management now live together on this page."
         ),
         buildPreview(
           "user-company-profile",
@@ -529,6 +573,59 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       warnings: [
         "Do not share company API keys when someone only needs a public link or passport access key. Those are different security layers.",
         "Do not hand bearer tokens to external read-only partners. Use company API keys for that case.",
+      ],
+    },
+    {
+      id: "operator-did-and-controlled-access",
+      icon: "🪪",
+      category: "Trust",
+      audience: "Company admins, editors preparing compliant DPPs, and operators supporting controlled-data access",
+      title: "Understand economic-operator identity, DIDs, facilities, and controlled audiences",
+      summary: "Newer DPP workflows rely on more than a local product ID. The platform can carry economic-operator identifiers, product/DPP DID identifiers, model/batch/item granularity, facility identifiers, and controlled audience grants so public, regulated, and delegated access all stay distinct.",
+      facts: [
+        { label: "Economic operator", value: "Stored on the company and copied into authenticated user identity and standards payloads when configured" },
+        { label: "Granularity", value: "DPPs can be model, batch, or item level depending on company policy and passport data" },
+        { label: "Facilities", value: "Managed company facility identifiers can be attached to DPPs and exposed through facility DID documents" },
+        { label: "Controlled audiences", value: "Access levels include consumers, economic operators, notified bodies, market surveillance, customs, EU Commission, delegated operators, repairers, recyclers, backup providers, and legitimate-interest users" },
+      ],
+      journeys: [
+        {
+          title: "Know which identifier is which",
+          items: [
+            "`dppId` is the internal passport record identifier used by dashboard rows and most company APIs.",
+            "`product_id` is the local product, serial, model, or batch identifier that users recognize operationally.",
+            "`product_identifier_did` is the global product identifier used by DID/standards flows when available.",
+            "`granularity` says whether the DPP represents a model, batch, or item. Released granularity changes use a linked successor flow instead of silent in-place mutation.",
+          ],
+        },
+        {
+          title: "How DID documents are used",
+          items: [
+            "The platform DID lives at `/.well-known/did.json`.",
+            "Company DID documents use `/did/company/:slug/did.json`.",
+            "Product subject DID documents use `/did/battery/model/:stableId/did.json`, `/did/battery/batch/:stableId/did.json`, or `/did/battery/item/:stableId/did.json`.",
+            "DPP record DID documents use `/did/dpp/:granularity/:stableId/did.json`, and facility DID documents use `/did/facility/:stableId/did.json`.",
+            "The universal `/resolve?did=...` endpoint redirects browsers to the public passport where possible and API clients to the DID document URL.",
+          ],
+        },
+        {
+          title: "How controlled access is different from public access",
+          items: [
+            "Public fields are visible through public passport routes with no login.",
+            "Restricted public-view fields can be unlocked with a passport access key for one passport.",
+            "Logged-in audience access uses user or passport grants so controlled element access can be tied to a person, audience, reason, and expiry.",
+            "Emergency revoke endpoints exist for access grants, API keys, and audience grants when access must stop immediately.",
+          ],
+        },
+      ],
+      links: [
+        { label: "Open Company Profile", route: "/dashboard/company-profile", description: "Review company identity and public presentation settings." },
+        { label: "Open My Passports", route: "/dashboard/my-passports", description: "Find DPP IDs, public links, versions, and passport actions." },
+      ],
+      table: GOVERNANCE_SECURITY_API_TABLE,
+      tips: [
+        "For regulated integrations, collect the economic-operator identifier scheme, facility identifiers, and intended granularity before bulk creation begins.",
+        "Use audience grants for logged-in controlled access. Use passport access keys only for the public viewer unlock case.",
       ],
     },
     {
@@ -599,7 +696,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       title: "Understand the API process step by step before calling any endpoint",
       summary: "If you are not from an IT background, think of the API as a structured door into the same product you see in the dashboard. The key questions are always the same: who is calling, what credential do they use, what data do they send, and what should happen next. This section explains those flows in plain language first so the endpoint tables later feel much easier to use.",
       facts: [
-        { label: "Human users", value: "Use bearer tokens after login" },
+        { label: "Human users", value: "Use dashboard session cookies after login; bearer tokens are optional for scripts/tests" },
         { label: "External read-only systems", value: "Use company API keys with the /api/v1 endpoints" },
         { label: "Devices and sensors", value: "Use the passport's own device key" },
         { label: "Public viewers", value: "Usually need no authentication unless restricted fields must be unlocked" },
@@ -609,7 +706,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         "Start by deciding whether the caller is a person, an outside read-only partner, a live device, or the Asset Management tool. That choice decides the right credential.",
       ],
       warnings: [
-        "The safest integrations are the ones that use the smallest permission needed. Read-only partners should not receive write-capable bearer tokens.",
+        "The safest integrations are the ones that use the smallest permission needed. Read-only partners should not receive dashboard sessions or bearer tokens.",
       ],
     },
     {
@@ -618,9 +715,10 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "API",
       audience: "Company admins and editors performing protected write operations",
       title: "Use the company write APIs for create, update, release, revise, and bulk handling",
-      summary: "These are the main protected endpoints for changing passport data from scripts, tools, or controlled internal integrations. Every endpoint in this section needs a bearer token plus company access, and most of them also require an editor or company-admin role.",
+      summary: "These are the main protected endpoints for changing passport data from scripts, tools, or controlled internal integrations. Every endpoint in this section needs a browser session or bearer token plus company access, and most of them also require an editor or company-admin role.",
       facts: [
-        { label: "Main header", value: "Authorization: Bearer <token>" },
+        { label: "Dashboard auth", value: "Session cookie sent automatically by fetchWithAuth" },
+        { label: "Script auth", value: "Authorization: Bearer <token> when you intentionally issue a token" },
         { label: "Company scope", value: "The :companyId in the URL must match the company the token is allowed to access" },
         { label: "Bulk limit", value: "The bulk create, bulk fetch, bulk patch, delete, and upsert endpoints cap requests at 500 rows" },
         { label: "Schema rule", value: "Unknown passport field keys are rejected instead of silently stored" },
@@ -655,9 +753,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "API",
       audience: "Company users and integration teams that need controlled reads or exports",
       title: "Read, compare, and export passport data with the company APIs",
-      summary: "Not every integration is a write integration. Many teams simply need to read what already exists, fetch many passports by known IDs, export CSV or JSON, inspect version history, or check whether one passport already has an access key or device key configured. These endpoints stay inside the normal company security boundary and therefore still use bearer authentication.",
+      summary: "Not every integration is a write integration. Many teams simply need to read what already exists, fetch many passports by known IDs, export CSV or JSON, inspect version history, or check whether one passport already has an access key or device key configured. These endpoints stay inside the normal company security boundary and therefore use dashboard session or bearer authentication.",
       facts: [
-        { label: "Read auth", value: "Bearer token with company access" },
+        { label: "Read auth", value: "Session cookie or bearer token with company access" },
         { label: "Best use case", value: "Internal tools, controlled exports, compare/history pages, and support diagnostics" },
         { label: "Export formats", value: "CSV and JSON-LD from the draft export endpoint" },
         { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by dppId or product_id in one request" },
@@ -738,6 +836,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Invite a teammate from Manage Team and choose the role if your account has admin permissions.",
             "Use the role legend on the page to understand exactly what Admin, Editor, and Viewer can do.",
             "Change roles or deactivate users when responsibilities shift or access should be removed.",
+            "Use session revocation when a teammate's existing browser sessions should be invalidated immediately after a role or access change.",
           ],
         },
         {
@@ -786,10 +885,10 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "Sharing",
       audience: "Editors, company admins, and anyone preparing external access",
       title: "Know what the public viewer and consumer experience can do",
-      summary: "Released passports become much more than rows in a table. Their public viewer can show introduction content, translations, charts, signatures, PDF previews, restricted-field unlocking, scan indicators, and printable output for external audiences.",
+      summary: "Released passports become much more than rows in a table. Their public viewer can show introduction content, translations, charts, signatures, PDF previews, restricted-field unlocking, scan indicators, carrier authenticity evidence, suspicious-carrier reporting, and printable output for external audiences.",
       facts: [
         { label: "Public entry points", value: "Copied link or QR code into the public `/p/:productId` route" },
-        { label: "Viewer features", value: "Introduction tabs, translated sections, charts, composition visuals, PDF previews, QR display, print, and signature badges" },
+        { label: "Viewer features", value: "Introduction tabs, translated sections, charts, composition visuals, PDF previews, QR display, print, signature badges, scan badges, and carrier authenticity indicators" },
         { label: "Restricted access", value: "Non-public field groups stay hidden until unlocked with a passport access key" },
         { label: "Sharing options", value: "Public link, QR labels, print PDF, JSON-LD export, CSV exports, and analytics PDF exports" },
       ],
@@ -808,12 +907,15 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Public fields are visible immediately in the public passport viewer.",
             "Restricted fields are intentionally hidden until someone enters a valid passport access key.",
             "Dynamic fields can render history charts and live-value visualizations when the type uses those field settings.",
+            "Carrier authenticity metadata can show trusted viewer host, QR print specifications, signed carrier payload status, verification evidence, and anti-counterfeit instructions.",
+            "Public viewers can report a suspicious QR code or label; company users can later inspect those security events.",
           ],
         },
         {
           title: "Export the right artifact",
           items: [
             "Use QR label export for packaging or physical tagging workflows.",
+            "Use data-carrier verification evidence when QR print quality, placement, durability, or scan checks need to be recorded.",
             "Use JSON-LD export when another system needs structured Battery Pass content.",
             "Use CSV exports when teams need spreadsheet-based reporting or downstream batch handling.",
           ],

@@ -426,7 +426,7 @@ docker-compose up --verbose
 **Install Extensions**:
 - Docker
 - Remote - Containers
-- Vue - Official
+- React - Official
 - REST Client
 - Postman
 
@@ -464,10 +464,10 @@ docker-compose up --verbose
 
 ## Next Steps
 
-1. **Read Architecture**: [docs/ARCHITECTURE.md](./ARCHITECTURE.md)
-2. **API Reference**: [docs/api/ENDPOINTS.md](./api/ENDPOINTS.md)
-3. **Development Guidelines**: [docs/development/DEVELOPMENT.md](./development/DEVELOPMENT.md)
-4. **Deploy to Production**: [docs/deployment/OCI.md](./deployment/OCI.md)
+1. **Read Architecture**: [docs/architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md)
+2. **API Reference**: [docs/api/ENDPOINTS.md](../api/ENDPOINTS.md)
+3. **Development Guidelines**: [docs/development/DEVELOPMENT.md](../development/DEVELOPMENT.md)
+4. **Deploy to Production**: [docs/deployment/OCI.md](../deployment/OCI.md)
 
 ---
 
