@@ -226,6 +226,39 @@
       color: var(--teal);
     }
 
+    /* Cookie Policy styling */
+    .cookie-policy h2 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin: 2rem 0 1rem;
+      padding-left: 0;
+      position: relative;
+      letter-spacing: normal;
+    }
+
+    .cookie-policy h2::before {
+      display: none;
+    }
+
+    .cookie-policy h3 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin: 1.2rem 0 0.6rem;
+      letter-spacing: normal;
+    }
+
+    .cookie-policy h4 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin: 0.8rem 0 0.4rem;
+    }
+
     @media (max-width: 768px) {
       .legal-hero {
         padding: 2rem 1rem;
@@ -537,6 +570,7 @@
       
 
       
+        <div class="cookie-policy">
         <h2>Cookie Policy</h2>
         <h3>1. What Are Cookies?</h3>
         <p>Cookies are small text files stored on your device when you visit a website. Similar technologies include local storage, session storage, pixels, SDKs, and server-side tracking technologies. These technologies help websites work, remember preferences, maintain sessions, understand usage, and secure accounts.</p>
@@ -582,6 +616,7 @@
 
         <h3>7. Updates to This Cookie Policy</h3>
         <p>We may update this Cookie Policy as our website, Service, cookies, providers, or legal requirements change. The updated version will be posted with a new "Last updated" date.</p>
+        </div>
       
     </article>
   </div>
