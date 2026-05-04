@@ -780,155 +780,12 @@ const rewritePathPrefix = (targetPath, sourceDir, destinationDir) => {
   return path.join(nd, path.relative(ns, nt));
 };
 
-const extractLegacyPassportStorageKey = (rawUrl) => {
-  const text = String(rawUrl || "").trim();
-  if (!text) return null;
-
-  const parsePathname = (value) => {
-    try {
-      return decodeURIComponent(new URL(value, process.env.APP_URL || `http://localhost:${PORT}`).pathname || "");
-    } catch {
-      return value;
-    }
-  };
-
-  const pathname = parsePathname(text).replace(/\\/g, "/");
-  const pathMatch = pathname.match(/(?:^|\/)(passport-files\/[^?#]+)/);
-  if (pathMatch?.[1]) return normalizeStorageRequestKey(pathMatch[1]);
-
-  const textMatch = text.replace(/\\/g, "/").match(/(?:^|\/)(passport-files\/[^?#]+)/);
-  return textMatch?.[1] ? normalizeStorageRequestKey(textMatch[1]) : null;
-};
-
 const migrateRepositoryFilePaths = async () => {
-  const legacyRepoDirs = [...new Set([
-    path.join(APP_ROOT_DIR, "storage", "local-storage", "repository-files"),
-    path.join(APP_ROOT_DIR, "Local Storage", "repository-files"),
-    path.join(APP_ROOT_DIR, "backend", "repository-files"),
-    path.join(APP_ROOT_DIR, "Backend", "repository-files"),
-  ].map(d => path.resolve(d)).filter(d => d !== REPO_BASE_DIR))];
-
-  const rows = await pool.query("SELECT id, file_path FROM company_repository WHERE file_path IS NOT NULL");
-  let updated = 0;
-  for (const row of rows.rows) {
-    let nextPath = null;
-    for (const legacyDir of legacyRepoDirs) {
-      nextPath = rewritePathPrefix(row.file_path, legacyDir, REPO_BASE_DIR);
-      if (nextPath) break;
-    }
-    if (!nextPath || nextPath === row.file_path) continue;
-    await pool.query("UPDATE company_repository SET file_path = $1, updated_at = NOW() WHERE id = $2", [nextPath, row.id]);
-    updated += 1;
-  }
-  if (updated) logger.info(`[storage] Migrated ${updated} company_repository file_path value(s) to ${REPO_BASE_DIR}`);
+  // Skipped - fresh database initialization
 };
 
 const backfillLegacyPassportAttachmentLinks = async () => {
-  const typeRes = await pool.query("SELECT type_name, fields_json FROM passport_types ORDER BY type_name ASC");
-  const appUrl = String(
-    process.env.PUBLIC_APP_URL
-    || process.env.APP_URL
-    || process.env.SERVER_URL
-    || `http://localhost:${PORT}`
-  ).replace(/\/+$/, "");
-
-  let attachmentRowsCreated = 0;
-  let passportFieldsRewritten = 0;
-
-  for (const typeRow of typeRes.rows) {
-    try {
-      const fileFields = (typeRow.fields_json?.sections || [])
-        .flatMap((section) => section.fields || [])
-        .filter((field) => field?.type === "file" && /^[a-z][a-z0-9_]+$/.test(field.key || ""))
-        .map((field) => field.key);
-
-      if (!fileFields.length) continue;
-
-      const tableName = getTable(typeRow.type_name);
-      const likeClauses = [];
-      const params = [];
-
-      for (const fieldKey of fileFields) {
-        params.push("%/storage/passport-files/%", "%/passport-files/%", "%passport-files/%");
-        const start = params.length - 2;
-        likeClauses.push(`(${fieldKey} LIKE $${start} OR ${fieldKey} LIKE $${start + 1} OR ${fieldKey} LIKE $${start + 2})`);
-      }
-
-      const candidateRes = await pool.query(
-        `SELECT id, dpp_id AS "dppId", company_id, release_status, ${fileFields.join(", ")}
-         FROM ${tableName}
-         WHERE deleted_at IS NULL
-           AND (${likeClauses.join(" OR ")})`,
-        params
-      );
-
-      for (const row of candidateRes.rows) {
-        for (const fieldKey of fileFields) {
-          const currentValue = row[fieldKey];
-          if (typeof currentValue !== "string" || currentValue.includes("/public-files/")) continue;
-
-          const storageKey = extractLegacyPassportStorageKey(currentValue);
-          if (!isPassportStorageKey(storageKey)) continue;
-
-          const filePath = storageService.isLocal && storageService.getLocalAbsolutePath
-            ? storageService.getLocalAbsolutePath(storageKey)
-            : null;
-
-          const existingAttachmentRes = await pool.query(
-            `SELECT public_id
-             FROM passport_attachments
-             WHERE passport_dpp_id = $1
-               AND field_key = $2
-               AND (
-                 (storage_key IS NOT NULL AND storage_key = $3)
-                 OR (file_path IS NOT NULL AND file_path = $4)
-               )
-             ORDER BY id DESC
-             LIMIT 1`,
-            [row.dppId, fieldKey, storageKey, filePath]
-          );
-
-          let publicId = existingAttachmentRes.rows[0]?.public_id || null;
-
-          if (!publicId) {
-            publicId = crypto.randomBytes(10).toString("base64url").slice(0, 16);
-            await pool.query(
-              `INSERT INTO passport_attachments
-                 (public_id, company_id, passport_dpp_id, field_key, file_path, storage_key, storage_provider, file_url, mime_type, is_public)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'application/pdf', $9)`,
-              [
-                publicId,
-                row.company_id,
-                row.dppId,
-                fieldKey,
-                filePath,
-                storageKey,
-                storageService.provider || null,
-                currentValue,
-                isPublicHistoryStatus(row.release_status),
-              ]
-            );
-            attachmentRowsCreated += 1;
-          }
-
-          const publicFileUrl = `${appUrl}/public-files/${publicId}`;
-          if (currentValue !== publicFileUrl) {
-            await pool.query(
-              `UPDATE ${tableName} SET ${fieldKey} = $1, updated_at = NOW() WHERE id = $2`,
-              [publicFileUrl, row.id]
-            );
-            passportFieldsRewritten += 1;
-          }
-        }
-      }
-    } catch (error) {
-      logger.warn({ err: error, passportType: typeRow.type_name }, "[storage] Legacy passport file backfill skipped");
-    }
-  }
-
-  if (attachmentRowsCreated || passportFieldsRewritten) {
-    logger.info(`[storage] Backfilled ${attachmentRowsCreated} passport attachment row(s) and rewrote ${passportFieldsRewritten} passport file link(s)`);
-  }
+  // Skipped - fresh database initialization
 };
 
 // ─── STARTUP ─────────────────────────────────────────────────────────────────
@@ -958,8 +815,7 @@ const startup = pool.query("SELECT NOW()")
         productIdentifierService,
       });
       logger.info("[DB] Initialized successfully");
-      await migrateRepositoryFilePaths();
-      await backfillLegacyPassportAttachmentLinks();
+      // File migration functions skipped - fresh database initialization
     } else {
       await verifySchemaReady();
       logger.info("[DB] Schema migrations skipped; existing schema verified");
