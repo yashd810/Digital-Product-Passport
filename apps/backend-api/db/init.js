@@ -395,7 +395,6 @@ async function initDb(pool, {
       otp_expires_at   TIMESTAMPTZ,
       two_factor_enabled BOOLEAN NOT NULL DEFAULT false,
       last_login_at    TIMESTAMPTZ,
-      pepper_version   INTEGER NOT NULL DEFAULT 1,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -456,7 +455,6 @@ async function initDb(pool, {
       otp_expires_at   TIMESTAMPTZ,
       two_factor_enabled BOOLEAN NOT NULL DEFAULT false,
       last_login_at    TIMESTAMPTZ,
-      pepper_version   INTEGER NOT NULL DEFAULT 1,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -1007,7 +1005,6 @@ async function initDb(pool, {
       key_hash     VARCHAR(64)  NOT NULL UNIQUE,
       key_prefix   VARCHAR(16)  NOT NULL,
       key_salt     VARCHAR(64),
-      hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'sha256',
       scopes       TEXT[]       NOT NULL DEFAULT ARRAY['dpp:read']::text[],
       expires_at   TIMESTAMPTZ,
       created_by   INT REFERENCES users(id) ON DELETE SET NULL,
@@ -1034,8 +1031,6 @@ async function initDb(pool, {
   `);
   await pool.query(`
     ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'sha256'
-  `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash    ON api_keys(key_hash)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_prefix   ON api_keys(key_prefix)`);
@@ -1153,17 +1148,6 @@ async function initDb(pool, {
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS branding_json JSONB NOT NULL DEFAULT '{}'::jsonb
   `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1
-  `);
-  await runMigration(pool, "2026-04-27.backfill-user-session-version", async (db) => {
-    await db.query(`
-      UPDATE users
-      SET session_version = 1
-      WHERE session_version IS NULL OR session_version < 1
-    `).catch(() => {});
-  });
 
   // Dynamic field values — time-series: every push appends a new row, nothing is ever overwritten
   await pool.query(`
@@ -1487,12 +1471,6 @@ async function initDb(pool, {
           ON ${tableName}(company_id, product_identifier_did)
           WHERE deleted_at IS NULL
       `);
-      await pool.query(
-        `UPDATE ${tableName}
-         SET release_status = $1
-         WHERE release_status = $2`,
-        [IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS]
-      );
 
       if (productIdentifierService) {
         await runMigration(pool, `2026-04-27.backfill-product-identifier-did.${type_name}`, async (db) => {
@@ -1648,17 +1626,6 @@ async function initDb(pool, {
   } catch (e) {
     logger.warn({ err: e }, "Could not finalize DIN SPEC carbon footprint label/performance-class migration");
   }
-
-  await runMigration(pool, "2026-04-27.normalize-workflow-revision-status", async (db) => {
-    await db.query(
-      `UPDATE passport_workflow
-       SET previous_release_status = $1
-       WHERE previous_release_status = $2`,
-      [IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS]
-    ).catch((e) => {
-      logger.warn({ err: e }, "Could not normalize workflow revision status");
-    });
-  });
 
   // ── Templates tables ─────────────────────────────────────────────────────
   await pool.query(`
