@@ -1029,8 +1029,7 @@ async function initDb(pool, {
     ALTER TABLE api_keys
     ADD COLUMN IF NOT EXISTS key_salt VARCHAR(64)
   `);
-  await pool.query(`
-    ALTER TABLE api_keys
+  
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash    ON api_keys(key_hash)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_prefix   ON api_keys(key_prefix)`);
