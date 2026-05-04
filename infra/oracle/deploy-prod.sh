@@ -18,13 +18,13 @@ fi
 cd "$APP_DIR"
 case "$DEPLOY_TARGET" in
   all)
-    COMPOSE_FILE="docker-compose.prod.yml"
+    COMPOSE_FILE="docker/docker-compose.prod.yml"
     ;;
   frontend)
-    COMPOSE_FILE="docker-compose.prod.frontend.yml"
+    COMPOSE_FILE="docker/docker-compose.prod.frontend.yml"
     ;;
   backend)
-    COMPOSE_FILE="docker-compose.prod.backend.yml"
+    COMPOSE_FILE="docker/docker-compose.prod.backend.yml"
     ;;
   *)
     echo "Unsupported DPP_DEPLOY_TARGET: $DEPLOY_TARGET"
