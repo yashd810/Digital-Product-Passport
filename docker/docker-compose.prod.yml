@@ -1,7 +1,7 @@
 services:
   frontend-app:
     build:
-      context: .
+      context: ..
       dockerfile: apps/frontend-app/Dockerfile
       args:
         VITE_API_URL: "${VITE_API_URL:-}"
@@ -14,7 +14,7 @@ services:
 
   public-passport-viewer:
     build:
-      context: .
+      context: ..
       dockerfile: apps/public-passport-viewer/Dockerfile
       args:
         VITE_API_URL: "${VITE_API_URL:-}"
@@ -27,7 +27,7 @@ services:
 
   backend-api:
     build:
-      context: .
+      context: ..
       dockerfile: apps/backend-api/Dockerfile
     ports:
       - "${BACKEND_PORT:-3001}:3001"
@@ -52,7 +52,7 @@ services:
 
   asset-management:
     build:
-      context: .
+      context: ..
       dockerfile: apps/asset-management/Dockerfile
     ports:
       - "${ASSET_MANAGEMENT_PORT:-3003}:8080"
@@ -62,7 +62,7 @@ services:
 
   marketing-site:
     build:
-      context: .
+      context: ..
       dockerfile: apps/marketing-site/Dockerfile
     ports:
       - "${MARKETING_PORT:-8080}:8080"

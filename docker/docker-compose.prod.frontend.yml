@@ -1,7 +1,7 @@
 services:
   frontend-app:
     build:
-      context: .
+      context: ..
       dockerfile: apps/frontend-app/Dockerfile
       args:
         VITE_API_URL: "${VITE_API_URL:-https://api.claros-dpp.online}"
@@ -14,7 +14,7 @@ services:
 
   public-passport-viewer:
     build:
-      context: .
+      context: ..
       dockerfile: apps/public-passport-viewer/Dockerfile
       args:
         VITE_API_URL: "${VITE_API_URL}"
@@ -27,7 +27,7 @@ services:
 
   asset-management:
     build:
-      context: .
+      context: ..
       dockerfile: apps/asset-management/Dockerfile
     environment:
       BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"
@@ -37,7 +37,7 @@ services:
 
   marketing-site:
     build:
-      context: .
+      context: ..
       dockerfile: apps/marketing-site/Dockerfile
     environment:
       BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"

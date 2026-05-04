@@ -33,7 +33,7 @@ services:
 
   backend-api:
     build:
-      context: .
+      context: ..
       dockerfile: apps/backend-api/Dockerfile
     working_dir: /app
     command: node Server/server.js
