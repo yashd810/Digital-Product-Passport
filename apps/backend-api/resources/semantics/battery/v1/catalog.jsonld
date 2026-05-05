@@ -1,0 +1,179 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "dcterms": "http://purl.org/dc/terms/",
+    "foaf": "http://xmlns.com/foaf/0.1/",
+    "adms": "http://www.w3.org/ns/adms#",
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "vcard": "http://www.w3.org/2006/vcard/ns#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "clarosBattery": "https://www.claros-dpp.online/dictionary/battery/v1/terms/",
+    "clarosBatteryClass": "https://www.claros-dpp.online/dictionary/battery/v1/classes/"
+  },
+  "@id": "https://www.claros-dpp.online/dictionary/battery/v1/catalog",
+  "@type": "dcat:Catalog",
+  "dcterms:title": "Claros Battery Dictionary Catalog",
+  "dcterms:description": "DCAT-AP-aligned metadata catalog for the Claros battery semantic dictionary and its machine-readable distributions.",
+  "dcterms:publisher": {
+    "@id": "https://www.claros-dpp.online",
+    "@type": "foaf:Organization",
+    "foaf:name": "Claros DPP"
+  },
+  "dcterms:language": "en",
+  "dcterms:modified": {
+    "@value": "2026-04-24T17:40:07.377Z",
+    "@type": "xsd:dateTime"
+  },
+  "dcterms:conformsTo": [
+    {
+      "@id": "https://www.w3.org/TR/vocab-dcat-3/",
+      "dcterms:title": "Data Catalog Vocabulary (DCAT) Version 3"
+    },
+    {
+      "@id": "https://semiceu.github.io/DCAT-AP/releases/3.0.1/",
+      "dcterms:title": "DCAT-AP 3.0.1"
+    }
+  ],
+  "dcat:themeTaxonomy": {
+    "@id": "https://www.claros-dpp.online/dictionary/battery/v1/category-scheme",
+    "@type": "skos:ConceptScheme",
+    "dcterms:title": "Battery passport attribute categories"
+  },
+  "dcat:dataset": {
+    "@id": "https://www.claros-dpp.online/dictionary/battery/v1/dataset",
+    "@type": "dcat:Dataset",
+    "dcterms:identifier": "claros_battery_dictionary_v1",
+    "dcterms:title": "Claros Battery Dictionary",
+    "dcterms:description": "Internal battery passport dictionary derived from the BatteryPass Data Attribute Longlist v1.3.",
+    "dcterms:publisher": {
+      "@id": "https://www.claros-dpp.online",
+      "@type": "foaf:Organization",
+      "foaf:name": "Claros DPP"
+    },
+    "dcterms:language": "en",
+    "dcterms:issued": {
+      "@value": "2026-04-24T17:40:07.377Z",
+      "@type": "xsd:dateTime"
+    },
+    "dcterms:modified": {
+      "@value": "2026-04-24T17:40:07.377Z",
+      "@type": "xsd:dateTime"
+    },
+    "dcterms:conformsTo": [
+      {
+        "@id": "https://www.w3.org/TR/vocab-dcat-3/"
+      },
+      {
+        "@id": "https://semiceu.github.io/DCAT-AP/releases/3.0.1/"
+      },
+      {
+        "@id": "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld"
+      }
+    ],
+    "dcat:keyword": [
+      "battery passport",
+      "digital product passport",
+      "semantic dictionary",
+      "BatteryPass",
+      "DCAT-AP"
+    ],
+    "dcat:theme": [
+      {
+        "@id": "http://publications.europa.eu/resource/authority/data-theme/TECH"
+      },
+      {
+        "@id": "http://publications.europa.eu/resource/authority/data-theme/ENVI"
+      }
+    ],
+    "dcat:landingPage": {
+      "@id": "https://www.claros-dpp.online/dictionary/battery/v1"
+    },
+    "dcat:contactPoint": {
+      "@type": "vcard:Organization",
+      "vcard:fn": "Claros DPP",
+      "vcard:hasURL": {
+        "@id": "https://www.claros-dpp.online"
+      }
+    },
+    "dcat:distribution": [
+      {
+        "@id": "https://www.claros-dpp.online/dictionary/battery/v1/distributions/terms-json",
+        "@type": "dcat:Distribution",
+        "dcterms:title": "Battery dictionary terms JSON",
+        "dcat:accessURL": {
+          "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1/terms"
+        },
+        "dcat:downloadURL": {
+          "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1/terms"
+        },
+        "dcat:mediaType": "application/json",
+        "dcterms:format": "JSON"
+      },
+      {
+        "@id": "https://www.claros-dpp.online/dictionary/battery/v1/distributions/context-jsonld",
+        "@type": "dcat:Distribution",
+        "dcterms:title": "Battery dictionary JSON-LD context",
+        "dcat:accessURL": {
+          "@id": "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld"
+        },
+        "dcat:downloadURL": {
+          "@id": "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld"
+        },
+        "dcat:mediaType": "application/ld+json",
+        "dcterms:format": "JSON-LD"
+      },
+      {
+        "@id": "https://www.claros-dpp.online/dictionary/battery/v1/distributions/category-rules-json",
+        "@type": "dcat:Distribution",
+        "dcterms:title": "Battery category applicability rules",
+        "dcat:accessURL": {
+          "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1/category-rules"
+        },
+        "dcat:downloadURL": {
+          "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1/category-rules"
+        },
+        "dcat:mediaType": "application/json",
+        "dcterms:format": "JSON"
+      },
+      {
+        "@id": "https://www.claros-dpp.online/dictionary/battery/v1/distributions/field-map-json",
+        "@type": "dcat:Distribution",
+        "dcterms:title": "Application field to semantic term map",
+        "dcat:accessURL": {
+          "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1/field-map"
+        },
+        "dcat:downloadURL": {
+          "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1/field-map"
+        },
+        "dcat:mediaType": "application/json",
+        "dcterms:format": "JSON"
+      }
+    ]
+  },
+  "dcat:service": {
+    "@id": "https://www.claros-dpp.online/dictionary/battery/v1/service",
+    "@type": "dcat:DataService",
+    "dcterms:title": "Claros Battery Dictionary API",
+    "dcat:endpointURL": {
+      "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1"
+    },
+    "dcat:servesDataset": {
+      "@id": "https://www.claros-dpp.online/dictionary/battery/v1/dataset"
+    }
+  },
+  "dcat:record": {
+    "@id": "https://www.claros-dpp.online/dictionary/battery/v1/records/dataset",
+    "@type": "dcat:CatalogRecord",
+    "dcterms:title": "Catalog record for the Claros Battery Dictionary",
+    "dcterms:modified": {
+      "@value": "2026-04-24T17:40:07.377Z",
+      "@type": "xsd:dateTime"
+    },
+    "foaf:primaryTopic": {
+      "@id": "https://www.claros-dpp.online/dictionary/battery/v1/dataset"
+    }
+  },
+  "termCount": 100
+}

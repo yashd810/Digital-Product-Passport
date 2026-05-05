@@ -17,6 +17,7 @@ module.exports = function createBatteryDictionaryService() {
   const units           = loadJson("units.json");
   const fieldMap        = loadJson("field-map.json");
   const context         = loadJson("context.jsonld");
+  const dcatCatalog     = loadJson("catalog.jsonld");
   const categoryRules   = loadJson("category-rules.json");
 
   // Index terms by slug and by field key for fast lookup
@@ -43,6 +44,7 @@ module.exports = function createBatteryDictionaryService() {
   function getUnits() { return units; }
   function getFieldMap() { return fieldMap; }
   function getContext() { return context; }
+  function getDcatCatalog() { return dcatCatalog; }
   function getCategoryRules() { return categoryRules; }
 
   function getTermBySlug(slug) {
@@ -122,6 +124,7 @@ module.exports = function createBatteryDictionaryService() {
     getUnits,
     getFieldMap,
     getContext,
+    getDcatCatalog,
     getCategoryRules,
     getTermBySlug,
     getTermsByCategory,

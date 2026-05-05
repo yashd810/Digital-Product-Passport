@@ -37,11 +37,191 @@
   },
   "regulatoryTraceability": {
     "scope": "Battery passport implementation aligned to the Claros battery semantic model.",
-    "traceabilityMethod": "Each term carries source-oriented metadata such as specRef/number, source attribute naming, datatype, category placement, and regulationReferences when available from the curated source.",
+    "traceabilityMethod": "Each term carries source-oriented metadata from the pinned BatteryPass workbook, including DIN/DKE chapter, source row, regulatory requirements, access rights, static/dynamic behavior, model/item granularity, component granularity, category applicability, datatype, and regulation references.",
     "applicabilityModel": "Battery-category applicability is captured separately in category-rules.json and linked to exports during validation.",
     "limitations": [
       "This manifest documents implementation provenance, not normative legal endorsement.",
       "Formal compliance claims should cite both the upstream BatteryPass source version and this Claros dictionary version."
+    ]
+  },
+  "interoperabilityProfile": {
+    "targetFramework": "Interoperable Europe semantic interoperability",
+    "dcatVersion": "DCAT 3",
+    "dcatApVersion": "DCAT-AP 3.0.1",
+    "conformsTo": [
+      "https://www.w3.org/TR/vocab-dcat-3/",
+      "https://semiceu.github.io/DCAT-AP/releases/3.0.1/"
+    ],
+    "catalogUrl": "https://www.claros-dpp.online/dictionary/battery/v1/catalog.jsonld",
+    "datasetUrl": "https://www.claros-dpp.online/dictionary/battery/v1/dataset",
+    "dataServiceUrl": "https://www.claros-dpp.online/dictionary/battery/v1/service",
+    "termModel": "Each dictionary term is represented as a dereferenceable RDF property and SKOS concept with explicit rdfs:domain and rdfs:range metadata. Domains use section-specific battery passport classes aligned with the Spherity DBP v0.2 vocabulary rather than a single generic container.",
+    "domainModel": {
+      "DigitalBatteryPassport": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/DigitalBatteryPassport",
+        "label": "Digital Battery Passport",
+        "referenceClass": "https://dpp-vocabulary.spherity.com/dbp#DigitalBatteryPassport"
+      },
+      "DPPInfo": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/DPPInfo",
+        "label": "DPP Information",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#DPPInfo"
+      },
+      "BatteryIdentifiers": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryIdentifiers",
+        "label": "Battery Identifiers",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryIdentifiers"
+      },
+      "OperatorIdentifiers": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/OperatorIdentifiers",
+        "label": "Operator Identifiers",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#OperatorIdentifiers"
+      },
+      "ProductData": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/ProductData",
+        "label": "Product Data",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#ProductData"
+      },
+      "RestrictedProductData": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RestrictedProductData",
+        "label": "Restricted Product Data",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#RestrictedProductData"
+      },
+      "BatteryAttributes": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryAttributes",
+        "label": "Battery Attributes",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryAttributes"
+      },
+      "BatteryCompliancePublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCompliancePublic",
+        "label": "Battery Compliance Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryCompliancePublic"
+      },
+      "BatteryComplianceRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryComplianceRestricted",
+        "label": "Battery Compliance Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryComplianceRestricted"
+      },
+      "BatteryCarbonFootprint": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
+        "label": "Battery Carbon Footprint",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryCarbonFootprint"
+      },
+      "SupplyChainDueDiligence": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/SupplyChainDueDiligence",
+        "label": "Supply Chain Due Diligence",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#SupplyChainDueDiligence"
+      },
+      "BatteryMaterialsPublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryMaterialsPublic",
+        "label": "Battery Materials Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryMaterialsPublic"
+      },
+      "BatteryMaterialsRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryMaterialsRestricted",
+        "label": "Battery Materials Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryMaterialsRestricted"
+      },
+      "BatteryCircularityPublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCircularityPublic",
+        "label": "Battery Circularity Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryCircularityPublic"
+      },
+      "BatteryCircularityRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCircularityRestricted",
+        "label": "Battery Circularity Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryCircularityPrivate"
+      },
+      "RecycledRenewableContent": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
+        "label": "Recycled and Renewable Content",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#RecycledRenewableContent"
+      },
+      "EndUserInformation": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/EndUserInformation",
+        "label": "End-User Information",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#EndUserInformation"
+      },
+      "CapacityEnergyVoltagePublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/CapacityEnergyVoltagePublic",
+        "label": "Capacity, Energy and Voltage Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#CapacityEnergyVoltagePublic"
+      },
+      "CapacityEnergyVoltageRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/CapacityEnergyVoltageRestricted",
+        "label": "Capacity, Energy and Voltage Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#CapacityEnergyVoltageRestricted"
+      },
+      "PowerCapabilityPublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PowerCapabilityPublic",
+        "label": "Power Capability Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#PowerCapabilityPublic"
+      },
+      "PowerCapabilityRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PowerCapabilityRestricted",
+        "label": "Power Capability Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#PowerCapabilityRestricted"
+      },
+      "RoundTripEfficiencyPublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyPublic",
+        "label": "Round Trip Efficiency Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#RoundTripEfficiencyPublic"
+      },
+      "RoundTripEfficiencyRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyRestricted",
+        "label": "Round Trip Efficiency Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#RoundTripEfficiencyRestricted"
+      },
+      "InternalResistancePublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/InternalResistancePublic",
+        "label": "Internal Resistance Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#InternalResistancePublic"
+      },
+      "InternalResistanceRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/InternalResistanceRestricted",
+        "label": "Internal Resistance Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#InternalResistanceRestricted"
+      },
+      "BatteryLifetimePublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimePublic",
+        "label": "Battery Lifetime Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryLifetimePublic"
+      },
+      "BatteryLifetimeRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimeRestricted",
+        "label": "Battery Lifetime Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryLifetimeRestricted"
+      },
+      "TemperatureConditionsPublic": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsPublic",
+        "label": "Temperature Conditions Public",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#TemperatureConditionsPublic"
+      },
+      "TemperatureConditionsRestricted": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsRestricted",
+        "label": "Temperature Conditions Restricted",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#TemperatureConditionsRestricted"
+      },
+      "NegativeEvents": {
+        "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/NegativeEvents",
+        "label": "Negative Events",
+        "referenceClass": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#NegativeEvents"
+      }
+    },
+    "referenceVocabulary": {
+      "title": "Spherity Digital Battery Passport vocabulary v0.2",
+      "vocabularyUrl": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass.html",
+      "contextUrl": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass.context.jsonld",
+      "ontologyUrl": "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass.ttl",
+      "usage": "Used as an implementation reference for protected JSON-LD context conventions and section-specific battery passport domain classes; Claros term IRIs remain canonical for this dictionary."
+    },
+    "controlledVocabularies": [
+      "DCAT",
+      "DCAT-AP",
+      "Dublin Core Terms",
+      "SKOS",
+      "RDFS",
+      "XSD"
     ]
   },
   "batteryCategoryScope": [
@@ -63,5 +243,6 @@
   "unitsUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/units",
   "categoriesUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/categories",
   "categoryRulesUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/category-rules",
-  "fieldMapUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/field-map"
+  "fieldMapUrl": "https://www.claros-dpp.online/api/dictionary/battery/v1/field-map",
+  "catalogUrl": "https://www.claros-dpp.online/dictionary/battery/v1/catalog.jsonld"
 }

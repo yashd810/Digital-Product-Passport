@@ -134,11 +134,43 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath }) 
             <DetailRow label="Data format" value={term.dataType?.format} />
             <DetailRow label="JSON type" value={term.dataType?.jsonType} />
             <DetailRow label="XSD datatype" value={term.dataType?.xsdType} mono />
+            <DetailRow label="Domain" value={term.domain?.curie || term.semanticBinding?.domain?.curie} mono />
+            <DetailRow label="Range" value={term.range?.curie || term.semanticBinding?.range?.curie} mono />
             <DetailRow label="Unit" value={unitDisplay} />
             <DetailRow label="Access rights" value={term.accessRights} />
             <DetailRow label="Static vs dynamic" value={term.staticOrDynamic} />
+            <DetailRow label="Update requirement" value={term.updateRequirement} />
+            <DetailRow label="Granularity" value={term.granularityLevel} />
+            <DetailRow label="DIN/DKE chapter" value={term.dinDkeSpec99100Chapter} />
+            <DetailRow label="Workbook row" value={term.sourceWorkbookRow} />
             <DetailRow label="Internal key" value={term.internalKey || term.internal_key} mono />
             <DetailRow label="Element ID" value={term.elementId || term.element_id} mono />
+          </div>
+
+          <div className="dictionary-detail-section">
+            <h2>Battery category requirements</h2>
+            {term.batteryCategoryRequirements ? (
+              <div className="dictionary-detail-pill-row">
+                {Object.entries(term.batteryCategoryRequirements).map(([category, requirement]) => (
+                  <span key={category} className="dictionary-field-pill">{category}: {requirement || "not applicable"}</span>
+                ))}
+              </div>
+            ) : (
+              <p className="dictionary-detail-empty">No category requirements are attached to this term yet.</p>
+            )}
+          </div>
+
+          <div className="dictionary-detail-section">
+            <h2>Component granularity</h2>
+            {term.componentGranularity ? (
+              <div className="dictionary-detail-pill-row">
+                {Object.entries(term.componentGranularity).map(([component, requirement]) => (
+                  <span key={component} className="dictionary-field-pill">{component}: {requirement || "not applicable"}</span>
+                ))}
+              </div>
+            ) : (
+              <p className="dictionary-detail-empty">No component granularity is attached to this term yet.</p>
+            )}
           </div>
 
           <div className="dictionary-detail-section">
