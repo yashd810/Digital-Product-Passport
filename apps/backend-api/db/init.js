@@ -99,7 +99,15 @@ async function addPassportRegistryForeignKey(pool, {
 }
 
 async function truncateTableIfExists(pool, tableName) {
-  await pool.query(`TRUNCATE TABLE ${tableName} RESTART IDENTITY CASCADE`).catch(() => {});
+  // Check if table exists before truncating to avoid transaction abort
+  const exists = await pool.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1`,
+    [tableName]
+  ).catch(() => ({ rows: [] }));
+  
+  if (exists.rows.length > 0) {
+    await pool.query(`TRUNCATE TABLE ${tableName} RESTART IDENTITY CASCADE`).catch(() => {});
+  }
 }
 
 /**
