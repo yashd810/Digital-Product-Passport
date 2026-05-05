@@ -1546,9 +1546,17 @@ async function initDb(pool, {
       ["passport_attachments", "passport_attachments_passport_dpp_id_fkey"],
     ];
     for (const [tableName, constraintName] of constrainedTables) {
-      await db.query(
-        `ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${constraintName}`
-      );
+      // Check if table exists before trying to alter it
+      const tableExists = await db.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1`,
+        [tableName]
+      ).catch(() => ({ rows: [] }));
+      
+      if (tableExists.rows.length > 0) {
+        await db.query(
+          `ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${constraintName}`
+        ).catch(() => {});
+      }
     }
 
     const sharedTables = [
@@ -1570,26 +1578,42 @@ async function initDb(pool, {
     ];
 
     for (const [tableName, columns] of sharedTables) {
-      for (const columnName of columns) {
-        await db.query(
-          `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} DROP DEFAULT`
-        );
-        await db.query(
-          `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE TEXT USING ${columnName}::text`
-        );
+      // Check if table exists before trying to alter it
+      const tableExists = await db.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1`,
+        [tableName]
+      ).catch(() => ({ rows: [] }));
+      
+      if (tableExists.rows.length > 0) {
+        for (const columnName of columns) {
+          await db.query(
+            `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} DROP DEFAULT`
+          ).catch(() => {});
+          await db.query(
+            `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE TEXT USING ${columnName}::text`
+          ).catch(() => {});
+        }
       }
     }
 
-    const typedPassportRows = await db.query("SELECT type_name FROM passport_types");
+    const typedPassportRows = await db.query("SELECT type_name FROM passport_types").catch(() => ({ rows: [] }));
     for (const { type_name } of typedPassportRows.rows) {
       const tableName = getTable(type_name);
-      for (const columnName of ["dpp_id", "lineage_id"]) {
-        await db.query(
-          `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} DROP DEFAULT`
-        );
-        await db.query(
-          `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE TEXT USING ${columnName}::text`
-        );
+      // Check if table exists before altering it
+      const tableExists = await db.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1`,
+        [tableName]
+      ).catch(() => ({ rows: [] }));
+      
+      if (tableExists.rows.length > 0) {
+        for (const columnName of ["dpp_id", "lineage_id"]) {
+          await db.query(
+            `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} DROP DEFAULT`
+          ).catch(() => {});
+          await db.query(
+            `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE TEXT USING ${columnName}::text`
+          ).catch(() => {});
+        }
       }
     }
 
