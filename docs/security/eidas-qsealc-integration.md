@@ -2,6 +2,15 @@
 
 Last updated: 2026-04-29
 
+## Table of Contents
+
+- [Current position](#current-position)
+- [What certificate is needed](#what-certificate-is-needed)
+- [Why this matters](#why-this-matters)
+- [Trust-level choices](#trust-level-choices)
+- [How to fulfill the requirement](#how-to-fulfill-the-requirement)
+- [Related Documentation](#related-documentation)
+
 ## Current position
 
 What the app already does well is the technical half of prEN 18246:

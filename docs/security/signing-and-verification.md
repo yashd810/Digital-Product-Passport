@@ -2,6 +2,14 @@
 
 Last updated: 2026-04-29
 
+## Table of Contents
+
+- [Current ESDC model](#current-esdc-model)
+- [Deterministic integrity](#deterministic-integrity)
+- [Trust and governance metadata](#trust-and-governance-metadata)
+- [Public verification surfaces](#public-verification-surfaces)
+- [Related Documentation](#related-documentation)
+
 Code/files:
 - `apps/backend-api/services/signing-service.js`
 - `apps/backend-api/routes/passport-public.js`

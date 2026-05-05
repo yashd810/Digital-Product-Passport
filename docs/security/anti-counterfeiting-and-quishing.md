@@ -1,5 +1,15 @@
 # Anti-counterfeiting, Phishing, and Quishing Controls
 
+## Table of Contents
+
+- [Hardening layers](#hardening-layers)
+- [Automatic suspicious-event capture](#automatic-suspicious-event-capture)
+- [Manual suspicious-carrier reporting](#manual-suspicious-carrier-reporting)
+- [Trusted-entry guidance](#trusted-entry-guidance)
+- [Related Documentation](#related-documentation)
+
+## Hardening layers
+
 The app now hardens the physical-to-digital DPP entry point in four layers:
 
 1. `TrustedEntryPanel` in the public and technical viewers shows:

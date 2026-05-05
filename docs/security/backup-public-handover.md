@@ -4,6 +4,17 @@ Last updated: 2026-04-30
 
 This document describes the operational handover workflow used when an economic operator is no longer active and a backup provider must become the public DPP source.
 
+## Table of Contents
+
+- [Goal](#goal)
+- [Preconditions](#preconditions)
+- [What becomes public](#what-becomes-public)
+- [Activation workflow](#activation-workflow)
+- [Admin/API routes](#adminapi-routes)
+- [Public-route behavior](#public-route-behavior)
+- [Verification evidence](#verification-evidence)
+- [Related Documentation](#related-documentation)
+
 ## Goal
 
 The platform keeps normal public DPP access on the primary public routes, but the served content can switch to a verified backup-backed public snapshot when the economic operator is inactive.

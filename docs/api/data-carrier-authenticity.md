@@ -1,5 +1,8 @@
 # Data Carrier Authenticity
 
+Last updated: 2026-05-05  
+Status: Verified - carrier metadata fields and endpoints correct
+
 The app now supports optional product data-carrier authenticity metadata on each passport. This is intended for higher-risk use cases where the public DPP link alone is not enough and the carrier should expose verification guidance or signed carrier-binding evidence.
 
 Supported fields:

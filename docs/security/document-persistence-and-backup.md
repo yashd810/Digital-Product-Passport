@@ -4,6 +4,15 @@ Last updated: 2026-04-30
 
 This document explains how additional digital documentation attached to a DPP is preserved, downloaded, and carried into backup evidence.
 
+## Table of Contents
+
+- [Public and controlled download behavior](#public-and-controlled-download-behavior)
+- [What the backup layer stores](#what-the-backup-layer-stores)
+- [Mandatory-document rule](#mandatory-document-rule)
+- [Verification evidence](#verification-evidence)
+- [Admin/API evidence](#adminapi-evidence)
+- [Related Documentation](#related-documentation)
+
 ## Public and controlled download behavior
 
 Uploaded passport documents are stored in `passport_attachments` and are served through opaque app-managed URLs:

@@ -2,6 +2,16 @@
 
 This document describes how the app records and protects audit evidence for controlled DPP data and access-rights management.
 
+## Table of Contents
+
+- [What is logged](#what-is-logged)
+- [Tamper evidence](#tamper-evidence)
+- [Append-only protection](#append-only-protection)
+- [Company and user deletion behavior](#company-and-user-deletion-behavior)
+- [Integrity verification](#integrity-verification)
+- [Anchoring](#anchoring)
+- [Related Documentation](#related-documentation)
+
 ## What is logged
 
 The app writes audit entries for:

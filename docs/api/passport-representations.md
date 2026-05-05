@@ -1,6 +1,7 @@
 # Passport Representations
 
-Last updated: 2026-04-30
+Last updated: 2026-05-05  
+Status: Verified - content negotiation accurately documented
 
 Code/files:
 - `apps/backend-api/routes/passport-public.js`

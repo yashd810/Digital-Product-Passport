@@ -4,6 +4,14 @@ Source: `apps/frontend-app`
 
 The dashboard is a React 18/Vite single-page app for authenticated users and super-admins.
 
+## Table of Contents
+
+- [Main Responsibilities](#main-responsibilities)
+- [Important Files](#important-files)
+- [Commands](#commands)
+- [Routing Notes](#routing-notes)
+- [Related Documentation](#related-documentation)
+
 ## Main Responsibilities
 
 - User auth screens: login, registration, OAuth callback, password reset.
@@ -42,3 +50,12 @@ npm run test:contrast
 Routes are centralized in `src/app/containers/App.js`. Dashboard routes are nested under `/dashboard`; admin routes are nested under `/admin`; public passport aliases are exposed through `/passport/*`, `/dpp/*`, and `/p/*`.
 
 Use backend permissions as the source of truth. Frontend guards improve navigation but do not replace server-side checks.
+
+## Related Documentation
+
+- [Architecture Overview](../architecture/ARCHITECTURE.md) - System architecture
+- [Data Flow](../architecture/DATA_FLOW.md) - Request/response flows
+- [API Endpoints](../api/ENDPOINTS.md) - Backend endpoints used
+- [Authentication Model](../api/access-grants.md) - Permission system
+- [Project Structure](../architecture/PROJECT_STRUCTURE.md) - Repository organization
+- [Frontend Accessibility](../frontend/accessibility-and-portability.md) - Accessibility standards

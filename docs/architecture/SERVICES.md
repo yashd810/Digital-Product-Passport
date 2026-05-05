@@ -2,6 +2,17 @@
 
 This map connects the source folders, containers, ports, and main route surfaces.
 
+## Table of Contents
+
+- [Local Containers](#local-containers)
+- [Backend Route Modules](#backend-route-modules)
+- [Backend Services](#backend-services)
+- [Service Dependencies](#service-dependencies)
+- [Frontend Route Ownership](#frontend-route-ownership)
+- [Public URL Families](#public-url-families)
+- [Inter-Service Communication](#inter-service-communication)
+- [Related Documentation](#related-documentation)
+
 ## Local Containers
 
 Defined in `docker/docker-compose.yml`.
@@ -78,3 +89,92 @@ Defined in `docker/docker-compose.yml`.
 | `/api/v1/*` | Backend API | Standards-oriented DPP API surface |
 | `/did/*`, `/.well-known/did.json`, `/resolve` | Backend API | DID documents and resolution |
 | `/storage/*`, `/repository-files/*`, `/public-files/*` | Backend API | File access, with checks where needed |
+
+## Service Dependencies
+
+### Frontend App Dependencies
+
+```
+frontend-app (3000)
+  ├─ backend-api (3001)
+  │  ├─ PostgreSQL (5432)
+  │  └─ object-storage (9000)
+  ├─ public-passport-viewer (shared components)
+  └─ dictionary data (from backend)
+```
+
+### Backend API Dependencies
+
+```
+backend-api (3001)
+  ├─ PostgreSQL (5432) - persistent data storage
+  ├─ object-storage (9000) - file storage
+  ├─ email service - notifications
+  ├─ passport-service - core business logic
+  ├─ storage-service - file operations
+  ├─ did-service - identifier resolution
+  └─ security-service - auth & encryption
+```
+
+### Public Passport Viewer Dependencies
+
+```
+public-passport-viewer (3004)
+  ├─ backend-api (3001) - read passport data
+  └─ frontend-app (3000) - shared viewer components
+```
+
+### Asset Management Dependencies
+
+```
+asset-management (3003)
+  ├─ backend-api (3001) - source data & job submission
+  └─ PostgreSQL (5432) - job state tracking
+```
+
+### Marketing Site
+
+```
+marketing-site (8080)
+  └─ static assets only (no runtime dependencies)
+```
+
+## Inter-Service Communication
+
+### Frontend to Backend
+
+- All `/api/*` and `/api/v1/*` requests use **Bearer token authentication** via `Authorization` header
+- Requests require valid JWT token from `routes/auth.js`
+- Rate limiting applied via `middleware/rate-limit.js`
+- CORS configured in `Server/server.js`
+
+### Backend to Database
+
+- Direct PostgreSQL connections using connection pooling
+- Migrations handled in `db/init.js` on startup
+- Schema defined across 47 tables (see [passport-type-storage-model.md](../api/passport-type-storage-model.md))
+
+### Backend to Storage
+
+- Local storage abstraction via `storage-service.js`
+- Supports both local filesystem and MinIO object storage
+- File operations include validation and access checks
+
+### Service-to-Service (within backend)
+
+- **passport-service** called by routes for CRUD operations
+- **did-service** called by passport and public routes for identifier generation
+- **signing-service** called for canonical representations and signatures
+- **battery-dictionary-service** called by dictionary routes
+- **access-rights-service** called by all routes for permission checks
+- **security-service** called for password hashing and OTP validation
+
+## Related Documentation
+
+- [Architecture Overview](ARCHITECTURE.md) - High-level system architecture
+- [Data Flow](DATA_FLOW.md) - Request/response flow through the system
+- [Project Structure](PROJECT_STRUCTURE.md) - Repository organization and file locations
+- [API Endpoints](../api/ENDPOINTS.md) - Complete endpoint reference
+- [DID and Passport Model](did-and-passport-model.md) - Identifier and passport structure
+- [Database Schema](../api/passport-type-storage-model.md) - PostgreSQL table definitions
+- [Access Grants Model](../api/access-grants.md) - Permission and delegation model

@@ -2,6 +2,20 @@
 
 This repository is organized as a multi-app DPP platform. The goal is for code folders to contain source and runtime files, while Markdown documentation lives under `docs/`.
 
+## Table of Contents
+
+- [Root Layout](#root-layout)
+- [Application Folders](#application-folders)
+  - [Backend API](#appsbackend-api)
+  - [Frontend App](#appsfrontend-app)
+  - [Public Passport Viewer](#appspublic-passport-viewer)
+  - [Marketing Site](#appsmarketing-site)
+  - [Asset Management](#appsasset-management)
+- [Documentation Layout](#documentation-layout)
+- [Runtime Containers](#runtime-containers)
+- [Where To Make Changes](#where-to-make-changes)
+- [Related Documentation](#related-documentation)
+
 ## Root Layout
 
 ```text
@@ -121,3 +135,13 @@ The local stack is defined in `docker/docker-compose.yml`:
 | Database table/index | `apps/backend-api/db/init.js` |
 | Docker wiring | `docker/docker-compose.yml`, `infra/docker/`, app Dockerfiles |
 | Production domains/TLS | `infra/oracle/Caddyfile`, deployment docs |
+
+## Related Documentation
+
+- [Architecture Overview](ARCHITECTURE.md) - High-level runtime architecture and service layout
+- [Data Flow](DATA_FLOW.md) - Request/response data movement and authentication flows
+- [SERVICES.md](SERVICES.md) - Service-to-port mapping and inter-service dependencies
+- [API Endpoints](../api/ENDPOINTS.md) - Complete API reference across all 14 route files
+- [Deployment Guide](../deployment/production-domain-and-did-setup.md) - Production deployment instructions
+- [DID and Passport Model](did-and-passport-model.md) - DID architecture and passport structure
+- [OAIS Archive Mapping](oais-archive-mapping.md) - Archive standard compliance model

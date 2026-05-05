@@ -4,7 +4,13 @@ Last updated: 2026-04-30
 
 This document defines the identifier-persistence policy used for DPP records and product identifiers.
 
-It exists to make the repository’s persistence guarantees explicit for prEN 18219-style review.
+## Table of Contents
+
+- [Identifier roles](#identifier-roles)
+- [Policy rules](#policy-rules)
+- [Granularity change policy](#granularity-change-policy)
+- [Resolution continuity](#resolution-continuity)
+- [Related Documentation](#related-documentation)
 
 ## Identifier roles
 

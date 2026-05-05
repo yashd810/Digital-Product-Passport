@@ -4,6 +4,15 @@ Source: `apps/backend-api`
 
 The backend is a Node.js/Express API backed by PostgreSQL. It is the trust boundary for authentication, company access, passport lifecycle rules, public passport reads, DID/signing behavior, repository files, workflow, audit logging, and admin operations.
 
+## Table of Contents
+
+- [Important Files](#important-files)
+- [Route Modules](#route-modules)
+- [Commands](#commands)
+- [Environment](#environment)
+- [Persistence](#persistence)
+- [Related Documentation](#related-documentation)
+
 ## Important Files
 
 | Path | Purpose |
@@ -49,3 +58,12 @@ Production requires at least `JWT_SECRET`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, 
 ## Persistence
 
 The backend initializes and migrates schema through `db/init.js` at startup when `RUN_SCHEMA_MIGRATIONS` allows it. See [Database Schema](../database/DATABASE_SCHEMA.md).
+
+## Related Documentation
+
+- [Architecture Overview](../architecture/ARCHITECTURE.md) - System architecture and design
+- [Services Map](../architecture/SERVICES.md) - Backend service responsibilities
+- [API Endpoints](../api/ENDPOINTS.md) - Complete endpoint reference
+- [Database Schema](../database/DATABASE_SCHEMA.md) - Database table definitions
+- [Data Carrier Authenticity](../api/data-carrier-authenticity.md) - Signing and verification
+- [Deployment Guide](../deployment/) - Deployment instructions

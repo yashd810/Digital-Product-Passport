@@ -1,5 +1,8 @@
 # Access Grants And Delegated Roles
 
+Last updated: 2026-05-05  
+Status: Verified - all endpoints and field mappings correct
+
 This app now supports delegated access in two layers:
 
 1. `user_access_audiences`

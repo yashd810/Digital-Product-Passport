@@ -4,7 +4,12 @@ Last updated: 2026-04-30
 
 This document defines the formal backup continuity policy for the DPP platform so RPO/RTO evidence is explicit rather than inferred from route behavior.
 
-For the broader archive-model mapping to ISO 14721 OAIS concepts, see [oais-archive-mapping.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/architecture/oais-archive-mapping.md:1).
+## Table of Contents
+
+- [Policy values](#policy-values)
+- [How the app implements this](#how-the-app-implements-this)
+- [Admin/API visibility](#adminapi-visibility)
+- [Related Documentation](#related-documentation)
 
 ## Policy values
 

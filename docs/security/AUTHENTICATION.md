@@ -808,6 +808,21 @@ router.post('/auth/login', loginLimiter, login);
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,        // 1 minute
   max: 100,                    // 100 requests
+});
+
+app.use('/api/', apiLimiter);
+```
+
+---
+
+## Related Documentation
+
+- [Data Protection Guide](DATA_PROTECTION.md) - Encryption and secure storage
+- [Audit Logging & Compliance](AUDIT_LOGGING.md) - Audit trail and forensic analysis
+- [Access Revocation](access-revocation-process.md) - Permission management
+- [Signing and Verification](signing-and-verification.md) - Cryptographic integrity
+- [Current State Audit](../architecture/current-state-audit.md) - System deployment status
+- [Project Structure](../architecture/PROJECT_STRUCTURE.md) - Repository organization
   keyGenerator: (req) => req.user.userId  // Per user
 });
 

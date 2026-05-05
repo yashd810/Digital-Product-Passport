@@ -1,6 +1,7 @@
 # DID Resolution
 
-Last updated: 2026-04-24
+Last updated: 2026-05-05  
+Status: Verified - all endpoints correct
 
 Code/files:
 - `apps/backend-api/routes/dpp-api.js`

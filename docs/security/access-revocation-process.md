@@ -2,6 +2,14 @@
 
 This document defines the operational access-rights revocation process implemented by the app.
 
+## Table of Contents
+
+- [Who can revoke](#who-can-revoke)
+- [What can be revoked](#what-can-be-revoked)
+- [Standard revocation behavior](#standard-revocation-behavior)
+- [Emergency revocation behavior](#emergency-revocation-behavior)
+- [Related Documentation](#related-documentation)
+
 ## Who can revoke
 
 - `super_admin`
