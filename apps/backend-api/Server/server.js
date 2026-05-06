@@ -597,7 +597,7 @@ const upload = multer({
 if (storageService.isLocal) {
   app.use("/storage", (req, res, next) => {
     const storageKey = normalizeStorageRequestKey(req.path);
-    if (isPassportStorageKey(storageKey)) {
+    if (isPassportStorageKey(storageKey) || storageKey.startsWith("repository-files/")) {
       return res.status(404).json({ error: "File not found" });
     }
     next();
@@ -618,19 +618,9 @@ if (storageService.isLocal) {
   // can enforce visibility rules and avoid exposing predictable bucket paths.
   // New uploads store an opaque public_id; legacy files without an attachment
   // record will 404 via /public-files and need to be re-uploaded.
-  app.use("/repository-files", express.static(REPO_BASE_DIR, {
-    setHeaders: (res, fp) => {
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      if (fp.endsWith(".pdf")) {
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", "inline");
-        res.removeHeader("X-Frame-Options");
-        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-      } else {
-        res.setHeader("Cross-Origin-Resource-Policy", "same-site");
-      }
-    },
-  }));
+  // Company repository files are private assets and must go through the
+  // repository API so company membership is checked before bytes are served.
+  app.use("/repository-files", (_req, res) => res.status(404).json({ error: "File not found" }));
 }
 
 const repoUpload = multer({
@@ -646,7 +636,7 @@ if (!storageService.isLocal && storageService.fetchObject) {
   app.get(/^\/storage\/(.+)$/, async (req, res) => {
     const storageKey = normalizeStorageRequestKey(req.params[0]);
     if (!storageKey) return res.status(400).json({ error: "Storage key required" });
-    if (isPassportStorageKey(storageKey)) {
+    if (isPassportStorageKey(storageKey) || storageKey.startsWith("repository-files/")) {
       return res.status(404).json({ error: "Stored object not found" });
     }
     try {

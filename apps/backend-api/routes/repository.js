@@ -14,23 +14,44 @@ module.exports = function registerRepositoryRoutes(app, {
   isPathInsideBase,
   storageService,
 }) {
-  const withResolvedFileUrl = (row) => ({
+  const repositoryFileUrl = (req, row) => {
+    if (row?.id && (row.storage_key || row.file_path)) {
+      return `${req.protocol}://${req.get("host")}/api/companies/${row.company_id}/repository/${row.id}/file`;
+    }
+    return row?.file_url || null;
+  };
+
+  const withResolvedFileUrl = (req, row) => ({
     ...row,
-    file_url: row.storage_key ? storageService.getPublicUrl(row.storage_key) : row.file_url,
+    file_url: repositoryFileUrl(req, row),
   });
+
+  const setRepositoryFileHeaders = (res, row) => {
+    const mimeType = row.mime_type || "application/octet-stream";
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Cache-Control", "private, max-age=300");
+    res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+    res.setHeader("Content-Security-Policy", "sandbox");
+    if (mimeType === "application/pdf") {
+      res.setHeader("Content-Disposition", "inline");
+      res.removeHeader("X-Frame-Options");
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    }
+  };
 
   app.get("/api/companies/:companyId/repository", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { companyId } = req.params;
       const parentId = req.query.parentId ? parseInt(req.query.parentId, 10) : null;
       const r = await pool.query(
-        `SELECT id, parent_id, name, type, file_url, storage_key, mime_type, size_bytes, created_at
+        `SELECT id, company_id, parent_id, name, type, file_url, storage_key, file_path, mime_type, size_bytes, created_at
          FROM company_repository
          WHERE company_id = $1 AND parent_id IS NOT DISTINCT FROM $2
          ORDER BY type DESC, name ASC`,
         [companyId, parentId]
       );
-      res.json(r.rows.map(withResolvedFileUrl));
+      res.json(r.rows.map((row) => withResolvedFileUrl(req, row)));
     } catch {
       res.status(500).json({ error: "Failed to list repository" });
     }
@@ -68,7 +89,7 @@ module.exports = function registerRepositoryRoutes(app, {
          VALUES ($1, $2, $3, 'folder', $4) RETURNING *`,
         [req.params.companyId, parentId || null, name.trim(), req.user.userId]
       );
-      res.status(201).json(withResolvedFileUrl(r.rows[0]));
+      res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
     } catch {
       res.status(500).json({ error: "Failed to create folder" });
     }
@@ -110,7 +131,7 @@ module.exports = function registerRepositoryRoutes(app, {
             req.user.userId,
           ]
         );
-        res.status(201).json(withResolvedFileUrl(r.rows[0]));
+        res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
       } catch (e) {
         if (e.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({ error: "File too large. Max 50 MB." });
@@ -130,7 +151,7 @@ module.exports = function registerRepositoryRoutes(app, {
          VALUES ($1, $2, $3, 'file', $4, 'application/pdf', $5) RETURNING *`,
         [req.params.companyId, parentId || null, name.trim(), sourceUrl, req.user.userId]
       );
-      res.status(201).json(withResolvedFileUrl(r.rows[0]));
+      res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
     } catch {
       res.status(500).json({ error: "Failed to copy to repository" });
     }
@@ -146,7 +167,7 @@ module.exports = function registerRepositoryRoutes(app, {
         [name.trim(), req.params.itemId, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Item not found" });
-      res.json(withResolvedFileUrl(r.rows[0]));
+      res.json(withResolvedFileUrl(req, r.rows[0]));
     } catch {
       res.status(500).json({ error: "Failed to rename" });
     }
@@ -190,13 +211,13 @@ module.exports = function registerRepositoryRoutes(app, {
   app.get("/api/companies/:companyId/repository/symbols", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(
-        `SELECT id, name, mime_type, file_url, storage_key, size_bytes, created_at
+        `SELECT id, company_id, name, mime_type, file_url, storage_key, file_path, size_bytes, created_at
          FROM company_repository
          WHERE company_id = $1 AND type = 'file' AND mime_type LIKE 'image/%'
          ORDER BY name ASC`,
         [req.params.companyId]
       );
-      res.json(r.rows.map(withResolvedFileUrl));
+      res.json(r.rows.map((row) => withResolvedFileUrl(req, row)));
     } catch {
       res.status(500).json({ error: "Failed to fetch symbols" });
     }
@@ -235,10 +256,55 @@ module.exports = function registerRepositoryRoutes(app, {
             req.user.userId,
           ]
         );
-        res.status(201).json(withResolvedFileUrl(r.rows[0]));
+        res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
       } catch (e) {
       logger.error("Company symbol upload error:", e.message);
         res.status(500).json({ error: e.message || "Upload failed" });
+      }
+    }
+  );
+
+  app.get(
+    "/api/companies/:companyId/repository/:itemId/file",
+    authenticateToken,
+    checkCompanyAccess,
+    async (req, res) => {
+      try {
+        const item = await pool.query(
+          `SELECT *
+           FROM company_repository
+           WHERE id = $1
+             AND company_id = $2
+             AND type = 'file'
+           LIMIT 1`,
+          [req.params.itemId, req.params.companyId]
+        );
+        if (!item.rows.length) return res.status(404).json({ error: "File not found" });
+        const row = item.rows[0];
+
+        setRepositoryFileHeaders(res, row);
+
+        if (row.storage_key && storageService.fetchObject) {
+          const objectResponse = await storageService.fetchObject(row.storage_key);
+          const contentLength = objectResponse.headers?.get("content-length");
+          const etag = objectResponse.headers?.get("etag");
+          if (contentLength) res.setHeader("Content-Length", contentLength);
+          if (etag) res.setHeader("ETag", etag);
+          return res.send(Buffer.from(await objectResponse.arrayBuffer()));
+        }
+
+        if (row.file_path) {
+          const safeFilePath = path.resolve(row.file_path);
+          if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR) || !fs.existsSync(safeFilePath)) {
+            return res.status(404).json({ error: "File not found" });
+          }
+          return res.sendFile(safeFilePath);
+        }
+
+        res.status(404).json({ error: "File not available" });
+      } catch (e) {
+        logger.error({ err: e }, "[repository-file] Failed to serve repository file");
+        res.status(500).json({ error: "Failed to serve file" });
       }
     }
   );

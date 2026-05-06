@@ -3,6 +3,7 @@ import { LANGUAGES, translateFieldValue, translateSchemaLabel } from "../../app/
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel } from "../utils/viewerHelpers";
 
 const API = import.meta.env.VITE_API_URL || "";

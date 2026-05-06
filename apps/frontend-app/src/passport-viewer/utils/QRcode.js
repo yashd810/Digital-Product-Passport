@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildPublicPassportPath } from "../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../passports/utils/publicViewerUrl";
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { NavLink } from "react-router-dom";
+import { fetchWithAuth } from "../../../shared/api/authHeaders";
 import "./CompanyRepository.css";
 
 const API = import.meta.env.VITE_API_URL || "";

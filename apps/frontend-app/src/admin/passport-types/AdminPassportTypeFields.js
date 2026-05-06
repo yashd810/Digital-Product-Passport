@@ -5,6 +5,7 @@ import {
   CONFIDENTIALITY_LEVEL_LABELS,
   UPDATE_AUTHORITY_LABELS,
 } from "./builderHelpers";
+import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
