@@ -14,24 +14,21 @@ Automated and manual deployment scripts for OCI production environment.
 ## Quick Start
 
 ```bash
-# Full automated deployment to OCI
-OCI_IP="79.72.16.68" bash deploy-to-oci.sh
+# Deploy the frontend OCI host
+DPP_DEPLOY_TARGET=frontend OCI_IP="79.72.16.68" bash scripts/deploy/deploy-to-oci.sh
 
-# Alternative deployment
-bash deploy-oci.sh
+# Deploy the backend OCI host
+DPP_DEPLOY_TARGET=backend OCI_IP="82.70.54.173" bash scripts/deploy/deploy-to-oci.sh
 
 # Manual step-by-step
-bash deploy-manual.sh
-
-# Fix authentication issues
-bash CRITICAL_COOKIE_FIX.sh
+DPP_DEPLOY_TARGET=frontend bash scripts/deploy/deploy-manual.sh
 ```
 
 ## Scripts Overview
 
 | Script | Purpose | When to Use |
 |--------|---------|------------|
-| `deploy-to-oci.sh` | Full automated deployment | First deployment or major updates |
+| `deploy-to-oci.sh` | Full automated deployment with explicit target selection | First deployment or major updates |
 | `deploy-oci.sh` | Simplified deployment | Quick redeploy with existing config |
 | `deploy-manual.sh` | Manual steps | Understanding deployment process |
 | `CRITICAL_COOKIE_FIX.sh` | Fix auth cookies | If authentication fails after deploy |
@@ -44,6 +41,7 @@ Before deploying, set these variables:
 export OCI_IP="79.72.16.68"
 export SSH_KEY="$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key"
 export OCI_USER="ubuntu"
+export DPP_DEPLOY_TARGET="frontend"
 ```
 
 Or add to `.env`:
@@ -51,7 +49,10 @@ Or add to `.env`:
 OCI_IP=79.72.16.68
 SSH_KEY=$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key
 OCI_USER=ubuntu
+DPP_DEPLOY_TARGET=frontend
 ```
+
+`DPP_DEPLOY_TARGET` is required for the main deploy scripts. Use `frontend` on the frontend host, `backend` on the backend host, and `all` only for a single-host deployment.
 
 ## Troubleshooting Deployments
 

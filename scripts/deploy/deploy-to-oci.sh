@@ -8,12 +8,37 @@ set -e
 OCI_USER="${OCI_USER:-ubuntu}"
 OCI_IP="${OCI_IP:-79.76.53.122}"
 SSH_KEY="${SSH_KEY:-$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key}"
+DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
 APP_DIR="/opt/dpp"
 ENV_FILE="/etc/dpp/dpp.env"
 REPO="https://github.com/yashd810/Digital-Product-Passport.git"
 BRANCH="main"
 SSH_CMD="/usr/bin/ssh"
 TIMEOUT_SECONDS=600
+TIMEOUT_CMD=""
+
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="timeout"
+fi
+
+if [ -z "$DEPLOY_TARGET" ]; then
+    echo "❌ DPP_DEPLOY_TARGET is required. Use one of: frontend, backend, all"
+    echo "Examples:"
+    echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=79.72.16.68 bash scripts/deploy/deploy-to-oci.sh"
+    echo "  DPP_DEPLOY_TARGET=backend OCI_IP=82.70.54.173 bash scripts/deploy/deploy-to-oci.sh"
+    exit 1
+fi
+
+case "$DEPLOY_TARGET" in
+    frontend|backend|all) ;;
+    *)
+        echo "❌ Unsupported DPP_DEPLOY_TARGET: $DEPLOY_TARGET"
+        echo "Use one of: frontend, backend, all"
+        exit 1
+        ;;
+esac
 
 echo "=================================="
 echo "🚀 DPP OCI Deployment Script"
@@ -22,6 +47,8 @@ echo ""
 echo "Configuration:"
 echo "  OCI IP: $OCI_IP"
 echo "  User: $OCI_USER"
+echo "  Deploy Target: $DEPLOY_TARGET"
+echo "  Compose Project: $COMPOSE_PROJECT_NAME"
 echo "  App Dir: $APP_DIR"
 echo "  Env File: $ENV_FILE"
 echo "  Timeout: ${TIMEOUT_SECONDS}s"
@@ -69,6 +96,9 @@ APP_DIR="/opt/dpp"
 ENV_FILE="/etc/dpp/dpp.env"
 REPO="https://github.com/yashd810/Digital-Product-Passport.git"
 BRANCH="main"
+DEPLOY_TARGET="${DPP_DEPLOY_TARGET:?DPP_DEPLOY_TARGET is required}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
 
 echo "📂 Checking application directory..."
 if [ ! -d "$APP_DIR" ]; then
@@ -99,7 +129,11 @@ echo ""
 # Run deployment with timeout
 echo "🐳 Building and starting Docker containers (this may take 10-15 minutes)..."
 cd "$APP_DIR"
-(timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="all" ./infra/oracle/deploy-prod.sh 2>&1 || true)
+if [ -n "$REMOVE_ORPHANS" ]; then
+    timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" DPP_REMOVE_ORPHANS="$REMOVE_ORPHANS" ./infra/oracle/deploy-prod.sh
+else
+    timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" ./infra/oracle/deploy-prod.sh
+fi
 
 echo ""
 echo "✅ Deployment process complete!"
@@ -124,29 +158,40 @@ echo "⏱️  Starting remote deployment (timeout: ${TIMEOUT_SECONDS}s)..."
 echo "---"
 
 # Execute with timeout
-(timeout $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "bash /tmp/deploy.sh" 2>&1 || true) | tee /tmp/deploy-output.log
+REMOTE_ENV="DPP_DEPLOY_TARGET='$DEPLOY_TARGET' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME'"
+if [ -n "$REMOVE_ORPHANS" ]; then
+    REMOTE_ENV="$REMOTE_ENV DPP_REMOVE_ORPHANS='$REMOVE_ORPHANS'"
+fi
+if [ -n "$TIMEOUT_CMD" ]; then
+    ($TIMEOUT_CMD $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash /tmp/deploy.sh" 2>&1) | tee /tmp/deploy-output.log
+else
+    echo "⚠️  Local timeout command not found; running SSH deployment without local timeout wrapper."
+    ($SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash /tmp/deploy.sh" 2>&1) | tee /tmp/deploy-output.log
+fi
 
 EXIT_CODE=${PIPESTATUS[0]}
 
 echo "---"
-echo ""
-echo "=================================="
-echo "✅ Deployment Complete!"
-echo "=================================="
-echo ""
-echo "📍 Next steps:"
-echo "1. SSH into instance: $SSH_CMD -i '$SSH_KEY' ${OCI_USER}@${OCI_IP}"
-echo "2. Check running services: sudo docker ps"
-echo "3. View logs: sudo docker logs backend-api 2>&1 | tail -20"
-echo "4. Test API health: curl -s http://localhost:3001/health | jq ."
-echo ""
 echo "📋 Deployment log saved to: /tmp/deploy-output.log"
 echo ""
 
-if [ $EXIT_CODE -eq 124 ] || [ $EXIT_CODE -eq 0 ]; then
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "=================================="
+    echo "✅ Deployment Complete!"
+    echo "=================================="
+    echo ""
+    echo "📍 Next steps:"
+    echo "1. SSH into instance: $SSH_CMD -i '$SSH_KEY' ${OCI_USER}@${OCI_IP}"
+    echo "2. Check running services: sudo docker ps"
+    echo "3. View logs: sudo docker logs backend-api 2>&1 | tail -20"
+    echo "4. Test API health: curl -s http://localhost:3001/health | jq ."
+    echo ""
     echo "✅ Deployment process completed (see above for details)"
     exit 0
+elif [ $EXIT_CODE -eq 124 ]; then
+    echo "❌ Deployment timed out after ${TIMEOUT_SECONDS}s. Check the host before retrying."
+    exit 124
 else
-    echo "⚠️  Deployment process exited with code: $EXIT_CODE"
-    exit 0
+    echo "❌ Deployment process exited with code: $EXIT_CODE"
+    exit "$EXIT_CODE"
 fi

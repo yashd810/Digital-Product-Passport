@@ -5,7 +5,7 @@
 set -e
 
 echo "======================================"
-echo "Manual OCI Deployment - 403 Error Fix"
+echo "Manual OCI Deployment"
 echo "======================================"
 echo ""
 
@@ -14,12 +14,33 @@ APP_DIR="${APP_DIR:-/opt/dpp}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 REPO_URL="${REPO_URL:-https://github.com/yashd810/Digital-Product-Passport.git}"
 BRANCH="${BRANCH:-main}"
+DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+
+if [ -z "$DEPLOY_TARGET" ]; then
+    echo "❌ DPP_DEPLOY_TARGET is required. Use one of: frontend, backend, all"
+    echo "Examples:"
+    echo "  DPP_DEPLOY_TARGET=frontend ./scripts/deploy/deploy-manual.sh"
+    echo "  DPP_DEPLOY_TARGET=backend ./scripts/deploy/deploy-manual.sh"
+    exit 1
+fi
+
+case "$DEPLOY_TARGET" in
+    frontend|backend|all) ;;
+    *)
+        echo "❌ Unsupported DPP_DEPLOY_TARGET: $DEPLOY_TARGET"
+        echo "Use one of: frontend, backend, all"
+        exit 1
+        ;;
+esac
 
 echo "Configuration:"
 echo "  App Directory: $APP_DIR"
 echo "  Environment File: $ENV_FILE"
 echo "  Repository: $REPO_URL"
 echo "  Branch: $BRANCH"
+echo "  Deploy Target: $DEPLOY_TARGET"
+echo "  Compose Project: $COMPOSE_PROJECT_NAME"
 echo ""
 
 # Step 1: Check Docker
@@ -78,7 +99,8 @@ cd "$APP_DIR"
 
 echo "   Building Docker images..."
 DPP_ENV_FILE="$ENV_FILE" \
-DPP_DEPLOY_TARGET="all" \
+COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
+DPP_DEPLOY_TARGET="$DEPLOY_TARGET" \
   sudo -E bash ./infra/oracle/deploy-prod.sh
 
 echo ""
@@ -123,7 +145,7 @@ echo "   Check database:"
 echo "     docker exec postgres psql -U postgres -d dpp_system"
 echo ""
 echo "   Restart services:"
-echo "     docker-compose -f docker-compose.prod.yml restart"
+echo "     DPP_ENV_FILE=$ENV_FILE DPP_DEPLOY_TARGET=$DEPLOY_TARGET ./infra/oracle/deploy-prod.sh"
 echo ""
 echo "   View running services:"
 echo "     docker ps"
@@ -137,8 +159,5 @@ echo "Summary:"
 echo "  - Code updated from GitHub main branch"
 echo "  - Docker images rebuilt"
 echo "  - Services restarted"
-echo "  - Database migration 2026-05-02.ensure-admin-super-role will run on startup"
-echo "  - Admin user will be automatically promoted to super_admin role"
-echo ""
-echo "The /api/admin/analytics endpoint should now be accessible"
+echo "  - Target '$DEPLOY_TARGET' was deployed using Compose project '$COMPOSE_PROJECT_NAME'"
 echo ""
