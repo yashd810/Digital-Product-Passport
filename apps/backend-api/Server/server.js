@@ -771,23 +771,6 @@ const isPathInsideBase = (targetPath, baseDir) => {
   return nt === nb || nt.startsWith(`${nb}${path.sep}`);
 };
 
-const rewritePathPrefix = (targetPath, sourceDir, destinationDir) => {
-  const nt = path.resolve(targetPath);
-  const ns = path.resolve(sourceDir);
-  const nd = path.resolve(destinationDir);
-  if (nt === ns) return nd;
-  if (!nt.startsWith(`${ns}${path.sep}`)) return null;
-  return path.join(nd, path.relative(ns, nt));
-};
-
-const migrateRepositoryFilePaths = async () => {
-  // Skipped - fresh database initialization
-};
-
-const backfillLegacyPassportAttachmentLinks = async () => {
-  // Skipped - fresh database initialization
-};
-
 // ─── STARTUP ─────────────────────────────────────────────────────────────────
 process.on("unhandledRejection", (reason) => logger.error({ err: reason }, "[Unhandled Rejection]"));
 
@@ -815,7 +798,6 @@ const startup = pool.query("SELECT NOW()")
         productIdentifierService,
       });
       logger.info("[DB] Initialized successfully");
-      // File migration functions skipped - fresh database initialization
     } else {
       await verifySchemaReady();
       logger.info("[DB] Schema migrations skipped; existing schema verified");

@@ -4,6 +4,19 @@
 **Status**: CRITICAL FIX - Required for production API authentication  
 **Commit**: 9b82448
 
+## Table of Contents
+
+1. [Issue Summary](#issue-summary)
+2. [Infrastructure Setup](#infrastructure-setup)
+3. [How to Deploy](#how-to-deploy)
+4. [Configuration Details](#configuration-details)
+5. [Verification Checklist](#verification-checklist)
+6. [Rollback Plan](#rollback-plan)
+7. [Technical Details](#technical-details)
+8. [Questions](#questions)
+
+---
+
 ## Issue Summary
 
 All API requests from the frontend (`app.claros-dpp.online`) to the backend (`api.claros-dpp.online`) were returning `403 Forbidden` with error message: `Invalid or expired token`
@@ -223,5 +236,16 @@ Refer to:
 - `CRITICAL_COOKIE_DOMAIN_FIX.md` - Original issue documentation
 - `CRITICAL_COOKIE_FIX.sh` - Shell script for automated fix
 - `DEPLOYMENT_FIX_GUIDE.md` - Extended deployment guide
+
+---
+
+## Related Documentation
+
+- [OCI.md](OCI.md) - OCI deployment guide
+- [LOCAL.md](LOCAL.md) - Local development setup
+- [DISTRIBUTED_DEPLOYMENT_GUIDE.md](DISTRIBUTED_DEPLOYMENT_GUIDE.md) - Multi-server infrastructure
+- [production-domain-and-did-setup.md](production-domain-and-did-setup.md) - Domain and environment configuration
+- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Authentication mechanisms
+- [AUDIT_LOGGING.md](../security/AUDIT_LOGGING.md) - Login and authentication event logging
 
 **Git Commit**: `9b82448` - See what changed in this commit

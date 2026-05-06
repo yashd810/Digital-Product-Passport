@@ -797,4 +797,15 @@ WHERE user_id NOT IN (SELECT id FROM users)
 
 ---
 
+## Related Documentation
+
+- [Audit Logging & Anchoring](audit-logging-and-anchoring.md) - Non-repudiation and audit evidence protection
+- [Authentication](AUTHENTICATION.md) - Session and user management  
+- [Data Protection](DATA_PROTECTION.md) - Encryption and sensitive data handling
+- [Access Revocation](access-revocation-process.md) - Permission management and revocation
+- [Current State Audit](../architecture/current-state-audit.md) - System configuration and status
+- [OAIS Archive Mapping](../architecture/oais-archive-mapping.md) - Long-term preservation model
+
+---
+
 **[← Back to Security Docs](../README.md)**

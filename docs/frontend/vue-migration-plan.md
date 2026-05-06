@@ -2,6 +2,13 @@
 
 Last updated: 2026-04-27
 
+## Table of Contents
+
+1. [Current state](#current-state)
+2. [Safe migration order](#safe-migration-order)
+3. [Main risks](#main-risks)
+4. [Recommended acceptance criteria](#recommended-acceptance-criteria)
+
 ## Current state
 
 The repository does not have an isolated "frontend shell" that can be swapped from React to Vue independently.
@@ -65,3 +72,18 @@ That means a true Vue migration is not a package replacement. It is a UI rewrite
 - consumer passport pages match current behavior
 - technical passport view still loads history, signatures, and unlock flows
 - Docker builds and OCI deploy stay unchanged at the environment-variable level
+
+---
+
+## Related Documentation
+
+- [DEVELOPMENT.md](../development/DEVELOPMENT.md) - Development guidelines
+- [DEVELOPMENT_INDEX.md](../development/DEVELOPMENT_INDEX.md) - Development patterns
+- [accessibility-and-portability.md](./accessibility-and-portability.md) - Accessibility standards
+- [frontend-app.md](../apps/frontend-app.md) - Frontend app structure
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - System architecture
+- [DEPLOYMENT.md](../deployment/LOCAL.md) - Local development setup
+
+---
+
+**[← Back to Docs](../README.md)**

@@ -25,8 +25,6 @@ const MODEL_KEY = "claros_battery_dictionary_v1";
 const WORKBOOK_SHEET_NAME = "Data attribute longlist_DR_v1.3";
 const DPP_CLASS_IRI = `${BASE_IRI}/classes/DigitalBatteryPassport`;
 const GENERIC_DPP_CLASS_IRI = "https://schema.digitalproductpassport.eu/ns/dpp#DigitalProductPassport";
-const SPHERITY_DBP_VOCAB_IRI = "https://dpp-vocabulary.spherity.com/dbp";
-const SPHERITY_DBP_CONTEXT_IRI = "https://dpp-vocabulary.spherity.com/contexts/dbp/v1.jsonld";
 const DCAT_AP_301_IRI = "https://semiceu.github.io/DCAT-AP/releases/3.0.1/";
 const DCAT_3_IRI = "https://www.w3.org/TR/vocab-dcat-3/";
 const DOMAIN_CLASS_BASE_IRI = `${BASE_IRI}/classes/`;
@@ -34,123 +32,93 @@ const DOMAIN_CLASS_BASE_IRI = `${BASE_IRI}/classes/`;
 const DOMAIN_CLASSES = {
   DigitalBatteryPassport: {
     label: "Digital Battery Passport",
-    referenceClass: `${SPHERITY_DBP_VOCAB_IRI}#DigitalBatteryPassport`,
   },
   DPPInfo: {
     label: "DPP Information",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#DPPInfo",
   },
   BatteryIdentifiers: {
     label: "Battery Identifiers",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryIdentifiers",
   },
   OperatorIdentifiers: {
     label: "Operator Identifiers",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#OperatorIdentifiers",
   },
   ProductData: {
     label: "Product Data",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#ProductData",
   },
-  RestrictedProductData: {
-    label: "Restricted Product Data",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#RestrictedProductData",
+  RestrictedProductInfo: {
+    label: "Restricted Product Info",
   },
   BatteryAttributes: {
     label: "Battery Attributes",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryAttributes",
   },
   BatteryCompliancePublic: {
     label: "Battery Compliance Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryCompliancePublic",
   },
   BatteryComplianceRestricted: {
     label: "Battery Compliance Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryComplianceRestricted",
   },
   BatteryCarbonFootprint: {
     label: "Battery Carbon Footprint",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryCarbonFootprint",
   },
   SupplyChainDueDiligence: {
     label: "Supply Chain Due Diligence",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#SupplyChainDueDiligence",
   },
   BatteryMaterialsPublic: {
     label: "Battery Materials Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryMaterialsPublic",
   },
   BatteryMaterialsRestricted: {
     label: "Battery Materials Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryMaterialsRestricted",
   },
   BatteryCircularityPublic: {
     label: "Battery Circularity Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryCircularityPublic",
   },
   BatteryCircularityRestricted: {
     label: "Battery Circularity Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryCircularityPrivate",
   },
   RecycledRenewableContent: {
     label: "Recycled and Renewable Content",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#RecycledRenewableContent",
   },
   EndUserInformation: {
     label: "End-User Information",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#EndUserInformation",
   },
-  CapacityEnergyVoltagePublic: {
-    label: "Capacity, Energy and Voltage Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#CapacityEnergyVoltagePublic",
+  PerformanceDurabilityPublic: {
+    label: "Performance and Durability Public",
   },
-  CapacityEnergyVoltageRestricted: {
-    label: "Capacity, Energy and Voltage Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#CapacityEnergyVoltageRestricted",
+  PerformanceDurabilityRestricted: {
+    label: "Performance and Durability Restricted",
   },
   PowerCapabilityPublic: {
     label: "Power Capability Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#PowerCapabilityPublic",
   },
   PowerCapabilityRestricted: {
     label: "Power Capability Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#PowerCapabilityRestricted",
   },
   RoundTripEfficiencyPublic: {
     label: "Round Trip Efficiency Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#RoundTripEfficiencyPublic",
   },
   RoundTripEfficiencyRestricted: {
     label: "Round Trip Efficiency Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#RoundTripEfficiencyRestricted",
   },
   InternalResistancePublic: {
     label: "Internal Resistance Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#InternalResistancePublic",
   },
   InternalResistanceRestricted: {
     label: "Internal Resistance Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#InternalResistanceRestricted",
   },
   BatteryLifetimePublic: {
     label: "Battery Lifetime Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryLifetimePublic",
   },
   BatteryLifetimeRestricted: {
     label: "Battery Lifetime Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#BatteryLifetimeRestricted",
   },
   TemperatureConditionsPublic: {
     label: "Temperature Conditions Public",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#TemperatureConditionsPublic",
   },
   TemperatureConditionsRestricted: {
     label: "Temperature Conditions Restricted",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#TemperatureConditionsRestricted",
   },
   NegativeEvents: {
     label: "Negative Events",
-    referenceClass: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass#NegativeEvents",
   },
 };
 
@@ -318,10 +286,6 @@ function buildDomainClass(classKey) {
       curie: "clarosBatteryClass:DigitalBatteryPassport",
       label: "Digital Battery Passport",
     },
-    referenceClass: {
-      iri: definition.referenceClass,
-      label: `Spherity ${classKey}`,
-    },
   };
   if (classKey === "DigitalBatteryPassport") {
     domain.broaderClass = {
@@ -346,7 +310,7 @@ function resolveDomainClassKey(term) {
   if (number >= 5 && number <= 8) return "BatteryIdentifiers";
   if (number >= 9 && number <= 11) return "OperatorIdentifiers";
   if (number >= 12 && number <= 15) return "ProductData";
-  if (number === 16 || number === 20) return "RestrictedProductData";
+  if (number === 16 || number === 20) return "RestrictedProductInfo";
   if (number >= 17 && number <= 19) return "BatteryAttributes";
 
   if (category.includes("labels") || category.includes("conformity")) {
@@ -365,7 +329,7 @@ function resolveDomainClassKey(term) {
   if (category.includes("performance")) {
     const publicTerm = isPublicTerm(term);
     if (subcategory.includes("capacity") || subcategory.includes("voltage")) {
-      return publicTerm ? "CapacityEnergyVoltagePublic" : "CapacityEnergyVoltageRestricted";
+      return publicTerm ? "PerformanceDurabilityPublic" : "PerformanceDurabilityRestricted";
     }
     if (subcategory.includes("power")) {
       return publicTerm ? "PowerCapabilityPublic" : "PowerCapabilityRestricted";
@@ -952,19 +916,18 @@ async function main() {
       catalogUrl: `${BASE_IRI}/catalog.jsonld`,
       datasetUrl: `${BASE_IRI}/dataset`,
       dataServiceUrl: `${BASE_IRI}/service`,
-      termModel: "Each dictionary term is represented as a dereferenceable RDF property and SKOS concept with explicit rdfs:domain and rdfs:range metadata. Domains use section-specific battery passport classes aligned with the Spherity DBP v0.2 vocabulary rather than a single generic container.",
+      termModel: "Each dictionary term is represented as a dereferenceable RDF property and SKOS concept with explicit rdfs:domain and rdfs:range metadata. Domains use section-specific battery passport classes informed by the DBP v0.2 reference vocabulary rather than a single generic container.",
       domainModel: Object.fromEntries(
         Object.entries(DOMAIN_CLASSES).map(([classKey, definition]) => [
           classKey,
           {
             iri: `${DOMAIN_CLASS_BASE_IRI}${classKey}`,
             label: definition.label,
-            referenceClass: definition.referenceClass,
           },
         ])
       ),
       referenceVocabulary: {
-        title: "Spherity Digital Battery Passport vocabulary v0.2",
+        title: "Digital Battery Passport vocabulary v0.2 reference",
         vocabularyUrl: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass.html",
         contextUrl: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass.context.jsonld",
         ontologyUrl: "https://dpp.vocabulary.spherity.com/dbp/v0.2/batteryPass.ttl",

@@ -2,6 +2,16 @@
 
 This project is a React/Express/PostgreSQL monorepo-style service stack. Prefer existing local patterns over introducing new framework conventions.
 
+## Table of Contents
+
+1. [Principles](#principles)
+2. [Frontend](#frontend)
+3. [Backend](#backend)
+4. [Database Changes](#database-changes)
+5. [API Changes](#api-changes)
+6. [Testing](#testing)
+7. [More Workflow Detail](#more-workflow-detail)
+
 ## Principles
 
 - Backend permissions are authoritative. Frontend route guards are not security controls.
@@ -90,3 +100,18 @@ For narrow docs-only changes, a link/path check is usually enough. For code chan
 ## More Workflow Detail
 
 Use [Developer Workflows](./WORKFLOWS.md) for feature-specific change paths.
+
+---
+
+## Related Documentation
+
+- [WORKFLOWS.md](./WORKFLOWS.md) - Feature-specific developer workflows
+- [scripts.md](./scripts.md) - Deployment and utility scripts
+- [utility-scripts.md](./utility-scripts.md) - Database automation scripts
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - System architecture overview
+- [ENDPOINTS.md](../api/ENDPOINTS.md) - API endpoint reference
+- [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) - Database schema
+
+---
+
+**[← Back to Docs](../README.md)**

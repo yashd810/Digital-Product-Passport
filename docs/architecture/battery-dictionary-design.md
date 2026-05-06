@@ -14,7 +14,7 @@ Design summary:
 - Frontend battery browsing reads the generated term list from `battery-dictionary-terms.generated.json`.
 - The manifest is the canonical place for governance, source authority, versioning, and regulatory traceability metadata for the Claros battery semantic model.
 - `catalog.jsonld` publishes a DCAT/DCAT-AP-compatible catalog view of the dictionary with `dcat:Catalog`, `dcat:Dataset`, `dcat:Distribution`, and `dcat:DataService` metadata.
-- `context.jsonld` uses a protected JSON-LD 1.1 context with `id`/`type` aliases and battery-passport class mappings, following the same convention as the Spherity DBP v0.2 vocabulary reference.
+- `context.jsonld` uses a protected JSON-LD 1.1 context with `id`/`type` aliases and battery-passport class mappings, following the same convention as the DBP v0.2 reference vocabulary.
 
 Governance and authority:
 - This dictionary is an internal Claros implementation vocabulary derived from the BatteryPass Data Attribute Longlist v1.3.
@@ -24,7 +24,7 @@ Governance and authority:
 Versioning and traceability:
 - Dictionary releases are versioned independently as Claros artifacts and also record the pinned upstream source version used to generate them.
 - Term-level traceability lives in `terms.json` through source-oriented metadata such as `specRef`, `number`, `attributeName`, `sourceWorkbookRow`, `sourceAttributeName`, `dinDkeSpec99100Chapter`, `accessRights`, `staticOrDynamic`, `updateRequirement`, `granularityLevel`, `componentGranularity`, and `regulationReferences`.
-- Every term is modeled as a dereferenceable RDF property/SKOS concept with explicit `domain` and `range`; domains are section-specific classes aligned to Spherity DBP v0.2, such as `DPPInfo`, `BatteryIdentifiers`, `BatteryCarbonFootprint`, `CapacityEnergyVoltagePublic`, and `TemperatureConditionsRestricted`, and ranges are derived from the source datatype's XSD mapping.
+- Every term is modeled as a dereferenceable RDF property/SKOS concept with explicit `domain` and `range`; domains are section-specific classes informed by the DBP v0.2 reference vocabulary, such as `DPPInfo`, `BatteryIdentifiers`, `BatteryCarbonFootprint`, `PerformanceDurabilityPublic`, `PerformanceDurabilityRestricted`, and `TemperatureConditionsRestricted`, and ranges are derived from the source datatype's XSD mapping.
 - Battery-category applicability and requirement levels live in `category-rules.json`, which the export validator uses for category-based completeness checks.
 - App-to-dictionary semantic bindings live in `field-map.json`.
 

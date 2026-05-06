@@ -1,6 +1,19 @@
 # Oracle Cloud Free Tier Deployment
 
-The easiest Oracle Cloud Free Tier deployment path for this project is:
+## Table of Contents
+
+1. [What This Folder Gives You](#what-this-folder-gives-you)
+2. [Recommended OCI Setup](#recommended-oci-setup)
+3. [OCI Object Storage Values](#oci-object-storage-values)
+4. [Minimal Deployment Flow](#minimal-deployment-flow)
+5. [Two-Host OCI Split](#two-host-oci-split)
+6. [Secret Handling](#secret-handling-recommendation)
+7. [Notes](#notes)
+8. [HTTP/2 Minimum](#http2-minimum-for-public-delivery)
+9. [TLS Policy](#tls-policy-for-public-delivery)
+10. [Post-Deploy Verification](#post-deploy-verification)
+
+---
 
 - `OCI Compute` Always Free VM for the app containers
 - `OCI Object Storage` for uploaded files / symbols / repository assets
@@ -150,6 +163,17 @@ DPP_ENV_FILE=/etc/dpp/dpp.env ./infra/oracle/deploy-prod.sh
 ```
 
 This keeps the checked-out repo clean while still letting Docker Compose read the same env file for build args and runtime settings.
+
+---
+
+## Related Documentation
+
+- [OCI.md](OCI.md) - Complete OCI production deployment
+- [oci-free-tier-edge.md](oci-free-tier-edge.md) - OCI networking and edge configuration
+- [production-domain-and-did-setup.md](production-domain-and-did-setup.md) - Domain setup and certificates
+- [deploy-scripts.md](deploy-scripts.md) - Automated deployment scripts
+- [LOCAL.md](LOCAL.md) - Local development reference
+- [Data Protection](../security/DATA_PROTECTION.md) - Encryption and key management
 
 ## Notes
 

@@ -148,3 +148,14 @@ These payloads are written under the backup provider object prefix in a `securit
 4. Deactivate the user when the actor is no longer authorized at all.
 5. Review `audit_logs` after the action.
 6. Review backup-provider event replication if external evidence is required.
+
+---
+
+## Related Documentation
+
+- [Authentication](AUTHENTICATION.md) - Session and token management
+- [Audit Logging](AUDIT_LOGGING.md) - Tracking revocation events
+- [Data Protection](DATA_PROTECTION.md) - Protecting access control data
+- [backup-continuity-policy.md](backup-continuity-policy.md) - Restoring access after backup
+- [identifier-persistence-policy.md](identifier-persistence-policy.md) - User and company identifier management
+- [Services](../architecture/SERVICES.md) - Backend service dependencies

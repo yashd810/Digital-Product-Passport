@@ -50,3 +50,14 @@ The viewer now reinforces these rules:
 - only trust the QR code when it opens on the expected public viewer domain
 - public DPP pages should not request passwords or payment details
 - protected carriers should be checked against signature/certificate metadata when available
+
+---
+
+## Related Documentation
+
+- [signing-and-verification.md](signing-and-verification.md) - Digital signatures and verification mechanisms
+- [data-carrier-authenticity](../api/data-carrier-authenticity.md) - Metadata authenticity endpoints
+- [did-resolution](../api/did-resolution.md) - Decentralized identifier verification
+- [eidas-qsealc-integration.md](eidas-qsealc-integration.md) - EU qualified signatures
+- [identifier-persistence-policy.md](identifier-persistence-policy.md) - DID persistence and recovery
+- [AUDIT_LOGGING.md](AUDIT_LOGGING.md) - Tracking verification events

@@ -41,8 +41,8 @@ describe("battery dictionary service", () => {
     expect(service.getTermByFieldKey("unique_battery_identifier")).toHaveProperty("domainClassKey", "BatteryIdentifiers");
     expect(service.getTermByFieldKey("manufacturer_identifier")).toHaveProperty("domainClassKey", "OperatorIdentifiers");
     expect(service.getTermByFieldKey("battery_carbon_footprint_per_functional_unit")).toHaveProperty("domainClassKey", "BatteryCarbonFootprint");
-    expect(service.getTermByFieldKey("remaining_capacity")).toHaveProperty("domainClassKey", "CapacityEnergyVoltageRestricted");
-    expect(service.getTermByFieldKey("rated_capacity")).toHaveProperty("domainClassKey", "CapacityEnergyVoltagePublic");
+    expect(service.getTermByFieldKey("remaining_capacity")).toHaveProperty("domainClassKey", "PerformanceDurabilityRestricted");
+    expect(service.getTermByFieldKey("rated_capacity")).toHaveProperty("domainClassKey", "PerformanceDurabilityPublic");
   });
 
   test("builds a JSON-LD context with inline field overrides", () => {

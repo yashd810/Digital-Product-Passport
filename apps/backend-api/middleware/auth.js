@@ -128,7 +128,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
         return res.status(403).json({ error: "Invalid or expired token" });
       }
       const currentUserRes = await pool.query(
-        `SELECT u.id, u.email, u.company_id, u.role, u.is_active, u.two_factor_enabled,
+        `SELECT u.id, u.email, u.company_id, u.role, u.is_active, u.session_version, u.two_factor_enabled,
                 c.economic_operator_identifier, c.economic_operator_identifier_scheme
          FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
@@ -141,6 +141,13 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       }
 
       const currentUser = currentUserRes.rows[0];
+      if (
+        payload.sessionVersion !== undefined &&
+        Number(payload.sessionVersion) !== Number(currentUser.session_version || 1)
+      ) {
+        return res.status(401).json({ error: "Session is no longer valid" });
+      }
+
       const audienceRes = await pool.query(
         `SELECT audience
          FROM user_access_audiences
@@ -150,7 +157,6 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
            AND (expires_at IS NULL OR expires_at > NOW())`,
         [currentUser.id, currentUser.company_id]
       ).catch(() => ({ rows: [] }));
-      // Session version validation removed - fresh database initialization
 
       req.user = {
         userId: currentUser.id,

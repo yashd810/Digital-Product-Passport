@@ -4,6 +4,19 @@
 **Status**: Complete and verified against codebase  
 **Database Schema Version**: 47 tables (post-legacy-removal)
 
+## Table of Contents
+
+1. [Related Code Files](#related-code-files)
+2. [What It Controls](#what-it-controls)
+3. [Database Table: company_dpp_policies](#database-table-company_dpp_policies)
+4. [API Endpoints](#api-endpoints)
+5. [Configuration Requirements](#configuration-requirements)
+6. [Field Validation Rules](#field-validation-rules)
+7. [Implementation Details](#implementation-details)
+8. [Enforcement in Passport Creation](#enforcement-in-passport-creation)
+
+---
+
 ## Related Code Files
 - `apps/backend-api/db/init.js` - Database schema definition
 - `apps/backend-api/routes/admin.js` - API endpoint implementations (lines 735-831)
@@ -201,3 +214,18 @@ When creating new passports:
 - Cannot override granularity if `allow_granularity_override` = false
 - Granularity value must be one of: 'model', 'batch', 'item'
 - Validation occurs in `passports.js` route handler
+
+---
+
+## Related Documentation
+
+- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Super admin role and permissions
+- [passport-representations.md](../api/passport-representations.md) - Passport data models
+- [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) - Database tables and structure
+- [admin-routes.md](../api/admin-routes.md) - Admin API endpoints
+- [ADMIN_INDEX.md](./ADMIN_INDEX.md) - Admin documentation index
+- [did-resolution.md](../api/did-resolution.md) - DID minting and configuration
+
+---
+
+**[← Back to Docs](../README.md)**

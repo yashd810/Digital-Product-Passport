@@ -18,7 +18,7 @@ flowchart LR
   DPPInfo["DPPInfo"]
   Identifiers["BatteryIdentifiers"]
   OperatorIds["OperatorIdentifiers"]
-  ProductData["ProductData / RestrictedProductData"]
+  ProductData["ProductData / RestrictedProductInfo"]
   Compliance["BatteryCompliance<br/>Public/Restricted"]
   Carbon["BatteryCarbonFootprint"]
   Materials["BatteryMaterials<br/>Public/Restricted"]
@@ -69,7 +69,7 @@ Implemented:
 - DCAT 3 and DCAT-AP 3.0.1 conformance links.
 - JSON-LD context with protected terms, `id`/`type` aliases, and `DigitalBatteryPassport`.
 - Explicit term-level `domain` and `range`.
-- Spherity v0.2-style section domains, for example `DPPInfo`, `BatteryIdentifiers`, `BatteryCarbonFootprint`, `CapacityEnergyVoltagePublic`, and `TemperatureConditionsRestricted`, instead of one generic `DictionaryTerm` domain.
+- Section-specific DBP domains, for example `DPPInfo`, `BatteryIdentifiers`, `BatteryCarbonFootprint`, `PerformanceDurabilityPublic`, `PerformanceDurabilityRestricted`, and `TemperatureConditionsRestricted`, instead of one generic `DictionaryTerm` domain.
 - Workbook-derived traceability for all 100 terms.
 
 Still missing for a stronger/full DCAT-AP implementation:

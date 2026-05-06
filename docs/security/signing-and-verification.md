@@ -151,3 +151,14 @@ Production note:
 - New issuance prefers EC P-256 with `ES256`.
 - Historical public keys remain stored for verification continuity.
 - `vc_issuance_enabled = false` on a company policy skips new VC issuance on release.
+
+---
+
+## Related Documentation
+
+- [audit-logging-and-anchoring.md](audit-logging-and-anchoring.md) - Signature non-repudiation
+- [anti-counterfeiting-and-quishing.md](anti-counterfeiting-and-quishing.md) - Verification and trust
+- [eidas-qsealc-integration.md](eidas-qsealc-integration.md) - EU qualified signatures
+- [data-carrier-authenticity](../api/data-carrier-authenticity.md) - Metadata signature endpoints
+- [did-and-passport-model.md](../architecture/did-and-passport-model.md) - Signature algorithms and verification
+- [Data Protection](DATA_PROTECTION.md) - Key and certificate security

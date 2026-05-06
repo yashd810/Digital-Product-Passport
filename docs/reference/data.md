@@ -2,6 +2,14 @@
 
 Data files and datasets for the Claros Digital Product Passport project.
 
+## Table of Contents
+
+1. [Files Overview](#files-overview)
+2. [BatteryPass Data Attributes](#batterypass-data-attributes)
+3. [Working with Data Files](#working-with-data-files)
+
+---
+
 ## Files Overview
 
 | File | Description | Purpose |
@@ -61,6 +69,17 @@ The data attributes from this file are mapped to:
 - Sensitive data should NOT be stored here
 - Use `.gitignore` to prevent committing data with secrets
 - For production data, use secure backup procedures
+
+---
+
+## Related Documentation
+
+- [din-spec-99100-import-guide.md](./din-spec-99100-import-guide.md) - DIN SPEC 99100 passport data format
+- [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) - Database schema and field mappings
+- [API_INDEX.md](../api/API_INDEX.md) - API endpoints for passport creation
+- [battery-dictionary.md](../api/battery-dictionary.md) - Battery data attributes
+- [DEVELOPMENT.md](../development/DEVELOPMENT.md) - Development practices
+- [REFERENCE_INDEX.md](./REFERENCE_INDEX.md) - Reference documentation index
 
 ---
 

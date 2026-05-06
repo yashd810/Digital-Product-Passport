@@ -2,6 +2,15 @@
 
 Automated and manual deployment scripts for OCI production environment.
 
+## Table of Contents
+
+1. [Quick Start](#quick-start)
+2. [Scripts Overview](#scripts-overview)
+3. [Environment Configuration](#environment-configuration)
+4. [Troubleshooting Deployments](#troubleshooting-deployments)
+
+---
+
 ## Quick Start
 
 ```bash
@@ -72,4 +81,15 @@ sudo docker-compose -f docker-compose.prod.yml logs backend-api
 
 ---
 
-**[← Back to Scripts](../README.md)**
+**[← Back to Scripts](../README.md)
+
+---
+
+## Related Documentation
+
+- [OCI.md](OCI.md) - OCI production deployment guide
+- [LOCAL.md](LOCAL.md) - Local development deployment
+- [DISTRIBUTED_DEPLOYMENT_GUIDE.md](DISTRIBUTED_DEPLOYMENT_GUIDE.md) - Distributed infrastructure setup
+- [DEPLOYMENT_INSTRUCTIONS.md](DEPLOYMENT_INSTRUCTIONS.md) - Critical authentication fixes
+- [production-domain-and-did-setup.md](production-domain-and-did-setup.md) - Domain and environment configuration
+- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Authentication requirements**

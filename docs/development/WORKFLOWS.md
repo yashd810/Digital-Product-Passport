@@ -2,6 +2,19 @@
 
 Use this guide when you need to understand how a product workflow is wired before changing code.
 
+## Table of Contents
+
+1. [Local Development](#local-development)
+2. [Add Or Change A Dashboard Page](#add-or-change-a-dashboard-page)
+3. [Add Or Change A Backend Endpoint](#add-or-change-a-backend-endpoint)
+4. [Add Or Change Passport Type Fields](#add-or-change-passport-type-fields)
+5. [Passport Lifecycle](#passport-lifecycle)
+6. [Public Viewer Changes](#public-viewer-changes)
+7. [Auth And Access Changes](#auth-and-access-changes)
+8. [Storage And Repository Changes](#storage-and-repository-changes)
+9. [Data Carrier, DID, Signing, And Public Integrity](#data-carrier-did-signing-and-public-integrity)
+10. [Documentation Updates](#documentation-updates)
+
 ## Local Development
 
 ```bash
@@ -101,3 +114,18 @@ When code changes affect behavior, update the closest docs:
 - Persistence: `docs/database/`
 - Security or audit behavior: `docs/security/`
 - Deployment/runtime variables: `docs/deployment/`, `docs/infrastructure/`, or `docs/configuration/`
+
+---
+
+## Related Documentation
+
+- [DEVELOPMENT.md](./DEVELOPMENT.md) - Development guidelines and conventions
+- [scripts.md](./scripts.md) - Deployment and utility scripts
+- [utility-scripts.md](./utility-scripts.md) - Database automation scripts
+- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Auth and access control
+- [SERVICES.md](../architecture/SERVICES.md) - Service architecture
+- [ENDPOINTS.md](../api/ENDPOINTS.md) - API endpoints
+
+---
+
+**[← Back to Docs](../README.md)**

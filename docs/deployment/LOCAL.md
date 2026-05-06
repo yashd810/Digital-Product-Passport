@@ -2,6 +2,21 @@
 
 Complete guide for setting up and running Claros DPP locally for development.
 
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Quick Start](#quick-start-5-minutes)
+3. [Services Configuration](#services-configuration)
+4. [Docker Compose Commands](#docker-compose-commands)
+5. [Development Workflow](#development-workflow)
+6. [Common Development Tasks](#common-development-tasks)
+7. [Environment Variables](#environment-variables)
+8. [Troubleshooting](#troubleshooting)
+9. [Performance Tips](#performance-tips)
+10. [IDE Setup](#ide-setup)
+11. [Best Practices](#best-practices)
+12. [Next Steps](#next-steps)
+
 ---
 
 ## Prerequisites
@@ -629,4 +644,15 @@ npm run build --profile
 2. API Reference: See [api/ENDPOINTS.md](../api/ENDPOINTS.md)
 3. Development Guidelines: See [development/DEVELOPMENT.md](../development/DEVELOPMENT.md)
 4. Deploy to Production: See [deployment/OCI.md](./OCI.md)
+
+---
+
+## Related Documentation
+
+- [OCI.md](OCI.md) - Production deployment on Oracle Cloud
+- [DISTRIBUTED_DEPLOYMENT_GUIDE.md](DISTRIBUTED_DEPLOYMENT_GUIDE.md) - Multi-server infrastructure setup
+- [DEPLOYMENT_INSTRUCTIONS.md](DEPLOYMENT_INSTRUCTIONS.md) - JWT and authentication fixes
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - System architecture overview
+- [SERVICES.md](../architecture/SERVICES.md) - Local container services and ports
+- [PROJECT_STRUCTURE.md](../architecture/PROJECT_STRUCTURE.md) - Codebase organization
 

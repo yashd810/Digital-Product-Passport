@@ -2,6 +2,17 @@
 
 Comprehensive PostgreSQL database schema documentation for the Claros DPP platform.
 
+## Table of Contents
+
+1. [Database Overview](#database-overview)
+2. [Core Tables](#core-tables)
+3. [Relationships Diagram](#relationships-diagram)
+4. [Common Queries](#common-queries)
+5. [Constraints & Validations](#constraints--validations)
+6. [Backup & Recovery](#backup--recovery)
+7. [Performance Monitoring](#performance-monitoring)
+8. [Maintenance Tasks](#maintenance-tasks)
+
 ---
 
 ## Database Overview
@@ -549,6 +560,21 @@ VACUUM ANALYZE;
 -- Rebuild fragmented indexes
 REINDEX TABLE digital_product_passports;
 ```
+
+---
+
+## Related Documentation
+
+- [LOCAL.md](../deployment/LOCAL.md) - Local database setup
+- [DATABASE.md](../infrastructure/DATABASE.md) - Database infrastructure
+- [configuration-files.md](../configuration/configuration-files.md) - Database configuration variables
+- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - User authentication and roles
+- [din-spec-99100-import-guide.md](../reference/din-spec-99100-import-guide.md) - Passport data schema
+- [DATABASE_INDEX.md](./DATABASE_INDEX.md) - Database documentation index
+
+---
+
+**[← Back to Docs](../README.md)**
 
 ---
 

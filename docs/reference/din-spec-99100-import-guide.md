@@ -1,5 +1,26 @@
 # DIN SPEC 99100 v1.3 Passport - Data Import Guide
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [API Import Format](#️-important-api-import-format)
+3. [Section 1: Identifiers and Product Data](#section-1-identifiers-and-product-data)
+4. [Section 2: Symbols, Labels & Documentation of Conformity](#section-2-symbols-labels--documentation-of-conformity)
+5. [Section 3: Battery Carbon Footprint](#section-3-battery-carbon-footprint)
+6. [Section 4: Supply Chain Due Diligence](#section-4-supply-chain-due-diligence)
+7. [Section 5: Battery Materials and Composition](#section-5-battery-materials-and-composition)
+8. [Section 6: Circularity and Resource Efficiency](#section-6-circularity-and-resource-efficiency)
+9. [Section 7: Performance and Durability](#section-7-performance-and-durability)
+10. [Field Types Reference](#field-types-reference)
+11. [Dynamic vs Static Fields](#dynamic-vs-static-fields)
+12. [Access Restrictions](#access-restrictions)
+13. [Handling Tables in CSV vs JSON](#handling-tables-in-csv-vs-json)
+14. [Files Provided](#files-provided)
+15. [Import Command](#import-command)
+16. [Validation Notes](#validation-notes)
+
+---
+
 ## Overview
 
 **Passport Type:** `din_spec_v13`  
@@ -333,3 +354,18 @@ curl -F "file=@din-spec-99100-passport.csv" \
 5. **URLs/Files**: Use full HTTP/HTTPS URLs
 6. **Symbol Files**: SVG or PNG recommended
 7. **Dynamic Fields**: Can be left empty on first import, updated later
+
+---
+
+## Related Documentation
+
+- [data.md](./data.md) - Reference data files and BatteryPass attributes
+- [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) - Database schema for passport storage
+- [API_INDEX.md](../api/API_INDEX.md) - Complete API endpoint reference
+- [battery-dictionary.md](../api/battery-dictionary.md) - Battery field definitions
+- [DEPLOYMENT.md](../deployment/LOCAL.md) - Local testing setup
+- [REFERENCE_INDEX.md](./REFERENCE_INDEX.md) - Reference documentation index
+
+---
+
+**[← Back to Docs](../README.md)**

@@ -2,6 +2,14 @@
 
 Last updated: 2026-04-30
 
+## Table of Contents
+
+1. [What is implemented in code](#what-is-implemented-in-code)
+2. [Low-bandwidth and portability position](#low-bandwidth-and-portability-position)
+3. [What still requires manual validation](#what-still-requires-manual-validation)
+4. [Recommended validation checklist](#recommended-validation-checklist)
+5. [CI coverage now in place](#ci-coverage-now-in-place)
+
 ## What is implemented in code
 
 The frontend now explicitly supports several baseline accessibility and portability requirements:
@@ -57,3 +65,18 @@ The frontend CI job now runs:
 1. `npm test`
 2. `npm run test:contrast`
 3. `npm run build`
+
+---
+
+## Related Documentation
+
+- [DEVELOPMENT.md](../development/DEVELOPMENT.md) - Frontend development conventions
+- [DEVELOPMENT_INDEX.md](../development/DEVELOPMENT_INDEX.md) - Development patterns and guidelines
+- [backend-api.md](../apps/backend-api.md) - Backend API integration
+- [frontend-app.md](../apps/frontend-app.md) - Frontend application structure
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - System architecture
+- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Auth and security
+
+---
+
+**[← Back to Docs](../README.md)**

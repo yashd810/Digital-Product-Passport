@@ -65,11 +65,11 @@ Compliance-oriented manifest fields:
 - `versioning` ties the released dictionary version to the pinned upstream source version.
 - `regulatoryTraceability` explains how term-level provenance and category applicability are represented.
 - `interoperabilityProfile` records the DCAT 3/DCAT-AP 3.0.1 target, catalog URL, and controlled vocabularies reused for semantic interoperability.
-- `context.jsonld` follows the protected JSON-LD context pattern used by the Spherity DBP v0.2 vocabulary, including `id`/`type` aliases and battery-passport class mappings.
+- `context.jsonld` follows the protected JSON-LD context pattern used by the DBP v0.2 reference vocabulary, including `id`/`type` aliases and battery-passport class mappings.
 
 Traceability artifacts:
 - `catalog.jsonld` publishes the dictionary as a `dcat:Catalog` with a `dcat:Dataset`, `dcat:Distribution` entries, a `dcat:DataService`, and conformance links to DCAT 3 and DCAT-AP 3.0.1.
-- `terms.json` carries per-term identifiers, spec references, source attribute names, datatype metadata, source workbook row, access rights, static/dynamic behavior, update requirement, DIN/DKE chapter, model/item granularity, component granularity, regulation references, and explicit Spherity-style section `domain` plus XSD-derived `range` metadata.
+- `terms.json` carries per-term identifiers, spec references, source attribute names, datatype metadata, source workbook row, access rights, static/dynamic behavior, update requirement, DIN/DKE chapter, model/item granularity, component granularity, regulation references, and explicit section `domain` plus XSD-derived `range` metadata.
 - `category-rules.json` carries battery-category applicability and mandatory/voluntary requirement levels.
 - `field-map.json` records the app-field-to-term mapping used during export and validation.
 

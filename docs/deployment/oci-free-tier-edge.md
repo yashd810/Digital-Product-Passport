@@ -2,6 +2,19 @@
 
 Last updated: 2026-04-30
 
+## Table of Contents
+
+1. [Current OCI Free-Tier Availability](#current-oci-free-tier-availability)
+2. [Recommended Mode](#recommended-mode-for-this-repo)
+3. [Alternative Mode](#alternative-mode)
+4. [Health-Check Target](#health-check-target)
+5. [Suggested OCI Layouts](#suggested-oci-layouts)
+6. [Repo Changes](#repo-changes-already-in-place)
+7. [Practical Recommendation](#practical-recommendation)
+8. [Evidence and Limits](#evidence-and-limits)
+
+---
+
 ## Current OCI free-tier availability
 
 As of April 30, 2026, Oracle documents the following Always Free networking resources in the tenancy home region:
@@ -138,3 +151,14 @@ This repo can document and prepare the deployment path, but the actual proof of 
 Express/Node application code is not the compliance boundary for TLS or HTTP/2. The public ingress layer must terminate or pass through HTTPS in a way that enforces TLS `1.2+` and negotiates HTTP/2 or newer, then the live endpoint must be verified after deployment.
 
 So the codebase can support secure communication, but deployment evidence is still needed for a formal assessment.
+
+---
+
+## Related Documentation
+
+- [OCI.md](OCI.md) - Full OCI deployment guide
+- [oracle-cloud-free-tier.md](oracle-cloud-free-tier.md) - Free tier setup basics
+- [DISTRIBUTED_DEPLOYMENT_GUIDE.md](DISTRIBUTED_DEPLOYMENT_GUIDE.md) - Multi-server networking
+- [production-domain-and-did-setup.md](production-domain-and-did-setup.md) - Caddy and TLS configuration
+- [SERVICES.md](../architecture/SERVICES.md) - Port and service mapping
+- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Authentication requirements

@@ -75,3 +75,14 @@ Each replication row now includes a `documentation_summary` showing:
 - `mandatoryCopyFailures`
 - `attachmentCopyCount`
 - `referenceOnlyCount`
+
+---
+
+## Related Documentation
+
+- [backup-continuity-policy.md](backup-continuity-policy.md) - Maintaining access during backup
+- [backup-public-handover.md](backup-public-handover.md) - Public backup availability
+- [audit-logging-and-anchoring.md](audit-logging-and-anchoring.md) - Backup event tracking
+- [identifier-persistence-policy.md](identifier-persistence-policy.md) - DID recovery after restore
+- [Data Protection](DATA_PROTECTION.md) - Backup encryption and security
+- [OAIS Archive Mapping](../architecture/oais-archive-mapping.md) - Long-term preservation model

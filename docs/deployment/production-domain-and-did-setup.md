@@ -2,6 +2,21 @@
 
 Last updated: 2026-04-30
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [DID Web Domain](#did-web-domain)
+3. [Application URLs](#application-urls)
+4. [Allowed Origins](#allowed-origins)
+5. [Signing Keys](#signing-keys)
+6. [Storage Configuration](#storage-configuration)
+7. [Backup Provider](#backup-provider)
+8. [Caddy Configuration](#caddy-configuration)
+9. [Environment Variables](#environment-variables)
+10. [Verification](#verification)
+
+---
+
 Code/files:
 - `apps/backend-api/services/did-service.js`
 - `apps/backend-api/Server/server.js`
@@ -151,3 +166,14 @@ Live verification after deployment:
   - `TLS 1.2` accepted
   - ALPN negotiation reaches `HTTP/2`
 - run an external scan such as SSL Labs or `testssl.sh` against the live hostname for third-party evidence
+
+---
+
+## Related Documentation
+
+- [OCI.md](OCI.md) - OCI production deployment
+- [DISTRIBUTED_DEPLOYMENT_GUIDE.md](DISTRIBUTED_DEPLOYMENT_GUIDE.md) - Multi-server setup
+- [oci-free-tier-edge.md](oci-free-tier-edge.md) - Edge networking configuration
+- [DEPLOYMENT_INSTRUCTIONS.md](DEPLOYMENT_INSTRUCTIONS.md) - Authentication setup
+- [did-and-passport-model.md](../architecture/did-and-passport-model.md) - DID structure and resolution
+- [Data Protection](../security/DATA_PROTECTION.md) - Certificate and key security

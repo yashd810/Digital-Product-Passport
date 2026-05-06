@@ -95,3 +95,14 @@ The persistence policy depends on:
 - backup public-handover activation when required
 
 This is why DPP identifier persistence is stronger than simple database uniqueness alone.
+
+---
+
+## Related Documentation
+
+- [did-and-passport-model.md](../architecture/did-and-passport-model.md) - DID structure and resolution
+- [audit-logging-and-anchoring.md](audit-logging-and-anchoring.md) - DID anchoring and evidence
+- [document-persistence-and-backup.md](document-persistence-and-backup.md) - DID recovery after restore
+- [did-resolution](../api/did-resolution.md) - DID resolution endpoints
+- [access-revocation-process.md](access-revocation-process.md) - Company and user identifier management
+- [anti-counterfeiting-and-quishing.md](anti-counterfeiting-and-quishing.md) - DID verification

@@ -498,6 +498,19 @@ docker-compose restart backend-api
 
 ---
 
+## Related Documentation
+
+- [LOCAL.md](../deployment/LOCAL.md) - Local development environment setup
+- [DEPLOYMENT.md](../deployment/DEPLOYMENT_INSTRUCTIONS.md) - Production deployment procedures
+- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - JWT and authentication mechanisms
+- [DATABASE.md](../infrastructure/DATABASE.md) - Database configuration and management
+- [DOCKER.md](../infrastructure/DOCKER.md) - Docker and containerization troubleshooting
+- [INFRASTRUCTURE_INDEX.md](../infrastructure/INFRASTRUCTURE_INDEX.md) - Full infrastructure documentation
+
+---
+
+**[← Back to Docs](../../README.md)**
+
 ## Getting Help
 
 If you encounter an issue not covered here:

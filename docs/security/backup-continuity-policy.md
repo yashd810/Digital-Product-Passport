@@ -71,3 +71,14 @@ The policy can be overridden explicitly in production with:
 - `BACKUP_POLICY_RESTORE_TEST_METHOD`
 
 If these are not set, the app falls back to the defaults in this document.
+
+---
+
+## Related Documentation
+
+- [access-revocation-process.md](access-revocation-process.md) - Restoring permissions after backup
+- [document-persistence-and-backup.md](document-persistence-and-backup.md) - Backup mechanisms and recovery
+- [identifier-persistence-policy.md](identifier-persistence-policy.md) - DID recovery after restore
+- [backup-public-handover.md](backup-public-handover.md) - Public backup availability
+- [audit-logging-and-anchoring.md](audit-logging-and-anchoring.md) - Backup evidence preservation
+- [deployment/oci-free-tier-edge.md](../deployment/oci-free-tier-edge.md) - OCI backup configuration

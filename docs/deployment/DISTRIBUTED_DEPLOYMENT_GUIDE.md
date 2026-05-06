@@ -6,6 +6,19 @@
 **Root Cause**: Frontend using wrong docker-compose file (single-server vs distributed)
 **Solution**: Deploy each server with its own specific compose file
 
+## Table of Contents
+
+1. [🏗️ Architecture](#️-architecture)
+2. [📋 Deployment Configuration](#-deployment-configuration)
+3. [🔴 The 502 Error](#-the-502-error-what-happened)
+4. [✅ What Was Fixed](#-what-was-fixed)
+5. [🧪 Verification](#-verification)
+6. [📊 Current Status](#-current-status-verified)
+7. [🔧 Troubleshooting](#-troubleshooting)
+8. [📝 Deployment Checklist](#-deployment-checklist)
+9. [🎯 Key Learnings](#-key-learnings)
+10. [📚 File Structure](#-file-structure)
+
 ---
 
 ## 🏗️ Architecture
@@ -375,3 +388,14 @@ Both should return the same response (200 OK).
 **Frontend**: 79.72.16.68 (Running on docker-compose.prod.frontend.yml) ✓  
 **Backend**: 82.70.54.173 (Running on docker-compose.prod.backend.yml) ✓  
 **Connection**: ✓ HTTP 200 OK
+
+---
+
+## Related Documentation
+
+- [OCI.md](OCI.md) - Single-server OCI production deployment
+- [LOCAL.md](LOCAL.md) - Local development reference
+- [production-domain-and-did-setup.md](production-domain-and-did-setup.md) - Domain configuration for distributed setup
+- [DEPLOYMENT_INSTRUCTIONS.md](DEPLOYMENT_INSTRUCTIONS.md) - Authentication configuration
+- [SERVICES.md](../architecture/SERVICES.md) - Service dependencies and ports
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - Overall system architecture

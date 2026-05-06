@@ -729,4 +729,17 @@ async function logSecurityIncident(type, severity, details) {
 
 ---
 
+---
+
+## Related Documentation
+
+- [AUTHENTICATION.md](AUTHENTICATION.md) - User authentication and session management
+- [AUDIT_LOGGING.md](AUDIT_LOGGING.md) - Change tracking and compliance
+- [signing-and-verification.md](signing-and-verification.md) - Cryptographic signing and verification
+- [eidas-qsealc-integration.md](eidas-qsealc-integration.md) - EU qualified electronic seal compliance
+- [document-persistence-and-backup.md](document-persistence-and-backup.md) - Data backup and recovery
+- [DID and Passport Model](../architecture/did-and-passport-model.md) - Data structure and encryption requirements
+
+---
+
 **[← Back to Security Docs](../README.md) | [Next: Audit Logging →](./AUDIT_LOGGING.md)**

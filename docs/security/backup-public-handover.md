@@ -81,3 +81,14 @@ Handover activation depends on a verified replication record from `passport_back
 - the replication record remained in `verification_status = "verified"`
 
 This provides a concrete check that the backup copy is still intact before it is used as the public fallback source.
+
+---
+
+## Related Documentation
+
+- [document-persistence-and-backup.md](document-persistence-and-backup.md) - Backup creation and recovery procedures
+- [backup-continuity-policy.md](backup-continuity-policy.md) - Access continuity during backup
+- [audit-logging-and-anchoring.md](audit-logging-and-anchoring.md) - Backup evidence preservation
+- [AUDIT_LOGGING.md](AUDIT_LOGGING.md) - Handover event tracking
+- [Data Protection](DATA_PROTECTION.md) - Backup encryption standards
+- [deployment/oci-free-tier-edge.md](../deployment/oci-free-tier-edge.md) - Production deployment backup
