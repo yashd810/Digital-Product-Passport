@@ -4,6 +4,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/dpp}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-all}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
 
 if [ ! -d "$APP_DIR" ]; then
   echo "Missing app directory: $APP_DIR"
@@ -33,5 +34,5 @@ case "$DEPLOY_TARGET" in
     ;;
 esac
 
-DPP_ENV_FILE="$ENV_FILE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --build -d
-DPP_ENV_FILE="$ENV_FILE" docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
+DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --build -d
+DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
