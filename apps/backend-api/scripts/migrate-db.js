@@ -10,7 +10,6 @@ const createProductIdentifierService = require("../services/product-identifier-s
 const logger = require("../services/logger");
 const {
   IN_REVISION_STATUS,
-  LEGACY_IN_REVISION_STATUS,
   SYSTEM_PASSPORT_FIELDS,
   getTable,
   normalizeReleaseStatus,
@@ -73,7 +72,6 @@ async function main() {
     getTable,
     createPassportTable: passportService.createPassportTable,
     IN_REVISION_STATUS,
-    LEGACY_IN_REVISION_STATUS,
     productIdentifierService,
   });
   logger.info("[DB] Migrations completed successfully");

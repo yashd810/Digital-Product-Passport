@@ -1,7 +1,6 @@
 "use strict";
 
 const BATTERY_DICTIONARY_MODEL_KEY = "claros_battery_dictionary_v1";
-const LEGACY_BATTERY_PASSPORT_TYPE = "din_spec_99100";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -24,10 +23,6 @@ function isBatteryUmbrellaCategory(umbrellaCategory) {
   return normalized.includes("battery");
 }
 
-function isLegacyBatteryPassportType(passportType) {
-  return normalizeText(passportType).toLowerCase() === LEGACY_BATTERY_PASSPORT_TYPE;
-}
-
 function hasRequiredBatterySemanticModel({ umbrellaCategory = null, semanticModelKey = null } = {}) {
   if (!isBatteryUmbrellaCategory(umbrellaCategory)) return true;
   return normalizeText(semanticModelKey) === BATTERY_DICTIONARY_MODEL_KEY;
@@ -42,15 +37,13 @@ function shouldUseBatteryDictionary({ passportType = null, typeDef = null, optio
     return true;
   }
 
-  return isLegacyBatteryPassportType(passportType || typeDef?.type_name);
+  return false;
 }
 
 module.exports = {
   BATTERY_DICTIONARY_MODEL_KEY,
-  LEGACY_BATTERY_PASSPORT_TYPE,
   normalizeSemanticModelKey,
   isBatteryUmbrellaCategory,
-  isLegacyBatteryPassportType,
   hasRequiredBatterySemanticModel,
   shouldUseBatteryDictionary,
 };

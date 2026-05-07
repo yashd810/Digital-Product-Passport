@@ -36,8 +36,8 @@ describe("passport representation service", () => {
         granularity: "item",
         dppIdentity: {
           companyDid: (companyId) => `did:web:www.example.test:did:company:${companyId}`,
-          productModelDid: () => "did:web:www.example.test:did:battery:model:legacy",
-          dppDid: () => "did:web:www.example.test:did:dpp:item:legacy",
+          productModelDid: () => "did:web:www.example.test:did:battery:model:fixture",
+          dppDid: () => "did:web:www.example.test:did:dpp:item:fixture",
           buildCanonicalPublicUrl: () => "https://app.example.test/dpp/acme/battery/BAT-2026-001",
         },
       }

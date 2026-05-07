@@ -265,19 +265,6 @@ module.exports = function registerAdminRoutes(app, {
       params
     );
 
-    await pool.query(
-      `UPDATE companies
-       SET dpp_granularity = COALESCE($1, dpp_granularity),
-           granularity_locked = COALESCE($2, granularity_locked),
-           updated_at = NOW()
-       WHERE id = $3`,
-      [
-      updates.default_granularity || null,
-      updates.allow_granularity_override === undefined ? null : !updates.allow_granularity_override,
-      companyId]
-
-    ).catch(() => {});
-
     return result.rows[0] || null;
   }
 
@@ -795,39 +782,6 @@ module.exports = function registerAdminRoutes(app, {
     }
   });
 
-  app.patch("/api/admin/companies/:id/dpp-policy", authenticateToken, isSuperAdmin, async (req, res) => {
-    try {
-      const companyId = parseInt(req.params.id, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
-
-      const { dpp_granularity, granularity_locked } = req.body || {};
-      const company = await pool.query("SELECT id FROM companies WHERE id = $1 LIMIT 1", [companyId]);
-      if (!company.rows.length) return res.status(404).json({ error: "Company not found" });
-      await ensureCompanyDppPolicy(companyId);
-
-      const updates = {};
-      if (dpp_granularity !== undefined) updates.default_granularity = dpp_granularity;
-      if (granularity_locked !== undefined) updates.allow_granularity_override = !granularity_locked;
-      const validatedUpdates = validateCompanyDppPolicyInput(updates);
-      if (!Object.keys(validatedUpdates).length) {
-        return res.status(400).json({ error: "No fields to update. Provide dpp_granularity and/or granularity_locked." });
-      }
-
-      const policy = await updateCompanyDppPolicy(companyId, validatedUpdates);
-
-      await logAudit(
-        companyId, req.user.userId,
-        "UPDATE_DPP_POLICY", "company_dpp_policies", String(companyId),
-        null,
-        validatedUpdates
-      );
-
-      res.json({ success: true, policy });
-    } catch (e) {
-      logger.error("DPP policy update error:", e.message);
-      res.status(500).json({ error: "Failed to update DPP policy" });
-    }
-  });
 
   app.delete("/api/admin/companies/:companyId", authenticateToken, isSuperAdmin, async (req, res) => {
     const client = await pool.connect();
@@ -915,8 +869,7 @@ module.exports = function registerAdminRoutes(app, {
       );
 
       await Promise.all(repoFiles.rows.map((row) => storageService.deleteStoredFile({
-        storageKey: row.storage_key,
-        filePath: row.file_path
+        storageKey: row.storage_key
       }).catch(() => {})));
       const repoDir = path.join(REPO_BASE_DIR, String(companyId));
       fs.rmSync(repoDir, { recursive: true, force: true });

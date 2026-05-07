@@ -1,721 +1,232 @@
 # Database Management Guide
 
-Complete guide to PostgreSQL database management for Claros DPP, including backup procedures, maintenance, monitoring, and optimization.
+Last reviewed: 2026-05-07
 
----
+This guide covers PostgreSQL operations for the current Claros DPP app. For table-level schema details, use [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md).
 
-## Table of Contents
+## Current Defaults
 
-1. [Database Overview](#database-overview)
-2. [Connection Management](#connection-management)
-3. [Backup & Recovery](#backup--recovery)
-4. [Database Migrations](#database-migrations)
-5. [Performance Monitoring](#performance-monitoring)
-6. [Optimization](#optimization)
-7. [Maintenance](#maintenance)
-8. [Troubleshooting](#troubleshooting)
+Docker defaults come from [docker-compose.yml](../../docker/docker-compose.yml):
 
----
+| Variable | Default |
+|----------|---------|
+| `DB_HOST` | `postgres` |
+| `DB_PORT` | `5432` |
+| `DB_NAME` | `dpp_system` |
+| `DB_USER` | `postgres` |
+| `DB_PASSWORD` | `postgres` |
 
-## Database Overview
+Local `.env` files may override these values.
 
-### PostgreSQL
+Connect from the Postgres container:
 
-Claros DPP uses PostgreSQL 15 running in a Docker container.
-
-**Connection Details (Local)**:
-- Host: `localhost` (Docker: `postgres`)
-- Port: `5432`
-- Database: `claros_dpp`
-- User: `claros_user`
-- Password: `claros_password_dev`
-
-**Connection Details (Production/OCI)**:
-- Host: `localhost` (or internal Docker name)
-- Port: `5432`
-- Database: `claros_dpp`
-- User: `claros_user` (custom password)
-- Password: (set in `.env`)
-
-### Database Features Used
-
-- **JSONB**: Flexible schema for DPP data
-- **Transactions**: Data consistency
-- **Soft Deletes**: Non-destructive data removal via `deleted_at` timestamp
-- **Audit Logging**: Track all changes
-- **Connection Pooling**: PgBouncer for connection management
-- **Full-Text Search**: Search capabilities
-- **Indexing**: Performance optimization
-
----
-
-## Connection Management
-
-### Direct Connection (psql)
-
-**From Docker container**:
 ```bash
-docker-compose exec postgres psql -U claros_user -d claros_dpp
+docker-compose exec postgres psql -U postgres -d dpp_system
 ```
 
-**From host machine**:
+Connect from the host:
+
 ```bash
-psql -h localhost -U claros_user -d claros_dpp -W
-# Enter password: claros_password_dev
+psql -h localhost -U postgres -d dpp_system -W
 ```
 
-**From Node.js backend**:
-```javascript
-const { Pool } = require('pg');
+## Schema Initialization
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'postgres',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'claros_dpp',
-  user: process.env.DB_USER || 'claros_user',
-  password: process.env.DB_PASSWORD || 'claros_password_dev',
-  max: 20,                    // Connection pool size
-  idleTimeoutMillis: 30000,  // 30 seconds
-  connectionTimeoutMillis: 2000,
-});
+The backend initializes the schema on startup through [apps/backend-api/db/init.js](../../apps/backend-api/db/init.js).
 
-module.exports = pool;
+The initializer:
+
+- creates `pgcrypto`
+- creates `schema_migrations`
+- creates the current static tables
+- adds missing columns and indexes
+- creates dynamic passport tables for active `passport_types`
+- enforces current cleanup such as dropping removed company policy columns
+
+There is no separate required SQL file such as `apps/backend-api/db/schema.sql`.
+
+## Connection Pool
+
+The backend uses `pg.Pool` with environment-driven connection settings.
+
+Recommended production controls:
+
+- keep database access private to the application network
+- set strong `DB_PASSWORD`
+- keep pool size below the database connection limit
+- use health checks to detect connection failures
+- monitor slow queries and table growth
+
+## Backup
+
+SQL dump:
+
+```bash
+docker-compose exec -T postgres pg_dump -U postgres dpp_system > backup.sql
 ```
 
-### Connection Pool Settings
+Compressed custom-format dump:
 
-Optimize based on load:
-
-```javascript
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  max: 20,                      // Max connections
-  min: 5,                       // Min connections
-  idleTimeoutMillis: 30000,    // Idle timeout
-  connectionTimeoutMillis: 2000, // Connect timeout
-});
+```bash
+docker-compose exec -T postgres pg_dump -U postgres -Fc dpp_system > backup.dump
 ```
 
-**Pool Tuning**:
-- `max`: 20-50 for typical workload
-- `min`: 5-10 (maintains warm connections)
-- `idleTimeoutMillis`: 30000ms (30 seconds)
+Restore SQL dump:
 
-### Monitor Connections
+```bash
+docker-compose exec -T postgres psql -U postgres dpp_system < backup.sql
+```
 
-**View active connections**:
+Restore custom-format dump:
+
+```bash
+docker-compose exec -T postgres pg_restore -U postgres -d dpp_system --clean --if-exists < backup.dump
+```
+
+Verify backup contents:
+
+```bash
+pg_restore --list backup.dump | head
+```
+
+## Recovery Checks
+
+After restore, verify core records:
+
 ```sql
-SELECT 
-  datname as database,
-  usename as user,
-  application_name,
-  state,
-  count(*) as count
+SELECT count(*) FROM companies;
+SELECT count(*) FROM users;
+SELECT count(*) FROM passport_types;
+SELECT count(*) FROM passport_registry;
+SELECT count(*) FROM audit_logs;
+```
+
+For a specific passport type, inspect the generated table name from the backend and then query it directly:
+
+```sql
+SELECT id, dpp_id, product_id, release_status, updated_at
+FROM battery_passports
+ORDER BY updated_at DESC
+LIMIT 20;
+```
+
+## Monitoring
+
+Active connections:
+
+```sql
+SELECT datname, usename, application_name, state, count(*) AS count
 FROM pg_stat_activity
 GROUP BY datname, usename, application_name, state;
 ```
 
-**Kill idle connections**:
-```sql
-SELECT pg_terminate_backend(pid)
-FROM pg_stat_activity
-WHERE datname = 'claros_dpp'
-  AND usename = 'claros_user'
-  AND state = 'idle'
-  AND query_start < NOW() - INTERVAL '30 minutes';
-```
-
----
-
-## Backup & Recovery
-
-### Automated Backups
-
-**Script for daily backups** (`backup.sh`):
-
-```bash
-#!/bin/bash
-
-BACKUP_DIR="/opt/backups"
-DB_HOST="localhost"
-DB_NAME="claros_dpp"
-DB_USER="claros_user"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/claros_dpp_$TIMESTAMP.sql.gz"
-
-# Create backup directory
-mkdir -p $BACKUP_DIR
-
-# Backup database
-PGPASSWORD=$DB_PASSWORD pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME | gzip > $BACKUP_FILE
-
-# Check backup
-if [ -f $BACKUP_FILE ]; then
-  echo "Backup created: $BACKUP_FILE"
-  
-  # Delete backups older than 30 days
-  find $BACKUP_DIR -name "claros_dpp_*.sql.gz" -mtime +30 -delete
-  
-  # Optional: Copy to remote storage
-  # aws s3 cp $BACKUP_FILE s3://my-bucket/backups/
-else
-  echo "Backup failed!"
-  exit 1
-fi
-```
-
-**Schedule with cron**:
-```bash
-# Daily backup at 2 AM
-0 2 * * * /opt/scripts/backup.sh
-
-# Crontab entry
-crontab -e
-```
-
-### Manual Backup
-
-**SQL dump (text format)**:
-```bash
-# Backup
-pg_dump -h localhost -U claros_user claros_dpp > backup.sql
-
-# Restore
-psql -h localhost -U claros_user claros_dpp < backup.sql
-```
-
-**Custom format (faster, compressed)**:
-```bash
-# Backup
-pg_dump -h localhost -U claros_user -Fc claros_dpp > backup.dump
-
-# Restore
-pg_restore -h localhost -U claros_user -d claros_dpp backup.dump
-```
-
-**From Docker**:
-```bash
-# Backup
-docker-compose exec postgres pg_dump -U claros_user claros_dpp > backup.sql
-
-# Restore
-docker-compose exec -T postgres psql -U claros_user claros_dpp < backup.sql
-```
-
-### Verify Backup
-
-```bash
-# Check dump file
-pg_dump -h localhost -U claros_user --verbose claros_dpp > /dev/null
-
-# Check custom format backup
-pg_restore --list backup.dump | head
-
-# Test restore to new database
-createdb -U claros_user claros_dpp_test
-pg_restore -d claros_dpp_test backup.dump
-dropdb -U claros_user claros_dpp_test
-```
-
-### Recovery
-
-**From SQL dump**:
-```bash
-# Single user mode (stop connections first)
-SELECT pg_terminate_backend(pid)
-FROM pg_stat_activity
-WHERE datname = 'claros_dpp';
-
-# Restore
-psql -U claros_user claros_dpp < backup.sql
-
-# Verify
-SELECT count(*) FROM digital_product_passports;
-```
-
-**Point-in-time recovery** (requires WAL archiving):
-```bash
-# Configure postgresql.conf
-wal_level = replica
-archive_mode = on
-archive_command = 'cp %p /var/lib/postgresql/wal_archive/%f'
-
-# Restore to specific time
-pg_basebackup -D /var/lib/postgresql/data_new
-# Edit recovery.conf
-# recovery_target_time = '2024-01-15 12:00:00'
-```
-
----
-
-## Database Migrations
-
-### Migration System
-
-Claros DPP uses simple SQL migrations in `/apps/backend-api/db/migrations/`.
-
-**File naming**: `001_initial_schema.sql`, `002_add_audit_logs.sql`, etc.
-
-### Running Migrations
-
-**Automatic (on startup)**:
-```javascript
-// In server.js
-const { runMigrations } = require('./db/migrations');
-
-app.listen(3001, async () => {
-  await runMigrations();
-  console.log('Server running on port 3001');
-});
-```
-
-**Manual**:
-```bash
-# From backend container
-docker-compose exec backend-api npm run db:migrate
-
-# Or directly
-node apps/backend-api/db/migrations/run.js
-```
-
-### Creating Migrations
-
-**New migration file**: `003_add_new_column.sql`
+Database size:
 
 ```sql
--- Migration: Add new column to users
--- Created: 2024-01-15
-
-ALTER TABLE users ADD COLUMN phone_number VARCHAR(20);
-
-CREATE INDEX idx_users_phone ON users(phone_number);
-
--- Rollback:
--- ALTER TABLE users DROP COLUMN phone_number;
--- DROP INDEX idx_users_phone;
+SELECT pg_size_pretty(pg_database_size(current_database())) AS database_size;
 ```
 
-### Migration Rollback
+Largest tables:
 
-**Remove last migration**:
 ```sql
--- Reverse the migration
-ALTER TABLE users DROP COLUMN phone_number;
-DROP INDEX idx_users_phone;
-
--- Update migrations table
-DELETE FROM migrations WHERE name = '003_add_new_column';
+SELECT
+  schemaname,
+  relname AS table_name,
+  pg_size_pretty(pg_total_relation_size(relid)) AS total_size
+FROM pg_catalog.pg_statio_user_tables
+ORDER BY pg_total_relation_size(relid) DESC
+LIMIT 20;
 ```
 
----
+Slow query extension, if enabled:
 
-## Performance Monitoring
-
-### Query Performance
-
-**Enable query logging**:
 ```sql
--- Log queries slower than 1 second
-ALTER DATABASE claros_dpp SET log_min_duration_statement = 1000;
-
--- View logs
-SELECT query, mean_exec_time
-FROM pg_stat_statements
-ORDER BY mean_exec_time DESC
-LIMIT 10;
-```
-
-**EXPLAIN ANALYZE**:
-```sql
--- Analyze query performance
-EXPLAIN ANALYZE
-SELECT * FROM digital_product_passports
-WHERE workspace_id = 'workspace-123'
-  AND is_published = true
-ORDER BY created_at DESC
-LIMIT 10;
-```
-
-**Identify slow queries**:
-```sql
--- Top 10 slowest queries
 SELECT query, calls, mean_exec_time
 FROM pg_stat_statements
 ORDER BY mean_exec_time DESC
 LIMIT 10;
-
--- Queries with most total time
-SELECT query, calls, total_exec_time
-FROM pg_stat_statements
-ORDER BY total_exec_time DESC
-LIMIT 10;
 ```
 
-### Index Monitoring
+## Index And Vacuum Maintenance
 
-**Find unused indexes**:
+Find unused indexes:
+
 ```sql
-SELECT schemaname, tablename, indexname, idx_scan
+SELECT schemaname, relname AS table_name, indexrelname AS index_name, idx_scan
 FROM pg_stat_user_indexes
 WHERE idx_scan = 0
-ORDER BY pg_relation_size(indexrelname) DESC;
+ORDER BY pg_relation_size(indexrelid) DESC;
 ```
 
-**Find missing indexes** (for frequent WHERE clauses):
-```sql
--- Queries with high I/O
-SELECT query, rows, blks_hit, blks_read
-FROM pg_stat_statements
-WHERE blks_read > 0
-ORDER BY blks_read DESC
-LIMIT 10;
-```
-
-### Connection Monitoring
-
-**View active connections**:
-```sql
-SELECT 
-  pid,
-  usename,
-  application_name,
-  state,
-  query,
-  query_start
-FROM pg_stat_activity
-ORDER BY query_start DESC;
-```
-
-**Connection count by user**:
-```sql
-SELECT usename, count(*) 
-FROM pg_stat_activity 
-GROUP BY usename;
-```
-
-### Database Statistics
-
-```sql
--- Database size
-SELECT 
-  pg_size_pretty(pg_database_size('claros_dpp')) as database_size;
-
--- Table sizes
-SELECT 
-  schemaname,
-  tablename,
-  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
-FROM pg_tables
-ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
-
--- Index sizes
-SELECT 
-  schemaname,
-  indexname,
-  pg_size_pretty(pg_relation_size(schemaname||'.'||indexname)) as size
-FROM pg_indexes
-ORDER BY pg_relation_size(schemaname||'.'||indexname) DESC;
-```
-
----
-
-## Optimization
-
-### Indexing Strategy
-
-**Create indexes for common queries**:
-
-```sql
--- On workspace_id (frequent filter)
-CREATE INDEX idx_dpp_workspace_id 
-  ON digital_product_passports(workspace_id);
-
--- On boolean columns
-CREATE INDEX idx_dpp_is_published 
-  ON digital_product_passports(is_published)
-  WHERE is_published = true;
-
--- Composite index for common filter combinations
-CREATE INDEX idx_dpp_workspace_published
-  ON digital_product_passports(workspace_id, is_published);
-
--- On JSON data
-CREATE INDEX idx_dpp_data_gin
-  ON digital_product_passports USING GIN(data);
-
--- On timestamps
-CREATE INDEX idx_audit_created_at
-  ON audit_logs(created_at DESC)
-  WHERE deleted_at IS NULL;
-```
-
-### Query Optimization
-
-**Before** (inefficient):
-```javascript
-// Get all passports, then filter in application
-const all = await pool.query('SELECT * FROM digital_product_passports');
-const filtered = all.rows.filter(p => p.workspace_id === wsId && p.is_published);
-```
-
-**After** (optimized):
-```javascript
-// Filter in database with index
-const result = await pool.query(
-  'SELECT * FROM digital_product_passports WHERE workspace_id = $1 AND is_published = true',
-  [wsId]
-);
-```
-
-### JSONB Optimization
-
-```sql
--- Efficiently query JSONB columns
-SELECT id, data->>'product_name' as product_name
-FROM digital_product_passports
-WHERE data->>'product_type' = 'battery';
-
--- Index JSONB values
-CREATE INDEX idx_dpp_product_type
-  ON digital_product_passports USING GIN((data->>'product_type'));
-
--- Query with index
-SELECT * FROM digital_product_passports
-WHERE data->>'product_type' = 'battery';
-```
-
-### Connection Pooling Optimization
-
-```javascript
-// Monitor pool
-console.log(pool.totalCount);    // Total connections
-console.log(pool.idleCount);     // Available connections
-console.log(pool.waitingCount);  // Waiting for connection
-
-// Adjust pool size based on metrics
-// If waitingCount > 5: increase max
-// If idleCount > 15: decrease max
-```
-
-### Vacuum & Analyze
-
-**Manual optimization**:
-```sql
--- Full table optimization
-VACUUM FULL;
-
--- Incremental optimization (can run with load)
-VACUUM;
-
--- Update statistics
-ANALYZE;
-
--- Specific table
-VACUUM ANALYZE digital_product_passports;
-```
-
-**Schedule automatic vacuum**:
-```sql
--- Default autovacuum runs automatically
--- Adjust parameters in postgresql.conf
-autovacuum_max_workers = 3
-autovacuum_naptime = 10s
-```
-
----
-
-## Maintenance
-
-### Daily Tasks
+Run routine maintenance:
 
 ```bash
-# Check backup status
-ls -lh /opt/backups/ | tail -5
-
-# Check database size
-docker-compose exec postgres psql -U claros_user -d claros_dpp -c \
-  "SELECT pg_size_pretty(pg_database_size('claros_dpp'));"
-
-# Check connection count
-docker-compose exec postgres psql -U claros_user -d claros_dpp -c \
-  "SELECT count(*) FROM pg_stat_activity;"
+docker-compose exec postgres vacuumdb -U postgres -d dpp_system --analyze
 ```
 
-### Weekly Tasks
+Reindex only when needed:
 
 ```sql
--- Update statistics
-ANALYZE;
-
--- Check for unused indexes
-SELECT * FROM pg_stat_user_indexes WHERE idx_scan = 0;
-
--- Review slow queries
-SELECT query, calls, mean_exec_time 
-FROM pg_stat_statements 
-ORDER BY mean_exec_time DESC 
-LIMIT 5;
+REINDEX DATABASE dpp_system;
 ```
 
-### Monthly Tasks
+## Current High-Value Index Areas
 
-```sql
--- Full optimization
-VACUUM FULL ANALYZE;
+The initializer creates indexes for:
 
--- Check for bloated tables
-SELECT 
-  schemaname,
-  tablename,
-  ROUND(pg_total_relation_size(schemaname||'.'||tablename)/1024/1024) as size_mb
-FROM pg_tables
-ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+- company and passport registry lookups
+- passport lineage
+- passport history and archive retrieval
+- access grants
+- audit log and anchor integrity queries
+- repository folder browsing
+- symbols by category
+- backup replication status
+- asset-management schedules
+- notifications by user/read state
 
--- Reindex if needed
-REINDEX DATABASE claros_dpp;
-```
-
-### Quarterly Tasks
-
-- Review and optimize slow queries
-- Audit data integrity
-- Update backup storage
-- Review security policies
-- Plan capacity
-
----
+Before adding new indexes, confirm the live query pattern with `EXPLAIN ANALYZE`.
 
 ## Troubleshooting
 
-### Connection Issues
+Connection refused:
 
-**"Connection refused"**:
 ```bash
-# Check if PostgreSQL is running
 docker-compose ps postgres
-
-# Check logs
 docker-compose logs postgres
-
-# Restart
-docker-compose restart postgres
 ```
 
-**"Too many connections"**:
+Authentication failure:
+
+```bash
+docker-compose exec postgres psql -U postgres -d dpp_system -c "SELECT 1;"
+```
+
+Schema did not initialize:
+
+```bash
+docker-compose logs backend-api | rg "initDb|schema|migration|database"
+```
+
+Lock or long-running query:
+
 ```sql
--- Check connection limit
-SHOW max_connections;
-
--- Check current connections
-SELECT count(*) FROM pg_stat_activity;
-
--- Kill idle connections
-SELECT pg_terminate_backend(pid)
+SELECT pid, usename, state, query_start, query
 FROM pg_stat_activity
-WHERE state = 'idle'
-  AND query_start < NOW() - INTERVAL '1 hour';
+WHERE state <> 'idle'
+ORDER BY query_start ASC;
 ```
 
-### Performance Issues
+Terminate a stuck backend only after checking the query:
 
-**Slow queries**:
-```bash
-# Enable slow query logging
-docker-compose exec postgres psql -U claros_user claros_dpp -c \
-  "ALTER SYSTEM SET log_min_duration_statement = 1000;"
-
-docker-compose restart postgres
-```
-
-**High CPU usage**:
 ```sql
--- Find expensive queries
-SELECT query, calls, mean_exec_time 
-FROM pg_stat_statements 
-WHERE mean_exec_time > 1000 
-ORDER BY mean_exec_time DESC;
-
--- Add indexes as needed
+SELECT pg_terminate_backend(<pid>);
 ```
-
-### Data Issues
-
-**Verify data integrity**:
-```sql
--- Check for orphaned records
-SELECT * FROM audit_logs WHERE user_id NOT IN (SELECT id FROM users);
-
--- Fix soft deletes
-SELECT count(*) FROM digital_product_passports WHERE deleted_at IS NOT NULL;
-
--- Restore accidentally deleted data (if keeping audit log)
-SELECT * FROM audit_logs WHERE action = 'delete' ORDER BY created_at DESC LIMIT 1;
-```
-
-### Backup Issues
-
-**Backup failed**:
-```bash
-# Check disk space
-df -h
-
-# Check permissions
-ls -la /opt/backups/
-
-# Verify database is accessible
-pg_isready -h localhost
-```
-
----
-
-## Best Practices
-
-### Security
-
-- ✅ Use strong passwords
-- ✅ Change default credentials
-- ✅ Restrict network access
-- ✅ Use SSL/TLS for connections
-- ✅ Regular audit logs review
-
-### Performance
-
-- ✅ Index frequently filtered columns
-- ✅ Monitor query performance
-- ✅ Use connection pooling
-- ✅ Regular VACUUM and ANALYZE
-- ✅ Monitor disk space
-
-### Reliability
-
-- ✅ Daily automated backups
-- ✅ Test backup restoration
-- ✅ Monitor connection health
-- ✅ Plan for disk space
-- ✅ Document procedures
-
-### Maintenance
-
-- ✅ Regular updates
-- ✅ Monitor slow logs
-- ✅ Clean old data
-- ✅ Verify backups
-- ✅ Capacity planning
-
----
 
 ## Related Documentation
 
-- [DOCKER.md](DOCKER.md) - Docker container management for database
-- [CADDY.md](CADDY.md) - Reverse proxy configuration
-- [docker-compose-files.md](docker-compose-files.md) - Docker Compose database services
-- [passport-type-storage-model.md](../api/passport-type-storage-model.md) - Database schema reference
-- [LOCAL.md](../deployment/LOCAL.md) - Local database setup
-- [OCI.md](../deployment/OCI.md) - Production database deployment
-
----
-
-**[← Back to Infrastructure Docs](../README.md)**
+- [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md)
+- [DOCKER.md](./DOCKER.md)
+- [LOCAL.md](../deployment/LOCAL.md)
+- [OCI.md](../deployment/OCI.md)
+- [backup-continuity-policy.md](../security/backup-continuity-policy.md)

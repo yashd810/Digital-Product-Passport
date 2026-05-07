@@ -457,7 +457,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "Dictionary",
       audience: "Company users working with battery passports or JSON-LD exports",
       title: "Use the Battery Dictionary to check terms, units, access rights, and semantic IDs",
-      summary: "The dashboard includes a Battery Dictionary browser for DIN SPEC 99100 and Battery Pass style work. Use it to search terms, open detail pages, check canonical IRIs, see expected units and data formats, and understand which application field keys map to each dictionary element.",
+      summary: "The dashboard includes a Battery Dictionary browser for Battery Pass style work. Use it to search terms, open detail pages, check canonical IRIs, see expected units and data formats, and understand which application field keys map to each dictionary element.",
       facts: [
         { label: "Dashboard route", value: "/dashboard/dictionary/battery/v1" },
         { label: "Public route", value: "/dictionary/battery/v1" },

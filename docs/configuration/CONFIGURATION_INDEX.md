@@ -139,16 +139,15 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 |----------|------|---------|---------|
 | DB_HOST | string | Database hostname | postgres |
 | DB_PORT | number | Database port | 5432 |
-| DB_USER | string | Database user | claros_user |
+| DB_USER | string | Database user | postgres |
 | DB_PASSWORD | string | Database password | *** |
-| DB_NAME | string | Database name | claros_dpp |
+| DB_NAME | string | Database name | dpp_system |
 
 ### Authentication & Security
 
 | Variable | Type | Purpose | Requirements |
 |----------|------|---------|---------------|
 | JWT_SECRET | string | JWT signing key | Min 32 characters |
-| JWT_EXPIRATION | string | Token expiry | Format: "24h" |
 | COOKIE_DOMAIN | string | Session cookie domain | .claros-dpp.online |
 | REQUIRE_MFA_FOR_CONTROLLED_DATA | boolean | MFA enforcement | true/false |
 | CORS_ORIGINS | string | Allowed origins | Comma-separated URLs |
@@ -208,7 +207,6 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
    - Check CORS configuration
 3. Check JWT authentication issues
    - Verify JWT_SECRET is set
-   - Check JWT_EXPIRATION format
 
 **File:** [configuration-files.md#troubleshooting](configuration-files.md#troubleshooting)
 
@@ -267,9 +265,8 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 
 **Steps:**
 1. Generate JWT_SECRET (32+ random characters)
-2. Set JWT_EXPIRATION=24h
-3. Set COOKIE_DOMAIN=.claros-dpp.online (production)
-4. Enable REQUIRE_MFA_FOR_CONTROLLED_DATA=true
+2. Set COOKIE_DOMAIN=.claros-dpp.online (production)
+3. Enable REQUIRE_MFA_FOR_CONTROLLED_DATA=true
 5. Configure CORS_ORIGINS for allowed domains
 
 **Related:** [AUTHENTICATION.md](../security/AUTHENTICATION.md)

@@ -47,7 +47,7 @@ npm run test:contrast
 
 ## Routing Notes
 
-Routes are centralized in `src/app/containers/App.js`. Dashboard routes are nested under `/dashboard`; admin routes are nested under `/admin`; public passport aliases are exposed through `/passport/*`, `/dpp/*`, and `/p/*`.
+Routes are centralized in `src/app/containers/App.js`. Dashboard routes are nested under `/dashboard`; admin routes are nested under `/admin`; public passport views are exposed through `/dpp/*` and `/p/*`.
 
 Use backend permissions as the source of truth. Frontend guards improve navigation but do not replace server-side checks.
 

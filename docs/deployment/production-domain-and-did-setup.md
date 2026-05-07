@@ -145,7 +145,7 @@ Migration notes:
 - keep HTTPS enforced end to end because consumer QR codes now rely exclusively on public HTTPS URLs
 - enforce TLS `1.2+` only at the public reverse proxy edge; the Oracle Caddy config now pins the listener to `tls1.2` through `tls1.3`
 - enforce HTTP/2 minimum at the public reverse proxy edge; the Oracle Caddy config now limits the HTTPS listener to `h2` and `h3`
-- rotate legacy RSA signing keys to P-256 before enabling ES256 issuance in production
+- configure a P-256 ES256 signing key before issuing production passports
 
 Production reverse-proxy policy:
 - public ingress terminates on the Oracle Caddy edge in `infra/oracle/Caddyfile`

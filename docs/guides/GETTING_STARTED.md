@@ -119,9 +119,9 @@ cp .env.example .env
 # Database
 DB_HOST=postgres
 DB_PORT=5432
-DB_NAME=dpp_db
-DB_USER=dpp_user
-DB_PASSWORD=dev_password
+DB_NAME=dpp_system
+DB_USER=postgres
+DB_PASSWORD=postgres
 
 # API
 API_PORT=3001
@@ -133,7 +133,6 @@ VITE_PUBLIC_VIEWER_URL=http://localhost:3004
 
 # JWT
 JWT_SECRET=your-secret-key-here
-JWT_EXPIRY=24h
 
 # Node Env
 NODE_ENV=development
@@ -173,16 +172,16 @@ docker-compose restart
 
 ### 6. Database Initialization
 
-The database automatically initializes from `apps/backend-api/db/schema.sql` on first run.
-
-**Manual initialization** (if needed):
-```bash
-docker-compose exec postgres psql -U dpp_user -d dpp_db < apps/backend-api/db/schema.sql
-```
+The backend initializes the database automatically from `apps/backend-api/db/init.js` on startup.
 
 **Access database directly**:
 ```bash
-docker-compose exec postgres psql -U dpp_user -d dpp_db
+docker-compose exec postgres psql -U postgres -d dpp_system
+```
+
+**Check current tables**:
+```bash
+docker-compose exec postgres psql -U postgres -d dpp_system -c "\\dt"
 ```
 
 ---
@@ -306,7 +305,7 @@ npm test
 
 ```bash
 # Connect to database
-docker-compose exec postgres psql -U dpp_user -d dpp_db
+docker-compose exec postgres psql -U postgres -d dpp_system
 
 # List tables
 \dt
@@ -315,7 +314,7 @@ docker-compose exec postgres psql -U dpp_user -d dpp_db
 SELECT id, email, created_at FROM users;
 
 # View passports
-SELECT id, product_name, is_published FROM digital_product_passports;
+SELECT dpp_id, passport_type, company_id, created_at FROM passport_registry LIMIT 20;
 
 # Exit
 \q
@@ -505,4 +504,3 @@ docker-compose up --verbose
 ---
 
 **[← Back to Docs](../README.md)**
-

@@ -17,7 +17,7 @@ The public viewer is a small React 18/Vite shell for released passport URLs. It 
 - Serve public URLs without requiring login.
 - Render consumer passport pages.
 - Render technical passport pages.
-- Support current `/dpp/*` paths and legacy `/passport/*` aliases.
+- Support current `/dpp/*` public passport paths.
 - Redirect the root path to a not-found passport view.
 
 ## Important Files

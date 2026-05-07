@@ -131,29 +131,6 @@ function App() {
         <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId/technical/*" element={<PassportViewer />} />
         <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId" element={<ConsumerPage />} />
 
-        {/* Legacy passport viewer aliases */}
-        <Route path="/passport/preview/:previewId/technical/*" element={
-          <ProtectedRoute token={token} authReady={authReady}>
-            <PassportViewer previewMode={true} previewCompanyId={companyId} />
-          </ProtectedRoute>
-        } />
-        <Route path="/passport/preview/:previewId" element={
-          <ProtectedRoute token={token} authReady={authReady}>
-            <ConsumerPage previewMode={true} previewCompanyId={companyId} />
-          </ProtectedRoute>
-        } />
-        <Route path="/passport/inactive/:productId/:versionNumber/technical/*" element={<PassportViewer />} />
-        <Route path="/passport/inactive/:productId/:versionNumber" element={<ConsumerPage />} />
-        <Route path="/passport/:productId/technical/*" element={<PassportViewer />} />
-        <Route path="/passport/:productId" element={<ConsumerPage />} />
-
-        {/* Version diff — needs token for API */}
-        <Route path="/passport/:dppId/diff" element={
-          <ProtectedRoute token={token} authReady={authReady}>
-            <VersionDiff companyId={companyId} />
-          </ProtectedRoute>
-        } />
-
         {/* CSV Import */}
         <Route path="/csv-import/:passportType" element={
           <ProtectedRoute token={token} authReady={authReady}>
@@ -177,6 +154,7 @@ function App() {
           <Route path="my-passports"  element={<PassportList user={user} companyId={companyId} filterByUser={true} />} />
           <Route path="passports/product/:productKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="passports/umbrella/:umbrellaKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
+          <Route path="passports/:dppId/diff" element={<VersionDiff companyId={companyId} />} />
           <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="notifications"   element={<NotificationsPage user={user} />} />
           <Route path="messages"        element={<MessagingPage user={user} />} />

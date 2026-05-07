@@ -147,9 +147,8 @@ Production note:
 
 ## Migration notes
 
-- Existing `RSA-SHA256` rows remain verifiable.
-- New issuance prefers EC P-256 with `ES256`.
-- Historical public keys remain stored for verification continuity.
+- Signing keys must be EC P-256 and use `ES256`.
+- Historical ES256 public keys remain stored for verification continuity.
 - `vc_issuance_enabled = false` on a company policy skips new VC issuance on release.
 
 ---

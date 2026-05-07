@@ -76,7 +76,6 @@ Examples:
 
 ```text
 battery -> battery_passports
-din_spec_99100 -> din_spec_99100_passports
 ```
 
 The helper replaces unsafe characters with underscores before appending `_passports`.

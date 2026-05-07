@@ -26,7 +26,7 @@ Supported fields:
 These fields are stored per passport in `carrier_authenticity` and are exposed in:
 
 - operational DPP JSON responses
-- expanded/canonical DPP JSON responses
+- full/canonical DPP JSON responses
 - `GET /api/passports/:dppId/qrcode`
 
 ## Recommended usage

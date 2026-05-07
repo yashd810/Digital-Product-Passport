@@ -65,7 +65,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   function getRepresentation(req) {
     const raw = String(req.query.representation || "").trim().toLowerCase();
-    return ["expanded", "full"].includes(raw) ? "expanded" : "compressed";
+    return raw === "full" ? "full" : "compressed";
   }
 
   function wantsJsonResolution(req) {
@@ -107,8 +107,8 @@ module.exports = function registerPassportPublicRoutes(app, {
       `SELECT c.id,
               c.company_name,
               c.did_slug,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS dpp_granularity,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS default_granularity,
+              COALESCE(p.default_granularity, 'item') AS dpp_granularity,
+              COALESCE(p.default_granularity, 'item') AS default_granularity,
               COALESCE(p.jsonld_export_enabled, true) AS jsonld_export_enabled,
               c.is_active
        FROM companies c
@@ -139,8 +139,8 @@ module.exports = function registerPassportPublicRoutes(app, {
       `SELECT c.id,
               c.company_name,
               c.did_slug,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS dpp_granularity,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS default_granularity,
+              COALESCE(p.default_granularity, 'item') AS dpp_granularity,
+              COALESCE(p.default_granularity, 'item') AS default_granularity,
               COALESCE(p.jsonld_export_enabled, true) AS jsonld_export_enabled,
               c.is_active
        FROM companies c
@@ -219,7 +219,7 @@ module.exports = function registerPassportPublicRoutes(app, {
   function buildResolutionPayload(did, passport, company, typeDef) {
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, {
       company,
-      granularity: company?.default_granularity || company?.dpp_granularity || passport.granularity || "model"
+      granularity: company?.default_granularity || passport.granularity || "model"
     });
     return {
       did,
@@ -236,9 +236,9 @@ module.exports = function registerPassportPublicRoutes(app, {
   }
 
   function buildRequestedPassportPayload(req, passport, typeDef, company) {
-    const granularity = company?.default_granularity || company?.dpp_granularity || passport?.granularity || "model";
+    const granularity = company?.default_granularity || passport?.granularity || "model";
     const serializerOptions = { company, granularity };
-    if (getRepresentation(req) === "expanded" && typeof buildExpandedPassportPayload === "function") {
+    if (getRepresentation(req) === "full" && typeof buildExpandedPassportPayload === "function") {
       return buildExpandedPassportPayload(passport, typeDef, serializerOptions);
     }
     return buildCanonicalPassportPayload(passport, typeDef, serializerOptions);
@@ -576,7 +576,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       null;
       const canonicalPayload = buildCanonicalPassportPayload(sanitizedPassport, typeDef, {
         company,
-        granularity: company?.default_granularity || company?.dpp_granularity || sanitizedPassport.granularity || "model"
+        granularity: company?.default_granularity || sanitizedPassport.granularity || "model"
       });
       const requestedPayload = buildRequestedPassportPayload(req, sanitizedPassport, typeDef, company);
 
@@ -607,7 +607,7 @@ module.exports = function registerPassportPublicRoutes(app, {
         }
       };
 
-      if (getRepresentation(req) === "expanded") {
+      if (getRepresentation(req) === "full") {
         if (wantsSemanticResponse(req)) {
           if (!ensureJsonLdExportEnabled(company)) {
             return res.status(403).json({ error: "JSON-LD export is disabled for this company." });

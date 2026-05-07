@@ -1,9 +1,0 @@
-{
-  "passportType": "din_spec_99100",
-  "source": {
-    "name": "Battery Pass Data Model",
-    "version": "v1.2.0",
-    "repository": "https://github.com/batterypass/BatteryPassDataModel",
-    "note": "Legacy Battery Pass semantic mappings were removed. Use the Claros battery dictionary resources under resources/semantics/battery/v1."
-  }
-}

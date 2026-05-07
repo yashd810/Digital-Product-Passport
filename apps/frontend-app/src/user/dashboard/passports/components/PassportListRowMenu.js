@@ -55,7 +55,7 @@ export function PassportListRowMenu({
       <button className="menu-item" onClick={() => { setHistoryModal({ dppId: passport.dppId, passportType: pType }); setOpenMenuId(null); }}>
         🕘 Update history
       </button>
-      <button className="menu-item" onClick={() => { navigate(`/passport/${passport.dppId}/diff?passportType=${pType}`); setOpenMenuId(null); }}>
+      <button className="menu-item" onClick={() => { navigate(`/dashboard/passports/${passport.dppId}/diff?passportType=${pType}`); setOpenMenuId(null); }}>
         🔀 Compare versions
       </button>
       <button className="menu-item" onClick={() => { setDeviceModal({ passport, pType }); setOpenMenuId(null); }}>

@@ -1275,14 +1275,14 @@ GET /did/battery/item/:stableId/did.json
 
 ---
 
-### Get Company DID (Legacy)
+### Get Company DID
 
 **Request**
 ```
 GET /did/company/:companyId/did.json
 ```
 
-Deprecated in favor of `/did/company/:companySlug/did.json`
+Company slugs are preferred for public DID URLs.
 
 ---
 
@@ -1369,7 +1369,7 @@ All public passport endpoints support content negotiation:
 - `Accept: application/json` → JSON payload
 - `Accept: application/ld+json` → JSON-LD (if enabled for company)
 - `?representation=compressed` → Minimal format
-- `?representation=expanded` → Full format with metadata
+- `?representation=full` → Full format with metadata
 
 ---
 
@@ -1626,4 +1626,3 @@ See **[did-resolution.md](did-resolution.md)**
 ✅ All error codes documented
 ✅ All request/response formats documented
 ✅ All specialized features linked to dedicated documentation
-

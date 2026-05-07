@@ -36,7 +36,7 @@ module.exports = function createPassportRepresentationService({
     if (normalized === "invalid") return "Invalid";
     if (normalized === "obsolete") return "Inactive";
     if (normalized === "inactive") return "Inactive";
-    if (["draft", "in_review", "in_revision", "revised"].includes(normalized)) return "Inactive";
+    if (["draft", "in_review", "in_revision"].includes(normalized)) return "Inactive";
     return "Invalid";
   }
 

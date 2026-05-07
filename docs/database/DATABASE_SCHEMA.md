@@ -1,586 +1,282 @@
 # Database Schema - Claros DPP
 
-Comprehensive PostgreSQL database schema documentation for the Claros DPP platform.
+Last reviewed: 2026-05-07
 
-## Table of Contents
+This document describes the current PostgreSQL schema created by [init.js](../../apps/backend-api/db/init.js). The app no longer uses the old workspace/passport-version schema. Data is scoped by company, dynamic passport tables are created per passport type, and shared passport metadata is anchored through `passport_registry`.
 
-1. [Database Overview](#database-overview)
-2. [Core Tables](#core-tables)
-3. [Relationships Diagram](#relationships-diagram)
-4. [Common Queries](#common-queries)
-5. [Constraints & Validations](#constraints--validations)
-6. [Backup & Recovery](#backup--recovery)
-7. [Performance Monitoring](#performance-monitoring)
-8. [Maintenance Tasks](#maintenance-tasks)
+## Runtime Source Of Truth
 
----
+- Startup schema creation and migrations: [apps/backend-api/db/init.js](../../apps/backend-api/db/init.js)
+- Per-passport-type table creation: [apps/backend-api/Server/server.js](../../apps/backend-api/Server/server.js)
+- Passport type storage model: [passport-type-storage-model.md](../api/passport-type-storage-model.md)
+- Company DPP policy model: [company-granularity-policy.md](../admin/company-granularity-policy.md)
+
+The schema initializer is idempotent. It creates missing tables and indexes, adds missing columns, and removes old company policy columns that are not part of the current model.
 
 ## Database Overview
 
-**Database Name**: `dpp_db`
-**User**: `dpp_user`
-**Port**: 5432
-
-**Tables**:
-1. users
-2. workspaces
-3. workspace_members
-4. digital_product_passports
-5. passport_versions
-6. assets
-7. audit_logs
-8. sessions
-9. invitations
-10. notifications
-
----
-
-## Core Tables
-
-### 1. users
-
-Stores user account information.
-
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    phone VARCHAR(20),
-    organization VARCHAR(255),
-    avatar_url VARCHAR(2048),
-    active BOOLEAN DEFAULT true,
-    email_verified BOOLEAN DEFAULT false,
-    email_verified_at TIMESTAMP,
-    last_login_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP
-);
-
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_active ON users(active);
-```
-
-**Description**:
-- `id`: Unique identifier (UUID)
-- `email`: User email, must be unique
-- `password_hash`: Hashed password (bcrypt)
-- `first_name`, `last_name`: User display name
-- `phone`: Contact number (optional)
-- `organization`: Company/organization name
-- `avatar_url`: Profile picture URL
-- `active`: Account status (soft delete support)
-- `email_verified`: Email verification status
-- `email_verified_at`: When email was verified
-- `last_login_at`: Last login timestamp
-- `created_at`, `updated_at`: Timestamps
-- `deleted_at`: Soft delete timestamp
-
----
-
-### 2. workspaces
-
-Organizational units for grouping DPPs and collaborators.
-
-```sql
-CREATE TABLE workspaces (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    slug VARCHAR(255) UNIQUE,
-    logo_url VARCHAR(2048),
-    website VARCHAR(255),
-    active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP
-);
-
-CREATE INDEX idx_workspaces_owner_id ON workspaces(owner_id);
-CREATE INDEX idx_workspaces_active ON workspaces(active);
-CREATE INDEX idx_workspaces_slug ON workspaces(slug);
-```
-
-**Description**:
-- `id`: Unique workspace identifier
-- `owner_id`: FK to users table (who created workspace)
-- `name`: Workspace name
-- `description`: Workspace description
-- `slug`: URL-friendly identifier
-- `logo_url`: Workspace logo/avatar
-- `website`: Company website
-- `active`: Soft delete support
-
-**Use Cases**:
-- Organize DPPs by organization
-- Separate data between clients
-- Team collaboration boundaries
-
----
-
-### 3. workspace_members
-
-Maps users to workspaces with roles.
-
-```sql
-CREATE TABLE workspace_members (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role VARCHAR(50) NOT NULL DEFAULT 'viewer', -- admin, editor, viewer
-    joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    removed_at TIMESTAMP,
-    UNIQUE(workspace_id, user_id)
-);
-
-CREATE INDEX idx_workspace_members_user_id ON workspace_members(user_id);
-CREATE INDEX idx_workspace_members_workspace_id ON workspace_members(workspace_id);
-```
-
-**Description**:
-- `id`: Member record ID
-- `workspace_id`: FK to workspaces
-- `user_id`: FK to users
-- `role`: User role in workspace
-  - `admin`: Full access, manage members
-  - `editor`: Can create/edit DPPs
-  - `viewer`: Read-only access
-- `joined_at`: When user joined
-- `removed_at`: When user left (soft delete)
-
-**Roles & Permissions**:
-
-| Role | View | Create | Edit | Delete | Publish | Invite |
-|------|------|--------|------|--------|---------|--------|
-| admin | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| editor | ✓ | ✓ | ✓ | Own | ✓ | ✗ |
-| viewer | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-
----
-
-### 4. digital_product_passports
-
-Core DPP data storage with flexible JSON schema.
-
-```sql
-CREATE TABLE digital_product_passports (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    product_id VARCHAR(255) NOT NULL,
-    product_name VARCHAR(255) NOT NULL,
-    data JSONB NOT NULL, -- Flexible schema
-    version INTEGER NOT NULL DEFAULT 1,
-    is_published BOOLEAN DEFAULT false,
-    published_at TIMESTAMP,
-    created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    updated_by UUID REFERENCES users(id) ON DELETE RESTRICT,
-    public_link_token VARCHAR(255) UNIQUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP
-);
-
-CREATE INDEX idx_dpp_workspace_id ON digital_product_passports(workspace_id);
-CREATE INDEX idx_dpp_created_by ON digital_product_passports(created_by);
-CREATE INDEX idx_dpp_is_published ON digital_product_passports(is_published);
-CREATE INDEX idx_dpp_public_link_token ON digital_product_passports(public_link_token);
-CREATE INDEX idx_dpp_product_id ON digital_product_passports(product_id);
-```
-
-**Description**:
-- `id`: Unique DPP identifier
-- `workspace_id`: Which workspace owns this DPP
-- `product_id`: Product identifier (e.g., battery serial number)
-- `product_name`: Human-readable product name
-- `data`: JSONB field for flexible DPP data structure
-- `version`: Version number (increments on updates)
-- `is_published`: Whether DPP is publicly visible
-- `published_at`: When DPP was published
-- `created_by`, `updated_by`: User audit trail
-- `public_link_token`: Token for shareable public link
-- `created_at`, `updated_at`: Timestamps
-- `deleted_at`: Soft delete
-
-**Example data field** (JSONB):
-```json
-{
-  "battery_info": {
-    "capacity": "50 kWh",
-    "chemistry": "LFP",
-    "voltage": "400V",
-    "cycles": 1500
-  },
-  "manufacturer": {
-    "name": "Battery Corp",
-    "location": "Germany"
-  },
-  "certifications": ["UN 38.3", "CE"],
-  "environmental_impact": {
-    "co2_per_kwh": 45,
-    "recycling_percentage": 85
-  }
-}
-```
-
----
-
-### 5. passport_versions
-
-Version history for DPP changes.
-
-```sql
-CREATE TABLE passport_versions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    passport_id UUID NOT NULL REFERENCES digital_product_passports(id) ON DELETE CASCADE,
-    version INTEGER NOT NULL,
-    data JSONB NOT NULL,
-    changed_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    change_summary TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_passport_versions_passport_id ON passport_versions(passport_id);
-CREATE INDEX idx_passport_versions_version ON passport_versions(version);
-```
-
-**Description**:
-- Stores complete snapshot of DPP data for each version
-- Enables version history and rollback (if implemented)
-- Audit trail of changes
-
----
-
-### 6. assets
-
-File/asset storage metadata.
-
-```sql
-CREATE TABLE assets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    passport_id UUID NOT NULL REFERENCES digital_product_passports(id) ON DELETE CASCADE,
-    filename VARCHAR(255) NOT NULL,
-    original_filename VARCHAR(255),
-    mime_type VARCHAR(100),
-    file_size BIGINT,
-    file_path VARCHAR(2048),
-    file_url VARCHAR(2048),
-    uploaded_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    download_count INTEGER DEFAULT 0,
-    last_downloaded_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP
-);
-
-CREATE INDEX idx_assets_passport_id ON assets(passport_id);
-CREATE INDEX idx_assets_uploaded_by ON assets(uploaded_by);
-```
-
-**Description**:
-- Stores file metadata (actual files stored in object storage or filesystem)
-- Links files to specific DPPs
-- Tracks downloads and usage
-
----
-
-### 7. audit_logs
-
-Complete audit trail of system actions.
-
-```sql
-CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    action VARCHAR(50) NOT NULL, -- created, updated, deleted, published, etc.
-    entity_type VARCHAR(50) NOT NULL, -- passport, user, workspace, etc.
-    entity_id VARCHAR(255) NOT NULL,
-    changes JSONB, -- What changed (old values, new values)
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    status VARCHAR(20) DEFAULT 'success', -- success, failure
-    error_message TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_entity_type ON audit_logs(entity_type);
-CREATE INDEX idx_audit_logs_entity_id ON audit_logs(entity_id);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
-CREATE INDEX idx_audit_logs_action ON audit_logs(action);
-```
-
-**Description**:
-- Logs every significant action in system
-- Security and compliance requirement
-- Enables investigation of issues
-
-**Example entries**:
-```sql
--- User created passport
-INSERT INTO audit_logs VALUES (..., 'created', 'passport', 'uuid-123', 
-  '{"product_name": "Battery"}', ...);
-
--- User published passport
-INSERT INTO audit_logs VALUES (..., 'published', 'passport', 'uuid-123', 
-  '{"is_published": true}', ...);
-
--- Admin deleted user
-INSERT INTO audit_logs VALUES (..., 'deleted', 'user', 'uuid-456', 
-  '{"email": "old@example.com"}', ...);
-```
-
----
-
-### 8. sessions
-
-User session management.
-
-```sql
-CREATE TABLE sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash VARCHAR(255) NOT NULL UNIQUE,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_activity_at TIMESTAMP
-);
-
-CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
-```
-
-**Description**:
-- Tracks active user sessions
-- Enables session revocation
-- Security auditing
-
----
-
-### 9. invitations
-
-Pending workspace invitations.
-
-```sql
-CREATE TABLE invitations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    inviter_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    email VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'viewer',
-    token VARCHAR(255) NOT NULL UNIQUE,
-    accepted_at TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_invitations_workspace_id ON invitations(workspace_id);
-CREATE INDEX idx_invitations_email ON invitations(email);
-CREATE INDEX idx_invitations_token ON invitations(token);
-```
-
-**Description**:
-- Pending invitations for users not yet in system
-- Includes invitation token for verification link
-- Expires after configurable period (default: 7 days)
-
----
-
-### 10. notifications
-
-User notifications and alerts.
-
-```sql
-CREATE TABLE notifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    notification_type VARCHAR(50) NOT NULL, -- passport_created, user_invited, etc.
-    title VARCHAR(255) NOT NULL,
-    message TEXT,
-    related_entity_type VARCHAR(50),
-    related_entity_id VARCHAR(255),
-    read_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_notifications_read_at ON notifications(read_at);
-```
-
-**Description**:
-- In-app notifications
-- Tracks read/unread status
-- Links to related entities
-
----
-
-## Relationships Diagram
-
-```
+Default local settings:
+
+| Setting | Value |
+|---------|-------|
+| Database | `dpp_system` |
+| User | `postgres` |
+| Port | `5432` |
+| Required extension | `pgcrypto` |
+
+Current static tables:
+
+```text
+api_keys
+asset_management_jobs
+asset_management_runs
+audit_log_anchors
+audit_logs
+backup_public_handovers
+backup_service_providers
+companies
+company_dpp_policies
+company_facilities
+company_passport_access
+company_repository
+conversation_members
+conversations
+dpp_registry_registrations
+dpp_subject_registry
+invite_tokens
+messages
+notifications
+passport_access_grants
+passport_archives
+passport_attachments
+passport_backup_replications
+passport_dynamic_values
+passport_edit_sessions
+passport_history_visibility
+passport_registry
+passport_revision_batch_items
+passport_revision_batches
+passport_scan_events
+passport_security_events
+passport_signatures
+passport_signing_keys
+passport_template_fields
+passport_templates
+passport_type_drafts
+passport_type_schema_events
+passport_types
+password_reset_tokens
+product_identifier_lineage
+request_rate_limits
+schema_migrations
+symbols
+umbrella_categories
+user_access_audiences
+user_identities
 users
-├── 1:N ← workspaces (owner_id)
-├── 1:N ← workspace_members (user_id)
-├── 1:N ← digital_product_passports (created_by, updated_by)
-├── 1:N ← assets (uploaded_by)
-├── 1:N ← audit_logs (user_id)
-├── 1:N ← sessions (user_id)
-├── 1:N ← invitations (inviter_id)
-└── 1:N ← notifications (user_id)
-
-workspaces
-├── 1:N ← workspace_members (workspace_id)
-├── 1:N ← digital_product_passports (workspace_id)
-└── 1:N ← invitations (workspace_id)
-
-workspace_members
-└── N:N between workspaces and users
-
-digital_product_passports
-├── 1:N ← assets (passport_id)
-└── 1:N ← passport_versions (passport_id)
-    └── References audit_logs via action/entity_id
 ```
 
----
+The app also creates one data table per active passport type. For example, a `battery` passport type uses a generated passport table whose name is resolved through the backend table-name helper. These typed tables hold the operational row data for each passport.
+
+## Core Company And User Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `companies` | Company tenant records and public DID branding identity. | `id`, `company_name`, `is_active`, `asset_management_enabled`, `did_slug`, `economic_operator_identifier`, `branding_json` |
+| `company_dpp_policies` | Current company-level DPP policy. | `company_id`, `default_granularity`, `allow_granularity_override`, `mint_model_dids`, `mint_item_dids`, `mint_facility_dids`, `vc_issuance_enabled`, `jsonld_export_enabled`, `claros_battery_dictionary_enabled` |
+| `users` | Login accounts, profile data, company role, 2FA flags, and session versioning. | `id`, `email`, `password_hash`, `company_id`, `role`, `is_active`, `otp_code_hash`, `two_factor_enabled`, `session_version`, profile fields |
+| `user_identities` | SSO identity links for users. | `user_id`, `provider_key`, `provider_subject`, `raw_profile`, `last_login_at` |
+| `invite_tokens` | Company invitations. | `token`, `email`, `company_id`, `invited_by`, `role_to_assign`, `used`, `expires_at` |
+| `password_reset_tokens` | Password reset tokens. | `user_id`, `token`, `used`, `expires_at` |
+
+Important notes:
+
+- `company_dpp_policies` is the only current source for company granularity policy.
+- `companies.dpp_granularity` and `companies.granularity_locked` are intentionally dropped by the initializer.
+- JWTs must include the current `users.session_version`; changing it revokes old sessions.
+
+## Passport Type And Dynamic Passport Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `passport_types` | Admin-defined passport type schemas. | `type_name`, `display_name`, `umbrella_category`, `semantic_model_key`, `fields_json`, `is_active`, `created_by` |
+| `passport_type_drafts` | One draft schema per super-admin user. | `user_id`, `draft_json` |
+| `passport_type_schema_events` | Audit trail for schema changes. | `passport_type_id`, `type_name`, `table_name`, `schema_version`, `event_type`, `change_summary` |
+| `umbrella_categories` | Managed passport type categories. | `name`, `icon` |
+| `company_passport_access` | Company access grants for passport types. | `company_id`, `passport_type_id`, `access_revoked` |
+
+Dynamic passport tables store the actual passport rows for each passport type. The current shared columns include:
+
+```text
+id
+dpp_id
+lineage_id
+company_id
+passport_type
+product_id
+product_identifier_did
+granularity
+model_name
+version_number
+release_status
+compliance_profile_key
+content_specification_ids
+carrier_policy_key
+carrier_authenticity
+economic_operator_id
+facility_id
+created_by
+updated_by
+released_at
+deleted_at
+created_at
+updated_at
+```
+
+Each dynamic table also includes the fields defined in `passport_types.fields_json`.
+
+## Passport Registry And Identity
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `passport_registry` | Stable registry for every DPP identifier. | `dpp_id`, `lineage_id`, `company_id`, `passport_type`, hashed access/device keys, key prefixes, rotation timestamps |
+| `dpp_subject_registry` | Issued DID records for company/product/DPP subjects. | `company_id`, `passport_dpp_id`, `product_id`, `product_identifier_did`, `granularity`, `product_did`, `dpp_did`, `company_did` |
+| `dpp_registry_registrations` | External/local registry registration records. | `passport_dpp_id`, `company_id`, `product_identifier`, `dpp_id`, `registry_name`, `status`, `registration_payload` |
+| `product_identifier_lineage` | Linked successor records when identifier granularity changes. | `lineage_id`, previous/replacement passport IDs, identifiers, granularities, `transition_reason` |
+
+`passport_registry.dpp_id` is the parent identifier used by most shared passport tables. Registry IDs are text, not UUID-only values.
+
+## Passport Lifecycle And History
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `passport_archives` | Immutable snapshots for archived/revision/history states. | `dpp_id`, `lineage_id`, `company_id`, `passport_type`, `version_number`, `row_data`, `snapshot_reason` |
+| `passport_history_visibility` | Public/private visibility of version history rows. | `passport_dpp_id`, `version_number`, `is_public`, `updated_by` |
+| `passport_edit_sessions` | Active edit locks/sessions. | `passport_dpp_id`, `company_id`, `passport_type`, `user_id`, `last_activity_at` |
+| `passport_revision_batches` | Bulk revision batch headers. | `company_id`, `passport_type`, `scope_type`, `changes_json`, counts, workflow targets |
+| `passport_revision_batch_items` | Per-passport results for a bulk revision. | `batch_id`, `passport_dpp_id`, `status`, version numbers, `message` |
+
+Release status is stored on the dynamic passport row. History and archive records preserve exact row snapshots.
+
+## Access Control And Security Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `api_keys` | Company-scoped API keys for `/api/v1`. | `company_id`, `name`, `key_hash`, `key_prefix`, `key_salt`, `hash_algorithm`, `scopes`, `expires_at`, `is_active` |
+| `user_access_audiences` | User-level audience grants. | `user_id`, `company_id`, `audience`, `granted_by`, `expires_at`, `is_active` |
+| `passport_access_grants` | Element/passport audience grants. | `passport_dpp_id`, `company_id`, `audience`, `element_id_path`, `grantee_user_id`, `expires_at`, `is_active` |
+| `passport_signatures` | Released passport signatures. | `passport_dpp_id`, `version_number`, `data_hash`, `signature`, `algorithm`, `signing_key_id`, `vc_json` |
+| `passport_signing_keys` | Public signing keys by key ID. | `key_id`, `public_key`, `algorithm`, `algorithm_version` |
+| `passport_scan_events` | Public scan analytics. | `passport_dpp_id`, `viewer_user_id`, `user_agent`, `referrer`, `scanned_at` |
+| `passport_security_events` | Passport security and carrier-verification events. | `passport_dpp_id`, `company_id`, `event_type`, `severity`, `source`, `details` |
+| `request_rate_limits` | Database-backed rate-limit buckets. | `bucket_key`, `count`, `reset_at` |
+
+Current API keys use salted HMAC SHA-256 (`hash_algorithm = 'hmac_sha256'`). Plain SHA-256 API key lookup is not part of the current authentication path.
+
+Current passport signing uses ES256/P-256. JWT authentication is separate and uses the authentication settings documented in [AUTHENTICATION.md](../security/AUTHENTICATION.md).
+
+## Audit And Integrity
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `audit_logs` | Append-only audit events. | `company_id`, `user_id`, `actor_identifier`, `audience`, `action`, `table_name`, `record_id`, `old_values`, `new_values`, `previous_event_hash`, `event_hash`, `hash_version` |
+| `audit_log_anchors` | Anchors for audit-chain integrity snapshots. | `company_id`, `log_count`, `root_event_hash`, `previous_anchor_hash`, `anchor_hash`, `anchor_type`, `metadata_json`, `anchored_by` |
+
+The initializer creates triggers that reject `UPDATE` and `DELETE` on `audit_logs` and `audit_log_anchors`.
+
+## Repository, Files, And Symbols
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `company_repository` | Company-scoped folders/files. | `company_id`, `parent_id`, `name`, `type`, `file_path`, `storage_key`, `storage_provider`, `file_url`, metadata |
+| `symbols` | Global icon/symbol repository. | `name`, `category`, `storage_key`, `storage_provider`, `file_url`, `created_by`, `is_active` |
+| `passport_attachments` | App-mediated passport attachment records. | `public_id`, `company_id`, `passport_dpp_id`, `field_key`, `storage_key`, `storage_provider`, `file_url`, `mime_type`, `is_public` |
+
+Storage should prefer provider keys (`storage_key`, `storage_provider`). Public attachment access goes through app-mediated public IDs.
+
+## Backup, Continuity, And Public Handover
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `backup_service_providers` | Company/global backup providers. | `company_id`, `provider_key`, `provider_type`, `display_name`, `object_prefix`, `public_base_url`, `config_json`, `is_active` |
+| `passport_backup_replications` | Per-passport backup snapshots. | `backup_provider_key`, `passport_dpp_id`, `lineage_id`, `company_id`, `version_number`, `replication_status`, `storage_key`, `public_url`, hash/verification fields |
+| `backup_public_handovers` | Active public fallback handover records. | `company_id`, `passport_dpp_id`, `lineage_id`, `product_id`, `backup_provider_key`, `public_url`, `public_row_data`, `handover_status`, verification fields |
+
+Backup public handover is current behavior. It is not an old file-serving fallback.
+
+## Asset Management, Templates, Messaging, Notifications
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `asset_management_jobs` | Scheduled/manual import jobs. | `company_id`, `passport_type`, `source_kind`, `source_config`, `records_json`, schedule fields, `last_status` |
+| `asset_management_runs` | Execution history for asset jobs. | `job_id`, `company_id`, `passport_type`, `trigger_type`, `status`, request/generated JSON |
+| `passport_templates` | Company passport templates. | `company_id`, `passport_type`, `name`, `description`, `created_by` |
+| `passport_template_fields` | Field values for templates. | `template_id`, `field_key`, `field_value`, `is_model_data` |
+| `conversations` | Company conversation threads. | `company_id`, `created_at` |
+| `conversation_members` | Conversation membership/read state. | `conversation_id`, `user_id`, `last_read_at` |
+| `messages` | Conversation messages. | `conversation_id`, `sender_id`, `body`, `created_at` |
+| `notifications` | User notifications and actions. | `user_id`, `type`, `title`, `message`, `passport_dpp_id`, `action_url`, `read` |
+
+## Facilities And Compliance Identity
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `company_facilities` | Company facility identifiers for manufacturing and compliance. | `company_id`, `facility_identifier`, `identifier_scheme`, `display_name`, `metadata_json`, `is_active` |
+
+Facility and economic-operator values are also projected onto passport rows where required by the active compliance profile.
 
 ## Common Queries
 
-### Get user's workspaces
+Find active passports for a company and type:
+
 ```sql
-SELECT w.* FROM workspaces w
-INNER JOIN workspace_members wm ON w.id = wm.workspace_id
-WHERE wm.user_id = $1 AND w.deleted_at IS NULL
-ORDER BY w.created_at DESC;
+SELECT *
+FROM battery_passports
+WHERE company_id = $1
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC;
 ```
 
-### Get workspace DPPs
+Find the stable registry row for a passport:
+
 ```sql
-SELECT * FROM digital_product_passports
-WHERE workspace_id = $1 AND deleted_at IS NULL
-ORDER BY created_at DESC;
+SELECT *
+FROM passport_registry
+WHERE dpp_id = $1;
 ```
 
-### Get published DPPs (public access)
+Find all passport history snapshots:
+
 ```sql
-SELECT * FROM digital_product_passports
-WHERE is_published = true AND deleted_at IS NULL
-  AND public_link_token = $1;
+SELECT *
+FROM passport_archives
+WHERE dpp_id = $1
+ORDER BY version_number DESC, archived_at DESC;
 ```
 
-### Get user's audit trail
+Find active access grants for a passport:
+
 ```sql
-SELECT * FROM audit_logs
-WHERE user_id = $1
-ORDER BY created_at DESC
-LIMIT 100;
+SELECT *
+FROM passport_access_grants
+WHERE passport_dpp_id = $1
+  AND is_active = true
+  AND (expires_at IS NULL OR expires_at > NOW());
 ```
 
-### Get passport version history
+Find current company DPP policy:
+
 ```sql
-SELECT * FROM passport_versions
-WHERE passport_id = $1
-ORDER BY version DESC;
+SELECT c.id, c.company_name, p.*
+FROM companies c
+LEFT JOIN company_dpp_policies p ON p.company_id = c.id
+WHERE c.id = $1;
 ```
 
----
+## Maintenance Notes
 
-## Constraints & Validations
-
-**Data Integrity**:
-- Foreign key constraints prevent orphaned data
-- UNIQUE constraints on email, workspace slug
-- CHECK constraints on role values
-- NOT NULL constraints on critical fields
-
-**Soft Deletes**:
-- All tables except junction tables have `deleted_at` column
-- Queries filter `WHERE deleted_at IS NULL`
-- Permanent deletion possible if needed
-
-**Indexing Strategy**:
-- Foreign keys indexed for JOIN performance
-- Boolean columns indexed (is_published, active)
-- Timestamp columns indexed (for range queries)
-- Text search columns indexed if needed
-
----
-
-## Backup & Recovery
-
-### Backup Strategy
-```bash
-# Full backup
-pg_dump dpp_db > backup_$(date +%Y%m%d).sql
-
-# Restore backup
-psql dpp_db < backup_20260504.sql
-```
-
-### Point-in-Time Recovery
-- WAL (Write-Ahead Logging) enabled for PITR
-- Backups retained for 30 days (configurable)
-
----
-
-## Performance Monitoring
-
-### Query Analysis
-```sql
--- Find slow queries
-SELECT query, mean_time, calls 
-FROM pg_stat_statements 
-ORDER BY mean_time DESC 
-LIMIT 10;
-```
-
-### Index Usage
-```sql
--- Check unused indexes
-SELECT schemaname, tablename, indexname 
-FROM pg_stat_user_indexes 
-WHERE idx_scan = 0;
-```
-
----
-
-## Maintenance Tasks
-
-### Vacuum & Analyze
-```sql
--- Remove dead rows and update statistics
-VACUUM ANALYZE;
-```
-
-### Index Maintenance
-```sql
--- Rebuild fragmented indexes
-REINDEX TABLE digital_product_passports;
-```
-
----
-
-## Related Documentation
-
-- [LOCAL.md](../deployment/LOCAL.md) - Local database setup
-- [DATABASE.md](../infrastructure/DATABASE.md) - Database infrastructure
-- [configuration-files.md](../configuration/configuration-files.md) - Database configuration variables
-- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - User authentication and roles
-- [din-spec-99100-import-guide.md](../reference/din-spec-99100-import-guide.md) - Passport data schema
-- [DATABASE_INDEX.md](./DATABASE_INDEX.md) - Database documentation index
-
----
-
-**[← Back to Docs](../README.md)**
-
----
-
-## Next Steps
-
-- See [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for system design
-- See [DATA_FLOW.md](../architecture/DATA_FLOW.md) for data movement
-- See [api/ENDPOINTS.md](../api/ENDPOINTS.md) for API reference
-
+- Do not manually recreate dynamic passport tables; let the backend create them from active `passport_types`.
+- Do not reintroduce removed company policy columns. Use `company_dpp_policies.default_granularity` and `allow_granularity_override`.
+- Do not rely on plaintext `access_key` or `device_api_key` values in `passport_registry`; current startup hardening nulls those fields after hashing.
+- Use `schema_migrations` for one-time startup migrations that must not be repeated.
+- Use backup and audit integrity docs for operational retention and verification procedures.

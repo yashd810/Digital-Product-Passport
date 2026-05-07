@@ -199,8 +199,8 @@ nano .env.prod
 # Database
 DB_HOST=postgres
 DB_PORT=5432
-DB_NAME=dpp_db
-DB_USER=dpp_user
+DB_NAME=dpp_system
+DB_USER=postgres
 DB_PASSWORD=your_strong_password_here
 
 # API
@@ -215,7 +215,6 @@ VITE_PUBLIC_VIEWER_URL=https://viewer.claros-dpp.online
 
 # JWT
 JWT_SECRET=your-secure-random-secret-key-here-min-32-chars
-JWT_EXPIRY=24h
 
 # Email (optional)
 SMTP_HOST=smtp.gmail.com
@@ -372,10 +371,10 @@ cat > /opt/backup-dpp.sh << 'EOF'
 #!/bin/bash
 BACKUP_DIR="/backups/dpp"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/dpp_db_$TIMESTAMP.sql"
+BACKUP_FILE="$BACKUP_DIR/dpp_system_$TIMESTAMP.sql"
 
 docker-compose -f /opt/apps/Digital-Product-Passport/docker-compose.yml \
-  exec -T postgres pg_dump -U dpp_user dpp_db > "$BACKUP_FILE"
+  exec -T postgres pg_dump -U postgres dpp_system > "$BACKUP_FILE"
 
 # Compress
 gzip "$BACKUP_FILE"
@@ -394,7 +393,7 @@ chmod +x /opt/backup-dpp.sh
 
 **Manual backup**:
 ```bash
-docker-compose exec postgres pg_dump -U dpp_user dpp_db > backup_$(date +%Y%m%d).sql
+docker-compose exec postgres pg_dump -U postgres dpp_system > backup_$(date +%Y%m%d).sql
 ```
 
 ### Log Rotation
@@ -554,7 +553,7 @@ docker-compose ps postgres
 docker-compose logs postgres
 
 # Verify database credentials
-docker-compose exec postgres psql -U dpp_user -d dpp_db -c "SELECT 1;"
+docker-compose exec postgres psql -U postgres -d dpp_system -c "SELECT 1;"
 ```
 
 ### SSL Certificate Issues
@@ -583,7 +582,7 @@ docker stats
 docker-compose logs backend-api
 
 # Optimize database
-docker-compose exec postgres vacuumdb -U dpp_user -d dpp_db -f
+docker-compose exec postgres vacuumdb -U postgres -d dpp_system -f
 ```
 
 ### Connection Refused
@@ -680,7 +679,7 @@ sudo systemctl enable unattended-upgrades
 ls -lah /backups/dpp/
 
 # Restore from backup
-docker-compose exec -T postgres psql -U dpp_user -d dpp_db < /backups/dpp/dpp_db_TIMESTAMP.sql
+docker-compose exec -T postgres psql -U postgres -d dpp_system < /backups/dpp/dpp_system_TIMESTAMP.sql
 ```
 
 ### Server Restoration
@@ -700,14 +699,14 @@ If entire server fails:
 
 ```bash
 # Analyze and vacuum
-docker-compose exec postgres psql -U dpp_user -d dpp_db << EOF
+docker-compose exec postgres psql -U postgres -d dpp_system << EOF
 ANALYZE;
 VACUUM ANALYZE;
-REINDEX DATABASE dpp_db;
+REINDEX DATABASE dpp_system;
 EOF
 
 # Check slow queries
-docker-compose exec postgres psql -U dpp_user -d dpp_db << EOF
+docker-compose exec postgres psql -U postgres -d dpp_system << EOF
 SELECT query, mean_time, calls 
 FROM pg_stat_statements 
 ORDER BY mean_time DESC 
@@ -780,4 +779,3 @@ For issues or questions:
 - [production-domain-and-did-setup.md](production-domain-and-did-setup.md) - Domain and DID configuration
 - [DEPLOYMENT_INSTRUCTIONS.md](DEPLOYMENT_INSTRUCTIONS.md) - Authentication fixes
 - [deploy-scripts.md](deploy-scripts.md) - Automated deployment scripts
-

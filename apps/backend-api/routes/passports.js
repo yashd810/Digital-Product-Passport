@@ -189,8 +189,8 @@ module.exports = function registerPassportRoutes(app, {
   async function getCompanyDppPolicy(companyId) {
     const result = await pool.query(
       `SELECT c.id,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS default_granularity,
-              COALESCE(p.allow_granularity_override, NOT COALESCE(c.granularity_locked, false)) AS allow_granularity_override,
+              COALESCE(p.default_granularity, 'item') AS default_granularity,
+              COALESCE(p.allow_granularity_override, false) AS allow_granularity_override,
               COALESCE(p.mint_model_dids, true) AS mint_model_dids,
               COALESCE(p.mint_item_dids, true) AS mint_item_dids,
               COALESCE(p.mint_facility_dids, false) AS mint_facility_dids,
@@ -544,7 +544,7 @@ module.exports = function registerPassportRoutes(app, {
   }
 
   function isFullRepresentationRequest(value) {
-    return ["expanded", "full"].includes(String(value || "").trim().toLowerCase());
+    return String(value || "").trim().toLowerCase() === "full";
   }
 
   async function loadCompanySerializationContext(companyId) {
@@ -552,8 +552,8 @@ module.exports = function registerPassportRoutes(app, {
       `SELECT c.id,
               c.company_name,
               c.did_slug,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS dpp_granularity,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS default_granularity
+              COALESCE(p.default_granularity, 'item') AS dpp_granularity,
+              COALESCE(p.default_granularity, 'item') AS default_granularity
        FROM companies c
        LEFT JOIN company_dpp_policies p ON p.company_id = c.id
        WHERE c.id = $1
@@ -1328,7 +1328,7 @@ module.exports = function registerPassportRoutes(app, {
         statusSql = "";
       } else if (statusFilter === "released") {
         statusSql = ` AND release_status = 'released'`;
-      } else if (statusFilter === "in_revision" || statusFilter === "revised") {
+      } else if (statusFilter === "in_revision") {
         statusSql = ` AND release_status IN ${IN_REVISION_STATUSES_SQL}`;
       } else {
         statusSql = ` AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
@@ -1456,7 +1456,7 @@ module.exports = function registerPassportRoutes(app, {
         return res.json(
           buildExpandedPassportPayload(resolved.passport, typeDef.rows[0], {
             company,
-            granularity: company?.default_granularity || company?.dpp_granularity || resolved.passport.granularity || "model"
+            granularity: company?.default_granularity || resolved.passport.granularity || "model"
           })
         );
       }
@@ -2055,7 +2055,7 @@ module.exports = function registerPassportRoutes(app, {
         await pool.query(
           `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
-          [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+          [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.signatureAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
         );
         await logAudit(companyId, req.user.userId, "SIGN_PASSPORT", "passport_signatures", dppId, null, {
           version_number: released.version_number,
@@ -2722,7 +2722,7 @@ module.exports = function registerPassportRoutes(app, {
             await pool.query(
               `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
-              [dppId, releasedRow.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+              [dppId, releasedRow.version_number, sigData.dataHash, sigData.signature, sigData.signatureAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
             await logAudit(companyId, userId, "SIGN_PASSPORT", "passport_signatures", dppId, null, {
               version_number: releasedRow.version_number,

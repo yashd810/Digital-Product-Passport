@@ -56,7 +56,7 @@ did:web:www.claros-dpp.online:did:company:acme-energy
 **Data:**
 - Public key(s) for verifying company signatures
 - Company metadata (name, location, contact)
-- Cryptographic algorithm version (RS256, ES256)
+- Cryptographic algorithm version (ES256)
 
 **Stored in:** `companies` table with `did_web` column
 
@@ -202,7 +202,7 @@ Passport Instance (UUID-based, stored in type table)
   │
   ├─ Signature
   │  ├─ canonical_json (JCS-formatted content)
-  │  ├─ signature (RS256 or ES256)
+  │  ├─ signature (ES256)
   │  ├─ public_key_id (reference to issuer key)
   │  └─ signature_date
   │
@@ -225,7 +225,7 @@ Passport UUID: 72b99c83-952c-4179-96f6-54a513d39dbc
   └─ Archived versions
 ```
 
-**Version tracking:** `passport_versions` table with timestamps and change notes
+**Version tracking:** current versions live on the dynamic passport table, with released/archive snapshots in `passport_archives` and public visibility flags in `passport_history_visibility`.
 
 ## Passport Signatures
 
@@ -254,7 +254,6 @@ Canonical (sorted, no spaces):
 
 | Algorithm | Type | Key Size | Usage |
 | --- | --- | --- | --- |
-| RS256 | RSA | 2048 bits | Legacy/standard |
 | ES256 | ECDSA | 256 bits | Modern, smaller keys |
 
 **Selection:** Determined by `passport_signing_keys.algorithm_version`
@@ -372,7 +371,7 @@ SERVER_URL                  # Internal server URL
 # Signing keys
 PRIVATE_KEY_PATH            # Path to /app/resources/dpp-keys/private.pem
 PUBLIC_KEY_PATH             # Path to /app/resources/dpp-keys/public.pem
-SIGNING_ALGORITHM           # RS256 or ES256
+SIGNING_ALGORITHM           # ES256
 ```
 
 **Per-Company DID Controls:**
@@ -382,7 +381,7 @@ DID generation behavior is configurable per company via `company_dpp_policies`:
 ```json
 {
   "company_id": "...",
-  "dpp_signature_algorithm": "RS256",
+  "dpp_signature_algorithm": "ES256",
   "dpp_granularity": "item",
   "public_url_pattern": "dpp/{company}/{product}/{id}"
 }

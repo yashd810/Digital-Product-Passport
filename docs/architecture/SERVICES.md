@@ -84,7 +84,7 @@ Defined in `docker/docker-compose.yml`.
 | `/dashboard/*` | Frontend dashboard | Requires user session |
 | `/admin/*` | Frontend dashboard | Requires super-admin role |
 | `/create/*`, `/edit/*` | Frontend dashboard | Requires editor/admin access |
-| `/passport/*`, `/dpp/*`, `/p/*` | Dashboard or public viewer | Public released views, plus authenticated preview routes |
+| `/dpp/*`, `/p/*` | Dashboard or public viewer | Public released views, plus authenticated preview routes |
 | `/api/*` | Backend API | JSON REST endpoints |
 | `/api/v1/*` | Backend API | Standards-oriented DPP API surface |
 | `/did/*`, `/.well-known/did.json`, `/resolve` | Backend API | DID documents and resolution |

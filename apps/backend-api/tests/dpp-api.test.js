@@ -195,7 +195,7 @@ function createTestApp(options = {}) {
     id: 1,
     companyId: 5,
     lineageId: releasedPassport.lineage_id,
-    previousDppId: "dpp_legacy_model",
+    previousDppId: "dpp_model_previous",
     replacementDppId: releasedPassport.dppId,
     previousIdentifier: "did:web:www.example.test:did:battery:model:c5-bat-2026-001-abcdef123456",
     replacementIdentifier: releasedPassport.product_identifier_did,
@@ -267,7 +267,7 @@ function createTestApp(options = {}) {
             passport_dpp_id: releasedPassport.dppId,
             company_id: releasedPassport.company_id,
             product_identifier: releasedPassport.product_identifier_did,
-            dpp_id: "did:web:www.example.test:did:dpp:item:legacy",
+            dpp_id: "did:web:www.example.test:did:dpp:item:fixture",
             registry_name: "local",
             status: "registered",
             registered_at: "2026-04-27T11:00:00.000Z",
@@ -307,13 +307,13 @@ function createTestApp(options = {}) {
       if (
         normalizedSql.includes("SET deleted_at = NOW()")
         && normalizedSql.includes("WHERE guid = $1")
-        && normalizedSql.includes("release_status IN ('draft', 'in_revision', 'revised')")
+        && normalizedSql.includes("release_status IN ('draft', 'in_revision')")
       ) {
         return { rows: editablePassport ? [{ dpp_id: editablePassport.dppId }] : [] };
       }
-      if (normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("release_status IN ('draft', 'in_revision', 'revised')")) {
+      if (normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("release_status IN ('draft', 'in_revision')")) {
         return {
-          rows: editablePassport && ["draft", "in_revision", "revised"].includes(editablePassport.release_status)
+          rows: editablePassport && ["draft", "in_revision"].includes(editablePassport.release_status)
             ? [editablePassport]
             : [],
         };
@@ -391,8 +391,8 @@ function createTestApp(options = {}) {
       digitalProductPassportId: passport.dppId,
       uniqueProductIdentifier: passport.product_identifier_did || passport.product_id,
       localProductId: passport.product_id,
-      subjectDid: "did:web:www.example.test:did:battery:item:legacy",
-      dppDid: "did:web:www.example.test:did:dpp:item:legacy",
+      subjectDid: "did:web:www.example.test:did:battery:item:fixture",
+      dppDid: "did:web:www.example.test:did:dpp:item:fixture",
       companyDid: "did:web:www.example.test:did:company:5",
       contentSpecificationIds: ["claros_battery_dictionary_v1"],
       lastUpdate: passport.updated_at || passport.created_at || "2026-04-27T10:00:00.000Z",
@@ -421,8 +421,8 @@ function createTestApp(options = {}) {
       digitalProductPassportId: passport.dppId,
       uniqueProductIdentifier: passport.product_identifier_did || passport.product_id,
       localProductId: passport.product_id,
-      subjectDid: "did:web:www.example.test:did:battery:item:legacy",
-      dppDid: "did:web:www.example.test:did:dpp:item:legacy",
+      subjectDid: "did:web:www.example.test:did:battery:item:fixture",
+      dppDid: "did:web:www.example.test:did:dpp:item:fixture",
       companyDid: "did:web:www.example.test:did:company:5",
       contentSpecificationIds: ["claros_battery_dictionary_v1"],
       lastUpdate: passport.updated_at || passport.created_at || "2026-04-27T10:00:00.000Z",
@@ -493,8 +493,8 @@ function createTestApp(options = {}) {
     dppIdentity: {
       buildCanonicalPublicUrl: () => "https://app.example.test/dpp/acme/battery/BAT-2026-001",
       companyDid: (companyId) => `did:web:www.example.test:did:company:${companyId}`,
-      productModelDid: () => "did:web:www.example.test:did:battery:model:legacy",
-      dppDid: () => "did:web:www.example.test:did:dpp:item:legacy",
+      productModelDid: () => "did:web:www.example.test:did:battery:model:fixture",
+      dppDid: () => "did:web:www.example.test:did:dpp:item:fixture",
       facilityDid: (facilityId) => `did:web:www.example.test:did:facility:${facilityId}`,
       platformDid: () => "did:web:www.example.test",
       parseDid: (value) => {
@@ -525,7 +525,7 @@ function createTestApp(options = {}) {
       }
       return Object.keys(data);
     },
-    isEditablePassportStatus: (status) => ["draft", "in_revision", "revised"].includes(status),
+    isEditablePassportStatus: (status) => ["draft", "in_revision"].includes(status),
     logAudit: jest.fn(async () => {}),
     accessRightsService: {
       canReadElement: jest.fn(async ({ user, elementIdPath }) => {
@@ -617,14 +617,14 @@ describe("DPP standards API", () => {
     expect(response.body.passport.localProductId).toBe("BAT-NEW-001");
   });
 
-  test("POST /api/v1/dpps returns expanded elements when representation=expanded is requested", async () => {
+  test("POST /api/v1/dpps returns full elements when representation=full is requested", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "post",
       path: "/api/v1/dpps",
       query: {
-        representation: "expanded",
+        representation: "full",
       },
       body: {
         passportType: "battery",
@@ -698,7 +698,7 @@ describe("DPP standards API", () => {
         productId: "BAT-2026-001",
       },
       query: {
-        representation: "expanded",
+        representation: "full",
       },
     });
 
@@ -718,7 +718,7 @@ describe("DPP standards API", () => {
     );
   });
 
-  test("GET /api/v1/dppsByProductId/:productId still accepts representation=full as a backwards-compatible alias", async () => {
+  test("GET /api/v1/dppsByProductId/:productId accepts representation=full for full DPP payloads", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
@@ -775,7 +775,7 @@ describe("DPP standards API", () => {
       },
       query: {
         date: "2026-04-28T00:00:00.000Z",
-        representation: "expanded",
+        representation: "full",
       },
     });
 
@@ -821,7 +821,7 @@ describe("DPP standards API", () => {
     });
   });
 
-  test("removes the old product lookup GET routes", () => {
+  test("does not register removed product lookup GET routes", () => {
     const app = createTestApp();
 
     expect(() => findRouteLayer(app, "get", "/api/dpp/by-product/:productId")).toThrow(
@@ -837,7 +837,7 @@ describe("DPP standards API", () => {
     expect(findRouteLayer(app, "get", "/api/v1/dppsByProductIdAndDate/:productId").length).toBeGreaterThan(0);
   });
 
-  test("removes the old /api/v1/dppsByIdAndDate/:dppId route", () => {
+  test("does not register removed /api/v1/dppsByIdAndDate/:dppId route", () => {
     const app = createTestApp();
 
     expect(() => findRouteLayer(app, "get", "/api/v1/dppsByIdAndDate/:dppId")).toThrow(
@@ -949,7 +949,7 @@ describe("DPP standards API", () => {
     });
   });
 
-  test("removes the old /api/v1/dppIdsByProductIds route", () => {
+  test("does not register removed /api/v1/dppIdsByProductIds route", () => {
     const app = createTestApp();
 
     expect(() => findRouteLayer(app, "post", "/api/v1/dppIdsByProductIds")).toThrow(
@@ -1147,7 +1147,7 @@ describe("DPP standards API", () => {
     });
   });
 
-  test("PATCH /api/v1/dpps/:dppId returns expanded elements when representation=full is requested", async () => {
+  test("PATCH /api/v1/dpps/:dppId returns full elements when representation=full is requested", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {

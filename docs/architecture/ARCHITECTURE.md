@@ -60,7 +60,7 @@ Important route groups:
 | `/dashboard/*` | Authenticated user dashboard |
 | `/admin/*` | Super-admin pages |
 | `/create/:passportType`, `/edit/:dppId` | Passport creation/editing |
-| `/passport/*`, `/dpp/*`, `/p/*` | Consumer and technical passport views |
+| `/dpp/*`, `/p/*` | Consumer and technical passport views |
 | `/dictionary/battery/v1/*` | Battery dictionary browser |
 
 `ProtectedRoute` and `AdminRoute` guard authenticated areas. `useSessionAuth` owns local session state, user state, selected company, and logout/update handlers.

@@ -71,7 +71,7 @@ The OpenAPI folder contains the complete API specification for the Claros DPP (D
 - All 7+ endpoints with method details
 - Authentication requirements (Bearer JWT, API Key)
 - Content negotiation patterns (JSON, JSON-LD)
-- Representation formats (compressed, expanded)
+- Representation formats (compressed, full)
 - Error responses and status codes
 - Complete curl examples for each scenario
 
@@ -215,8 +215,7 @@ docker run -p 8080:8080 -e SPEC_URL=file:///dpp-api-v1.yaml \
 ### Representation Options
 
 - **Compressed** - `?representation=compressed` (compact payload)
-- **Expanded** - `?representation=expanded` (prEN 18223 format)
-- **Full** - `?representation=full` (backward-compatible alias)
+- **Full** - `?representation=full` (prEN 18223 format)
 
 ---
 
@@ -231,8 +230,8 @@ curl "http://localhost:3001/api/v1/dpps/BATTERY-12345"
 # 2. Read specific element
 curl "http://localhost:3001/api/v1/dpps/{dppId}/elements/$.manufacturer"
 
-# 3. Verify in expanded format
-curl "http://localhost:3001/api/v1/dpps/BATTERY-12345?representation=expanded"
+# 3. Verify in full format
+curl "http://localhost:3001/api/v1/dpps/BATTERY-12345?representation=full"
 ```
 
 ### Pattern 2: Create → Update → Register
@@ -318,7 +317,7 @@ curl "http://localhost:3001/api/v1/dpps/SHARED-ID?companyId=1"
 
 ## Related Documentation
 
-- [API Overview](../api/README.md) - API documentation hub
+- [API Overview](../api/ENDPOINTS.md) - API documentation hub
 - [Passport Representations](../api/passport-representations.md) - Format specifications
 - [DID Resolution](../api/did-resolution.md) - Identifier resolution
 - [Authentication](../security/AUTHENTICATION.md) - Auth implementation details

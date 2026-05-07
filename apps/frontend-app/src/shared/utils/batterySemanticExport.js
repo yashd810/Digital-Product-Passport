@@ -1,4 +1,4 @@
-const BATTERY_PASS_PASSPORT_TYPE = "din_spec_99100";
+const BATTERY_PASS_PASSPORT_TYPE = "battery";
 const BATTERY_PASS_MODEL_KEY = "claros_battery_dictionary_v1";
 const BATTERY_CONTEXT_URL = "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld";
 
@@ -66,7 +66,7 @@ function shouldUseBatteryDictionary(passportType, options = {}) {
   if (isBatteryUmbrellaCategory(options.umbrellaCategory)) return true;
   const modelKey = normalizeSemanticModelKey(options.semanticModelKey);
   if (modelKey === BATTERY_PASS_MODEL_KEY) return true;
-  if (modelKey) return isBatteryPassExportType(passportType);
+  if (modelKey) return false;
   return isBatteryPassExportType(passportType);
 }
 

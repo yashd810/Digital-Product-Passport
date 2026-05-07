@@ -54,7 +54,6 @@ The Claros DPP administration documentation provides comprehensive reference for
 4. **API Administration**
    - Company policy retrieval (GET)
    - Policy updates (PUT)
-   - Legacy support (PATCH)
    - Super admin authorization
 
 ---
@@ -69,7 +68,7 @@ The Claros DPP administration documentation provides comprehensive reference for
 - Related code files and implementations
 - What the policy controls
 - Database schema (company_dpp_policies table)
-- API endpoints (GET, PUT, PATCH)
+- API endpoints (GET, PUT)
 - Configuration requirements
 - Field validation rules
 - Implementation details
@@ -89,7 +88,6 @@ The Claros DPP administration documentation provides comprehensive reference for
 **API Endpoints Documented:**
 - GET /api/admin/companies/{company_id}/dpp-policy
 - PUT /api/admin/companies/{company_id}/dpp-policy
-- PATCH /api/admin/companies/{company_id}/dpp-policy (legacy)
 
 **Database Elements:**
 - Table: company_dpp_policies
@@ -239,7 +237,6 @@ The Claros DPP administration documentation provides comprehensive reference for
 **Endpoints:**
 - GET: Retrieve company policy
 - PUT: Update full policy (replaces all fields)
-- PATCH: Update partial policy (legacy, field mapping)
 
 **Authentication:**
 - Bearer token required
@@ -286,12 +283,11 @@ The Claros DPP administration documentation provides comprehensive reference for
 
 ### Database & API
 - [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) - Database schema including company_dpp_policies table
-- [admin-routes.md](../api/admin-routes.md) - Admin API endpoints
-- [API_INDEX.md](../api/API_INDEX.md) - Complete API reference
+- [admin-endpoints.md](../api/admin-endpoints.md) - Admin API endpoints
+- [ENDPOINTS.md](../api/ENDPOINTS.md) - Complete API reference
 
 ### Passport & Data
 - [passport-representations.md](../api/passport-representations.md) - Passport data models and fields
-- [din-spec-99100-import-guide.md](../reference/din-spec-99100-import-guide.md) - Passport specification
 - [did-resolution.md](../api/did-resolution.md) - DID generation and resolution
 
 ### Development & Integration

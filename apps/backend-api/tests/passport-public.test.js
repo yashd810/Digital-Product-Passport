@@ -174,7 +174,7 @@ function createTestApp(options = {}) {
           rows: [{
             key_id: "test-key-001",
             public_key: "-----BEGIN PUBLIC KEY-----\nTEST\n-----END PUBLIC KEY-----",
-            algorithm: "ECDSA-SHA256",
+            algorithm: "ES256",
             algorithm_version: "ES256",
             created_at: "2026-04-29T10:00:00.000Z",
           }],
@@ -184,7 +184,7 @@ function createTestApp(options = {}) {
         return {
           rows: [{
             key_id: "test-key-001",
-            algorithm: "ECDSA-SHA256",
+            algorithm: "ES256",
             algorithm_version: "ES256",
             created_at: "2026-04-29T10:00:00.000Z",
           }],
@@ -202,8 +202,8 @@ function createTestApp(options = {}) {
     getTable: (passportType) => `${passportType}_passports`,
     normalizePassportRow: (row) => row,
     normalizeProductIdValue: (value) => String(value || "").trim(),
-    buildCurrentPublicPassportPath: () => "/passport/acme-energy/bat-2026-001",
-    buildInactivePublicPassportPath: () => "/passport/acme-energy/bat-2026-001/v/2",
+    buildCurrentPublicPassportPath: () => "/dpp/acme-energy/battery-pack/bat-2026-001",
+    buildInactivePublicPassportPath: () => "/dpp/inactive/acme-energy/battery-pack/bat-2026-001/2",
     stripRestrictedFieldsForPublicView: async (row) => row,
     getCompanyNameMap: async () => new Map([["5", "Acme Energy"]]),
     resolveReleasedPassportByProductId: options.resolveReleasedPassportByProductId || (async () => ({ passport })),
@@ -268,7 +268,7 @@ describe("passport public routes", () => {
     expect(response.body.elements).toBeUndefined();
   });
 
-  test("GET /api/passports/:dppId/canonical with representation=full returns expanded elements", async () => {
+  test("GET /api/passports/:dppId/canonical with representation=full returns full elements", async () => {
     const { app, passport } = createTestApp();
 
     const response = await invokeRoute(app, {
@@ -294,7 +294,7 @@ describe("passport public routes", () => {
     );
   });
 
-  test("GET /api/passports/:dppId/canonical also accepts representation=expanded", async () => {
+  test("GET /api/passports/:dppId/canonical treats representation=expanded as compressed", async () => {
     const { app, passport } = createTestApp();
 
     const response = await invokeRoute(app, {
@@ -305,15 +305,8 @@ describe("passport public routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body.fields).toBeUndefined();
-    expect(response.body.elements).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          elementId: "batteryMass",
-          objectType: "SingleValuedDataElement",
-        }),
-      ])
-    );
+    expect(response.body.elements).toBeUndefined();
+    expect(response.body.fields).toEqual(expect.objectContaining({ battery_mass: 450 }));
   });
 
   test("GET /api/signing-key returns trust metadata and retained historical keys", async () => {

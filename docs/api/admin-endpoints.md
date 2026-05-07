@@ -651,7 +651,7 @@ Enable/disable asset management features for a company.
 
 ## DPP Policy (Company-Specific Settings)
 
-See [company-granularity-policy.md](company-granularity-policy.md) for complete DPP policy documentation.
+See [company-granularity-policy.md](../admin/company-granularity-policy.md) for complete DPP policy documentation.
 
 ---
 
@@ -898,4 +898,3 @@ Example error response:
   "error": "Failed to create passport type"
 }
 ```
-

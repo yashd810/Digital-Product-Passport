@@ -19,7 +19,7 @@ function createResponse() {
   };
 }
 
-describe("auth middleware API key migration", () => {
+describe("auth middleware", () => {
   const originalRequireMfa = process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA;
 
   afterEach(() => {
@@ -153,35 +153,62 @@ describe("auth middleware API key migration", () => {
     expect(verify).toHaveBeenNthCalledWith(2, "fresh-token", "test");
   });
 
-  test("upgrades legacy SHA-256 API keys to salted HMAC-SHA256 after a successful auth", async () => {
-    const rawKey = "dpp_legacy_key_for_tests";
-    const legacyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
-    const calls = [];
+  test("rejects JWTs that do not carry a session version", async () => {
+    const pool = {
+      query: jest.fn(),
+    };
+
+    const { authenticateToken } = createAuthMiddleware({
+      jwt: {
+        verify: jest.fn(() => ({ userId: 9 })),
+      },
+      crypto,
+      pool,
+      JWT_SECRET: "test",
+      SESSION_COOKIE_NAME: "sid",
+    });
+
+    const req = {
+      headers: {
+        authorization: "Bearer token-value",
+      },
+    };
+    const res = createResponse();
+    let nextCalled = false;
+
+    await authenticateToken(req, res, () => {
+      nextCalled = true;
+    });
+
+    expect(nextCalled).toBe(false);
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({ error: "Session is no longer valid" });
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test("authenticates salted HMAC-SHA256 API keys by prefix", async () => {
+    const rawKey = "dpp_modern_key_for_tests";
+    const keySalt = "0123456789abcdef0123456789abcdef";
+    const keyHash = crypto.createHmac("sha256", keySalt).update(rawKey).digest("hex");
 
     const pool = {
       query: jest.fn(async (sql, params = []) => {
-        calls.push({ sql: String(sql), params });
         if (String(sql).includes("FROM api_keys") && String(sql).includes("WHERE key_prefix = $1")) {
-          return { rows: [] };
-        }
-        if (String(sql).includes("FROM api_keys") && String(sql).includes("WHERE key_hash = $1")) {
+          expect(params).toEqual([rawKey.slice(0, 16)]);
           return {
             rows: [{
               id: 7,
               company_id: 5,
               scopes: ["dpp:read"],
-            expires_at: null,
-            key_hash: legacyHash,
-            key_prefix: null,
-            key_salt: null,
-            hash_algorithm: "sha256",
-            economic_operator_identifier: "did:web:www.example.test:did:company:5",
-            economic_operator_identifier_scheme: "did",
-          }],
-        };
-      }
-        if (String(sql).includes("UPDATE api_keys") && String(sql).includes("SET key_hash = $1")) {
-          return { rows: [] };
+              expires_at: null,
+              key_hash: keyHash,
+              key_prefix: rawKey.slice(0, 16),
+              key_salt: keySalt,
+              hash_algorithm: "hmac_sha256",
+              economic_operator_identifier: "did:web:www.example.test:did:company:5",
+              economic_operator_identifier_scheme: "did",
+            }],
+          };
         }
         if (String(sql).includes("UPDATE api_keys SET last_used_at = NOW()")) {
           return { rows: [] };
@@ -226,13 +253,6 @@ describe("auth middleware API key migration", () => {
       economicOperatorIdentifier: "did:web:www.example.test:did:company:5",
       economicOperatorIdentifierScheme: "did",
     });
-
-    const upgradeCall = calls.find(({ sql }) => sql.includes("SET key_hash = $1"));
-    expect(upgradeCall).toBeTruthy();
-    expect(upgradeCall.params[1]).toBe(rawKey.slice(0, 16));
-    expect(upgradeCall.params[2]).toMatch(/^[a-f0-9]{32}$/);
-    expect(upgradeCall.params[3]).toBe("hmac_sha256");
-    expect(upgradeCall.params[5]).toBe(legacyHash);
   });
 
   test("requireEditor blocks controlled-data changes when MFA is required but not verified", async () => {

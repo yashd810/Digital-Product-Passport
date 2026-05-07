@@ -68,7 +68,7 @@ Server-side checks still happen on every protected endpoint; frontend route guar
 
 ## Public Passport View Flow
 
-1. User opens a public URL such as `/dpp/:manufacturerSlug/:modelSlug/:productId` or `/passport/:productId`.
+1. User opens a public URL such as `/dpp/:manufacturerSlug/:modelSlug/:productId`.
 2. Public viewer routes render `ConsumerPage` or `PassportViewerPage`.
 3. Viewer code calls public backend routes such as `/api/passports/by-product/:productId`, `/api/passports/:dppId`, history, signature, DID, and dynamic-value endpoints.
 4. Backend confirms the passport/version is public, released, or otherwise viewable.

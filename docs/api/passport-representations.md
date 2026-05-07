@@ -12,7 +12,7 @@ Code/files:
 Supported representations:
 - Operational/public JSON from `GET /api/passports/by-product/:productId`
 - Canonical JSON from `GET /api/passports/:dppId/canonical`
-- Standards expanded JSON from `GET /api/v1/dppsByProductId/:productId?representation=expanded`
+- Standards full JSON from `GET /api/v1/dppsByProductId/:productId?representation=full`
 - JSON-LD from `GET /api/passports/:dppId?format=semantic`
 - VC with proof metadata from `GET /api/passports/:dppId/signature`
 
@@ -21,21 +21,19 @@ Content negotiation matrix:
   - `Accept: application/json` -> JSON payload
   - `Accept: application/ld+json` -> JSON-LD payload when JSON-LD export is enabled for the company
   - `?representation=compressed` -> compressed operational/public DPP shape
-  - `?representation=expanded` -> prEN 18223-style expanded payload with DPP header plus `elements[]`
-  - `?representation=full` -> accepted as a backward-compatible alias for `expanded`
+  - `?representation=full` -> prEN 18223-style full payload with DPP header plus `elements[]`
 - Standards routes such as `GET /api/v1/dppsByProductId/:productId` and `GET /api/v1/dppsByProductIdAndDate/:productId`:
   - `Accept: application/json` -> JSON payload
   - `Accept: application/ld+json` -> JSON-LD payload
   - `?representation=compressed` -> compressed standards payload
-  - `?representation=expanded` -> expanded standards payload
-  - `?representation=full` -> accepted as a backward-compatible alias for `expanded`
+  - `?representation=full` -> full standards payload
 - Browser/resolver entrypoints such as `GET /resolve?did=...` and the public DID resolution routes:
   - `Accept: text/html` -> redirect to the public passport HTML page or company page
   - `Accept: application/json` or `Accept: application/did+ld+json` -> DID document or JSON resolution target
 
 Example request:
 ```http
-GET /api/v1/dppsByProductId/BAT-2026-001?representation=expanded
+GET /api/v1/dppsByProductId/BAT-2026-001?representation=full
 ```
 
 Example response:
@@ -63,12 +61,11 @@ Configuration requirements:
 - `APP_URL`
 - battery dictionary artifacts present for JSON-LD export
 
-Migration notes:
+Representation notes:
 - Canonical JSON preserves numeric, boolean, object, and array typing.
 - `uniqueProductIdentifier` is the globally unique public identifier, currently represented by the canonical DID-based product identifier.
 - `localProductId` is the company/business-scoped product serial previously exposed as `product_id`.
-- `representation=expanded` is the preferred standards-facing query option for the prEN 18223-style `elements[]` export on `/api/v1/dppsByProductId/:productId`.
-- `representation=full` is still accepted as a backward-compatible alias where expanded payloads were previously exposed.
+- `representation=full` is the standards-facing query option for the prEN 18223-style `elements[]` export on `/api/v1/dppsByProductId/:productId`.
 - Public page responses now include `linked_data` pointers used to emit hidden JSON-LD metadata on the consumer page.
 
 Patch semantics:
@@ -88,4 +85,4 @@ Batch lookup semantics:
 
 Field naming:
 - Standards-facing DPP payloads use `lastUpdate` as the canonical external timestamp field.
-- Internal database rows still use `updated_at`; legacy `lastUpdated` inputs should be mapped to `lastUpdate` before leaving the API boundary.
+- Internal database rows use `updated_at`; `lastUpdated` inputs should be mapped to `lastUpdate` before leaving the API boundary.

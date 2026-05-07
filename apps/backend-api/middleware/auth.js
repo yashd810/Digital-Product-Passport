@@ -18,44 +18,8 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   const API_KEY_PREFIX_LENGTH = 16;
 
   const getApiKeyPrefix = (rawKey) => String(rawKey || "").slice(0, API_KEY_PREFIX_LENGTH);
-  const hashLegacyApiKey = (rawKey) => crypto.createHash("sha256").update(String(rawKey || "")).digest("hex");
-  const hashApiKeyWithSalt = (rawKey, salt, algorithm = "hmac_sha256") => {
-    if (algorithm === "hmac_sha256" && salt) {
-      return crypto.createHmac("sha256", String(salt)).update(String(rawKey || "")).digest("hex");
-    }
-    return hashLegacyApiKey(rawKey);
-  };
-  const buildApiKeyHashRecord = (rawKey) => {
-    const keySalt = crypto.randomBytes(16).toString("hex");
-    return {
-      keyPrefix: getApiKeyPrefix(rawKey),
-      keySalt,
-      hashAlgorithm: "hmac_sha256",
-      keyHash: crypto.createHmac("sha256", keySalt).update(String(rawKey || "")).digest("hex"),
-    };
-  };
-  const needsApiKeyUpgrade = (rawKey, row) => {
-    if (!row) return false;
-    if (row.hash_algorithm !== "hmac_sha256") return true;
-    if (!row.key_salt) return true;
-    return row.key_prefix !== getApiKeyPrefix(rawKey);
-  };
-  const scheduleApiKeyUpgrade = (rawKey, row) => {
-    if (!needsApiKeyUpgrade(rawKey, row)) return;
-    const upgraded = buildApiKeyHashRecord(rawKey);
-    pool.query(
-      `UPDATE api_keys
-       SET key_hash = $1,
-           key_prefix = $2,
-           key_salt = $3,
-           hash_algorithm = $4
-       WHERE id = $5
-         AND key_hash = $6`,
-      [upgraded.keyHash, upgraded.keyPrefix, upgraded.keySalt, upgraded.hashAlgorithm, row.id, row.key_hash]
-    ).catch((err) => {
-      logger.error({ err, keyId: row.id }, "API key migration upgrade failed");
-    });
-  };
+  const hashApiKeyWithSalt = (rawKey, salt) =>
+    crypto.createHmac("sha256", String(salt)).update(String(rawKey || "")).digest("hex");
 
   const parseCookies = (req) => {
     const raw = req.headers.cookie || "";
@@ -127,6 +91,9 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       if (!payload) {
         return res.status(403).json({ error: "Invalid or expired token" });
       }
+      if (payload.sessionVersion === undefined || payload.sessionVersion === null) {
+        return res.status(401).json({ error: "Session is no longer valid" });
+      }
       const currentUserRes = await pool.query(
         `SELECT u.id, u.email, u.company_id, u.role, u.is_active, u.session_version, u.two_factor_enabled,
                 c.economic_operator_identifier, c.economic_operator_identifier_scheme
@@ -142,7 +109,6 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
 
       const currentUser = currentUserRes.rows[0];
       if (
-        payload.sessionVersion !== undefined &&
         Number(payload.sessionVersion) !== Number(currentUser.session_version || 1)
       ) {
         return res.status(401).json({ error: "Session is no longer valid" });
@@ -235,27 +201,10 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
           [keyPrefix]
         );
         matchedRow = prefixed.rows.find((row) => {
-          const computed = hashApiKeyWithSalt(key, row.key_salt, row.hash_algorithm);
+          if (row.hash_algorithm !== "hmac_sha256" || !row.key_salt) return false;
+          const computed = hashApiKeyWithSalt(key, row.key_salt);
           return computed === row.key_hash;
         }) || null;
-        if (matchedRow) scheduleApiKeyUpgrade(key, matchedRow);
-      }
-
-      if (!matchedRow) {
-        const legacyHash = hashLegacyApiKey(key);
-        const legacy = await pool.query(
-          `SELECT ak.id, ak.company_id, ak.scopes, ak.expires_at, ak.key_hash, ak.key_prefix, ak.key_salt, ak.hash_algorithm,
-                  c.economic_operator_identifier, c.economic_operator_identifier_scheme
-           FROM api_keys ak
-           LEFT JOIN companies c ON c.id = ak.company_id
-           WHERE key_hash = $1
-             AND ak.is_active = true
-             AND (ak.expires_at IS NULL OR ak.expires_at > NOW())
-           LIMIT 1`,
-          [legacyHash]
-        );
-        matchedRow = legacy.rows[0] || null;
-        if (matchedRow) scheduleApiKeyUpgrade(key, matchedRow);
       }
 
       if (!matchedRow) return res.status(401).json({ error: "Invalid or revoked API key." });

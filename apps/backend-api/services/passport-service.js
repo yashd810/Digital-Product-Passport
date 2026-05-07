@@ -4,9 +4,9 @@ const nodeCrypto = require("crypto");
 const logger = require("./logger");
 const canonicalizeJson = require("./json-canonicalization");
 
-const IN_REVISION_STATUSES_SQL       = `('in_revision','revised')`;
-const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','in_revision','revised')`;
-const REVISION_BLOCKING_STATUSES_SQL = `('draft','in_revision','revised','in_review')`;
+const IN_REVISION_STATUSES_SQL       = `('in_revision')`;
+const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','in_revision')`;
+const REVISION_BLOCKING_STATUSES_SQL = `('draft','in_revision','in_review')`;
 const EDIT_SESSION_TIMEOUT_HOURS     = 12;
 const EDIT_SESSION_TIMEOUT_SQL       = `${EDIT_SESSION_TIMEOUT_HOURS} hours`;
 const LIVE_PASSPORT_SYSTEM_COLUMNS = new Set([

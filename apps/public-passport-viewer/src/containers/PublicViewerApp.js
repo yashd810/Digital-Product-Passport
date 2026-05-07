@@ -28,13 +28,8 @@ export default function PublicViewerApp() {
         <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId/technical/*" element={<PassportViewer />} />
         <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId" element={<ConsumerPage />} />
 
-        <Route path="/passport/inactive/:productId/:versionNumber/technical/*" element={<PassportViewer />} />
-        <Route path="/passport/inactive/:productId/:versionNumber" element={<ConsumerPage />} />
-        <Route path="/passport/:productId/technical/*" element={<PassportViewer />} />
-        <Route path="/passport/:productId" element={<ConsumerPage />} />
-
-        <Route path="/" element={<Navigate to="/passport/not-found" replace />} />
-        <Route path="/passport/not-found" element={<NotFound />} />
+        <Route path="/" element={<Navigate to="/p/not-found" replace />} />
+        <Route path="/p/not-found" element={<NotFound />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

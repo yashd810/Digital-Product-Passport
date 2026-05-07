@@ -6,7 +6,6 @@ const batteryCategoryRules = require("../resources/semantics/battery/v1/category
 const { buildCarrierAuthenticityResponseFields } = require("../helpers/carrier-authenticity");
 const {
   BATTERY_DICTIONARY_MODEL_KEY,
-  LEGACY_BATTERY_PASSPORT_TYPE,
   shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
 } = require("./battery-dictionary-targeting");
 
@@ -78,7 +77,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     if (normalized === "invalid") return "Invalid";
     if (normalized === "obsolete") return "Inactive";
     if (normalized === "inactive") return "Inactive";
-    if (["draft", "in_review", "in_revision", "revised"].includes(normalized)) return "Inactive";
+    if (["draft", "in_review", "in_revision"].includes(normalized)) return "Inactive";
     return "Invalid";
   }
 
@@ -923,7 +922,6 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       options.granularity
       || findHeaderAliasValue(passport || {}, HEADER_FIELD_ALIASES.granularity)
       || passport?.granularity
-      || company?.dpp_granularity
       || "model"
     ).trim().toLowerCase() || "model";
     const companySlug = company?.did_slug

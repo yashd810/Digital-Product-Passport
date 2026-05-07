@@ -79,10 +79,6 @@ function createLocalStorageService(options) {
       const absolutePath = absolutePathForKey(storageKey);
       await fs.promises.rm(absolutePath, { force: true }).catch(() => {});
     },
-    async deleteLegacyPath(filePath) {
-      if (!filePath) return;
-      await fs.promises.rm(path.resolve(filePath), { force: true, recursive: true }).catch(() => {});
-    },
     getPublicUrl(storageKey) {
       return publicUrlForKey(storageKey);
     },
@@ -194,7 +190,6 @@ function createS3StorageService(options) {
         Key: storageKey
       }));
     },
-    async deleteLegacyPath() {},
     async fetchObject(storageKey) {
       const response = await s3.send(new GetObjectCommand({
         Bucket: bucket,
@@ -301,9 +296,8 @@ function createStorageService(options) {
         cacheControl: "public, max-age=31536000, immutable"
       });
     },
-    async deleteStoredFile({ storageKey, filePath }) {
+    async deleteStoredFile({ storageKey }) {
       if (storageKey) return service.deleteObject(storageKey);
-      if (filePath && service.deleteLegacyPath) return service.deleteLegacyPath(filePath);
     },
     getLocalAbsolutePath(storageKey) {
       if (!service.isLocal || !service.resolveAbsolutePath) return null;

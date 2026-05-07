@@ -284,9 +284,9 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: claros_dpp
-      DB_USER: claros_user
-      DB_PASSWORD: claros_password_dev
+      DB_NAME: dpp_system
+      DB_USER: postgres
+      DB_PASSWORD: postgres
       NODE_ENV: development
       JWT_SECRET: your-jwt-secret-here
       SERVER_URL: http://localhost:3001
@@ -323,9 +323,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: claros_dpp
-      POSTGRES_USER: claros_user
-      POSTGRES_PASSWORD: claros_password_dev
+      POSTGRES_DB: dpp_system
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -454,9 +454,9 @@ Containers discover each other by service name:
 const pgConnection = new Pool({
   host: 'postgres',     // Service name from docker-compose.yml
   port: 5432,
-  database: 'claros_dpp',
-  user: 'claros_user',
-  password: 'claros_password_dev'
+  database: 'dpp_system',
+  user: 'postgres',
+  password: 'postgres'
 });
 
 // Frontend connecting to API

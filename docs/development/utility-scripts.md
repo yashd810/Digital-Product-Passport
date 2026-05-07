@@ -46,9 +46,9 @@ These scripts need database access. Ensure:
 # Environment variables set
 export DB_HOST="localhost"
 export DB_PORT="5432"
-export DB_USER="claros_user"
-export DB_PASSWORD="claros_password_dev"
-export DB_NAME="claros_dpp"
+export DB_USER="postgres"
+export DB_PASSWORD="postgres"
+export DB_NAME="dpp_system"
 
 # Or use .env file in project root
 ```

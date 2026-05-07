@@ -37,7 +37,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "companies",
         purpose: "Tenant master record, Asset Management switch, DID slug, and economic-operator identity.",
-        columns: ["id", "company_name", "is_active", "asset_management_enabled", "asset_management_revoked_at", "dpp_granularity", "granularity_locked", "did_slug", "economic_operator_identifier", "economic_operator_identifier_scheme", "created_at", "updated_at"],
+        columns: ["id", "company_name", "is_active", "asset_management_enabled", "asset_management_revoked_at", "did_slug", "economic_operator_identifier", "economic_operator_identifier_scheme", "created_at", "updated_at"],
       },
       {
         name: "company_dpp_policies",
@@ -99,11 +99,6 @@ export const CORE_DATABASE_TABLES = [
         name: "product_identifier_lineage",
         purpose: "Tracks successor/transition relationships when product identifiers or granularity change.",
         columns: ["id", "company_id", "old_product_identifier", "new_product_identifier", "old_granularity", "new_granularity", "reason", "created_by", "created_at"],
-      },
-      {
-        name: "din_spec_99100_passports",
-        purpose: "Example generated passport table currently present in the database. Every active passport type gets its own `<type>_passports` table with these lifecycle columns plus one column per configured field.",
-        columns: ["id", "dpp_id", "lineage_id", "company_id", "model_name", "product_id", "product_identifier_did", "release_status", "version_number", "qr_code", "granularity", "compliance_profile_key", "content_specification_ids", "carrier_policy_key", "carrier_authenticity", "economic_operator_id", "facility_id", "created_by", "updated_by", "created_at", "updated_at", "deleted_at", "...dynamic field columns from the passport type schema"],
       },
       {
         name: "passport_edit_sessions",
@@ -334,7 +329,7 @@ export const BACKEND_API_FAMILIES = [
       "Returns the public passport payload with public fields only by default.",
       "Unlocks restricted field groups when a valid passport access key is provided.",
       "Serves canonical passport payloads, signatures, signing-key metadata, DID documents, DID resolution, scan logging, security reports, public dynamic-value endpoints, and DPP JSON-LD contexts.",
-      "Current DID documents are lineage/stable-ID based; older company/product DID URLs redirect to the canonical DID document URLs.",
+      "Current DID documents are lineage/stable-ID based; numeric company/product DID URLs redirect to the canonical DID document URLs.",
     ],
   },
   {
@@ -406,7 +401,7 @@ export const BACKEND_API_FAMILIES = [
     route: "/api/dictionary/battery/v1/* and /dictionary/battery/v1/*",
     details: [
       "Serves the Claros battery dictionary context, manifest, categories, units, field maps, category rules, and term details.",
-      "Feeds the public, user-dashboard, and admin-dashboard dictionary browser plus semantic export guidance for DIN SPEC 99100 style fields.",
+      "Feeds the public, user-dashboard, and admin-dashboard dictionary browser plus semantic export guidance for battery passport fields.",
       "Also exposes static JSON-LD/context aliases without requiring login.",
     ],
   },
@@ -696,7 +691,7 @@ export const PUBLIC_AND_LIVE_API_TABLE = {
     ["Get current signing key", "GET /api/signing-key", "No auth", "No body", "The active public signing key metadata."],
     ["Get DID document", "GET /.well-known/did.json", "No auth", "No body", "A DID document that helps outside verifiers validate released passport signatures."],
     ["Resolve DID", "GET /resolve?did=did:web:...", "No auth", "Accept header decides browser redirect or DID document redirect", "Universal resolver for platform, company, battery model/batch/item, DPP, and facility DIDs."],
-    ["DID documents", "GET /did/company/:slug/did.json, /did/battery/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities. Legacy numeric/product routes redirect to stable-ID versions."],
+    ["DID documents", "GET /did/company/:slug/did.json, /did/battery/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities. Numeric/product routes redirect to stable-ID versions."],
     ["DPP JSON-LD context", "GET /contexts/dpp/v1", "No auth", "No body", "JSON-LD context for DPP linked-data payloads."],
     ["Record scan", "POST /api/passports/:dppId/scan", "No auth", "Optional scan metadata", "Stores public scan event telemetry."],
     ["Read scan stats", "GET /api/passports/:dppId/scan-stats", "No auth", "No body", "Returns aggregate scan information."],
@@ -787,7 +782,6 @@ export const ADMIN_PLATFORM_API_TABLE = {
     ["Enable or disable Asset Management for a company", "PATCH /api/admin/companies/:companyId/asset-management", "Session cookie or bearer token and super-admin role", "{ enabled: true or false }", "Turns the company's Asset Management access on or off."],
     ["Grant or revoke company type access", "POST /api/admin/company-access and DELETE /api/admin/company-access/:companyId/:typeId", "Session cookie or bearer token and super-admin role", "{ companyId, passportTypeId } for POST", "Controls which companies can use which passport types."],
     ["Manage global symbols", "GET /api/symbols, GET /api/symbols/categories, POST /api/admin/symbols, DELETE /api/admin/symbols/:id", "Session cookie or bearer token; create/delete require super-admin role", "Multipart file for POST", "Manages global reusable symbols visible to form authors."],
-    ["Migrate repository symbols", "POST /api/admin/migrate-symbols", "Session cookie or bearer token and super-admin role", "No body", "Backfills legacy repository symbol records into the global symbols library."],
     ["List system analytics", "GET /api/admin/analytics", "Session cookie or bearer token and super-admin role", "No body", "Reads system-wide company and passport metrics."],
     ["Read company analytics", "GET /api/admin/companies/:companyId/analytics", "Session cookie or bearer token and super-admin role", "No body", "Reads one tenant's analytics and user distribution."],
     ["Change a tenant user's role", "PATCH /api/admin/users/:userId/role", "Session cookie or bearer token and super-admin role", "{ role }", "Support operation for tenant user role adjustments from admin analytics."],

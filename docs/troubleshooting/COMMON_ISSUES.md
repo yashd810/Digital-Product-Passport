@@ -288,7 +288,7 @@ docker-compose ps postgres
 docker-compose logs postgres
 
 # Verify database is accessible
-psql -h localhost -U claros_user -d claros_dpp -c "SELECT version();"
+psql -h localhost -U postgres -d dpp_system -c "SELECT version();"
 ```
 
 **Deployment Procedure**:
@@ -348,9 +348,9 @@ docker-compose logs postgres
 **2. Verify Connection Credentials**
 ```bash
 # Test with psql directly
-psql -h localhost -U claros_user -d claros_dpp -W
+psql -h localhost -U postgres -d dpp_system -W
 
-# Enter password: claros_password_dev
+# Enter the password from DB_PASSWORD
 
 # If connection succeeds, credentials are correct
 ```
@@ -434,7 +434,7 @@ lsof -i -P -n | grep LISTEN
 **1. Check Database Performance**
 ```sql
 -- Enable slow query logging
-ALTER DATABASE claros_dpp SET log_min_duration_statement = 1000;
+ALTER DATABASE dpp_system SET log_min_duration_statement = 1000;
 
 -- View slow queries
 SELECT query, calls, mean_exec_time 
@@ -443,12 +443,13 @@ ORDER BY mean_exec_time DESC
 LIMIT 10;
 ```
 
-**2. Add Indexes**
+**2. Check Existing Indexes Before Adding New Ones**
 ```sql
--- Create missing indexes
-CREATE INDEX idx_passport_workspace ON digital_product_passports(workspace_id);
-CREATE INDEX idx_passport_published ON digital_product_passports(is_published)
-  WHERE is_published = true;
+EXPLAIN ANALYZE
+SELECT *
+FROM passport_registry
+WHERE company_id = 1
+ORDER BY created_at DESC;
 ```
 
 **3. Check API Logs**
@@ -482,7 +483,7 @@ docker-compose exec backend-api npm run db:migrate
 
 **Q: How do I access the database directly?**
 ```bash
-docker-compose exec postgres psql -U claros_user claros_dpp
+docker-compose exec postgres psql -U postgres dpp_system
 ```
 
 **Q: How do I view logs for a specific service?**

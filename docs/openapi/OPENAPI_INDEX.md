@@ -117,7 +117,7 @@ The Claros DPP (Digital Product Passport) OpenAPI specification (version 2026-04
 - `companyId` (query, optional) - Company identifier
 - `representation` (query, optional) - Payload representation format
 
-**Response:** Passport payload in compressed or expanded format
+**Response:** Passport payload in compressed or full format
 
 **Content Negotiation:**
 - `Accept: application/json` - Returns JSON
@@ -125,8 +125,7 @@ The Claros DPP (Digital Product Passport) OpenAPI specification (version 2026-04
 
 **Representation Formats:**
 - `compressed` - Compact payload form
-- `expanded` - prEN 18223-style header + `elements[]` array
-- `full` - Backward-compatible alias for expanded
+- `full` - Standards full representation with DPP header and `elements[]`
 
 ---
 
@@ -221,13 +220,12 @@ The API supports multiple content representation formats based on `Accept` heade
 | Format | Header | Query Parameter | Description |
 |--------|--------|-----------------|-------------|
 | **JSON** | `Accept: application/json` | `representation=compressed` | Compact JSON payload |
-| **JSON-LD** | `Accept: application/ld+json` | `representation=expanded` | Linked Data format |
-| **Expanded** | - | `representation=expanded` | prEN 18223 header + elements array |
-| **Legacy** | - | `representation=full` | Backward-compatible alias for expanded |
+| **JSON-LD** | `Accept: application/ld+json` | `representation=full` | Linked Data full format |
+| **Full** | - | `representation=full` | prEN 18223 header + elements array |
 
 ### Data Elements Array
 
-When using expanded representation, responses include:
+When using full representation, responses include:
 ```yaml
 elements: []  # Array of DPP data elements
 ```
@@ -407,7 +405,7 @@ properties:
 - **In:** query
 - **Required:** false
 - **Type:** string
-- **Allowed Values:** `compressed`, `expanded`, `full`
+- **Allowed Values:** `compressed`, `full`
 
 #### ElementIdPath
 - **Name:** `elementIdPath`
@@ -650,9 +648,9 @@ properties:
    curl -H "Accept: application/ld+json" "http://localhost:3001/api/v1/dpps/product-123"
    ```
 
-3. **Expanded representation**
+3. **Full representation**
    ```bash
-   curl "http://localhost:3001/api/v1/dpps/product-123?representation=expanded"
+   curl "http://localhost:3001/api/v1/dpps/product-123?representation=full"
    ```
 
 4. **Compressed representation**
@@ -783,7 +781,7 @@ properties:
 
 ## Related Documentation
 
-- [API Overview](../api/README.md) - General API documentation
+- [API Overview](../api/ENDPOINTS.md) - General API documentation
 - [Passport Representations](../api/passport-representations.md) - Format details
 - [DID Resolution](../api/did-resolution.md) - Identifier resolution
 - [Data Carrier Authenticity](../api/data-carrier-authenticity.md) - Verification

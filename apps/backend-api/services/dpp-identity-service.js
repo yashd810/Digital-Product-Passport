@@ -264,7 +264,7 @@ function didToDocumentUrl(did) {
  *
  * Pattern: <appUrl>/dpp/<manufacturerSlug>/<modelSlug>/<encodedProductId>
  *
- * Uses product_id (NOT the record ID). Falls back to /passport/<dppId> only if no product_id.
+ * Uses product_id (NOT the record ID). Falls back to the record DPP ID only if no product_id exists.
  *
  * @param {object} passport  - passport row (must have product_id, model_name, dppId, company_id)
  * @param {string} companyName - human-readable company name (used to derive manufacturerSlug)
@@ -273,14 +273,11 @@ function buildCanonicalPublicUrl(passport, companyName) {
   const appUrl = getAppUrl();
 
   const productId = passport.product_id;
-  if (!productId) {
-    // Fallback: record-id-based URL when no product identifier is available
-    return `${appUrl}/passport/${passport.dppId || passport.dpp_id || passport.guid}`;
-  }
+  const routeProductId = productId || passport.dppId || passport.dpp_id || passport.guid;
 
   const manufacturerSlug = slugify(companyName || String(passport.company_id));
-  const modelSlug        = slugify(passport.model_name || productId);
-  const encodedProductId = encodeURIComponent(String(productId));
+  const modelSlug        = slugify(passport.model_name || routeProductId);
+  const encodedProductId = encodeURIComponent(String(routeProductId));
 
   return `${appUrl}/dpp/${manufacturerSlug}/${modelSlug}/${encodedProductId}`;
 }

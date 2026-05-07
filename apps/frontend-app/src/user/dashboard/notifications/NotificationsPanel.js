@@ -99,7 +99,7 @@ function NotificationsPanel({ user }) {
       return;
     }
     if (n.passport_guid) {
-      window.open(`${window.location.origin}/passport/preview/${encodeURIComponent(n.passport_guid)}`, "_blank", "noopener,noreferrer");
+      window.open(`${window.location.origin}/dpp/preview/company/product/${encodeURIComponent(n.passport_guid)}`, "_blank", "noopener,noreferrer");
       return;
     }
   };

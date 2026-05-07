@@ -221,15 +221,15 @@ module.exports = function registerDppApiRoutes(app, {
 
   function getRepresentation(req) {
     const raw = String(req.query.representation || "").trim().toLowerCase();
-    return ["expanded", "full"].includes(raw) ? "expanded" : "compressed";
+    return raw === "full" ? "full" : "compressed";
   }
 
   function getRepresentationFromValue(value) {
-    return ["expanded", "full"].includes(String(value || "").trim().toLowerCase()) ? "expanded" : "compressed";
+    return String(value || "").trim().toLowerCase() === "full" ? "full" : "compressed";
   }
 
   function buildMutationPassportPayload(passport, typeDef, companyName, representationValue) {
-    if (getRepresentationFromValue(representationValue) === "expanded") {
+    if (getRepresentationFromValue(representationValue) === "full") {
       return buildExpandedPassportPayload(passport, typeDef, { companyName });
     }
     return buildCanonicalPassportPayload(passport, typeDef, { companyName });
@@ -237,7 +237,7 @@ module.exports = function registerDppApiRoutes(app, {
 
   async function buildPassportResponse(req, passport, typeDef, companyName) {
     const sanitized = await stripRestrictedFieldsForPublicView(passport, passport.passport_type);
-    if (getRepresentation(req) === "expanded") {
+    if (getRepresentation(req) === "full") {
       return buildExpandedPassportPayload(sanitized, typeDef, { companyName });
     }
     return buildOperationalDppPayload(sanitized, typeDef, {
@@ -757,7 +757,7 @@ module.exports = function registerDppApiRoutes(app, {
       const tableName = getTable(typeRow.type_name);
       const liveParams = [stableId];
       const statusSql = editableOnly ?
-      "release_status IN ('draft', 'in_revision', 'revised')" :
+      "release_status IN ('draft', 'in_revision')" :
       versionNumber !== null && versionNumber !== undefined ?
       "release_status IN ('released', 'obsolete')" :
       "release_status = 'released'";
@@ -974,7 +974,7 @@ module.exports = function registerDppApiRoutes(app, {
          FROM ${tableName}
          WHERE company_id = $2
            AND (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
-           AND release_status IN ('draft', 'in_revision', 'revised')
+           AND release_status IN ('draft', 'in_revision')
            AND deleted_at IS NULL
          ORDER BY version_number DESC, updated_at DESC
          LIMIT 1`,
@@ -1026,7 +1026,7 @@ module.exports = function registerDppApiRoutes(app, {
         `SELECT *
          FROM ${tableName}
          WHERE (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))${companySql}
-           AND release_status IN ('draft', 'in_revision', 'revised')
+           AND release_status IN ('draft', 'in_revision')
            AND deleted_at IS NULL
          ORDER BY version_number DESC, updated_at DESC
          LIMIT 1`,
@@ -1296,7 +1296,7 @@ module.exports = function registerDppApiRoutes(app, {
               c.company_name,
               c.did_slug,
               c.is_active,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'item') AS dpp_granularity
+              COALESCE(p.default_granularity, 'item') AS dpp_granularity
        FROM companies c
        LEFT JOIN company_dpp_policies p ON p.company_id = c.id
        WHERE c.id = $1
@@ -2041,7 +2041,7 @@ module.exports = function registerDppApiRoutes(app, {
          SET deleted_at = NOW(),
              updated_at = NOW()
          WHERE dpp_id = $1
-           AND release_status IN ('draft', 'in_revision', 'revised')
+           AND release_status IN ('draft', 'in_revision')
            AND deleted_at IS NULL
          RETURNING dpp_id`,
         [editable.passport.dppId]

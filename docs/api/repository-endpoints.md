@@ -8,7 +8,6 @@ Comprehensive documentation for company document repository and symbol managemen
 - [Folder Management](#folder-management)
 - [File Management](#file-management)
 - [Symbol Management](#symbol-management)
-- [Symbol Migration](#symbol-migration)
 
 ---
 
@@ -618,81 +617,6 @@ name: "Company Logo - 2025"
 
 ---
 
-## Symbol Migration
-
-Admin function to migrate legacy symbols to company repositories.
-
-### POST /api/admin/migrate-symbols
-
-Migrate all system-wide symbols to individual company repositories.
-
-**Authentication**: Required (Bearer token)  
-**Authorization**: Super admin role required  
-**Rate Limit**: Standard
-
-**Request**
-
-```http
-POST /api/admin/migrate-symbols
-Authorization: Bearer <super-admin-token>
-```
-
-**Response** (200 OK)
-
-```json
-{
-  "success": true,
-  "inserted": 45,
-  "skipped": 15,
-  "symbols": 60,
-  "companies": 10
-}
-```
-
-**Response Fields**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `success` | boolean | Migration completed successfully |
-| `inserted` | number | Count of symbol copies created |
-| `skipped` | number | Count of symbols already present in company repo |
-| `symbols` | number | Total symbols migrated |
-| `companies` | number | Total companies processed |
-
-**Operation**:
-1. Fetches all active symbols from global `symbols` table
-2. For each company, creates repository entries for each symbol
-3. Uses duplicate detection: skips if symbol already exists at that file_url
-4. Auto-detects MIME type based on file extension
-5. Maps extensions: .svg→svg+xml, .png→png, .jpg→jpeg, .webp→webp
-6. Creates repository entries with symbol file_url pointing to original
-
-**MIME Type Mapping**
-
-| Extension | MIME Type |
-|-----------|-----------|
-| .svg | image/svg+xml |
-| .png | image/png |
-| .jpg/.jpeg | image/jpeg |
-| .webp | image/webp |
-| Others | image/png (default) |
-
-**Error Responses**
-
-| Code | Error | Description |
-|------|-------|-------------|
-| 401 | Unauthorized | Missing or invalid authentication token |
-| 403 | Forbidden | Super admin role required |
-| 500 | Internal Error | Migration failed with error message |
-
-**Use Cases**:
-- One-time migration from old symbol system
-- Populate all company repositories after system update
-- Refresh symbol references for existing data
-
-**Idempotent**: Safe to run multiple times (duplicates skipped)
-
----
 
 ## Related Documentation
 

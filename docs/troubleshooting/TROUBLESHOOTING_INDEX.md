@@ -209,7 +209,7 @@ The Claros DPP system troubleshooting guides provide comprehensive solutions for
 **Steps:**
 1. Read [Database Issues](COMMON_ISSUES.md#database-issues)
 2. Verify container is running: `docker-compose ps postgres`
-3. Test credentials: `psql -h localhost -U claros_user -d claros_dpp`
+3. Test credentials: `psql -h localhost -U postgres -d dpp_system`
 4. Check host configuration in .env: `echo $DB_HOST`
 5. Review slow queries: Check pg_stat_statements
 6. Add missing indexes if needed
@@ -295,7 +295,7 @@ docker-compose logs -f backend-api
 docker-compose restart backend-api
 
 # Test database
-psql -h localhost -U claros_user -d claros_dpp
+psql -h localhost -U postgres -d dpp_system
 
 # Check environment
 env | grep -E "JWT|COOKIE|DB_"
@@ -349,7 +349,6 @@ ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 - [docker-compose-files.md](../infrastructure/docker-compose-files.md) - Compose configuration
 
 ### API Documentation
-- [API_INDEX.md](../api/API_INDEX.md) - API endpoints reference
 - [ENDPOINTS.md](../api/ENDPOINTS.md) - Endpoint specifications
 
 ### Architecture

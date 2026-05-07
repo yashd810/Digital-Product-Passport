@@ -59,7 +59,7 @@ Get company configuration, available passport types, and system presets for asse
   },
   "assumptions": {
     "editable_statuses": ["draft", "in_revision"],
-    "dynamic_pushes_do_not_change_passport_versions": true
+    "dynamic_pushes_do_not_create_release_history": true
   }
 }
 ```
@@ -543,4 +543,3 @@ All Asset Management endpoints return consistent error responses:
 | `404` | Not Found - Resource doesn't exist |
 | `429` | Too Many Requests - Rate limit exceeded |
 | `500` | Server Error - Internal server error |
-

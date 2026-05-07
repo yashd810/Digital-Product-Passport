@@ -313,7 +313,6 @@ npm run test
 
 ### API & Data
 - [ENDPOINTS.md](../api/ENDPOINTS.md) - API endpoint reference
-- [din-spec-99100-import-guide.md](../reference/din-spec-99100-import-guide.md) - Data import guide
 - [battery-dictionary.md](../api/battery-dictionary.md) - Field definitions
 
 ### Applications

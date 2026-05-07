@@ -18,7 +18,7 @@ Data files and datasets for the Claros Digital Product Passport project.
 
 ## BatteryPass Data Attributes
 
-Excel file containing the comprehensive list of data attributes for battery passport creation according to EU DIN SPEC 99100 standard.
+Excel file containing the comprehensive list of data attributes for battery passport creation.
 
 ### File Information
 - **Version**: 1.3
@@ -74,9 +74,8 @@ The data attributes from this file are mapped to:
 
 ## Related Documentation
 
-- [din-spec-99100-import-guide.md](./din-spec-99100-import-guide.md) - DIN SPEC 99100 passport data format
 - [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) - Database schema and field mappings
-- [API_INDEX.md](../api/API_INDEX.md) - API endpoints for passport creation
+- [ENDPOINTS.md](../api/ENDPOINTS.md) - API endpoints for passport creation
 - [battery-dictionary.md](../api/battery-dictionary.md) - Battery data attributes
 - [DEVELOPMENT.md](../development/DEVELOPMENT.md) - Development practices
 - [REFERENCE_INDEX.md](./REFERENCE_INDEX.md) - Reference documentation index

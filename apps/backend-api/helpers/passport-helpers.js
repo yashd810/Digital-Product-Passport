@@ -3,7 +3,6 @@
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
 const IN_REVISION_STATUS = "in_revision";
-const LEGACY_IN_REVISION_STATUS = "revised";
 
 const SYSTEM_PASSPORT_FIELDS = new Set([
   "id",
@@ -52,8 +51,7 @@ const getTable = (typeName) => {
 
 // ─── STATUS HELPERS ───────────────────────────────────────────────────────────
 
-const normalizeReleaseStatus = (status) =>
-  status === LEGACY_IN_REVISION_STATUS ? IN_REVISION_STATUS : status;
+const normalizeReleaseStatus = (status) => status;
 
 const isPublicHistoryStatus = (status) => {
   const normalized = normalizeReleaseStatus(status);
@@ -566,7 +564,6 @@ const toDynamicStoredValue = (value) => {
 
 module.exports = {
   IN_REVISION_STATUS,
-  LEGACY_IN_REVISION_STATUS,
   SYSTEM_PASSPORT_FIELDS,
   EDITABLE_PASSPORT_STATUSES,
   getTable,

@@ -7,7 +7,6 @@ module.exports = function registerRepositoryRoutes(app, {
   authenticateToken,
   checkCompanyAccess,
   requireEditor,
-  isSuperAdmin,
   repoUpload,
   repoSymbolUpload,
   REPO_BASE_DIR,
@@ -198,7 +197,7 @@ module.exports = function registerRepositoryRoutes(app, {
             return res.status(400).json({ error: "Stored file path is invalid" });
           }
         }
-        await storageService.deleteStoredFile({ storageKey: row.storage_key, filePath: row.file_path });
+        await storageService.deleteStoredFile({ storageKey: row.storage_key });
       }
 
       await pool.query("DELETE FROM company_repository WHERE id = $1", [row.id]);
@@ -308,49 +307,4 @@ module.exports = function registerRepositoryRoutes(app, {
       }
     }
   );
-
-  app.post("/api/admin/migrate-symbols", authenticateToken, isSuperAdmin, async (req, res) => {
-    try {
-      const [symsRes, companiesRes] = await Promise.all([
-        pool.query("SELECT id, name, file_url FROM symbols WHERE is_active = true"),
-        pool.query("SELECT id FROM companies"),
-      ]);
-      const symbols = symsRes.rows;
-      const companies = companiesRes.rows;
-      const extMime = {
-        ".svg": "image/svg+xml",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".webp": "image/webp",
-      };
-
-      let inserted = 0;
-      let skipped = 0;
-      for (const company of companies) {
-        for (const sym of symbols) {
-          const exists = await pool.query(
-            "SELECT id FROM company_repository WHERE company_id = $1 AND file_url = $2",
-            [company.id, sym.file_url]
-          );
-          if (exists.rows.length) {
-            skipped += 1;
-            continue;
-          }
-          const ext = path.extname(sym.file_url).toLowerCase();
-          const mimeType = extMime[ext] || "image/png";
-          await pool.query(
-            `INSERT INTO company_repository (company_id, parent_id, name, type, file_url, mime_type, created_by)
-             VALUES ($1, NULL, $2, 'file', $3, $4, $5)`,
-            [company.id, sym.name, sym.file_url, mimeType, req.user.userId]
-          );
-          inserted += 1;
-        }
-      }
-      res.json({ success: true, inserted, skipped, symbols: symbols.length, companies: companies.length });
-    } catch (e) {
-      logger.error("Symbol migration error:", e.message);
-      res.status(500).json({ error: `Migration failed: ${e.message}` });
-    }
-  });
 };

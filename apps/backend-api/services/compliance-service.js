@@ -2,7 +2,6 @@
 
 const {
   BATTERY_DICTIONARY_MODEL_KEY,
-  LEGACY_BATTERY_PASSPORT_TYPE,
   shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
 } = require("./battery-dictionary-targeting");
 
@@ -58,7 +57,7 @@ const VALID_UPDATE_AUTHORITIES = new Set([
   "system",
 ]);
 
-const BATTERY_PASS_PASSPORT_TYPE = LEGACY_BATTERY_PASSPORT_TYPE;
+const BATTERY_PASS_PASSPORT_TYPE = "battery";
 const BATTERY_SEMANTIC_MODEL_KEY = BATTERY_DICTIONARY_MODEL_KEY;
 const APPLICABLE_REQUIREMENT_LEVELS = new Set([
   "mandatory_battreg",

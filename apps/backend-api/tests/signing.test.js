@@ -165,7 +165,7 @@ describe("signing service", () => {
       version_number: PASSPORT.version_number,
       data_hash: signed.dataHash,
       signature: signed.signature,
-      algorithm: signed.legacyAlgorithm,
+      algorithm: signed.signatureAlgorithm,
       signing_key_id: signed.keyId,
       released_at: signed.releasedAt,
       signed_at: signed.releasedAt,
@@ -182,7 +182,7 @@ describe("signing service", () => {
     }));
   });
 
-  test("keeps legacy RSA credentials verifiable", async () => {
+  test("rejects RSA signing keys", async () => {
     const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", {
       modulusLength: 2048,
       publicKeyEncoding: { type: "spki", format: "pem" },
@@ -194,26 +194,7 @@ describe("signing service", () => {
     const pool = createMockPool();
     const { signingService } = buildTestHarness(pool);
 
-    await signingService.loadOrGenerateSigningKey();
-    const signed = await signingService.signPassport(PASSPORT, TYPE_DEF);
-
-    expect(signed.signatureAlgorithm).toBe("RS256");
-
-    pool.state.signatures.set(`${PASSPORT.guid}:${PASSPORT.version_number}`, {
-      passport_dpp_id: PASSPORT.guid,
-      version_number: PASSPORT.version_number,
-      data_hash: signed.dataHash,
-      signature: signed.signature,
-      algorithm: "RSA-SHA256",
-      signing_key_id: signed.keyId,
-      released_at: signed.releasedAt,
-      signed_at: signed.releasedAt,
-      vc_json: signed.vcJson,
-    });
-
-    const verification = await signingService.verifyPassportSignature(PASSPORT.guid, PASSPORT.version_number);
-    expect(verification.status).toBe("valid");
-    expect(verification.algorithm).toBe("RS256");
+    await expect(signingService.loadOrGenerateSigningKey()).rejects.toThrow("Expected P-256 EC");
   });
 
   test("produces the same canonical hash for logically identical passport payloads", async () => {

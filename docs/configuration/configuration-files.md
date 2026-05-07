@@ -39,13 +39,12 @@ VITE_PUBLIC_VIEWER_URL=http://localhost:3004
 # Database
 DB_HOST=postgres
 DB_PORT=5432
-DB_USER=claros_user
-DB_PASSWORD=claros_password_dev
-DB_NAME=claros_dpp
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=dpp_system
 
 # Authentication
 JWT_SECRET=your-secret-key-here
-JWT_EXPIRATION=24h
 
 # Features
 DEBUG=true
@@ -69,13 +68,12 @@ VITE_PUBLIC_VIEWER_URL=https://viewer.claros-dpp.online
 # Database
 DB_HOST=localhost
 DB_PORT=5432
-DB_USER=claros_user
+DB_USER=postgres
 DB_PASSWORD=[SECURE_PASSWORD]
-DB_NAME=claros_dpp
+DB_NAME=dpp_system
 
 # Authentication
 JWT_SECRET=[SECURE_SECRET_32_CHARS_MIN]
-JWT_EXPIRATION=24h
 
 # Production Features
 DEBUG=false
@@ -133,7 +131,6 @@ sudo docker-compose -f docker-compose.prod.yml up -d
 
 ### Authentication
 - **JWT_SECRET**: Secret key for JWT signing (min 32 characters)
-- **JWT_EXPIRATION**: Token expiration time (e.g., "24h")
 - **COOKIE_DOMAIN**: Domain for session cookies (production only)
 
 ### Security Features
@@ -178,7 +175,6 @@ sudo docker-compose -f docker-compose.prod.yml up -d
 **JWT authentication fails**:
 ```bash
 # Verify JWT_SECRET is set and matches backend
-# Check JWT_EXPIRATION format
 # Verify token hasn't expired
 ```
 

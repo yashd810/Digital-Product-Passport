@@ -2,7 +2,7 @@
 
 **Last updated**: 2026-05-05  
 **Status**: Complete and verified against codebase  
-**Database Schema Version**: 47 tables (post-legacy-removal)
+**Database Schema Version**: 47 tables
 
 ## Table of Contents
 
@@ -120,40 +120,6 @@ Authorization: Bearer <token>
 - 400: Invalid company ID, Company not found, No policy fields supplied, Invalid field values
 - 500: Failed to update DPP policy
 
-### PATCH - Partially Update Company DPP Policy (Legacy Support)
-```http
-PATCH /api/admin/companies/{company_id}/dpp-policy
-Content-Type: application/json
-Authorization: Bearer <token>
-
-{
-  "dpp_granularity": "batch",
-  "granularity_locked": true
-}
-```
-
-**Note:** PATCH endpoint provides backward compatibility:
-- `dpp_granularity` maps to `default_granularity`
-- `granularity_locked` inverts to `allow_granularity_override` (locked=true → override=false)
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "policy": {
-    "id": 1,
-    "company_id": 7,
-    "default_granularity": "batch",
-    "allow_granularity_override": false,
-    ...
-  }
-}
-```
-
-**Error Responses:**
-- 400: Invalid company ID, Company not found, No fields to update
-- 500: Failed to update DPP policy
-
 ## Configuration Requirements
 
 **Authentication:**
@@ -201,11 +167,9 @@ All boolean fields must be actual boolean values (true/false), not strings.
 - Action type: 'UPDATE_COMPANY_DPP_POLICY'
 - Records old and new values for compliance
 
-**Backward Compatibility:**
-- Legacy `companies.dpp_granularity` column is still updated via PATCH endpoint
-- Legacy `companies.granularity_locked` column is still updated via PATCH endpoint
-- New code uses `company_dpp_policies` table exclusively
-- Both columns updated synchronously to prevent conflicts
+**Policy Storage:**
+- `company_dpp_policies` is the only company granularity policy source
+- Previous company-level granularity columns are dropped during startup schema initialization
 
 ## Enforcement in Passport Creation
 
@@ -222,7 +186,7 @@ When creating new passports:
 - [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Super admin role and permissions
 - [passport-representations.md](../api/passport-representations.md) - Passport data models
 - [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) - Database tables and structure
-- [admin-routes.md](../api/admin-routes.md) - Admin API endpoints
+- [admin-endpoints.md](../api/admin-endpoints.md) - Admin API endpoints
 - [ADMIN_INDEX.md](./ADMIN_INDEX.md) - Admin documentation index
 - [did-resolution.md](../api/did-resolution.md) - DID minting and configuration
 

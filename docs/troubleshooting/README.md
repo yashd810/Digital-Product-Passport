@@ -35,12 +35,6 @@ Comprehensive troubleshooting guide covering:
 
 Includes step-by-step solutions with code examples and verification procedures.
 
-## Archived Documentation
-
-Historical fixes and solutions are archived in [../archive/](../archive/) for reference.
-
----
-
 ## Related Documentation
 
 - [DEVELOPMENT.md](../development/DEVELOPMENT.md) - Development practices and workflows

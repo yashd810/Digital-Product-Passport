@@ -6,7 +6,7 @@ const {
 } = require("../services/battery-pass-export");
 
 describe("battery-pass-export", () => {
-  test("uses the battery dictionary for battery umbrella categories even without the legacy type or semantic model key", () => {
+  test("uses the battery dictionary for battery umbrella categories without requiring a matching type or semantic model key", () => {
     const typeDef = {
       type_name: "ev_battery_passport_custom",
       umbrella_category: "Battery Digital Passport",

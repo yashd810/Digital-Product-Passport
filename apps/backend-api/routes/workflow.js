@@ -334,7 +334,7 @@ module.exports = function registerWorkflowRoutes(app, {
               await pool.query(
                 `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
-                [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+                [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.signatureAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
               );
               await logAudit(
                 wf.company_id,
@@ -439,7 +439,7 @@ module.exports = function registerWorkflowRoutes(app, {
             await pool.query(
               `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
-              [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.legacyAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
+              [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.signatureAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
             );
             await logAudit(
               wf.company_id,

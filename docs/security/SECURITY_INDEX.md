@@ -140,7 +140,7 @@ The Claros DPP security documentation system comprises **12 comprehensive docume
 
 **Key Topics**:
 - JWS (JSON Web Signature) implementation
-- RS256 and ES256 signature algorithms
+- ES256 signature algorithm
 - Certificate and key pair management
 - Signature verification procedures
 - Verifiable Credentials (VC) standards

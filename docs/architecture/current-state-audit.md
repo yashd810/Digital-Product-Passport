@@ -94,7 +94,7 @@ DATABASE_URL            # PostgreSQL connection string
 ```
 
 **Signing Keys:**
-- `/app/resources/dpp-keys/private.pem` - RS256/ES256 private key
+- `/app/resources/dpp-keys/private.pem` - ES256 private key
 - `/app/resources/dpp-keys/public.pem` - Public key for verification
 
 **Object Storage:**
@@ -223,7 +223,7 @@ ENABLE_ACCESS_REVOCATION=true
 
 ### Data Protection
 
-- ✅ Passport signing with RS256/ES256
+- ✅ Passport signing with ES256
 - ✅ Canonical JSON representation for signatures
 - ✅ Encrypted backups to object storage
 - ✅ API rate limiting implemented

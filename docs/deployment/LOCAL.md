@@ -69,9 +69,9 @@ Edit `.env` if needed (defaults work for local development):
 # Database
 DB_HOST=postgres
 DB_PORT=5432
-DB_NAME=dpp_db
-DB_USER=dpp_user
-DB_PASSWORD=dev_password
+DB_NAME=dpp_system
+DB_USER=postgres
+DB_PASSWORD=postgres
 
 # API
 API_PORT=3001
@@ -83,7 +83,6 @@ VITE_PUBLIC_VIEWER_URL=http://localhost:3004
 
 # JWT
 JWT_SECRET=dev-secret-key-change-in-production
-JWT_EXPIRY=24h
 ```
 
 ### 3. Start Services
@@ -162,9 +161,9 @@ npm run dev
 ```
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=dpp_db
-DB_USER=dpp_user
-DB_PASSWORD=dev_password
+DB_NAME=dpp_system
+DB_USER=postgres
+DB_PASSWORD=postgres
 API_PORT=3001
 JWT_SECRET=dev-secret
 NODE_ENV=development
@@ -218,22 +217,22 @@ docker-compose up -d --build marketing-site
 **Connection Details**:
 - Host: localhost
 - Port: 5432
-- Database: dpp_db
-- User: dpp_user
-- Password: dev_password
+- Database: dpp_system
+- User: postgres
+- Password: postgres
 
 **Access database**:
 ```bash
 # Via Docker
-docker-compose exec postgres psql -U dpp_user -d dpp_db
+docker-compose exec postgres psql -U postgres -d dpp_system
 
 # Directly (if PostgreSQL installed locally)
-psql -h localhost -U dpp_user -d dpp_db
+psql -h localhost -U postgres -d dpp_system
 ```
 
 **Create sample data**:
 ```bash
-docker-compose exec postgres psql -U dpp_user -d dpp_db < apps/backend-api/db/seed.sql
+docker-compose exec postgres psql -U postgres -d dpp_system < apps/backend-api/db/seed.sql
 ```
 
 ---
@@ -312,9 +311,9 @@ docker-compose run backend-api npm test
 5. Run tests: `npm test`
 
 **Database Changes**:
-1. Create migration in `apps/backend-api/db/migrations/`
-2. Run migration: `npm run migrate`
-3. Update schema.sql
+1. Update `apps/backend-api/db/init.js` for startup schema changes
+2. Add a `schema_migrations` guarded migration for one-time data changes
+3. Update database docs
 4. Restart backend
 
 ### Testing
@@ -372,7 +371,7 @@ docker-compose exec backend-api node --inspect=0.0.0.0:9229 Server/server.js
 
 ```bash
 # Keep containers, reset data
-docker-compose exec postgres psql -U dpp_user -d dpp_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+docker-compose exec postgres psql -U postgres -d dpp_system -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
 # Or completely remove and restart
 docker-compose down -v
@@ -382,8 +381,8 @@ docker-compose up -d
 ### View Database Schema
 
 ```bash
-docker-compose exec postgres psql -U dpp_user -d dpp_db -c "\dt"
-docker-compose exec postgres psql -U dpp_user -d dpp_db -c "\d digital_product_passports"
+docker-compose exec postgres psql -U postgres -d dpp_system -c "\dt"
+docker-compose exec postgres psql -U postgres -d dpp_system -c "\d passport_registry"
 ```
 
 ### View API Response
@@ -394,7 +393,7 @@ curl http://localhost:3001/api/health
 
 # With auth (after login)
 curl -H "Authorization: Bearer <JWT_TOKEN>" \
-  http://localhost:3001/api/workspaces
+  http://localhost:3001/api/users/me
 ```
 
 ### Check Port Usage
@@ -448,8 +447,7 @@ Digital-Product-Passport/
 
 **JWT**:
 - `JWT_SECRET` - Secret key for signing tokens
-- `JWT_EXPIRY` - Token expiration time (e.g., 24h)
-- `JWT_ALGORITHM` - HS256 or RS256
+- Token lifetime is currently set in the backend auth helper.
 
 **Frontend**:
 - `VITE_API_URL` - Backend API URL
@@ -552,10 +550,10 @@ docker stats
 
 ```bash
 # Analyze query performance
-EXPLAIN ANALYZE SELECT * FROM digital_product_passports;
+EXPLAIN ANALYZE SELECT * FROM passport_registry;
 
 # Rebuild indexes
-REINDEX TABLE digital_product_passports;
+REINDEX TABLE passport_registry;
 
 # Vacuum to reclaim space
 VACUUM ANALYZE;
@@ -655,4 +653,3 @@ npm run build --profile
 - [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - System architecture overview
 - [SERVICES.md](../architecture/SERVICES.md) - Local container services and ports
 - [PROJECT_STRUCTURE.md](../architecture/PROJECT_STRUCTURE.md) - Codebase organization
-

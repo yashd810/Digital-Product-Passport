@@ -266,7 +266,7 @@ test("builds correct slug structure", () => {
   assert.ok(url.includes("/dpp/tesla-energy/model-x/"), `Expected slug path in: ${url}`);
   assert.ok(url.endsWith("MODEL-X"), `Expected encoded productId at end: ${url}`);
 });
-test("falls back to /passport/:dppId when no product_id", () => {
+test("falls back to DPP ID in canonical /dpp route when no product_id", () => {
   const passport = {
     guid:       "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     product_id: null,
@@ -274,7 +274,7 @@ test("falls back to /passport/:dppId when no product_id", () => {
     company_id: 5,
   };
   const url = dppIdentity.buildCanonicalPublicUrl(passport, "Acme Corp");
-  assert.ok(url.includes("/passport/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), `Expected guid fallback: ${url}`);
+  assert.ok(url.includes("/dpp/acme-corp/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"), `Expected guid fallback: ${url}`);
 });
 
 // ─── SUMMARY ─────────────────────────────────────────────────────────────────

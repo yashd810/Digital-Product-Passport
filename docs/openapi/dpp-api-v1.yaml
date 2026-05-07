@@ -10,9 +10,8 @@ info:
     `Accept: application/json` for JSON payloads and
     `Accept: application/ld+json` for JSON-LD payloads. Query
     `representation=compressed` selects the compressed payload form, while
-    `representation=expanded` selects the prEN 18223-style header plus
-    `elements[]` payload. The legacy `representation=full` value remains
-    accepted as an alias for `expanded`.
+    `representation=full` selects the prEN 18223-style header plus
+    `elements[]` payload.
 servers:
   - url: https://www.claros-dpp.online
     description: Production
@@ -325,7 +324,7 @@ paths:
                   type: integer
                 representation:
                   type: string
-                  enum: [compressed, expanded]
+                  enum: [compressed, full]
                 format:
                   type: string
                   enum: [json, jsonld]
@@ -348,7 +347,7 @@ paths:
                 properties:
                   representation:
                     type: string
-                    enum: [compressed, expanded]
+                    enum: [compressed, full]
                   format:
                     type: string
                     enum: [json, jsonld]
@@ -371,7 +370,7 @@ paths:
                 properties:
                   representation:
                     type: string
-                    enum: [compressed, expanded]
+                    enum: [compressed, full]
                   format:
                     type: string
                     enum: [json, jsonld]
@@ -396,12 +395,10 @@ paths:
       tags: [DPP]
       summary: Read the current active/latest released passport by productId
       description: >
-        Standards-conformant productId lookup route. Use `representation=expanded`
-        to receive the prEN 18223-style expanded payload with a Digital Product
+        Standards-conformant productId lookup route. Use `representation=full`
+        to receive the prEN 18223-style full payload with a Digital Product
         Passport header plus `elements[]`. `Accept: application/json` returns
-        JSON, while `Accept: application/ld+json` returns JSON-LD. The legacy
-        `representation=full` value remains accepted as a backward-compatible
-        alias.
+        JSON, while `Accept: application/ld+json` returns JSON-LD.
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/RepresentationQuery'
@@ -666,7 +663,7 @@ components:
       required: true
       schema:
         type: string
-      description: Legacy product identifier parameter used on compatibility routes.
+      description: Product identifier parameter used on product lookup routes.
     DppIdPath:
       name: dppId
       in: path
@@ -698,10 +695,9 @@ components:
       required: false
       schema:
         type: string
-        enum: [compressed, expanded]
+        enum: [compressed, full]
       description: >
-        Use `expanded` for the prEN 18223-style header plus `elements[]` export.
-        The legacy value `full` is also accepted as a backward-compatible alias.
+        Use `full` for the prEN 18223-style header plus `elements[]` export.
     ElementIdPath:
       name: elementIdPath
       in: path
@@ -739,7 +735,7 @@ components:
         lastUpdate:
           type: string
           format: date-time
-          description: Canonical standards-facing timestamp for the latest DPP update. Internal database fields may be named `updated_at`; legacy examples using `lastUpdated` should be mapped to this field at the API boundary.
+          description: Canonical standards-facing timestamp for the latest DPP update. Internal database fields may be named `updated_at`; inputs using `lastUpdated` should be mapped to this field at the API boundary.
         economicOperatorId:
           type: string
           description: Economic operator identifier responsible for the DPP.
@@ -796,7 +792,7 @@ components:
       properties:
         productIdentifier:
           type: string
-          description: Echoes the requested `productId` value for backward-compatible response shape.
+          description: Echoes the requested `productId` value in the response shape.
         found:
           type: boolean
         error:

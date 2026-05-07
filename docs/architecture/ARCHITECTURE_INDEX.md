@@ -131,7 +131,7 @@ Complete reference guide to system architecture, design patterns, and technical 
 - DID structure explanation (company, product, passport DIDs)
 - DID resolution flow and endpoints
 - Passport structure and versioning
-- Signature and cryptography model (RS256, ES256, JCS)
+- Signature and cryptography model (ES256, JCS)
 - Public URL mapping and QR codes
 - Implementation details and code locations
 - Complete resolution flow example

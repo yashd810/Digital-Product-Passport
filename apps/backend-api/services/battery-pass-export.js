@@ -4,7 +4,6 @@ const fs = require("fs");
 const path = require("path");
 const {
   BATTERY_DICTIONARY_MODEL_KEY,
-  LEGACY_BATTERY_PASSPORT_TYPE,
   normalizeSemanticModelKey,
   isBatteryUmbrellaCategory,
   shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
@@ -16,7 +15,7 @@ const clarosBatteryContext = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../resources/semantics/battery/v1/context.jsonld"), "utf8")
 );
 
-const BATTERY_PASS_PASSPORT_TYPE = LEGACY_BATTERY_PASSPORT_TYPE;
+const BATTERY_PASS_PASSPORT_TYPE = "battery";
 const BATTERY_PASS_MODEL_KEY = BATTERY_DICTIONARY_MODEL_KEY;
 const BATTERY_CONTEXT_URL = batteryDictionaryManifest.contextUrl || "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld";
 const CLAROS_CONTEXT_ENTRIES = clarosBatteryContext?.["@context"] || {};

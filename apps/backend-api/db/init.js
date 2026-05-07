@@ -116,14 +116,13 @@ async function truncateTableIfExists(pool, tableName) {
  *
  * Usage:
  *   const { initDb } = require("./db/init");
- *   await initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS, LEGACY_IN_REVISION_STATUS });
+ *   await initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS });
  */
 
 async function initDb(pool, {
   getTable,
   createPassportTable,
   IN_REVISION_STATUS,
-  LEGACY_IN_REVISION_STATUS,
   productIdentifierService,
 }) {
   await pool.query(`SELECT pg_advisory_lock($1)`, [SCHEMA_MIGRATION_LOCK_KEY]);
@@ -150,14 +149,6 @@ async function initDb(pool, {
   await pool.query(`
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS asset_management_revoked_at TIMESTAMPTZ
-  `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS dpp_granularity VARCHAR(20) NOT NULL DEFAULT 'model'
-  `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS granularity_locked BOOLEAN NOT NULL DEFAULT false
   `);
   await pool.query(`
     ALTER TABLE companies
@@ -227,6 +218,11 @@ async function initDb(pool, {
     DROP COLUMN IF EXISTS legacy_semantic_compatibility
   `);
   await pool.query(`
+    ALTER TABLE companies
+    DROP COLUMN IF EXISTS dpp_granularity,
+    DROP COLUMN IF EXISTS granularity_locked
+  `);
+  await pool.query(`
     INSERT INTO company_dpp_policies (
       company_id,
       default_granularity,
@@ -234,11 +230,8 @@ async function initDb(pool, {
     )
     SELECT
       c.id,
-      CASE
-        WHEN c.dpp_granularity IN ('model', 'batch', 'item') THEN c.dpp_granularity
-        ELSE 'item'
-      END,
-      COALESCE(c.granularity_locked, false) = false
+      'item',
+      false
     FROM companies c
     ON CONFLICT (company_id) DO NOTHING
   `);
@@ -1013,6 +1006,7 @@ async function initDb(pool, {
       key_hash     VARCHAR(64)  NOT NULL UNIQUE,
       key_prefix   VARCHAR(16)  NOT NULL,
       key_salt     VARCHAR(64),
+      hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'hmac_sha256',
       scopes       TEXT[]       NOT NULL DEFAULT ARRAY['dpp:read']::text[],
       expires_at   TIMESTAMPTZ,
       created_by   INT REFERENCES users(id) ON DELETE SET NULL,
@@ -1036,6 +1030,10 @@ async function initDb(pool, {
   await pool.query(`
     ALTER TABLE api_keys
     ADD COLUMN IF NOT EXISTS key_salt VARCHAR(64)
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'hmac_sha256'
   `);
   
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
@@ -1230,7 +1228,7 @@ async function initDb(pool, {
       version_number INTEGER      NOT NULL DEFAULT 1,
       data_hash      TEXT         NOT NULL,
       signature      TEXT         NOT NULL,
-      algorithm      VARCHAR(50)  NOT NULL DEFAULT 'RSA-SHA256',
+      algorithm      VARCHAR(50)  NOT NULL DEFAULT 'ES256',
       signing_key_id VARCHAR(64)  NOT NULL,
       released_at    TIMESTAMPTZ  NOT NULL,
       signed_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -1243,23 +1241,14 @@ async function initDb(pool, {
     CREATE TABLE IF NOT EXISTS passport_signing_keys (
       key_id     VARCHAR(64) PRIMARY KEY,
       public_key TEXT        NOT NULL,
-      algorithm  VARCHAR(50) NOT NULL DEFAULT 'RSA-SHA256',
-      algorithm_version VARCHAR(20) NOT NULL DEFAULT 'RS256',
+      algorithm  VARCHAR(50) NOT NULL DEFAULT 'ES256',
+      algorithm_version VARCHAR(20) NOT NULL DEFAULT 'ES256',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     ALTER TABLE passport_signing_keys
-    ADD COLUMN IF NOT EXISTS algorithm_version VARCHAR(20) NOT NULL DEFAULT 'RS256'
-  `);
-  await pool.query(`
-    UPDATE passport_signing_keys
-    SET algorithm_version = CASE
-      WHEN algorithm = 'ECDSA-SHA256' THEN 'ES256'
-      ELSE 'RS256'
-    END
-    WHERE algorithm_version IS NULL
-       OR algorithm_version NOT IN ('RS256', 'ES256')
+    ADD COLUMN IF NOT EXISTS algorithm_version VARCHAR(20) NOT NULL DEFAULT 'ES256'
   `);
 
   // One in-progress draft per super-admin user
@@ -1628,35 +1617,6 @@ async function initDb(pool, {
       WHERE lineage_id IS NULL OR TRIM(lineage_id) = ''
     `);
   });
-
-  try {
-    await runMigration(pool, "2026-04-27.finalize-din-spec-carbon-footprint-column", async (db) => {
-      const legacyDinSpecCol = await db.query(`
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name = 'din_spec_99100_passports'
-          AND column_name = 'carbon_footprint_performance_class'
-        LIMIT 1
-      `);
-
-      if (!legacyDinSpecCol.rows.length) return;
-
-      await db.query(`
-        UPDATE din_spec_99100_passports
-        SET carbon_footprint_label_and_performance_class =
-          COALESCE(NULLIF(TRIM(carbon_footprint_label_and_performance_class), ''), NULLIF(TRIM(carbon_footprint_performance_class), ''))
-        WHERE carbon_footprint_performance_class IS NOT NULL
-      `);
-
-      await db.query(`
-        ALTER TABLE din_spec_99100_passports
-        DROP COLUMN IF EXISTS carbon_footprint_performance_class
-      `);
-    });
-  } catch (e) {
-    logger.warn({ err: e }, "Could not finalize DIN SPEC carbon footprint label/performance-class migration");
-  }
 
   // ── Templates tables ─────────────────────────────────────────────────────
   await pool.query(`

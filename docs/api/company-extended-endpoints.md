@@ -587,7 +587,7 @@ Facility identifiers support multi-site manufacturing tracking:
 
 ### Bulk Import Strategies
 
-**CSV Method**: Best for spreadsheet-based data sources, legacy systems, manual entry
+**CSV Method**: Best for spreadsheet-based data sources, external operational systems, manual entry
 
 **JSON Method**: Best for API integration, programmatic data generation, complex structures
 

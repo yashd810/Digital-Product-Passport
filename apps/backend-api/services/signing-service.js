@@ -18,7 +18,6 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
   function inferKeyAlgorithmVersion(publicKeyPem) {
     const publicKey = crypto.createPublicKey(publicKeyPem);
-    if (publicKey.asymmetricKeyType === "rsa") return "RS256";
     if (publicKey.asymmetricKeyType === "ec") {
       const jwk = publicKey.export({ format: "jwk" });
       if (jwk.crv !== "P-256") {
@@ -26,11 +25,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       }
       return "ES256";
     }
-    throw new Error(`[Signing] Unsupported signing key type "${publicKey.asymmetricKeyType}".`);
-  }
-
-  function toLegacySignatureAlgorithm(algorithmVersion) {
-    return algorithmVersion === "ES256" ? "ECDSA-SHA256" : "RSA-SHA256";
+    throw new Error(`[Signing] Unsupported signing key type "${publicKey.asymmetricKeyType}". Expected P-256 EC for ES256 signing.`);
   }
 
   async function loadOrGenerateSigningKey() {
@@ -70,7 +65,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       [
       _signingKey.keyId,
       _signingKey.publicKey,
-      toLegacySignatureAlgorithm(_signingKey.algorithmVersion),
+      _signingKey.algorithmVersion,
       _signingKey.algorithmVersion]
 
     ).catch(() => {});
@@ -134,8 +129,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       `SELECT c.id,
               c.company_name,
               c.did_slug,
-              c.dpp_granularity,
-              COALESCE(p.default_granularity, c.dpp_granularity, 'model') AS default_granularity,
+              COALESCE(p.default_granularity, 'model') AS default_granularity,
               COALESCE(p.vc_issuance_enabled, true) AS vc_issuance_enabled,
               COALESCE(p.mint_model_dids, true) AS mint_model_dids,
               COALESCE(p.mint_item_dids, true) AS mint_item_dids,
@@ -154,7 +148,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     const company = await loadCompanyForPassport(passport.company_id);
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, {
       company,
-      granularity: passport.granularity || company?.default_granularity || company?.dpp_granularity || "model"
+      granularity: passport.granularity || company?.default_granularity || "model"
     });
     const fields = {};
 
@@ -253,7 +247,6 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       dataHash,
       keyId: _signingKey.keyId,
       signatureAlgorithm: _signingKey.algorithmVersion,
-      legacyAlgorithm: toLegacySignatureAlgorithm(_signingKey.algorithmVersion),
       signedAt: issuedAt,
       document: signedDocument,
       trustMetadata,
@@ -267,9 +260,10 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     const signer = crypto.createSign("SHA256");
     signer.update(`${headerB64}.${payload}`);
     signer.end();
-    const sigB64url = algorithmVersion === "ES256" ?
-    signer.sign({ key: privateKey, dsaEncoding: "ieee-p1363" }, "base64url") :
-    signer.sign(privateKey, "base64url");
+    if (algorithmVersion !== "ES256") {
+      throw new Error(`[Signing] Unsupported signing algorithm "${algorithmVersion}". Expected ES256.`);
+    }
+    const sigB64url = signer.sign({ key: privateKey, dsaEncoding: "ieee-p1363" }, "base64url");
     return `${headerB64}..${sigB64url}`;
   }
 
@@ -306,31 +300,27 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       signature: jws.split(".")[2],
       keyId: _signingKey.keyId,
       signatureAlgorithm: _signingKey.algorithmVersion,
-      legacyAlgorithm: toLegacySignatureAlgorithm(_signingKey.algorithmVersion),
       releasedAt,
       vcJson: JSON.stringify(vcWithProof)
     };
   }
 
   function resolveAlgorithmVersion({ storedAlgorithmVersion, storedAlgorithm, headerAlgorithm, publicKeyPem }) {
-    if (headerAlgorithm === "ES256" || headerAlgorithm === "RS256") return headerAlgorithm;
-    if (storedAlgorithmVersion === "ES256" || storedAlgorithmVersion === "RS256") return storedAlgorithmVersion;
-    if (storedAlgorithm === "ECDSA-SHA256") return "ES256";
-    if (storedAlgorithm === "RSA-SHA256") return "RS256";
+    if (headerAlgorithm === "ES256") return headerAlgorithm;
+    if (storedAlgorithmVersion === "ES256") return storedAlgorithmVersion;
+    if (storedAlgorithm === "ES256") return storedAlgorithm;
     return inferKeyAlgorithmVersion(publicKeyPem);
   }
 
   function verifyJwsSignature({ publicKeyPem, algorithmVersion, signingInput, signature }) {
+    if (algorithmVersion !== "ES256") return false;
     const verifier = crypto.createVerify("SHA256");
     verifier.update(signingInput);
     verifier.end();
-    if (algorithmVersion === "ES256") {
-      return verifier.verify(
-        { key: publicKeyPem, dsaEncoding: "ieee-p1363" },
-        Buffer.from(signature, "base64url")
-      );
-    }
-    return verifier.verify(publicKeyPem, Buffer.from(signature, "base64url"));
+    return verifier.verify(
+      { key: publicKeyPem, dsaEncoding: "ieee-p1363" },
+      Buffer.from(signature, "base64url")
+    );
   }
 
   async function verifyPassportSignature(dppId, versionNumber) {

@@ -175,7 +175,7 @@ describe("backup provider service", () => {
       pool,
       storageService,
       buildCanonicalPassportPayload: (passport) => ({
-        digitalProductPassportId: "did:web:www.example.test:did:dpp:item:legacy",
+        digitalProductPassportId: "did:web:www.example.test:did:dpp:item:fixture",
         uniqueProductIdentifier: passport.product_identifier_did,
       }),
     });
@@ -392,7 +392,7 @@ describe("backup provider service", () => {
         passportDppId: "72b99c83-952c-4179-96f6-54a513d39dbc",
       },
       passport: {
-        digitalProductPassportId: "did:web:www.example.test:did:dpp:item:legacy",
+        digitalProductPassportId: "did:web:www.example.test:did:dpp:item:fixture",
       },
     };
     const storedPayloadHash = require("crypto")
@@ -440,7 +440,7 @@ describe("backup provider service", () => {
       pool,
       storageService,
       buildCanonicalPassportPayload: () => ({
-        digitalProductPassportId: "did:web:www.example.test:did:dpp:item:legacy",
+        digitalProductPassportId: "did:web:www.example.test:did:dpp:item:fixture",
       }),
     });
 
