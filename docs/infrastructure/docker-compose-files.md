@@ -55,9 +55,9 @@ sudo docker-compose -f docker-compose.prod.yml logs -f backend-api
 ## Configuration
 
 ### Environment Variables
-Set in `../config/` directory:
-- `config/.env.local` - Local development
-- `config/.env.production` - Production deployment
+Set in environment files:
+- `docker/.env` - Local Docker Compose values
+- `config/.env.production` - Production deployment values; OCI can override this with `DPP_ENV_FILE=/etc/dpp/dpp.env`
 
 ### Services Defined
 

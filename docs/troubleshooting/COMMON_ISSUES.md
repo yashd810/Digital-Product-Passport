@@ -302,9 +302,9 @@ cd /opt/dpp
 # 3. Pull latest code
 git pull origin main
 
-# 4. Set environment variables if needed
-cp .env.example .env
-# Edit .env with production values
+# 4. Verify production environment file
+# Local template: config/.env.production
+# OCI runtime path: /etc/dpp/dpp.env
 
 # 5. Build services
 sudo docker-compose -f docker-compose.prod.yml build --no-cache

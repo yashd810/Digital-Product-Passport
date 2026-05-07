@@ -98,18 +98,6 @@ async function addPassportRegistryForeignKey(pool, {
   }
 }
 
-async function truncateTableIfExists(pool, tableName) {
-  // Check if table exists before truncating to avoid transaction abort
-  const exists = await pool.query(
-    `SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1`,
-    [tableName]
-  ).catch(() => ({ rows: [] }));
-  
-  if (exists.rows.length > 0) {
-    await pool.query(`TRUNCATE TABLE ${tableName} RESTART IDENTITY CASCADE`).catch(() => {});
-  }
-}
-
 /**
  * Database initialization — creates or alters all tables and indexes.
  * Extracted from server.js to keep startup logic separate from route handling.
@@ -138,6 +126,10 @@ async function initDb(pool, {
       is_active        BOOLEAN NOT NULL DEFAULT true,
       asset_management_enabled BOOLEAN NOT NULL DEFAULT false,
       asset_management_revoked_at TIMESTAMPTZ,
+      did_slug         VARCHAR(160),
+      economic_operator_identifier TEXT,
+      economic_operator_identifier_scheme VARCHAR(80),
+      branding_json    JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -326,6 +318,10 @@ async function initDb(pool, {
       payload_hash        VARCHAR(64),
       payload_json        JSONB NOT NULL DEFAULT '{}'::jsonb,
       error_message       TEXT,
+      verification_status VARCHAR(40) NOT NULL DEFAULT 'pending',
+      verification_error_message TEXT,
+      verified_payload_hash VARCHAR(64),
+      last_verified_at    TIMESTAMPTZ,
       replicated_at       TIMESTAMPTZ,
       created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -393,8 +389,19 @@ async function initDb(pool, {
       role             VARCHAR(50) NOT NULL DEFAULT 'viewer',
       is_active        BOOLEAN NOT NULL DEFAULT true,
       otp_code         VARCHAR(6),
+      otp_code_hash    TEXT,
       otp_expires_at   TIMESTAMPTZ,
       two_factor_enabled BOOLEAN NOT NULL DEFAULT false,
+      session_version  INTEGER NOT NULL DEFAULT 1,
+      avatar_url       TEXT,
+      phone            VARCHAR(50),
+      job_title        VARCHAR(120),
+      bio              TEXT,
+      preferred_language VARCHAR(12) DEFAULT 'en',
+      default_reviewer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      default_approver_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      auth_source      VARCHAR(100) NOT NULL DEFAULT 'local',
+      sso_only         BOOLEAN NOT NULL DEFAULT false,
       last_login_at    TIMESTAMPTZ,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -443,24 +450,6 @@ async function initDb(pool, {
   `);
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id               SERIAL PRIMARY KEY,
-      email            VARCHAR(255) NOT NULL UNIQUE,
-      password_hash    VARCHAR(255) NOT NULL,
-      first_name       VARCHAR(100),
-      last_name        VARCHAR(100),
-      company_id       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-      role             VARCHAR(50) NOT NULL DEFAULT 'viewer',
-      is_active        BOOLEAN NOT NULL DEFAULT true,
-      otp_code         VARCHAR(6),
-      otp_expires_at   TIMESTAMPTZ,
-      two_factor_enabled BOOLEAN NOT NULL DEFAULT false,
-      last_login_at    TIMESTAMPTZ,
-      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await pool.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS otp_code_hash TEXT
   `);
@@ -491,6 +480,10 @@ async function initDb(pool, {
   await pool.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false
+  `);
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1
   `);
   await pool.query(`
     ALTER TABLE users
@@ -618,44 +611,6 @@ async function initDb(pool, {
       OR semantic_model_key = '${BATTERY_DICTIONARY_MODEL_KEY}'
     )
   `);
-  await runMigration(pool, "2026-04-29.reset-passport-domain-data", async (db) => {
-    const typedPassportTables = await db.query(`
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name LIKE '%\\_passports' ESCAPE '\\'
-        AND table_name <> 'passport_types'
-      ORDER BY table_name ASC
-    `).catch(() => ({ rows: [] }));
-
-    for (const { table_name } of typedPassportTables.rows) {
-      await db.query(`DROP TABLE IF EXISTS ${table_name} CASCADE`).catch(() => {});
-    }
-
-    for (const tableName of [
-      "passport_access_grants",
-      "passport_archives",
-      "passport_attachments",
-      "passport_backup_replications",
-      "passport_dynamic_values",
-      "passport_edit_sessions",
-      "passport_history_visibility",
-      "passport_registry",
-      "passport_revision_batch_items",
-      "passport_scan_events",
-      "passport_security_events",
-      "passport_signatures",
-      "passport_workflow",
-      "company_passport_access",
-      "dpp_registry_registrations",
-      "dpp_subject_registry",
-      "passport_type_drafts",
-    ]) {
-      await truncateTableIfExists(db, tableName);
-    }
-
-    await truncateTableIfExists(db, "passport_types");
-  });
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS audit_logs (
@@ -665,8 +620,13 @@ async function initDb(pool, {
       action           VARCHAR(100) NOT NULL,
       table_name       VARCHAR(100),
       record_id        VARCHAR(100),
+      actor_identifier TEXT,
+      audience         VARCHAR(80),
       old_values       JSONB,
       new_values       JSONB,
+      previous_event_hash VARCHAR(64),
+      event_hash       VARCHAR(64),
+      hash_version     SMALLINT NOT NULL DEFAULT 2,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
@@ -779,23 +739,6 @@ async function initDb(pool, {
     )
   `);
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS passport_registry (
-      dpp_id                     TEXT        PRIMARY KEY,
-      lineage_id               TEXT        NOT NULL,
-      company_id               INTEGER     NOT NULL,
-      passport_type            VARCHAR(50) NOT NULL,
-      access_key               VARCHAR(255),
-      access_key_hash          VARCHAR(64),
-      access_key_prefix        VARCHAR(24),
-      access_key_last_rotated_at TIMESTAMPTZ,
-      device_api_key           VARCHAR(255),
-      device_api_key_hash      VARCHAR(64),
-      device_api_key_prefix    VARCHAR(24),
-      device_key_last_rotated_at TIMESTAMPTZ,
-      created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
   await pool.query(`
     ALTER TABLE passport_registry
     ADD COLUMN IF NOT EXISTS lineage_id TEXT
@@ -1378,6 +1321,8 @@ async function initDb(pool, {
       model_name       VARCHAR(255),
       product_id       VARCHAR(255),
       product_identifier_did TEXT,
+      actor_identifier TEXT,
+      snapshot_reason VARCHAR(100),
       release_status   VARCHAR(50),
       row_data         JSONB NOT NULL,
       archived_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,

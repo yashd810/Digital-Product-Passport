@@ -5,8 +5,8 @@ Environment configuration files for local development and production deployment.
 ## Table of Contents
 
 1. [Files Overview](#files-overview)
-2. [Local Development (.env.local)](#local-development-envlocal)
-3. [Production (.env.production)](#production-envproduction)
+2. [Local Development (docker/.env)](#local-development-dockerenv)
+3. [Production (config/.env.production)](#production-configenvproduction)
 4. [Using Configuration Files](#using-configuration-files)
 5. [Environment Variable Reference](#environment-variable-reference)
 6. [Security Best Practices](#security-best-practices)
@@ -18,10 +18,10 @@ Environment configuration files for local development and production deployment.
 
 | File | Purpose | When Needed |
 |------|---------|------------|
-| `.env.local` | Local development environment variables | Local development |
-| `.env.production` | Production environment variables | OCI deployment |
+| `docker/.env` | Local Docker Compose environment variables | Local development |
+| `config/.env.production` | Production environment variables | OCI deployment |
 
-## Local Development (.env.local)
+## Local Development (docker/.env)
 
 Used by Docker Compose for local development.
 
@@ -40,7 +40,7 @@ VITE_PUBLIC_VIEWER_URL=http://localhost:3004
 DB_HOST=postgres
 DB_PORT=5432
 DB_USER=postgres
-DB_PASSWORD=postgres
+DB_PASSWORD=[LOCAL_STRONG_PASSWORD]
 DB_NAME=dpp_system
 
 # Authentication
@@ -51,7 +51,7 @@ DEBUG=true
 REQUIRE_MFA_FOR_CONTROLLED_DATA=false
 ```
 
-## Production (.env.production)
+## Production (config/.env.production)
 
 Used for OCI deployment - NEVER commit actual secrets!
 
@@ -85,11 +85,11 @@ COOKIE_DOMAIN=.claros-dpp.online
 
 ### Local Development
 ```bash
-# Docker Compose automatically uses .env.local
-docker-compose up -d
+# From the repo root, the local compose file reads docker/.env
+docker compose -f docker/docker-compose.yml up -d
 
 # Or specify explicitly
-docker-compose --env-file config/.env.local up -d
+docker compose -f docker/docker-compose.yml --env-file docker/.env up -d
 ```
 
 ### Production (OCI)
@@ -97,15 +97,15 @@ docker-compose --env-file config/.env.local up -d
 # SSH to OCI
 ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 
-# Copy production config
-cp config/.env.production /opt/dpp/.env
+# Copy production config to the server runtime env path
+cp config/.env.production /etc/dpp/dpp.env
 
 # Edit with actual secrets
-nano /opt/dpp/.env
+nano /etc/dpp/dpp.env
 
 # Start services
 cd /opt/dpp
-sudo docker-compose -f docker-compose.prod.yml up -d
+sudo DPP_ENV_FILE=/etc/dpp/dpp.env docker compose -f docker-compose.prod.yml --env-file /etc/dpp/dpp.env up -d
 ```
 
 ## Environment Variable Reference

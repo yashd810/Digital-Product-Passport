@@ -19,4 +19,4 @@ runcmd:
   - mkdir -p /opt/dpp
   - chown ubuntu:ubuntu /opt/dpp
 
-final_message: "OCI VM bootstrap complete. SSH in, copy .env.prod to /opt/dpp, then run /opt/dpp/infra/oracle/bootstrap.sh after cloning the repo."
+final_message: "OCI VM bootstrap complete. SSH in, copy config/.env.production to /etc/dpp/dpp.env, then run /opt/dpp/infra/oracle/bootstrap.sh after cloning the repo."

@@ -120,7 +120,7 @@ Expected response: `200 OK` with notifications array (not 403)
 ./deploy-oci.sh 82.70.54.173 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
 ```backend server
 scp -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key \
-    /Users/yashdesai/Desktop/Passport/Claude/files/files/.env.prod \
+    /Users/yashdesai/Desktop/Passport/Claude/files/files/config/.env.production \
     ubuntu@82.70.54.173:/etc/dpp/dpp.env
 
 # 2. SSH and restart
@@ -129,9 +129,9 @@ ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
 If you're deploying from this repository:
 
 ```bash
-# 1. Copy the corrected .env.prod to OCI
+# 1. Copy the corrected production env to OCI
 scp -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key \
-    /Users/yashdesai/Desktop/Passport/Claude/files/files/.env.prod \
+    /Users/yashdesai/Desktop/Passport/Claude/files/files/config/.env.production \
     ubuntu@79.76.53.122:/etc/dpp/dpp.env
 
 # 2. SSH and restart
@@ -154,15 +154,9 @@ docker logs -f backend-api | grep -E "listening|error|CRITICAL"
 | `DB_HOST` | `postgres` | Docker service name for database connection |
 | `REQUIRE_MFA_FOR_CONTROLLED_DATA` | `true` | Enforce MFA for sensitive operations |
 
-### Existing Production Secrets (Unchanged)
+### Existing Production Secrets
 
-```
-JWT_SECRET=ecefa7dd3bfb1b8ec68bf4c9a5b2b4c1ee898d7ded698f1e9a1ca67693eab91e
-PEPPER_V1=3f798261179b5258e410123fe84e517c1954634441c1daed71920995148215ec
-SESSION_COOKIE_NAME=dpp_session
-COOKIE_SECURE=true
-COOKIE_SAME_SITE=None
-```
+Keep existing production secret values in `/etc/dpp/dpp.env`; do not commit them to the repository.
 
 ---
 
@@ -187,8 +181,7 @@ If anything goes wrong:
 ```bash
 ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.76.53.122
 
-# Revert environment file
-sudo git -C /opt/dpp checkout HEAD -- .env.prod
+# Restore the server environment file from your backup or copy config/.env.production again
 
 # Restart
 cd /opt/dpp

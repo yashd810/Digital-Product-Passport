@@ -124,7 +124,7 @@ cd /opt/dpp && sudo docker-compose -f docker-compose.prod.yml logs -f backend-ap
 
 ## Pre-Deployment Checklist
 
-- [ ] Environment variables configured (.env.prod)
+- [ ] Environment variables configured (`config/.env.production` locally or `/etc/dpp/dpp.env` on OCI)
 - [ ] SSH key permissions correct (chmod 600)
 - [ ] OCI instance running and accessible
 - [ ] Latest code committed and pushed to main branch

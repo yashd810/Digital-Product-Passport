@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_REQUIREMENT_TEXT,
+  validatePasswordPolicy,
+} from "../utils/passwordPolicy";
 import "../styles/Landing.css";
 
 const API = import.meta.env.VITE_API_URL || "";
-const PASSWORD_MIN_LENGTH = 12;
 
 function Register({ setToken, setUser, setCompanyId }) {
   const navigate  = useNavigate();
@@ -68,8 +72,9 @@ function Register({ setToken, setUser, setCompanyId }) {
       return;
     }
 
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+    const passwordPolicyError = validatePasswordPolicy(password);
+    if (passwordPolicyError) {
+      setError(passwordPolicyError);
       return;
     }
 
@@ -238,8 +243,12 @@ function Register({ setToken, setUser, setCompanyId }) {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                minLength={PASSWORD_MIN_LENGTH}
                 disabled={isLoading}
               />
+              <span style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+                {PASSWORD_REQUIREMENT_TEXT}
+              </span>
             </div>
             <div className="form-group">
               <label htmlFor="confirmPassword">Confirm Password</label>

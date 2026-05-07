@@ -59,11 +59,7 @@ cd Digital-Product-Passport
 
 ### 2. Environment Configuration
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` if needed (defaults work for local development):
+Edit `docker/.env` if needed. Defaults work for local development:
 
 ```bash
 # Database

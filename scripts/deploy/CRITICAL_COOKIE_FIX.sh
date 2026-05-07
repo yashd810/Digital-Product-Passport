@@ -5,13 +5,13 @@
 # Symptom: All API requests return 403 Forbidden
 # Root Cause: Cookies not being sent across subdomains due to missing COOKIE_DOMAIN setting
 
-# The Fix: Add this to your .env.prod (or /etc/dpp/dpp.env)
+# The Fix: Add this to config/.env.production locally and /etc/dpp/dpp.env on OCI
 
 echo "======================================"
 echo "CRITICAL: Cross-Domain Cookie Fix"
 echo "======================================"
 echo ""
-echo "Your .env.prod MUST contain:"
+echo "Your production env file MUST contain:"
 echo ""
 echo "COOKIE_DOMAIN=.claros-dpp.online"
 echo "COOKIE_SECURE=true"
@@ -57,7 +57,7 @@ echo ""
 echo "   You should see no 403 errors now."
 echo ""
 
-# Optional: Show current .env.prod if it exists
+# Optional: show current production env if it exists on OCI
 if [ -f /etc/dpp/dpp.env ]; then
   echo "======================================"
   echo "Current Cookie Settings:"

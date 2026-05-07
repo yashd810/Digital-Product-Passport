@@ -21,8 +21,8 @@ This index provides quick navigation and comprehensive reference for system conf
 
 | Configuration | File | Focus | Environment |
 |---------------|------|-------|-------------|
-| [Local Development](#local-development) | configuration-files.md | .env.local setup | Development |
-| [Production Deployment](#production) | configuration-files.md | .env.production setup | OCI |
+| [Local Development](#local-development) | configuration-files.md | docker/.env setup | Development |
+| [Production Deployment](#production) | configuration-files.md | config/.env.production setup | OCI |
 
 ---
 
@@ -67,7 +67,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 **Purpose:** Complete reference for environment configuration files and variables for local and production deployment.
 
 **Topics Covered:**
-- Files overview (.env.local, .env.production)
+- Files overview (docker/.env, config/.env.production)
 - Local development environment setup
 - Production environment configuration
 - Using configuration files (Docker, OCI deployment)
@@ -82,14 +82,14 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 - Troubleshooting common issues
 
 **Configuration Files Documented:**
-- `.env.local` - Local development (Docker Compose)
-- `.env.production` - Production (OCI deployment)
+- `docker/.env` - Local development (Docker Compose)
+- `config/.env.production` - Production (OCI deployment)
 
 **Environment Variables:** 20+ documented with explanations
 
 **Key Sections:**
-- Local Development (.env.local) with 10+ variables
-- Production (.env.production) with security templates
+- Local Development (docker/.env) with local Docker variables
+- Production (config/.env.production) with security templates
 - Using Configuration Files (deployment procedures)
 - Environment Variable Reference (5 categories)
 - Security Best Practices (5 key practices)
@@ -161,7 +161,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 **Goal:** Configure local environment for development
 
 **Steps:**
-1. Copy .env.example to .env.local
+1. Create or update docker/.env
 2. Set NODE_ENV=development
 3. Set DEBUG=true for detailed logs
 4. Configure DB_HOST=postgres (Docker service)
@@ -170,7 +170,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 
 **Time:** 5 minutes
 
-**File:** [configuration-files.md#local-development-envlocal](configuration-files.md#local-development-envlocal)
+**File:** [configuration-files.md#local-development-dockerenv](configuration-files.md#local-development-dockerenv)
 
 ---
 
@@ -179,7 +179,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 **Goal:** Secure production configuration for OCI
 
 **Steps:**
-1. Create .env.production file
+1. Create or update `config/.env.production`
 2. Set NODE_ENV=production
 3. Set DEBUG=false
 4. Set DB_HOST=localhost (after SSH)
@@ -219,9 +219,9 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 **Goal:** Get local environment running
 
 **Steps:**
-1. Read [Local Development section](configuration-files.md#local-development-envlocal)
-2. Create .env.local with provided variables
-3. Run `docker-compose up -d`
+1. Read [Local Development section](configuration-files.md#local-development-dockerenv)
+2. Create or update `docker/.env` with provided variables
+3. Run `docker compose -f docker/docker-compose.yml up -d`
 4. Verify services at http://localhost:3000
 
 **Related:** [LOCAL.md](../deployment/LOCAL.md)
@@ -234,7 +234,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 
 **Steps:**
 1. Read [Production section](configuration-files.md#production-envproduction)
-2. Create .env.production template
+2. Create `config/.env.production` template
 3. Generate strong secrets (32+ chars)
 4. Set domain to production URL
 5. Enable security features
@@ -280,7 +280,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 | Total Configuration Files | 1 |
 | Files with Table of Contents | 1/1 (100%) |
 | Files with Related Documentation | 1/1 (100%) |
-| Configuration File Types | 2 (.env.local, .env.production) |
+| Configuration File Types | 2 (docker/.env, config/.env.production) |
 | Environment Variables | 20+ |
 | Variable Categories | 5 |
 | Core Settings | 2 |

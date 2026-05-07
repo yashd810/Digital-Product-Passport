@@ -51,7 +51,7 @@ npm run check:passport-storage
 
 ## Environment
 
-Use `apps/backend-api/.env.example` as the app-specific reference. In Docker, environment is also supplied from `docker/docker-compose.yml`, optional root `.env`, and optional `apps/backend-api/.env`.
+Local Docker development loads runtime values from `docker/.env`; production deployments load from `config/.env.production` locally or the configured server env file such as `/etc/dpp/dpp.env`.
 
 Production requires at least `JWT_SECRET`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `ALLOWED_ORIGINS`.
 

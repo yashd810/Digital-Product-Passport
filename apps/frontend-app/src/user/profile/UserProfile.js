@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useI18n } from "../../app/providers/i18n";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_REQUIREMENT_TEXT,
+  validatePasswordPolicy,
+} from "../../auth/utils/passwordPolicy";
 import "../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
-const PASSWORD_MIN_LENGTH = 12;
 
 function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = true, showLanguageSelector = true, profileTitle, profileSubtitle }) {
   const { t } = useI18n();
@@ -115,8 +119,9 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
       return;
     }
     if (newPw !== confPw) { flash("error", "New passwords don't match"); return; }
-    if (newPw.length < PASSWORD_MIN_LENGTH) {
-      flash("error", `Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+    const passwordPolicyError = validatePasswordPolicy(newPw);
+    if (passwordPolicyError) {
+      flash("error", passwordPolicyError);
       return;
     }
     setSavingPw(true);
@@ -280,6 +285,9 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
                   <label>{t("newPassword")}</label>
                   <input type="password" value={newPw} placeholder={`Min. ${PASSWORD_MIN_LENGTH} characters`} disabled={savingPw}
                     onChange={e => setNewPw(e.target.value)} required minLength={PASSWORD_MIN_LENGTH} />
+                  <span style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
+                    {PASSWORD_REQUIREMENT_TEXT}
+                  </span>
                 </div>
                 <div className="form-group">
                   <label>{t("confirmPassword")}</label>

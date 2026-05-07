@@ -32,10 +32,7 @@ cd Digital-Product-Passport
 ```
 
 2. **Configure Environment**
-```bash
-cp .env.example .env
-# Edit .env with your settings (optional for local dev)
-```
+Local Docker development uses `docker/.env`. The checked-in defaults are not required; edit the ignored local file only when you need to change ports, secrets, or service URLs.
 
 3. **Start Services**
 ```bash
@@ -109,12 +106,7 @@ cd Digital-Product-Passport
 
 ### 4. Environment Configuration
 
-**Copy example env file**:
-```bash
-cp .env.example .env
-```
-
-**Edit .env** (optional for local development):
+**Edit `docker/.env`** only if you need to override local defaults:
 ```bash
 # Database
 DB_HOST=postgres

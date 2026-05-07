@@ -1,6 +1,9 @@
 "use strict";
 
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({
+  path: process.env.DOTENV_CONFIG_PATH || path.resolve(__dirname, "../../../docker/.env"),
+});
 
 const { Pool } = require("pg");
 const createPassportService = require("../services/passport-service");

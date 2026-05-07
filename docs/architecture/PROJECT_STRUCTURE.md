@@ -54,8 +54,7 @@ apps/backend-api/
 ├── tests/                        # Jest/Supertest tests
 ├── scripts/                      # Backend-specific maintenance scripts
 ├── Dockerfile
-├── package.json
-└── .env.example
+└── package.json
 ```
 
 Primary route registration happens in `Server/server.js`, then delegates to `routes/*.js`. Core persistence setup is in `db/init.js`.

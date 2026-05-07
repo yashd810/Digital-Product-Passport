@@ -1,5 +1,8 @@
 "use strict";
-require("dotenv").config();
+const path           = require("path");
+require("dotenv").config({
+  path: process.env.DOTENV_CONFIG_PATH || path.resolve(__dirname, "../../../docker/.env"),
+});
 const express        = require("express");
 const { Pool }       = require("pg");
 const cors           = require("cors");
@@ -9,7 +12,6 @@ const crypto         = require("crypto");
 const jwt            = require("jsonwebtoken");
 const multer         = require("multer");
 const fs             = require("fs");
-const path           = require("path");
 
 const { initDb }               = require("../db/init");
 const createSigningService     = require("../services/signing-service");

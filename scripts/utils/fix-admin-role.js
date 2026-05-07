@@ -3,7 +3,10 @@
  * Fix Script: Grant super_admin role to admin email
  * This script updates the user role to super_admin based on the ADMIN_EMAIL
  */
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({
+  path: process.env.DOTENV_CONFIG_PATH || path.resolve(__dirname, "../../docker/.env"),
+});
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -16,7 +19,7 @@ const pool = new Pool({
 
 async function fixAdminRole() {
   try {
-    const adminEmail = process.env.ADMIN_EMAIL || "yashd810@gmail.com";
+    const adminEmail = process.env.ADMIN_EMAIL || "digitalproductpass@gmail.com";
     
     console.log(`🔧 Fixing admin role for: ${adminEmail}`);
 

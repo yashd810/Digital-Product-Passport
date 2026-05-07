@@ -76,7 +76,7 @@ if [ ! -f "$ENV_FILE" ]; then
     echo "❌ Environment file not found: $ENV_FILE"
     echo ""
     echo "Please create the environment file at: $ENV_FILE"
-    echo "You can copy from .env.prod as a template"
+    echo "You can copy from config/.env.production as a template"
     echo "Required variables:"
     echo "  - DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME"
     echo "  - JWT_SECRET, PEPPER_V1"

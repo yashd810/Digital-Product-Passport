@@ -188,13 +188,13 @@ ls -la
 
 ```bash
 # Copy environment template
-cp .env.example .env.prod
+cp config/.env.production /etc/dpp/dpp.env
 
 # Edit with production values
-nano .env.prod
+nano /etc/dpp/dpp.env
 ```
 
-**Production .env.prod**:
+**Production env**:
 ```bash
 # Database
 DB_HOST=postgres
@@ -242,7 +242,7 @@ services:
     restart: unless-stopped
 
   backend-api:
-    env_file: .env.prod
+    env_file: /etc/dpp/dpp.env
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]

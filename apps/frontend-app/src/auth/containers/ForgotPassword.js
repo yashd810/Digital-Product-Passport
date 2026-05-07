@@ -2,10 +2,15 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import {
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_REQUIREMENT_TEXT,
+  passwordStrength,
+  validatePasswordPolicy,
+} from "../utils/passwordPolicy";
 import "../styles/Landing.css";
 
 const API = import.meta.env.VITE_API_URL || "";
-const PASSWORD_MIN_LENGTH = 12;
 
 export function ForgotPassword() {
   const navigate = useNavigate();
@@ -122,8 +127,9 @@ export function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (password.length < PASSWORD_MIN_LENGTH) {
-      setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+    const passwordPolicyError = validatePasswordPolicy(password);
+    if (passwordPolicyError) {
+      setError(passwordPolicyError);
       return;
     }
     if (password !== confirm)  { setError("Passwords do not match"); return; }
@@ -144,17 +150,7 @@ export function ResetPassword() {
     }
   };
 
-  const strength = (p) => {
-    if (!p) return null;
-    if (p.length < PASSWORD_MIN_LENGTH) return { label:"Too short", color:"#e53e3e", pct:20 };
-    if (p.length < PASSWORD_MIN_LENGTH + 2) return { label:"Weak", color:"#dd6b20", pct:40 };
-    const has = (re) => re.test(p);
-    const score = [has(/[A-Z]/),has(/[0-9]/),has(/[^A-Za-z0-9]/)].filter(Boolean).length;
-    if (score === 0) return { label:"Fair",   color:"#d69e2e", pct:55 };
-    if (score === 1) return { label:"Good",   color:"#38a169", pct:75 };
-    return               { label:"Strong",  color:"#2f855a", pct:100 };
-  };
-  const str = strength(password);
+  const str = passwordStrength(password);
 
   if (!tokenOk) {
     return (
@@ -208,8 +204,12 @@ export function ResetPassword() {
               id="newpw" type="password" value={password} required
               placeholder={`Min. ${PASSWORD_MIN_LENGTH} characters`} disabled={loading}
               onChange={e => setPassword(e.target.value)}
+              minLength={PASSWORD_MIN_LENGTH}
               autoFocus
             />
+            <span style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+              {PASSWORD_REQUIREMENT_TEXT}
+            </span>
             {str && (
               <div style={{ marginTop:6 }}>
                 <div style={{ height:4, borderRadius:2, background:"#e2e8f0", overflow:"hidden" }}>

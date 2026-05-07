@@ -26,7 +26,7 @@ This keeps the stack very close to your current Docker setup and avoids a larger
 - [cloud-init.yaml](../../infra/oracle/cloud-init.yaml)
   Bootstraps an Ubuntu VM with Docker, Git, and the app folder.
 - [bootstrap.sh](../../infra/oracle/bootstrap.sh)
-  Server-side deployment helper. Run this on the VM after your `.env.prod` is in place.
+  Server-side deployment helper. Run this on the VM after `/etc/dpp/dpp.env` is in place.
 - [deploy-prod.sh](../../infra/oracle/deploy-prod.sh)
   Rebuild/start helper that reads secrets from an external env file such as `/etc/dpp/dpp.env` and supports `DPP_DEPLOY_TARGET=all|frontend|backend`.
 - [oci.env.example](../../infra/oracle/oci.env.example)
@@ -79,7 +79,7 @@ STORAGE_S3_FORCE_PATH_STYLE=true
 
 ```bash
 ssh -i <your-key>.pem ubuntu@<vm-public-ip> "sudo mkdir -p /etc/dpp && sudo chown ubuntu:ubuntu /etc/dpp"
-scp -i <your-key>.pem .env.prod ubuntu@<vm-public-ip>:/etc/dpp/dpp.env
+scp -i <your-key>.pem config/.env.production ubuntu@<vm-public-ip>:/etc/dpp/dpp.env
 ```
 
 5. On the VM, run:
