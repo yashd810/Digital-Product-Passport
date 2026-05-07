@@ -1,6 +1,6 @@
 // ForgotPassword.js
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import {
   PASSWORD_MIN_LENGTH,
@@ -91,9 +91,9 @@ export function ForgotPassword() {
         <div className="auth-divider" />
         <div className="auth-footer">
           <p>
-            <button className="link-btn" onClick={() => navigate("/login")}>
+            <Link to="/login">
               ← Back to sign in
-            </button>
+            </Link>
           </p>
         </div>
       </div>
@@ -239,9 +239,9 @@ export function ResetPassword() {
         <div className="auth-divider" />
         <div className="auth-footer">
           <p>
-            <button className="link-btn" onClick={() => navigate("/login")}>
+            <Link to="/login">
               ← Back to sign in
-            </button>
+            </Link>
           </p>
         </div>
       </div>

@@ -393,6 +393,7 @@ async function initDb(pool, {
       otp_expires_at   TIMESTAMPTZ,
       two_factor_enabled BOOLEAN NOT NULL DEFAULT false,
       session_version  INTEGER NOT NULL DEFAULT 1,
+      pepper_version   INTEGER NOT NULL DEFAULT 1,
       avatar_url       TEXT,
       phone            VARCHAR(50),
       job_title        VARCHAR(120),
@@ -484,6 +485,10 @@ async function initDb(pool, {
   await pool.query(`
     ALTER TABLE users
     ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1
+  `);
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS pepper_version INTEGER NOT NULL DEFAULT 1
   `);
   await pool.query(`
     ALTER TABLE users

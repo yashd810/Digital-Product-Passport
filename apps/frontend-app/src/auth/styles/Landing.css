@@ -624,16 +624,31 @@
   font-size: 15px;
 }
 
-.auth-footer a {
+.auth-footer a,
+.auth-footer .link-btn {
   color: #0db5b0;
   text-decoration: none;
   font-weight: 700;
   transition: color 0.25s ease;
 }
 
-[data-theme="light"] .auth-footer a { color: #0db5b0; }
+[data-theme="light"] .auth-footer a,
+[data-theme="light"] .auth-footer .link-btn { color: #0db5b0; }
 
-.auth-footer a:hover { text-decoration: underline; color: #06d6d0; }
+.auth-footer .link-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.auth-footer a:hover,
+.auth-footer .link-btn:hover {
+  color: #06d6d0;
+  text-decoration: underline;
+}
 
 @media (max-width: 600px) {
   .auth-card { padding: 28px 18px; }

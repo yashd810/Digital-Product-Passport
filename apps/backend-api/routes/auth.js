@@ -452,7 +452,10 @@ module.exports = function registerAuthRoutes(app, {
       );
       await pool.query("UPDATE password_reset_tokens SET used = true WHERE token = ANY($1::text[])", [[token, tokenHash]]);
       res.json({ success: true });
-    } catch { res.status(500).json({ error: "Password reset failed" }); }
+    } catch (e) {
+      logger.error("Reset password error:", e.message);
+      res.status(500).json({ error: "Password reset failed" });
+    }
   });
 
   // ─── COMPANY INVITE ──────────────────────────────────────────────────────────
