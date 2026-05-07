@@ -17,6 +17,12 @@
 
 claros-dpp.online, www.claros-dpp.online {
 	import production_tls_policy
+	@dictionaryArtifacts {
+		path /dictionary/battery/v1/context.jsonld /dictionary/battery/v1/catalog.jsonld /dictionary/battery/v1/manifest.json /dictionary/battery/v1/category-rules.json /dictionary/battery/v1/categories /dictionary/battery/v1/units /dictionary/battery/v1/field-map /dictionary/battery/v1/terms*
+	}
+	reverse_proxy @dictionaryArtifacts https://api.claros-dpp.online {
+		header_up Host api.claros-dpp.online
+	}
 	reverse_proxy 127.0.0.1:8080
 }
 
