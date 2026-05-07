@@ -100,6 +100,7 @@ module.exports = function registerAuthRoutes(app, {
 
       const tokenRow = await pool.query(
         `SELECT it.*, c.company_name, c.economic_operator_identifier, c.economic_operator_identifier_scheme
+         FROM invite_tokens it
          LEFT JOIN companies c ON c.id = it.company_id
          WHERE it.token = $1 AND it.used = false AND it.expires_at > NOW()`,
         [token]
@@ -135,7 +136,10 @@ module.exports = function registerAuthRoutes(app, {
           economic_operator_identifier_scheme: invite.economic_operator_identifier_scheme || null,
         }),
       });
-    } catch (e) { logger.error("Register error:", e.message); res.status(500).json({ error: "Registration failed" }); }
+    } catch (e) {
+      logger.error({ err: e }, "Register error");
+      res.status(500).json({ error: "Registration failed" });
+    }
   });
 
   // ─── VALIDATE INVITE ────────────────────────────────────────────────────────
