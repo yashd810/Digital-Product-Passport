@@ -38,7 +38,7 @@ function createConformanceFixture() {
 
   const typeDef = {
     type_name: "battery",
-    umbrella_category: "Battery Digital Passport",
+    product_category: "Battery Digital Passport",
     semantic_model_key: "claros_battery_dictionary_v1",
     fields_json: {
       sections: [
@@ -166,7 +166,7 @@ describe("battery DPP conformance", () => {
   test("resolves JSON-LD battery context and inline semantic mappings from the type definition", () => {
     const typeDef = {
       type_name: "ev_battery_passport_custom",
-      umbrella_category: "Battery Digital Passport",
+      product_category: "Battery Digital Passport",
       semantic_model_key: "generic_dpp_v1",
       fields_json: {
         sections: [
@@ -201,7 +201,7 @@ describe("battery DPP conformance", () => {
       "ev_battery_passport_custom",
       {
         semanticModelKey: "generic_dpp_v1",
-        umbrellaCategory: "Battery Digital Passport",
+        productCategory: "Battery Digital Passport",
       }
     );
 

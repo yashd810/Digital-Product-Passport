@@ -178,8 +178,8 @@ function AdminAnalytics() {
         { label: "Obsolete", value: analytics.overall.obsolete_count || 0, tone: "obsolete" },
         { label: "Archived", value: analytics.overall.archived_count || 0, tone: "archived" },
       ];
-      const productCategoryRows = (analytics.byUmbrella || []).map((item) => [
-        item.umbrella_category || "Uncategorized",
+      const productCategoryRows = (analytics.byProductCategory || []).map((item) => [
+        item.product_category || "Uncategorized",
         item.total || 0,
         item.draft || 0,
         item.released || 0,
@@ -192,10 +192,10 @@ function AdminAnalytics() {
         item.released_count || 0,
         item.revised_count || 0,
       ]);
-      const productCategoryChartItems = (analytics.byUmbrella || [])
+      const productCategoryChartItems = (analytics.byProductCategory || [])
         .filter((item) => (item.total || 0) > 0)
         .map((item, index) => ({
-          label: item.umbrella_category || "Uncategorized",
+          label: item.product_category || "Uncategorized",
           value: item.total || 0,
           color: ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length],
         }));
@@ -255,10 +255,10 @@ function AdminAnalytics() {
     }
   };
 
-  const productCategoryChartItems = (analytics.byUmbrella || [])
+  const productCategoryChartItems = (analytics.byProductCategory || [])
     .filter((item) => (item.total || 0) > 0)
     .map((item, index) => ({
-      label: item.umbrella_category || "Uncategorized",
+      label: item.product_category || "Uncategorized",
       value: item.total || 0,
       color: ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length],
     }));
@@ -337,13 +337,13 @@ function AdminAnalytics() {
         </div>
       </div>
 
-      {analytics.byUmbrella && analytics.byUmbrella.length > 0 && (
+      {analytics.byProductCategory && analytics.byProductCategory.length > 0 && (
         <div className="companies-stats admin-section-spaced">
           <h3>Passports by Category</h3>
           <p className="admin-section-copy">
             Grouped by product category. Click a row to expand type breakdown.
           </p>
-          <table className="stats-table admin-analytics-table admin-analytics-table-umbrella">
+          <table className="stats-table admin-analytics-table admin-analytics-table-productCategory">
             <thead>
               <tr>
                 <th>Category</th>
@@ -356,14 +356,14 @@ function AdminAnalytics() {
               </tr>
             </thead>
             <tbody>
-              {analytics.byUmbrella.map((productCategory) => (
-                <React.Fragment key={productCategory.umbrella_category}>
-                  <tr className="umbrella-row" onClick={() => toggleProductCategory(productCategory.umbrella_category)}>
+              {analytics.byProductCategory.map((productCategory) => (
+                <React.Fragment key={productCategory.product_category}>
+                  <tr className="productCategory-row" onClick={() => toggleProductCategory(productCategory.product_category)}>
                     <td>
-                      <span className="admin-inline-icon">{productCategory.umbrella_icon}</span>
-                      <strong>{productCategory.umbrella_category}</strong>
+                      <span className="admin-inline-icon">{productCategory.product_icon}</span>
+                      <strong>{productCategory.product_category}</strong>
                       <span className="admin-inline-meta">
-                        {expanded[productCategory.umbrella_category] ? "▲" : "▼"} {productCategory.types.length} type{productCategory.types.length !== 1 ? "s" : ""}
+                        {expanded[productCategory.product_category] ? "▲" : "▼"} {productCategory.types.length} type{productCategory.types.length !== 1 ? "s" : ""}
                       </span>
                     </td>
                     <td><strong>{productCategory.total || 0}</strong></td>
@@ -373,7 +373,7 @@ function AdminAnalytics() {
                     <td><span className="mini-badge obsolete">{productCategory.obsolete || 0}</span></td>
                     <td><span className="mini-badge archived">{productCategory.archived || 0}</span></td>
                   </tr>
-                  {expanded[productCategory.umbrella_category] && productCategory.types.map((type) => (
+                  {expanded[productCategory.product_category] && productCategory.types.map((type) => (
                     <tr key={type.type_name} className="type-subrow">
                       <td className="admin-subrow-label">
                         └── {type.display_name}

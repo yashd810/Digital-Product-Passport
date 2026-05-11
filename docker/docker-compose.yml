@@ -67,9 +67,12 @@ services:
   asset-management:
     image: nginx:1.27-alpine
     ports:
-      - "${ASSET_MANAGEMENT_PORT:-3003}:80"
+      - "${ASSET_MANAGEMENT_PORT:-3003}:8080"
+    environment:
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://backend-api:3001}"
     volumes:
       - ../apps/asset-management:/usr/share/nginx/html:ro
+      - ../infra/docker/asset-management/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
     depends_on:
       - backend-api
 

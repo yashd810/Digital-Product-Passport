@@ -11,6 +11,12 @@
   }
 })();
 
+function setPanelDropdownState(element, isOpen) {
+  const panel = element?.closest?.(".panel");
+  if (!panel) return;
+  panel.classList.toggle("panel-dropdown-open", !!isOpen);
+}
+
 class CustomSelect {
   static instances = new Set();
 
@@ -83,12 +89,14 @@ class CustomSelect {
     this.open = true;
     this.menu.hidden = false;
     this.container.classList.add("cs-open");
+    setPanelDropdownState(this.container, true);
   }
 
   close() {
     this.open = false;
     this.menu.hidden = true;
     this.container.classList.remove("cs-open");
+    setPanelDropdownState(this.container, false);
   }
 }
 
@@ -116,12 +124,13 @@ const state = {
   importSummary: "",
   changedRows: new Set(),
   changedCells: new Set(),
+  pendingGridFocus: null,
 };
 
 const ASSET_LAUNCH_TOKEN_STORAGE_KEY = "asset-management-launch-token";
 
 const metaKeys = new Set(["id","company_id","release_status","version_number","is_editable","created_at","updated_at","updated_by","deleted_at","qr_code","created_by","field_label","created_by_email","first_name","last_name"]);
-const assetMatchKeys = new Set(["guid", "match_guid", "product_id", "match_product_id", "next_product_id"]);
+const assetMatchKeys = new Set(["dppId", "dpp_id", "match_dpp_id", "guid", "match_guid", "product_id", "match_product_id", "next_product_id"]);
 
 const els = {
   companyName: document.getElementById("company-name"),
@@ -261,9 +270,9 @@ function getFieldMap() {
   const map = {};
   els.fieldMapBody.querySelectorAll("tr").forEach(tr => {
     const [passportField, apiField] = tr.querySelectorAll("input");
-    const k = passportField.value.trim();
-    const v = apiField.value.trim();
-    if (k) map[k] = v;
+    const targetKey = passportField.value.trim();
+    const sourceKey = apiField.value.trim();
+    if (targetKey && sourceKey) map[sourceKey] = targetKey;
   });
   return map;
 }
@@ -271,7 +280,7 @@ function getFieldMap() {
 function setFieldMap(map) {
   els.fieldMapBody.innerHTML = "";
   if (!map || !Object.keys(map).length) return;
-  Object.entries(map).forEach(([k, v]) => addFieldMapRow(k, v));
+  Object.entries(map).forEach(([sourceKey, targetKey]) => addFieldMapRow(targetKey, sourceKey));
 }
 
 function serializeCellValue(value) {
@@ -294,15 +303,23 @@ function buildFieldList() {
 function sanitizeRows(rows) {
   return rows.map(row => {
     const next = {};
-    Object.entries(row || {}).forEach(([key, value]) => { next[key] = serializeCellValue(value); });
+    Object.entries(row || {}).forEach(([key, value]) => {
+      if (key === "guid" && row?.dppId !== undefined) return;
+      if (key === "match_guid" && row?.match_dpp_id !== undefined) return;
+      next[key] = serializeCellValue(value);
+    });
+    if (next.guid && !next.dppId) next.dppId = next.guid;
+    if (next.match_guid && !next.match_dpp_id) next.match_dpp_id = next.match_guid;
+    delete next.guid;
+    delete next.match_guid;
     return next;
   });
 }
 
 function getRowMatchKey(row) {
   if (!row) return "";
-  const guid = String(row.guid || row.match_guid || "").trim();
-  if (guid) return "guid:" + guid;
+  const dppId = String(row.dppId || row.match_dpp_id || row.guid || row.match_guid || "").trim();
+  if (dppId) return "dppId:" + dppId;
   const productId = String(row.product_id || row.match_product_id || "").trim();
   if (productId) return "product:" + productId.toLowerCase();
   return "";
@@ -331,6 +348,14 @@ function getSerializableRows() {
       acc[key] = value;
       return acc;
     }, {}))
+    .map((row) => {
+      const normalized = { ...row };
+      if (normalized.guid && !normalized.dppId) normalized.dppId = normalized.guid;
+      if (normalized.match_guid && !normalized.match_dpp_id) normalized.match_dpp_id = normalized.match_guid;
+      delete normalized.guid;
+      delete normalized.match_guid;
+      return normalized;
+    })
     .filter(row => Object.keys(row).length > 0);
 }
 
@@ -401,6 +426,7 @@ function setGridFieldDropdownOpen(isOpen) {
   els.gridFieldDropdown.classList.toggle("open", isOpen);
   els.gridFieldFilter.hidden = !isOpen;
   els.gridFieldToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  setPanelDropdownState(els.gridFieldDropdown, isOpen);
 }
 
 function applyPresetToForm() {
@@ -511,6 +537,7 @@ function renderPreview() {
   const s = state.preview.summary;
   renderStats(els.previewSummary, [
     { label: "Ready", value: s.ready },
+    { label: "Creates", value: s.ready_for_passport_create || 0 },
     { label: "Passport Updates", value: s.ready_for_passport_update },
     { label: "Dynamic Pushes", value: s.ready_for_dynamic_push },
     { label: "Skipped", value: s.skipped },
@@ -521,9 +548,10 @@ function renderPreview() {
   state.preview.details.forEach(detail => {
     const item = document.createElement("div");
     item.className = "detail-item " + (detail.status || "ready");
+    const identifier = detail.generated_dpp_id || detail.dppId || detail.guid || detail.product_id || "No identifier";
     item.innerHTML = '<strong>Row ' + (detail.row_index || "-") + '</strong><div>' +
-      (detail.guid || detail.product_id || "No identifier") + ' &middot; <strong>' + detail.status + '</strong></div><div>' +
-      (detail.error || detail.reason || "Ready to push") + '</div>';
+      identifier + ' &middot; <strong>' + detail.status + '</strong></div><div>' +
+      (detail.error || detail.reason || (detail.action === "create" ? "New passport will be created." : "Ready to push")) + '</div>';
     els.validationDetails.appendChild(item);
   });
   els.pushBackend.disabled = !(state.preview.generated_payload?.records || []).length;
@@ -574,21 +602,25 @@ function restoreGridViewport(snapshot) {
   };
   applyScroll();
 
-  if (snapshot.focus?.rowIndex && snapshot.focus?.fieldKey) {
-    const selector = '[data-grid-row-index="' + snapshot.focus.rowIndex + '"][data-grid-field-key="' + snapshot.focus.fieldKey + '"]';
+  const pendingFocus = state.pendingGridFocus;
+  const focusTarget = pendingFocus || snapshot.focus;
+
+  if (focusTarget?.rowIndex !== undefined && focusTarget?.fieldKey) {
+    const selector = '[data-grid-row-index="' + focusTarget.rowIndex + '"][data-grid-field-key="' + focusTarget.fieldKey + '"]';
     const input = els.gridWrap.querySelector(selector);
     if (input instanceof HTMLInputElement) {
       input.focus({ preventScroll: true });
       if (
-        typeof snapshot.focus.selectionStart === "number" &&
-        typeof snapshot.focus.selectionEnd === "number" &&
+        typeof focusTarget.selectionStart === "number" &&
+        typeof focusTarget.selectionEnd === "number" &&
         typeof input.setSelectionRange === "function"
       ) {
-        input.setSelectionRange(snapshot.focus.selectionStart, snapshot.focus.selectionEnd);
+        input.setSelectionRange(focusTarget.selectionStart, focusTarget.selectionEnd);
       }
     }
   }
 
+  state.pendingGridFocus = null;
   requestAnimationFrame(applyScroll);
 }
 
@@ -624,7 +656,7 @@ function renderGrid() {
   headRow.innerHTML = '<th class="sticky-col sticky-col-row">Row</th>';
   fields.forEach(field => {
     const th = document.createElement("th");
-    if (field.key === "guid") th.className = "sticky-col sticky-col-guid";
+    if (field.key === "dppId") th.className = "sticky-col sticky-col-guid";
     if (field.key === "product_id") th.className = "sticky-col sticky-col-product";
     th.textContent = field.label || field.key;
     headRow.appendChild(th);
@@ -647,7 +679,7 @@ function renderGrid() {
 
     fields.forEach(field => {
       const td = document.createElement("td");
-      if (field.key === "guid") td.classList.add("sticky-col", "sticky-col-guid");
+      if (field.key === "dppId") td.classList.add("sticky-col", "sticky-col-guid");
       if (field.key === "product_id") td.classList.add("sticky-col", "sticky-col-product");
       const cellKey = rowKey ? rowKey + "::" + field.key : "";
       td.classList.toggle("changed-cell", !!cellKey && state.changedCells.has(cellKey));
@@ -671,6 +703,8 @@ function renderGrid() {
         input.dataset.gridRowIndex = String(rowIndex);
         input.dataset.gridFieldKey = field.key;
         if (field.type === "table") input.placeholder = '[["col1","col2"]]';
+        else if (field.key === "product_id") input.placeholder = "Enter product or serial number";
+        else if (field.key === "dppId") input.placeholder = "Optional if matching an existing passport";
         input.addEventListener("input", e => updateCell(rowIndex, field.key, e.target.value));
         td.appendChild(input);
       }
@@ -700,12 +734,14 @@ function renderGrid() {
    ═══════════════════════════════════════════════ */
 
 function createBlankRow() {
-  const row = { guid: "", product_id: "", serial_number: "" };
+  const row = { dppId: "", product_id: "", serial_number: "" };
   buildFieldList().forEach(f => { if (!(f.key in row)) row[f.key] = ""; });
   state.rows.push(row);
+  state.pendingGridFocus = { rowIndex: state.rows.length - 1, fieldKey: "product_id" };
   markDiffsAgainstBaseline();
   state.preview = null;
   renderGrid(); renderWorkspaceSummary(); renderPreview();
+  showToast("Draft row added. Fill product_id or an existing dppId, then validate.", "info");
 }
 
 function parseCsv(text) {
@@ -731,7 +767,7 @@ function getCsvExportFields(mode = state.csvMode) {
   const allFields = buildFieldList();
   let sourceFields = mode === "filtered-columns" ? getVisibleFields() : allFields;
   if (mode === "filtered-columns") {
-    const requiredKeys = new Set(["guid", "product_id"]);
+    const requiredKeys = new Set(["dppId", "product_id"]);
     const requiredFields = allFields.filter(field => requiredKeys.has(field.key));
     const filteredSet = new Set(sourceFields.map(field => field.key));
     requiredFields.forEach(field => {
@@ -739,7 +775,7 @@ function getCsvExportFields(mode = state.csvMode) {
     });
   }
   const fieldMap = new Map(sourceFields.map(field => [field.key, field]));
-  const preferred = ["guid", "product_id", "serial_number"];
+  const preferred = ["dppId", "product_id", "serial_number"];
   const ordered = preferred.filter(key => fieldMap.has(key)).map(key => fieldMap.get(key));
   sourceFields.forEach(field => {
     if (!preferred.includes(field.key)) ordered.push(field);
@@ -767,8 +803,8 @@ function exportCsv() {
   const lines = [headers.map(esc).join(",")];
   if (state.csvMode === "template") {
     lines.push(headers.map(key => {
-      if (key === "guid") return esc("required match key");
-      if (key === "product_id") return esc("optional match key or updated serial");
+      if (key === "dppId") return esc("optional for updates; generated for new passports");
+      if (key === "product_id") return esc("required for new passports or fallback match key");
       const field = fields.find(item => item.key === key);
       return esc((field?.label || key) + (field?.type ? " (" + field.type + ")" : ""));
     }).join(","));
@@ -1145,9 +1181,9 @@ async function init() {
   initThemeToggle();
   initializeFromQuery();
   bindEvents();
-  addFieldMapRow("passportGuid", "guid");
-  addFieldMapRow("serialNumber", "serial_number");
-  addFieldMapRow("productId", "product_id");
+  addFieldMapRow("dppId", "passportDppId");
+  addFieldMapRow("serial_number", "serialNumber");
+  addFieldMapRow("product_id", "productId");
   renderWorkspaceSummary();
   renderPreview();
   renderCsvWorkflowSummary();

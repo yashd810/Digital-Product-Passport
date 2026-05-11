@@ -1,6 +1,32 @@
 import { PASSPORT_SECTIONS_MAP } from "../../../../passports/config/PassportFields";
 import { isReleasedPassportStatus } from "../../../../passports/utils/passportStatus";
 
+const BASE_COMPLETENESS_FIELDS = [
+  { key: "model_name", type: "text" },
+  { key: "product_id", type: "text" },
+];
+
+const FIELD_KEY_ALIASES = {
+  digitalProductPassportId: ["dppId", "dpp_id"],
+  dppId: ["dpp_id", "digitalProductPassportId"],
+  dpp_id: ["dppId", "digitalProductPassportId"],
+  uniqueProductIdentifier: ["product_identifier_did", "product_id", "localProductId"],
+  localProductId: ["product_id", "uniqueProductIdentifier"],
+  modelName: ["model_name"],
+  model_name: ["modelName"],
+  productId: ["product_id", "localProductId"],
+  product_id: ["productId", "localProductId"],
+  dppStatus: ["release_status"],
+  release_status: ["dppStatus"],
+  lastUpdate: ["updated_at", "created_at"],
+  economicOperatorId: ["economic_operator_id"],
+  economic_operator_id: ["economicOperatorId"],
+  facilityId: ["facility_id"],
+  facility_id: ["facilityId"],
+  contentSpecificationIds: ["content_specification_ids"],
+  content_specification_ids: ["contentSpecificationIds"],
+};
+
 export function formatPassportTypeLabel(passportType) {
   if (!passportType) return "Passport";
   return String(passportType)
@@ -49,29 +75,73 @@ export function parseCsvText(text) {
   return text.split("\n").map((line) => line.trim()).filter(Boolean).map(parseCsvRow);
 }
 
-export function calcCompleteness(passport, typeDefinitions = []) {
-  const pType = passport.passport_type;
-  if (!pType) return null;
+function getFieldCandidates(key) {
+  return [key, ...(FIELD_KEY_ALIASES[key] || [])].filter(Boolean);
+}
 
-  const dynamicType = typeDefinitions.find((type) => type.type_name === pType);
+function getPassportFieldValue(passport, key) {
+  for (const candidate of getFieldCandidates(key)) {
+    if (Object.prototype.hasOwnProperty.call(passport, candidate)) {
+      return passport[candidate];
+    }
+  }
+  return undefined;
+}
+
+function hasCompletionValue(value, field = {}) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+
+  const text = String(value).trim();
+  if (!text) return false;
+
+  if (field.type === "boolean") {
+    return ["true", "false", "yes", "no", "1", "0"].includes(text.toLowerCase());
+  }
+
+  if ((text.startsWith("[") && text.endsWith("]")) || (text.startsWith("{") && text.endsWith("}"))) {
+    try {
+      const parsed = JSON.parse(text);
+      return hasCompletionValue(parsed, field);
+    } catch {
+      return true;
+    }
+  }
+
+  return true;
+}
+
+function getTypeFields(passportType, typeDefinitions = []) {
+  const dynamicType = typeDefinitions.find((type) => type.type_name === passportType);
   const dynamicFields = dynamicType?.fields_json?.sections?.flatMap((section) => section.fields || []) || [];
-  const staticFields = PASSPORT_SECTIONS_MAP[pType]
-    ? Object.values(PASSPORT_SECTIONS_MAP[pType]).flatMap((section) => section.fields)
+  if (dynamicFields.length) return dynamicFields;
+
+  return PASSPORT_SECTIONS_MAP[passportType]
+    ? Object.values(PASSPORT_SECTIONS_MAP[passportType]).flatMap((section) => section.fields)
     : [];
-  const allFields = dynamicFields.length ? dynamicFields : staticFields;
+}
 
-  if (!allFields.length) return null;
-  const optional = allFields.filter((field) => field.type !== "file");
-  if (!optional.length) return null;
+export function calcCompleteness(passport, typeDefinitions = []) {
+  if (!passport) return null;
 
-  const filled = optional.filter((field) => {
-    const value = passport[field.key];
-    if (value === null || value === undefined || value === "") return false;
-    if (field.type === "boolean") return value === true;
-    return String(value).trim() !== "";
-  }).length;
+  const pType = passport.passport_type || passport.passportType;
+  const typeFields = pType ? getTypeFields(pType, typeDefinitions) : [];
+  const authorFields = typeFields.filter((field) => field.type !== "file" && !field.dynamic);
+  const fieldsToMeasure = [
+    ...BASE_COMPLETENESS_FIELDS,
+    ...authorFields.filter((field) => !BASE_COMPLETENESS_FIELDS.some((baseField) => baseField.key === field.key)),
+  ];
 
-  return Math.round((filled / optional.length) * 100);
+  if (!fieldsToMeasure.length) return null;
+
+  const filled = fieldsToMeasure.filter((field) =>
+    hasCompletionValue(getPassportFieldValue(passport, field.key), field)
+  ).length;
+
+  return Math.round((filled / fieldsToMeasure.length) * 100);
 }
 
 export function dedupeLatestReleasedPassports(passports = []) {

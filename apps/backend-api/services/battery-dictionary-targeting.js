@@ -17,19 +17,19 @@ function normalizeSemanticModelKey(modelKey) {
   return normalizeText(modelKey).toLowerCase();
 }
 
-function isBatteryUmbrellaCategory(umbrellaCategory) {
-  const normalized = normalizeKey(umbrellaCategory);
+function isBatteryProductCategory(productCategory) {
+  const normalized = normalizeKey(productCategory);
   if (!normalized) return false;
   return normalized.includes("battery");
 }
 
-function hasRequiredBatterySemanticModel({ umbrellaCategory = null, semanticModelKey = null } = {}) {
-  if (!isBatteryUmbrellaCategory(umbrellaCategory)) return true;
+function hasRequiredBatterySemanticModel({ productCategory = null, semanticModelKey = null } = {}) {
+  if (!isBatteryProductCategory(productCategory)) return true;
   return normalizeText(semanticModelKey) === BATTERY_DICTIONARY_MODEL_KEY;
 }
 
 function shouldUseBatteryDictionary({ passportType = null, typeDef = null, options = {} } = {}) {
-  if (isBatteryUmbrellaCategory(options.umbrellaCategory || typeDef?.umbrella_category)) {
+  if (isBatteryProductCategory(options.productCategory || typeDef?.product_category)) {
     return true;
   }
 
@@ -43,7 +43,7 @@ function shouldUseBatteryDictionary({ passportType = null, typeDef = null, optio
 module.exports = {
   BATTERY_DICTIONARY_MODEL_KEY,
   normalizeSemanticModelKey,
-  isBatteryUmbrellaCategory,
+  isBatteryProductCategory,
   hasRequiredBatterySemanticModel,
   shouldUseBatteryDictionary,
 };

@@ -62,7 +62,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
     const data = await r.json();
     const semanticModelKey = data.semantic_model_key || allPassportTypes.find((item) => item.type_name === type)?.semantic_model_key || "";
-    const umbrellaCategory = data.umbrella_category || allPassportTypes.find((item) => item.type_name === type)?.umbrella_category || "";
+    const productCategory = data.product_category || allPassportTypes.find((item) => item.type_name === type)?.product_category || "";
     const output = [];
     for (const passport of list) {
       const targetCompanyId = passport.company_id || companyId;
@@ -86,7 +86,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
       }
       output.push(payloadData);
     }
-    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, umbrellaCategory });
+    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, productCategory });
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

@@ -23,7 +23,7 @@ Main schema areas:
 | Area | Main Tables |
 |------|-------------|
 | Company and users | `companies`, `company_dpp_policies`, `users`, `user_identities`, `invite_tokens`, `password_reset_tokens` |
-| Passport definitions | `passport_types`, `passport_type_drafts`, `passport_type_schema_events`, `umbrella_categories`, `company_passport_access` |
+| Passport definitions | `passport_types`, `passport_type_drafts`, `passport_type_schema_events`, `product_categories`, `company_passport_access` |
 | Passport identity | `passport_registry`, `dpp_subject_registry`, `dpp_registry_registrations`, `product_identifier_lineage` |
 | Passport lifecycle | Dynamic passport tables, `passport_archives`, `passport_history_visibility`, `passport_edit_sessions`, revision batch tables |
 | Access and security | `api_keys`, `passport_access_grants`, `user_access_audiences`, `passport_signatures`, `passport_signing_keys`, scan/security event tables |

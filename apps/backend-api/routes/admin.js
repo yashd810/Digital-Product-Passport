@@ -5,9 +5,9 @@ const fs = require("fs");
 const logger = require("../services/logger");
 const { SYSTEM_PASSPORT_FIELDS } = require("../helpers/passport-helpers");
 const {
-  BATTERY_DICTIONARY_MODEL_KEY,
-  hasRequiredBatterySemanticModel
-} = require("../services/battery-dictionary-targeting");
+  normalizeSystemPassportHeader,
+  validateSystemPassportHeader,
+} = require("../services/passport-header-fields");
 
 const COMPANY_POLICY_DEFAULTS = {
   default_granularity: "item",
@@ -28,6 +28,9 @@ const COMPANY_POLICY_BOOL_FIELDS = [
 "vc_issuance_enabled",
 "jsonld_export_enabled",
 "claros_battery_dictionary_enabled"];
+
+const ARCHIVED_HISTORY_REASON_SQL = `('before_archive_delete','before_bulk_archive_delete')`;
+const ARCHIVED_HISTORY_FILTER_SQL = `(snapshot_reason IS NULL OR snapshot_reason IN ${ARCHIVED_HISTORY_REASON_SQL})`;
 
 
 const RESERVED_PASSPORT_FIELD_KEYS = [
@@ -86,6 +89,58 @@ const RESERVED_PASSPORT_SEMANTIC_TOKEN_MAP = new Map(
   RESERVED_PASSPORT_SEMANTIC_IDS.map((semanticId) => [normalizeReservedToken(semanticId), semanticId])
 );
 
+const VALID_ACCESS_LEVELS = new Set([
+  "public",
+  "consumers",
+  "notified_bodies",
+  "market_surveillance",
+  "customs_authority",
+  "eu_commission",
+  "legitimate_interest",
+  "economic_operator",
+  "delegated_operator",
+  "manufacturer",
+  "authorized_representative",
+  "importer",
+  "distributor",
+  "dealer",
+  "fulfilment_service_provider",
+  "professional_repairer",
+  "independent_operator",
+  "recycler",
+  "main_dpp_service_provider",
+  "backup_dpp_service_provider",
+]);
+
+const VALID_CONFIDENTIALITY_LEVELS = new Set([
+  "public",
+  "restricted",
+  "confidential",
+  "trade_secret",
+  "regulated",
+]);
+
+const VALID_UPDATE_AUTHORITIES = new Set([
+  "economic_operator",
+  "delegated_operator",
+  "manufacturer",
+  "authorized_representative",
+  "importer",
+  "distributor",
+  "dealer",
+  "fulfilment_service_provider",
+  "professional_repairer",
+  "independent_operator",
+  "recycler",
+  "notified_bodies",
+  "market_surveillance",
+  "customs_authority",
+  "eu_commission",
+  "main_dpp_service_provider",
+  "backup_dpp_service_provider",
+  "system",
+]);
+
 module.exports = function registerAdminRoutes(app, {
   pool,
   multer,
@@ -95,8 +150,9 @@ module.exports = function registerAdminRoutes(app, {
   verifyPassword,
   logAudit,
   getTable,
-  normalizePassportTypeSchema = ({ sections = [], currentSchemaVersion = 0 } = {}) => ({
+  normalizePassportTypeSchema = ({ sections = [], systemHeader = null, currentSchemaVersion = 0 } = {}) => ({
     schemaVersion: Number.parseInt(currentSchemaVersion, 10) > 0 ? Number.parseInt(currentSchemaVersion, 10) : 1,
+    systemHeader: normalizeSystemPassportHeader(systemHeader),
     sections: Array.isArray(sections) ? sections : [],
   }),
   getTypeSchemaVersion = (fieldsJson = {}) => Number.parseInt(fieldsJson.schemaVersion, 10) || 1,
@@ -115,14 +171,6 @@ module.exports = function registerAdminRoutes(app, {
   brandedEmail,
   storageService
 }) {
-  function enforceBatterySemanticModel({ umbrellaCategory = null, semanticModelKey = null } = {}) {
-    if (!hasRequiredBatterySemanticModel({ umbrellaCategory, semanticModelKey })) {
-      const error = new Error(`Battery passport types must use semantic_model_key "${BATTERY_DICTIONARY_MODEL_KEY}".`);
-      error.statusCode = 400;
-      throw error;
-    }
-  }
-
   function findReservedPassportHeaderFieldConflicts(sections = []) {
     const conflicts = [];
     for (const section of sections || []) {
@@ -169,8 +217,8 @@ module.exports = function registerAdminRoutes(app, {
         if (!field.key || !field.label || !field.type) {
           return "Each field must have key, label, and type";
         }
-        if (!/^[a-z][a-z0-9_]{0,199}$/.test(field.key)) {
-          return `Invalid field key: ${field.key}. Field keys must be lowercase letters, numbers, and underscores, and start with a lowercase letter.`;
+        if (!/^[a-z][A-Za-z0-9_]{0,199}$/.test(field.key)) {
+          return `Invalid field key: ${field.key}. Field keys must start with a lowercase letter and may contain letters, numbers, and underscores.`;
         }
         if (seenFieldKeys.has(field.key)) {
           return `Duplicate field key: ${field.key}`;
@@ -182,6 +230,96 @@ module.exports = function registerAdminRoutes(app, {
       }
     }
     return null;
+  }
+
+  function validatePassportTypeFieldGovernance(sections = []) {
+    const issues = [];
+
+    for (const section of sections) {
+      for (const field of section?.fields || []) {
+        const access = Array.isArray(field?.access) ? field.access.filter(Boolean) : [];
+        if (!access.length) {
+          issues.push({
+            code: "FIELD_ACCESS_MISSING",
+            key: field.key,
+            label: field.label || field.key,
+            section: section.label || section.key || null,
+            message: `Field "${field.label || field.key}" must expose at least one audience.`,
+          });
+        } else {
+          const invalidAccess = access.filter((entry) => !VALID_ACCESS_LEVELS.has(entry));
+          if (invalidAccess.length) {
+            issues.push({
+              code: "FIELD_ACCESS_INVALID",
+              key: field.key,
+              label: field.label || field.key,
+              section: section.label || section.key || null,
+              message: `Field "${field.label || field.key}" uses unsupported access values: ${invalidAccess.join(", ")}.`,
+            });
+          }
+        }
+
+        const confidentiality = String(field?.confidentiality || "").trim().toLowerCase();
+        if (!confidentiality) {
+          issues.push({
+            code: "FIELD_CONFIDENTIALITY_MISSING",
+            key: field.key,
+            label: field.label || field.key,
+            section: section.label || section.key || null,
+            message: `Field "${field.label || field.key}" must declare a confidentiality classification.`,
+          });
+        } else if (!VALID_CONFIDENTIALITY_LEVELS.has(confidentiality)) {
+          issues.push({
+            code: "FIELD_CONFIDENTIALITY_INVALID",
+            key: field.key,
+            label: field.label || field.key,
+            section: section.label || section.key || null,
+            message: `Field "${field.label || field.key}" uses unsupported confidentiality value "${field.confidentiality}".`,
+          });
+        }
+
+        const updateAuthority = Array.isArray(field?.updateAuthority)
+          ? field.updateAuthority
+          : (Array.isArray(field?.update_authority) ? field.update_authority : []);
+        if (!updateAuthority.length) {
+          issues.push({
+            code: "FIELD_UPDATE_AUTHORITY_MISSING",
+            key: field.key,
+            label: field.label || field.key,
+            section: section.label || section.key || null,
+            message: `Field "${field.label || field.key}" must declare at least one update authority.`,
+          });
+        } else {
+          const invalidUpdateAuthority = updateAuthority.filter((entry) => !VALID_UPDATE_AUTHORITIES.has(entry));
+          if (invalidUpdateAuthority.length) {
+            issues.push({
+              code: "FIELD_UPDATE_AUTHORITY_INVALID",
+              key: field.key,
+              label: field.label || field.key,
+              section: section.label || section.key || null,
+              message: `Field "${field.label || field.key}" uses unsupported updateAuthority values: ${invalidUpdateAuthority.join(", ")}.`,
+            });
+          }
+        }
+      }
+    }
+
+    return issues;
+  }
+
+  function normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion }) {
+    const systemHeaderValidation = validateSystemPassportHeader(systemHeader || normalizeSystemPassportHeader());
+    if (!systemHeaderValidation.valid) {
+      const error = new Error(systemHeaderValidation.error);
+      error.statusCode = 400;
+      error.details = systemHeaderValidation;
+      throw error;
+    }
+    return normalizePassportTypeSchema({
+      sections,
+      systemHeader: normalizeSystemPassportHeader(systemHeader),
+      currentSchemaVersion,
+    });
   }
 
   async function ensureCompanyDppPolicy(companyId) {
@@ -269,20 +407,20 @@ module.exports = function registerAdminRoutes(app, {
   }
 
 
-  // ─── UMBRELLA CATEGORIES ───────────────────────────────────────────────────
-  app.get("/api/admin/umbrella-categories", authenticateToken, isSuperAdmin, async (req, res) => {
+  // ─── PRODUCT CATEGORIES ───────────────────────────────────────────────────
+  app.get("/api/admin/product-categories", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const r = await pool.query("SELECT * FROM umbrella_categories ORDER BY name");
+      const r = await pool.query("SELECT * FROM product_categories ORDER BY name");
       res.json(r.rows);
-    } catch (e) {logger.error("List umbrellas error:", e.message);res.status(500).json({ error: "Failed to fetch categories" });}
+    } catch (e) {logger.error("List productCategories error:", e.message);res.status(500).json({ error: "Failed to fetch categories" });}
   });
 
-  app.post("/api/admin/umbrella-categories", authenticateToken, isSuperAdmin, async (req, res) => {
+  app.post("/api/admin/product-categories", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const { name, icon = "📋" } = req.body;
       if (!name?.trim()) return res.status(400).json({ error: "Name is required" });
       const r = await pool.query(
-        "INSERT INTO umbrella_categories (name, icon) VALUES ($1, $2) RETURNING *",
+        "INSERT INTO product_categories (name, icon) VALUES ($1, $2) RETURNING *",
         [name.trim(), icon]
       );
       res.status(201).json(r.rows[0]);
@@ -292,7 +430,7 @@ module.exports = function registerAdminRoutes(app, {
     }
   });
 
-  app.delete("/api/admin/umbrella-categories/:id", authenticateToken, isSuperAdmin, async (req, res) => {
+  app.delete("/api/admin/product-categories/:id", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const { password } = req.body || {};
       if (!password) return res.status(400).json({ error: "Password is required" });
@@ -302,15 +440,15 @@ module.exports = function registerAdminRoutes(app, {
       const valid = await verifyPassword(password, userRow.rows[0].password_hash);
       if (!valid) return res.status(403).json({ error: "Incorrect password" });
 
-      const cat = await pool.query("SELECT name FROM umbrella_categories WHERE id = $1", [req.params.id]);
+      const cat = await pool.query("SELECT name FROM product_categories WHERE id = $1", [req.params.id]);
       if (!cat.rows.length) return res.status(404).json({ error: "Category not found" });
       const usage = await pool.query(
-        "SELECT COUNT(*) FROM passport_types WHERE umbrella_category = $1", [cat.rows[0].name]
+        "SELECT COUNT(*) FROM passport_types WHERE product_category = $1", [cat.rows[0].name]
       );
       if (parseInt(usage.rows[0].count) > 0)
       return res.status(400).json({ error: "Cannot delete — passport types are using this category" });
-      await pool.query("DELETE FROM umbrella_categories WHERE id = $1", [req.params.id]);
-      await logAudit(null, req.user.userId, "DELETE_PRODUCT_CATEGORY", "umbrella_categories", req.params.id, null,
+      await pool.query("DELETE FROM product_categories WHERE id = $1", [req.params.id]);
+      await logAudit(null, req.user.userId, "DELETE_PRODUCT_CATEGORY", "product_categories", req.params.id, null,
       { name: cat.rows[0].name });
       res.json({ success: true });
     } catch (e) {res.status(500).json({ error: "Failed to delete category" });}
@@ -320,12 +458,12 @@ module.exports = function registerAdminRoutes(app, {
   app.get("/api/admin/passport-types", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const r = await pool.query(`
-        SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.semantic_model_key,
+        SELECT pt.id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon, pt.semantic_model_key,
                pt.fields_json, pt.is_active, pt.created_at,
                u.email AS created_by_email
         FROM passport_types pt
         LEFT JOIN users u ON u.id = pt.created_by
-        ORDER BY pt.umbrella_category, pt.display_name
+        ORDER BY pt.product_category, pt.display_name
       `);
       res.json(r.rows);
     } catch (e) {logger.error("List passport types error:", e.message);res.status(500).json({ error: "Failed to fetch passport types" });}
@@ -335,7 +473,7 @@ module.exports = function registerAdminRoutes(app, {
   app.get("/api/passport-types/:typeName", publicReadRateLimit, async (req, res) => {
     try {
       const r = await pool.query(
-        `SELECT id, type_name, display_name, umbrella_category, umbrella_icon, semantic_model_key, fields_json
+        `SELECT id, type_name, display_name, product_category, product_icon, semantic_model_key, fields_json
          FROM passport_types WHERE type_name = $1`,
         [req.params.typeName]
       );
@@ -347,27 +485,19 @@ module.exports = function registerAdminRoutes(app, {
   // ─── PASSPORT TYPES (CRUD by super admin) ─────────────────────────────────
   app.patch("/api/admin/passport-types/:id", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const { display_name, umbrella_category, umbrella_icon, semantic_model_key, sections } = req.body;
+      const { display_name, product_category, product_icon, semantic_model_key, sections, systemHeader } = req.body;
       const { id } = req.params;
 
       const existing = await pool.query("SELECT * FROM passport_types WHERE id = $1", [id]);
       if (!existing.rows.length) return res.status(404).json({ error: "Passport type not found" });
       const currentType = existing.rows[0];
-      const nextUmbrellaCategory = umbrella_category !== undefined ? umbrella_category : currentType.umbrella_category;
-      const nextSemanticModelKey = semantic_model_key !== undefined ? semantic_model_key || null : currentType.semantic_model_key;
-
-      enforceBatterySemanticModel({
-        umbrellaCategory: nextUmbrellaCategory,
-        semanticModelKey: nextSemanticModelKey
-      });
-
       const updates = [];
       const vals = [];
       let idx = 1;
 
       if (display_name !== undefined) {updates.push(`display_name = $${idx++}`);vals.push(display_name);}
-      if (umbrella_category !== undefined) {updates.push(`umbrella_category = $${idx++}`);vals.push(umbrella_category);}
-      if (umbrella_icon !== undefined) {updates.push(`umbrella_icon = $${idx++}`);vals.push(umbrella_icon);}
+      if (product_category !== undefined) {updates.push(`product_category = $${idx++}`);vals.push(product_category);}
+      if (product_icon !== undefined) {updates.push(`product_icon = $${idx++}`);vals.push(product_icon);}
       if (semantic_model_key !== undefined) {updates.push(`semantic_model_key = $${idx++}`);vals.push(semantic_model_key || null);}
       if (sections !== undefined) {
         const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
@@ -379,6 +509,13 @@ module.exports = function registerAdminRoutes(app, {
         }
         const sectionValidationError = validatePassportTypeSections(sections);
         if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
+        const fieldGovernanceIssues = validatePassportTypeFieldGovernance(sections);
+        if (fieldGovernanceIssues.length) {
+          return res.status(400).json({
+            error: "Passport type fields contain invalid access or governance metadata.",
+            issues: fieldGovernanceIssues
+          });
+        }
         const schemaChange = buildPassportTypeSchemaChange({
           currentFieldsJson: currentType.fields_json || {},
           nextSections: sections,
@@ -392,8 +529,9 @@ module.exports = function registerAdminRoutes(app, {
             typeChanged: schemaChange.typeChanged,
           });
         }
-        const fields_json = normalizePassportTypeSchema({
+        const fields_json = normalizeRequestedPassportTypeSchema({
           sections,
+          systemHeader,
           currentSchemaVersion: getTypeSchemaVersion(currentType.fields_json || {}) + 1,
         });
         updates.push(`fields_json = $${idx++}`);
@@ -462,19 +600,14 @@ module.exports = function registerAdminRoutes(app, {
 
   app.post("/api/admin/passport-types", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const { type_name, display_name, umbrella_category, umbrella_icon, semantic_model_key, sections } = req.body;
+      const { type_name, display_name, product_category, product_icon, semantic_model_key, sections, systemHeader } = req.body;
 
-      if (!type_name || !display_name || !umbrella_category || !sections)
-      return res.status(400).json({ error: "type_name, display_name, umbrella_category, and sections are required" });
+      if (!type_name || !display_name || !product_category || !sections)
+      return res.status(400).json({ error: "type_name, display_name, product_category, and sections are required" });
 
       if (!/^[a-z][a-z0-9_]{1,99}$/.test(type_name))
       return res.status(400).json({
         error: "type_name must be lowercase letters/numbers/underscores, 2–100 chars, start with a letter"
-      });
-
-      enforceBatterySemanticModel({
-        umbrellaCategory: umbrella_category,
-        semanticModelKey: semantic_model_key || null
       });
 
       const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
@@ -487,19 +620,26 @@ module.exports = function registerAdminRoutes(app, {
 
       const sectionValidationError = validatePassportTypeSections(sections);
       if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
+      const fieldGovernanceIssues = validatePassportTypeFieldGovernance(sections);
+      if (fieldGovernanceIssues.length) {
+        return res.status(400).json({
+          error: "Passport type fields contain invalid access or governance metadata.",
+          issues: fieldGovernanceIssues
+        });
+      }
 
-      const fields_json = normalizePassportTypeSchema({ sections, currentSchemaVersion: 1 });
+      const fields_json = normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion: 1 });
 
       const r = await pool.query(
-        `INSERT INTO passport_types (type_name, display_name, umbrella_category, umbrella_icon, semantic_model_key, fields_json, created_by)
+        `INSERT INTO passport_types (type_name, display_name, product_category, product_icon, semantic_model_key, fields_json, created_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [type_name, display_name, umbrella_category, umbrella_icon || "📋",
+        [type_name, display_name, product_category, product_icon || "📋",
         semantic_model_key || null, JSON.stringify(fields_json), req.user.userId]
       );
 
       await pool.query(
-        "INSERT INTO umbrella_categories (name, icon) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
-        [umbrella_category, umbrella_icon || "📋"]
+        "INSERT INTO product_categories (name, icon) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
+        [product_category, product_icon || "📋"]
       );
 
       await createPassportTable(type_name, {
@@ -508,7 +648,7 @@ module.exports = function registerAdminRoutes(app, {
       });
 
       await logAudit(null, req.user.userId, "CREATE_PASSPORT_TYPE", "passport_types", null, null,
-      { type_name, display_name, umbrella_category, semantic_model_key: semantic_model_key || null });
+      { type_name, display_name, product_category, semantic_model_key: semantic_model_key || null });
 
       res.status(201).json({ success: true, passportType: r.rows[0] });
     } catch (e) {
@@ -826,6 +966,8 @@ module.exports = function registerAdminRoutes(app, {
         await client.query("DELETE FROM passport_signatures WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
         await client.query("DELETE FROM passport_scan_events WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
         await client.query("DELETE FROM passport_workflow WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM passport_security_events WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM passport_edit_sessions WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
       }
 
       for (const passportType of passportTypes) {
@@ -1024,14 +1166,26 @@ module.exports = function registerAdminRoutes(app, {
     try {
       const companiesRes = await pool.query("SELECT id, company_name FROM companies ORDER BY company_name");
       const accessRes = await pool.query(`
-        SELECT cpa.company_id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon
+        SELECT cpa.company_id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon
         FROM company_passport_access cpa
         JOIN passport_types pt ON pt.id = cpa.passport_type_id
       `);
 
-      const archivedRes = await pool.query(`SELECT COUNT(DISTINCT dpp_id) FROM passport_archives`);
-      const archivedByCoRes = await pool.query(`SELECT company_id, COUNT(DISTINCT dpp_id) AS count FROM passport_archives GROUP BY company_id`);
-      const archivedByTypeRes = await pool.query(`SELECT company_id, passport_type, COUNT(DISTINCT dpp_id) AS count FROM passport_archives GROUP BY company_id, passport_type`);
+      const archivedRes = await pool.query(
+        `SELECT COUNT(DISTINCT dpp_id) FROM passport_archives WHERE ${ARCHIVED_HISTORY_FILTER_SQL}`
+      );
+      const archivedByCoRes = await pool.query(
+        `SELECT company_id, COUNT(DISTINCT dpp_id) AS count
+         FROM passport_archives
+         WHERE ${ARCHIVED_HISTORY_FILTER_SQL}
+         GROUP BY company_id`
+      );
+      const archivedByTypeRes = await pool.query(
+        `SELECT company_id, passport_type, COUNT(DISTINCT dpp_id) AS count
+         FROM passport_archives
+         WHERE ${ARCHIVED_HISTORY_FILTER_SQL}
+         GROUP BY company_id, passport_type`
+      );
       const archivedByCompany = {};
       archivedByCoRes.rows.forEach((r) => {archivedByCompany[r.company_id] = parseInt(r.count) || 0;});
       const archivedByType = {};
@@ -1047,7 +1201,7 @@ module.exports = function registerAdminRoutes(app, {
       };
       const byCompany = [];
       const byType = [];
-      const umbrellaMap = {};
+      const productCategoryMap = {};
 
       for (const company of companiesRes.rows) {
         const grantedTypes = accessRes.rows.filter((a) => a.company_id === company.id);
@@ -1075,38 +1229,38 @@ module.exports = function registerAdminRoutes(app, {
             overall.revised_count += stats.revised;
             overall.obsolete_count += stats.obsolete;
 
-            const umb = typeAccess.umbrella_category;
+            const umb = typeAccess.product_category;
             const typeArchived = archivedByType[`${company.id}:${typeAccess.type_name}`] || 0;
-            if (!umbrellaMap[umb]) {
-              umbrellaMap[umb] = {
-                umbrella_category: umb, umbrella_icon: typeAccess.umbrella_icon,
+            if (!productCategoryMap[umb]) {
+              productCategoryMap[umb] = {
+                product_category: umb, product_icon: typeAccess.product_icon,
                 total: 0, draft: 0, released: 0, revised: 0, obsolete: 0, archived: 0, types: {}
               };
             }
-            umbrellaMap[umb].total += stats.total;
-            umbrellaMap[umb].draft += stats.draft;
-            umbrellaMap[umb].released += stats.released;
-            umbrellaMap[umb].revised += stats.revised;
-            umbrellaMap[umb].obsolete += stats.obsolete;
-            umbrellaMap[umb].archived += typeArchived;
+            productCategoryMap[umb].total += stats.total;
+            productCategoryMap[umb].draft += stats.draft;
+            productCategoryMap[umb].released += stats.released;
+            productCategoryMap[umb].revised += stats.revised;
+            productCategoryMap[umb].obsolete += stats.obsolete;
+            productCategoryMap[umb].archived += typeArchived;
 
             const tKey = typeAccess.type_name;
-            if (!umbrellaMap[umb].types[tKey]) {
-              umbrellaMap[umb].types[tKey] = {
+            if (!productCategoryMap[umb].types[tKey]) {
+              productCategoryMap[umb].types[tKey] = {
                 type_name: tKey, display_name: typeAccess.display_name,
                 total: 0, draft: 0, released: 0, revised: 0, obsolete: 0, archived: 0
               };
             }
-            umbrellaMap[umb].types[tKey].total += stats.total;
-            umbrellaMap[umb].types[tKey].draft += stats.draft;
-            umbrellaMap[umb].types[tKey].released += stats.released;
-            umbrellaMap[umb].types[tKey].revised += stats.revised;
-            umbrellaMap[umb].types[tKey].obsolete += stats.obsolete;
-            umbrellaMap[umb].types[tKey].archived += typeArchived;
+            productCategoryMap[umb].types[tKey].total += stats.total;
+            productCategoryMap[umb].types[tKey].draft += stats.draft;
+            productCategoryMap[umb].types[tKey].released += stats.released;
+            productCategoryMap[umb].types[tKey].revised += stats.revised;
+            productCategoryMap[umb].types[tKey].obsolete += stats.obsolete;
+            productCategoryMap[umb].types[tKey].archived += typeArchived;
 
             byType.push({
               company_name: company.company_name, passport_type: typeAccess.type_name,
-              display_name: typeAccess.display_name, umbrella_category: umb,
+              display_name: typeAccess.display_name, product_category: umb,
               total_count: stats.total, draft_count: stats.draft,
               released_count: stats.released, revised_count: stats.revised
             });
@@ -1116,7 +1270,7 @@ module.exports = function registerAdminRoutes(app, {
         byCompany.push(compStats);
       }
 
-      const byUmbrella = Object.values(umbrellaMap).map((u) => ({
+      const byProductCategory = Object.values(productCategoryMap).map((u) => ({
         ...u, types: Object.values(u.types)
       }));
 
@@ -1124,7 +1278,7 @@ module.exports = function registerAdminRoutes(app, {
       overall.total_passports += overall.archived_count;
       byCompany.forEach((c) => {c.total_passports += c.archived_count;});
 
-      res.json({ overall, byCompany, byType, byUmbrella });
+      res.json({ overall, byCompany, byType, byProductCategory });
     } catch (e) {logger.error("Admin analytics error:", e.message);res.status(500).json({ error: "Failed to fetch analytics" });}
   });
 
@@ -1133,7 +1287,7 @@ module.exports = function registerAdminRoutes(app, {
       const { companyId } = req.params;
 
       const accessRes = await pool.query(`
-        SELECT pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, cpa.granted_at
+        SELECT pt.type_name, pt.display_name, pt.product_category, pt.product_icon, cpa.granted_at
         FROM company_passport_access cpa
         JOIN passport_types pt ON pt.id = cpa.passport_type_id
         WHERE cpa.company_id = $1
@@ -1157,13 +1311,13 @@ module.exports = function registerAdminRoutes(app, {
       }
       const trendSeriesMap = {};
 
-      for (const { type_name, display_name, umbrella_category, umbrella_icon } of accessRes.rows) {
+      for (const { type_name, display_name, product_category, product_icon } of accessRes.rows) {
         try {
           const stats = await queryTableStats(type_name, companyId);
           if (stats.total === 0) continue;
           totalPassports += stats.total;
           analytics.push({
-            passport_type: type_name, display_name, umbrella_category, umbrella_icon,
+            passport_type: type_name, display_name, product_category, product_icon,
             total: stats.total, draft_count: stats.draft, released_count: stats.released,
             revised_count: stats.revised, in_review_count: stats.in_review, obsolete_count: stats.obsolete
           });
@@ -1182,20 +1336,20 @@ module.exports = function registerAdminRoutes(app, {
             [companyId, trendStart.toISOString()]
           );
 
-          if (!trendSeriesMap[umbrella_category]) {
-            trendSeriesMap[umbrella_category] = {
-              umbrella_category, umbrella_icon, baseline: 0,
+          if (!trendSeriesMap[product_category]) {
+            trendSeriesMap[product_category] = {
+              product_category, product_icon, baseline: 0,
               monthlyCounts: Object.fromEntries(
                 trendMonths.map((month) => [month.toISOString().slice(0, 7), 0])
               )
             };
           }
 
-          trendSeriesMap[umbrella_category].baseline += parseInt(baselineRes.rows[0]?.count || 0, 10);
+          trendSeriesMap[product_category].baseline += parseInt(baselineRes.rows[0]?.count || 0, 10);
           monthlyRes.rows.forEach((row) => {
             const key = new Date(row.month_bucket).toISOString().slice(0, 7);
-            trendSeriesMap[umbrella_category].monthlyCounts[key] =
-            (trendSeriesMap[umbrella_category].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
+            trendSeriesMap[product_category].monthlyCounts[key] =
+            (trendSeriesMap[product_category].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
           });
         } catch (e) {logger.error(`Per-company analytics error for ${companyId}/${type_name}:`, e.message);}
       }
@@ -1208,7 +1362,11 @@ module.exports = function registerAdminRoutes(app, {
       );
       const scanStats = parseInt(scanRes.rows[0]?.count || 0, 10) || 0;
       const archivedRes = await pool.query(
-        `SELECT COUNT(DISTINCT dpp_id) FROM passport_archives WHERE company_id = $1`, [companyId]
+        `SELECT COUNT(DISTINCT dpp_id)
+         FROM passport_archives
+         WHERE company_id = $1
+           AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
+        [companyId]
       );
       const archivedCount = parseInt(archivedRes.rows[0]?.count || 0, 10) || 0;
       totalPassports += archivedCount;
@@ -1217,8 +1375,8 @@ module.exports = function registerAdminRoutes(app, {
         series: Object.values(trendSeriesMap).map((series) => {
           let running = series.baseline;
           return {
-            umbrella_category: series.umbrella_category,
-            umbrella_icon: series.umbrella_icon,
+            product_category: series.product_category,
+            product_icon: series.product_icon,
             values: trendMonths.map((month) => {
               const key = month.toISOString().slice(0, 7);
               running += series.monthlyCounts[key] || 0;
@@ -1315,12 +1473,12 @@ module.exports = function registerAdminRoutes(app, {
   app.get("/api/companies/:companyId/passport-types", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(`
-        SELECT DISTINCT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.fields_json,
+        SELECT DISTINCT pt.id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon, pt.fields_json,
           (NOT cpa.access_revoked) AS access_granted
         FROM passport_types pt
         JOIN company_passport_access cpa ON pt.id = cpa.passport_type_id
         WHERE cpa.company_id = $1
-        ORDER BY pt.umbrella_category, pt.display_name
+        ORDER BY pt.product_category, pt.display_name
       `, [req.params.companyId]);
 
       res.json(r.rows);

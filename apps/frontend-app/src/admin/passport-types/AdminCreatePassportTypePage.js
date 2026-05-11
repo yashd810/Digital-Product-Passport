@@ -3,18 +3,23 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import batteryDictionaryTerms from "../../shared/semantics/battery-dictionary-terms.generated.json";
 import {
+  ACCESS_LEVEL_LABELS,
   ACCESS_LEVELS,
   CONFIDENTIALITY_LEVELS,
   FIELD_TYPES,
+  HEADER_OWNERSHIP_LABELS,
   ICON_PRESETS,
   TRANS_LANGS,
+  UPDATE_AUTHORITY_LABELS,
   UPDATE_AUTHORITIES,
   buildSectionsFromCSV,
   downloadTemplate,
   newField,
   newSection,
+  normalizeSystemPassportHeader,
   parseCSV,
   rekeySection,
+  toFieldKey,
   toSlug,
 } from "./builderHelpers";
 import { TypeIdentityCard } from "./TypeIdentityCard";
@@ -23,6 +28,11 @@ import "../styles/AdminDashboard.css";
 const API = import.meta.env.VITE_API_URL || "";
 const BATTERY_DICTIONARY_MODEL_KEY = "claros_battery_dictionary_v1";
 const SEMANTIC_MODEL_OPTIONS = [
+  {
+    key: "generic_dpp_v1",
+    label: "Generic DPP",
+    description: "Use the generic digital product passport semantic profile without battery-specific dictionary mappings.",
+  },
   {
     key: "",
     label: "No semantic model",
@@ -43,20 +53,7 @@ function isBatteryDictionarySemanticModel(modelKey) {
   return String(modelKey || "").trim() === BATTERY_DICTIONARY_MODEL_KEY;
 }
 
-function normalizeCategoryKey(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function isBatteryUmbrellaCategory(value) {
-  return normalizeCategoryKey(value).includes("battery");
-}
-
-function normalizeSemanticModelKeyForUmbrella(umbrellaCategory, semanticModelKey) {
-  if (isBatteryUmbrellaCategory(umbrellaCategory)) return BATTERY_DICTIONARY_MODEL_KEY;
+function normalizeSemanticModelKey(semanticModelKey) {
   return String(semanticModelKey || "").trim();
 }
 
@@ -119,6 +116,10 @@ const BATTERY_PASS_FIELD_CATALOG = (() => {
       key,
       label: term.label || batteryPassHumanize(key),
       semanticId,
+      unit: term.unit || "",
+      unitDisplay: term.unitDisplay || "",
+      dataType: term.dataType || null,
+      range: term.range || null,
       normalizedAliases: [...aliases].map(batteryPassNormalize).filter(Boolean),
     };
   });
@@ -127,6 +128,31 @@ const BATTERY_PASS_FIELD_CATALOG = (() => {
 const BATTERY_PASS_FIELD_BY_SEMANTIC_ID = new Map(
   BATTERY_PASS_FIELD_CATALOG.map((entry) => [entry.semanticId, entry])
 );
+
+function deriveBatteryPassUnit(term) {
+  const unitDisplay = String(term?.unitDisplay || "").trim();
+  const unit = String(term?.unit || "").trim();
+  if (unitDisplay && unitDisplay.toLowerCase() !== "n.a.") return unitDisplay;
+  if (unit && unit.toLowerCase() !== "none") return unit;
+  return "";
+}
+
+function deriveBatteryPassDataType(term) {
+  const jsonType = String(term?.dataType?.jsonType || term?.range?.jsonType || "").trim().toLowerCase();
+  const xsdType = String(term?.dataType?.xsdType || term?.range?.curie || term?.range?.iri || "").trim().toLowerCase();
+
+  if (jsonType === "string") {
+    if (xsdType.includes("anyuri")) return "uri";
+    if (xsdType.includes("date")) return "date";
+    return "string";
+  }
+  if (jsonType === "number") return "number";
+  if (jsonType === "integer") return "integer";
+  if (jsonType === "boolean") return "boolean";
+  if (xsdType.includes("date")) return "date";
+  if (xsdType.includes("anyuri")) return "uri";
+  return "";
+}
 
 function resolveBatteryPassFieldDefinition(label, currentKey = "") {
   const exactKeyMatch = batteryPassExactCatalogMatch(currentKey);
@@ -219,17 +245,56 @@ function getSemanticSearchDisplayValue(field) {
   return `${selectedEntry.key} - ${selectedEntry.label}`;
 }
 
+function summarizeSelectedValues(values = [], labelMap = {}, fallback = "Select options") {
+  const normalized = Array.isArray(values) ? values : [];
+  if (!normalized.length) return fallback;
+  if (normalized.length <= 2) {
+    return normalized.map((value) => labelMap[value] || value).join(", ");
+  }
+  const [first, second] = normalized;
+  return `${labelMap[first] || first}, ${labelMap[second] || second} +${normalized.length - 2}`;
+}
+
+function CheckboxDropdown({
+  label,
+  icon,
+  summary,
+  isOpen,
+  onToggle,
+  children,
+  className = "",
+}) {
+  return (
+    <div className={`acpt-checkbox-dropdown ${className}${isOpen ? " open" : ""}`}>
+      <span className="acpt-access-label">{icon} {label}:</span>
+      <button
+        type="button"
+        className="acpt-checkbox-dropdown-trigger"
+        onClick={onToggle}
+      >
+        <span className="acpt-checkbox-dropdown-summary">{summary}</span>
+        <span className="acpt-checkbox-dropdown-caret">{isOpen ? "▲" : "▼"}</span>
+      </button>
+      {isOpen && (
+        <div className="acpt-checkbox-dropdown-menu">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function normalizeFieldToBatteryPass(field, semanticModelKey) {
   if (!isBatteryDictionarySemanticModel(semanticModelKey)) {
     return {
       ...field,
-      key: field.key || toSlug(field.label || ""),
+      key: field.key || toFieldKey(field.label || ""),
       semanticId: undefined,
     };
   }
   return {
     ...field,
-    key: field.key || toSlug(field.label || ""),
+    key: field.key || toFieldKey(field.label || ""),
   };
 }
 
@@ -281,7 +346,7 @@ function resolveSelectedSemanticMatch(field, semanticModelKey) {
   if (field.semanticId) {
     const catalogEntry = resolveBatteryPassFieldDefinitionBySemanticId(field.semanticId);
     return {
-      key: catalogEntry?.key || field.key || toSlug(field.label || ""),
+      key: catalogEntry?.key || field.key || toFieldKey(field.label || ""),
       label: catalogEntry?.label || field.label || batteryPassHumanize(field.key || ""),
       semanticId: field.semanticId,
     };
@@ -295,8 +360,8 @@ function AdminCreatePassportType() {
 
   // ── Meta fields ────────────────────────────────────────────
   const [displayName,    setDisplayName]    = useState("");
-  const [umbrella,       setUmbrella]       = useState("");
-  const [umbrellaIcon,   setUmbrellaIcon]   = useState("📋");
+  const [productCategory,       setProductCategory]       = useState("");
+  const [productIcon,   setProductIcon]   = useState("📋");
   const [semanticModelKey, setSemanticModelKey] = useState("");
   const [typeName,       setTypeName]       = useState("");
   const [typeNameManual, setTypeNameManual] = useState(false);
@@ -309,6 +374,7 @@ function AdminCreatePassportType() {
 
   // ── Section builder ────────────────────────────────────────
   const [sections, setSections] = useState([newSection("General")]);
+  const [systemHeader, setSystemHeader] = useState(() => normalizeSystemPassportHeader());
 
   // ── UI state ───────────────────────────────────────────────
   const [saving,   setSaving]   = useState(false);
@@ -316,6 +382,7 @@ function AdminCreatePassportType() {
   const [success,  setSuccess]  = useState("");
   const [csvError, setCsvError] = useState("");
   const [invalidFields, setInvalidFields] = useState([]);  // section/field IDs with errors
+  const [openGovernanceDropdown, setOpenGovernanceDropdown] = useState(null);
 
   const hasInvalid = (id) => invalidFields.includes(id);
 
@@ -338,12 +405,24 @@ function AdminCreatePassportType() {
     successAlertRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [success]);
 
+  useEffect(() => {
+    if (!openGovernanceDropdown) return undefined;
+    const handleClickOutside = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(".acpt-checkbox-dropdown")) return;
+      setOpenGovernanceDropdown(null);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openGovernanceDropdown]);
+
   const applyDraft = (draft) => {
-    const nextUmbrella = draft.umbrella || "";
-    const nextSemanticModelKey = normalizeSemanticModelKeyForUmbrella(nextUmbrella, draft.semanticModelKey || "");
+    const nextProductCategory = draft.productCategory || "";
+    const nextSemanticModelKey = normalizeSemanticModelKey(draft.semanticModelKey || "");
     setDisplayName(draft.displayName || "");
-    setUmbrella(nextUmbrella);
-    setUmbrellaIcon(draft.umbrellaIcon || "📋");
+    setProductCategory(nextProductCategory);
+    setProductIcon(draft.productIcon || "📋");
     setSemanticModelKey(nextSemanticModelKey);
     setTypeName(draft.typeName || "");
     setTypeNameManual(draft.typeNameManual || false);
@@ -353,6 +432,7 @@ function AdminCreatePassportType() {
       label_i18n: sec.label_i18n || {},
       fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
+    setSystemHeader(normalizeSystemPassportHeader(draft.systemHeader));
     if (restored.length > 0) setSections(syncSectionsWithSemanticModel(restored, nextSemanticModelKey));
   };
 
@@ -369,30 +449,30 @@ function AdminCreatePassportType() {
   useEffect(() => {
     if (!draftEnabled) return;
     const hasContent = displayName.trim() || sections.some(s => s.label || s.fields.length > 0);
-    if (!hasContent || !umbrella.trim()) return;
+    if (!hasContent || !productCategory.trim()) return;
     clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
       fetchWithAuth(DRAFT_API, {
         method: "PUT",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, semanticModelKey, typeName, typeNameManual, sections } }),
+        body: JSON.stringify({ draft_json: { displayName, productCategory, productIcon, semanticModelKey, typeName, typeNameManual, sections, systemHeader } }),
       }).catch(() => {});
     }, 1500);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [draftEnabled, displayName, umbrella, umbrellaIcon, semanticModelKey, typeName, typeNameManual, sections]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [draftEnabled, displayName, productCategory, productIcon, semanticModelKey, typeName, typeNameManual, sections, systemHeader]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveDraft = () => {
     if (!draftEnabled) return;
-    if (!umbrella.trim()) {
+    if (!productCategory.trim()) {
       setError("Select a product category before saving a draft.");
-      setInvalidFields(["umbrella"]);
+      setInvalidFields(["productCategory"]);
       return;
     }
     setError("");
     fetchWithAuth(DRAFT_API, {
       method: "PUT",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ draft_json: { displayName, umbrella, umbrellaIcon, semanticModelKey, typeName, typeNameManual, sections } }),
+      body: JSON.stringify({ draft_json: { displayName, productCategory, productIcon, semanticModelKey, typeName, typeNameManual, sections, systemHeader } }),
     })
       .then(r => r.ok ? (
         setSuccess("Draft saved successfully!"),
@@ -423,14 +503,14 @@ function AdminCreatePassportType() {
     reader.readAsText(file);
   };
 
-  // Fetch umbrella categories from API
-  const [umbrellaOptions, setUmbrellaOptions] = useState([]);
+  // Fetch product categories from API
+  const [productCategoryOptions, setProductCategoryOptions] = useState([]);
   useEffect(() => {
-    fetchWithAuth(`${API}/api/admin/umbrella-categories`, {
+    fetchWithAuth(`${API}/api/admin/product-categories`, {
       headers: authHeaders(),
     })
       .then(r => r.ok ? r.json() : [])
-      .then(setUmbrellaOptions)
+      .then(setProductCategoryOptions)
       .catch(() => {});
   }, []);
 
@@ -439,10 +519,10 @@ function AdminCreatePassportType() {
     const ed = initialEditData.current;
     if (!ed) return;
     setDisplayName(ed.display_name || "");
-    const nextUmbrella = ed.umbrella_category || "";
-    setUmbrella(nextUmbrella);
-    setUmbrellaIcon(ed.umbrella_icon || "📋");
-    const nextSemanticModelKey = normalizeSemanticModelKeyForUmbrella(nextUmbrella, ed.semantic_model_key || "");
+    const nextProductCategory = ed.product_category || "";
+    setProductCategory(nextProductCategory);
+    setProductIcon(ed.product_icon || "📋");
+    const nextSemanticModelKey = normalizeSemanticModelKey(ed.semantic_model_key || "");
     setSemanticModelKey(nextSemanticModelKey);
     setTypeName(ed.type_name || "");
     setTypeNameManual(true); // lock type_name, it cannot change
@@ -452,6 +532,7 @@ function AdminCreatePassportType() {
       label_i18n: sec.label_i18n || {},
       fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
+    setSystemHeader(normalizeSystemPassportHeader(ed.fields_json?.systemHeader));
     if (editSections.length > 0) setSections(syncSectionsWithSemanticModel(editSections, nextSemanticModelKey));
   }, []); // runs once
 
@@ -462,10 +543,10 @@ function AdminCreatePassportType() {
     if (!cd) return;
     cloneSourceTypeName.current = cd.type_name;
     setDisplayName(`Clone of ${cd.display_name || cd.type_name}`);
-    const nextUmbrella = cd.umbrella_category || "";
-    setUmbrella(nextUmbrella);
-    setUmbrellaIcon(cd.umbrella_icon || "📋");
-    const nextSemanticModelKey = normalizeSemanticModelKeyForUmbrella(nextUmbrella, cd.semantic_model_key || "");
+    const nextProductCategory = cd.product_category || "";
+    setProductCategory(nextProductCategory);
+    setProductIcon(cd.product_icon || "📋");
+    const nextSemanticModelKey = normalizeSemanticModelKey(cd.semantic_model_key || "");
     setSemanticModelKey(nextSemanticModelKey);
     const clonedSections = (cd.fields_json?.sections || []).map(sec => rekeySection({
       ...sec,
@@ -473,6 +554,7 @@ function AdminCreatePassportType() {
       label_i18n: sec.label_i18n || {},
       fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
+    setSystemHeader(normalizeSystemPassportHeader(cd.fields_json?.systemHeader));
     if (clonedSections.length > 0) setSections(syncSectionsWithSemanticModel(clonedSections, nextSemanticModelKey));
   }, []); // runs once — initial clone data captured in ref above
 
@@ -482,12 +564,6 @@ function AdminCreatePassportType() {
       setTypeName(toSlug(displayName));
     }
   }, [displayName, typeNameManual]);
-
-  useEffect(() => {
-    if (!isBatteryUmbrellaCategory(umbrella)) return;
-    if (semanticModelKey === BATTERY_DICTIONARY_MODEL_KEY) return;
-    setSemanticModelKey(BATTERY_DICTIONARY_MODEL_KEY);
-  }, [umbrella, semanticModelKey]);
 
   useEffect(() => {
     setSections((currentSections) => syncSectionsWithSemanticModel(currentSections, semanticModelKey));
@@ -547,12 +623,13 @@ function AdminCreatePassportType() {
             updated = normalizeFieldToBatteryPass(updated, semanticModelKey);
           }
 
+          if ("label" in patch && !updated._keyManual) {
+            updated.key = toFieldKey(patch.label || "");
+          }
+
           if ("label" in patch && !patch.label) {
             delete updated.semanticId;
             delete updated.semanticMode;
-            if (!updated._keyManual) {
-              updated.key = toSlug(patch.label || "");
-            }
           }
           // Switching TO table: set defaults
           if (patch.type === "table" && f.type !== "table") {
@@ -614,6 +691,8 @@ function AdminCreatePassportType() {
           return {
             ...f,
             semanticId: selected.semanticId,
+            unit: deriveBatteryPassUnit(selected),
+            dataType: deriveBatteryPassDataType(selected),
             _semanticOpen: false,
             _semanticSearch: `${selected.key} - ${selected.label}`,
           };
@@ -708,6 +787,20 @@ function AdminCreatePassportType() {
       );
     });
 
+  const updateSystemHeaderSection = (patch) =>
+    setSystemHeader((current) => normalizeSystemPassportHeader({
+      ...current,
+      section: { ...current.section, ...patch },
+    }));
+
+  const updateSystemHeaderField = (fieldKey, patch) =>
+    setSystemHeader((current) => normalizeSystemPassportHeader({
+      ...current,
+      fields: current.fields.map((field) =>
+        field.key === fieldKey ? { ...field, ...patch } : field
+      ),
+    }));
+
   // ── Submit ─────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -720,15 +813,10 @@ function AdminCreatePassportType() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return setError("Display name is required.");
     }
-    if (!umbrella.trim()) {
-      setInvalidFields(["umbrella"]);
+    if (!productCategory.trim()) {
+      setInvalidFields(["productCategory"]);
       window.scrollTo({ top: 0, behavior: "smooth" });
-      return setError("Umbrella category is required.");
-    }
-    if (isBatteryUmbrellaCategory(umbrella) && semanticModelKey !== BATTERY_DICTIONARY_MODEL_KEY) {
-      setInvalidFields(["semanticModelKey"]);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return setError(`Battery passport types must use the "${BATTERY_DICTIONARY_MODEL_KEY}" semantic model.`);
+      return setError("Product category is required.");
     }
     if (!editMode) {
       if (!typeName.trim()) {
@@ -743,12 +831,14 @@ function AdminCreatePassportType() {
       }
     }
 
+    const fieldKeyToId = new Map();
     const cleanSections = sections.map(sec => {
       const cleanSec = {
         key:    sec.key,
         label:  sec.label,
         fields: sec.fields.map(f => {
           const normalizedField = normalizeFieldToBatteryPass(f, semanticModelKey);
+          fieldKeyToId.set(normalizedField.key, f._id);
           const base = {
             key:    normalizedField.key,
             label:  normalizedField.label,
@@ -833,15 +923,28 @@ function AdminCreatePassportType() {
         body: JSON.stringify({
           type_name:         typeName,
           display_name:      displayName,
-          umbrella_category: umbrella,
-          umbrella_icon:     umbrellaIcon,
-          semantic_model_key: normalizeSemanticModelKeyForUmbrella(umbrella, semanticModelKey) || null,
+          product_category: productCategory,
+          product_icon:     productIcon,
+          semantic_model_key: normalizeSemanticModelKey(semanticModelKey) || null,
+          systemHeader:       normalizeSystemPassportHeader(systemHeader),
           sections:          cleanSections,
         }),
       });
 
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || (editMode ? "Failed to update passport type" : "Failed to create passport type"));
+      if (!r.ok) {
+        if (Array.isArray(data.fields) && data.fields.length > 0) {
+          const invalidIds = data.fields
+            .map((item) => fieldKeyToId.get(item.field))
+            .filter(Boolean);
+          if (invalidIds.length) setInvalidFields(invalidIds);
+          const details = data.fields
+            .map((item) => item.message || item.field || item.reservedField)
+            .join(" ");
+          throw new Error(`${data.error || "Passport type validation failed."} ${details}`.trim());
+        }
+        throw new Error(data.error || data.detail || (editMode ? "Failed to update passport type" : "Failed to create passport type"));
+      }
 
       setSuccess(editMode ? "Passport type updated successfully!" : "Passport type created successfully!");
       if (draftEnabled) fetchWithAuth(DRAFT_API, { method: "DELETE", headers: authHeaders() }).catch(() => {});
@@ -849,11 +952,12 @@ function AdminCreatePassportType() {
       setInvalidFields([]);
       if (!editMode) {
         setDisplayName("");
-          setUmbrella("");
-          setUmbrellaIcon("📋");
+          setProductCategory("");
+          setProductIcon("📋");
           setSemanticModelKey("");
         setTypeName("");
         setTypeNameManual(false);
+        setSystemHeader(normalizeSystemPassportHeader());
         setSections([newSection("General")]);
       }
     } catch (e) {
@@ -899,15 +1003,14 @@ function AdminCreatePassportType() {
         <TypeIdentityCard
           displayName={displayName}
           setDisplayName={setDisplayName}
-          umbrella={umbrella}
-          setUmbrella={setUmbrella}
-          umbrellaIcon={umbrellaIcon}
-          setUmbrellaIcon={setUmbrellaIcon}
+          productCategory={productCategory}
+          setProductCategory={setProductCategory}
+          productIcon={productIcon}
+          setProductIcon={setProductIcon}
           semanticModelKey={semanticModelKey}
           setSemanticModelKey={setSemanticModelKey}
-          isBatteryUmbrellaCategory={isBatteryUmbrellaCategory(umbrella)}
           semanticModelOptions={SEMANTIC_MODEL_OPTIONS}
-          umbrellaOptions={umbrellaOptions}
+          productCategoryOptions={productCategoryOptions}
           typeName={typeName}
           setTypeName={setTypeName}
           setTypeNameManual={setTypeNameManual}
@@ -917,6 +1020,95 @@ function AdminCreatePassportType() {
           setInvalidFields={setInvalidFields}
           iconPresets={ICON_PRESETS}
         />
+
+        <div className="acpt-card acpt-system-header-card">
+          <div className="acpt-builder-header">
+            <div>
+              <h3 className="acpt-card-title">Passport Header</h3>
+              <p className="acpt-builder-hint">
+                Standards-required header fields are locked to their JSON-LD keys and filled from controlled system sources.
+              </p>
+            </div>
+            <span className="acpt-system-header-lock">Locked standards header</span>
+          </div>
+
+          <div className="acpt-system-header-ownership">
+            {Object.entries(HEADER_OWNERSHIP_LABELS).map(([key, label]) => (
+              <span key={key} className={`acpt-system-header-owner acpt-system-header-owner-${key}`}>
+                {label}
+              </span>
+            ))}
+          </div>
+
+          <div className="acpt-section-name-row acpt-system-header-section-row">
+            <input
+              type="text"
+              value={systemHeader.section.label}
+              onChange={e => updateSystemHeaderSection({ label: e.target.value })}
+              className="acpt-section-name-input"
+              placeholder="Passport Header"
+            />
+            <div className="acpt-section-key-row">
+              <span className="acpt-key-label">key:</span>
+              <input
+                type="text"
+                value={systemHeader.section.key}
+                className="acpt-key-input acpt-mono"
+                disabled
+              />
+            </div>
+          </div>
+
+          <div className="acpt-system-header-grid">
+            {systemHeader.fields.map((field) => (
+              <div key={field.key} className="acpt-system-header-field">
+                <div className="acpt-system-header-label-row">
+                  <input
+                    type="text"
+                    value={field.label}
+                    onChange={e => updateSystemHeaderField(field.key, { label: e.target.value })}
+                    className="acpt-input acpt-field-label-input"
+                  />
+                  <button
+                    type="button"
+                    className={`acpt-i18n-toggle${field._i18nOpen ? " open" : ""}`}
+                    onClick={() => updateSystemHeaderField(field.key, { _i18nOpen: !field._i18nOpen })}
+                    title="Add translations for this header label"
+                  >
+                    🌐
+                  </button>
+                </div>
+                <div className="acpt-system-header-meta">
+                  <code>{field.key}</code>
+                  <span>{field.semanticId}</span>
+                  <span className={`acpt-system-header-owner acpt-system-header-owner-${field.ownership}`}>
+                    {HEADER_OWNERSHIP_LABELS[field.ownership] || field.ownership}
+                  </span>
+                  <span>{field.valueSource.replace(/_/g, " ")}</span>
+                  <strong>{field.required ? "Required" : "Conditional"}</strong>
+                </div>
+                {field._i18nOpen && (
+                  <div className="acpt-i18n-panel acpt-i18n-panel-field">
+                    {TRANS_LANGS.map(l => (
+                      <div key={l.code} className="acpt-i18n-row">
+                        <span className="acpt-i18n-flag">{l.flag} {l.name}</span>
+                        <input
+                          type="text"
+                          value={(field.label_i18n || {})[l.code] || ""}
+                          onChange={e => updateSystemHeaderField(field.key, {
+                            label_i18n: { ...(field.label_i18n || {}), [l.code]: e.target.value },
+                          })}
+                          placeholder={`"${field.label || "Header field"}" in ${l.name}`}
+                          className="acpt-i18n-input"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* ── Field Builder ── */}
         <div className="acpt-card">
@@ -1034,6 +1226,10 @@ function AdminCreatePassportType() {
                         field.semanticId || ""
                       );
                       const semanticSearchValue = getSemanticSearchDisplayValue(field);
+                      const accessSummary = summarizeSelectedValues(field.access || ["public"], ACCESS_LEVEL_LABELS, "Select access");
+                      const updateAuthoritySummary = summarizeSelectedValues(field.updateAuthority || ["economic_operator"], UPDATE_AUTHORITY_LABELS, "Select authority");
+                      const accessDropdownId = `${section._id}:${field._id}:access`;
+                      const updateDropdownId = `${section._id}:${field._id}:authority`;
                       return (
                         <>
                     <div className="acpt-field-row">
@@ -1119,6 +1315,7 @@ function AdminCreatePassportType() {
                           title="Move field to another section"
                           disabled={sections.length < 2}
                         >
+                          <option value={section._id}>Move section</option>
                           {sections.map(sec => (
                             <option key={sec._id} value={sec._id}>
                               {sec.label?.trim() || "Untitled section"}
@@ -1131,113 +1328,134 @@ function AdminCreatePassportType() {
                         onClick={() => removeField(section._id, field._id)} title="Remove field">✕</button>
                     </div>
 
-                    {/* ── Access level config (applies to all field types) ── */}
-                    <div className="acpt-field-access">
-                      <span className="acpt-access-label">🔒 Access:</span>
-                      {ACCESS_LEVELS.map(level => {
-                        const currentAccess = field.access || ["public"];
-                        const isPublicChecked = currentAccess.includes("public");
-                        const isChecked  = currentAccess.includes(level.value);
-                        // Non-public options are greyed out when Public is checked
-                        const isDisabled = level.value !== "public" && isPublicChecked;
-                        return (
-                          <label key={level.value} className={`acpt-access-check${isDisabled ? " acpt-access-disabled" : ""}`}>
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              disabled={isDisabled}
-                              onChange={e => {
-                                if (level.value === "public") {
-                                  // Checking Public → clear all others and set ["public"]
-                                  // Unchecking Public → set [] (user must pick restricted groups)
-                                  updateField(section._id, field._id, {
-                                    access: e.target.checked ? ["public"] : [],
-                                  });
-                                } else {
-                                  // Toggle this restricted group in/out of the access array
-                                  const next = e.target.checked
-                                    ? [...currentAccess.filter(a => a !== "public"), level.value]
-                                    : currentAccess.filter(a => a !== level.value);
-                                  updateField(section._id, field._id, { access: next });
-                                }
-                              }}
-                            />
-                            <span>{level.label}</span>
+                    <div className="acpt-field-top-row">
+                      <div className="acpt-field-governance-stack">
+                        {/* ── Access level config (applies to all field types) ── */}
+                        <div className="acpt-field-access">
+                          <CheckboxDropdown
+                            label="Access"
+                            icon="🔒"
+                            summary={accessSummary}
+                            isOpen={openGovernanceDropdown === accessDropdownId}
+                            onToggle={() => setOpenGovernanceDropdown((current) => current === accessDropdownId ? null : accessDropdownId)}
+                          >
+                            {ACCESS_LEVELS.map(level => {
+                              const currentAccess = field.access || ["public"];
+                              const isPublicChecked = currentAccess.includes("public");
+                              const isChecked = currentAccess.includes(level.value);
+                              const isDisabled = level.value !== "public" && isPublicChecked;
+                              return (
+                                <label key={level.value} className={`acpt-access-check${isDisabled ? " acpt-access-disabled" : ""}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    disabled={isDisabled}
+                                    onChange={e => {
+                                      if (level.value === "public") {
+                                        updateField(section._id, field._id, {
+                                          access: e.target.checked ? ["public"] : [],
+                                        });
+                                      } else {
+                                        const next = e.target.checked
+                                          ? [...currentAccess.filter(a => a !== "public"), level.value]
+                                          : currentAccess.filter(a => a !== level.value);
+                                        updateField(section._id, field._id, { access: next });
+                                      }
+                                    }}
+                                  />
+                                  <span>{level.label}</span>
+                                </label>
+                              );
+                            })}
+                          </CheckboxDropdown>
+                        </div>
+
+                        <div className="acpt-field-access">
+                          <label className="acpt-access-check">
+                            <span>🛡️ Confidentiality:</span>
+                            <select
+                              value={field.confidentiality || "public"}
+                              onChange={e => updateField(section._id, field._id, { confidentiality: e.target.value })}
+                              className="acpt-governance-select"
+                            >
+                              {CONFIDENTIALITY_LEVELS.map(level => (
+                                <option key={level.value} value={level.value}>
+                                  {level.label}
+                                </option>
+                              ))}
+                            </select>
                           </label>
-                        );
-                      })}
-                    </div>
+                        </div>
 
-                    <div className="acpt-field-access">
-                      <label className="acpt-access-check">
-                        <span>🧾 Confidentiality:</span>
-                        <select
-                          value={field.confidentiality || "public"}
-                          onChange={e => updateField(section._id, field._id, { confidentiality: e.target.value })}
-                        >
-                          {CONFIDENTIALITY_LEVELS.map(level => (
-                            <option key={level.value} value={level.value}>
-                              {level.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="acpt-field-access">
-                      <span className="acpt-access-label">✍️ Update Authority:</span>
-                      {UPDATE_AUTHORITIES.map(level => {
-                        const currentAuthorities = field.updateAuthority || ["economic_operator"];
-                        const isChecked = currentAuthorities.includes(level.value);
-                        return (
-                          <label key={level.value} className="acpt-access-check">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={e => {
-                                const next = e.target.checked
-                                  ? [...new Set([...currentAuthorities, level.value])]
-                                  : currentAuthorities.filter(a => a !== level.value);
-                                updateField(section._id, field._id, {
-                                  updateAuthority: next.length ? next : ["economic_operator"],
-                                });
-                              }}
-                            />
-                            <span>{level.label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-
-                    {/* ── Composition / Battery Pass mapping / Dynamic — single row ── */}
-                    <div className="acpt-field-meta-row">
-                      {/* Composition toggle */}
-                      <div className="acpt-field-composition">
-                        <label className="acpt-composition-toggle">
-                          <input
-                            type="checkbox"
-                            checked={!!field.composition}
-                            onChange={e => updateField(section._id, field._id, { composition: e.target.checked })}
-                          />
-                          <span className="acpt-composition-label">
-                            Composition (pie chart)
-                            <span className="acpt-composition-hint">
-                              Field contains material percentages. A pie chart will be shown automatically in the public passport view.
-                              Format: "Steel: 60%, Aluminium: 25%" or one entry per line.
-                            </span>
-                          </span>
-                        </label>
+                        <div className="acpt-field-access">
+                          <CheckboxDropdown
+                            label="Update Authority"
+                            icon="✍️"
+                            summary={updateAuthoritySummary}
+                            isOpen={openGovernanceDropdown === updateDropdownId}
+                            onToggle={() => setOpenGovernanceDropdown((current) => current === updateDropdownId ? null : updateDropdownId)}
+                          >
+                            {UPDATE_AUTHORITIES.map(level => {
+                              const currentAuthorities = field.updateAuthority || ["economic_operator"];
+                              const isChecked = currentAuthorities.includes(level.value);
+                              return (
+                                <label key={level.value} className="acpt-access-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={e => {
+                                      const next = e.target.checked
+                                        ? [...new Set([...currentAuthorities, level.value])]
+                                        : currentAuthorities.filter(a => a !== level.value);
+                                      updateField(section._id, field._id, {
+                                        updateAuthority: next.length ? next : ["economic_operator"],
+                                      });
+                                    }}
+                                  />
+                                  <span>{level.label}</span>
+                                </label>
+                              );
+                            })}
+                          </CheckboxDropdown>
+                        </div>
                       </div>
 
-                      {/* Battery Pass Metadata */}
+                      <div className="acpt-field-side-options">
+                        {/* Composition toggle */}
+                        <div className="acpt-field-composition">
+                          <label className="acpt-composition-toggle">
+                            <input
+                              type="checkbox"
+                              checked={!!field.composition}
+                              onChange={e => updateField(section._id, field._id, { composition: e.target.checked })}
+                            />
+                            <span className="acpt-composition-label">
+                              Composition (pie chart)
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* Dynamic (live data) toggle */}
+                        <div className="acpt-field-dynamic">
+                          <label className="acpt-dynamic-toggle">
+                            <input
+                              type="checkbox"
+                              checked={!!field.dynamic}
+                              onChange={e => updateField(section._id, field._id, { dynamic: e.target.checked })}
+                            />
+                            <span className="acpt-dynamic-label">
+                              Dynamic (live data)
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <div className="acpt-field-semantic-row">
                       <div className="acpt-field-semantic">
                         <div className="acpt-semantic-label">
                           🔬 Semantic Metadata
-                          <span className="acpt-semantic-hint">
-                            {isBatteryDictionarySemanticModel(semanticModelKey)
-                              ? "Hidden from users. Select the battery dictionary term manually and the export will use that canonical Claros term IRI."
-                              : "Hidden from users. Select a semantic model to enable semantic IDs for this field."}
-                          </span>
                         </div>
                         <div className="acpt-meta-fields-row">
                           <div className="acpt-meta-field-group">
@@ -1266,8 +1484,6 @@ function AdminCreatePassportType() {
                               <option value="uri">URI / Link</option>
                             </select>
                           </div>
-                        </div>
-                        {isBatteryDictionarySemanticModel(semanticModelKey) && (
                           <div className="acpt-meta-field-group acpt-meta-field-group-full">
                             <span className="acpt-meta-sub-label">Semantic Term</span>
                             <div className="acpt-semantic-picker">
@@ -1309,30 +1525,17 @@ function AdminCreatePassportType() {
                                 </div>
                               )}
                             </div>
+                          </div>
+                        </div>
+                        {isBatteryDictionarySemanticModel(semanticModelKey) && (
+                          <>
                             <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
                               {selectedSemanticMatch
                                 ? `Selected term: ${selectedSemanticMatch?.label || selectedSemanticMatch?.key || "Dictionary term"}`
                                 : "No semantic term selected yet."}
                             </div>
-                          </div>
+                          </>
                         )}
-                      </div>
-
-                      {/* Dynamic (live data) toggle */}
-                      <div className="acpt-field-dynamic">
-                        <label className="acpt-dynamic-toggle">
-                          <input
-                            type="checkbox"
-                            checked={!!field.dynamic}
-                            onChange={e => updateField(section._id, field._id, { dynamic: e.target.checked })}
-                          />
-                          <span className="acpt-dynamic-label">
-                            Dynamic (live data)
-                            <span className="acpt-dynamic-hint">
-                              Value is pushed by a connected device and updates automatically. Cannot be edited manually once the passport is released.
-                            </span>
-                          </span>
-                        </label>
                       </div>
                     </div>
 

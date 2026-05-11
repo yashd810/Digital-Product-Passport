@@ -2,6 +2,39 @@ import React, { useEffect, useState } from "react";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 
 const API = import.meta.env.VITE_API_URL || "";
+const OPERATOR_TYPE_OPTIONS = [
+  { value: "economic_operator", label: "Economic Operator" },
+  { value: "manufacturer", label: "Manufacturer" },
+  { value: "authorized_representative", label: "Authorized Representative" },
+  { value: "importer", label: "Importer" },
+  { value: "distributor", label: "Distributor" },
+  { value: "dealer", label: "Dealer" },
+  { value: "delegated_operator", label: "Delegated Operator" },
+  { value: "professional_repairer", label: "Professional Repairer" },
+  { value: "independent_operator", label: "Independent Operator" },
+  { value: "recycler", label: "Recycler" },
+  { value: "market_surveillance", label: "Market Surveillance" },
+  { value: "customs_authority", label: "Customs Authority" },
+  { value: "eu_commission", label: "EU Commission" },
+  { value: "main_dpp_service_provider", label: "Main DPP Service Provider" },
+  { value: "backup_dpp_service_provider", label: "Backup DPP Service Provider" },
+  { value: "public", label: "Public" },
+];
+const ACCESS_MODE_OPTIONS = [
+  { value: "read", label: "Read only" },
+  { value: "update", label: "Read and update" },
+];
+const CONFIDENTIALITY_OPTIONS = [
+  { value: "public", label: "Public" },
+  { value: "restricted", label: "Restricted" },
+  { value: "confidential", label: "Confidential" },
+  { value: "trade_secret", label: "Trade secret" },
+  { value: "regulated", label: "Regulated" },
+];
+
+function humanizeOption(value, options) {
+  return options.find((option) => option.value === value)?.label || value || "Not set";
+}
 
 function SecurityCenter({ user, companyId }) {
   const resolvedCompanyId = companyId || user?.companyId || user?.company_id || "";
@@ -17,6 +50,9 @@ function SecurityCenter({ user, companyId }) {
   const [apiKeys, setApiKeys] = useState([]);
   const [loadingKeys, setLoadingKeys] = useState(false);
   const [keyName, setKeyName] = useState("");
+  const [operatorType, setOperatorType] = useState("economic_operator");
+  const [accessMode, setAccessMode] = useState("read");
+  const [maxConfidentiality, setMaxConfidentiality] = useState("regulated");
   const [generatingKey, setGeneratingKey] = useState(false);
   const [revokingId, setRevokingId] = useState(null);
   const [newKey, setNewKey] = useState(null);
@@ -100,12 +136,26 @@ function SecurityCenter({ user, companyId }) {
       const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/api-keys`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ name: keyName.trim() }),
+        body: JSON.stringify({
+          name: keyName.trim(),
+          operator_type: operatorType,
+          access_mode: accessMode,
+          max_confidentiality: maxConfidentiality,
+        }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "Failed to generate key");
-      setNewKey({ name: d.name, key: d.key });
+      setNewKey({
+        name: d.name,
+        key: d.key,
+        operatorType: d.operator_type,
+        accessMode: d.access_mode,
+        maxConfidentiality: d.max_confidentiality,
+      });
       setKeyName("");
+      setOperatorType("economic_operator");
+      setAccessMode("read");
+      setMaxConfidentiality("regulated");
       setCopiedApiKey(false);
       await fetchApiKeys();
       flash("success", `Created company API key "${d.name}".`);
@@ -212,8 +262,8 @@ function SecurityCenter({ user, companyId }) {
         <div className="profile-card">
           <h4 className="card-section-title">🏢 Company API Keys</h4>
           <p className="profile-helper-text">
-            Company API keys are used only for the public read-only <code>/api/v1/passports</code> endpoints.
-            Send them in the <code>X-API-Key</code> header. They are different from bearer tokens, device keys, and public passport access keys.
+            Company API keys are used for external operator integrations on <code>/api/v1/passports</code>.
+            Send them in the <code>X-API-Key</code> header. Each key can represent one operator, be read-only or update-enabled, and be capped to a maximum confidentiality level.
           </p>
 
           {!resolvedCompanyId && (
@@ -235,6 +285,9 @@ function SecurityCenter({ user, companyId }) {
                   </p>
                   <p style={{ margin: "0 0 10px", color: "#86efac", fontSize: 13 }}>
                     This is the only time this key will be shown. Copy it now.
+                  </p>
+                  <p style={{ margin: "0 0 10px", color: "var(--text-secondary)", fontSize: 12 }}>
+                    {humanizeOption(newKey.operatorType, OPERATOR_TYPE_OPTIONS)} · {humanizeOption(newKey.accessMode, ACCESS_MODE_OPTIONS)} · Up to {humanizeOption(newKey.maxConfidentiality, CONFIDENTIALITY_OPTIONS)}
                   </p>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <code style={{ flex: 1, background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: 6, padding: "8px 12px", fontSize: 13, fontFamily: "monospace", wordBreak: "break-all", color: "var(--text-primary)" }}>
@@ -258,23 +311,65 @@ function SecurityCenter({ user, companyId }) {
                 </div>
               )}
 
-              <form onSubmit={generateApiKey} style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+              <form onSubmit={generateApiKey} style={{ display: "grid", gap: 10, marginBottom: 20 }}>
                 <input
                   type="text"
-                  placeholder="Key name (e.g. Production Integration)"
+                  placeholder="Key name (e.g. Recycler ABC Production)"
                   value={keyName}
                   onChange={(e) => setKeyName(e.target.value)}
                   disabled={generatingKey}
                   maxLength={100}
                   className="token-input"
-                  style={{ flex: 1, minWidth: 220 }}
+                  style={{ minWidth: 220 }}
                 />
+                <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+                  <label style={{ display: "grid", gap: 6 }}>
+                    <span className="profile-helper-text" style={{ margin: 0 }}>Operator type</span>
+                    <select
+                      value={operatorType}
+                      onChange={(e) => setOperatorType(e.target.value)}
+                      disabled={generatingKey}
+                      className="token-input"
+                    >
+                      {OPERATOR_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ display: "grid", gap: 6 }}>
+                    <span className="profile-helper-text" style={{ margin: 0 }}>Access mode</span>
+                    <select
+                      value={accessMode}
+                      onChange={(e) => setAccessMode(e.target.value)}
+                      disabled={generatingKey}
+                      className="token-input"
+                    >
+                      {ACCESS_MODE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ display: "grid", gap: 6 }}>
+                    <span className="profile-helper-text" style={{ margin: 0 }}>Max confidentiality</span>
+                    <select
+                      value={maxConfidentiality}
+                      onChange={(e) => setMaxConfidentiality(e.target.value)}
+                      disabled={generatingKey}
+                      className="token-input"
+                    >
+                      {CONFIDENTIALITY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <button
                   type="submit"
                   disabled={generatingKey || !keyName.trim()}
                   className="btn-copy-token"
+                  style={{ justifySelf: "start" }}
                 >
-                  {generatingKey ? "Generating..." : "+ Generate Key"}
+                  {generatingKey ? "Generating..." : "+ Generate Operator Key"}
                 </button>
               </form>
 
@@ -302,6 +397,9 @@ function SecurityCenter({ user, companyId }) {
                         <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>{key.name}</div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2, fontFamily: "monospace" }}>
                           {key.key_prefix}...
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>
+                          {humanizeOption(key.operator_type, OPERATOR_TYPE_OPTIONS)} · {humanizeOption(key.access_mode, ACCESS_MODE_OPTIONS)} · Up to {humanizeOption(key.max_confidentiality, CONFIDENTIALITY_OPTIONS)}
                         </div>
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text-secondary)", textAlign: "right" }}>

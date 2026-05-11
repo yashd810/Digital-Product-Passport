@@ -15,7 +15,7 @@ import {
 const API = import.meta.env.VITE_API_URL || "";
 
 export function usePassportListState({ user, companyId, filterByUser }) {
-  const { passportType, productKey, umbrellaKey } = useParams();
+  const { passportType, productKey, productCategoryKey } = useParams();
 
   const [passports, setPassports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,8 +51,8 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const activeType = passportType || null;
   const activeProductCategory = productKey
     ? decodeURIComponent(productKey)
-    : umbrellaKey
-      ? decodeURIComponent(umbrellaKey)
+    : productCategoryKey
+      ? decodeURIComponent(productCategoryKey)
       : null;
 
   const activeTypeData = useMemo(
@@ -146,7 +146,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     setShowFilters(false);
     setSortConfig({ key: "created_at", direction: "desc" });
     setColumnFilters({});
-  }, [filterByUser, passportType, productKey, umbrellaKey]);
+  }, [filterByUser, passportType, productKey, productCategoryKey]);
 
   useEffect(() => {
     if (!companyId) return;
@@ -202,7 +202,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         });
         const types = typeResponse.ok ? await typeResponse.json() : [];
         const all = await fetchForTypes(
-          (Array.isArray(types) ? types : []).filter((type) => type.umbrella_category === activeProductCategory)
+          (Array.isArray(types) ? types : []).filter((type) => type.product_category === activeProductCategory)
         );
         all.sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
         setPassports(all);

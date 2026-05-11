@@ -196,8 +196,8 @@ function LineChart({ labels, series }) {
               <div key={index} className="olt-row">
                 <span className="olt-swatch" style={{ background: color }} />
                 <span className="olt-name">
-                  {item.umbrella_icon ? `${item.umbrella_icon} ` : ""}
-                  {item.umbrella_category}
+                  {item.product_icon ? `${item.product_icon} ` : ""}
+                  {item.product_category}
                 </span>
                 <span className="olt-val">{value}</span>
               </div>
@@ -214,8 +214,8 @@ function LineChart({ labels, series }) {
               style={{ backgroundColor: item.color || OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length] }}
             />
             <span className="overview-line-legend-name">
-              {item.umbrella_icon ? `${item.umbrella_icon} ` : ""}
-              {item.umbrella_category}
+              {item.product_icon ? `${item.product_icon} ` : ""}
+              {item.product_category}
             </span>
           </div>
         ))}
@@ -373,7 +373,7 @@ function AdminCompanyAnalytics() {
               ? renderLineChartSvg(data.trend.labels, trendSeries, { width: 420, height: 220 })
               : "",
             legendItems: trendSeries.map((item) => ({
-              label: `${item.umbrella_icon ? `${item.umbrella_icon} ` : ""}${item.umbrella_category}`,
+              label: `${item.product_icon ? `${item.product_icon} ` : ""}${item.product_category}`,
               color: item.color,
             })),
             emptyText: "No trend data yet",

@@ -192,6 +192,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       if (keyPrefix) {
         const prefixed = await pool.query(
           `SELECT ak.id, ak.company_id, ak.scopes, ak.expires_at, ak.key_hash, ak.key_salt, ak.hash_algorithm,
+                  ak.operator_type, ak.access_mode, ak.max_confidentiality,
                   c.economic_operator_identifier, c.economic_operator_identifier_scheme
            FROM api_keys ak
            LEFT JOIN companies c ON c.id = ak.company_id
@@ -214,6 +215,9 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
         companyId: String(matchedRow.company_id),
         scopes: normalizeScopes(matchedRow.scopes),
         expiresAt: matchedRow.expires_at || null,
+        operatorType: matchedRow.operator_type || "economic_operator",
+        accessMode: matchedRow.access_mode || "read",
+        maxConfidentiality: matchedRow.max_confidentiality || "regulated",
         mfaEnabled: false,
         mfaVerifiedAt: null,
         authenticationMethods: ["api_key"],

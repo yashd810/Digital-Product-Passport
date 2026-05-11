@@ -42,8 +42,8 @@ Get company configuration, available passport types, and system presets for asse
       "id": "uuid",
       "type_name": "battery-passport",
       "display_name": "Battery Digital Product Passport",
-      "umbrella_category": "Batteries",
-      "umbrella_icon": "🔋",
+      "product_category": "Batteries",
+      "product_icon": "🔋",
       "fields_json": {
         "sections": [...]
       }

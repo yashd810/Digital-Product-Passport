@@ -90,10 +90,10 @@ function CompanyAccess() {
     }
   };
 
-  // Group types by umbrella_category
+  // Group types by product_category
   const grouped = allTypes.reduce((acc, t) => {
-    const key = t.umbrella_category;
-    if (!acc[key]) acc[key] = { icon: t.umbrella_icon, types: [] };
+    const key = t.product_category;
+    if (!acc[key]) acc[key] = { icon: t.product_icon, types: [] };
     acc[key].types.push(t);
     return acc;
   }, {});
@@ -142,11 +142,11 @@ function CompanyAccess() {
                 </button>
               </div>
             ) : (
-              Object.entries(grouped).map(([umbrella, { icon, types }]) => (
-                <div key={umbrella} className="access-umbrella-group">
-                  <div className="access-umbrella-header">
-                    <span className="access-umbrella-icon">{icon}</span>
-                    <span className="access-umbrella-name">{umbrella}</span>
+              Object.entries(grouped).map(([productCategory, { icon, types }]) => (
+                <div key={productCategory} className="access-productCategory-group">
+                  <div className="access-productCategory-header">
+                    <span className="access-productCategory-icon">{icon}</span>
+                    <span className="access-productCategory-name">{productCategory}</span>
                   </div>
 
                   <div className="types-grid">

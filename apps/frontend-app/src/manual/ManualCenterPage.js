@@ -49,7 +49,7 @@ function ManualCenter({ mode = "user", user, companyId }) {
             fetchWithAuth(`${API}/api/admin/passport-types`, {
               headers: authHeaders(),
             }).catch(() => null),
-            fetchWithAuth(`${API}/api/admin/umbrella-categories`, {
+            fetchWithAuth(`${API}/api/admin/product-categories`, {
               headers: authHeaders(),
             }).catch(() => null),
           ]);

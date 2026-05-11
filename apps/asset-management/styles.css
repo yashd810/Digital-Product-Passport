@@ -266,9 +266,15 @@ code {
 }
 
 .panel {
+  position: relative;
+  z-index: 0;
   padding: 24px;
   border-radius: var(--radius);
   box-shadow: var(--panel-shadow-soft);
+}
+
+.panel.panel-dropdown-open {
+  z-index: 20;
 }
 
 .controls-panel,
@@ -429,6 +435,11 @@ textarea {
   position: relative;
   width: 100%;
   min-width: 0;
+}
+
+.custom-select.cs-open,
+.field-filter-dropdown.open {
+  z-index: 30;
 }
 
 .cs-trigger {

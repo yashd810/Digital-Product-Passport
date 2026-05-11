@@ -663,7 +663,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Work in the Asset Grid",
           items: [
             "The grid behaves like a simple spreadsheet. Row, Passport DPP ID, and Serial Number stay visible while you scroll.",
-            "Use Add Blank Row when you want to stage a new row manually before previewing it.",
+            "Use Create Passport Row when you want to stage a new row manually before previewing it.",
             "Use Export CSV to create a safe base file. Filtered columns export still keeps `dppId` and `product_id` so the file can be matched on import.",
             "Keep `dppId` whenever possible. If your incoming data does not have `dppId`, make sure `product_id` is present and stable.",
           ],

@@ -31,13 +31,13 @@ All responses are JSON. Successful responses (2xx) contain data or operation sta
 
 ---
 
-## Umbrella Categories (Product Type Categories)
+## Product Categories (Product Type Categories)
 
 ### List All Categories
 
-**GET** `/api/admin/umbrella-categories`
+**GET** `/api/admin/product-categories`
 
-Returns all umbrella categories used for organizing passport types.
+Returns all product categories used for organizing passport types.
 
 **Parameters:** None
 
@@ -60,9 +60,9 @@ Returns all umbrella categories used for organizing passport types.
 
 ### Create Category
 
-**POST** `/api/admin/umbrella-categories`
+**POST** `/api/admin/product-categories`
 
-Create a new umbrella category for organizing passport types.
+Create a new product category for organizing passport types.
 
 **Request Body:**
 ```json
@@ -94,9 +94,9 @@ Create a new umbrella category for organizing passport types.
 
 ### Delete Category
 
-**DELETE** `/api/admin/umbrella-categories/:id`
+**DELETE** `/api/admin/product-categories/:id`
 
-Delete an umbrella category. Requires password confirmation. Category must not be in use by any passport types.
+Delete an product category. Requires password confirmation. Category must not be in use by any passport types.
 
 **Parameters:**
 - `id` (path parameter, required) - Category ID to delete
@@ -141,8 +141,8 @@ Returns all passport types (both active and inactive). Super admin only.
     "id": "uuid",
     "type_name": "battery-passport",
     "display_name": "Battery Digital Product Passport",
-    "umbrella_category": "Batteries",
-    "umbrella_icon": "🔋",
+    "product_category": "Batteries",
+    "product_icon": "🔋",
     "semantic_model_key": "battery",
     "fields_json": {...},
     "is_active": true,
@@ -172,8 +172,8 @@ Get a single passport type definition by type name. **No authentication required
   "id": "uuid",
   "type_name": "battery-passport",
   "display_name": "Battery Digital Product Passport",
-  "umbrella_category": "Batteries",
-  "umbrella_icon": "🔋",
+  "product_category": "Batteries",
+  "product_icon": "🔋",
   "semantic_model_key": "battery",
   "fields_json": {
     "sections": [
@@ -205,8 +205,8 @@ Create a new passport type definition with field schema.
 {
   "type_name": "battery-passport",
   "display_name": "Battery Digital Product Passport",
-  "umbrella_category": "Batteries",
-  "umbrella_icon": "🔋",
+  "product_category": "Batteries",
+  "product_icon": "🔋",
   "semantic_model_key": "battery",
   "fields_json": {
     "sections": [
@@ -232,8 +232,8 @@ Create a new passport type definition with field schema.
 **Parameters:**
 - `type_name` (string, required) - Unique identifier for passport type
 - `display_name` (string, required) - Human-readable name
-- `umbrella_category` (string, required) - Category for organization
-- `umbrella_icon` (string, optional) - Emoji icon
+- `product_category` (string, required) - Category for organization
+- `product_icon` (string, optional) - Emoji icon
 - `semantic_model_key` (string, required) - Semantic model identifier
 - `fields_json` (object, required) - Schema defining passport fields
 
@@ -243,8 +243,8 @@ Create a new passport type definition with field schema.
   "id": "uuid",
   "type_name": "battery-passport",
   "display_name": "Battery Digital Product Passport",
-  "umbrella_category": "Batteries",
-  "umbrella_icon": "🔋",
+  "product_category": "Batteries",
+  "product_icon": "🔋",
   "semantic_model_key": "battery",
   "fields_json": {...},
   "is_active": true,

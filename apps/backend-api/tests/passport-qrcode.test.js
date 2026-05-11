@@ -251,7 +251,9 @@ function createTestApp() {
     buildBatteryPassJsonExport: () => ({}),
     storageService: {},
     complianceService: { resolveProfileMetadata: () => ({ key: "generic_dpp_v1", contentSpecificationIds: [], defaultCarrierPolicyKey: null }) },
-    accessRightsService: {},
+    accessRightsService: {
+      VALID_AUDIENCES: new Set(["consumers", "importers", "recyclers", "legitimate_interest"]),
+    },
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId }) => ({ productIdInput: rawProductId, productIdentifierDid: null }),
     },
@@ -265,13 +267,14 @@ function createTestApp() {
 describe("passport qr-code routes", () => {
   test("stores carrier authenticity metadata and returns a signed carrier payload", async () => {
     const { app } = createTestApp();
+    const publicPassportUrl = "https://viewer.claros-dpp.online/dpp/acme-energy/battery-pack/BAT-2026-001";
 
     const saveResponse = await invokeRoute(app, {
       method: "post",
       path: "/api/passports/:dppId/qrcode",
       params: { dppId: "dpp_test_qr_1" },
       body: {
-        qrCode: "data:image/png;base64,AAAA",
+        qrCode: publicPassportUrl,
         passportType: "battery",
         carrierSecurityStatus: "signed_payload",
         carrierAuthenticationMethod: "signed_qr_payload",
@@ -302,7 +305,7 @@ describe("passport qr-code routes", () => {
     expect(fetchResponse.statusCode).toBe(200);
     expect(fetchResponse.body).toEqual(
       expect.objectContaining({
-        qrCode: "data:image/png;base64,AAAA",
+        qrCode: publicPassportUrl,
         carrierSecurityStatus: "signed_payload",
         signedCarrierPayload: expect.objectContaining({
           format: "claros_dpp_carrier_binding_v1",

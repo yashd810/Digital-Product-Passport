@@ -8,6 +8,7 @@ const {
   BATTERY_DICTIONARY_MODEL_KEY,
   shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
 } = require("./battery-dictionary-targeting");
+const { getSystemPassportHeader } = require("./passport-header-fields");
 
 function createCanonicalPassportSerializer({ didService, productIdentifierService = null }) {
   const APPLICABLE_REQUIREMENT_LEVELS = new Set([
@@ -103,6 +104,13 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
+  }
+
+  function isUriLikeValue(value) {
+    const text = normalizeText(value);
+    if (!text) return false;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return true;
+    return /^https?:\/\//i.test(text);
   }
 
   function parseBoolean(value) {
@@ -912,22 +920,41 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     return null;
   }
 
+  function getHeaderFieldConfig(typeDef, key) {
+    return getSystemPassportHeader(typeDef).fields.find((field) => field.key === key) || null;
+  }
+
+  function pushMissingHeaderIssue(validationIssues, typeDef, key, value) {
+    const headerField = getHeaderFieldConfig(typeDef, key);
+    if (!headerField?.required || !isBlankValue(value)) return;
+    validationIssues.push({
+      key,
+      code: "REQUIRED_HEADER_FIELD_MISSING",
+      message: `Required passport header field "${key}" is missing from the generated standards payload.`,
+      dictionaryReference: headerField.semanticId || null,
+      valueSource: headerField.valueSource || null,
+    });
+  }
+
   function buildCanonicalPassportPayload(passport, typeDef, options = {}) {
     const publicOrigin = didService?.getPublicOrigin?.() || "http://localhost:3000";
     const company = options.company || null;
+    const companyName = String(options.companyName || "").trim();
     const passportType = String(passport?.passport_type || typeDef?.type_name || options.passportType || "battery").trim().toLowerCase() || "battery";
     const didPassportType = "battery";
     const stableId = didService?.normalizeStableId?.(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.guid);
     const resolvedGranularity = String(
       options.granularity
-      || findHeaderAliasValue(passport || {}, HEADER_FIELD_ALIASES.granularity)
+      || company?.default_granularity
+      || company?.dpp_granularity
       || passport?.granularity
       || "model"
     ).trim().toLowerCase() || "model";
-    const companySlug = company?.did_slug
-      ? didService.normalizeCompanySlug(company.did_slug)
-      : didService.normalizeCompanySlug(company?.company_name || `company-${passport.company_id}`);
-    const companyDid = didService.generateCompanyDid(companySlug);
+    const companySlugSource = company?.did_slug || company?.company_name || companyName || "";
+    const companySlug = companySlugSource
+      ? didService.normalizeCompanySlug(companySlugSource)
+      : null;
+    const companyDid = companySlug ? didService.generateCompanyDid(companySlug) : null;
     const subjectDid = resolvedGranularity === "item"
       ? didService.generateItemDid(didPassportType, stableId)
       : resolvedGranularity === "batch"
@@ -1001,15 +1028,15 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       fields[fieldDef.key] = typedValue;
     }
 
-    const dppSchemaVersion = findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.dppSchemaVersion) || passport?.dpp_schema_version || "prEN 18223:2025";
-    const rawDppStatus = findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.dppStatus) || passport?.dpp_status || null;
+    const dppSchemaVersion = passport?.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025";
+    const rawDppStatus = passport?.dpp_status || null;
     const dppStatus = toDppStatus(passport?.release_status || rawDppStatus);
-    const economicOperatorId = findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.economicOperatorId) || passport?.economic_operator_id || companyDid;
-    const facilityId = findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.facilityId) || passport?.facility_id || null;
+    const economicOperatorId = passport?.economic_operator_id || company?.economic_operator_identifier || companyDid;
+    const facilityId = passport?.facility_id || passport?.facility_identifier || null;
     const contentSpecificationIdsRaw =
-      findHeaderAliasValue(fields, HEADER_FIELD_ALIASES.contentSpecificationIds)
-      || passport?.content_specification_ids
+      passport?.content_specification_ids
       || typeDef?.semantic_model_key
+      || typeDef?.fields_json?.semanticModelKey
       || [];
     const contentSpecificationIds = Array.isArray(contentSpecificationIdsRaw)
       ? contentSpecificationIdsRaw
@@ -1023,6 +1050,35 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
         }
       });
     });
+
+    const localProductId = passport.product_id || null;
+    const storedProductIdentifier = isUriLikeValue(passport.product_identifier_did)
+      ? passport.product_identifier_did
+      : null;
+    const uniqueProductIdentifier = derivedProductIdentifierDid || storedProductIdentifier || null;
+    const storedPassportIdentifier = isUriLikeValue(passport?.dppId || passport?.dpp_id || passport?.guid)
+      ? (passport?.dppId || passport?.dpp_id || passport?.guid)
+      : null;
+    const digitalProductPassportId = dppDid || storedPassportIdentifier || null;
+    const lastUpdate = toIsoTimestamp(passport.updated_at || passport.created_at);
+    const headerValues = {
+      digitalProductPassportId,
+      uniqueProductIdentifier,
+      localProductId,
+      granularity: toTitleCaseGranularity(resolvedGranularity),
+      dppSchemaVersion,
+      dppStatus,
+      lastUpdate,
+      economicOperatorId,
+      facilityId,
+      contentSpecificationIds: Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],
+      subjectDid,
+      dppDid,
+      companyDid,
+    };
+    for (const [key, value] of Object.entries(headerValues)) {
+      pushMissingHeaderIssue(validationIssues, typeDef, key, value);
+    }
 
     const resolvedVersionNumber = Number(passport.version_number) || 1;
     const extensions = buildClarosExtensions({
@@ -1044,17 +1100,14 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       }
     }
 
-    const localProductId = passport.product_id || null;
-    const uniqueProductIdentifier = passport.product_identifier_did || derivedProductIdentifierDid || localProductId;
-
     return {
-      digitalProductPassportId: passport?.dppId || passport?.dpp_id || passport?.guid || dppDid,
+      digitalProductPassportId,
       uniqueProductIdentifier,
       localProductId,
-      granularity: toTitleCaseGranularity(resolvedGranularity),
+      granularity: headerValues.granularity,
       dppSchemaVersion,
       dppStatus,
-      lastUpdate: toIsoTimestamp(passport.updated_at || passport.created_at),
+      lastUpdate,
       economicOperatorId,
       facilityId,
       contentSpecificationIds: Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],

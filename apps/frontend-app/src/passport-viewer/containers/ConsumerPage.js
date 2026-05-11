@@ -5,6 +5,7 @@ import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i
 import { formatPassportStatus, isReleasedPassportStatus } from "../../passports/utils/passportStatus";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildPreviewTechnicalPassportPath, buildTechnicalPassportPath } from "../../passports/utils/passportRoutes";
+import { getMarketingContactUrl } from "../utils/QRcode";
 import { TrustedEntryPanel, ViewerDomainIndicator } from "../components/ViewerBlocks";
 import "../styles/PassportViewer.css";
 
@@ -105,6 +106,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
   };
 
   const manufacturer     = company?.company_name || passport.manufacturer || "—";
+  const contactUrl = theme.supportLink || getMarketingContactUrl();
   const ratedCapacity    = getFieldVal(["capacity", /rated.capacity/i])    || passport.capacity  || "—";
   const batteryChemistry = getFieldVal(["chemistry", /battery.chemistry/i]) || passport.chemistry || "—";
   const stateOfHealth    = getFieldVal([/state.of.health/i,          "state_of_health"]);
@@ -267,7 +269,7 @@ function BatteryConsumerView({ passport, company, typeDef, dynamicValues = {} })
             </a>
           )}
           <div className="cp-footer-note">Powered by ClarosDPP, digital passport provider via software as a service.</div>
-          <a className="cp-footer-support" href="mailto:digitalproductpass@gmail.com">Contact information</a>
+          <a className="cp-footer-support" href={contactUrl} target="_blank" rel="noopener noreferrer">Contact information</a>
         </div>
       </main>
     </div>
@@ -300,6 +302,7 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
 
   const pType = passport.passport_type || "generic";
   const theme = getConsumerTheme(pType, company?.branding_json);
+  const contactUrl = theme.supportLink || getMarketingContactUrl();
 
   const statusLabel = formatPassportStatus(passport.release_status);
 
@@ -438,7 +441,7 @@ function GenericConsumerView({ passport, company, typeDef, dynamicValues }) {
             </a>
           )}
           <div className="cp-footer-note">Powered by ClarosDPP, digital passport provider via software as a service.</div>
-          <a className="cp-footer-support" href="mailto:digitalproductpass@gmail.com">Contact information</a>
+          <a className="cp-footer-support" href={contactUrl} target="_blank" rel="noopener noreferrer">Contact information</a>
         </div>
       </main>
     </div>
@@ -478,6 +481,9 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
           ? { ...data, preview_mode: true, previewId: previewId || data.dppId }
           : data;
         setPassport(resolvedPassport);
+        if (!previewMode && resolvedPassport?.company_profile) {
+          setCompany(resolvedPassport.company_profile);
+        }
         if (resolvedPassport?.dppId && !previewMode) {
           const viewerUserId = getViewerUserId();
           fetchWithAuth(`${API}/api/passports/${resolvedPassport.dppId}/scan`, {
@@ -491,7 +497,9 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
           }).catch(() => {});
         }
         const [companyRes, typeRes, dynamicRes, canonicalRes] = await Promise.all([
-          resolvedPassport.company_id   ? fetchWithAuth(`${API}/api/companies/${resolvedPassport.company_id}/profile`)     : Promise.resolve(null),
+          previewMode && resolvedPassport.company_id
+            ? fetchWithAuth(`${API}/api/companies/${resolvedPassport.company_id}/profile`)
+            : Promise.resolve(null),
           resolvedPassport.passport_type ? fetchWithAuth(`${API}/api/passport-types/${resolvedPassport.passport_type}`)    : Promise.resolve(null),
           resolvedPassport.inactive_public_version || !resolvedPassport.dppId
             ? Promise.resolve(null)
@@ -526,8 +534,8 @@ function BatteryConsumerPage({ previewMode = false, previewCompanyId = null }) {
     </div>
   );
 
-  const umbrellaCategory = typeDef?.umbrella_category || "";
-  const isBattery = /battery/i.test(umbrellaCategory);
+  const productCategory = typeDef?.product_category || "";
+  const isBattery = /battery/i.test(productCategory);
   const linkedDataPayload = passport?.linked_data?.public_url && canonicalJson
     ? {
         "@context": [

@@ -30,7 +30,7 @@ const ManageTeam = lazy(() => import("../../user/dashboard/team/ManageTeam"));
 const CompanyRepository = lazy(() => import("../../user/dashboard/repository/CompanyRepository"));
 const WorkflowDashboard = lazy(() => import("../../user/dashboard/workflow/WorkflowDashboard"));
 
-const ConsumerPage = lazy(() => import("../../passport-viewer/containers/ConsumerPage"));
+const PublicPassportRedirectPage = lazy(() => import("../../passport-viewer/containers/PublicPassportRedirectPage"));
 const CSVImportGuide = lazy(() => import("../../user/dashboard/csv/CSVImportGuide"));
 const NotificationsPage = lazy(() => import("../../user/dashboard/notifications/NotificationsPage"));
 const MessagingPage = lazy(() => import("../../user/dashboard/notifications/MessagingPage"));
@@ -112,8 +112,8 @@ function App() {
         <Route path="/oauth/callback"  element={<OAuthCallback setToken={setToken} setUser={setUser} setCompanyId={setCompanyId} />} />
 
         {/* Consumer QR landing page */}
-        <Route path="/p/:productId" element={<ConsumerPage />} />
-        <Route path="/p/inactive/:productId/:versionNumber" element={<ConsumerPage />} />
+        <Route path="/p/:productId" element={<PublicPassportRedirectPage />} />
+        <Route path="/p/inactive/:productId/:versionNumber" element={<PublicPassportRedirectPage />} />
 
         {/* Passport viewer — public */}
         <Route path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId/technical/*" element={
@@ -123,13 +123,13 @@ function App() {
         } />
         <Route path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId" element={
           <ProtectedRoute token={token} authReady={authReady}>
-            <ConsumerPage previewMode={true} previewCompanyId={companyId} />
+            <PassportViewer previewMode={true} previewCompanyId={companyId} />
           </ProtectedRoute>
         } />
         <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber/technical/*" element={<PassportViewer />} />
-        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber" element={<ConsumerPage />} />
+        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber" element={<PassportViewer />} />
         <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId/technical/*" element={<PassportViewer />} />
-        <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId" element={<ConsumerPage />} />
+        <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId" element={<PassportViewer />} />
 
         {/* CSV Import */}
         <Route path="/csv-import/:passportType" element={
@@ -153,7 +153,7 @@ function App() {
           <Route path="overview"      element={<Overview companyId={companyId} />} />
           <Route path="my-passports"  element={<PassportList user={user} companyId={companyId} filterByUser={true} />} />
           <Route path="passports/product/:productKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
-          <Route path="passports/umbrella/:umbrellaKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
+          <Route path="passports/productCategory/:productCategoryKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="passports/:dppId/diff" element={<VersionDiff companyId={companyId} />} />
           <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="notifications"   element={<NotificationsPage user={user} />} />

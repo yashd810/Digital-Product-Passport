@@ -2,6 +2,7 @@
 
 const nodeCrypto = require("crypto");
 const logger = require("./logger");
+const { normalizeSystemPassportHeader } = require("./passport-header-fields");
 const canonicalizeJson = require("./json-canonicalization");
 
 const IN_REVISION_STATUSES_SQL       = `('in_revision')`;
@@ -22,6 +23,7 @@ const LIVE_PASSPORT_SYSTEM_COLUMNS = new Set([
   "carrier_policy_key",
   "carrier_authenticity",
   "economic_operator_id",
+  "economic_operator_identifier_scheme",
   "facility_id",
   "granularity",
   "release_status",
@@ -33,6 +35,30 @@ const LIVE_PASSPORT_SYSTEM_COLUMNS = new Set([
   "updated_at",
   "deleted_at",
 ]);
+const LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS = [
+  ["dpp_id", "TEXT NOT NULL"],
+  ["lineage_id", "TEXT NOT NULL"],
+  ["company_id", "INTEGER NOT NULL"],
+  ["model_name", "VARCHAR(255)"],
+  ["product_id", "VARCHAR(255) NOT NULL"],
+  ["product_identifier_did", "TEXT"],
+  ["compliance_profile_key", "VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1'"],
+  ["content_specification_ids", "TEXT"],
+  ["carrier_policy_key", "VARCHAR(120)"],
+  ["carrier_authenticity", "JSONB"],
+  ["economic_operator_id", "TEXT"],
+  ["economic_operator_identifier_scheme", "VARCHAR(80)"],
+  ["facility_id", "TEXT"],
+  ["granularity", "VARCHAR(20) NOT NULL DEFAULT 'model'"],
+  ["release_status", "VARCHAR(50) NOT NULL DEFAULT 'draft'"],
+  ["version_number", "INTEGER NOT NULL DEFAULT 1"],
+  ["qr_code", "TEXT"],
+  ["created_by", "INTEGER REFERENCES users(id) ON DELETE SET NULL"],
+  ["updated_by", "INTEGER REFERENCES users(id) ON DELETE SET NULL"],
+  ["created_at", "TIMESTAMPTZ NOT NULL DEFAULT NOW()"],
+  ["updated_at", "TIMESTAMPTZ NOT NULL DEFAULT NOW()"],
+  ["deleted_at", "TIMESTAMPTZ"],
+];
 
 module.exports = function createPassportService({
   pool,
@@ -60,6 +86,10 @@ module.exports = function createPassportService({
   createTransporter,
   brandedEmail,
 }) {
+  function isMissingRelationError(error) {
+    return error?.code === "42P01";
+  }
+
   // ─── AUDIT / NOTIFICATION ────────────────────────────────────────────────
 
   function buildAuditEventPayload({
@@ -603,6 +633,8 @@ module.exports = function createPassportService({
   async function stripRestrictedFieldsForPublicView(passport, passportType) {
     if (!passport || !passportType) return passport;
     const sanitized = { ...passport };
+    delete sanitized.company_id;
+    delete sanitized.companyId;
     try {
       const typeRes = await pool.query(
         "SELECT fields_json FROM passport_types WHERE type_name = $1",
@@ -624,7 +656,10 @@ module.exports = function createPassportService({
 
   async function fetchCompanyPassportRecord({ companyId, dppId = null, passportType = null, versionNumber = null }) {
     let resolvedPassportType = passportType || null;
-    const hasExplicitVersion = Number.isFinite(Number(versionNumber));
+    const hasExplicitVersion = versionNumber !== null &&
+      versionNumber !== undefined &&
+      String(versionNumber).trim() !== "" &&
+      Number.isFinite(Number(versionNumber));
     const parsedVersionNumber = hasExplicitVersion ? Number(versionNumber) : null;
 
     if (!resolvedPassportType) {
@@ -776,34 +811,41 @@ module.exports = function createPassportService({
 
     for (const { type_name } of ptRows.rows) {
       const tableName = getTable(type_name);
-      const liveParams = candidates;
+      const liveParams = [candidates];
       let versionSql = "";
       let companySql = "";
-      let companyParamOffset = liveParams.length;
       if (companyId !== null && companyId !== undefined) {
         liveParams.push(companyId);
-        companyParamOffset = liveParams.length;
-        companySql = ` AND company_id = $${companyParamOffset}`;
+        companySql = ` AND company_id = $${liveParams.length}`;
       }
       if (versionNumber !== null && versionNumber !== undefined) {
         liveParams.push(versionNumber);
         versionSql = ` AND version_number = $${liveParams.length}`;
       }
 
-      const liveRes = await pool.query(
-        `SELECT *
-         FROM ${tableName}
-         WHERE ${matchSql}
-           AND ${
-             versionNumber !== null && versionNumber !== undefined
-               ? "release_status IN ('released', 'obsolete')"
-               : "release_status = 'released'"
-           }${companySql}
-           AND deleted_at IS NULL${versionSql}
-         ORDER BY version_number DESC, updated_at DESC
-         LIMIT 1`,
-        liveParams
-      );
+      let liveRes;
+      try {
+        liveRes = await pool.query(
+          `SELECT *
+           FROM ${tableName}
+           WHERE ${matchSql}
+             AND ${
+               versionNumber !== null && versionNumber !== undefined
+                 ? "release_status IN ('released', 'obsolete')"
+                 : "release_status = 'released'"
+             }${companySql}
+             AND deleted_at IS NULL${versionSql}
+           ORDER BY version_number DESC, updated_at DESC
+           LIMIT 1`,
+          liveParams
+        );
+      } catch (error) {
+        if (isMissingRelationError(error)) {
+          logger.warn({ tableName, passportType: type_name }, "Skipping passport type lookup because storage table does not exist yet");
+          continue;
+        }
+        throw error;
+      }
       if (liveRes.rows.length) {
         matches.push({
           passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: type_name },
@@ -949,16 +991,25 @@ module.exports = function createPassportService({
 
     for (const { type_name } of ptRows.rows) {
       const tableName = getTable(type_name);
-      const liveRes = await pool.query(
-        `SELECT *
-         FROM ${tableName}
-         WHERE company_id = $1
-           AND (product_id = ANY($2::text[]) OR product_identifier_did = ANY($2::text[]))
-           AND deleted_at IS NULL
-         ORDER BY version_number DESC, updated_at DESC, id DESC
-         LIMIT 1`,
-        [companyId, candidates]
-      );
+      let liveRes;
+      try {
+        liveRes = await pool.query(
+          `SELECT *
+           FROM ${tableName}
+           WHERE company_id = $1
+             AND (product_id = ANY($2::text[]) OR product_identifier_did = ANY($2::text[]))
+             AND deleted_at IS NULL
+           ORDER BY version_number DESC, updated_at DESC, id DESC
+           LIMIT 1`,
+          [companyId, candidates]
+        );
+      } catch (error) {
+        if (isMissingRelationError(error)) {
+          logger.warn({ tableName, passportType: type_name }, "Skipping preview lookup because storage table does not exist yet");
+          continue;
+        }
+        throw error;
+      }
       if (liveRes.rows.length) {
         liveMatches.push({
           passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: type_name },
@@ -1293,10 +1344,11 @@ module.exports = function createPassportService({
     });
   }
 
-  function normalizePassportTypeSchema({ sections = [], currentSchemaVersion = 0 } = {}) {
+  function normalizePassportTypeSchema({ sections = [], systemHeader = null, currentSchemaVersion = 0 } = {}) {
     const parsedVersion = Number.parseInt(currentSchemaVersion, 10);
     return {
       schemaVersion: Number.isFinite(parsedVersion) && parsedVersion > 0 ? parsedVersion : 1,
+      systemHeader: normalizeSystemPassportHeader(systemHeader),
       sections: Array.isArray(sections) ? sections : [],
     };
   }
@@ -1457,6 +1509,7 @@ module.exports = function createPassportService({
         carrier_policy_key VARCHAR(120),
         carrier_authenticity JSONB,
         economic_operator_id TEXT,
+        economic_operator_identifier_scheme VARCHAR(80),
         facility_id TEXT,
         granularity    VARCHAR(20)  NOT NULL DEFAULT 'model',
         release_status VARCHAR(50)  NOT NULL DEFAULT 'draft',
@@ -1477,6 +1530,10 @@ module.exports = function createPassportService({
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_lineage ON ${tableName}(lineage_id) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_status ON ${tableName}(release_status) WHERE deleted_at IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did ON ${tableName}(company_id, product_identifier_did) WHERE deleted_at IS NULL`);
+
+    for (const [columnName, columnDefinition] of LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS) {
+      await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${columnName} ${columnDefinition}`);
+    }
 
     const addedColumns = [];
     const indexedColumns = [];

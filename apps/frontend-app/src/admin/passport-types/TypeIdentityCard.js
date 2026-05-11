@@ -3,15 +3,14 @@ import React from "react";
 export function TypeIdentityCard({
   displayName,
   setDisplayName,
-  umbrella,
-  setUmbrella,
-  umbrellaIcon,
-  setUmbrellaIcon,
+  productCategory,
+  setProductCategory,
+  productIcon,
+  setProductIcon,
   semanticModelKey,
   setSemanticModelKey,
-  isBatteryUmbrellaCategory,
   semanticModelOptions,
-  umbrellaOptions,
+  productCategoryOptions,
   typeName,
   setTypeName,
   setTypeNameManual,
@@ -40,29 +39,29 @@ export function TypeIdentityCard({
         </div>
 
         <div className="acpt-field-group acpt-span2">
-          <label>Umbrella Category *</label>
-          {umbrellaOptions.length === 0 ? (
+          <label>Product Category *</label>
+          {productCategoryOptions.length === 0 ? (
             <div className="acpt-hint acpt-hint-error">
-              No umbrella categories yet.{" "}
+              No product categories yet.{" "}
               <a href="/admin/passport-types" className="acpt-hint-link">
                 Go back and add one first.
               </a>
             </div>
           ) : (
             <select
-              value={umbrella}
+              value={productCategory}
               onChange={e => {
-                const selected = umbrellaOptions.find(o => o.name === e.target.value);
-                setUmbrella(e.target.value);
+                const selected = productCategoryOptions.find(o => o.name === e.target.value);
+                setProductCategory(e.target.value);
                 setError("");
                 setInvalidFields([]);
-                if (selected) setUmbrellaIcon(selected.icon);
+                if (selected) setProductIcon(selected.icon);
               }}
-              className={`acpt-input${hasInvalid("umbrella") ? " acpt-input-error" : ""}`}
+              className={`acpt-input${hasInvalid("productCategory") ? " acpt-input-error" : ""}`}
               required
             >
               <option value="">— Select a category —</option>
-              {umbrellaOptions.map(o => (
+              {productCategoryOptions.map(o => (
                 <option key={o.id} value={o.name}>{o.icon} {o.name}</option>
               ))}
             </select>
@@ -75,14 +74,14 @@ export function TypeIdentityCard({
           <div className="acpt-icon-row">
             <input
               type="text"
-              value={umbrellaIcon}
-              onChange={e => setUmbrellaIcon(e.target.value)}
+              value={productIcon}
+              onChange={e => setProductIcon(e.target.value)}
               className="acpt-input acpt-icon-input"
               maxLength={4}
             />
             <div className="acpt-icon-presets">
               {iconPresets.map(ic => (
-                <button key={ic} type="button" className={`acpt-icon-btn ${umbrellaIcon === ic ? "selected" : ""}`} onClick={() => setUmbrellaIcon(ic)}>
+                <button key={ic} type="button" className={`acpt-icon-btn ${productIcon === ic ? "selected" : ""}`} onClick={() => setProductIcon(ic)}>
                   {ic}
                 </button>
               ))}
@@ -115,7 +114,7 @@ export function TypeIdentityCard({
         </div>
 
         <div className="acpt-field-group acpt-span2">
-          <label>Semantic Model {isBatteryUmbrellaCategory ? "*" : ""}</label>
+          <label>Semantic Model</label>
           <select
             value={semanticModelKey}
             onChange={e => {
@@ -124,22 +123,18 @@ export function TypeIdentityCard({
               setInvalidFields([]);
             }}
             className={`acpt-input${hasInvalid("semanticModelKey") ? " acpt-input-error" : ""}`}
-            disabled={isBatteryUmbrellaCategory}
           >
             {semanticModelOptions.map((option) => (
               <option
                 key={option.key || "none"}
                 value={option.key}
-                disabled={isBatteryUmbrellaCategory && option.key !== semanticModelKey}
               >
                 {option.label}
               </option>
             ))}
           </select>
           <span className="acpt-hint">
-            {isBatteryUmbrellaCategory
-              ? "Battery passport types are locked to the Claros battery dictionary semantic model."
-              : (semanticModelOptions.find((option) => option.key === semanticModelKey) || semanticModelOptions[0])?.description}
+            {(semanticModelOptions.find((option) => option.key === semanticModelKey) || semanticModelOptions[0])?.description}
           </span>
         </div>
       </div>

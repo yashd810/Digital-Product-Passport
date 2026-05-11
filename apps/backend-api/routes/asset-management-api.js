@@ -38,13 +38,13 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const company = await assertAssetManagementEnabled(companyId);
 
       const types = await pool.query(
-        `SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.fields_json
+        `SELECT pt.id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon, pt.fields_json
          FROM passport_types pt
          JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
          WHERE cpa.company_id = $1
            AND cpa.access_revoked = false
            AND pt.is_active = true
-         ORDER BY pt.umbrella_category NULLS FIRST, pt.display_name ASC`,
+         ORDER BY pt.product_category NULLS FIRST, pt.display_name ASC`,
         [companyId]
       );
 
@@ -171,7 +171,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         userId: req.assetContext.userId,
       });
       const status = pushResult.summary.failed
-        ? (pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed")
+        ? (pushResult.summary.passports_created || pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed")
         : "success";
       const run = await recordAssetRun({
         companyId,

@@ -106,6 +106,9 @@ module.exports = function registerPassportPublicRoutes(app, {
     const result = await pool.query(
       `SELECT c.id,
               c.company_name,
+              c.company_logo,
+              c.introduction_text,
+              c.branding_json,
               c.did_slug,
               COALESCE(p.default_granularity, 'item') AS dpp_granularity,
               COALESCE(p.default_granularity, 'item') AS default_granularity,
@@ -138,6 +141,9 @@ module.exports = function registerPassportPublicRoutes(app, {
     const result = await pool.query(
       `SELECT c.id,
               c.company_name,
+              c.company_logo,
+              c.introduction_text,
+              c.branding_json,
               c.did_slug,
               COALESCE(p.default_granularity, 'item') AS dpp_granularity,
               COALESCE(p.default_granularity, 'item') AS default_granularity,
@@ -154,7 +160,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   async function loadTypeDef(passportType) {
     const result = await pool.query(
-      `SELECT type_name, umbrella_category, semantic_model_key, fields_json
+      `SELECT type_name, product_category, semantic_model_key, fields_json
        FROM passport_types
        WHERE type_name = $1
        LIMIT 1`,
@@ -244,6 +250,17 @@ module.exports = function registerPassportPublicRoutes(app, {
     return buildCanonicalPassportPayload(passport, typeDef, serializerOptions);
   }
 
+  function buildPublicCompanyProfile(company) {
+    if (!company) return null;
+    return {
+      company_name: company.company_name || "",
+      company_logo: company.company_logo || null,
+      introduction_text: company.introduction_text || "",
+      branding_json: company.branding_json || {},
+      did_slug: company.did_slug || null,
+    };
+  }
+
   function flattenSemanticPayload(canonicalPayload) {
     if (Array.isArray(canonicalPayload?.elements)) {
       return {
@@ -266,7 +283,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     const semanticSource = flattenSemanticPayload(canonicalPayload);
     const exported = buildBatteryPassJsonExport([semanticSource], passportType, {
       semanticModelKey: typeDef?.semantic_model_key,
-      umbrellaCategory: typeDef?.umbrella_category
+      productCategory: typeDef?.product_category
     });
     const graphItem = { ...(exported?.["@graph"]?.[0] || semanticSource) };
     delete graphItem.passport_type;
@@ -517,7 +534,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   async function loadPassportTypeSchema(passportType) {
     const result = await pool.query(
-      `SELECT id, type_name, display_name, umbrella_category, umbrella_icon, fields_json
+      `SELECT id, type_name, display_name, product_category, product_icon, fields_json
        FROM passport_types
        WHERE type_name = $1`,
       [passportType]
@@ -582,6 +599,15 @@ module.exports = function registerPassportPublicRoutes(app, {
 
       const basePayload = {
         ...sanitizedPassport,
+        digitalProductPassportId: canonicalPayload.digitalProductPassportId,
+        uniqueProductIdentifier: canonicalPayload.uniqueProductIdentifier,
+        localProductId: canonicalPayload.localProductId,
+        economicOperatorId: canonicalPayload.economicOperatorId,
+        facilityId: canonicalPayload.facilityId,
+        subjectDid: canonicalPayload.subjectDid,
+        dppDid: canonicalPayload.dppDid,
+        companyDid: canonicalPayload.companyDid,
+        company_profile: buildPublicCompanyProfile(company),
         public_path: publicPath,
         inactive_path: buildInactivePublicPassportPath({
           companyName,
@@ -602,10 +628,15 @@ module.exports = function registerPassportPublicRoutes(app, {
             subjectDid: canonicalPayload.subjectDid,
             dppDid: canonicalPayload.dppDid,
             companyDid: canonicalPayload.companyDid,
-            facilityDid: linkedSubjects?.facilityDid || null
+            facilityDid: linkedSubjects?.facilityDid
+              || (canonicalPayload.facilityId && String(canonicalPayload.facilityId).startsWith("did:")
+                ? canonicalPayload.facilityId
+                : (sanitizedPassport.facility_id ? didService.generateFacilityDid(sanitizedPassport.facility_id) : null))
           }
         }
       };
+      delete basePayload.company_id;
+      delete basePayload.companyId;
 
       if (getRepresentation(req) === "full") {
         if (wantsSemanticResponse(req)) {
@@ -623,9 +654,10 @@ module.exports = function registerPassportPublicRoutes(app, {
         }
         const semanticPayload = { ...basePayload };
         delete semanticPayload.linked_data;
+        delete semanticPayload.company_profile;
         const exported = buildBatteryPassJsonExport([semanticPayload], passport.passport_type, {
           semanticModelKey: typeDef?.semantic_model_key,
-          umbrellaCategory: typeDef?.umbrella_category
+          productCategory: typeDef?.product_category
         });
         res.setHeader("Content-Type", "application/ld+json");
         return res.json({
@@ -639,6 +671,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       if (error.code === "AMBIGUOUS_PRODUCT_ID") {
         return res.status(409).json({ error: error.message });
       }
+      logger.error({ err: error, productId: req.params.productId, version: req.query.version || null }, "GET /api/passports/by-product/:productId failed");
       res.status(500).json({ error: "Failed to fetch passport" });
     }
   });

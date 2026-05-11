@@ -24,14 +24,15 @@ const API = import.meta.env.VITE_API_URL || "";
 const ICON_PRESETS = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🔋","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
 
 function getSemanticModelLabel(modelKey) {
+  if (modelKey === "generic_dpp_v1") return "Generic DPP";
   if (modelKey === "claros_battery_dictionary_v1") return "Claros Battery Dictionary";
-  return "No semantic model";
+  return modelKey || "No semantic model";
 }
 
 function AdminPassportTypes() {
   const navigate = useNavigate();
   const [types,      setTypes]      = useState([]);
-  const [umbrellas,  setUmbrellas]  = useState([]);
+  const [productCategories,  setProductCategories]  = useState([]);
   const [draftType,  setDraftType]  = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState("");
@@ -95,23 +96,23 @@ function AdminPassportTypes() {
   };
 
   // New product category form state
-  const [showUmbrellaForm, setShowUmbrellaForm] = useState(false);
-  const [newUmbName,       setNewUmbName]       = useState("");
-  const [newUmbIcon,       setNewUmbIcon]       = useState("📋");
-  const [umbSaving,        setUmbSaving]        = useState(false);
-  const [umbError,         setUmbError]         = useState("");
+  const [showProductCategoryForm, setShowProductCategoryForm] = useState(false);
+  const [newCatName,       setNewCatName]       = useState("");
+  const [newCatIcon,       setNewCatIcon]       = useState("📋");
+  const [umbSaving,        setCatSaving]        = useState(false);
+  const [umbError,         setCatError]         = useState("");
 
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
       const [typesRes, umbRes, draftRes] = await Promise.all([
         fetchWithAuth(`${API}/api/admin/passport-types`,       { headers: authHeaders() }),
-        fetchWithAuth(`${API}/api/admin/umbrella-categories`,  { headers: authHeaders() }),
+        fetchWithAuth(`${API}/api/admin/product-categories`,  { headers: authHeaders() }),
         fetchWithAuth(`${API}/api/admin/passport-type-draft`,  { headers: authHeaders() }),
       ]);
       if (!typesRes.ok) throw new Error("Failed to fetch passport types");
       setTypes(await typesRes.json());
-      if (umbRes.ok) setUmbrellas(await umbRes.json());
+      if (umbRes.ok) setProductCategories(await umbRes.json());
       if (draftRes.ok) {
         const row = await draftRes.json();
         setDraftType(row?.draft_json ? { savedAt: row.updated_at, ...row.draft_json } : null);
@@ -144,31 +145,31 @@ function AdminPassportTypes() {
     }
   };
 
-  const handleAddUmbrella = async (e) => {
+  const handleAddProductCategory = async (e) => {
     e.preventDefault();
-    setUmbError("");
-    if (!newUmbName.trim()) return setUmbError("Name is required.");
-    setUmbSaving(true);
+    setCatError("");
+    if (!newCatName.trim()) return setCatError("Name is required.");
+    setCatSaving(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/admin/umbrella-categories`, {
+      const r = await fetchWithAuth(`${API}/api/admin/product-categories`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ name: newUmbName.trim(), icon: newUmbIcon }),
+        body: JSON.stringify({ name: newCatName.trim(), icon: newCatIcon }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Failed to create");
-      setNewUmbName(""); setNewUmbIcon("📋");
-      setShowUmbrellaForm(false);
+      setNewCatName(""); setNewCatIcon("📋");
+      setShowProductCategoryForm(false);
         showMsg(`Product category "${data.name}" created.`);
       fetchAll();
     } catch (e) {
-      setUmbError(e.message);
+      setCatError(e.message);
     } finally {
-      setUmbSaving(false);
+      setCatSaving(false);
     }
   };
 
-  const handleDeleteUmbrella = async (umb) => {
+  const handleDeleteProductCategory = async (umb) => {
     setDeleteCategoryTarget(umb);
     setDeleteCategoryPassword("");
     setDeleteCategoryError("");
@@ -180,7 +181,7 @@ function AdminPassportTypes() {
     if (!deleteCategoryPassword) return setDeleteCategoryError("Password is required.");
     try {
       setDeletingCategory(true);
-      const r = await fetchWithAuth(`${API}/api/admin/umbrella-categories/${deleteCategoryTarget.id}`, {
+      const r = await fetchWithAuth(`${API}/api/admin/product-categories/${deleteCategoryTarget.id}`, {
         method: "DELETE",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ password: deleteCategoryPassword }),
@@ -217,14 +218,14 @@ function AdminPassportTypes() {
 
   // Group types by product category
   const grouped = types.reduce((acc, t) => {
-    const key = t.umbrella_category;
-    if (!acc[key]) acc[key] = { icon: t.umbrella_icon, types: [] };
+    const key = t.product_category;
+    if (!acc[key]) acc[key] = { icon: t.product_icon, types: [] };
     acc[key].types.push(t);
     return acc;
   }, {});
 
-  const draftGroupKey = draftType?.umbrella?.trim() || "";
-  const draftGroupIcon = draftType?.umbrellaIcon || "📋";
+  const draftGroupKey = draftType?.productCategory?.trim() || "";
+  const draftGroupIcon = draftType?.productIcon || "📋";
   const groupedEntries = Object.entries(grouped);
 
   if (draftType && !grouped[draftGroupKey]) {
@@ -254,43 +255,43 @@ function AdminPassportTypes() {
       {msg   && <div className="alert alert-success">{msg}</div>}
 
       {/* ── Product Categories Management ── */}
-      <div className="apt-umbrellas-panel">
-        <div className="apt-umbrellas-header">
+      <div className="apt-productCategories-panel">
+        <div className="apt-productCategories-header">
           <div>
-            <h3 className="apt-umbrellas-title">Product Categories</h3>
-            <p className="apt-umbrellas-hint">
+            <h3 className="apt-productCategories-title">Product Categories</h3>
+            <p className="apt-productCategories-hint">
               Group related passport types. Can only delete a category if no types use it.
             </p>
           </div>
-          <button className="apt-add-umbrella-btn" onClick={() => { setShowUmbrellaForm(o => !o); setUmbError(""); }}>
-            {showUmbrellaForm ? "✕ Cancel" : "+ Add Category"}
+          <button className="apt-add-productCategory-btn" onClick={() => { setShowProductCategoryForm(o => !o); setCatError(""); }}>
+            {showProductCategoryForm ? "✕ Cancel" : "+ Add Category"}
           </button>
         </div>
 
-        {showUmbrellaForm && (
-          <form className="apt-umbrella-form" onSubmit={handleAddUmbrella}>
+        {showProductCategoryForm && (
+          <form className="apt-productCategory-form" onSubmit={handleAddProductCategory}>
             {umbError && <div className="alert alert-error admin-alert-inline">{umbError}</div>}
-            <div className="apt-umbrella-form-row">
+            <div className="apt-productCategory-form-row">
               <input
                 type="text"
-                value={newUmbName}
-                onChange={e => setNewUmbName(e.target.value)}
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
                 placeholder="Category name, e.g. Battery Passport"
-                className="apt-umbrella-name-input"
+                className="apt-productCategory-name-input"
                 autoFocus
               />
-              <div className="apt-umbrella-icon-row">
+              <div className="apt-productCategory-icon-row">
                 <input
                   type="text"
-                  value={newUmbIcon}
-                  onChange={e => setNewUmbIcon(e.target.value)}
-                  className="apt-umbrella-icon-input"
+                  value={newCatIcon}
+                  onChange={e => setNewCatIcon(e.target.value)}
+                  className="apt-productCategory-icon-input"
                   maxLength={4}
                 />
                 {ICON_PRESETS.map(ic => (
                   <button key={ic} type="button"
-                    className={`apt-icon-preset-btn ${newUmbIcon === ic ? "selected" : ""}`}
-                    onClick={() => setNewUmbIcon(ic)}>{ic}</button>
+                    className={`apt-icon-preset-btn ${newCatIcon === ic ? "selected" : ""}`}
+                    onClick={() => setNewCatIcon(ic)}>{ic}</button>
                 ))}
               </div>
               <button type="submit" className="apt-create-btn" disabled={umbSaving}>
@@ -300,25 +301,25 @@ function AdminPassportTypes() {
           </form>
         )}
 
-        <div className="apt-umbrella-chips">
-          {umbrellas.length === 0 && (
-            <span className="apt-umbrella-empty">No product categories yet. Add one above.</span>
+        <div className="apt-productCategory-chips">
+          {productCategories.length === 0 && (
+            <span className="apt-productCategory-empty">No product categories yet. Add one above.</span>
           )}
-          {umbrellas.map(umb => {
+          {productCategories.map(umb => {
             const inUse = !!grouped[umb.name];
             return (
-              <div key={umb.id} className={`apt-umbrella-chip ${inUse ? "apt-umbrella-chip-used" : ""}`}>
-                <span className="apt-umbrella-chip-icon">{umb.icon}</span>
-                <span className="apt-umbrella-chip-name">{umb.name}</span>
+              <div key={umb.id} className={`apt-productCategory-chip ${inUse ? "apt-productCategory-chip-used" : ""}`}>
+                <span className="apt-productCategory-chip-icon">{umb.icon}</span>
+                <span className="apt-productCategory-chip-name">{umb.name}</span>
                 {inUse
-                  ? <span className="apt-umbrella-chip-count">{grouped[umb.name].types.length} type{grouped[umb.name].types.length !== 1 ? "s" : ""}</span>
+                  ? <span className="apt-productCategory-chip-count">{grouped[umb.name].types.length} type{grouped[umb.name].types.length !== 1 ? "s" : ""}</span>
                   : (
                     <>
-                      <button className="apt-umbrella-chip-delete" onClick={() => handleDeleteUmbrella(umb)} title="Delete">✕</button>
+                      <button className="apt-productCategory-chip-delete" onClick={() => handleDeleteProductCategory(umb)} title="Delete">✕</button>
                       <button
                         type="button"
-                        className="apt-umbrella-delete-btn"
-                        onClick={() => handleDeleteUmbrella(umb)}
+                        className="apt-productCategory-delete-btn"
+                        onClick={() => handleDeleteProductCategory(umb)}
                       >
                         Delete
                       </button>

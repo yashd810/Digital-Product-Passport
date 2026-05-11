@@ -1483,10 +1483,10 @@ See **[access-grants.md](access-grants.md)**
 
 See **[admin-endpoints.md](admin-endpoints.md)**
 
-**Umbrella Categories (3):**
-- GET `/api/admin/umbrella-categories`
-- POST `/api/admin/umbrella-categories`
-- DELETE `/api/admin/umbrella-categories/:id`
+**Product Categories (3):**
+- GET `/api/admin/product-categories`
+- POST `/api/admin/product-categories`
+- DELETE `/api/admin/product-categories/:id`
 
 **Passport Types (7):**
 - GET `/api/admin/passport-types`

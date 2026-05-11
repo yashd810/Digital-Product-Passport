@@ -5,7 +5,7 @@ const path = require("path");
 const {
   BATTERY_DICTIONARY_MODEL_KEY,
   normalizeSemanticModelKey,
-  isBatteryUmbrellaCategory,
+  isBatteryProductCategory,
   shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
 } = require("./battery-dictionary-targeting");
 
@@ -101,7 +101,7 @@ function isBatteryPassExportType(passportType) {
 
 function shouldUseBatteryDictionary(passportType, options = {}, typeDef = null) {
   if (!shouldTargetBatteryDictionary({ passportType, typeDef, options })) return false;
-  if (isBatteryUmbrellaCategory(options.umbrellaCategory || typeDef?.umbrella_category)) return true;
+  if (isBatteryProductCategory(options.productCategory || typeDef?.product_category)) return true;
   const explicitModelKey = normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semantic_model_key);
   return !explicitModelKey || isSupportedBatterySemanticModel(resolveRequestedBatteryModelKey(options, typeDef));
 }

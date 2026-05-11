@@ -4,7 +4,9 @@ import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
 import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel } from "../utils/viewerHelpers";
+import { getMarketingContactUrl } from "../utils/QRcode";
 
 const API = import.meta.env.VITE_API_URL || "";
 const PUBLIC_VIEWER_URL = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
@@ -182,6 +184,82 @@ export function TrustedEntryPanel({
   );
 }
 
+function formatHeaderValue(value) {
+  if (value === null || value === undefined || value === "") return "Not available";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "Not available";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function parseHeaderArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return value ? [value] : [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return [trimmed];
+    }
+  }
+  return trimmed.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+export function PassportHeaderPanel({ passport, typeDef }) {
+  if (!passport) return null;
+  const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
+  const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields : [];
+  const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
+  const resolvedCompanyDid = passport.companyDid || passport.company_did || canonicalSubjects.companyDid || null;
+  const resolvedFacilityDid = passport.facilityDid || passport.facility_did || canonicalSubjects.facilityDid || null;
+  const resolvedSubjectDid = passport.subjectDid || passport.subject_did || canonicalSubjects.subjectDid || passport.product_identifier_did || null;
+  const resolvedDppDid = passport.dppDid || passport.dpp_did || canonicalSubjects.dppDid || null;
+  const headerValues = {
+    digitalProductPassportId: passport.digitalProductPassportId || passport.dppId || passport.dpp_id,
+    uniqueProductIdentifier: passport.uniqueProductIdentifier || passport.product_identifier_did || passport.product_id,
+    localProductId: passport.product_id,
+    granularity: passport.granularity || "item",
+    dppSchemaVersion: passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
+    dppStatus: formatPassportStatus(passport.release_status),
+    lastUpdate: passport.updated_at || passport.created_at
+      ? new Date(passport.updated_at || passport.created_at).toISOString()
+      : null,
+    economicOperatorId: resolvedCompanyDid || passport.economicOperatorId || passport.economic_operator_id,
+    facilityId: resolvedFacilityDid || passport.facilityId || passport.facility_id,
+    contentSpecificationIds: parseHeaderArray(passport.content_specification_ids || passport.compliance_profile_key || typeDef?.semantic_model_key),
+    subjectDid: resolvedSubjectDid,
+    dppDid: resolvedDppDid,
+    companyDid: resolvedCompanyDid,
+  };
+
+  return (
+    <section className="pv-header-panel" aria-labelledby="pv-header-panel-title">
+      <div className="pv-header-panel-head">
+        <div>
+          <p className="pv-header-panel-kicker">Standards Header</p>
+          <h3 id="pv-header-panel-title">{systemHeader?.section?.label || "Passport Header"}</h3>
+        </div>
+        <span className="pv-header-panel-badge">JSON-LD required</span>
+      </div>
+      <p className="pv-header-panel-copy">
+        These identifiers and status fields are generated or governed by the platform and form the mandatory public passport header.
+      </p>
+      <div className="pv-header-grid">
+        {fields.map((field) => (
+          <article key={field.key} className={`pv-header-card pv-header-card-${field.ownership || "system_generated"}`}>
+            <div className="pv-header-card-top">
+              <span className="pv-header-label">{field.label || field.key}</span>
+            </div>
+            <strong className="pv-header-value">{formatHeaderValue(headerValues[field.key])}</strong>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Viewer UI Blocks
 // ─────────────────────────────────────────────────────────────────────────────
@@ -337,14 +415,13 @@ export function Header({ displayName, lang, setLang, dppId, companyData, brandTh
 }
 
 export function Footer({ brandTheme }) {
-  const supportHref = brandTheme?.supportLink || "mailto:digitalproductpass@gmail.com";
-  const supportLabel = supportHref.startsWith("mailto:") ? "Contact information" : "Support";
+  const supportHref = brandTheme?.supportLink || getMarketingContactUrl();
   return (
     <footer className="viewer-footer">
       <p className="viewer-footer-provider">{brandTheme?.footerText || "Powered by ClarosDPP, digital passport provider via software as a service."}</p>
       <ViewerDomainIndicator />
       <p className="viewer-footer-subtle">
-        <a href={supportHref} className="viewer-footer-link">{supportLabel}</a>
+        <a href={supportHref} target="_blank" rel="noopener noreferrer" className="viewer-footer-link">Contact information</a>
       </p>
     </footer>
   );

@@ -200,7 +200,7 @@ function buildCanonicalPassportPayload(passport, _typeDef, { company } = {}) {
 
 const TYPE_DEF = {
   type_name: "ev_battery_passport_custom",
-  umbrella_category: "Battery Digital Passport",
+  product_category: "Battery Digital Passport",
   semantic_model_key: "generic_dpp_v1",
   fields_json: {
     sections: [
@@ -407,7 +407,7 @@ describe("compliance service", () => {
     );
   });
 
-  test("blocks release when access metadata is missing or invalid", async () => {
+  test("does not block release when access metadata is missing or invalid", async () => {
     const typeDef = {
       ...TYPE_DEF,
       fields_json: {
@@ -441,10 +441,11 @@ describe("compliance service", () => {
       battery_category: "EV",
     }, TYPE_DEF.type_name);
 
-    expect(result.workflowReleaseAllowed).toBe(false);
-    expect(result.blockingIssues.map((issue) => issue.code)).toEqual(
+    expect(result.accessIssues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining(["FIELD_ACCESS_MISSING", "FIELD_ACCESS_INVALID"])
     );
+    expect(result.workflowReleaseAllowed).toBe(true);
+    expect(result.directReleaseAllowed).toBe(true);
   });
 
   test("ignores non-applicable category fields when the workbook marks them as not applicable", async () => {
@@ -492,14 +493,14 @@ describe("compliance service", () => {
     expect(result.profile.key).toBe("battery_dpp_v1");
     expect(result.blockingIssues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining([
-        "PROFILE_GOVERNANCE_FIELD_MISSING",
-        "CARRIER_POLICY_MISSING",
+        "CATEGORY_REQUIRED_FIELD_MISSING",
         "FACILITY_IDENTIFIER_MISSING",
+        "MANAGED_SEMANTIC_FIELD_MISSING",
       ])
     );
   });
 
-  test("blocks release when a battery profile does not expose a controlled-access layer", async () => {
+  test("allows release when a battery profile exposes only public fields", async () => {
     const publicOnlyTypeDef = {
       ...TYPE_DEF,
       fields_json: {
@@ -537,8 +538,9 @@ describe("compliance service", () => {
       certificate_url: "https://example.com/certificate",
     }, TYPE_DEF.type_name);
 
-    expect(result.workflowReleaseAllowed).toBe(false);
-    expect(result.blockingIssues.map((issue) => issue.code)).toContain("CONTROLLED_ACCESS_LAYER_MISSING");
+    expect(result.workflowReleaseAllowed).toBe(true);
+    expect(result.directReleaseAllowed).toBe(true);
+    expect(result.blockingIssues.map((issue) => issue.code)).not.toContain("CONTROLLED_ACCESS_LAYER_MISSING");
   });
 
   test("blocks release when managed mandatory standards identifiers cannot be derived", async () => {
@@ -576,5 +578,32 @@ describe("compliance service", () => {
     expect(result.managedSemanticIssues.map((issue) => issue.key)).toEqual(
       expect.arrayContaining(["unique_dpp_identifier", "unique_product_identifier"])
     );
+  });
+
+  test("normalizes system-managed compliance profile fields before reporting blocking issues", async () => {
+    const service = createComplianceService({
+      pool: createMockPool(TYPE_DEF),
+      batteryDictionaryService: createMockBatteryDictionaryService(),
+      buildCanonicalPassportPayload,
+    });
+
+    const result = await service.evaluatePassport({
+      passport_type: TYPE_DEF.type_name,
+      company_id: 5,
+      compliance_profile_key: "generic_dpp_v1",
+      content_specification_ids: null,
+      carrier_policy_key: null,
+      facility_id: "PLANT-01",
+      passport_identifier: "BAT-2026-001",
+      battery_category: "EV",
+      battery_mass: "450.5",
+      state_of_charge_soc: "50.0",
+      certificate_url: "https://example.com/certificate",
+    }, TYPE_DEF.type_name);
+
+    expect(result.profile.key).toBe("battery_dpp_v1");
+    expect(result.blockingIssues.map((issue) => issue.code)).not.toContain("COMPLIANCE_PROFILE_MISMATCH");
+    expect(result.blockingIssues.map((issue) => issue.code)).not.toContain("PROFILE_GOVERNANCE_FIELD_MISSING");
+    expect(result.blockingIssues.map((issue) => issue.code)).not.toContain("CARRIER_POLICY_MISSING");
   });
 });

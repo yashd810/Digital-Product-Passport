@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
+import { buildComplianceErrorMessage } from "../../../../shared/utils/complianceErrors";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
 import {
   isEditablePassportStatus,
@@ -188,6 +189,17 @@ export function usePassportListActions({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Bulk release failed");
+      if (data.summary?.failed) {
+        const firstFailed = Array.isArray(data.details)
+          ? data.details.find((detail) => detail?.status === "failed")
+          : null;
+        if (firstFailed?.compliance || firstFailed?.message) {
+          showError(buildComplianceErrorMessage({
+            error: firstFailed.message || `Failed to release ${firstFailed.dppId || "passport"}.`,
+            compliance: firstFailed.compliance || null,
+          }, { maxIssues: 2 }));
+        }
+      }
       showSuccess(`Released ${data.summary?.released || 0}, skipped ${data.summary?.skipped || 0}, failed ${data.summary?.failed || 0}`);
       setSelectedPassports(new Set());
       fetchPassports();
@@ -255,7 +267,7 @@ export function usePassportListActions({
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
         const semanticModelKey = typeData.semantic_model_key || "";
-        const umbrellaCategory = typeData.umbrella_category || "";
+        const productCategory = typeData.product_category || "";
 
         const exported = [];
         for (const passport of passportsForType) {
@@ -278,7 +290,7 @@ export function usePassportListActions({
           continue;
         }
 
-        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, umbrellaCategory });
+        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, productCategory });
         const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);

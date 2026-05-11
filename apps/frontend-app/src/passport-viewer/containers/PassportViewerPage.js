@@ -14,7 +14,7 @@ import {
   buildPublicPassportPath,
   buildTechnicalPassportPath,
 } from "../../passports/utils/passportRoutes";
-import { PassportIntro, Header, Footer, PassportTabRail, SignatureBadge, EmptySectionsState, SectionView, PrintView } from "../components/ViewerBlocks";
+import { PassportIntro, Header, Footer, PassportTabRail, SignatureBadge, EmptySectionsState, SectionView, PrintView, PassportHeaderPanel } from "../components/ViewerBlocks";
 import "../styles/PassportViewer.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -79,10 +79,13 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         if (!r.ok) throw new Error("Passport not found");
         const data = await r.json();
         setPassport(data);
+        if (!isPreviewMode && data?.company_profile) {
+          setCompanyData(data.company_profile);
+        }
 
         // 2. Fetch company branding in parallel with type definition
         const [profileRes, typeRes] = await Promise.all([
-          data.company_id
+          isPreviewMode && data.company_id
             ? fetchWithAuth(`${API}/api/companies/${data.company_id}/profile`)
             : Promise.resolve(null),
           fetchWithAuth(`${API}/api/passport-types/${data.passport_type}`),
@@ -131,7 +134,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           try {
             await saveQRCodeToDatabase(
               passport.dppId,
-              generatedBundle.qrCodeDataUrl,
+              generatedBundle.publicUrl,
               passport.passport_type,
               generatedBundle.carrierAuthenticity
             );
@@ -368,7 +371,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
                 >
                   ← Back to landing page
                 </button>
-                <h2>{typeDef?.umbrella_icon || ""} {displayName}</h2>
+                <h2>{typeDef?.product_icon || ""} {displayName}</h2>
                 <p className="viewer-subtitle">{isPreviewMode ? "Draft preview of the public passport viewer" : "Public passport viewer"}</p>
               </div>
               <SignatureBadge verification={sigVerification} />
@@ -461,6 +464,8 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
               onOpenHistory={() => setShowHistoryModal(true)}
               onPrint={() => { setTimeout(() => window.print(), 300); }}
             />
+
+            <PassportHeaderPanel passport={passport} typeDef={typeDef} />
 
             <div className="viewer-route-panel">
               {sections.length > 0 && (

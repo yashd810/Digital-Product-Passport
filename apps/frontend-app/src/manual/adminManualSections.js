@@ -249,14 +249,14 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Category features", value: "Create category, choose icon, and delete when no longer needed" },
         { label: "Type actions", value: "View fields, edit metadata, clone, activate/deactivate, and delete" },
-        { label: "Catalog grouping", value: "Types are displayed underneath umbrella product categories" },
+        { label: "Catalog grouping", value: "Types are displayed underneath productCategory product categories" },
         { label: "Live example type", value: getPassportTypeLabel(firstType) || "First available type" },
       ],
       journeys: [
         {
           title: "Shape the catalog first",
           items: [
-            "Create umbrella categories before adding many types so the catalog remains understandable to future tenants.",
+            "Create product categories before adding many types so the catalog remains understandable to future tenants.",
             "Choose icons carefully because those icons also appear in company-side navigation.",
             "Delete categories only when they are truly obsolete and the type structure has already been cleaned up or migrated.",
           ],
@@ -304,7 +304,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Set the structure before the details",
           items: [
-            "Create the type metadata, display name, and umbrella-category placement first.",
+            "Create the type metadata, display name, and product-category placement first.",
             "Add sections in the order the company-side form and public viewer should present them.",
             "Only then add fields inside each section so the future UI flow is logical for authors and viewers alike.",
           ],
@@ -361,7 +361,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       summary: "The admin shell includes the same Battery Dictionary browser as the user dashboard, but the admin use case is schema design. It helps you choose the right semantic model, inspect canonical term IRIs, verify units and access-right expectations, and avoid stale field mappings before companies start authoring passports.",
       facts: [
         { label: "Admin route", value: "/admin/dictionary/battery/v1" },
-        { label: "Semantic model", value: "Battery umbrella categories are locked to claros_battery_dictionary_v1" },
+        { label: "Semantic model", value: "Battery product categories are locked to claros_battery_dictionary_v1" },
         { label: "Dictionary APIs", value: "Manifest, context, categories, units, field-map, category-rules, terms, and term details" },
         { label: "Public availability", value: "The dictionary is also available at /dictionary/battery/v1 without dashboard login" },
       ],

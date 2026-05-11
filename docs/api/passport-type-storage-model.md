@@ -30,7 +30,7 @@ Important columns:
 
 - `type_name`: machine name, for example `battery`
 - `display_name`: user-facing label
-- `umbrella_category`: grouping/category
+- `product_category`: grouping/category
 - `semantic_model_key`: optional semantic model mapping key
 - `fields_json JSONB`: type schema containing sections and fields
 - `is_active`: whether the type is available
@@ -139,7 +139,7 @@ Allowed:
 
 - adding a new field
 - changing labels or section placement
-- changing display metadata such as `display_name`, `umbrella_category`, or `semantic_model_key`
+- changing display metadata such as `display_name`, `product_category`, or `semantic_model_key`
 
 Blocked:
 

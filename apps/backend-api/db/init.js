@@ -547,13 +547,43 @@ async function initDb(pool, {
       ON user_identities(user_id)
   `);
 
+  await runMigration(pool, "2026-05-08.rename-umbrella-to-product", async (db) => {
+    // Rename columns in passport_types if they exist
+    await db.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='umbrella_category') THEN
+          ALTER TABLE passport_types RENAME COLUMN umbrella_category TO product_category;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='umbrella_icon') THEN
+          ALTER TABLE passport_types RENAME COLUMN umbrella_icon TO product_icon;
+        END IF;
+      END $$;
+    `);
+
+    // Rename table umbrella_categories to product_categories if it exists
+    await db.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='umbrella_categories') THEN
+          ALTER TABLE umbrella_categories RENAME TO product_categories;
+        END IF;
+      END $$;
+    `);
+
+    // Rename index if it exists
+    await db.query(`
+      ALTER INDEX IF EXISTS idx_passport_types_umbrella RENAME TO idx_passport_types_product_category;
+    `);
+  });
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_types (
       id               SERIAL PRIMARY KEY,
       type_name        VARCHAR(100) NOT NULL UNIQUE,
       display_name     VARCHAR(255) NOT NULL,
-      umbrella_category VARCHAR(100),
-      umbrella_icon    VARCHAR(10) DEFAULT '📋',
+      product_category VARCHAR(100),
+      product_icon    VARCHAR(10) DEFAULT '📋',
       semantic_model_key VARCHAR(100),
       fields_json      JSONB NOT NULL DEFAULT '{"sections":[]}',
       is_active        BOOLEAN NOT NULL DEFAULT true,
@@ -599,7 +629,7 @@ async function initDb(pool, {
   await pool.query(
     `UPDATE passport_types
        SET semantic_model_key = $1
-     WHERE COALESCE(umbrella_category, '') ~* 'battery'
+     WHERE COALESCE(product_category, '') ~* 'battery'
        AND semantic_model_key IS DISTINCT FROM $1`,
     [BATTERY_DICTIONARY_MODEL_KEY]
   );
@@ -611,8 +641,8 @@ async function initDb(pool, {
     ALTER TABLE passport_types
     ADD CONSTRAINT passport_types_battery_semantic_model_key_ck
     CHECK (
-      umbrella_category IS NULL
-      OR lower(umbrella_category) NOT LIKE '%battery%'
+      product_category IS NULL
+      OR lower(product_category) NOT LIKE '%battery%'
       OR semantic_model_key = '${BATTERY_DICTIONARY_MODEL_KEY}'
     )
   `);
@@ -836,7 +866,7 @@ async function initDb(pool, {
     ALTER TABLE passport_registry
     ALTER COLUMN device_api_key DROP DEFAULT
   `).catch(() => {});
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_umbrella ON passport_types(umbrella_category)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_product_category ON passport_types(product_category)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_active   ON passport_types(is_active)`);
 
   await pool.query(`
@@ -851,9 +881,9 @@ async function initDb(pool, {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_cpa_company ON company_passport_access(company_id)`);
 
-  // Umbrella categories — standalone managed table
+  // Product categories — standalone managed table
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS umbrella_categories (
+    CREATE TABLE IF NOT EXISTS product_categories (
       id         SERIAL PRIMARY KEY,
       name       VARCHAR(100) NOT NULL UNIQUE,
       icon       VARCHAR(10)  NOT NULL DEFAULT '📋',
@@ -862,10 +892,10 @@ async function initDb(pool, {
   `);
   // Seed from existing passport_types so nothing is orphaned
   await pool.query(`
-    INSERT INTO umbrella_categories (name, icon)
-    SELECT DISTINCT umbrella_category, COALESCE(umbrella_icon, '📋')
+    INSERT INTO product_categories (name, icon)
+    SELECT DISTINCT product_category, COALESCE(product_icon, '📋')
     FROM passport_types
-    WHERE umbrella_category IS NOT NULL
+    WHERE product_category IS NOT NULL
     ON CONFLICT (name) DO NOTHING
   `);
 
@@ -956,6 +986,9 @@ async function initDb(pool, {
       key_salt     VARCHAR(64),
       hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'hmac_sha256',
       scopes       TEXT[]       NOT NULL DEFAULT ARRAY['dpp:read']::text[],
+      operator_type VARCHAR(80) NOT NULL DEFAULT 'economic_operator',
+      access_mode  VARCHAR(16) NOT NULL DEFAULT 'read',
+      max_confidentiality VARCHAR(32) NOT NULL DEFAULT 'regulated',
       expires_at   TIMESTAMPTZ,
       created_by   INT REFERENCES users(id) ON DELETE SET NULL,
       created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -982,6 +1015,18 @@ async function initDb(pool, {
   await pool.query(`
     ALTER TABLE api_keys
     ADD COLUMN IF NOT EXISTS hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'hmac_sha256'
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS operator_type VARCHAR(80) NOT NULL DEFAULT 'economic_operator'
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS access_mode VARCHAR(16) NOT NULL DEFAULT 'read'
+  `);
+  await pool.query(`
+    ALTER TABLE api_keys
+    ADD COLUMN IF NOT EXISTS max_confidentiality VARCHAR(32) NOT NULL DEFAULT 'regulated'
   `);
   
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
@@ -1407,6 +1452,10 @@ async function initDb(pool, {
       await pool.query(`
         ALTER TABLE ${tableName}
         ADD COLUMN IF NOT EXISTS economic_operator_id TEXT
+      `);
+      await pool.query(`
+        ALTER TABLE ${tableName}
+        ADD COLUMN IF NOT EXISTS economic_operator_identifier_scheme VARCHAR(80)
       `);
       await pool.query(`
         ALTER TABLE ${tableName}

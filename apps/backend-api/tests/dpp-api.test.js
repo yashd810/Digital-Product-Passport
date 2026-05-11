@@ -224,11 +224,11 @@ function createTestApp(options = {}) {
           }],
         };
       }
-      if (normalizedSql.includes("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types")) {
+      if (normalizedSql.includes("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types")) {
         return {
           rows: [{
             type_name: "battery",
-            umbrella_category: "Battery Digital Passport",
+            product_category: "Battery Digital Passport",
             semantic_model_key: "claros_battery_dictionary_v1",
             fields_json: {
               sections: [{
@@ -242,11 +242,11 @@ function createTestApp(options = {}) {
           }],
         };
       }
-      if (normalizedSql.includes("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name")) {
+      if (normalizedSql.includes("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name")) {
         return {
           rows: [{
             type_name: "battery",
-            umbrella_category: "Battery Digital Passport",
+            product_category: "Battery Digital Passport",
             semantic_model_key: "claros_battery_dictionary_v1",
             fields_json: {
               sections: [{
@@ -570,7 +570,7 @@ function createTestApp(options = {}) {
     complianceService: {
       loadPassportTypeDefinition: async () => ({
         type_name: "battery",
-        umbrella_category: "Battery Digital Passport",
+        product_category: "Battery Digital Passport",
         semantic_model_key: "claros_battery_dictionary_v1",
         fields_json: {
           sections: [{

@@ -181,6 +181,8 @@ if (IS_PRODUCTION) {
 
 const defaultAllowedOrigins = IS_PRODUCTION ? [] : [
   "http://localhost:3000", "http://127.0.0.1:3000",
+  "http://localhost:3003", "http://127.0.0.1:3003",
+  "http://localhost:3004", "http://127.0.0.1:3004",
   "http://localhost:5173", "http://127.0.0.1:5173",
   `http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`,
 ];
@@ -304,7 +306,7 @@ const ASSET_IGNORED_SYSTEM_COLUMNS = new Set([
   "deleted_at", "release_status", "version_number", "is_editable", "field_label",
   "created_by_email", "first_name", "last_name",
 ]);
-const ASSET_MATCH_FIELDS = new Set(["dppId", "match_dpp_id", "product_id", "match_product_id", "next_product_id"]);
+const ASSET_MATCH_FIELDS = new Set(["dppId", "dpp_id", "match_dpp_id", "guid", "match_guid", "product_id", "match_product_id", "next_product_id"]);
 const ASSET_ERP_PRESETS = [
   {
     key: "generic_rest", label: "Generic REST",
@@ -520,7 +522,7 @@ async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
   const normalizedType = String(passportType || "").trim();
   if (!normalizedType) { const e = new Error("passport_type is required"); e.statusCode = 400; throw e; }
   const result = await pool.query(
-    `SELECT pt.id, pt.type_name, pt.display_name, pt.umbrella_category, pt.umbrella_icon, pt.semantic_model_key, pt.fields_json, pt.is_active
+    `SELECT pt.id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon, pt.semantic_model_key, pt.fields_json, pt.is_active
      FROM passport_types pt
      JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
      WHERE cpa.company_id = $1 AND cpa.access_revoked = false AND pt.is_active = true AND pt.type_name = $2
@@ -719,6 +721,7 @@ const assetService = createAssetService({
   pool, getTable, logAudit,
   assertCompanyAssetPassportTypeAccess, assertAssetManagementEnabled, getLatestCompanyPassports,
   findExistingPassportByProductId, updatePassportRowById, normalizeProductIdValue,
+  generateProductIdValue, generateDppRecordId, productIdentifierService, createPassportTable, archivePassportSnapshot,
   isPlainObject, getValueAtPath, normalizeAssetHeaders, coerceAssetFieldValue,
   comparableHistoryFieldValue, toDynamicStoredValue, getAssetFieldMap,
   EDITABLE_RELEASE_STATUSES_SQL, ASSET_MATCH_FIELDS, ASSET_IGNORED_SYSTEM_COLUMNS,
@@ -848,7 +851,7 @@ registerPassportRoutes(app, {
   stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
   submitPassportToWorkflow, signPassport, signPortableDataConstruct: signingService.signPortableDataConstruct,
   buildBatteryPassJsonExport, storageService, complianceService, accessRightsService, productIdentifierService,
-  backupProviderService, buildExpandedPassportPayload,
+  backupProviderService, buildExpandedPassportPayload, createPassportTable,
 });
 
 registerPassportPublicRoutes(app, {

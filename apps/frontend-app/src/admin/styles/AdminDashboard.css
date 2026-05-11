@@ -247,23 +247,23 @@
   overflow-wrap: anywhere;
 }
 
-.admin-analytics-table-umbrella th:nth-child(1),
-.admin-analytics-table-umbrella td:nth-child(1) {
+.admin-analytics-table-productCategory th:nth-child(1),
+.admin-analytics-table-productCategory td:nth-child(1) {
   width: 28%;
 }
 
-.admin-analytics-table-umbrella th:nth-child(2),
-.admin-analytics-table-umbrella td:nth-child(2),
-.admin-analytics-table-umbrella th:nth-child(3),
-.admin-analytics-table-umbrella td:nth-child(3),
-.admin-analytics-table-umbrella th:nth-child(4),
-.admin-analytics-table-umbrella td:nth-child(4),
-.admin-analytics-table-umbrella th:nth-child(5),
-.admin-analytics-table-umbrella td:nth-child(5),
-.admin-analytics-table-umbrella th:nth-child(6),
-.admin-analytics-table-umbrella td:nth-child(6),
-.admin-analytics-table-umbrella th:nth-child(7),
-.admin-analytics-table-umbrella td:nth-child(7) {
+.admin-analytics-table-productCategory th:nth-child(2),
+.admin-analytics-table-productCategory td:nth-child(2),
+.admin-analytics-table-productCategory th:nth-child(3),
+.admin-analytics-table-productCategory td:nth-child(3),
+.admin-analytics-table-productCategory th:nth-child(4),
+.admin-analytics-table-productCategory td:nth-child(4),
+.admin-analytics-table-productCategory th:nth-child(5),
+.admin-analytics-table-productCategory td:nth-child(5),
+.admin-analytics-table-productCategory th:nth-child(6),
+.admin-analytics-table-productCategory td:nth-child(6),
+.admin-analytics-table-productCategory th:nth-child(7),
+.admin-analytics-table-productCategory td:nth-child(7) {
   width: 12%;
   text-align: center;
 }
@@ -1031,8 +1031,8 @@
   font-style: italic;
 }
 
-/* ── Umbrella Categories Panel ───────────────────────────── */
-.apt-umbrellas-panel {
+/* ── Product Categories Panel ───────────────────────────── */
+.apt-productCategories-panel {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
@@ -1040,27 +1040,27 @@
   margin-bottom: 28px;
 }
 
-.apt-umbrellas-header {
+.apt-productCategories-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 16px;
 }
 
-.apt-umbrellas-title {
+.apt-productCategories-title {
   font-size: 15px;
   font-weight: 700;
   color: var(--onyx, #1a1a2e);
   margin: 0 0 4px;
 }
 
-.apt-umbrellas-hint {
+.apt-productCategories-hint {
   font-size: 12px;
   color: #6b7280;
   margin: 0;
 }
 
-.apt-add-umbrella-btn {
+.apt-add-productCategory-btn {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   border: 1px solid rgba(13, 181, 176, 0.32);
   border-radius: 6px;
@@ -1073,13 +1073,13 @@
   transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
   box-shadow: 0 14px 28px rgba(13,181,176,0.18);
 }
-.apt-add-umbrella-btn:hover {
+.apt-add-productCategory-btn:hover {
   background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
   transform: translateY(-1px);
   box-shadow: 0 18px 34px rgba(13,181,176,0.26);
 }
 
-.apt-umbrella-form {
+.apt-productCategory-form {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -1087,14 +1087,14 @@
   margin-bottom: 16px;
 }
 
-.apt-umbrella-form-row {
+.apt-productCategory-form-row {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
 }
 
-.apt-umbrella-name-input {
+.apt-productCategory-name-input {
   flex: 1 1 220px;
   padding: 8px 12px;
   border: 1px solid #d1d5db;
@@ -1102,16 +1102,16 @@
   font-size: 14px;
   min-width: 180px;
 }
-.apt-umbrella-name-input:focus { outline: none; border-color: var(--jet); box-shadow: 0 0 0 2px rgba(28,55,56,0.15); }
+.apt-productCategory-name-input:focus { outline: none; border-color: var(--jet); box-shadow: 0 0 0 2px rgba(28,55,56,0.15); }
 
-.apt-umbrella-icon-row {
+.apt-productCategory-icon-row {
   display: flex;
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
 }
 
-.apt-umbrella-icon-input {
+.apt-productCategory-icon-input {
   width: 48px;
   padding: 8px;
   border: 1px solid #d1d5db;
@@ -1119,7 +1119,7 @@
   font-size: 18px;
   text-align: center;
 }
-.apt-umbrella-icon-input:focus { outline: none; border-color: var(--jet); }
+.apt-productCategory-icon-input:focus { outline: none; border-color: var(--jet); }
 
 .apt-icon-preset-btn {
   background: none;
@@ -1133,20 +1133,20 @@
 .apt-icon-preset-btn:hover,
 .apt-icon-preset-btn.selected { border-color: var(--jet); background: var(--mint); }
 
-/* ── Umbrella chips ──────────────────────────────────────── */
-.apt-umbrella-chips {
+/* ── Product Category chips ──────────────────────────────────────── */
+.apt-productCategory-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.apt-umbrella-empty {
+.apt-productCategory-empty {
   font-size: 13px;
   color: #9ca3af;
   font-style: italic;
 }
 
-.apt-umbrella-chip {
+.apt-productCategory-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1158,16 +1158,16 @@
   color: #374151;
 }
 
-.apt-umbrella-chip-used {
+.apt-productCategory-chip-used {
   background: #f0fdf4;
   border-color: #86efac;
   color: #166534;
 }
 
-.apt-umbrella-chip-icon { font-size: 15px; }
-.apt-umbrella-chip-name { font-weight: 600; }
+.apt-productCategory-chip-icon { font-size: 15px; }
+.apt-productCategory-chip-name { font-weight: 600; }
 
-.apt-umbrella-chip-count {
+.apt-productCategory-chip-count {
   font-size: 11px;
   background: #bbf7d0;
   color: #166534;
@@ -1176,7 +1176,7 @@
   font-weight: 700;
 }
 
-.apt-umbrella-chip-delete {
+.apt-productCategory-chip-delete {
   background: none;
   border: none;
   color: #9ca3af;
@@ -1186,9 +1186,9 @@
   line-height: 1;
   transition: color 0.15s;
 }
-.apt-umbrella-chip-delete:hover { color: #ef4444; }
+.apt-productCategory-chip-delete:hover { color: #ef4444; }
 
-.apt-umbrella-delete-btn {
+.apt-productCategory-delete-btn {
   margin-left: 4px;
   padding: 4px 10px;
   border-radius: 999px;
@@ -1201,19 +1201,19 @@
   transition: all 0.15s;
 }
 
-.apt-umbrella-delete-btn:hover {
+.apt-productCategory-delete-btn:hover {
   background: rgba(239, 68, 68, 0.2);
   border-color: rgba(239, 68, 68, 0.42);
   color: #ffd4d4;
 }
 
-[data-theme="light"] .apt-umbrella-delete-btn {
+[data-theme="light"] .apt-productCategory-delete-btn {
   background: #fff1f1;
   color: #b42318;
   border-color: #f1b0ab;
 }
 
-[data-theme="light"] .apt-umbrella-delete-btn:hover {
+[data-theme="light"] .apt-productCategory-delete-btn:hover {
   background: #ffe2e0;
   color: #912018;
   border-color: #e28b84;
@@ -1793,19 +1793,28 @@
 }
 
 .acpt-move-select {
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
   font-size: 12px;
-  color: var(--charcoal);
+  color: var(--text-secondary);
   outline: none;
-  background: #fff;
+  background: rgba(255,255,255,0.05);
   cursor: pointer;
-  min-width: 150px;
+  min-width: 118px;
+  max-width: 132px;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .acpt-move-select:focus {
-  border-color: var(--jet);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .acpt-move-select {
+  background: rgba(255,255,255,0.92);
+  color: var(--charcoal);
+  border-color: rgba(17, 44, 72, 0.16);
 }
 
 .acpt-add-field-btn {
@@ -1864,7 +1873,7 @@
   margin-bottom: 14px;
 }
 .acpt-preview-icon { font-size: 24px; }
-.acpt-preview-umbrella { font-size: 14px; font-weight: 700; color: var(--charcoal); }
+.acpt-preview-productCategory { font-size: 14px; font-weight: 700; color: var(--charcoal); }
 .acpt-preview-indent {
   font-size: 13px;
   color: #6b7280;
@@ -1905,32 +1914,33 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  margin: 6px 0 0 26px;
-  padding: 8px 14px;
+  gap: 4px 10px;
+  margin: 4px 0 0 26px;
+  padding: 6px 10px;
   background: #faf5ff;
   border: 1px solid #d8b4fe;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 10px;
+  font-size: 11px;
 }
 
 .acpt-access-label {
   font-weight: 700;
   color: #6c3483;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.03em;
 }
 
 .acpt-access-check {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
+  gap: 4px;
+  font-size: 11px;
   color: var(--charcoal);
   cursor: pointer;
   user-select: none;
+  line-height: 1.2;
 }
 .acpt-access-check input[type="checkbox"] { accent-color: #9b59b6; cursor: pointer; }
 
@@ -1940,9 +1950,108 @@
 }
 .acpt-access-check.acpt-access-disabled input { cursor: not-allowed; }
 
+.acpt-governance-select {
+  min-width: 132px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+  font-size: 10px;
+}
+
+[data-theme="light"] .acpt-governance-select {
+  background: #ffffff;
+  color: var(--charcoal);
+  border-color: rgba(17, 44, 72, 0.16);
+}
+
+.acpt-checkbox-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.acpt-checkbox-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 156px;
+  max-width: min(100%, 300px);
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.acpt-checkbox-dropdown-summary {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.acpt-checkbox-dropdown-caret {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+
+.acpt-checkbox-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 240;
+  width: min(320px, 100%);
+  max-height: 180px;
+  overflow: auto;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background:
+    linear-gradient(180deg, rgba(18,24,38,0.98), rgba(16,22,34,0.98)),
+    var(--bg-elevated);
+  box-shadow: 0 18px 36px rgba(0,0,0,0.35);
+}
+
+[data-theme="light"] .acpt-checkbox-dropdown-trigger {
+  background: #ffffff;
+  color: var(--charcoal);
+  border-color: rgba(17, 44, 72, 0.16);
+}
+
+[data-theme="light"] .acpt-checkbox-dropdown-menu {
+  background: #ffffff;
+  border-color: rgba(17, 44, 72, 0.12);
+  box-shadow: 0 18px 36px rgba(17, 44, 72, 0.14);
+}
+
+.acpt-checkbox-dropdown-menu .acpt-access-check {
+  display: flex;
+  width: 100%;
+  padding: 5px 7px;
+  border-radius: 7px;
+}
+
+.acpt-checkbox-dropdown-menu .acpt-access-check:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+[data-theme="light"] .acpt-checkbox-dropdown-menu .acpt-access-check:hover {
+  background: rgba(13, 181, 176, 0.08);
+}
+
 /* ── Table field config ──────────────────────────────────── */
 .acpt-field-wrap {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   position: relative;
   z-index: 0;
 }
@@ -1957,19 +2066,19 @@
 
 /* ── Composition field toggle ────────────────────────────── */
 .acpt-field-composition {
-  margin: 6px 0 0 26px;
-  padding: 8px 14px;
+  margin: 4px 0 0 26px;
+  padding: 6px 10px;
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
-  border-radius: 6px;
+  border-radius: 10px;
 }
 
 .acpt-composition-toggle {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 5px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .acpt-composition-toggle input[type="checkbox"] {
@@ -1981,10 +2090,11 @@
 .acpt-composition-label {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   font-weight: 700;
   color: #14532d;
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.2;
 }
 
 .acpt-composition-hint {
@@ -1996,19 +2106,19 @@
 
 /* ── Dynamic field toggle ────────────────────────────────── */
 .acpt-field-dynamic {
-  margin: 6px 0 0 26px;
-  padding: 8px 14px;
+  margin: 4px 0 0 26px;
+  padding: 6px 10px;
   background: #fff7ed;
   border: 1px solid #fed7aa;
-  border-radius: 6px;
+  border-radius: 10px;
 }
 
 .acpt-dynamic-toggle {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 5px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .acpt-dynamic-toggle input[type="checkbox"] {
@@ -2020,10 +2130,11 @@
 .acpt-dynamic-label {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   font-weight: 700;
   color: #9a3412;
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.2;
 }
 
 .acpt-dynamic-hint {
@@ -2044,11 +2155,11 @@
 .acpt-semantic-label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
+  gap: 2px;
+  font-size: 11px;
   font-weight: 700;
   color: #075985;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .acpt-semantic-hint {
@@ -2067,18 +2178,49 @@
 
 /* ── Meta row: composition / Battery Pass mapping / dynamic ─── */
 .acpt-field-meta-row {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  margin: 8px 0 0 26px;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.45fr) minmax(170px, 0.9fr);
+  gap: 6px;
+  margin: 6px 0 0 26px;
   align-items: stretch;
 }
 
-.acpt-field-meta-row .acpt-field-composition,
+.acpt-field-top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(165px, 0.62fr);
+  gap: 4px;
+  margin: 4px 0 0 26px;
+  align-items: stretch;
+}
+
+.acpt-field-governance-stack {
+  display: grid;
+  gap: 4px;
+}
+
+.acpt-field-semantic-row {
+  margin: 6px 0 0 26px;
+}
+
+.acpt-field-side-options {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+}
+
+.acpt-field-meta-row .acpt-field-side-options,
 .acpt-field-meta-row .acpt-field-semantic,
+.acpt-field-meta-row .acpt-field-composition,
 .acpt-field-meta-row .acpt-field-dynamic {
   flex: 1;
   margin: 0;
+}
+
+@media (max-width: 1080px) {
+  .acpt-field-meta-row,
+  .acpt-field-top-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Field option panels: theme-aligned overrides ────────── */
@@ -2087,8 +2229,8 @@
 .acpt-field-semantic,
 .acpt-field-dynamic {
   margin: 8px 0 0 26px;
-  padding: 12px 16px;
-  border-radius: 14px;
+  padding: 9px 12px;
+  border-radius: 12px;
   border: 1px solid var(--border-strong);
   background:
     linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
@@ -2155,9 +2297,11 @@
 
 /* ── Field metadata: unit / dataType / ontology URI ─────── */
 .acpt-meta-fields-row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(180px, 0.8fr) minmax(0, 1.6fr);
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: end;
 }
 
 .acpt-meta-field-group {
@@ -2165,15 +2309,17 @@
   flex-direction: column;
   gap: 4px;
   flex: 1;
+  min-width: 130px;
 }
 
 .acpt-meta-field-group-full {
-  flex: none;
-  width: 100%;
+  flex: 1;
+  width: auto;
+  min-width: 0;
 }
 
 .acpt-meta-sub-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -2181,9 +2327,9 @@
 }
 
 .acpt-type-select-sm {
-  font-size: 12px;
-  padding: 5px 8px;
-  height: 32px;
+  font-size: 11px;
+  padding: 4px 8px;
+  height: 30px;
 }
 
 .acpt-semantic-search {
@@ -2192,6 +2338,16 @@
   background: var(--bg-elevated);
   color: var(--text-primary);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+@media (max-width: 1180px) {
+  .acpt-meta-fields-row {
+    grid-template-columns: 1fr;
+  }
+
+  .acpt-meta-field-group-full {
+    width: 100%;
+  }
 }
 
 .acpt-semantic-search::placeholder {
@@ -2219,10 +2375,10 @@
   left: 0;
   right: 0;
   z-index: 220;
-  max-height: 320px;
+  max-height: 180px;
   overflow-y: auto;
-  padding: 8px;
-  border-radius: 14px;
+  padding: 6px;
+  border-radius: 12px;
   border: 1px solid var(--border-strong);
   background:
     linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
@@ -2633,9 +2789,6 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 14px 20px;
-  position: sticky;
-  bottom: 0;
-  z-index: 50;
   background: var(--bg-surface, #0f1923);
   border-top: 1px solid var(--border-strong);
   margin: 0 -20px;
@@ -4601,6 +4754,7 @@
 
 .apt-fv-section-spaced {
   padding: 12px 0;
+  overflow-x: auto;
 }
 
 .apt-fv-section-title-strong {
@@ -4611,6 +4765,37 @@
   width: 100%;
   margin-top: 8px;
 }
+
+.apt-fv-table-header,
+.apt-fv-table-custom {
+  min-width: 980px;
+}
+
+.apt-fv-table-header th:nth-child(1),
+.apt-fv-table-header td:nth-child(1) { width: 18%; }
+.apt-fv-table-header th:nth-child(2),
+.apt-fv-table-header td:nth-child(2) { width: 19%; }
+.apt-fv-table-header th:nth-child(3),
+.apt-fv-table-header td:nth-child(3) { width: 24%; }
+.apt-fv-table-header th:nth-child(4),
+.apt-fv-table-header td:nth-child(4) { width: 16%; }
+.apt-fv-table-header th:nth-child(5),
+.apt-fv-table-header td:nth-child(5) { width: 14%; }
+.apt-fv-table-header th:nth-child(6),
+.apt-fv-table-header td:nth-child(6) { width: 9%; }
+
+.apt-fv-table-custom th:nth-child(1),
+.apt-fv-table-custom td:nth-child(1) { width: 20%; }
+.apt-fv-table-custom th:nth-child(2),
+.apt-fv-table-custom td:nth-child(2) { width: 18%; }
+.apt-fv-table-custom th:nth-child(3),
+.apt-fv-table-custom td:nth-child(3) { width: 10%; }
+.apt-fv-table-custom th:nth-child(4),
+.apt-fv-table-custom td:nth-child(4) { width: 22%; }
+.apt-fv-table-custom th:nth-child(5),
+.apt-fv-table-custom td:nth-child(5) { width: 13%; }
+.apt-fv-table-custom th:nth-child(6),
+.apt-fv-table-custom td:nth-child(6) { width: 17%; }
 
 /* Admin create passport type helpers */
 .acpt-hint-error {
@@ -4648,8 +4833,8 @@
   color: var(--text-secondary);
 }
 
-/* Umbrella group layout */
-.access-umbrella-group {
+/* Product Category group layout */
+.access-productCategory-group {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -4657,30 +4842,30 @@
   padding-bottom: 20px;
 }
 
-.access-umbrella-group:first-child {
+.access-productCategory-group:first-child {
   padding-top: 0;
 }
 
-.access-umbrella-group:last-child {
+.access-productCategory-group:last-child {
   padding-bottom: 0;
 }
 
-.access-umbrella-group + .access-umbrella-group {
+.access-productCategory-group + .access-productCategory-group {
   border-top: 1px solid var(--border);
 }
 
-.access-umbrella-header {
+.access-productCategory-header {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.access-umbrella-icon {
+.access-productCategory-icon {
   font-size: 18px;
   line-height: 1;
 }
 
-.access-umbrella-name {
+.access-productCategory-name {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
@@ -4695,7 +4880,7 @@
    ============================================ */
 
 .apt-group,
-.apt-umbrellas-panel,
+.apt-productCategories-panel,
 .apt-modal,
 .acpt-card,
 .sym-card,
@@ -4704,7 +4889,7 @@
 .access-summary,
 .company-info,
 .apt-empty,
-.apt-umbrella-form,
+.apt-productCategory-form,
 .acpt-preview-card {
   background:
     linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01)),
@@ -4715,7 +4900,7 @@
 }
 
 [data-theme="light"] .apt-group,
-[data-theme="light"] .apt-umbrellas-panel,
+[data-theme="light"] .apt-productCategories-panel,
 [data-theme="light"] .apt-draft-card,
 [data-theme="light"] .apt-modal,
 [data-theme="light"] .acpt-card,
@@ -4725,7 +4910,7 @@
 [data-theme="light"] .access-summary,
 [data-theme="light"] .company-info,
 [data-theme="light"] .apt-empty,
-[data-theme="light"] .apt-umbrella-form,
+[data-theme="light"] .apt-productCategory-form,
 [data-theme="light"] .acpt-preview-card {
   background: #ffffff;
   border-color: rgba(28,55,56,0.12);
@@ -4771,7 +4956,7 @@
 .companies-section h2,
 .create-company-card h3,
 .apt-group-name,
-.apt-umbrellas-title,
+.apt-productCategories-title,
 .apt-draft-card-title,
 .acpt-card-title,
 .sym-card-title,
@@ -4791,8 +4976,8 @@
 .apt-draft-card-eyebrow,
 .apt-draft-card-subtitle,
 .apt-draft-card-label,
-.apt-umbrellas-hint,
-.apt-umbrella-empty,
+.apt-productCategories-hint,
+.apt-productCategory-empty,
 .apt-fv-section-title,
 .apt-modal-label,
 .apt-modal-warning,
@@ -4830,8 +5015,8 @@
 [data-theme="light"] .apt-draft-card-eyebrow,
 [data-theme="light"] .apt-draft-card-subtitle,
 [data-theme="light"] .apt-draft-card-label,
-[data-theme="light"] .apt-umbrellas-hint,
-[data-theme="light"] .apt-umbrella-empty,
+[data-theme="light"] .apt-productCategories-hint,
+[data-theme="light"] .apt-productCategory-empty,
 [data-theme="light"] .apt-fv-section-title,
 [data-theme="light"] .apt-modal-label,
 [data-theme="light"] .apt-modal-warning,
@@ -4973,7 +5158,7 @@
   box-shadow: 0 18px 34px rgba(13,181,176,0.24);
 }
 
-.apt-add-umbrella-btn,
+.apt-add-productCategory-btn,
 .apt-view-fields-btn,
 .acpt-csv-template-btn,
 .acpt-draft-discard-btn,
@@ -4985,7 +5170,7 @@
   border: 1px solid var(--border);
 }
 
-[data-theme="light"] .apt-add-umbrella-btn,
+[data-theme="light"] .apt-add-productCategory-btn,
 [data-theme="light"] .apt-view-fields-btn,
 [data-theme="light"] .acpt-csv-template-btn,
 [data-theme="light"] .acpt-draft-discard-btn,
@@ -4997,7 +5182,7 @@
   border-color: rgba(28,55,56,0.14);
 }
 
-.apt-add-umbrella-btn:hover,
+.apt-add-productCategory-btn:hover,
 .apt-view-fields-btn:hover,
 .acpt-csv-template-btn:hover,
 .acpt-draft-discard-btn:hover,
@@ -5019,8 +5204,8 @@
 
 .form-group input,
 .admin-select-input,
-.apt-umbrella-name-input,
-.apt-umbrella-icon-input,
+.apt-productCategory-name-input,
+.apt-productCategory-icon-input,
 .apt-modal-input,
 .acpt-input,
 .acpt-section-name-input,
@@ -5040,8 +5225,8 @@
 
 [data-theme="light"] .form-group input,
 [data-theme="light"] .admin-select-input,
-[data-theme="light"] .apt-umbrella-name-input,
-[data-theme="light"] .apt-umbrella-icon-input,
+[data-theme="light"] .apt-productCategory-name-input,
+[data-theme="light"] .apt-productCategory-icon-input,
 [data-theme="light"] .apt-modal-input,
 [data-theme="light"] .acpt-input,
 [data-theme="light"] .acpt-section-name-input,
@@ -5058,8 +5243,8 @@
   border-color: rgba(28,55,56,0.18);
 }
 
-.apt-umbrella-name-input:focus,
-.apt-umbrella-icon-input:focus,
+.apt-productCategory-name-input:focus,
+.apt-productCategory-icon-input:focus,
 .apt-modal-input:focus,
 .acpt-input:focus,
 .acpt-section-name-input:focus,
@@ -5079,6 +5264,120 @@
 .apt-fv-table {
   background: transparent;
   color: var(--text-primary);
+}
+
+.acpt-system-header-card {
+  border-color: rgba(13,181,176,0.26);
+}
+
+.acpt-system-header-lock {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(13,181,176,0.12);
+  color: var(--accent);
+  border: 1px solid rgba(13,181,176,0.22);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.acpt-system-header-section-row {
+  margin-bottom: 16px;
+}
+
+.acpt-system-header-ownership {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.acpt-system-header-owner {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.04);
+}
+
+.acpt-system-header-owner-system_generated {
+  color: #90cdf4;
+  border-color: rgba(144,205,244,0.35);
+  background: rgba(144,205,244,0.08);
+}
+
+.acpt-system-header-owner-company_managed {
+  color: var(--accent);
+  border-color: rgba(13,181,176,0.35);
+  background: rgba(13,181,176,0.1);
+}
+
+.acpt-system-header-owner-passport_author_editable {
+  color: #fbbf24;
+  border-color: rgba(251,191,36,0.35);
+  background: rgba(251,191,36,0.1);
+}
+
+.acpt-system-header-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.acpt-system-header-field {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,0.025);
+}
+
+[data-theme="light"] .acpt-system-header-field {
+  background: rgba(13,181,176,0.04);
+  border-color: rgba(28,55,56,0.12);
+}
+
+.acpt-system-header-label-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.acpt-system-header-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.acpt-system-header-meta code {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.acpt-system-header-meta span {
+  overflow-wrap: anywhere;
+}
+
+.acpt-system-header-meta strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .apt-fv-table th {
@@ -5119,6 +5418,7 @@
 .acpt-semantic-hint code {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   padding: 4px 10px;
   border-radius: 8px;
   background: rgba(13,181,176,0.18);
@@ -5126,6 +5426,8 @@
   color: #d8fffb;
   font-weight: 700;
   font-size: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 [data-theme="light"] .apt-fv-table code,
@@ -5202,36 +5504,36 @@
 
 .apt-card-display-name,
 .apt-group-name,
-.apt-umbrellas-title,
+.apt-productCategories-title,
 .apt-empty h3,
-.apt-preview-umbrella {
+.apt-preview-productCategory {
   color: var(--heading-display);
 }
 
 [data-theme="light"] .apt-card-display-name,
 [data-theme="light"] .apt-group-name,
-[data-theme="light"] .apt-umbrellas-title,
+[data-theme="light"] .apt-productCategories-title,
 [data-theme="light"] .apt-empty h3,
-[data-theme="light"] .apt-preview-umbrella {
+[data-theme="light"] .apt-preview-productCategory {
   color: var(--heading-strong);
 }
 
 .apt-card-meta,
 .apt-group-count,
-.apt-umbrellas-hint,
+.apt-productCategories-hint,
 .apt-empty p,
 .apt-immutable-note,
-.apt-umbrella-empty,
+.apt-productCategory-empty,
 .apt-fv-section-title {
   color: var(--text-secondary);
 }
 
 [data-theme="light"] .apt-card-meta,
 [data-theme="light"] .apt-group-count,
-[data-theme="light"] .apt-umbrellas-hint,
+[data-theme="light"] .apt-productCategories-hint,
 [data-theme="light"] .apt-empty p,
 [data-theme="light"] .apt-immutable-note,
-[data-theme="light"] .apt-umbrella-empty,
+[data-theme="light"] .apt-productCategory-empty,
 [data-theme="light"] .apt-fv-section-title {
   color: #4f6b7c;
 }
@@ -5261,63 +5563,63 @@
 }
 
 .apt-group-count,
-.apt-umbrella-chip,
-.apt-add-umbrella-btn,
+.apt-productCategory-chip,
+.apt-add-productCategory-btn,
 .apt-view-fields-btn {
   border-color: var(--border);
 }
 
 .apt-group-count,
-.apt-umbrella-chip {
+.apt-productCategory-chip {
   background: rgba(255,255,255,0.06);
 }
 
 [data-theme="light"] .apt-group-count,
-[data-theme="light"] .apt-umbrella-chip {
+[data-theme="light"] .apt-productCategory-chip {
   background: #eef5f8;
   border-color: rgba(23,48,74,0.12);
 }
 
-.apt-umbrella-chip {
+.apt-productCategory-chip {
   color: var(--text-primary);
 }
 
-.apt-add-umbrella-btn {
+.apt-add-productCategory-btn {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: #0b1826;
   border-color: rgba(13, 181, 176, 0.32);
   box-shadow: 0 14px 28px rgba(13,181,176,0.18);
 }
 
-.apt-add-umbrella-btn:hover {
+.apt-add-productCategory-btn:hover {
   background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
   color: #0b1826;
   border-color: rgba(13, 181, 176, 0.42);
   box-shadow: 0 18px 34px rgba(13,181,176,0.26);
 }
 
-[data-theme="light"] .apt-add-umbrella-btn {
+[data-theme="light"] .apt-add-productCategory-btn {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: #0b1826;
   border-color: rgba(13, 181, 176, 0.3);
 }
 
-[data-theme="light"] .apt-add-umbrella-btn:hover {
+[data-theme="light"] .apt-add-productCategory-btn:hover {
   background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
   color: #0b1826;
   border-color: rgba(13, 181, 176, 0.42);
 }
 
-[data-theme="light"] .apt-umbrella-chip {
+[data-theme="light"] .apt-productCategory-chip {
   color: #17304a;
 }
 
-.apt-umbrella-chip-count {
+.apt-productCategory-chip-count {
   background: rgba(16,185,129,0.18);
   color: #b7f5d7;
 }
 
-[data-theme="light"] .apt-umbrella-chip-count {
+[data-theme="light"] .apt-productCategory-chip-count {
   background: #d9f7e8;
   color: #166534;
 }
@@ -5335,6 +5637,9 @@
 .apt-fv-table td,
 .apt-fv-table th {
   line-height: 1.45;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .apt-fv-table td {
@@ -5782,7 +6087,17 @@
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
-  padding: 20px 0 8px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  position: sticky;
+  bottom: 0;
+  z-index: 220;
+  margin: 14px -6px 0;
+  border-top: 1px solid var(--border-strong);
+  background:
+    linear-gradient(180deg, rgba(15, 25, 35, 0.88), rgba(15, 25, 35, 0.97)),
+    var(--bg-surface);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.18);
 }
 
 .acpt-actions .cancel-btn,
@@ -5838,10 +6153,29 @@
   color: var(--onyx);
   border-color: rgba(28,55,56,0.2);
 }
+[data-theme="light"] .acpt-actions {
+  background:
+    linear-gradient(180deg, rgba(245, 248, 250, 0.88), rgba(245, 248, 250, 0.98)),
+    #f5f8fa;
+  box-shadow: 0 -10px 24px rgba(17, 44, 72, 0.08);
+}
 [data-theme="light"] .acpt-actions .cancel-btn:hover:not(:disabled) {
   background: rgba(0,0,0,0.04);
 }
 [data-theme="light"] .acpt-save-draft-btn {
   color: var(--accent-strong);
   border-color: var(--accent-strong);
+}
+
+@media (max-width: 980px) {
+  .acpt-actions {
+    flex-wrap: wrap;
+    justify-content: stretch;
+  }
+
+  .acpt-actions .cancel-btn,
+  .acpt-actions .submit-btn,
+  .acpt-save-draft-btn {
+    flex: 1 1 180px;
+  }
 }

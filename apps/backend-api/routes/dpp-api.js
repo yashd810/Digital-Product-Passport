@@ -200,7 +200,7 @@ module.exports = function registerDppApiRoutes(app, {
 
     const [companyNameMap, typeRes] = await Promise.all([
     getCompanyNameMap([result.passport.company_id]),
-    pool.query("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [result.passport.passport_type])]
+    pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [result.passport.passport_type])]
     );
 
     return {
@@ -750,7 +750,7 @@ module.exports = function registerDppApiRoutes(app, {
     editableOnly = false,
     atDate = null
   } = {}) {
-    const typeRows = await pool.query("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
+    const typeRows = await pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
     const matches = [];
 
     for (const typeRow of typeRows.rows) {
@@ -940,7 +940,7 @@ module.exports = function registerDppApiRoutes(app, {
 
     const [companyNameMap, typeRes] = await Promise.all([
     getCompanyNameMap([companyId]),
-    pool.query("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [passportType])]
+    pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [passportType])]
     );
 
     return {
@@ -964,7 +964,7 @@ module.exports = function registerDppApiRoutes(app, {
       productId: parsed.productId,
       granularity: parsed.granularity || "item"
     }) || [parsed.productId];
-    const typeRows = await pool.query("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
+    const typeRows = await pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
 
     const matches = [];
     for (const typeRow of typeRows.rows) {
@@ -1004,7 +1004,7 @@ module.exports = function registerDppApiRoutes(app, {
       return resolveEditablePassportByDppId(productIdentifier);
     }
 
-    const typeRows = await pool.query("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
+    const typeRows = await pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
     const matches = [];
 
     for (const typeRow of typeRows.rows) {
@@ -1337,7 +1337,7 @@ module.exports = function registerDppApiRoutes(app, {
     if (!result?.passport) return null;
     const [companyNameMap, typeRes] = await Promise.all([
     getCompanyNameMap([result.passport.company_id]),
-    pool.query("SELECT type_name, umbrella_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [result.passport.passport_type])]
+    pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [result.passport.passport_type])]
     );
     return {
       passport: result.passport,
@@ -2021,34 +2021,66 @@ module.exports = function registerDppApiRoutes(app, {
         return res.status(409).json({ error: "Passport is not editable" });
       }
 
-      await archivePassportSnapshot({
-        passport: editable.passport,
-        passportType: editable.passport.passport_type,
-        archivedBy: req.user.userId,
-        actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "before_standards_delete",
-      });
+      const isDraft = editable.passport.release_status === "draft";
+
+      if (!isDraft) {
+        await archivePassportSnapshot({
+          passport: editable.passport,
+          passportType: editable.passport.passport_type,
+          archivedBy: req.user.userId,
+          actorIdentifier: getActorIdentifier(req.user),
+          snapshotReason: "before_standards_delete",
+        });
+      }
 
       await replicatePassportToBackup({
         passport: editable.passport,
         typeDef: editable.typeDef,
-        reason: "standards_delete",
-        snapshotScope: "deleted_editable"
+        reason: isDraft ? "standards_hard_delete" : "standards_delete",
+        snapshotScope: isDraft ? "hard_deleted_draft" : "deleted_editable"
       }).catch(() => {});
 
-      const deleted = await pool.query(
-        `UPDATE ${editable.tableName}
-         SET deleted_at = NOW(),
-             updated_at = NOW()
-         WHERE dpp_id = $1
-           AND release_status IN ('draft', 'in_revision')
-           AND deleted_at IS NULL
-         RETURNING dpp_id`,
-        [editable.passport.dppId]
-      );
+      let deleted;
+      if (isDraft) {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query("DELETE FROM passport_dynamic_values WHERE passport_dpp_id = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_signatures WHERE passport_dpp_id = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_scan_events WHERE passport_dpp_id = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_workflow WHERE passport_dpp_id = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_security_events WHERE passport_dpp_id = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_edit_sessions WHERE passport_dpp_id = $1", [editable.passport.dppId]);
+          deleted = await client.query(
+            `DELETE FROM ${editable.tableName}
+             WHERE dpp_id = $1
+               AND release_status = 'draft'
+               AND deleted_at IS NULL
+             RETURNING dpp_id`,
+            [editable.passport.dppId]
+          );
+          await client.query("COMMIT");
+        } catch (err) {
+          await client.query("ROLLBACK");
+          throw err;
+        } finally {
+          client.release();
+        }
+      } else {
+        deleted = await pool.query(
+          `UPDATE ${editable.tableName}
+           SET deleted_at = NOW(),
+               updated_at = NOW()
+           WHERE dpp_id = $1
+             AND release_status IN ('draft', 'in_revision')
+             AND deleted_at IS NULL
+           RETURNING dpp_id`,
+          [editable.passport.dppId]
+        );
+      }
       if (!deleted.rows.length) return res.status(404).json({ error: "Passport not found or not editable" });
 
-      await logAudit(editable.passport.company_id, req.user.userId, "DELETE_DPP", editable.tableName, editable.passport.dppId, {
+      await logAudit(editable.passport.company_id, req.user.userId, isDraft ? "HARD_DELETE_DPP" : "DELETE_DPP", editable.tableName, editable.passport.dppId, {
         dppId
       }, null);
 

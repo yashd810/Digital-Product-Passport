@@ -137,7 +137,7 @@ function createTestApp(options = {}) {
 
   const typeDef = {
     type_name: "battery",
-    umbrella_category: "Battery Digital Passport",
+    product_category: "Battery Digital Passport",
     semantic_model_key: "claros_battery_dictionary_v1",
     fields_json: {
       sections: [
@@ -242,6 +242,35 @@ function createTestApp(options = {}) {
 }
 
 describe("passport public routes", () => {
+  test("GET /api/passports/by-product/:productId omits company_id and includes public company profile plus canonical DIDs", async () => {
+    const { app, passport } = createTestApp({
+      resolveReleasedPassportByProductId: async () => ({ passport }),
+    });
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/passports/by-product/:productId",
+      params: { productId: passport.product_id },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.company_id).toBeUndefined();
+    expect(response.body.company_profile).toEqual(
+      expect.objectContaining({
+        company_name: "Acme Energy",
+        did_slug: "acme-energy",
+      })
+    );
+    expect(response.body.companyDid).toBe("did:web:www.claros-dpp.online:did:company:acme-energy");
+    expect(response.body.dppDid).toBe("did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc");
+    expect(response.body.linked_data?.canonical_subjects).toEqual(
+      expect.objectContaining({
+        companyDid: "did:web:www.claros-dpp.online:did:company:acme-energy",
+        dppDid: "did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc",
+      })
+    );
+  });
+
   test("GET /api/passports/:dppId/canonical keeps compressed payloads by default", async () => {
     const { app, passport } = createTestApp();
 
@@ -386,7 +415,7 @@ describe("passport public routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body.digitalProductPassportId).toBe("dpp_handover_001");
+    expect(response.body.digitalProductPassportId).toBe("did:web:www.claros-dpp.online:did:dpp:item:dpp_handover_001");
     expect(response.body.fields).toEqual(
       expect.objectContaining({
         battery_mass: 455,

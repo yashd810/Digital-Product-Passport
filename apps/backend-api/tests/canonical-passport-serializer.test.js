@@ -31,14 +31,29 @@ function test(name, fn) {
 const typeDef = {
   type_name: "generic_passport",
   fields_json: {
+    systemHeader: {
+      section: { key: "passport_header", label: "Passport Header" },
+      fields: [
+        { key: "digitalProductPassportId", semanticId: "dpp:digitalProductPassportId", valueSource: "system", required: true, locked: true },
+        { key: "uniqueProductIdentifier", semanticId: "dpp:uniqueProductIdentifier", valueSource: "system", required: true, locked: true },
+        { key: "localProductId", semanticId: "dpp:productId", valueSource: "system", required: true, locked: true },
+        { key: "granularity", semanticId: "dpp:granularity", valueSource: "company_policy", required: true, locked: true },
+        { key: "dppSchemaVersion", semanticId: "dpp:dppSchemaVersion", valueSource: "passport_type", required: true, locked: true },
+        { key: "dppStatus", semanticId: "dpp:dppStatus", valueSource: "system", required: true, locked: true },
+        { key: "lastUpdate", semanticId: "dpp:lastUpdate", valueSource: "system", required: true, locked: true },
+        { key: "economicOperatorId", semanticId: "dpp:economicOperatorId", valueSource: "company_identity", required: true, locked: true },
+        { key: "facilityId", semanticId: "dpp:facilityId", valueSource: "company_or_passport", required: false, locked: true },
+        { key: "contentSpecificationIds", semanticId: "dpp:contentSpecificationIds", valueSource: "passport_type", required: true, locked: true },
+        { key: "subjectDid", semanticId: "dpp:subjectDid", valueSource: "system", required: true, locked: true },
+        { key: "dppDid", semanticId: "dpp:dppDid", valueSource: "system", required: true, locked: true },
+        { key: "companyDid", semanticId: "dpp:companyDid", valueSource: "system", required: true, locked: true },
+      ],
+    },
     sections: [
       {
         fields: [
           { key: "batteryMass", dataType: "number" },
           { key: "isReplaceable", dataType: "boolean" },
-          { key: "content_specification_ids" },
-          { key: "facility_id" },
-          { key: "dpp_status" },
         ],
       },
     ],
@@ -71,7 +86,7 @@ const company = {
 console.log("\nbuildCanonicalPassportPayload()");
 test("preserves typed field values and required headers", () => {
   const payload = buildCanonicalPassportPayload(passport, typeDef, { company });
-  assert.strictEqual(payload.digitalProductPassportId, "dpp_fff9372d-6405-4207-9ed2-808426a3151c");
+  assert.strictEqual(payload.digitalProductPassportId, "did:web:www.claros-dpp.online:did:dpp:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
   assert.strictEqual(payload.uniqueProductIdentifier, "did:web:www.claros-dpp.online:did:battery:item:pid-72b99c83");
   assert.strictEqual(payload.localProductId, "PID-72b99c83");
   assert.strictEqual(payload.granularity, "Item");
@@ -91,6 +106,12 @@ test("preserves typed field values and required headers", () => {
   assert.ok(!("facility_id" in payload.fields));
   assert.ok(!("content_specification_ids" in payload.fields));
   assert.ok(!("dpp_status" in payload.fields));
+});
+
+test("derives company DID from company name when only public company identity is available", () => {
+  const payload = buildCanonicalPassportPayload(passport, typeDef, { companyName: "Example Corp" });
+  assert.strictEqual(payload.companyDid, "did:web:www.claros-dpp.online:did:company:example-corp");
+  assert.ok(!payload.companyDid.includes(":company:2"));
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

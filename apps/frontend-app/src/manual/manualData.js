@@ -50,14 +50,14 @@ export const CORE_DATABASE_TABLES = [
         columns: ["id", "company_id", "facility_identifier", "identifier_scheme", "display_name", "metadata_json", "is_active", "created_by", "created_at", "updated_at"],
       },
       {
-        name: "umbrella_categories",
+        name: "product_categories",
         purpose: "Super-admin-managed product categories shown above passport types.",
         columns: ["id", "name", "icon", "created_at"],
       },
       {
         name: "passport_types",
         purpose: "Published passport type definitions, semantic model selection, governance metadata, and field schemas.",
-        columns: ["id", "type_name", "display_name", "umbrella_category", "umbrella_icon", "semantic_model_key", "fields_json", "is_active", "created_by", "created_at", "updated_at"],
+        columns: ["id", "type_name", "display_name", "product_category", "product_icon", "semantic_model_key", "fields_json", "is_active", "created_by", "created_at", "updated_at"],
       },
       {
         name: "passport_type_schema_events",
@@ -767,9 +767,9 @@ export const ADMIN_PLATFORM_API_TABLE = {
   title: "Super-admin API operations that shape the platform",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it controls"],
   rows: [
-    ["List categories", "GET /api/admin/umbrella-categories", "Session cookie or bearer token and super-admin role", "No body", "Reads the current umbrella product categories."],
-    ["Create a category", "POST /api/admin/umbrella-categories", "Session cookie or bearer token and super-admin role", "{ name, icon }", "Adds a new umbrella category for the catalog tree."],
-    ["Delete a category", "DELETE /api/admin/umbrella-categories/:id", "Session cookie or bearer token and super-admin role", "{ password }", "Deletes a category if no passport type is still using it."],
+    ["List categories", "GET /api/admin/product-categories", "Session cookie or bearer token and super-admin role", "No body", "Reads the current productCategory product categories."],
+    ["Create a category", "POST /api/admin/product-categories", "Session cookie or bearer token and super-admin role", "{ name, icon }", "Adds a new product category for the catalog tree."],
+    ["Delete a category", "DELETE /api/admin/product-categories/:id", "Session cookie or bearer token and super-admin role", "{ password }", "Deletes a category if no passport type is still using it."],
     ["List passport types", "GET /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "No body", "Shows the published type catalog and metadata."],
     ["Create a passport type", "POST /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "Type metadata plus fields_json schema", "Creates a new type and its runtime table."],
     ["Update a passport type", "PATCH /api/admin/passport-types/:id", "Session cookie or bearer token and super-admin role", "Updated metadata and or fields_json", "Changes an existing type definition."],

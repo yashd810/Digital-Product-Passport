@@ -70,7 +70,7 @@ product_identifier_lineage
 request_rate_limits
 schema_migrations
 symbols
-umbrella_categories
+product_categories
 user_access_audiences
 user_identities
 users
@@ -99,10 +99,10 @@ Important notes:
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `passport_types` | Admin-defined passport type schemas. | `type_name`, `display_name`, `umbrella_category`, `semantic_model_key`, `fields_json`, `is_active`, `created_by` |
+| `passport_types` | Admin-defined passport type schemas. | `type_name`, `display_name`, `product_category`, `semantic_model_key`, `fields_json`, `is_active`, `created_by` |
 | `passport_type_drafts` | One draft schema per super-admin user. | `user_id`, `draft_json` |
 | `passport_type_schema_events` | Audit trail for schema changes. | `passport_type_id`, `type_name`, `table_name`, `schema_version`, `event_type`, `change_summary` |
-| `umbrella_categories` | Managed passport type categories. | `name`, `icon` |
+| `product_categories` | Managed passport type categories. | `name`, `icon` |
 | `company_passport_access` | Company access grants for passport types. | `company_id`, `passport_type_id`, `access_revoked` |
 
 Dynamic passport tables store the actual passport rows for each passport type. The current shared columns include:

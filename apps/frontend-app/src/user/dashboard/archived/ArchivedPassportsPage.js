@@ -188,7 +188,7 @@ function ArchivedPassports({ user, companyId }) {
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
         const semanticModelKey = typeData.semantic_model_key || "";
-        const umbrellaCategory = typeData.umbrella_category || "";
+        const productCategory = typeData.product_category || "";
 
         const exported = [];
         for (const passport of passportsForType) {
@@ -209,7 +209,7 @@ function ArchivedPassports({ user, companyId }) {
 
         if (!exported.length) continue;
 
-        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, umbrellaCategory });
+        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, productCategory });
         const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);

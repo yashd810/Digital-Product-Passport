@@ -58,6 +58,7 @@ module.exports = function registerAuthRoutes(app, {
       first_name: row.first_name,
       last_name: row.last_name,
       company_name: row.company_name || null,
+      asset_management_enabled: Boolean(row.asset_management_enabled),
       ...buildAuthIdentityPayload(row),
     };
   }
@@ -99,7 +100,8 @@ module.exports = function registerAuthRoutes(app, {
       if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
 
       const tokenRow = await pool.query(
-        `SELECT it.*, c.company_name, c.economic_operator_identifier, c.economic_operator_identifier_scheme
+        `SELECT it.*, c.company_name, c.asset_management_enabled,
+                c.economic_operator_identifier, c.economic_operator_identifier_scheme
          FROM invite_tokens it
          LEFT JOIN companies c ON c.id = it.company_id
          WHERE it.token = $1 AND it.used = false AND it.expires_at > NOW()`,
@@ -132,6 +134,7 @@ module.exports = function registerAuthRoutes(app, {
         user: buildAuthUserResponse({
           ...u,
           company_name: invite.company_name || null,
+          asset_management_enabled: invite.asset_management_enabled || false,
           economic_operator_identifier: invite.economic_operator_identifier || null,
           economic_operator_identifier_scheme: invite.economic_operator_identifier_scheme || null,
         }),
@@ -183,7 +186,8 @@ module.exports = function registerAuthRoutes(app, {
       }
 
       const result = await pool.query(
-        `SELECT u.*, c.company_name, c.economic_operator_identifier, c.economic_operator_identifier_scheme FROM users u
+        `SELECT u.*, c.company_name, c.asset_management_enabled,
+                c.economic_operator_identifier, c.economic_operator_identifier_scheme FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.email = $1 AND u.is_active = true`,
         [email]
@@ -267,7 +271,8 @@ module.exports = function registerAuthRoutes(app, {
       if (!payload.pre_auth) return res.status(401).json({ error: "Invalid session token" });
 
       const result = await pool.query(
-        `SELECT u.*, c.company_name, c.economic_operator_identifier, c.economic_operator_identifier_scheme FROM users u
+        `SELECT u.*, c.company_name, c.asset_management_enabled,
+                c.economic_operator_identifier, c.economic_operator_identifier_scheme FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.id = $1 AND u.is_active = true`,
         [payload.userId]

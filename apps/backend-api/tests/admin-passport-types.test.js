@@ -146,7 +146,7 @@ describe("admin passport type validation", () => {
       body: {
         type_name: "battery_custom",
         display_name: "Battery Custom",
-        umbrella_category: "Battery Digital Passport",
+        product_category: "Battery Digital Passport",
         semantic_model_key: "claros_battery_dictionary_v1",
         sections: [
           {
@@ -187,7 +187,7 @@ describe("admin passport type validation", () => {
       body: {
         type_name: "battery_custom_semantic",
         display_name: "Battery Custom Semantic",
-        umbrella_category: "Battery Digital Passport",
+        product_category: "Battery Digital Passport",
         semantic_model_key: "claros_battery_dictionary_v1",
         sections: [
           {
@@ -214,6 +214,169 @@ describe("admin passport type validation", () => {
           conflictType: "semanticId",
           reservedField: "dpp:digitalProductPassportId",
         }),
+      ])
+    );
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test("stores locked system passport header metadata when creating a type", async () => {
+    const { app, pool } = createTestApp();
+    pool.query.mockImplementation(async (sql, params = []) => {
+      if (String(sql).includes("INSERT INTO passport_types")) {
+        return {
+          rows: [{
+            id: 12,
+            type_name: params[0],
+            fields_json: JSON.parse(params[5]),
+          }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/admin/passport-types",
+      body: {
+        type_name: "battery_custom",
+        display_name: "Battery Custom",
+        product_category: "Battery Digital Passport",
+        semantic_model_key: "claros_battery_dictionary_v1",
+        systemHeader: {
+          section: { label: "Readable Header" },
+          fields: [
+            { key: "digitalProductPassportId", label: "Readable DPP ID" },
+            { key: "uniqueProductIdentifier", label: "Readable Product Identifier" },
+            { key: "localProductId", label: "Readable Local Product ID" },
+            { key: "granularity", label: "Readable Granularity" },
+            { key: "dppSchemaVersion", label: "Readable Schema Version" },
+            { key: "dppStatus", label: "Readable Status" },
+            { key: "lastUpdate", label: "Readable Last Update" },
+            { key: "economicOperatorId", label: "Readable Economic Operator" },
+            { key: "facilityId", label: "Readable Facility" },
+            { key: "contentSpecificationIds", label: "Readable Content Specs" },
+            { key: "subjectDid", label: "Readable Subject DID" },
+            { key: "dppDid", label: "Readable DPP DID" },
+            { key: "companyDid", label: "Readable Company DID" },
+          ],
+        },
+        sections: [
+          {
+            key: "overview",
+            label: "Overview",
+            fields: [{
+              key: "manufacturer",
+              label: "Manufacturer",
+              type: "text",
+              access: ["public"],
+              confidentiality: "public",
+              updateAuthority: ["economic_operator"],
+            }],
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.passportType.fields_json.systemHeader.section.label).toBe("Readable Header");
+    expect(response.body.passportType.fields_json.systemHeader.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "digitalProductPassportId",
+          label: "Readable DPP ID",
+          semanticId: "dpp:digitalProductPassportId",
+          valueSource: "system",
+          locked: true,
+        }),
+      ])
+    );
+  });
+
+  test("rejects attempts to remove locked system passport header fields", async () => {
+    const { app, pool } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/admin/passport-types",
+      body: {
+        type_name: "battery_custom_missing_header",
+        display_name: "Battery Custom Missing Header",
+        product_category: "Battery Digital Passport",
+        semantic_model_key: "claros_battery_dictionary_v1",
+        systemHeader: {
+          section: { label: "Passport Header" },
+          fields: [{ key: "digitalProductPassportId", label: "DPP ID" }],
+        },
+        sections: [
+          {
+            key: "overview",
+            label: "Overview",
+            fields: [{
+              key: "manufacturer",
+              label: "Manufacturer",
+              type: "text",
+              access: ["public"],
+              confidentiality: "public",
+              updateAuthority: ["economic_operator"],
+            }],
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.error).toMatch(/system managed/i);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test("rejects passport type creation when field access or governance metadata is invalid", async () => {
+    const { app, pool } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/admin/passport-types",
+      body: {
+        type_name: "battery_invalid_governance",
+        display_name: "Battery Invalid Governance",
+        product_category: "Battery Digital Passport",
+        semantic_model_key: "claros_battery_dictionary_v1",
+        sections: [
+          {
+            key: "overview",
+            label: "Overview",
+            fields: [
+              {
+                key: "manufacturer",
+                label: "Manufacturer",
+                type: "text",
+                access: [],
+                confidentiality: "",
+                updateAuthority: [],
+              },
+              {
+                key: "battery_category",
+                label: "Battery Category",
+                type: "text",
+                access: ["public", "unknown_audience"],
+                confidentiality: "top_secret",
+                updateAuthority: ["unknown_actor"],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.error).toMatch(/invalid access or governance metadata/i);
+    expect(response.body.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "FIELD_ACCESS_MISSING", key: "manufacturer" }),
+        expect.objectContaining({ code: "FIELD_CONFIDENTIALITY_MISSING", key: "manufacturer" }),
+        expect.objectContaining({ code: "FIELD_UPDATE_AUTHORITY_MISSING", key: "manufacturer" }),
+        expect.objectContaining({ code: "FIELD_ACCESS_INVALID", key: "battery_category" }),
+        expect.objectContaining({ code: "FIELD_CONFIDENTIALITY_INVALID", key: "battery_category" }),
+        expect.objectContaining({ code: "FIELD_UPDATE_AUTHORITY_INVALID", key: "battery_category" }),
       ])
     );
     expect(pool.query).not.toHaveBeenCalled();

@@ -199,7 +199,7 @@ export default function CreateHub({ user, companyId }) {
 
   const typeLabel = selectedType?.display_name || selectedType?.type_name || "";
   const grouped = passportTypes.reduce((acc, pt) => {
-    const cat = pt.umbrella_category || "Other";
+    const cat = pt.product_category || "Other";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(pt);
     return acc;
@@ -235,7 +235,7 @@ export default function CreateHub({ user, companyId }) {
                   <div className="ch-type-group-label">{cat}</div>
                   {types.map(pt => (
                     <button key={pt.id} className="ch-type-card" onClick={() => selectType(pt)}>
-                      <span className="ch-type-icon">{pt.umbrella_icon || "📋"}</span>
+                      <span className="ch-type-icon">{pt.product_icon || "📋"}</span>
                       <span className="ch-type-name">{pt.display_name || pt.type_name}</span>
                       <span className="ch-method-arrow">→</span>
                     </button>
@@ -248,7 +248,7 @@ export default function CreateHub({ user, companyId }) {
             </div>
           ) : (
             <div className="ch-selected-type">
-              <span className="ch-type-icon">{selectedType?.umbrella_icon || "📋"}</span>
+              <span className="ch-type-icon">{selectedType?.product_icon || "📋"}</span>
               <strong>{typeLabel}</strong>
             </div>
           )}

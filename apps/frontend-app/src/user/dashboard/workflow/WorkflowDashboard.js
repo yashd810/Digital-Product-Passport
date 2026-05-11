@@ -5,6 +5,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
+import { extractComplianceError, formatComplianceIssueSummary } from "../../../shared/utils/complianceErrors";
 import "../../../admin/styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -25,13 +26,56 @@ function WorkflowBadge({ status }) {
   );
 }
 
+function ComplianceFailureNotice({ error }) {
+  if (!error?.message) return null;
+
+  const blockingIssues = Array.isArray(error.blockingIssues) ? error.blockingIssues : [];
+  const missingFields = Array.isArray(error.missingFields) ? error.missingFields : [];
+  const mandatoryMissingFields = missingFields.filter((field) => field?.mandatory);
+
+  return (
+    <div className="alert alert-error dashboard-alert-inline wf-compliance-alert">
+      <div className="wf-error-title">{error.message}</div>
+
+      {blockingIssues.length > 0 && (
+        <div className="wf-error-section">
+          <div className="wf-error-heading">Blocking issues</div>
+          <ul className="wf-error-list">
+            {blockingIssues.map((issue, index) => (
+              <li key={`${issue.code || "issue"}-${issue.key || index}`}>
+                {formatComplianceIssueSummary(issue)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {mandatoryMissingFields.length > 0 && (
+        <div className="wf-error-section">
+          <div className="wf-error-heading">
+            {error.workflowRequired ? "Missing fields before direct release" : "Missing required fields"}
+          </div>
+          <ul className="wf-error-list">
+            {mandatoryMissingFields.map((field, index) => (
+              <li key={`${field.key || field.label || "missing"}-${index}`}>
+                {field.label || field.key}
+                {field.section ? ` (${field.section})` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Release Modal with reviewer + approver selection ──────────
 export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
   const [teamUsers,    setTeamUsers]    = useState([]);
   const [reviewerId,   setReviewerId]   = useState("");
   const [approverId,   setApproverId]   = useState("");
   const [submitting,   setSubmitting]   = useState(false);
-  const [error,        setError]        = useState("");
+  const [error,        setError]        = useState(null);
 
   useEffect(() => {
     // Load eligible users (editors + admins)
@@ -58,7 +102,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
   }, []);
 
   const handleRelease = async () => {
-    setSubmitting(true); setError("");
+    setSubmitting(true); setError(null);
     const hasWorkflow = reviewerId || approverId;
     try {
       if (hasWorkflow) {
@@ -76,7 +120,11 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
           }
         );
         const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "Failed");
+        if (!r.ok) {
+          setError(extractComplianceError(d, "Failed to submit passport to workflow"));
+          setSubmitting(false);
+          return;
+        }
         onDone("Submitted for review/approval");
       } else {
         // Direct release (no workflow)
@@ -89,11 +137,15 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
           }
         );
         const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "Failed");
+        if (!r.ok) {
+          setError(extractComplianceError(d, "Failed to release passport"));
+          setSubmitting(false);
+          return;
+        }
         onDone("Released");
       }
     } catch (err) {
-      setError(err.message);
+      setError({ message: err.message || "Failed to complete release request", blockingIssues: [], missingFields: [] });
       setSubmitting(false);
     }
   };
@@ -114,7 +166,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
             Optionally assign a reviewer and/or approver. Leave both empty to release immediately.
           </p>
 
-          {error && <div className="alert alert-error dashboard-alert-inline">{error}</div>}
+          <ComplianceFailureNotice error={error} />
 
           <div className="wf-select-group">
             <label>🔍 Reviewer <span className="wf-opt">(optional)</span></label>
@@ -173,10 +225,10 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
 function ActionModal({ wf, action, companyId, onClose, onDone }) {
   const [comment,   setComment]   = useState("");
   const [submitting,setSubmitting]= useState(false);
-  const [error,     setError]     = useState("");
+  const [error,     setError]     = useState(null);
 
   const handle = async () => {
-    setSubmitting(true); setError("");
+    setSubmitting(true); setError(null);
     try {
       const r = await fetchWithAuth(`${API}/api/passports/${wf.passport_guid}/workflow/${action}`, {
         method: "POST",
@@ -184,10 +236,14 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
         body: JSON.stringify({ comment, passportType: wf.passport_type }),
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Failed");
+      if (!r.ok) {
+        setError(extractComplianceError(d, `Failed to ${action} passport`));
+        setSubmitting(false);
+        return;
+      }
       onDone(`${action === "approve" ? "Approved" : "Rejected"} successfully`);
     } catch (err) {
-      setError(err.message);
+      setError({ message: err.message || `Failed to ${action} passport`, blockingIssues: [], missingFields: [] });
       setSubmitting(false);
     }
   };
@@ -202,7 +258,7 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
         </div>
         <div className="modal-body">
           <p><strong>{wf.model_name}</strong> v{wf.version_number}</p>
-          {error && <div className="alert alert-error dashboard-alert-inline">{error}</div>}
+          <ComplianceFailureNotice error={error} />
           <div className="wf-select-group">
             <label>Comment <span className="wf-opt">(optional)</span></label>
             <textarea rows={3} value={comment} placeholder={isApprove ? "Add approval notes…" : "Reason for rejection…"}

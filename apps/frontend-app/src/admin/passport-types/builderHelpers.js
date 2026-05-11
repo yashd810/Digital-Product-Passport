@@ -77,6 +77,54 @@ export const FIELD_TYPES = [
   { value: "symbol",   label: "Symbol (from repository)" },
 ];
 
+export const DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION = {
+  key: "passport_header",
+  label: "Passport Header",
+};
+
+export const HEADER_OWNERSHIP_LABELS = {
+  system_generated: "System generated",
+  company_managed: "Company managed",
+  passport_author_editable: "Passport author editable",
+};
+
+export const DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS = [
+  { key: "digitalProductPassportId", label: "Digital Product Passport ID", semanticId: "dpp:digitalProductPassportId", valueSource: "system", ownership: "system_generated", required: true, locked: true },
+  { key: "uniqueProductIdentifier", label: "Unique Product Identifier", semanticId: "dpp:uniqueProductIdentifier", valueSource: "system", ownership: "system_generated", required: true, locked: true },
+  { key: "localProductId", label: "Local Product ID", semanticId: "dpp:productId", valueSource: "system", ownership: "passport_author_editable", required: true, locked: true },
+  { key: "granularity", label: "Granularity", semanticId: "dpp:granularity", valueSource: "company_policy", ownership: "company_managed", required: true, locked: true },
+  { key: "dppSchemaVersion", label: "DPP Schema Version", semanticId: "dpp:dppSchemaVersion", valueSource: "passport_type", ownership: "company_managed", required: true, locked: true },
+  { key: "dppStatus", label: "DPP Status", semanticId: "dpp:dppStatus", valueSource: "system", ownership: "system_generated", required: true, locked: true },
+  { key: "lastUpdate", label: "Last Update", semanticId: "dpp:lastUpdate", valueSource: "system", ownership: "system_generated", required: true, locked: true },
+  { key: "economicOperatorId", label: "Economic Operator ID", semanticId: "dpp:economicOperatorId", valueSource: "company_identity", ownership: "company_managed", required: true, locked: true },
+  { key: "facilityId", label: "Facility ID", semanticId: "dpp:facilityId", valueSource: "company_or_passport", ownership: "passport_author_editable", required: false, locked: true },
+  { key: "contentSpecificationIds", label: "Content Specification IDs", semanticId: "dpp:contentSpecificationIds", valueSource: "passport_type", ownership: "company_managed", required: true, locked: true },
+  { key: "subjectDid", label: "Subject DID", semanticId: "dpp:subjectDid", valueSource: "system", ownership: "system_generated", required: true, locked: true },
+  { key: "dppDid", label: "DPP DID", semanticId: "dpp:dppDid", valueSource: "system", ownership: "system_generated", required: true, locked: true },
+  { key: "companyDid", label: "Company DID", semanticId: "dpp:companyDid", valueSource: "system", ownership: "system_generated", required: true, locked: true },
+];
+
+export function normalizeSystemPassportHeader(input = {}) {
+  const inputFields = Array.isArray(input?.fields) ? input.fields : [];
+  const inputByKey = new Map(inputFields.map((field) => [field?.key, field]));
+  const section = input?.section || {};
+  return {
+    section: {
+      key: DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.key,
+      label: String(section.label || "").trim() || DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.label,
+    },
+    fields: DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS.map((field) => {
+      const override = inputByKey.get(field.key) || {};
+      return {
+        ...field,
+        label: String(override.label || "").trim() || field.label,
+        label_i18n: override.label_i18n || {},
+        _i18nOpen: !!override._i18nOpen,
+      };
+    }),
+  };
+}
+
 export const ICON_PRESETS = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🔋","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
 
 export const toSlug = (str) =>
@@ -85,6 +133,24 @@ export const toSlug = (str) =>
     .split(/\s+/)
     .filter(Boolean)
     .join("_");
+
+export const toFieldKey = (str) => {
+  const parts = String(str || "")
+    .trim()
+    .replace(/[^A-Za-z0-9\s]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!parts.length) return "";
+
+  return parts
+    .map((part, index) => {
+      const lower = part.toLowerCase();
+      if (index === 0) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join("");
+};
 
 export const rekeySection = (sec) => ({
   ...sec,
@@ -96,7 +162,7 @@ export const rekeySection = (sec) => ({
         seen.add(field.key);
         return field;
       }
-      const key = toSlug(field.label);
+      const key = field.key || toFieldKey(field.label);
       seen.add(key);
       return { ...field, key };
     });
@@ -228,7 +294,7 @@ export const buildSectionsFromCSV = (rows) => {
     label: sectionLabel,
     fields: fields.map(({ label, type, access, confidentiality, updateAuthority }) => ({
       _id: Math.random().toString(36).slice(2),
-      key: toSlug(label),
+      key: toFieldKey(label),
       label,
       type,
       access: Array.isArray(access) && access.length ? access : ["public"],
@@ -275,7 +341,7 @@ export function newSection(label = "") {
 export function newField(label = "") {
   return {
     _id: Math.random().toString(36).slice(2),
-    key: toSlug(label),
+    key: toFieldKey(label),
     label,
     label_i18n: {},
     type: "text",

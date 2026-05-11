@@ -98,6 +98,19 @@ const normalizePassportRequestBody = (body = {}) => {
     if (normalized.uniqueProductIdentifier !== undefined) normalized.product_identifier_did = normalized.uniqueProductIdentifier;
     else if (normalized.unique_product_identifier !== undefined) normalized.product_identifier_did = normalized.unique_product_identifier;
   }
+  if (normalized.economic_operator_id === undefined && normalized.economicOperatorId !== undefined) {
+    normalized.economic_operator_id = normalized.economicOperatorId;
+  }
+  if (normalized.economic_operator_identifier_scheme === undefined) {
+    if (normalized.economicOperatorIdentifierScheme !== undefined) {
+      normalized.economic_operator_identifier_scheme = normalized.economicOperatorIdentifierScheme;
+    } else if (normalized.operatorIdentifierScheme !== undefined) {
+      normalized.economic_operator_identifier_scheme = normalized.operatorIdentifierScheme;
+    }
+  }
+  if (normalized.facility_id === undefined && normalized.facilityId !== undefined) {
+    normalized.facility_id = normalized.facilityId;
+  }
   if (normalized.dpp_id === undefined) {
     if (normalized.dppId !== undefined) normalized.dpp_id = normalized.dppId;
   }
@@ -152,6 +165,10 @@ const normalizePassportRequestBody = (body = {}) => {
   delete normalized.localProductId;
   delete normalized.uniqueProductIdentifier;
   delete normalized.unique_product_identifier;
+  delete normalized.economicOperatorId;
+  delete normalized.economicOperatorIdentifierScheme;
+  delete normalized.operatorIdentifierScheme;
+  delete normalized.facilityId;
   delete normalized.dppId;
   delete normalized.carrierAuthenticity;
   delete normalized.carrierSecurityStatus;
@@ -207,7 +224,7 @@ const getWritablePassportColumns = (data, excluded = SYSTEM_PASSPORT_FIELDS) =>
   Object.keys(data).filter((key) =>
     data[key] !== undefined &&
     !excluded.has(key) &&
-    /^[a-z][a-z0-9_]+$/.test(key)
+    /^[a-z][a-z0-9_]*$/.test(key)
   );
 
 const getStoredPassportValues = (keys, data) =>

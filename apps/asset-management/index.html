@@ -48,12 +48,12 @@
                 <div class="ingest-subsection">
                   <h3>JSON Paste</h3>
                   <p>Array of objects or <code>{ records: [...] }</code>.</p>
-                  <textarea id="json-paste" rows="6" placeholder='[{"guid":"...","model_name":"..."}]'></textarea>
+                  <textarea id="json-paste" rows="6" placeholder='[{"dppId":"...","model_name":"..."}]'></textarea>
                   <button id="apply-json" class="ghost-btn" type="button">Apply JSON</button>
                 </div>
                 <div class="ingest-subsection">
                   <h3>CSV Import</h3>
-                  <p>Row-based headers: <code>guid</code>, <code>product_id</code>, or field keys.</p>
+                  <p>Row-based headers: <code>dppId</code>, <code>product_id</code>, or field keys.</p>
                   <input id="csv-file" type="file" accept=".csv,text/csv" />
                   <div id="csv-import-summary" class="inline-note">Export a template first if you want the right columns and current values prefilled.</div>
                 </div>
@@ -93,19 +93,20 @@
         <!-- Asset Grid -->
         <section class="panel grid-panel">
           <div class="panel-head">
-            <div><h2>Asset Grid</h2><p>Edit rows like a spreadsheet. Keep <code>guid</code> for safe rematching.</p></div>
+            <div><h2>Asset Grid</h2><p>Edit rows like a spreadsheet. Keep <code>dppId</code> when updating existing passports.</p></div>
             <div class="toolbar grid-toolbar">
               <div class="toolbar-group">
                 <div id="export-mode" class="custom-select compact-select" data-placeholder="Current rows"></div>
                 <button id="export-csv" class="ghost-btn" type="button">Export CSV</button>
               </div>
-              <button id="add-row" class="ghost-btn" type="button">Add Blank Row</button>
+              <button id="add-row" class="ghost-btn" type="button">Create Passport Row</button>
               <button id="validate-preview" class="primary-btn" type="button">Validate &amp; Build JSON</button>
             </div>
           </div>
           <div id="csv-workflow-summary" class="inline-note">Export a template, edit it in Excel or Sheets, then import it back into the grid.</div>
+          <div class="inline-note">Create Passport Row adds a draft row to the grid. Enter <code>product_id</code> or an existing <code>dppId</code>, then validate to prepare the passport package.</div>
           <div class="grid-filter-bar">
-            <label><span>Search</span><input id="grid-search" type="text" placeholder="guid, product_id, or any value" /></label>
+            <label><span>Search</span><input id="grid-search" type="text" placeholder="dppId, product_id, or any value" /></label>
             <label><span>Status</span><div id="grid-status-filter" class="custom-select" data-placeholder="All rows"></div></label>
             <div class="field-filter-group">
               <span>Fields</span>

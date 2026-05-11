@@ -368,6 +368,21 @@ function isValueCompatibleWithTerm(value, term) {
   return true;
 }
 
+function dedupeIssues(issues = []) {
+  const seen = new Set();
+  return issues.filter((issue) => {
+    const key = [
+      issue?.code || "",
+      issue?.label || "",
+      issue?.expectedType || "",
+      issue?.message || "",
+    ].join("::");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function normalizeBatteryCategory(value) {
   const normalized = normalizeLookupKey(value);
   if (!normalized) return null;
@@ -425,7 +440,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
 
   async function loadPassportTypeDefinition(passportType) {
     const result = await pool.query(
-      `SELECT id, type_name, display_name, umbrella_category, semantic_model_key, fields_json
+      `SELECT id, type_name, display_name, product_category, semantic_model_key, fields_json
        FROM passport_types
        WHERE type_name = $1
        LIMIT 1`,
@@ -653,22 +668,11 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       const access = Array.isArray(field?.access) ? field.access : [];
       return access.includes("public");
     });
-    const hasControlledAudience = fields.some((field) => {
-      const access = Array.isArray(field?.access) ? field.access : [];
-      return access.some((audience) => audience && audience !== "public");
-    });
 
     if (!hasPublicAudience) {
       issues.push(createIssue({
         code: "PUBLIC_ACCESS_LAYER_MISSING",
         message: "Battery DPP profiles must expose at least one publicly accessible field layer before release.",
-      }));
-    }
-
-    if (!hasControlledAudience) {
-      issues.push(createIssue({
-        code: "CONTROLLED_ACCESS_LAYER_MISSING",
-        message: "Battery DPP profiles must expose at least one restricted-access field layer before release.",
       }));
     }
 
@@ -690,17 +694,24 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     }
 
     if (profile.requireCompanyOperatorIdentifier) {
-      if (!normalizeText(company?.economic_operator_identifier)) {
+      const effectiveEconomicOperatorId = normalizeText(
+        passport?.economic_operator_id || company?.economic_operator_identifier
+      );
+      const effectiveEconomicOperatorIdentifierScheme = normalizeText(
+        passport?.economic_operator_identifier_scheme || company?.economic_operator_identifier_scheme
+      );
+
+      if (!effectiveEconomicOperatorId) {
         issues.push(createIssue({
           code: "ECONOMIC_OPERATOR_IDENTIFIER_MISSING",
-          message: "The company must declare an economic operator identifier before regulated release.",
-          key: "economic_operator_identifier",
+          message: "The passport must declare an economic operator identifier before regulated release.",
+          key: "economic_operator_id",
         }));
       }
-      if (!normalizeText(company?.economic_operator_identifier_scheme)) {
+      if (!effectiveEconomicOperatorIdentifierScheme) {
         issues.push(createIssue({
           code: "ECONOMIC_OPERATOR_IDENTIFIER_SCHEME_MISSING",
-          message: "The company must declare which identifier scheme governs its economic operator identifier.",
+          message: "The passport must declare which identifier scheme governs its economic operator identifier.",
           key: "economic_operator_identifier_scheme",
         }));
       }
@@ -722,15 +733,29 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       }));
     }
 
-    if (normalizeText(passport?.compliance_profile_key) && normalizeText(passport?.compliance_profile_key) !== profile.key) {
-      issues.push(createIssue({
-        code: "COMPLIANCE_PROFILE_MISMATCH",
-        message: `Passport declares compliance profile "${passport.compliance_profile_key}" but the resolved profile is "${profile.key}".`,
-        key: "compliance_profile_key",
-      }));
-    }
-
     return issues;
+  }
+
+  function applyManagedGovernanceDefaults(passport = {}, profile, company = null) {
+    const normalized = { ...passport };
+    if (profile?.key) {
+      normalized.compliance_profile_key = profile.key;
+    }
+    if ((!normalized.content_specification_ids || (Array.isArray(normalized.content_specification_ids) && normalized.content_specification_ids.length === 0))
+      && Array.isArray(profile?.contentSpecificationIds)
+      && profile.contentSpecificationIds.length) {
+      normalized.content_specification_ids = profile.contentSpecificationIds;
+    }
+    if (!normalizeText(normalized.carrier_policy_key) && profile?.defaultCarrierPolicyKey) {
+      normalized.carrier_policy_key = profile.defaultCarrierPolicyKey;
+    }
+    if (!normalizeText(normalized.economic_operator_id) && company?.economic_operator_identifier) {
+      normalized.economic_operator_id = company.economic_operator_identifier;
+    }
+    if (!normalizeText(normalized.economic_operator_identifier_scheme) && company?.economic_operator_identifier_scheme) {
+      normalized.economic_operator_identifier_scheme = company.economic_operator_identifier_scheme;
+    }
+    return normalized;
   }
 
 function validateSemanticData(fields, passport) {
@@ -989,22 +1014,24 @@ function validateSemanticData(fields, passport) {
       ...field,
       __isBatteryPassport: batteryPassport,
     }));
+    const basePassport = passport || {};
     const normalizedCategory = batteryPassport
-      ? normalizeBatteryCategory((passport || {}).battery_category)
+      ? normalizeBatteryCategory(basePassport.battery_category)
       : null;
     const profile = resolveProfileMetadata({
-      passportType: passportType || passport?.passport_type,
+      passportType: passportType || basePassport.passport_type,
       typeDef: resolvedTypeDef,
-      granularity: passport?.granularity,
+      granularity: basePassport.granularity,
     });
-    const company = await loadCompanyGovernance(passport?.company_id);
-    const completeness = buildCompleteness(fields, passport || {}, { normalizedCategory });
+    const company = await loadCompanyGovernance(basePassport.company_id);
+    const normalizedPassport = applyManagedGovernanceDefaults(basePassport, profile, company);
+    const completeness = buildCompleteness(fields, normalizedPassport, { normalizedCategory });
     const accessIssues = validateAccess(fields);
     const governanceIssues = validateFieldGovernance(fields);
     const audienceLayerIssues = validateAudienceLayerCoverage(fields, profile);
-    const semanticIssues = validateSemanticData(fields, passport || {});
+    const semanticIssues = validateSemanticData(fields, normalizedPassport);
     const batteryCategory = batteryPassport
-      ? evaluateBatteryCategory(fields, passport || {}, completeness)
+      ? evaluateBatteryCategory(fields, normalizedPassport, completeness)
       : {
           raw: null,
           normalized: null,
@@ -1020,26 +1047,24 @@ function validateSemanticData(fields, passport) {
           issues: [],
         };
 
-    const profileIssues = validateProfileGovernance({ passport: passport || {}, profile, company });
+    const profileIssues = validateProfileGovernance({ passport: normalizedPassport, profile, company });
     const requiredFieldIssues = buildRequiredFieldIssues(completeness, { normalizedCategory });
     const managedSemantic = evaluateManagedSemanticFields({
       fields,
-      passport: passport || {},
+      passport: normalizedPassport,
       typeDef: resolvedTypeDef,
       company,
       profile,
       normalizedCategory,
     });
-    const blockingIssues = [
-      ...accessIssues,
-      ...governanceIssues,
+    const blockingIssues = dedupeIssues([
       ...audienceLayerIssues,
       ...semanticIssues,
       ...requiredFieldIssues,
       ...profileIssues,
       ...managedSemantic.issues,
       ...batteryCategory.issues,
-    ];
+    ]);
     const workflowReleaseAllowed = blockingIssues.length === 0;
     const directReleaseAllowed = workflowReleaseAllowed && completeness.missingFields.length === 0;
     const workflowRequired = workflowReleaseAllowed && completeness.missingFields.length > 0;

@@ -53,8 +53,8 @@ function normalizeCategoryKey(value) {
     .trim();
 }
 
-function isBatteryUmbrellaCategory(umbrellaCategory) {
-  const normalized = normalizeCategoryKey(umbrellaCategory);
+function isBatteryProductCategory(productCategory) {
+  const normalized = normalizeCategoryKey(productCategory);
   return Boolean(normalized) && normalized.includes("battery");
 }
 
@@ -63,7 +63,7 @@ export function isBatteryPassExportType(passportType) {
 }
 
 function shouldUseBatteryDictionary(passportType, options = {}) {
-  if (isBatteryUmbrellaCategory(options.umbrellaCategory)) return true;
+  if (isBatteryProductCategory(options.productCategory)) return true;
   const modelKey = normalizeSemanticModelKey(options.semanticModelKey);
   if (modelKey === BATTERY_PASS_MODEL_KEY) return true;
   if (modelKey) return false;

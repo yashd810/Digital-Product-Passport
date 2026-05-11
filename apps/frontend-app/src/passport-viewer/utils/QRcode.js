@@ -10,39 +10,18 @@ const DEFAULT_QUIET_ZONE_MODULES = 4;
 const DEFAULT_QR_WIDTH_PX = 300;
 const MIN_MODULE_MM = 0.25;
 const DPP_GRAPHICAL_MARKING = "IEC_61406_TRIANGLE";
+const MARKETING_CONTACT_URL = "https://www.claros-dpp.online/contact.html";
 
 function shouldRenderIec61406Marker(granularity = "item") {
   return String(granularity || "item").trim().toLowerCase() !== "model";
 }
 
-function drawIec61406Marker(canvas, {
-  foreground = "#0b1826",
-  background = "#ffffff",
-} = {}) {
-  const context = canvas.getContext("2d");
-  if (!context) return;
-
-  const markerSize = Math.max(18, Math.round(canvas.width * 0.18));
-  const inset = Math.max(4, Math.round(canvas.width * 0.04));
-  const startX = inset;
-  const startY = inset;
-
-  context.save();
-  context.fillStyle = background;
-  context.fillRect(startX - 2, startY - 2, markerSize + 4, markerSize + 4);
-  context.beginPath();
-  context.moveTo(startX, startY);
-  context.lineTo(startX + markerSize, startY);
-  context.lineTo(startX, startY + markerSize);
-  context.closePath();
-  context.fillStyle = foreground;
-  context.fill();
-  context.restore();
+export function getMarketingContactUrl() {
+  return MARKETING_CONTACT_URL;
 }
 
 export const renderPassportQrToCanvas = async (canvas, {
   url,
-  granularity = "item",
   width = DEFAULT_QR_WIDTH_PX,
   margin = DEFAULT_QUIET_ZONE_MODULES,
   color = {},
@@ -57,12 +36,6 @@ export const renderPassportQrToCanvas = async (canvas, {
     color,
     version: Number.isInteger(version) ? version : undefined,
   });
-  if (shouldRenderIec61406Marker(granularity)) {
-    drawIec61406Marker(canvas, {
-      foreground: color.dark || "#0b1826",
-      background: color.light || "#ffffff",
-    });
-  }
   return canvas;
 };
 
@@ -284,18 +257,18 @@ export const generateQRCode = async ({ productId, companyName = "", modelName = 
 };
 
 /**
- * Save QR code to database.
+ * Save the canonical public passport URL to database.
  * passportType is required so the server knows which table to update.
  */
-export const saveQRCodeToDatabase = async (dppId, qrCodeDataUrl, passportType, options = {}) => {
+export const saveQRCodeToDatabase = async (dppId, qrCodeUrl, passportType, options = {}) => {
   try {
-    if (!qrCodeDataUrl) return null;
+    if (!qrCodeUrl) return null;
     const response = await fetchWithAuth(`${API}/api/passports/${dppId}/qrcode`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ qrCode: qrCodeDataUrl, passportType, ...options }),
+      body: JSON.stringify({ qrCode: qrCodeUrl, passportType, ...options }),
     });
 
     if (!response.ok) {

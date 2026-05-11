@@ -6,10 +6,10 @@ const {
 } = require("../services/battery-pass-export");
 
 describe("battery-pass-export", () => {
-  test("uses the battery dictionary for battery umbrella categories without requiring a matching type or semantic model key", () => {
+  test("uses the battery dictionary for battery product categories without requiring a matching type or semantic model key", () => {
     const typeDef = {
       type_name: "ev_battery_passport_custom",
-      umbrella_category: "Battery Digital Passport",
+      product_category: "Battery Digital Passport",
       semantic_model_key: "generic_dpp_v1",
       fields_json: {
         sections: [
@@ -33,7 +33,7 @@ describe("battery-pass-export", () => {
       { guid: "guid-1", passport_type: "ev_battery_passport_custom", battery_mass: "450.5" },
     ], "ev_battery_passport_custom", {
       semanticModelKey: "generic_dpp_v1",
-      umbrellaCategory: "Battery Digital Passport",
+      productCategory: "Battery Digital Passport",
     });
 
     expect(exported.passport_type).toBe("ev_battery_passport_custom");

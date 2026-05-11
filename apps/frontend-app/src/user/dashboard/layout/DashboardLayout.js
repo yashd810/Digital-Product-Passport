@@ -100,7 +100,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
   // Group passport types by product category if available
   const groupedTypes = passportTypes.reduce((acc, pt) => {
-    const productCategory = pt.umbrella_category || pt.display_name || formatPassportTypeLabel(pt.type_name);
+    const productCategory = pt.product_category || pt.display_name || formatPassportTypeLabel(pt.type_name);
     if (!acc[productCategory]) acc[productCategory] = [];
     acc[productCategory].push(pt);
     return acc;
@@ -197,10 +197,10 @@ function DashboardLayout({ user, companyId, onLogout }) {
                     <React.Fragment key={productCategory}>
                       <NavLink
                         to={`/dashboard/passports/product/${encodeURIComponent(productCategory)}`}
-                        className={({ isActive }) => `sidebar-link sidebar-link-umbrella${isActive ? " active" : ""}`}
+                        className={({ isActive }) => `sidebar-link sidebar-link-productCategory${isActive ? " active" : ""}`}
                       >
-                        <span className="sidebar-umbrella-icon">{types[0]?.umbrella_icon || "📋"}</span>
-                        <span className="sidebar-umbrella-label">{productCategory}</span>
+                        <span className="sidebar-productCategory-icon">{types[0]?.product_icon || "📋"}</span>
+                        <span className="sidebar-productCategory-label">{productCategory}</span>
                       </NavLink>
                       {types.map(pt => (
                         <NavLink

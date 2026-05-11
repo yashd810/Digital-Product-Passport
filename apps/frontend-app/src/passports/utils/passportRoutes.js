@@ -37,14 +37,13 @@ export function buildTechnicalPassportPath({
   modelName = "",
   productId = "",
 }) {
-  const landingPath = buildPublicPassportPath({
+  return buildPublicPassportPath({
     companyName,
     manufacturerName,
     manufacturedBy,
     modelName,
     productId,
   });
-  return landingPath ? `${landingPath}/technical` : null;
 }
 
 export function buildInactivePassportPath({
@@ -67,7 +66,7 @@ export function buildInactiveTechnicalPassportPath({
   productId = "",
   versionNumber = "",
 }) {
-  const landingPath = buildInactivePassportPath({
+  return buildInactivePassportPath({
     companyName,
     manufacturerName,
     manufacturedBy,
@@ -75,7 +74,6 @@ export function buildInactiveTechnicalPassportPath({
     productId,
     versionNumber,
   });
-  return landingPath ? `${landingPath}/technical` : null;
 }
 
 export function buildPreviewPassportPath({
@@ -99,7 +97,7 @@ export function buildPreviewTechnicalPassportPath({
   productId = "",
   previewId = "",
 }) {
-  const landingPath = buildPreviewPassportPath({
+  return buildPreviewPassportPath({
     companyName,
     manufacturerName,
     manufacturedBy,
@@ -107,5 +105,4 @@ export function buildPreviewTechnicalPassportPath({
     productId,
     previewId,
   });
-  return landingPath ? `${landingPath}/technical` : null;
 }

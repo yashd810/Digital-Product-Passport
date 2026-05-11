@@ -3,7 +3,9 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   ACCESS_LEVEL_LABELS,
   CONFIDENTIALITY_LEVEL_LABELS,
+  HEADER_OWNERSHIP_LABELS,
   UPDATE_AUTHORITY_LABELS,
+  normalizeSystemPassportHeader,
 } from "./builderHelpers";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
@@ -11,8 +13,9 @@ import "../styles/AdminDashboard.css";
 const API = import.meta.env.VITE_API_URL || "";
 
 function getSemanticModelLabel(modelKey) {
+  if (modelKey === "generic_dpp_v1") return "Generic DPP";
   if (modelKey === "claros_battery_dictionary_v1") return "Claros Battery Dictionary";
-  return "No semantic model";
+  return modelKey || "No semantic model";
 }
 
 function AdminPassportTypeFields() {
@@ -48,6 +51,7 @@ function AdminPassportTypeFields() {
   if (!typeDef) return <div className="alert alert-error">No type data available.</div>;
 
   const sections = typeDef.fields_json?.sections || []; 
+  const systemHeader = normalizeSystemPassportHeader(typeDef.fields_json?.systemHeader);
   const fieldCount = sections.reduce((sum, s) => sum + (s.fields?.length || 0), 0);
   const describeList = (values = [], labelMap = {}) =>
     (Array.isArray(values) ? values : [])
@@ -67,14 +71,46 @@ function AdminPassportTypeFields() {
         </div>
       </div>
 
-      {sections.length === 0 ? (
-        <div className="alert alert-info">No field sections are defined.</div>
-      ) : (
-        <div className="apt-fields-viewer apt-fields-viewer-plain">
+      <div className="apt-fields-viewer apt-fields-viewer-plain">
+        <div className="apt-fv-section apt-fv-section-spaced">
+          <div className="apt-fv-section-title apt-fv-section-title-strong">{systemHeader.section.label}</div>
+          <table className="apt-fv-table apt-fv-table-full apt-fv-table-header">
+            <caption className="apt-sr-only">
+              System-managed passport header fields with standards mapping and source ownership.
+            </caption>
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Key</th>
+                  <th>Semantic ID</th>
+                  <th>Ownership</th>
+                  <th>Source</th>
+                  <th>Required</th>
+              </tr>
+            </thead>
+            <tbody>
+              {systemHeader.fields.map(field => (
+                <tr key={field.key}>
+                  <td>{field.label}</td>
+                  <td><code>{field.key}</code></td>
+                  <td><code>{field.semanticId}</code></td>
+                  <td>{HEADER_OWNERSHIP_LABELS[field.ownership] || field.ownership}</td>
+                  <td>{field.valueSource.replace(/_/g, " ")}</td>
+                  <td>{field.required ? "Yes" : "Conditional"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {sections.length === 0 ? (
+          <div className="alert alert-info">No custom field sections are defined.</div>
+        ) : (
+          <>
           {sections.map(section => (
             <div key={section.key} className="apt-fv-section apt-fv-section-spaced">
               <div className="apt-fv-section-title apt-fv-section-title-strong">{section.label}</div>
-              <table className="apt-fv-table apt-fv-table-full">
+              <table className="apt-fv-table apt-fv-table-full apt-fv-table-custom">
                 <caption className="apt-sr-only">
                   {section.label} fields with access audience, confidentiality, and update authority rules.
                 </caption>
@@ -103,8 +139,9 @@ function AdminPassportTypeFields() {
               </table>
             </div>
           ))}
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
