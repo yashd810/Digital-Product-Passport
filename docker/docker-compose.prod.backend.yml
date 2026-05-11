@@ -17,6 +17,8 @@ services:
       FILES_DIR: /data/passport-files
       REPO_DIR: /data/repository-files
       UPLOADS_DIR: /data/uploads
+    volumes:
+      - local_storage_data:/data
     restart: unless-stopped
     depends_on:
       - postgres
@@ -37,4 +39,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  local_storage_data:
   postgres_data:
