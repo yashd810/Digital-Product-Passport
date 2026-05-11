@@ -6,12 +6,11 @@ services:
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     env_file:
-      - path: ${DPP_ENV_FILE:-/etc/dpp/dpp.env}
-        required: true
+      - path: ${DPP_ENV_FILE:-/etc/dpp/.env.prod}
+        required: false
     environment:
       NODE_ENV: production
       PORT: 3001
-      DOTENV_CONFIG_PATH: /etc/dpp/.env.prod
       DB_HOST: "${DB_HOST:-postgres}"
       DB_PORT: "${DB_PORT:-5432}"
       LOCAL_STORAGE_DIR: /data
@@ -37,12 +36,12 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     env_file:
-      - path: ${DPP_ENV_FILE:-/etc/dpp/dpp.env}
-        required: true
+      - path: ${DPP_ENV_FILE:-/etc/dpp/.env.prod}
+        required: false
     environment:
-      POSTGRES_DB: "${DB_NAME:-dpp}"
+      POSTGRES_DB: "${DB_NAME:-dpp_system}"
       POSTGRES_USER: "${DB_USER:-postgres}"
-      POSTGRES_PASSWORD: "${DB_PASSWORD:-postgres_temp_restore}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-postgres}"
     volumes:
       - postgres_data:/var/lib/postgresql
     restart: unless-stopped
