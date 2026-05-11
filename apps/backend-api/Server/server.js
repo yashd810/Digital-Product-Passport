@@ -37,6 +37,7 @@ const createAccessRightsService           = require("../services/access-rights-s
 const createProductIdentifierService      = require("../services/product-identifier-service");
 const createBackupProviderService         = require("../services/backup-provider-service");
 const canonicalizeJson                    = require("../services/json-canonicalization");
+const { generateDppRecordId }             = require("../services/dpp-record-id");
 
 global.console = logger.console;
 
