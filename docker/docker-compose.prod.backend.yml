@@ -17,19 +17,9 @@ services:
       FILES_DIR: /data/passport-files
       REPO_DIR: /data/repository-files
       UPLOADS_DIR: /data/uploads
-    volumes:
-      - local_storage_data:/data
     restart: unless-stopped
     depends_on:
       - postgres
-      - local-storage
-
-  local-storage:
-    image: alpine:3.20
-    command: sh -c "mkdir -p /data/passport-files /data/repository-files /data/uploads/symbols && tail -f /dev/null"
-    volumes:
-      - local_storage_data:/data
-    restart: unless-stopped
 
   postgres:
     image: postgres:18-alpine
@@ -47,5 +37,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  local_storage_data:
   postgres_data:

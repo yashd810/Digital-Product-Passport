@@ -62,7 +62,6 @@ services:
       - local_storage_data:/data
     depends_on:
       - postgres
-      - local-storage
 
   asset-management:
     image: nginx:1.27-alpine
@@ -82,12 +81,6 @@ services:
       - "${MARKETING_PORT:-8080}:80"
     volumes:
       - ../apps/marketing-site:/usr/share/nginx/html:ro
-
-  local-storage:
-    image: alpine:3.20
-    command: sh -c "mkdir -p /data/passport-files /data/repository-files /data/uploads/symbols && tail -f /dev/null"
-    volumes:
-      - local_storage_data:/data
 
   postgres:
     image: postgres:18-alpine
