@@ -93,23 +93,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  object-storage-dev:
-    image: minio/minio:latest
-    profiles: ["object-storage"]
-    command: server /data --console-address ":9001"
-    ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    environment:
-      MINIO_ROOT_USER: "${MINIO_ROOT_USER:-minioadmin}"
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin}"
-    volumes:
-      - minio_data:/data
-
 volumes:
   frontend_node_modules:
   backend_node_modules:
   public_viewer_node_modules:
   local_storage_data:
   postgres_data:
-  minio_data:

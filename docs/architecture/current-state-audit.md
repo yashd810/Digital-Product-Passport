@@ -1,6 +1,6 @@
 # Current State Audit
 
-Last updated: 2026-05-05
+Last updated: 2026-05-11
 
 ## Table of Contents
 
@@ -40,7 +40,7 @@ The DPP (Digital Product Passport) system is a multi-container Node.js and React
 | Database | PostgreSQL 18.3-Alpine | ✅ Production-ready | 5432 |
 | Asset Management | Static/Nginx | ✅ Ready | 3003 |
 | Marketing Site | Static HTML/Nginx | ✅ Ready | 8080 |
-| Object Storage | MinIO (local) or S3 (prod) | ✅ Ready | 9000/9001 |
+| Object Storage | Local volume (dev) or S3 (prod) | ✅ Ready | N/A |
 
 **Code location:**
 - Backend: `apps/backend-api/` with routes in `apps/backend-api/routes/` and services in `apps/backend-api/services/`
@@ -258,7 +258,7 @@ See [Security Architecture](../security/access-revocation-process.md) for more d
 **Scaling Considerations**:
 - No horizontal scaling currently implemented
 - Single container deployment suitable for 100-1000 users
-- Object storage scales independently (S3/MinIO)
+- Object storage scales independently (OCI Object Storage in production, local volumes in development)
 
 ## Known Limitations
 

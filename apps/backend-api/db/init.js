@@ -123,6 +123,15 @@ async function initDb(pool, {
     CREATE TABLE IF NOT EXISTS companies (
       id               SERIAL PRIMARY KEY,
       company_name     VARCHAR(255) NOT NULL UNIQUE,
+      legal_name       TEXT,
+      country          TEXT,
+      company_registration_number TEXT,
+      vat_number       TEXT,
+      website_domain   TEXT,
+      customer_trust_level TEXT DEFAULT 'BASIC',
+      verification_status TEXT DEFAULT 'unverified',
+      authorized_contact_name TEXT,
+      authorized_contact_email TEXT,
       is_active        BOOLEAN NOT NULL DEFAULT true,
       asset_management_enabled BOOLEAN NOT NULL DEFAULT false,
       asset_management_revoked_at TIMESTAMPTZ,
@@ -154,7 +163,18 @@ async function initDb(pool, {
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS economic_operator_identifier_scheme VARCHAR(80)
   `);
-    await runMigration(pool, "2026-04-27.backfill-company-did-slugs", async (db) => {
+  await pool.query(`
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS legal_name TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS country TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_registration_number TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS vat_number TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS website_domain TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS customer_trust_level TEXT DEFAULT 'BASIC';
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'unverified';
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS authorized_contact_name TEXT;
+    ALTER TABLE companies ADD COLUMN IF NOT EXISTS authorized_contact_email TEXT;
+  `);
+  await runMigration(pool, "2026-04-27.backfill-company-did-slugs", async (db) => {
       const companyRows = await db.query(`
         SELECT id, company_name, did_slug
         FROM companies
@@ -1228,6 +1248,25 @@ async function initDb(pool, {
       vc_json        TEXT,
       UNIQUE (passport_dpp_id, version_number)
     )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dpp_release_records (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      dpp_id TEXT NOT NULL REFERENCES passport_registry(dpp_id) ON DELETE CASCADE,
+      companyname TEXT NOT NULL,
+      released_by_user_id INTEGER NOT NULL REFERENCES users(id),
+      released_by_email TEXT NOT NULL,
+      release_version INTEGER NOT NULL,
+      dpp_hash TEXT NOT NULL,
+      signature_id INTEGER REFERENCES passport_signatures(id) ON DELETE SET NULL,
+      release_note TEXT,
+      released_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (dpp_id, release_version)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_dpp_release_records_dpp
+      ON dpp_release_records(dpp_id, release_version DESC)
   `);
   // Store public keys so verifiers can always look them up by key ID
   await pool.query(`

@@ -1,11 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { translateSchemaLabel } from "../../app/providers/i18n";
 import { generateQRCodeBundle, saveQRCodeToDatabase } from "../utils/QRcode";
 import { getViewerBrandTheme } from "../../app/providers/ThemeContext";
 import { isObsoletePassportStatus, isReleasedPassportStatus } from "../../passports/utils/passportStatus";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
-import PassportHistoryModal from "../../passports/history/PassportHistoryModal";
 import {
   buildInactivePassportPath,
   buildInactiveTechnicalPassportPath,
@@ -14,7 +12,7 @@ import {
   buildPublicPassportPath,
   buildTechnicalPassportPath,
 } from "../../passports/utils/passportRoutes";
-import { PassportIntro, Header, Footer, PassportTabRail, SignatureBadge, EmptySectionsState, SectionView, PrintView, PassportHeaderPanel } from "../components/ViewerBlocks";
+import PublicPassportPortal from "../components/PublicPassportPortal";
 import "../styles/PassportViewer.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -23,7 +21,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const { productId, versionNumber, previewId } = useParams();
   const navigate   = useNavigate();
   const location   = useLocation();
-  const printRef   = useRef(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Viewer state
@@ -53,9 +50,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [passportAccessKey, setPassportAccessKey] = useState(null);   // one-time reveal after rotation
   const [accessKeyBusy,     setAccessKeyBusy]     = useState(false);
   const [keyCopied,         setKeyCopied]         = useState(false);
-  const [showHistoryModal,  setShowHistoryModal]  = useState(false);
-  const [activeSectionKey,  setActiveSectionKey]  = useState("");
-  const [securityReportState, setSecurityReportState] = useState({ submitting: false, success: false, error: "" });
   const encodedProductId = encodeURIComponent(productId || "");
   const encodedPreviewId = encodeURIComponent(previewId || "");
   const isPreviewMode = !!previewMode && !!previewId;
@@ -231,17 +225,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   };
 
   // Derived viewer data
-  const sections = typeDef?.fields_json?.sections || typeDef?.sections || [];
-  const tabs = sections.map((section) => ({
-    sectionKey: section.key,
-    label: translateSchemaLabel(lang, section),
-  }));
-  const activeSection =
-    sections.find((section) => section.key === activeSectionKey) ||
-    sections[0] ||
-    null;
-  const passportType = passport?.passport_type;
-  const displayName  = typeDef?.display_name || passportType;
   const brandTheme = getViewerBrandTheme(companyData?.branding_json);
   const canonicalPublicPath = buildPublicPassportPath({
     companyName: companyData?.company_name,
@@ -306,38 +289,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     }
   }, [canonicalInactiveTechnicalPath, canonicalPreviewTechnicalPath, canonicalTechnicalPath, isInactiveView, isPreviewMode, location.pathname, navigate]);
 
-  useEffect(() => {
-    if (!sections.length) {
-      setActiveSectionKey("");
-      return;
-    }
-    if (!sections.some((section) => section.key === activeSectionKey)) {
-      setActiveSectionKey(sections[0].key);
-    }
-  }, [activeSectionKey, sections]);
-
   if (loading) return <div className="loading">Loading passport…</div>;
   if (error)   return <div className="alert alert-error">{error}</div>;
   if (!passport) return null;
-
-  const handleReportSuspiciousCarrier = async (report) => {
-    if (!passport?.dppId) return;
-    setSecurityReportState({ submitting: true, success: false, error: "" });
-    try {
-      const response = await fetchWithAuth(`${API}/api/passports/${passport.dppId}/security-report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(report),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to report suspicious carrier");
-      }
-      setSecurityReportState({ submitting: false, success: true, error: "" });
-    } catch (error) {
-      setSecurityReportState({ submitting: false, success: false, error: error.message || "Failed to report suspicious carrier" });
-    }
-  };
 
   return (
     <div
@@ -346,157 +300,58 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       style={brandTheme.style}
     >
       <div className="no-print">
-        <Header displayName={displayName} lang={lang} setLang={setLang} dppId={passport.dppId} companyData={companyData} brandTheme={brandTheme} />
-
-        <main id="viewer-main-content" className="viewer-content">
-          <div className="viewer-shell">
-            <div className="viewer-topbar">
-              <div className="viewer-title">
-                <button
-                  type="button"
-                  className="pv-secondary-btn viewer-back-btn"
-                  onClick={() => {
-                    const landingPath = isPreviewMode
-                      ? canonicalPreviewPath
-                      : isInactiveView
-                        ? canonicalInactivePath
-                        : canonicalPublicPath;
-                    if (landingPath) navigate(landingPath);
-                  }}
-                  disabled={!(isPreviewMode
-                    ? canonicalPreviewPath
-                    : isInactiveView
-                      ? canonicalInactivePath
-                      : canonicalPublicPath)}
-                >
-                  ← Back to landing page
-                </button>
-                <h2>{typeDef?.product_icon || ""} {displayName}</h2>
-                <p className="viewer-subtitle">{isPreviewMode ? "Draft preview of the public passport viewer" : "Public passport viewer"}</p>
-              </div>
-              <SignatureBadge verification={sigVerification} />
+        {isLoggedIn && (passportAccessKeyMeta || passportAccessKey) && (
+          <div className="access-key-bar">
+            <span className="access-key-bar-icon">🔑</span>
+            <div className="access-key-bar-text">
+              <strong>Passport Access Key</strong>
+              <span className="access-key-bar-hint">
+                Access keys are now write-only for security. Issue a new key when you need to share restricted-field access with an authorised party.
+              </span>
             </div>
-
-            {isPreviewMode && (
-              <div className="access-unlocked-bar preview-status-bar">
-                <div className="preview-status-copy">
-                  <strong>Preview mode</strong>
-                  <span>Previewing how this passport will look in the public viewer before release.</span>
-                </div>
-                {canonicalPublicPath && (
-                  <code className="preview-status-url" title={canonicalPublicPath}>
-                    Future public URL: {canonicalPublicPath}
-                  </code>
-                )}
-              </div>
+            <code className="access-key-bar-code">
+              {passportAccessKey || passportAccessKeyMeta?.keyPrefix || "Not issued yet"}
+            </code>
+            {passportAccessKey ? (
+              <button
+                className="access-key-bar-copy"
+                onClick={() => {
+                  navigator.clipboard.writeText(passportAccessKey);
+                  setKeyCopied(true);
+                  setTimeout(() => setKeyCopied(false), 2000);
+                }}
+              >
+                {keyCopied ? "✓ Copied" : "Copy"}
+              </button>
+            ) : (
+              <button
+                className="access-key-bar-copy"
+                onClick={handleRegenerateAccessKey}
+                disabled={accessKeyBusy}
+              >
+                {accessKeyBusy ? "Issuing…" : passportAccessKeyMeta?.hasAccessKey ? "Regenerate" : "Issue Key"}
+              </button>
             )}
-
-            {/* Access key info bar — only visible to logged-in company users */}
-            {isLoggedIn && (passportAccessKeyMeta || passportAccessKey) && (
-              <div className="access-key-bar">
-                <span className="access-key-bar-icon">🔑</span>
-                <div className="access-key-bar-text">
-                  <strong>Passport Access Key</strong>
-                  <span className="access-key-bar-hint">
-                    Access keys are now write-only for security. Issue a new key when you need to share restricted-field access with an authorised party.
-                  </span>
-                </div>
-                <code className="access-key-bar-code">
-                  {passportAccessKey || passportAccessKeyMeta?.keyPrefix || "Not issued yet"}
-                </code>
-                {passportAccessKey ? (
-                  <button
-                    className="access-key-bar-copy"
-                    onClick={() => {
-                      navigator.clipboard.writeText(passportAccessKey);
-                      setKeyCopied(true);
-                      setTimeout(() => setKeyCopied(false), 2000);
-                    }}
-                  >
-                    {keyCopied ? "✓ Copied" : "Copy"}
-                  </button>
-                ) : (
-                  <button
-                    className="access-key-bar-copy"
-                    onClick={handleRegenerateAccessKey}
-                    disabled={accessKeyBusy}
-                  >
-                    {accessKeyBusy ? "Issuing…" : passportAccessKeyMeta?.hasAccessKey ? "Regenerate" : "Issue Key"}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Unlocked banner — shown after successful key entry */}
-            {unlockedPassport && (
-              <div className="access-unlocked-bar">
-                ✅ Restricted fields are now visible. Access granted to authorised view.
-                <button className="access-relock-btn" onClick={() => setUnlockedPassport(null)}>
-                  🔒 Re-lock
-                </button>
-              </div>
-            )}
-
-            {isInactiveView && (
-              <div className="access-unlocked-bar">
-                Viewing inactive released snapshot v{passport.version_number}.
-                <button className="access-relock-btn" onClick={() => { if (canonicalPublicPath) navigate(canonicalPublicPath); }}>
-                  Open current passport
-                </button>
-              </div>
-            )}
-
-            {isObsoletePassportStatus(passport.release_status) && (
-              <div className="pv-obsolete-banner">
-                This is not the latest version of this passport. A newer version has been released.
-              </div>
-            )}
-
-            <PassportIntro
-              passport={passport}
-              companyData={companyData}
-              displayName={displayName}
-              qrCode={qrCode}
-              qrLoading={qrLoading}
-              carrierAuthenticity={passport?.carrier_authenticity || carrierAuthenticity}
-              onReportSuspiciousCarrier={handleReportSuspiciousCarrier}
-              securityReportState={securityReportState}
-              onOpenHistory={() => setShowHistoryModal(true)}
-              onPrint={() => { setTimeout(() => window.print(), 300); }}
-            />
-
-            <PassportHeaderPanel passport={passport} typeDef={typeDef} />
-
-            <div className="viewer-route-panel">
-              {sections.length > 0 && (
-                <PassportTabRail
-                  tabs={tabs}
-                  activeSectionKey={activeSection?.key || ""}
-                  onSelect={setActiveSectionKey}
-                />
-              )}
-              {sections.length === 0 && <EmptySectionsState />}
-              {activeSection && (
-                <SectionView
-                  key={activeSection.key}
-                  sectionId={`section-${activeSection.key}`}
-                  sectionDef={activeSection}
-                  passport={passport}
-                  unlockedPassport={unlockedPassport}
-                  onRequestUnlock={() => setShowAccessForm(true)}
-                  dynamicValues={dynamicValues}
-                  lang={lang}
-                />
-              )}
-            </div>
           </div>
-        </main>
+        )}
 
-        <Footer brandTheme={brandTheme} />
-      </div>
-
-      <div className="print-only" ref={printRef}>
-        <PrintView passport={passport} companyData={companyData} sections={sections} />
+        <PublicPassportPortal
+          passport={passport}
+          companyData={companyData}
+          typeDef={typeDef}
+          qrCode={qrCode}
+          qrLoading={qrLoading}
+          unlockedPassport={unlockedPassport}
+          onRequestUnlock={() => setShowAccessForm(true)}
+          dynamicValues={dynamicValues}
+          lang={lang}
+          sigVerification={sigVerification}
+          carrierAuthenticity={passport?.carrier_authenticity || carrierAuthenticity}
+          isPreviewMode={isPreviewMode}
+          isInactiveView={isInactiveView}
+          isObsolete={isObsoletePassportStatus(passport.release_status)}
+          canonicalPublicPath={canonicalPublicPath}
+        />
       </div>
 
       {/* ── Access Key Unlock Modal ── */}
@@ -529,17 +384,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
             </div>
           </div>
         </div>
-      )}
-
-      {showHistoryModal && (
-        <PassportHistoryModal
-          dppId={passport.dppId}
-          productId={passport.product_id}
-          passportType={passport.passport_type}
-          companyId={isPreviewMode ? previewCompanyId : null}
-          mode={isPreviewMode ? "company" : "public"}
-          onClose={() => setShowHistoryModal(false)}
-        />
       )}
     </div>
   );

@@ -4,6 +4,7 @@ const nodeCrypto = require("crypto");
 const logger = require("./logger");
 const { normalizeSystemPassportHeader } = require("./passport-header-fields");
 const canonicalizeJson = require("./json-canonicalization");
+const { isPublicVersionVisible } = require("../src/modules/public-passports/visibility");
 
 const IN_REVISION_STATUSES_SQL       = `('in_revision')`;
 const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','in_revision')`;
@@ -763,11 +764,16 @@ module.exports = function createPassportService({
     }
 
     const archiveRes = await pool.query(
-      `SELECT row_data FROM passport_archives
-       WHERE dpp_id = $1
-         AND passport_type = $2
-         AND release_status = 'released'
-       ORDER BY version_number DESC
+      `SELECT pa.row_data,
+              pa.version_number,
+              phv.is_public
+       FROM passport_archives pa
+       LEFT JOIN passport_history_visibility phv
+         ON phv.passport_dpp_id = pa.dpp_id
+        AND phv.version_number = pa.version_number
+       WHERE pa.dpp_id = $1
+         AND pa.passport_type = $2
+       ORDER BY pa.version_number DESC, pa.archived_at DESC
        LIMIT 1`,
       [normalizedDppId, passportType]
     );
@@ -776,6 +782,9 @@ module.exports = function createPassportService({
     const rowData = typeof archiveRes.rows[0].row_data === "string"
       ? JSON.parse(archiveRes.rows[0].row_data)
       : archiveRes.rows[0].row_data;
+    if (!isPublicVersionVisible(rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+      return { passport: null, archived: false };
+    }
     return {
       passport: { ...normalizePassportRow(rowData), passport_type: passportType, archived: true },
       archived: true,
@@ -864,16 +873,18 @@ module.exports = function createPassportService({
         archiveParams.push(versionNumber);
       }
       const archiveRes = await pool.query(
-        `SELECT product_identifier_did, row_data
-         FROM passport_archives
-         WHERE ${matchSql}
-           AND passport_type = $2${archiveCompanySql}
-           AND ${
-             versionNumber !== null && versionNumber !== undefined
-               ? "release_status IN ('released', 'obsolete')"
-               : "release_status = 'released'"
-           }${versionNumber !== null && versionNumber !== undefined ? ` AND version_number = $${archiveParams.length}` : ""}
-         ORDER BY version_number DESC, archived_at DESC
+        `SELECT pa.product_identifier_did,
+                pa.version_number,
+                pa.row_data,
+                phv.is_public
+         FROM passport_archives pa
+         LEFT JOIN passport_history_visibility phv
+           ON phv.passport_dpp_id = pa.dpp_id
+          AND phv.version_number = pa.version_number
+         WHERE ${matchSql.replaceAll("product_identifier_did", "pa.product_identifier_did").replaceAll("product_id", "pa.product_id")}
+           AND pa.passport_type = $2${archiveCompanySql}
+           ${versionNumber !== null && versionNumber !== undefined ? ` AND pa.version_number = $${archiveParams.length}` : ""}
+         ORDER BY pa.version_number DESC, pa.archived_at DESC
          LIMIT 1`,
         archiveParams
       );
@@ -881,6 +892,9 @@ module.exports = function createPassportService({
         const rowData = typeof archiveRes.rows[0].row_data === "string"
           ? JSON.parse(archiveRes.rows[0].row_data)
           : archiveRes.rows[0].row_data;
+        if (!isPublicVersionVisible(rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+          continue;
+        }
         matches.push({
           passport: {
             ...normalizePassportRow(rowData),
@@ -946,13 +960,16 @@ module.exports = function createPassportService({
       }
 
       const archiveRes = await pool.query(
-        `SELECT row_data
-         FROM passport_archives
-         WHERE lineage_id = $1
-           AND passport_type = $2
-           AND version_number = $3
-           AND release_status IN ('released', 'obsolete')
-         ORDER BY archived_at DESC
+        `SELECT pa.row_data,
+                phv.is_public
+         FROM passport_archives pa
+         LEFT JOIN passport_history_visibility phv
+           ON phv.passport_dpp_id = pa.dpp_id
+          AND phv.version_number = pa.version_number
+         WHERE pa.lineage_id = $1
+           AND pa.passport_type = $2
+           AND pa.version_number = $3
+         ORDER BY pa.archived_at DESC
          LIMIT 1`,
         [lineageContext.lineage_id, passportType, versionNumber]
       );
@@ -961,6 +978,9 @@ module.exports = function createPassportService({
       const rowData = typeof archiveRes.rows[0].row_data === "string"
         ? JSON.parse(archiveRes.rows[0].row_data)
         : archiveRes.rows[0].row_data;
+      if (!isPublicVersionVisible(rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+        return { passport: null, archived: false };
+      }
       const passport = { ...normalizePassportRow(rowData), passport_type: passportType, archived: true };
       const visibilityRes = await pool.query(
         `SELECT is_public

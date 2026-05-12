@@ -1,17 +1,30 @@
 "use strict";
 const path           = require("path");
-require("dotenv").config({
-  path: process.env.DOTENV_CONFIG_PATH || path.resolve(__dirname, "../../../docker/.env"),
-});
+const {
+  assertProductionStorageReadiness,
+  assertRequiredProductionEnvironment,
+  deriveRuntimeFlags,
+  deriveRuntimePaths,
+  ensureLocalDirectories,
+  initEnvironment,
+  isPassportStorageKey,
+  isPlainRecord,
+  normalizeIncomingDppIdentifiers,
+  normalizeOutgoingDppIdentifiers,
+  normalizeStorageRequestKey,
+  toBooleanEnv,
+} = require("../src/bootstrap/runtime-config");
+initEnvironment(__dirname);
 const express        = require("express");
 const { Pool }       = require("pg");
-const cors           = require("cors");
-const helmet         = require("helmet");
 const { v4: uuidv4 } = require("uuid");
 const crypto         = require("crypto");
 const jwt            = require("jsonwebtoken");
 const multer         = require("multer");
 const fs             = require("fs");
+const { configureHttp } = require("../src/bootstrap/http");
+const { registerAppRoutes } = require("../src/bootstrap/register-routes");
+const { registerSupportRoutes } = require("../src/bootstrap/support-routes");
 
 const { initDb }               = require("../db/init");
 const createSigningService     = require("../services/signing-service");
@@ -57,221 +70,37 @@ const {
   coerceAssetFieldValue, toDynamicStoredValue,
 } = require("../helpers/passport-helpers");
 
-// ─── ROUTE REGISTRATIONS ────────────────────────────────────────────────────
-const registerAssetManagementLaunchRoutes = require("../routes/asset-management-launch");
-const registerRepositoryRoutes            = require("../routes/repository");
-const registerNotificationRoutes          = require("../routes/notifications");
-const registerMessagingRoutes             = require("../routes/messaging");
-const registerWorkflowRoutes              = require("../routes/workflow");
-const registerHealthRoutes                = require("../routes/health");
-const registerAuthRoutes                  = require("../routes/auth");
-const registerAdminRoutes                 = require("../routes/admin");
-const registerAssetManagementApiRoutes    = require("../routes/asset-management-api");
-const registerPassportRoutes              = require("../routes/passports");
-const registerPassportPublicRoutes        = require("../routes/passport-public");
-const registerCompanyRoutes               = require("../routes/company");
-const registerDppApiRoutes                = require("../routes/dpp-api");
-const registerDictionaryRoutes            = require("../routes/dictionary");
-
 // ─── DIRECTORIES ─────────────────────────────────────────────────────────────
-const APP_ROOT_DIR = path.resolve(__dirname, "../../..");
-const ASSET_MANAGEMENT_DIR = path.resolve(
-  process.env.ASSET_MANAGEMENT_DIR || path.join(APP_ROOT_DIR, "apps", "asset-management")
-);
-const LOCAL_STORAGE_DIR = path.resolve(
-  process.env.LOCAL_STORAGE_DIR || path.join(APP_ROOT_DIR, "storage", "local-storage")
-);
-const FILES_BASE_DIR = path.resolve(
-  process.env.FILES_DIR || path.join(LOCAL_STORAGE_DIR, "passport-files")
-);
-const REPO_BASE_DIR = path.resolve(
-  process.env.REPO_DIR || path.join(LOCAL_STORAGE_DIR, "repository-files")
-);
-const UPLOADS_BASE_DIR = path.resolve(
-  process.env.UPLOADS_DIR || path.join(LOCAL_STORAGE_DIR, "uploads")
-);
-const GLOBAL_SYMBOLS_DIR = path.join(UPLOADS_BASE_DIR, "symbols");
-const PASSPORT_STORAGE_PREFIX = "passport-files/";
-
-const normalizeStorageRequestKey = (value) => {
-  const raw = String(value || "").replace(/^\/+/, "").replace(/\\/g, "/");
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-};
-
-const isPassportStorageKey = (value) => normalizeStorageRequestKey(value)
-  .startsWith(PASSPORT_STORAGE_PREFIX);
-
-const isPlainRecord = (value) =>
-  value !== null
-  && typeof value === "object"
-  && !Array.isArray(value)
-  && !(value instanceof Date)
-  && !Buffer.isBuffer(value);
-
-const normalizeIncomingDppIdentifiers = (value) => {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeIncomingDppIdentifiers(entry));
-  }
-  if (!isPlainRecord(value)) return value;
-
-  const normalized = {};
-  for (const [key, rawEntry] of Object.entries(value)) {
-    const entry = normalizeIncomingDppIdentifiers(rawEntry);
-    if (key === "dppId") normalized.dpp_id = entry;
-    else if (key === "dppIds") normalized.dpp_ids = entry;
-    else if (key === "dpp_id") normalized.dpp_id = entry;
-    else if (key === "match_dpp_id") normalized.match_dpp_id = entry;
-    else if (key === "matched_dpp_id") normalized.matched_dpp_id = entry;
-    else if (key === "passportDppId") normalized.passport_dpp_id = entry;
-    else if (key === "passport_dpp_id") normalized.passport_dpp_id = entry;
-    else normalized[key] = entry;
-  }
-  return normalized;
-};
-
-const normalizeOutgoingDppIdentifiers = (value) => {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeOutgoingDppIdentifiers(entry));
-  }
-  if (!isPlainRecord(value)) return value;
-
-  const normalized = {};
-  for (const [key, rawEntry] of Object.entries(value)) {
-    const entry = normalizeOutgoingDppIdentifiers(rawEntry);
-    if (key === "dpp_id") normalized.dppId = entry;
-    else if (key === "dppIds") normalized.dppIds = entry;
-    else if (key === "passportDppId" || key === "passport_dpp_id" || key === "passport_dpp_id") normalized.passportDppId = entry;
-    else normalized[key] = entry;
-  }
-  return normalized;
-};
-
-[LOCAL_STORAGE_DIR, FILES_BASE_DIR, REPO_BASE_DIR, GLOBAL_SYMBOLS_DIR].forEach((dir) => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-});
+const RUNTIME_PATHS = deriveRuntimePaths(__dirname);
+const {
+  assetManagementDir: ASSET_MANAGEMENT_DIR,
+  localStorageDir: LOCAL_STORAGE_DIR,
+  filesBaseDir: FILES_BASE_DIR,
+  repoBaseDir: REPO_BASE_DIR,
+  uploadsBaseDir: UPLOADS_BASE_DIR,
+  globalSymbolsDir: GLOBAL_SYMBOLS_DIR,
+  passportStoragePrefix: PASSPORT_STORAGE_PREFIX,
+} = RUNTIME_PATHS;
+ensureLocalDirectories(RUNTIME_PATHS);
 
 // ─── EXPRESS SETUP ───────────────────────────────────────────────────────────
 const app  = express();
 const PORT = process.env.PORT || 3001;
-app.disable("x-powered-by");
-app.set("trust proxy", 1);
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
-if (IS_PRODUCTION) app.set("env", "production");
-const RUN_SCHEMA_MIGRATIONS =
-  String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() === "true"
-  || (!IS_PRODUCTION && String(process.env.RUN_SCHEMA_MIGRATIONS || "").trim().toLowerCase() !== "false");
+const { isProduction: IS_PRODUCTION, runSchemaMigrations: RUN_SCHEMA_MIGRATIONS, allowedOriginSet, cspConnectSrc } = deriveRuntimeFlags(PORT);
 
 // Validate required environment variables in production
-if (IS_PRODUCTION) {
-  const requiredEnvVars = ["JWT_SECRET", "DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME"];
-  const missingEnvVars = requiredEnvVars.filter(v => !process.env[v]);
-  if (missingEnvVars.length > 0) {
-    logger.error({ missing: missingEnvVars }, "Missing required environment variables in production");
-    process.exit(1);
-  }
-  
-  if (!process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS.trim() === "") {
-    logger.error("ALLOWED_ORIGINS must be configured in production");
-    process.exit(1);
-  }
-}
-
-const defaultAllowedOrigins = IS_PRODUCTION ? [] : [
-  "http://localhost:3000", "http://127.0.0.1:3000",
-  "http://localhost:3003", "http://127.0.0.1:3003",
-  "http://localhost:3004", "http://127.0.0.1:3004",
-  "http://localhost:5173", "http://127.0.0.1:5173",
-  `http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`,
-];
-const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || "")
-  .split(",").map(s => s.trim()).filter(Boolean);
-const allowedOriginSet = new Set([...defaultAllowedOrigins, ...envAllowedOrigins]);
-const cspConnectSrc = ["'self'", ...allowedOriginSet];
-
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowedOriginSet.has(origin)) return cb(null, true);
-    cb(new Error("Forbidden"));
-  },
-  credentials: true,
-}));
-
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      defaultSrc: ["'self'"],
-      baseUri: ["'self'"],
-      frameAncestors: ["'none'"],
-      objectSrc: ["'none'"],
-      scriptSrc: ["'self'"],
-      scriptSrcAttr: ["'none'"],
-      styleSrc: ["'self'", "https:"],
-      styleSrcAttr: ["'none'"],
-      imgSrc: ["'self'", "data:", "blob:", "https:"],
-      fontSrc: ["'self'", "data:", "https:"],
-      connectSrc: cspConnectSrc,
-    },
-  },
-  crossOriginResourcePolicy: false,
-}));
-
-app.use((req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  if (IS_PRODUCTION) {
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    res.setHeader("X-XSS-Protection", "1; mode=block");
-  }
-  next();
+assertRequiredProductionEnvironment({ isProduction: IS_PRODUCTION, logger });
+configureHttp(app, {
+  allowedOriginSet,
+  assetManagementDir: ASSET_MANAGEMENT_DIR,
+  cspConnectSrc,
+  globalSymbolsDir: GLOBAL_SYMBOLS_DIR,
+  isPlainRecord,
+  isProduction: IS_PRODUCTION,
+  normalizeIncomingDppIdentifiers,
+  normalizeOutgoingDppIdentifiers,
+  port: PORT,
 });
-
-// CSRF: validate Origin on state-changing requests in production
-// API key requests are exempt (machine-to-machine, no cookies)
-app.use((req, res, next) => {
-  if (!IS_PRODUCTION) return next();
-  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();
-  if (req.headers["x-api-key"] || req.headers["x-asset-key"]) return next();
-  const origin = req.headers.origin || req.headers.referer;
-  if (!origin) return res.status(403).json({ error: "Forbidden: missing origin header" });
-  try {
-    const { origin: parsedOrigin } = new URL(origin);
-    if (!allowedOriginSet.has(parsedOrigin)) return res.status(403).json({ error: "Forbidden: origin not allowed" });
-  } catch {
-    return res.status(403).json({ error: "Forbidden: invalid origin header" });
-  }
-  next();
-});
-
-app.use(express.json({
-  limit: "10mb",
-  type: ["application/json", "application/merge-patch+json"],
-}));
-app.use((req, res, next) => {
-  if (req.body && (Array.isArray(req.body) || isPlainRecord(req.body))) {
-    req.body = normalizeIncomingDppIdentifiers(req.body);
-  }
-
-  const originalJson = res.json.bind(res);
-  res.json = (payload) => originalJson(normalizeOutgoingDppIdentifiers(payload));
-  next();
-});
-app.use("/uploads/symbols", express.static(GLOBAL_SYMBOLS_DIR));
-app.use("/asset-management", (req, res, next) => {
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Content-Security-Policy", [
-    "default-src 'self'", "script-src 'self'", "script-src-attr 'none'", "style-src 'self'", "style-src-attr 'none'",
-    "img-src 'self' data:", "font-src 'self' data:", "connect-src 'self'",
-    "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'",
-  ].join("; "));
-  next();
-}, express.static(ASSET_MANAGEMENT_DIR));
 
 // ─── DATABASE ────────────────────────────────────────────────────────────────
 const pool = new Pool({
@@ -336,47 +165,6 @@ const ASSET_ERP_PRESETS = [
   },
 ];
 
-function toBooleanEnv(value, fallback = false) {
-  if (value === undefined || value === null || value === "") return fallback;
-  return !["0", "false", "no", "off"].includes(String(value).trim().toLowerCase());
-}
-
-function assertProductionStorageReadiness() {
-  if (!IS_PRODUCTION) return;
-
-  const storageProvider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
-  const allowLocalStorage = toBooleanEnv(process.env.ALLOW_LOCAL_STORAGE_IN_PRODUCTION, false);
-  const allowMissingBackupProvider = toBooleanEnv(process.env.ALLOW_MISSING_BACKUP_PROVIDER_IN_PRODUCTION, false);
-  const missing = [];
-
-  if (storageProvider === "local" && !allowLocalStorage) {
-    throw new Error("[PRODUCTION] STORAGE_PROVIDER=local is blocked in production. Configure S3-compatible object storage or explicitly set ALLOW_LOCAL_STORAGE_IN_PRODUCTION=true for a temporary exception.");
-  }
-
-  if (storageProvider === "s3") {
-    for (const key of [
-      "STORAGE_S3_ENDPOINT",
-      "STORAGE_S3_REGION",
-      "STORAGE_S3_BUCKET",
-      "STORAGE_S3_ACCESS_KEY_ID",
-      "STORAGE_S3_SECRET_ACCESS_KEY",
-    ]) {
-      if (!process.env[key]) missing.push(key);
-    }
-  }
-
-  if (!toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false) && !allowMissingBackupProvider) {
-    missing.push("BACKUP_PROVIDER_ENABLED=true");
-  }
-  if (toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false) && !process.env.BACKUP_PROVIDER_OBJECT_PREFIX) {
-    missing.push("BACKUP_PROVIDER_OBJECT_PREFIX");
-  }
-
-  if (missing.length) {
-    throw new Error(`[PRODUCTION] Storage/DR guard failed. Missing required production storage configuration: ${missing.join(", ")}`);
-  }
-}
-
 if (IS_PRODUCTION) {
   const missing = [];
   if (!process.env.JWT_SECRET) missing.push("JWT_SECRET");
@@ -389,7 +177,7 @@ if (IS_PRODUCTION) {
   if (!process.env.PEPPER_V1)  logger.warn("[SECURITY] PEPPER_V1 is not set — using insecure default. Set it in .env before deploying.");
 }
 
-assertProductionStorageReadiness();
+assertProductionStorageReadiness({ isProduction: IS_PRODUCTION, logger });
 
 // ─── AUTH HELPERS ────────────────────────────────────────────────────────────
 const passwordService = createPasswordService({
@@ -572,35 +360,6 @@ const upload = multer({
   storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
 });
-if (storageService.isLocal) {
-  app.use("/storage", (req, res, next) => {
-    const storageKey = normalizeStorageRequestKey(req.path);
-    if (isPassportStorageKey(storageKey) || storageKey.startsWith("repository-files/")) {
-      return res.status(404).json({ error: "File not found" });
-    }
-    next();
-  }, express.static(LOCAL_STORAGE_DIR, {
-    setHeaders: (res, fp) => {
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      if (fp.endsWith(".pdf")) {
-        res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", "inline");
-        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-      } else {
-        res.setHeader("Cross-Origin-Resource-Policy", "same-site");
-      }
-    },
-  }));
-  // /passport-files direct static serving is intentionally removed.
-  // Passport files must be served through /public-files/:publicId so the app
-  // can enforce visibility rules and avoid exposing predictable bucket paths.
-  // New uploads store an opaque public_id; legacy files without an attachment
-  // record will 404 via /public-files and need to be re-uploaded.
-  // Company repository files are private assets and must go through the
-  // repository API so company membership is checked before bytes are served.
-  app.use("/repository-files", (_req, res) => res.status(404).json({ error: "File not found" }));
-}
-
 const repoUpload = multer({
   storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_, file, cb) => file.mimetype === "application/pdf" ? cb(null, true) : cb(new Error("Only PDF files are allowed"), false),
@@ -609,40 +368,6 @@ const repoSymbolUpload = multer({
   storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_, file, cb) => { const allowed = [".svg",".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(new Error("Only SVG, PNG, JPG, WebP files are allowed")); },
 });
-
-if (!storageService.isLocal && storageService.fetchObject) {
-  app.get(/^\/storage\/(.+)$/, async (req, res) => {
-    const storageKey = normalizeStorageRequestKey(req.params[0]);
-    if (!storageKey) return res.status(400).json({ error: "Storage key required" });
-    if (isPassportStorageKey(storageKey) || storageKey.startsWith("repository-files/")) {
-      return res.status(404).json({ error: "Stored object not found" });
-    }
-    try {
-      const objectResponse = await storageService.fetchObject(storageKey);
-      const contentType = objectResponse.headers.get("content-type");
-      const contentLength = objectResponse.headers.get("content-length");
-      const cacheControl = objectResponse.headers.get("cache-control");
-      const etag = objectResponse.headers.get("etag");
-
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Cross-Origin-Resource-Policy", storageKey.endsWith(".pdf") ? "cross-origin" : "same-site");
-      if (contentType) res.setHeader("Content-Type", contentType);
-      if (contentLength) res.setHeader("Content-Length", contentLength);
-      if (cacheControl) res.setHeader("Cache-Control", cacheControl);
-      if (etag) res.setHeader("ETag", etag);
-      if (storageKey.endsWith(".pdf")) {
-        res.setHeader("Content-Disposition", "inline");
-        res.removeHeader("X-Frame-Options");
-      }
-
-      const buffer = Buffer.from(await objectResponse.arrayBuffer());
-      res.send(buffer);
-    } catch (error) {
-      logger.error({ storageKey, err: error }, "[storage] Failed to proxy object");
-      res.status(404).json({ error: "Stored object not found" });
-    }
-  });
-}
 
 // ─── DID + CANONICAL SERIALIZATION SERVICES ─────────────────────────────────
 const didService = createDidService({
@@ -780,253 +505,165 @@ const startup = pool.query("SELECT NOW()")
 
 // ─── ROUTE REGISTRATIONS ─────────────────────────────────────────────────────
 
-registerAssetManagementLaunchRoutes(app, {
-  authenticateToken, checkCompanyAccess, requireEditor,
-  assertAssetManagementEnabled, generateAssetLaunchToken, ASSET_SHARED_SECRET,
-});
-
-registerRepositoryRoutes(app, {
-  pool, fs, path, authenticateToken, checkCompanyAccess, requireEditor,
-  repoUpload, repoSymbolUpload, REPO_BASE_DIR, isPathInsideBase, storageService,
-});
-
-registerNotificationRoutes(app, { pool, authenticateToken });
-
-registerMessagingRoutes(app, { pool, authenticateToken });
-
-registerWorkflowRoutes(app, {
-  pool, authenticateToken, checkCompanyAccess, requireEditor,
-  submitPassportToWorkflow, getTable, IN_REVISION_STATUS,
-  signPassport, markOlderVersionsObsolete, logAudit, buildCurrentPublicPassportPath,
-  createNotification, complianceService, archivePassportSnapshot,
-});
-
-registerAuthRoutes(app, {
-  pool, jwt, JWT_SECRET, hashPassword, verifyPassword, verifyPasswordAndUpgrade, generateToken, hashOpaqueToken,
-  validatePasswordPolicy, PASSWORD_MIN_LENGTH, hashOtpCode, generateOtpCode,
+registerAppRoutes(app, {
+  pool,
+  fs,
+  path,
+  crypto,
+  jwt,
+  multer,
+  JWT_SECRET,
+  PASSWORD_MIN_LENGTH,
   SESSION_COOKIE_NAME,
-  setAuthCookie, clearAuthCookie, sendOtpEmail, createTransporter, brandedEmail,
-  logAudit, authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
-  authenticateToken, checkCompanyAccess, oauthService, backupProviderService,
-});
-
-registerAdminRoutes(app, {
-  pool, multer, authenticateToken, isSuperAdmin, checkCompanyAccess, verifyPassword,
-  logAudit, getTable, normalizePassportTypeSchema, getTypeSchemaVersion,
-  buildPassportTypeSchemaChange, passportTypeHasStoredRecords,
-  createPassportTable, validatePassportTypeStorage, queryTableStats, publicReadRateLimit,
-  GLOBAL_SYMBOLS_DIR, REPO_BASE_DIR, FILES_BASE_DIR, IN_REVISION_STATUS, IN_REVISION_STATUSES_SQL,
-  createTransporter, brandedEmail, storageService,
-});
-
-registerAssetManagementApiRoutes(app, {
-  pool, requireAssetManagementKey, authenticateAssetPlatform, requireAssetEditor,
-  publicReadRateLimit, assetWriteRateLimit, assetSourceFetchRateLimit,
-  ASSET_ERP_PRESETS, ASSET_MATCH_FIELDS, IN_REVISION_STATUS,
-  assertAssetManagementEnabled, assertCompanyAssetPassportTypeAccess,
-  getLatestCompanyPassports, getAssetFieldMap, isPlainObject, normalizePassportRequestBody,
-  fetchAssetSourceRecords, prepareAssetPayload, executeAssetPush,
-  runAssetManagementJob, recordAssetRun, resolveAssetJobNextRunAt,
-});
-
-registerPassportRoutes(app, {
-  pool, fs, crypto, authenticateToken, checkCompanyAccess, checkCompanyAdmin,
-  requireEditor, authenticateApiKey, requireApiKeyScope, publicReadRateLimit, publicHeavyRateLimit,
-  apiKeyReadRateLimit, assetWriteRateLimit, upload,
-  hashSecret, createAccessKeyMaterial, createDeviceKeyMaterial,
-  IN_REVISION_STATUSES_SQL, EDITABLE_RELEASE_STATUSES_SQL, REVISION_BLOCKING_STATUSES_SQL,
-  EDIT_SESSION_TIMEOUT_HOURS, EDIT_SESSION_TIMEOUT_SQL, IN_REVISION_STATUS, SYSTEM_PASSPORT_FIELDS,
-  getTable, normalizePassportRow, normalizeReleaseStatus, isEditablePassportStatus,
-  normalizeProductIdValue, generateProductIdValue, normalizePassportRequestBody, extractExplicitFacilityId,
-  getWritablePassportColumns, getStoredPassportValues, toStoredPassportValue,
-  coerceBulkFieldValue, buildCurrentPublicPassportPath, buildInactivePublicPassportPath,
-  buildPreviewPassportPath, isPublicHistoryStatus,
-  logAudit, getPassportTypeSchema, findExistingPassportByProductId,
-  getPassportLineageContext, getPassportVersionsByLineage,
-  fetchCompanyPassportRecord, resolveCompanyPreviewPassport,
-  archivePassportSnapshot, archivePassportSnapshots,
-  updatePassportRowById, buildPassportVersionHistory,
-  clearExpiredEditSessions, listActiveEditSessions, markOlderVersionsObsolete,
-  verifyAuditLogChain,
-  buildAuditLogRootSummary, listAuditLogAnchors, anchorAuditLogRoot,
-  stripRestrictedFieldsForPublicView, getCompanyNameMap, queryTableStats,
-  submitPassportToWorkflow, signPassport, signPortableDataConstruct: signingService.signPortableDataConstruct,
-  buildBatteryPassJsonExport, storageService, complianceService, accessRightsService, productIdentifierService,
-  backupProviderService, buildExpandedPassportPayload, createPassportTable,
-});
-
-registerPassportPublicRoutes(app, {
-  pool, crypto, publicReadRateLimit, publicHeavyRateLimit, publicUnlockRateLimit,
-  getTable, normalizePassportRow, normalizeProductIdValue,
-  buildCurrentPublicPassportPath, buildInactivePublicPassportPath,
-  stripRestrictedFieldsForPublicView, getCompanyNameMap,
-  resolveReleasedPassportByProductId, resolvePublicPassportByDppId, buildPassportVersionHistory,
-  resolvePublicPathToSubjects,
-  verifyPassportSignature,
-  logAudit,
-  buildJsonLdContext: buildPassportJsonLdContext,
-  buildBatteryPassJsonExport,
-  buildCanonicalPassportPayload,
-  buildExpandedPassportPayload,
-  backupProviderService,
-  signingService,
-  didService,
-});
-
-registerCompanyRoutes(app, {
-  pool, authenticateToken, checkCompanyAccess, requireEditor, publicReadRateLimit,
-  getTable, getPassportTypeSchema, normalizePassportRequestBody, extractExplicitFacilityId,
-  normalizeProductIdValue, normalizeReleaseStatus, isEditablePassportStatus,
-  findExistingPassportByProductId, updatePassportRowById,
-  getWritablePassportColumns, getStoredPassportValues,
-  logAudit, EDITABLE_RELEASE_STATUSES_SQL, SYSTEM_PASSPORT_FIELDS,
-  buildBatteryPassJsonExport, productIdentifierService, complianceService, accessRightsService,
-});
-
-registerDppApiRoutes(app, {
-  pool, publicReadRateLimit, authenticateToken, requireEditor,
-  getTable, normalizePassportRow,
-  normalizeProductIdValue, extractExplicitFacilityId,
-  stripRestrictedFieldsForPublicView, getCompanyNameMap,
-  resolveReleasedPassportByProductId,
-  signingService,
-  buildOperationalDppPayload,
-  buildCanonicalPassportPayload,
-  buildExpandedPassportPayload,
-  buildExpandedDataElement,
-  buildPassportJsonLdContext,
-  didService,
-  dppIdentity,
-  productIdentifierService,
-  archivePassportSnapshot,
-  updatePassportRowById,
-  isEditablePassportStatus,
-  logAudit,
-  accessRightsService,
-  normalizePassportRequestBody,
+  ASSET_SHARED_SECRET,
+  ASSET_ERP_PRESETS,
+  ASSET_MATCH_FIELDS,
+  GLOBAL_SYMBOLS_DIR,
+  REPO_BASE_DIR,
+  FILES_BASE_DIR,
+  IN_REVISION_STATUS,
+  IN_REVISION_STATUSES_SQL,
+  EDITABLE_RELEASE_STATUSES_SQL,
+  REVISION_BLOCKING_STATUSES_SQL,
+  EDIT_SESSION_TIMEOUT_HOURS,
+  EDIT_SESSION_TIMEOUT_SQL,
   SYSTEM_PASSPORT_FIELDS,
+  authRateLimit,
+  otpRateLimit,
+  passwordResetRateLimit,
+  publicReadRateLimit,
+  publicHeavyRateLimit,
+  publicUnlockRateLimit,
+  apiKeyReadRateLimit,
+  assetWriteRateLimit,
+  assetSourceFetchRateLimit,
+  authenticateToken,
+  isSuperAdmin,
+  checkCompanyAccess,
+  requireEditor,
+  checkCompanyAdmin,
+  authenticateApiKey,
+  requireApiKeyScope,
+  hashPassword,
+  verifyPassword,
+  verifyPasswordAndUpgrade,
+  generateToken,
+  hashOpaqueToken,
+  validatePasswordPolicy,
+  hashOtpCode,
+  generateOtpCode,
+  setAuthCookie,
+  clearAuthCookie,
+  sendOtpEmail,
+  createTransporter,
+  brandedEmail,
+  oauthService,
+  backupProviderService,
+  requireAssetManagementKey,
+  authenticateAssetPlatform,
+  requireAssetEditor,
+  assertAssetManagementEnabled,
+  assertCompanyAssetPassportTypeAccess,
+  getLatestCompanyPassports,
+  fetchAssetSourceRecords,
+  prepareAssetPayload,
+  executeAssetPush,
+  runAssetManagementJob,
+  recordAssetRun,
+  resolveAssetJobNextRunAt,
+  upload,
+  repoUpload,
+  repoSymbolUpload,
+  hashSecret,
+  createAccessKeyMaterial,
+  createDeviceKeyMaterial,
+  getTable,
+  normalizePassportRow,
+  normalizeReleaseStatus,
+  isEditablePassportStatus,
+  normalizeProductIdValue,
+  generateProductIdValue,
+  normalizePassportRequestBody,
+  extractExplicitFacilityId,
   getWritablePassportColumns,
+  getStoredPassportValues,
   toStoredPassportValue,
+  coerceBulkFieldValue,
+  buildCurrentPublicPassportPath,
+  buildInactivePublicPassportPath,
+  buildPreviewPassportPath,
+  isPublicHistoryStatus,
+  logAudit,
   getPassportTypeSchema,
   findExistingPassportByProductId,
+  getPassportLineageContext,
+  getPassportVersionsByLineage,
+  fetchCompanyPassportRecord,
+  resolveCompanyPreviewPassport,
+  archivePassportSnapshot,
+  archivePassportSnapshots,
+  updatePassportRowById,
+  buildPassportVersionHistory,
+  clearExpiredEditSessions,
+  listActiveEditSessions,
+  markOlderVersionsObsolete,
+  verifyAuditLogChain,
+  buildAuditLogRootSummary,
+  listAuditLogAnchors,
+  anchorAuditLogRoot,
+  stripRestrictedFieldsForPublicView,
+  getCompanyNameMap,
+  queryTableStats,
+  submitPassportToWorkflow,
+  signPassport,
+  signPortableDataConstruct: signingService.signPortableDataConstruct,
+  buildBatteryPassJsonExport,
+  storageService,
   complianceService,
-  backupProviderService,
+  accessRightsService,
+  productIdentifierService,
+  buildExpandedPassportPayload,
+  createPassportTable,
+  resolveReleasedPassportByProductId,
+  resolvePublicPassportByDppId,
+  resolvePublicPathToSubjects,
+  verifyPassportSignature,
+  buildJsonLdContext: buildPassportJsonLdContext,
+  buildCanonicalPassportPayload,
+  signingService,
+  didService,
+  buildOperationalDppPayload,
+  buildExpandedDataElement,
+  dppIdentity,
+  batteryDictionaryService,
+  generateAssetLaunchToken,
+  isPathInsideBase,
+  normalizePassportTypeSchema,
+  getTypeSchemaVersion,
+  buildPassportTypeSchemaChange,
+  passportTypeHasStoredRecords,
+  validatePassportTypeStorage,
+  buildPassportJsonLdContext,
+  buildCanonicalPassportPayload,
+  buildExpandedPassportPayload,
+  createNotification,
+  getAssetFieldMap,
+  isPlainObject,
 });
-
-registerDictionaryRoutes(app, { publicReadRateLimit, batteryDictionaryService });
-
-// ─── APP-MEDIATED FILE SERVING ────────────────────────────────────────────────
-// Files are served through the app, not directly from storage, so:
-//   - storage paths are never exposed in URLs
-//   - access can be revoked without changing URLs
-//   - visibility rules are enforced at serve-time
-app.get("/public-files/:publicId", publicReadRateLimit, async (req, res) => {
-  try {
-    const { publicId } = req.params;
-    if (!/^[a-zA-Z0-9_-]{8,24}$/.test(publicId)) {
-      return res.status(400).json({ error: "Invalid file identifier" });
-    }
-
-    const row = await pool.query(
-      "SELECT * FROM passport_attachments WHERE public_id = $1",
-      [publicId]
-    );
-    if (!row.rows.length) return res.status(404).json({ error: "File not found" });
-
-    const attachment = row.rows[0];
-
-    // Only serve files that are flagged as public (i.e. belong to a released passport)
-    if (!attachment.is_public) {
-      return res.status(404).json({ error: "File not found" });
-    }
-
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Cache-Control", "public, max-age=300");
-    res.setHeader("Cross-Origin-Resource-Policy", attachment.mime_type === "application/pdf" ? "cross-origin" : "same-site");
-
-    if (storageService.isLocal && attachment.file_path) {
-      // Prevent path traversal: resolve and verify the path is inside FILES_BASE_DIR
-      const safePath = path.resolve(attachment.file_path);
-      if (safePath !== FILES_BASE_DIR && !safePath.startsWith(`${FILES_BASE_DIR}${path.sep}`)) {
-        return res.status(404).json({ error: "File not found" });
-      }
-      if (!fs.existsSync(safePath)) return res.status(404).json({ error: "File not found" });
-      const mimeType = attachment.mime_type || "application/octet-stream";
-      res.setHeader("Content-Type", mimeType);
-      if (mimeType === "application/pdf") {
-        res.setHeader("Content-Disposition", "inline");
-        res.removeHeader("X-Frame-Options");
-      }
-      return res.sendFile(safePath);
-    }
-
-    if (!storageService.isLocal && storageService.fetchObject && isPassportStorageKey(attachment.storage_key)) {
-      // Cloud: proxy stream through app (hides bucket URL from client)
-      const objectResponse = await storageService.fetchObject(attachment.storage_key);
-      const contentType = objectResponse.headers?.get("content-type") || attachment.mime_type;
-      const contentLength = objectResponse.headers?.get("content-length");
-      const etag = objectResponse.headers?.get("etag");
-      if (contentType) res.setHeader("Content-Type", contentType);
-      if (contentLength) res.setHeader("Content-Length", contentLength);
-      if (etag) res.setHeader("ETag", etag);
-      if (contentType === "application/pdf") {
-        res.setHeader("Content-Disposition", "inline");
-        res.removeHeader("X-Frame-Options");
-      }
-      const buffer = Buffer.from(await objectResponse.arrayBuffer());
-      return res.send(buffer);
-    }
-
-    res.status(404).json({ error: "File not available" });
-  } catch (e) {
-    logger.error({ err: e }, "[public-files] Failed to serve file");
-    res.status(500).json({ error: "Failed to serve file" });
-  }
-});
-
-registerHealthRoutes(app, pool);
-
-// ─── CONTACT FORM ────────────────────────────────────────────────────────────
-app.post("/api/contact", publicReadRateLimit, async (req, res) => {
-  try {
-    const { first_name, last_name, email, company, sector, service_interest, deadline, message, how_found } = req.body || {};
-    if (!first_name || !last_name || !email || !message)
-      return res.status(400).json({ error: "first_name, last_name, email, and message are required" });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return res.status(400).json({ error: "Invalid email address" });
-
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (!adminEmail) {
-      logger.warn("ADMIN_EMAIL not configured - contact form submission not forwarded");
-      return res.json({ ok: true });
-    }
-
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: `"ClarosDPP Contact" <${process.env.EMAIL_FROM}>`,
-      to: adminEmail,
-      replyTo: email,
-      subject: `New Contact Form Submission — ${first_name} ${last_name}`,
-      html: brandedEmail({
-        heading: "New Contact Form Submission",
-        body: `
-          <p><strong>Name:</strong> ${first_name} ${last_name}</p>
-          <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
-          ${company ? `<p><strong>Company:</strong> ${company}</p>` : ""}
-          ${sector ? `<p><strong>Sector:</strong> ${sector}</p>` : ""}
-          ${service_interest ? `<p><strong>Service Interest:</strong> ${service_interest}</p>` : ""}
-          ${deadline ? `<p><strong>Compliance Deadline:</strong> ${deadline}</p>` : ""}
-          ${how_found ? `<p><strong>How Found:</strong> ${how_found}</p>` : ""}
-          <p><strong>Message:</strong></p>
-          <p style="white-space:pre-wrap">${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
-        `,
-      }),
-    });
-    res.json({ ok: true });
-  } catch (e) {
-    logger.error({ err: e }, "[Contact] Failed to send contact email");
-    res.status(500).json({ error: "Failed to send message. Please email us directly." });
-  }
+registerSupportRoutes(app, {
+  express,
+  pool,
+  fs,
+  path,
+  logger,
+  storageService,
+  LOCAL_STORAGE_DIR,
+  FILES_BASE_DIR,
+  normalizeStorageRequestKey,
+  isPassportStorageKey,
+  publicReadRateLimit,
+  createTransporter,
+  brandedEmail,
 });
 
 startup.then(() => {

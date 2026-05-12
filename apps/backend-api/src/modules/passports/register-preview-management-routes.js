@@ -1,0 +1,155 @@
+"use strict";
+
+module.exports = function registerPreviewManagementRoutes(app, deps) {
+  const {
+    pool,
+    authenticateToken,
+    checkCompanyAccess,
+    requireEditor,
+    createAccessKeyMaterial,
+    EDIT_SESSION_TIMEOUT_HOURS,
+    stripRestrictedFieldsForPublicView,
+    getCompanyNameMap,
+    resolveCompanyPreviewPassport,
+    clearExpiredEditSessions,
+    listActiveEditSessions,
+    buildPreviewPassportPath,
+    buildCurrentPublicPassportPath,
+    buildInactivePublicPassportPath,
+    logAudit,
+  } = deps;
+
+  app.get("/api/companies/:companyId/passports/:passportKey/preview", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      const { companyId, passportKey } = req.params;
+      const resolved = await resolveCompanyPreviewPassport({ companyId, passportKey });
+      if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+
+      const passport = await stripRestrictedFieldsForPublicView(resolved.passport, resolved.passport.passport_type);
+      const companyNameMap = await getCompanyNameMap([passport.company_id]);
+      const companyName = companyNameMap.get(String(passport.company_id)) || "";
+
+      res.json({
+        ...passport,
+        preview_mode: true,
+        preview_path: buildPreviewPassportPath({
+          companyName,
+          manufacturerName: passport.manufacturer,
+          manufacturedBy: passport.manufactured_by,
+          modelName: passport.model_name,
+          productId: passport.product_id,
+          fallbackGuid: passport.dppId,
+        }),
+        public_path: buildCurrentPublicPassportPath({
+          companyName,
+          manufacturerName: passport.manufacturer,
+          manufacturedBy: passport.manufactured_by,
+          modelName: passport.model_name,
+          productId: passport.product_id,
+        }),
+        inactive_path: buildInactivePublicPassportPath({
+          companyName,
+          manufacturerName: passport.manufacturer,
+          manufacturedBy: passport.manufactured_by,
+          modelName: passport.model_name,
+          productId: passport.product_id,
+          versionNumber: passport.version_number,
+        }),
+      });
+    } catch (error) {
+      if (error.code === "AMBIGUOUS_PRODUCT_ID") return res.status(409).json({ error: error.message });
+      res.status(500).json({ error: "Failed to fetch passport preview" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      const editors = await listActiveEditSessions(req.params.dppId, req.user.userId);
+      res.json({ editors, timeoutHours: EDIT_SESSION_TIMEOUT_HOURS, serverTime: new Date().toISOString() });
+    } catch {
+      res.status(500).json({ error: "Failed to fetch edit session" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+    try {
+      const { companyId, dppId } = req.params;
+      const { passportType } = req.body;
+      if (!passportType) return res.status(400).json({ error: "passportType required" });
+
+      await clearExpiredEditSessions();
+      await pool.query(
+        `INSERT INTO passport_edit_sessions (passport_dpp_id, company_id, passport_type, user_id, last_activity_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())
+         ON CONFLICT (passport_dpp_id, user_id)
+         DO UPDATE SET company_id = EXCLUDED.company_id, passport_type = EXCLUDED.passport_type, last_activity_at = NOW(), updated_at = NOW()`,
+        [dppId, companyId, passportType, req.user.userId]
+      );
+
+      const editors = await listActiveEditSessions(dppId, req.user.userId);
+      res.json({ success: true, editors, timeoutHours: EDIT_SESSION_TIMEOUT_HOURS, lastActivityAt: new Date().toISOString() });
+    } catch {
+      res.status(500).json({ error: "Failed to update edit session" });
+    }
+  });
+
+  app.delete("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      await pool.query(
+        "DELETE FROM passport_edit_sessions WHERE passport_dpp_id = $1 AND user_id = $2",
+        [req.params.dppId, req.user.userId]
+      );
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ error: "Failed to clear edit session" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/passports/:dppId/access-key", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at
+         FROM passport_registry
+         WHERE dpp_id = $1 AND company_id = $2`,
+        [req.params.dppId, req.params.companyId]
+      );
+      if (!result.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+      res.json({
+        hasAccessKey: !!result.rows[0].access_key_hash,
+        keyPrefix: result.rows[0].access_key_prefix || null,
+        lastRotatedAt: result.rows[0].access_key_last_rotated_at || null,
+        revealable: false,
+      });
+    } catch {
+      res.status(500).json({ error: "Failed to get access key" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/passports/:dppId/access-key/regenerate", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+    try {
+      const { dppId, companyId } = req.params;
+      const material = createAccessKeyMaterial();
+      const updated = await pool.query(
+        `UPDATE passport_registry
+         SET access_key = NULL,
+             access_key_hash = $1,
+             access_key_prefix = $2,
+             access_key_last_rotated_at = NOW()
+         WHERE dpp_id = $3 AND company_id = $4
+         RETURNING access_key_prefix, access_key_last_rotated_at`,
+        [material.hash, material.prefix, dppId, companyId]
+      );
+      if (!updated.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passport_registry", dppId, null, { key_prefix: material.prefix });
+      res.json({
+        accessKey: material.rawKey,
+        keyPrefix: updated.rows[0].access_key_prefix,
+        lastRotatedAt: updated.rows[0].access_key_last_rotated_at,
+      });
+    } catch {
+      res.status(500).json({ error: "Failed to rotate access key" });
+    }
+  });
+};

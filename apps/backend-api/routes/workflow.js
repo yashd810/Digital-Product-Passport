@@ -1,4 +1,5 @@
 const logger = require("../services/logger");
+const { recordSignedDppRelease } = require("../services/dpp-release-record-service");
 
 module.exports = function registerWorkflowRoutes(app, {
   pool,
@@ -331,11 +332,15 @@ module.exports = function registerWorkflowRoutes(app, {
             const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
             const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null);
             if (sigData) {
-              await pool.query(
-                `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
-                [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.signatureAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
-              );
+              await recordSignedDppRelease(pool, {
+                passportDppId: dppId,
+                companyId: wf.company_id,
+                releasedByUserId: userId,
+                releasedByEmail: req.user.email,
+                versionNumber: released.version_number,
+                sigData,
+                releaseNote: comment || null
+              });
               await logAudit(
                 wf.company_id,
                 userId,
@@ -436,11 +441,15 @@ module.exports = function registerWorkflowRoutes(app, {
           const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
           const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null);
           if (sigData) {
-            await pool.query(
-              `INSERT INTO passport_signatures (passport_dpp_id, version_number, data_hash, signature, algorithm, signing_key_id, released_at, vc_json)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (passport_dpp_id, version_number) DO NOTHING`,
-              [dppId, released.version_number, sigData.dataHash, sigData.signature, sigData.signatureAlgorithm, sigData.keyId, sigData.releasedAt, sigData.vcJson || null]
-            );
+            await recordSignedDppRelease(pool, {
+              passportDppId: dppId,
+              companyId: wf.company_id,
+              releasedByUserId: userId,
+              releasedByEmail: req.user.email,
+              versionNumber: released.version_number,
+              sigData,
+              releaseNote: comment || null
+            });
             await logAudit(
               wf.company_id,
               userId,

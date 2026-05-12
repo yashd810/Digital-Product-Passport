@@ -119,8 +119,6 @@ The local stack is defined in `docker/docker-compose.yml`:
 | `public-passport-viewer` | `apps/public-passport-viewer` | 3004 |
 | `marketing-site` | `apps/marketing-site` | 8080 |
 | `postgres` | Docker image | 5432 |
-| `local-storage` | Docker volume helper | internal |
-| `object-storage-dev` | MinIO profile | 9000/9001 |
 
 ## Where To Make Changes
 

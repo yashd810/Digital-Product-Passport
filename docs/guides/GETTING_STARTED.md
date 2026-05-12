@@ -318,7 +318,7 @@ SELECT dpp_id, passport_type, company_id, created_at FROM passport_registry LIMI
 
 ```bash
 docker-compose down
-docker volume rm claros-dpp_postgres_data
+docker volume rm docker_postgres_data
 docker-compose up -d
 ```
 

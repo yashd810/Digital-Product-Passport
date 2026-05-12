@@ -92,8 +92,8 @@ Start with:
 - Backend storage abstraction: `apps/backend-api/services/storage-service.js`
 - Repository routes: `apps/backend-api/routes/repository.js`
 - Passport attachments/files: `apps/backend-api/routes/passports.js`
-- Local compose volumes: `docker/docker-compose.yml`
-- Storage directories: `storage/local-storage/`
+- Local compose volumes: `docker/docker-compose.yml` (uses `docker_local_storage_data` volume mounted to `/data`)
+- Storage directories: `storage/local-storage/` (accessible via mounted volume in dev)
 
 ## Data Carrier, DID, Signing, And Public Integrity
 

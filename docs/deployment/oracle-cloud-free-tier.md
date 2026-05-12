@@ -109,7 +109,6 @@ If you want to split the stack across two OCI Always Free instances:
 - backend host:
   - run `backend-api`
   - run `postgres`
-  - run `local-storage`
   - recommended Caddy config: [Caddyfile.backend](../../infra/oracle/Caddyfile.backend)
 
 Use:

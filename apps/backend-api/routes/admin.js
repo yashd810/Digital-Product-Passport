@@ -29,6 +29,8 @@ const COMPANY_POLICY_BOOL_FIELDS = [
 "jsonld_export_enabled",
 "claros_battery_dictionary_enabled"];
 
+const COMPANY_TRUST_LEVELS = new Set(["BASIC", "VERIFIED_BUSINESS", "ENTERPRISE"]);
+
 const ARCHIVED_HISTORY_REASON_SQL = `('before_archive_delete','before_bulk_archive_delete')`;
 const ARCHIVED_HISTORY_FILTER_SQL = `(snapshot_reason IS NULL OR snapshot_reason IN ${ARCHIVED_HISTORY_REASON_SQL})`;
 
@@ -786,11 +788,69 @@ module.exports = function registerAdminRoutes(app, {
   // ─── COMPANIES ─────────────────────────────────────────────────────────────
   app.post("/api/admin/companies", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const { companyName } = req.body;
-      if (!companyName) return res.status(400).json({ error: "Company name required" });
+      const {
+        companyName,
+        legalName,
+        country,
+        companyRegistrationNumber,
+        vatNumber,
+        websiteDomain,
+        customerTrustLevel,
+        authorizedContactName,
+        authorizedContactEmail
+      } = req.body || {};
+      const companyIdentity = {
+        companyName: String(companyName || "").trim(),
+        legalName: String(legalName || "").trim(),
+        country: String(country || "").trim().toUpperCase(),
+        companyRegistrationNumber: String(companyRegistrationNumber || "").trim(),
+        vatNumber: String(vatNumber || "").trim(),
+        websiteDomain: String(websiteDomain || "").trim(),
+        customerTrustLevel: String(customerTrustLevel || "").trim().toUpperCase(),
+        authorizedContactName: String(authorizedContactName || "").trim(),
+        authorizedContactEmail: String(authorizedContactEmail || "").trim().toLowerCase()
+      };
+      const requiredFields = [
+        ["companyName", "Company name"],
+        ["legalName", "Legal name"],
+        ["country", "Country"],
+        ["companyRegistrationNumber", "Company registration number"],
+        ["vatNumber", "VAT number"],
+        ["customerTrustLevel", "Customer trust level"],
+        ["authorizedContactName", "Authorized contact name"],
+        ["authorizedContactEmail", "Authorized contact email"]
+      ];
+      const missingField = requiredFields.find(([field]) => !companyIdentity[field]);
+      if (missingField) return res.status(400).json({ error: `${missingField[1]} required` });
+      if (!COMPANY_TRUST_LEVELS.has(companyIdentity.customerTrustLevel)) {
+        return res.status(400).json({ error: "Invalid customer trust level" });
+      }
       const r = await pool.query(
-        "INSERT INTO companies (company_name) VALUES ($1) RETURNING *",
-        [companyName]
+        `INSERT INTO companies (
+          company_name,
+          legal_name,
+          country,
+          company_registration_number,
+          vat_number,
+          website_domain,
+          customer_trust_level,
+          verification_status,
+          authorized_contact_name,
+          authorized_contact_email
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        RETURNING *`,
+        [
+          companyIdentity.companyName,
+          companyIdentity.legalName,
+          companyIdentity.country,
+          companyIdentity.companyRegistrationNumber,
+          companyIdentity.vatNumber,
+          companyIdentity.websiteDomain,
+          companyIdentity.customerTrustLevel,
+          "unverified",
+          companyIdentity.authorizedContactName,
+          companyIdentity.authorizedContactEmail
+        ]
       );
       await ensureCompanyDppPolicy(r.rows[0].id);
       res.status(201).json({ success: true, company: r.rows[0] });

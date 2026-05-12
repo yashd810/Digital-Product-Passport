@@ -6,7 +6,7 @@ services:
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     env_file:
-      - path: ${DPP_ENV_FILE:-/etc/dpp/.env.prod}
+      - path: ${DPP_ENV_FILE:-/etc/dpp/dpp.env}
         required: false
     environment:
       NODE_ENV: production
@@ -28,7 +28,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     env_file:
-      - path: ${DPP_ENV_FILE:-/etc/dpp/.env.prod}
+      - path: ${DPP_ENV_FILE:-/etc/dpp/dpp.env}
         required: false
     environment:
       POSTGRES_DB: "${DB_NAME:-dpp_system}"

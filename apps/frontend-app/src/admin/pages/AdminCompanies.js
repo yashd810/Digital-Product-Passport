@@ -22,11 +22,29 @@ function CompanyKebabMenu({ pos, onClose, children }) {
 
 const API = import.meta.env.VITE_API_URL || "";
 
+const INITIAL_COMPANY_FORM = {
+  companyName: "",
+  legalName: "",
+  country: "",
+  companyRegistrationNumber: "",
+  vatNumber: "",
+  websiteDomain: "",
+  customerTrustLevel: "BASIC",
+  authorizedContactName: "",
+  authorizedContactEmail: "",
+};
+
+const TRUST_LEVEL_OPTIONS = [
+  { value: "BASIC", label: "Small supplier - Basic" },
+  { value: "VERIFIED_BUSINESS", label: "Medium supplier - Verified business" },
+  { value: "ENTERPRISE", label: "Big customer - Enterprise" },
+];
+
 function AdminCompanies() {
   const navigate = useNavigate();
 
   const [companies,      setCompanies]      = useState([]);
-  const [newCompanyName, setNewCompanyName] = useState("");
+  const [companyForm,    setCompanyForm]    = useState(INITIAL_COMPANY_FORM);
   const [createdCompany, setCreatedCompany] = useState(null);
   const [isLoading,      setIsLoading]      = useState(false);
   const [isDeletingId,   setIsDeletingId]   = useState(null);
@@ -65,12 +83,14 @@ function AdminCompanies() {
   };
 
   const companyColumns = useMemo(() => ([
-    { key: "id", type: "number", getValue: (company) => company.id },
-    { key: "company_name", type: "string", getValue: (company) => company.company_name || "" },
-    { key: "granted_type_names", type: "string", getValue: (company) => (company.granted_type_names || []).join(" ") },
-    { key: "asset_management_enabled", type: "string", getValue: (company) => company.asset_management_enabled ? "enabled" : "disabled" },
-    { key: "created_at", type: "date", getValue: (company) => company.created_at },
-  ]), []);
+	    { key: "id", type: "number", getValue: (company) => company.id },
+	    { key: "company_name", type: "string", getValue: (company) => company.company_name || "" },
+	    { key: "legal_name", type: "string", getValue: (company) => company.legal_name || "" },
+	    { key: "customer_trust_level", type: "string", getValue: (company) => company.customer_trust_level || "" },
+	    { key: "granted_type_names", type: "string", getValue: (company) => (company.granted_type_names || []).join(" ") },
+	    { key: "asset_management_enabled", type: "string", getValue: (company) => company.asset_management_enabled ? "enabled" : "disabled" },
+	    { key: "created_at", type: "date", getValue: (company) => company.created_at },
+	  ]), []);
 
   const filteredCompanies = useMemo(
     () => applyTableControls(companies, companyColumns, sortConfig, columnFilters),
@@ -93,25 +113,49 @@ function AdminCompanies() {
     } catch (e) { setError(e.message); }
   };
 
-  const handleCreateCompany = async (e) => {
-    e.preventDefault();
-    setError(""); setSuccessMsg(""); setIsLoading(true);
-    if (!newCompanyName.trim()) { setError("Company name is required"); setIsLoading(false); return; }
-    try {
-      const r = await fetchWithAuth(`${API}/api/admin/companies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ companyName: newCompanyName }),
-      });
-      if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Failed to create company"); }
-      const data = await r.json();
-      setCreatedCompany(data.company);
-      setNewCompanyName("");
-      setSuccessMsg(`Created ${data.company.company_name}`);
-      fetchCompanies();
-    } catch (e) { setError(e.message || "Failed to create company"); }
-    finally { setIsLoading(false); }
-  };
+	  const handleCreateCompany = async (e) => {
+	    e.preventDefault();
+	    setError(""); setSuccessMsg(""); setIsLoading(true);
+	    const requiredFields = [
+	      ["companyName", "Company name"],
+	      ["legalName", "Legal name"],
+	      ["country", "Country"],
+	      ["companyRegistrationNumber", "Company registration number"],
+	      ["vatNumber", "VAT number"],
+	      ["authorizedContactName", "Authorized contact name"],
+	      ["authorizedContactEmail", "Authorized contact email"],
+	    ];
+	    const missingField = requiredFields.find(([field]) => !String(companyForm[field] || "").trim());
+	    if (missingField) {
+	      setError(`${missingField[1]} is required`);
+	      setIsLoading(false);
+	      return;
+	    }
+	    try {
+	      const r = await fetchWithAuth(`${API}/api/admin/companies`, {
+	        method: "POST",
+	        headers: { "Content-Type": "application/json", ...authHeaders() },
+	        body: JSON.stringify({
+	          ...companyForm,
+	          country: companyForm.country.trim().toUpperCase(),
+	          websiteDomain: companyForm.websiteDomain.trim(),
+	          verificationStatus: "unverified",
+	        }),
+	      });
+	      if (!r.ok) { const d = await r.json(); throw new Error(d.error || "Failed to create company"); }
+	      const data = await r.json();
+	      setCreatedCompany(data.company);
+	      setCompanyForm(INITIAL_COMPANY_FORM);
+	      setSuccessMsg(`Created ${data.company.company_name}`);
+	      fetchCompanies();
+	    } catch (e) { setError(e.message || "Failed to create company"); }
+	    finally { setIsLoading(false); }
+	  };
+
+	  const handleCompanyFormChange = (field, value) => {
+	    setCompanyForm((prev) => ({ ...prev, [field]: value }));
+	    setCreatedCompany(null);
+	  };
 
   const handleDeleteCompany = async (company) => {
     setError("");
@@ -252,16 +296,70 @@ function AdminCompanies() {
 
       {/* Create company */}
       <div className="create-company-card">
-        <h3>Create New Company</h3>
-        <form onSubmit={handleCreateCompany} className="company-form">
-          <div className="form-group">
-            <label htmlFor="companyName">Company Name</label>
-            <input id="companyName" type="text" value={newCompanyName}
-              onChange={e => { setNewCompanyName(e.target.value); setCreatedCompany(null); }}
-              placeholder="e.g., Acme Corp" required disabled={isLoading} />
-          </div>
-          <button type="submit" className="create-btn" disabled={isLoading}>
-            {isLoading ? "Creating…" : "Create Company"}
+	        <h3>Create New Company</h3>
+	        <form onSubmit={handleCreateCompany} className="company-form">
+	          <div className="company-form-grid">
+	            <div className="form-group">
+	              <label htmlFor="companyName">Company Name</label>
+	              <input id="companyName" type="text" value={companyForm.companyName}
+	                onChange={e => handleCompanyFormChange("companyName", e.target.value)}
+	                placeholder="ABC Supplier" required disabled={isLoading} />
+	            </div>
+	            <div className="form-group">
+	              <label htmlFor="legalName">Legal Name</label>
+	              <input id="legalName" type="text" value={companyForm.legalName}
+	                onChange={e => handleCompanyFormChange("legalName", e.target.value)}
+	                placeholder="ABC Supplier AB" required disabled={isLoading} />
+	            </div>
+	            <div className="form-group">
+	              <label htmlFor="country">Country</label>
+	              <input id="country" type="text" value={companyForm.country}
+	                onChange={e => handleCompanyFormChange("country", e.target.value)}
+	                placeholder="SE" maxLength={2} required disabled={isLoading} />
+	            </div>
+	            <div className="form-group">
+	              <label htmlFor="companyRegistrationNumber">Registration Number</label>
+	              <input id="companyRegistrationNumber" type="text" value={companyForm.companyRegistrationNumber}
+	                onChange={e => handleCompanyFormChange("companyRegistrationNumber", e.target.value)}
+	                placeholder="556xxx-xxxx" required disabled={isLoading} />
+	            </div>
+	            <div className="form-group">
+	              <label htmlFor="vatNumber">VAT Number</label>
+	              <input id="vatNumber" type="text" value={companyForm.vatNumber}
+	                onChange={e => handleCompanyFormChange("vatNumber", e.target.value)}
+	                placeholder="SE556xxxxxxx01" required disabled={isLoading} />
+	            </div>
+	            <div className="form-group">
+	              <label htmlFor="websiteDomain">Website Domain</label>
+	              <input id="websiteDomain" type="text" value={companyForm.websiteDomain}
+	                onChange={e => handleCompanyFormChange("websiteDomain", e.target.value)}
+	                placeholder="abc.se" disabled={isLoading} />
+	            </div>
+	            <div className="form-group">
+	              <label htmlFor="customerTrustLevel">Trust Level</label>
+	              <select id="customerTrustLevel" value={companyForm.customerTrustLevel}
+	                onChange={e => handleCompanyFormChange("customerTrustLevel", e.target.value)}
+	                disabled={isLoading}>
+	                {TRUST_LEVEL_OPTIONS.map((option) => (
+	                  <option key={option.value} value={option.value}>{option.label}</option>
+	                ))}
+	              </select>
+	            </div>
+	            <div className="form-group">
+	              <label htmlFor="authorizedContactName">Authorized Contact</label>
+	              <input id="authorizedContactName" type="text" value={companyForm.authorizedContactName}
+	                onChange={e => handleCompanyFormChange("authorizedContactName", e.target.value)}
+	                placeholder="Anna Andersson" required disabled={isLoading} />
+	            </div>
+	            <div className="form-group company-form-span">
+	              <label htmlFor="authorizedContactEmail">Authorized Contact Email</label>
+	              <input id="authorizedContactEmail" type="email" value={companyForm.authorizedContactEmail}
+	                onChange={e => handleCompanyFormChange("authorizedContactEmail", e.target.value)}
+	                placeholder="anna@abc.se" required disabled={isLoading} />
+	            </div>
+	          </div>
+	          <button type="submit" className="create-btn" disabled={isLoading}>
+	            {isLoading ? "Creating…" : "Create Company"}
           </button>
         </form>
 
@@ -280,11 +378,29 @@ function AdminCompanies() {
             <div className="company-code-result-grid">
               <div className="company-code-result-item">
                 <span className="company-code-result-label">Company</span>
-                <strong className="company-code-result-value">
-                  {createdCompany.company_name}
-                </strong>
-              </div>
-            </div>
+	                <strong className="company-code-result-value">
+	                  {createdCompany.company_name}
+	                </strong>
+	              </div>
+	              <div className="company-code-result-item">
+	                <span className="company-code-result-label">Legal Name</span>
+	                <strong className="company-code-result-value">
+	                  {createdCompany.legal_name || "Not set"}
+	                </strong>
+	              </div>
+	              <div className="company-code-result-item">
+	                <span className="company-code-result-label">Identity Level</span>
+	                <strong className="company-code-result-value">
+	                  {createdCompany.customer_trust_level || "BASIC"}
+	                </strong>
+	              </div>
+	              <div className="company-code-result-item">
+	                <span className="company-code-result-label">Verification</span>
+	                <strong className="company-code-result-value">
+	                  {createdCompany.verification_status || "unverified"}
+	                </strong>
+	              </div>
+	            </div>
 
             <p className="company-code-result-note">
               Next step: use the <strong>Invite</strong> action in the company table below to add users.
@@ -309,16 +425,20 @@ function AdminCompanies() {
           <thead>
             <tr>
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("id")}>ID{sortIndicator(sortConfig, "id") && ` ${sortIndicator(sortConfig, "id")}`}</button></th>
-              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("company_name")}>Company Name{sortIndicator(sortConfig, "company_name") && ` ${sortIndicator(sortConfig, "company_name")}`}</button></th>
-              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("granted_type_names")}>Access{sortIndicator(sortConfig, "granted_type_names") && ` ${sortIndicator(sortConfig, "granted_type_names")}`}</button></th>
+	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("company_name")}>Company Name{sortIndicator(sortConfig, "company_name") && ` ${sortIndicator(sortConfig, "company_name")}`}</button></th>
+	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("legal_name")}>Legal Identity{sortIndicator(sortConfig, "legal_name") && ` ${sortIndicator(sortConfig, "legal_name")}`}</button></th>
+	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("customer_trust_level")}>Trust{sortIndicator(sortConfig, "customer_trust_level") && ` ${sortIndicator(sortConfig, "customer_trust_level")}`}</button></th>
+	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("granted_type_names")}>Access{sortIndicator(sortConfig, "granted_type_names") && ` ${sortIndicator(sortConfig, "granted_type_names")}`}</button></th>
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("asset_management_enabled")}>Asset Platform{sortIndicator(sortConfig, "asset_management_enabled") && ` ${sortIndicator(sortConfig, "asset_management_enabled")}`}</button></th>
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("created_at")}>Created{sortIndicator(sortConfig, "created_at") && ` ${sortIndicator(sortConfig, "created_at")}`}</button></th>
               <th>Actions</th>
             </tr>
             {showFilters && <tr className="table-filter-row">
               <th><input className="table-filter-input" value={columnFilters.id || ""} onChange={e => setColumnFilters(prev => ({ ...prev, id: e.target.value }))} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.company_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, company_name: e.target.value }))} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.granted_type_names || ""} onChange={e => setColumnFilters(prev => ({ ...prev, granted_type_names: e.target.value }))} placeholder="Filter" /></th>
+	              <th><input className="table-filter-input" value={columnFilters.company_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, company_name: e.target.value }))} placeholder="Filter" /></th>
+	              <th><input className="table-filter-input" value={columnFilters.legal_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, legal_name: e.target.value }))} placeholder="Filter" /></th>
+	              <th><input className="table-filter-input" value={columnFilters.customer_trust_level || ""} onChange={e => setColumnFilters(prev => ({ ...prev, customer_trust_level: e.target.value }))} placeholder="Filter" /></th>
+	              <th><input className="table-filter-input" value={columnFilters.granted_type_names || ""} onChange={e => setColumnFilters(prev => ({ ...prev, granted_type_names: e.target.value }))} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.asset_management_enabled || ""} onChange={e => setColumnFilters(prev => ({ ...prev, asset_management_enabled: e.target.value }))} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.created_at || ""} onChange={e => setColumnFilters(prev => ({ ...prev, created_at: e.target.value }))} placeholder="Filter" /></th>
               <th></th>
@@ -327,9 +447,20 @@ function AdminCompanies() {
           <tbody>
             {filteredCompanies.map(company => (
               <tr key={company.id}>
-                <td className="id-cell">{company.id}</td>
-                <td className="name-cell">{company.company_name}</td>
-                <td>
+	                <td className="id-cell">{company.id}</td>
+	                <td className="name-cell">{company.company_name}</td>
+	                <td>
+	                  <div className="company-identity-cell">
+	                    <strong>{company.legal_name || company.company_name}</strong>
+	                    <span>{[company.country, company.company_registration_number].filter(Boolean).join(" · ") || "Identity pending"}</span>
+	                  </div>
+	                </td>
+	                <td>
+	                  <span className="company-access-pill">
+	                    {company.customer_trust_level || "BASIC"}
+	                  </span>
+	                </td>
+	                <td>
                   <div className="company-access-list">
                     {(company.granted_type_names || []).length > 0 ? (
                       (company.granted_type_names || []).map((typeName) => (

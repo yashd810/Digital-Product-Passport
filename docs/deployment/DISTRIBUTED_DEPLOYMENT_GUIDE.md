@@ -54,7 +54,6 @@
         │  prod.backend.yml):            │
         │ ✓ backend-api:3001             │
         │ ✓ postgres:5432                │
-        │ ✓ local-storage:/data          │
         └────────────────────────────────┘
 ```
 

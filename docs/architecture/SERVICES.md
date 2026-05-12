@@ -25,8 +25,6 @@ Defined in `docker/docker-compose.yml`.
 | `public-passport-viewer` | `apps/public-passport-viewer` | `npm run start -- --host 0.0.0.0 --port 3004` | 3004 |
 | `marketing-site` | `apps/marketing-site` | Nginx static server | 8080 |
 | `postgres` | Docker image | PostgreSQL 18 Alpine | 5432 |
-| `local-storage` | Docker image | Shared local storage volume | internal |
-| `object-storage-dev` | Docker profile | MinIO | 9000/9001 |
 
 ## Backend Route Modules
 
@@ -157,7 +155,7 @@ marketing-site (8080)
 ### Backend to Storage
 
 - Local storage abstraction via `storage-service.js`
-- Supports both local filesystem and MinIO object storage
+- Development: Local `/data` volume; Production: OCI Object Storage (S3)
 - File operations include validation and access checks
 
 ### Service-to-Service (within backend)
