@@ -1,5 +1,9 @@
 "use strict";
 
+const { handleRouteError } = require("../../shared/http/error-response");
+const { createValidationMiddleware } = require("../../shared/validation/request-schema");
+const { updateEditablePassportUseCase } = require("./application/update-passport");
+
 module.exports = function registerUpdateRoutes(app, deps) {
   const {
     pool,
@@ -36,18 +40,62 @@ module.exports = function registerUpdateRoutes(app, deps) {
     SYSTEM_PASSPORT_FIELDS,
   } = deps;
 
-  app.patch("/api/companies/:companyId/passports/bulk-update-all", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  const updateEditablePassport = updateEditablePassportUseCase(deps);
+  const companyParamSchema = {
+    type: "object",
+    required: ["companyId"],
+    properties: { companyId: { type: "string", minLength: 1 } },
+  };
+  const bulkUpdateAllSchema = {
+    type: "object",
+    anyOf: [["passport_type", "passportType"]],
+    required: ["update"],
+    properties: {
+      passport_type: { type: "string", minLength: 1 },
+      passportType: { type: "string", minLength: 1 },
+      update: { type: "object", minProperties: 1 },
+    },
+  };
+  const singleUpdateSchema = {
+    type: "object",
+    anyOf: [["passport_type", "passportType"]],
+    properties: {
+      passport_type: { type: "string", minLength: 1 },
+      passportType: { type: "string", minLength: 1 },
+    },
+  };
+  const bulkPatchSchema = {
+    type: ["object", "array"],
+    custom: (value) => {
+      if (Array.isArray(value)) {
+        if (!value.length) return [{ path: "body", message: "passports array required" }];
+        if (value.length > 500) return [{ path: "body", message: "Max 500 per request" }];
+        return [];
+      }
+      const passports = value?.passports;
+      if (!Array.isArray(passports) || !passports.length) {
+        return [{ path: "body.passports", message: "passports array required" }];
+      }
+      if (passports.length > 500) {
+        return [{ path: "body.passports", message: "Max 500 per request" }];
+      }
+      if (!(value.passport_type || value.passportType)) {
+        return [{ path: "body", message: "At least one of passport_type, passportType is required" }];
+      }
+      return [];
+    },
+  };
+
+  app.patch("/api/companies/:companyId/passports/bulk-update-all", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+    params: companyParamSchema,
+    body: bulkUpdateAllSchema,
+  }), async (req, res) => {
     try {
       const { companyId } = req.params;
       const userId = req.user.userId;
       const { passport_type, passportType, filter, update } = normalizePassportRequestBody(req.body);
 
       const requestedType = passport_type || passportType;
-      if (!requestedType) return res.status(400).json({ error: "passport_type required" });
-      if (!update || typeof update !== "object" || !Object.keys(update).length) {
-        return res.status(400).json({ error: "update object with at least one field is required" });
-      }
-
       const typeSchema = await getPassportTypeSchema(requestedType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(typeSchema.typeName);
@@ -147,201 +195,37 @@ module.exports = function registerUpdateRoutes(app, deps) {
       res.json({ summary: { matched: matchCount, updated: updatedGuids.length, fields_updated: updateKeys }, dppIds: updatedGuids });
     } catch (error) {
       logger.error("Bulk update all error:", error.message);
-      res.status(500).json({ error: "Bulk update all failed", detail: error.message });
+      return handleRouteError(res, error, "Bulk update all failed");
     }
   });
 
-  app.patch("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.patch("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+    params: {
+      type: "object",
+      required: ["companyId", "dppId"],
+      properties: {
+        companyId: { type: "string", minLength: 1 },
+        dppId: { type: "string", minLength: 1 },
+      },
+    },
+    body: singleUpdateSchema,
+  }), async (req, res) => {
     try {
-      const { companyId, dppId } = req.params;
-      const normalizedBody = normalizePassportRequestBody(req.body);
-      const {
-        passport_type,
-        passportType,
-        carrier_authenticity,
-        granularity,
-        compliance_profile_key,
-        content_specification_ids,
-        carrier_policy_key,
-        economic_operator_id,
-        economic_operator_identifier_scheme,
-        facility_id,
-        ...fields
-      } = normalizedBody;
-      const userId = req.user.userId;
-
-      const requestedPassportType = passport_type || passportType;
-      if (!requestedPassportType) return res.status(400).json({ error: "passportType is required in body" });
-      const typeSchema = await getPassportTypeSchema(requestedPassportType);
-      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
-      if (createPassportTable) {
-        await createPassportTable(typeSchema.typeName, {
-          createdBy: userId,
-          eventType: "runtime_patch_reconcile_table",
-        });
-      }
-      const tableName = getTable(typeSchema.typeName);
-
-      const current = await pool.query(
-        `SELECT * FROM ${tableName}
-         WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL LIMIT 1`,
-        [dppId]
-      );
-      if (!current.rows.length) return res.status(404).json({ error: "Passport not found or not editable." });
-      const rowId = current.rows[0].id;
-      const currentGranularity = String(current.rows[0].granularity || "item").trim().toLowerCase();
-
-      if (granularity !== undefined) {
-        const requestedGranularity = String(granularity || "").trim().toLowerCase();
-        if (!VALID_GRANULARITIES.has(requestedGranularity)) {
-          return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
-        }
-        if (requestedGranularity !== currentGranularity) {
-          const lineageAlreadyReleased = await hasReleasedLineageVersion({
-            tableName,
-            lineageId: current.rows[0].lineage_id,
-            excludeDppId: current.rows[0].dpp_id,
-          });
-          if (lineageAlreadyReleased) {
-            return res.status(409).json({
-              error: "GRANULARITY_CHANGE_REQUIRES_NEW_IDENTIFIER",
-              detail: "Released DPP granularity cannot be changed in place. Use the granularity transition workflow to mint a linked successor identifier.",
-              currentGranularity,
-              requestedGranularity,
-            });
-          }
-          fields.granularity = requestedGranularity;
-          const nextProductIdForGranularity = normalizeProductIdValue(fields.product_id || current.rows[0].product_id);
-          if (!nextProductIdForGranularity) {
-            return res.status(400).json({ error: "product_id cannot be blank when changing granularity" });
-          }
-          const storedProductIdentifiers = buildStoredProductIdentifiers({
-            companyId,
-            passportType: typeSchema.typeName,
-            productId: nextProductIdForGranularity,
-            granularity: requestedGranularity,
-          });
-          fields.product_id = storedProductIdentifiers.product_id;
-          fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
-        }
-      }
-
-      if (fields.product_id !== undefined) {
-        const normalizedProductId = normalizeProductIdValue(fields.product_id);
-        if (!normalizedProductId) return res.status(400).json({ error: "product_id cannot be blank" });
-        const existingByProductId = await findExistingPassportByProductId({
-          tableName,
-          companyId,
-          productId: normalizedProductId,
-          excludeGuid: dppId,
-          excludeLineageId: current.rows[0].lineage_id,
-        });
-        if (existingByProductId) {
-          return res.status(409).json({
-            error: `A passport with Serial Number "${normalizedProductId}" already exists.`,
-            existing_dpp_id: existingByProductId.dppId,
-            release_status: normalizeReleaseStatus(existingByProductId.release_status),
-          });
-        }
-        const storedProductIdentifiers = buildStoredProductIdentifiers({
-          companyId,
-          passportType: typeSchema.typeName,
-          productId: normalizedProductId,
-          granularity: fields.granularity || current.rows[0].granularity || "item",
-        });
-        fields.product_id = storedProductIdentifiers.product_id;
-        fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
-      } else if (!current.rows[0].product_identifier_did && current.rows[0].product_id) {
-        const storedProductIdentifiers = buildStoredProductIdentifiers({
-          companyId,
-          passportType: typeSchema.typeName,
-          productId: current.rows[0].product_id,
-          granularity: fields.granularity || current.rows[0].granularity || "item",
-        });
-        fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
-      }
-
-      const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
-        ...normalizedBody,
-        carrier_authenticity,
-      });
-      if (carrierAuthenticityMutation.provided) {
-        const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
-        const nextCarrierAuthenticity = await maybeSignCarrierPayload({
-          passport: {
-            ...current.rows[0],
-            dppId,
-            dpp_id: dppId,
-            company_id: companyId,
-            product_id: fields.product_id || current.rows[0].product_id,
-            model_name: fields.model_name || current.rows[0].model_name,
-          },
-          companyName,
-          metadata: applyCarrierAuthenticityMutation(current.rows[0].carrier_authenticity, carrierAuthenticityMutation),
-          forceSign: carrierAuthenticityMutation.signCarrierPayload,
-        });
-        fields.carrier_authenticity = buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity);
-      }
-
-      const effectiveGranularity = fields.granularity || current.rows[0].granularity || "item";
-      const complianceManagedFields = await buildComplianceManagedFields({
-        companyId,
-        passportType: typeSchema.typeName,
-        granularity: effectiveGranularity,
-        requestedFields: {
-          ...current.rows[0],
-          ...fields,
-          compliance_profile_key,
-          content_specification_ids,
-          carrier_policy_key,
-          economic_operator_id,
-          economic_operator_identifier_scheme,
-          facility_id,
-        },
-        facilitySource: normalizedBody,
-        existingFields: current.rows[0],
-      });
-      fields.compliance_profile_key = complianceManagedFields.compliance_profile_key;
-      fields.content_specification_ids = complianceManagedFields.content_specification_ids;
-      fields.carrier_policy_key = complianceManagedFields.carrier_policy_key;
-      fields.economic_operator_id = complianceManagedFields.economic_operator_id;
-      fields.economic_operator_identifier_scheme = complianceManagedFields.economic_operator_identifier_scheme;
-      fields.facility_id = complianceManagedFields.facility_id;
-
-      await archivePassportSnapshot({
-        passport: current.rows[0],
-        passportType: typeSchema.typeName,
-        archivedBy: userId,
-        actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "before_update",
-      });
-
-      const updateResult = await updatePassportRowById({ tableName, rowId, userId, data: fields, includeUpdatedRow: true });
-      const updateFields = updateResult.updateCols || [];
-      if (!updateFields.length) return res.status(400).json({ error: "No fields to update" });
-      if (updateResult.updatedRow) {
-        await archivePassportSnapshot({
-          passport: updateResult.updatedRow,
-          passportType: typeSchema.typeName,
-          archivedBy: userId,
-          actorIdentifier: getActorIdentifier(req.user),
-          snapshotReason: "after_update",
-        });
-      }
-
-      await logAudit(companyId, userId, "UPDATE", tableName, dppId, null, { fields_updated: updateFields });
-      res.json({ success: true });
+      const result = await updateEditablePassport({ req });
+      res.json(result);
     } catch (error) {
-      const statusCode = Number.isInteger(error?.statusCode) ? error.statusCode : 500;
       logger.error({ err: error, companyId: req.params.companyId, dppId: req.params.dppId }, "PATCH /passports/:dppId error");
-      res.status(statusCode).json({
-        error: statusCode === 500 ? "Failed to update passport" : (error.code || error.error || "Passport update failed"),
-        detail: error.message,
-      });
+      if (error?.payload) {
+        return res.status(error.statusCode || 500).json({ error: error.message, ...error.payload });
+      }
+      return handleRouteError(res, error, "Failed to update passport");
     }
   });
 
-  app.patch("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.patch("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+    params: companyParamSchema,
+    body: bulkPatchSchema,
+  }), async (req, res) => {
     try {
       const { companyId } = req.params;
       const userId = req.user.userId;
@@ -356,10 +240,6 @@ module.exports = function registerUpdateRoutes(app, deps) {
         passport_type = normalizedBody.passport_type;
         passports = normalizedBody.passports;
       }
-      if (!passport_type) return res.status(400).json({ error: "passport_type required" });
-      if (!Array.isArray(passports) || !passports.length) return res.status(400).json({ error: "passports array required" });
-      if (passports.length > 500) return res.status(400).json({ error: "Max 500 per request" });
-
       const typeSchema = await getPassportTypeSchema(passport_type);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       if (createPassportTable) {
@@ -514,7 +394,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
       res.json({ summary: { updated, skipped, failed, total: passports.length }, details });
     } catch (error) {
       logger.error("Bulk PATCH error:", error.message);
-      res.status(500).json({ error: "Bulk update failed", detail: error.message });
+      return handleRouteError(res, error, "Bulk update failed");
     }
   });
 };

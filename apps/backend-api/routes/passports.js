@@ -1,15 +1,15 @@
 "use strict";
 
-const logger = require("../services/logger");
-const { generateDppRecordId } = require("../services/dpp-record-id");
-const { recordSignedDppRelease } = require("../services/dpp-release-record-service");
+const logger = require("../src/infrastructure/logging/logger");
+const { generateDppRecordId } = require("../src/shared/identifiers/dpp-record-id");
+const { recordSignedDppRelease } = require("../src/infrastructure/audit/dpp-release-record-service");
 const {
   extractCarrierAuthenticityMutation,
   applyCarrierAuthenticityMutation,
   buildCarrierAuthenticityResponseFields,
   normalizeCarrierAuthenticityMetadata,
   validateQrPrintSpecification,
-} = require("../helpers/carrier-authenticity");
+} = require("../src/shared/passports/carrier-authenticity");
 const registerApiKeyRoutes = require("../src/modules/passports/register-api-key-routes");
 const registerAccessGrantRoutes = require("../src/modules/passports/register-access-grant-routes");
 const registerAuditAnalyticsRoutes = require("../src/modules/passports/register-audit-analytics-routes");

@@ -1,6 +1,6 @@
 "use strict";
 
-const logger = require("../services/logger");
+const logger = require("../src/infrastructure/logging/logger");
 
 module.exports = function registerAssetManagementApiRoutes(app, {
   pool,

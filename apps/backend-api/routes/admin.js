@@ -2,12 +2,12 @@
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs = require("fs");
-const logger = require("../services/logger");
-const { SYSTEM_PASSPORT_FIELDS } = require("../helpers/passport-helpers");
+const logger = require("../src/infrastructure/logging/logger");
+const { SYSTEM_PASSPORT_FIELDS } = require("../src/shared/passports/passport-helpers");
 const {
   normalizeSystemPassportHeader,
   validateSystemPassportHeader,
-} = require("../services/passport-header-fields");
+} = require("../src/shared/identifiers/passport-header-fields");
 
 const COMPANY_POLICY_DEFAULTS = {
   default_granularity: "item",

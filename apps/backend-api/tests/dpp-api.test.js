@@ -216,6 +216,10 @@ function createTestApp(options = {}) {
         .replace(/\bpassport_dpp_id\b/g, "passport_guid")
         .replace(/\bdpp_id\b/g, "guid");
 
+      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(String(sql).trim().toUpperCase())) {
+        return { rows: [] };
+      }
+
       if (normalizedSql.includes("SELECT economic_operator_identifier")) {
         return {
           rows: [{
@@ -299,6 +303,22 @@ function createTestApp(options = {}) {
       if (normalizedSql.includes("INSERT INTO passport_registry")) {
         return { rows: [] };
       }
+      if (
+        normalizedSql.includes("DELETE FROM passport_dynamic_values")
+        || normalizedSql.includes("DELETE FROM passport_signatures")
+        || normalizedSql.includes("DELETE FROM passport_scan_events")
+        || normalizedSql.includes("DELETE FROM passport_workflow")
+        || normalizedSql.includes("DELETE FROM passport_security_events")
+        || normalizedSql.includes("DELETE FROM passport_edit_sessions")
+      ) {
+        return { rows: [] };
+      }
+      if (
+        normalizedSql.includes("DELETE FROM battery_passports")
+        && normalizedSql.includes("release_status = 'draft'")
+      ) {
+        return { rows: editablePassport ? [{ dpp_id: editablePassport.dppId }] : [] };
+      }
       if (normalizedSql.includes("SELECT *") && normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("WHERE lineage_id = $1") && normalizedSql.includes("company_id = $2") && normalizedSql.includes("deleted_at IS NULL")) {
         return {
           rows: [releasedPassport, editablePassport].filter(Boolean),
@@ -359,6 +379,10 @@ function createTestApp(options = {}) {
       throw new Error(`Unexpected query: ${sql}`);
     }),
   };
+  pool.connect = jest.fn(async () => ({
+    query: pool.query,
+    release: jest.fn(),
+  }));
 
   registerDppApiRoutes(app, {
     pool,
@@ -881,7 +905,8 @@ describe("DPP standards API", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.body).toMatchObject({
-      error: "productId must be a non-empty array",
+      error: "VALIDATION_ERROR",
+      detail: "productId must be a non-empty array",
     });
   });
 
@@ -945,7 +970,8 @@ describe("DPP standards API", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.body).toMatchObject({
-      error: "productId must be a non-empty array",
+      error: "VALIDATION_ERROR",
+      detail: "productId must be a non-empty array",
     });
   });
 

@@ -105,6 +105,19 @@ test("prepareAssetPayload generates a new dppId for unmatched product rows", asy
   assert.strictEqual(payload.generated_payload.records[0].product_id, "BAT-001");
 });
 
+test("prepareAssetPayload ignores blank unknown columns on create rows", async () => {
+  const service = buildService();
+  const payload = await service.prepareAssetPayload({
+    companyId: 7,
+    passportType: "battery-passport",
+    records: [{ product_id: "BAT-001", model_name: "Model A", serial_number: "" }],
+  });
+
+  assert.strictEqual(payload.summary.failed, 0);
+  assert.strictEqual(payload.summary.ready_for_passport_create, 1);
+  assert.strictEqual(payload.generated_payload.records[0].action, "create");
+});
+
 test("executeAssetPush persists created passports and reports passports_created", async () => {
   const insertedRows = [];
   const registryRows = [];

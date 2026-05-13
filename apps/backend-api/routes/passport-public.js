@@ -1,6 +1,6 @@
 "use strict";
 
-const logger = require("../services/logger");
+const logger = require("../src/infrastructure/logging/logger");
 const { isPublicVersionVisible } = require("../src/modules/public-passports/visibility");
 
 module.exports = function registerPassportPublicRoutes(app, {
@@ -111,6 +111,7 @@ module.exports = function registerPassportPublicRoutes(app, {
               c.introduction_text,
               c.branding_json,
               c.did_slug,
+              c.customer_trust_level,
               COALESCE(p.default_granularity, 'item') AS dpp_granularity,
               COALESCE(p.default_granularity, 'item') AS default_granularity,
               COALESCE(p.jsonld_export_enabled, true) AS jsonld_export_enabled,
@@ -146,6 +147,7 @@ module.exports = function registerPassportPublicRoutes(app, {
               c.introduction_text,
               c.branding_json,
               c.did_slug,
+              c.customer_trust_level,
               COALESCE(p.default_granularity, 'item') AS dpp_granularity,
               COALESCE(p.default_granularity, 'item') AS default_granularity,
               COALESCE(p.jsonld_export_enabled, true) AS jsonld_export_enabled,
@@ -315,6 +317,23 @@ module.exports = function registerPassportPublicRoutes(app, {
     return company?.jsonld_export_enabled !== false;
   }
 
+  function resolveVerificationStatus(verifyResult) {
+    const status = String(verifyResult?.status || "").toLowerCase();
+    if (status === "valid") return "signed_by_claros";
+    if (status === "tampered") return "tampered";
+    if (status === "unsigned") return "unsigned";
+    if (status === "key_missing") return "signing_key_missing";
+    return "verification_failed";
+  }
+
+  function resolveIntegrityLabel(verifyResult) {
+    const status = String(verifyResult?.status || "").toLowerCase();
+    if (status === "valid") return "Signed";
+    if (status === "tampered") return "Tampered";
+    if (status === "unsigned") return "Unsigned";
+    return "Verification failed";
+  }
+
   async function loadPublicPassportByGuid(dppId, { versionNumber = null } = {}) {
     const normalizedGuid = String(dppId || "").trim();
     if (!normalizedGuid) return null;
@@ -385,6 +404,82 @@ module.exports = function registerPassportPublicRoutes(app, {
     );
 
     return { passport, typeDef, company };
+  }
+
+  async function loadPublicVerificationContext(dppId, { versionNumber = null } = {}) {
+    const loaded = await loadPublicPassportByGuid(dppId, { versionNumber });
+    if (!loaded?.passport) return null;
+
+    const sanitizedPassport = loaded.passport.backup_public_handover ?
+    loaded.passport :
+    await stripRestrictedFieldsForPublicView(loaded.passport, loaded.passport.passport_type);
+    const passportDppId = loaded.passport.dppId || loaded.passport.dpp_id || loaded.passport.guid || dppId;
+    const resolvedVersion = versionNumber || sanitizedPassport.version_number || loaded.passport.version_number || 1;
+    const verifyResult = await verifyPassportSignature(passportDppId, resolvedVersion);
+    const signatureRecord = await pool.query(
+      `SELECT ps.data_hash,
+              ps.signature,
+              COALESCE(ps.algorithm, ps.algorithm) AS algorithm,
+              ps.signing_key_id,
+              ps.released_at AS signature_released_at,
+              ps.signed_at,
+              ps.vc_json,
+              rr.released_by_email,
+              rr.released_at AS release_record_released_at,
+              rr.companyname
+       FROM passport_signatures ps
+       LEFT JOIN dpp_release_records rr
+         ON rr.dpp_id = ps.passport_dpp_id
+        AND rr.release_version = ps.version_number
+       WHERE ps.passport_dpp_id = $1
+         AND ps.version_number = $2
+       LIMIT 1`,
+      [passportDppId, resolvedVersion]
+    ).catch(() => ({ rows: [] }));
+    const signatureRow = signatureRecord.rows[0] || null;
+
+    return {
+      ...loaded,
+      sanitizedPassport,
+      resolvedVersion,
+      verifyResult,
+      signatureRow,
+    };
+  }
+
+  function buildPublicVerificationPayload(verificationContext) {
+    const { passport, company, sanitizedPassport, signatureRow, verifyResult } = verificationContext;
+    const passportDppId = passport.dppId || passport.dpp_id || passport.guid || null;
+    const dppUrl = buildPublicPassportUrl(sanitizedPassport, company?.company_name || "");
+    const signatureUrl = didService.buildApiUrl(`/api/public/dpp/${passportDppId}/signature.json`);
+    const canonicalDppJsonUrl = didService.buildApiUrl(`/api/public/dpp/${passportDppId}.json`);
+    const verificationBundleUrl = didService.buildApiUrl(`/api/public/dpp/${passportDppId}/verification-bundle.json`);
+    const didDocumentUrl = `https://${DID_DOMAIN}/.well-known/did.json`;
+    const verificationStatus = resolveVerificationStatus(verifyResult);
+    const dppDataUnchanged = verifyResult?.status === "valid";
+
+    return {
+      dppId: passportDppId,
+      companyId: company?.id ?? passport.company_id ?? null,
+      companyName: company?.company_name || signatureRow?.companyname || "",
+      trustLevel: company?.customer_trust_level || "BASIC",
+      releasedBy: signatureRow?.released_by_email || null,
+      releasedAt: signatureRow?.release_record_released_at || verifyResult?.releasedAt || signatureRow?.signature_released_at || null,
+      dppHash: verifyResult?.dataHash || signatureRow?.data_hash || null,
+      signature: signatureRow?.signature || null,
+      algorithm: verifyResult?.algorithm || signatureRow?.algorithm || "ES256",
+      signedBy: PLATFORM_DID,
+      publicKeyUrl: didDocumentUrl,
+      didDocumentUrl,
+      verificationStatus,
+      dppDataUnchanged,
+      integrity: resolveIntegrityLabel(verifyResult),
+      externalCompanyCertificate: "Not provided",
+      dppUrl,
+      canonicalDppJsonUrl,
+      signatureUrl,
+      verificationBundleUrl,
+    };
   }
 
   async function loadBackupHandoverPassport({
@@ -736,6 +831,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   app.get("/api/passports/:dppId", publicReadRateLimit, handleCanonicalPassportRequest);
   app.get("/api/passports/:dppId/canonical", publicReadRateLimit, handleCanonicalPassportRequest);
+  app.get("/api/public/dpp/:dppId.json", publicReadRateLimit, handleCanonicalPassportRequest);
 
   app.get("/api/passports/:dppId/history", publicReadRateLimit, async (req, res) => {
     try {
@@ -849,6 +945,72 @@ module.exports = function registerPassportPublicRoutes(app, {
     } catch (error) {
       logger.error("Signature verify error:", error.message);
       res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  app.get("/api/public/dpp/:dppId/signature.json", publicReadRateLimit, async (req, res) => {
+    try {
+      const verificationContext = await loadPublicVerificationContext(req.params.dppId, {
+        versionNumber: req.query.version ? parseInt(req.query.version, 10) : null,
+      });
+      if (!verificationContext?.passport) return res.status(404).json({ error: "Passport not found" });
+
+      const { verifyResult, signatureRow } = verificationContext;
+      let credential = null;
+      if (signatureRow?.vc_json) {
+        try {
+          credential = JSON.parse(signatureRow.vc_json);
+        } catch {
+          credential = null;
+        }
+      }
+
+      return res.json({
+        ...verifyResult,
+        signature: signatureRow?.signature || null,
+        algorithm: verifyResult?.algorithm || signatureRow?.algorithm || null,
+        signingKeyId: signatureRow?.signing_key_id || verifyResult?.keyId || null,
+        releasedBy: signatureRow?.released_by_email || null,
+        ...(credential ? { credential } : {}),
+      });
+    } catch {
+      return res.status(500).json({ error: "Failed to fetch signature proof" });
+    }
+  });
+
+  app.get("/api/public/dpp/:dppId/verify", publicReadRateLimit, async (req, res) => {
+    try {
+      const verificationContext = await loadPublicVerificationContext(req.params.dppId, {
+        versionNumber: req.query.version ? parseInt(req.query.version, 10) : null,
+      });
+      if (!verificationContext?.passport) return res.status(404).json({ error: "Passport not found" });
+      return res.json(buildPublicVerificationPayload(verificationContext));
+    } catch {
+      return res.status(500).json({ error: "Failed to build verification summary" });
+    }
+  });
+
+  app.get("/api/public/dpp/:dppId/verification-bundle.json", publicReadRateLimit, async (req, res) => {
+    try {
+      const verificationContext = await loadPublicVerificationContext(req.params.dppId, {
+        versionNumber: req.query.version ? parseInt(req.query.version, 10) : null,
+      });
+      if (!verificationContext?.passport) return res.status(404).json({ error: "Passport not found" });
+
+      const verificationPayload = buildPublicVerificationPayload(verificationContext);
+      const { verifyResult, signatureRow } = verificationContext;
+
+      return res.json({
+        ...verificationPayload,
+        hash: verificationPayload.dppHash,
+        signature: verificationPayload.signature,
+        verificationProofStatus: verifyResult?.status || "unsigned",
+        credentialId: verifyResult?.credentialId || null,
+        proofType: verifyResult?.proofType || null,
+        issuer: verifyResult?.issuer || verificationPayload.signedBy,
+      });
+    } catch {
+      return res.status(500).json({ error: "Failed to build verification bundle" });
     }
   });
 

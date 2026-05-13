@@ -498,6 +498,80 @@
   font-weight: 950;
 }
 
+.passport-portal .verification-panel {
+  margin-top: 14px;
+  border: 1px solid rgba(13, 181, 176, 0.16);
+  background: linear-gradient(180deg, rgba(13, 181, 176, 0.08), rgba(238, 246, 255, 0.48));
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.passport-portal .verification-panel-head h3 {
+  margin: 0.5rem 0 0.35rem;
+  font-size: 1.08rem;
+  letter-spacing: -0.03em;
+}
+
+.passport-portal .verification-panel-head p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.passport-portal .verification-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.passport-portal .verification-card {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.passport-portal .verification-card span {
+  display: block;
+  color: #6a8499;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 950;
+  margin-bottom: 0.2rem;
+}
+
+.passport-portal .verification-card strong {
+  display: block;
+  font-size: 0.94rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.passport-portal .verification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.passport-portal .verification-inline-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(13, 181, 176, 0.08), rgba(238, 246, 255, 0.5));
+  border: 1px solid rgba(13, 181, 176, 0.16);
+}
+
+.passport-portal .verification-inline-note span {
+  color: var(--muted);
+}
+
 .passport-portal .symbol-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -962,6 +1036,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .passport-portal .verification-grid,
   .passport-portal .document-grid,
   .passport-portal .overview-meta {
     grid-template-columns: 1fr 1fr;
@@ -993,6 +1068,7 @@
 
   .passport-portal .hero-cards,
   .passport-portal .overview-meta,
+  .passport-portal .verification-grid,
   .passport-portal .header-grid,
   .passport-portal .trust-grid,
   .passport-portal .document-grid {

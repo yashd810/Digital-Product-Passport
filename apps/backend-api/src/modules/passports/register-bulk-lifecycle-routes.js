@@ -298,18 +298,6 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             continue;
           }
           const compliance = await evaluateCompliance(currentPassport, passportType);
-          if (!compliance.directReleaseAllowed) {
-            details.push({
-              dppId,
-              status: "failed",
-              message: compliance.workflowRequired
-                ? "Workflow is required before release because the passport is incomplete."
-                : "Passport failed compliance validation. Fix the blocking issues before release.",
-              compliance,
-            });
-            failed += 1;
-            continue;
-          }
 
           await archivePassportSnapshot({
             passport: currentPassport,
@@ -363,7 +351,17 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
           await markOlderVersionsObsolete(tableName, dppId, releasedRow.version_number, passportType);
           await logAudit(companyId, userId, "RELEASE", tableName, dppId, { release_status: "draft_or_in_revision" }, { release_status: "released" });
-          details.push({ dppId, status: "released", version: releasedRow.version_number });
+          details.push({
+            dppId,
+            status: "released",
+            version: releasedRow.version_number,
+            compliance,
+            verificationStatus: compliance?.blockingIssues?.length
+              ? "released_with_issues"
+              : compliance?.completeness?.missingFields?.length
+                ? "released_with_missing_fields"
+                : "ready",
+          });
           released += 1;
         } catch (error) {
           details.push({ dppId, status: "failed", message: error.message });

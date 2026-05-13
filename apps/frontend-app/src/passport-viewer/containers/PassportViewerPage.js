@@ -39,6 +39,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   // Signature verification
   const [sigVerification, setSigVerification] = useState(null);
+  const [verificationBundle, setVerificationBundle] = useState(null);
 
   // Access-control state
   const [unlockedPassport,  setUnlockedPassport]  = useState(null);   // full data after valid key
@@ -162,6 +163,15 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     fetchWithAuth(`${API}/api/passports/${passport.dppId}/signature`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setSigVerification(d); })
+      .catch(() => {});
+  }, [passport?.dppId, passport?.release_status]);
+
+  useEffect(() => {
+    if (!passport?.dppId) return;
+    if (!isReleasedPassportStatus(passport?.release_status) && !isObsoletePassportStatus(passport?.release_status)) return;
+    fetchWithAuth(`${API}/api/public/dpp/${passport.dppId}/verification-bundle.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setVerificationBundle(d); })
       .catch(() => {});
   }, [passport?.dppId, passport?.release_status]);
 
@@ -346,6 +356,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           dynamicValues={dynamicValues}
           lang={lang}
           sigVerification={sigVerification}
+          verificationBundle={verificationBundle}
           carrierAuthenticity={passport?.carrier_authenticity || carrierAuthenticity}
           isPreviewMode={isPreviewMode}
           isInactiveView={isInactiveView}

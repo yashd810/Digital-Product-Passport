@@ -1,5 +1,13 @@
 "use strict";
 
+const { createValidationMiddleware } = require("../../shared/validation/request-schema");
+const {
+  batchLookupBodySchema,
+  dppIdParamsSchema,
+  productIdentifierVersionParamsSchema,
+  productIdParamsSchema,
+} = require("./request-schemas");
+
 module.exports = function registerPublicReadRoutes(app, deps) {
   const {
     logger,
@@ -21,10 +29,11 @@ module.exports = function registerPublicReadRoutes(app, deps) {
     buildIdentifierLineageEnvelope,
   } = deps;
 
-  app.get("/api/v1/dppsByProductId/:productId", publicReadRateLimit, async (req, res) => {
+  app.get("/api/v1/dppsByProductId/:productId", publicReadRateLimit, createValidationMiddleware({
+    params: productIdParamsSchema,
+  }), async (req, res) => {
     try {
       const productId = decodeURIComponent(req.params.productId);
-      if (!productId) return res.status(400).json({ error: "productId is required" });
 
       const result = await dbLookupByProductIdOnly(productId);
       if (!result) return res.status(404).json({ error: "Passport not found or not released" });
@@ -50,15 +59,14 @@ module.exports = function registerPublicReadRoutes(app, deps) {
     }
   });
 
-  app.post("/api/v1/dppsByProductIds", publicReadRateLimit, async (req, res) => {
+  app.post("/api/v1/dppsByProductIds", publicReadRateLimit, createValidationMiddleware({
+    body: batchLookupBodySchema,
+  }), async (req, res) => {
     try {
       const productIds = normalizeRequestedProductIds(req.body);
       const limit = parseBatchLimit(req.body?.limit);
       const offset = decodeBatchCursor(req.body?.cursor);
 
-      if (!productIds.length) {
-        return res.status(400).json({ error: "productId must be a non-empty array" });
-      }
       if (productIds.length > 1000) {
         return res.status(400).json({ error: "productId may contain at most 1000 entries" });
       }
@@ -99,7 +107,9 @@ module.exports = function registerPublicReadRoutes(app, deps) {
     }
   });
 
-  app.post("/api/v1/dppsByProductIds/search", publicReadRateLimit, async (req, res) => {
+  app.post("/api/v1/dppsByProductIds/search", publicReadRateLimit, createValidationMiddleware({
+    body: batchLookupBodySchema,
+  }), async (req, res) => {
     try {
       const productIds = normalizeRequestedProductIds(req.body);
       const companyId = req.body?.companyId !== undefined ? Number.parseInt(req.body.companyId, 10) : null;
@@ -109,9 +119,6 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       const limit = parseBatchLimit(req.body?.limit);
       const offset = decodeBatchCursor(req.body?.cursor);
 
-      if (!productIds.length) {
-        return res.status(400).json({ error: "productId must be a non-empty array" });
-      }
       if (productIds.length > 1000) {
         return res.status(400).json({ error: "productId may contain at most 1000 entries" });
       }
@@ -154,12 +161,13 @@ module.exports = function registerPublicReadRoutes(app, deps) {
     }
   });
 
-  app.get("/api/v1/dpps/:productIdentifier/versions/:versionNumber", publicReadRateLimit, async (req, res) => {
+  app.get("/api/v1/dpps/:productIdentifier/versions/:versionNumber", publicReadRateLimit, createValidationMiddleware({
+    params: productIdentifierVersionParamsSchema,
+  }), async (req, res) => {
     try {
       const productIdentifier = decodeURIComponent(req.params.productIdentifier);
       const companyId = req.query.companyId ? Number.parseInt(req.query.companyId, 10) : null;
       const versionNumber = Number.parseInt(req.params.versionNumber, 10);
-      if (!productIdentifier) return res.status(400).json({ error: "productIdentifier is required" });
       if (!Number.isFinite(versionNumber)) return res.status(400).json({ error: "Invalid versionNumber" });
       if (req.query.companyId && !Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid companyId" });
 
@@ -192,11 +200,12 @@ module.exports = function registerPublicReadRoutes(app, deps) {
     }
   });
 
-  app.get("/api/v1/dppsByProductIdAndDate/:productId", publicReadRateLimit, async (req, res) => {
+  app.get("/api/v1/dppsByProductIdAndDate/:productId", publicReadRateLimit, createValidationMiddleware({
+    params: productIdParamsSchema,
+  }), async (req, res) => {
     try {
       const productId = decodeURIComponent(req.params.productId);
       const rawDate = String(req.query.date || "").trim();
-      if (!productId) return res.status(400).json({ error: "productId is required" });
       if (!rawDate) return res.status(400).json({ error: "date query parameter is required" });
       const atDate = new Date(rawDate);
       if (Number.isNaN(atDate.getTime())) return res.status(400).json({ error: "Invalid date" });
@@ -219,10 +228,11 @@ module.exports = function registerPublicReadRoutes(app, deps) {
     }
   });
 
-  app.get("/api/v1/dpps/:dppId/identifier-lineage", publicReadRateLimit, async (req, res) => {
+  app.get("/api/v1/dpps/:dppId/identifier-lineage", publicReadRateLimit, createValidationMiddleware({
+    params: dppIdParamsSchema,
+  }), async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
-      if (!dppId) return res.status(400).json({ error: "dppId is required" });
 
       const released = await resolveReleasedPassportByDppId(dppId);
       if (!released?.passport) {

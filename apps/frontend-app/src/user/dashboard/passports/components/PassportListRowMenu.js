@@ -40,6 +40,9 @@ export function PassportListRowMenu({
       <button className={`menu-item release-item${!isEditablePassportStatus(passport.release_status) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.release_status)} onClick={() => { setReleaseModal({ ...passport, passport_type: pType }); setOpenMenuId(null); }}>
         🎯 Release
       </button>
+      <button className="menu-item" onClick={() => { setReleaseModal({ ...passport, passport_type: pType, checkerOnly: true }); setOpenMenuId(null); }}>
+        🧪 Verification check
+      </button>
       <button className="menu-item" onClick={() => { openPassportViewer(passport, { forcePreview: true }); setOpenMenuId(null); }}>
         👁 Preview public view
       </button>

@@ -1,5 +1,7 @@
 "use strict";
 
+const { createValidationMiddleware } = require("../../shared/validation/request-schema");
+
 module.exports = function registerLifecycleRoutes(app, deps) {
   const {
     pool,
@@ -38,7 +40,129 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     VALID_GRANULARITIES,
   } = deps;
 
-  app.patch("/api/companies/:companyId/passports/:dppId/release", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  const companyDppParamsSchema = {
+    type: "object",
+    required: ["companyId", "dppId"],
+    properties: {
+      companyId: { type: "string", minLength: 1 },
+      dppId: { type: "string", minLength: 1 },
+    },
+  };
+  const passportTypeBodySchema = {
+    type: "object",
+    required: ["passportType"],
+    properties: {
+      passportType: { type: "string", minLength: 1 },
+    },
+  };
+  const granularityTransitionBodySchema = {
+    type: "object",
+    required: ["passportType", "granularity"],
+    properties: {
+      passportType: { type: "string", minLength: 1 },
+      granularity: { type: "string", minLength: 1 },
+    },
+  };
+  const passportTypeQuerySchema = {
+    type: "object",
+    required: ["passportType"],
+    properties: {
+      passportType: { type: "string", minLength: 1 },
+    },
+  };
+
+  function buildVerificationSummary(compliance = {}) {
+    const blockingIssues = Array.isArray(compliance?.blockingIssues) ? compliance.blockingIssues : [];
+    const completeness = compliance?.completeness || {};
+    const missingMandatoryFields = Array.isArray(completeness?.missingMandatoryFields)
+      ? completeness.missingMandatoryFields
+      : [];
+    const missingOptionalFields = Array.isArray(completeness?.missingVoluntaryFields)
+      ? completeness.missingVoluntaryFields
+      : [];
+    const profileIssues = Array.isArray(compliance?.profileIssues) ? compliance.profileIssues : [];
+    const managedSemanticIssues = Array.isArray(compliance?.managedSemanticIssues) ? compliance.managedSemanticIssues : [];
+    const semanticIssues = Array.isArray(compliance?.semanticIssues) ? compliance.semanticIssues : [];
+    const categoryIssues = Array.isArray(compliance?.category?.issues) ? compliance.category.issues : [];
+    const passedChecks = [];
+
+    if (blockingIssues.length === 0) passedChecks.push("No blocking semantic, category, or governance issues found.");
+    if (missingMandatoryFields.length === 0) passedChecks.push("All required fields are currently present.");
+    if (profileIssues.length === 0 && managedSemanticIssues.length === 0) {
+      passedChecks.push("Managed compliance identifiers and profile fields are resolved.");
+    }
+    if (semanticIssues.length === 0) passedChecks.push("Mapped semantic values match the expected data types.");
+    if (categoryIssues.length === 0) passedChecks.push("Category-specific requirement checks passed.");
+
+    return {
+      status: blockingIssues.length > 0
+        ? "issues_found"
+        : missingMandatoryFields.length > 0
+          ? "missing_required_fields"
+          : missingOptionalFields.length > 0
+            ? "missing_optional_fields"
+            : "ready",
+      isReleaseReady: Boolean(compliance?.directReleaseAllowed),
+      canProceedWithWorkflow: Boolean(compliance?.workflowReleaseAllowed),
+      completenessPercentage: Number.isFinite(completeness?.percentage) ? completeness.percentage : 0,
+      passedChecks,
+      counts: {
+        blockingIssues: blockingIssues.length,
+        missingRequiredFields: missingMandatoryFields.length,
+        missingOptionalFields: missingOptionalFields.length,
+      },
+    };
+  }
+
+  app.get("/api/companies/:companyId/passports/:dppId/verification-check", authenticateToken, checkCompanyAccess, createValidationMiddleware({
+    params: companyDppParamsSchema,
+    query: passportTypeQuerySchema,
+  }), async (req, res) => {
+    try {
+      const { companyId, dppId } = req.params;
+      const { passportType } = req.query;
+      const tableName = getTable(passportType);
+      const result = await pool.query(
+        `SELECT *
+         FROM ${tableName}
+         WHERE dpp_id = $1 AND company_id = $2 AND deleted_at IS NULL
+         ORDER BY version_number DESC
+         LIMIT 1`,
+        [dppId, companyId]
+      );
+      const currentPassport = result.rows[0] || null;
+      if (!currentPassport) return res.status(404).json({ error: "Passport not found" });
+
+      const reconciledPassport = await reconcileManagedReleaseFields({
+        passport: currentPassport,
+        companyId,
+        passportType,
+        userId: req.user.userId,
+      });
+      const compliance = await evaluateCompliance(reconciledPassport, passportType);
+
+      res.json({
+        success: true,
+        passport: {
+          dppId: currentPassport.dpp_id || currentPassport.dppId,
+          passportType,
+          versionNumber: currentPassport.version_number || null,
+          releaseStatus: currentPassport.release_status || null,
+          modelName: currentPassport.model_name || null,
+          productId: currentPassport.product_id || null,
+        },
+        verification: buildVerificationSummary(compliance),
+        compliance,
+      });
+    } catch {
+      res.status(500).json({ error: "Failed to run verification check" });
+    }
+  });
+
+  app.patch("/api/companies/:companyId/passports/:dppId/release", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+    params: companyDppParamsSchema,
+    body: passportTypeBodySchema,
+  }), async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
       const { passportType } = req.body;
@@ -60,20 +184,6 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
 
       const compliance = await evaluateCompliance(reconciledPassport, passportType);
-      if (!compliance.directReleaseAllowed) {
-        if (compliance.workflowRequired) {
-          return res.status(409).json({
-            error: "Passport is incomplete. Assign at least a reviewer or approver before it can be released.",
-            code: "WORKFLOW_REQUIRED_FOR_INCOMPLETE_PASSPORT",
-            compliance,
-          });
-        }
-        return res.status(422).json({
-          error: "Passport failed compliance validation. Fix the blocking issues before release.",
-          code: "PASSPORT_COMPLIANCE_FAILED",
-          compliance,
-        });
-      }
 
       const tableName = getTable(passportType);
       await archivePassportSnapshot({
@@ -135,13 +245,21 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         snapshotScope: "released_current",
       }).catch(() => {});
 
-      res.json({ success: true, passport: normalizePassportRow(released), compliance });
+      res.json({
+        success: true,
+        passport: normalizePassportRow(released),
+        compliance,
+        verification: buildVerificationSummary(compliance),
+      });
     } catch {
       res.status(500).json({ error: "Failed to release passport" });
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:dppId/revise", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/revise", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+    params: companyDppParamsSchema,
+    body: passportTypeBodySchema,
+  }), async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
       const { passportType } = req.body;
@@ -217,7 +335,10 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:dppId/granularity-transition", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/granularity-transition", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+    params: companyDppParamsSchema,
+    body: granularityTransitionBodySchema,
+  }), async (req, res) => {
     try {
       const { companyId, dppId } = req.params;
       const { passportType, granularity, reason = null } = normalizePassportRequestBody(req.body || {});

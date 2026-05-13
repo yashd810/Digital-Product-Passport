@@ -336,31 +336,38 @@
   color: var(--text-primary);
 }
 
-.dictionary-term-unit {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-style: italic;
-}
-
-.dictionary-type-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: var(--dictionary-type-background);
-  color: var(--dictionary-type-color);
-  border: 1px solid var(--dictionary-type-border);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
 .dictionary-term-definition {
   margin: 0 0 10px;
   color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.7;
+}
+
+.dictionary-term-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.dictionary-term-meta-block {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+}
+
+.dictionary-term-meta-block strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.dictionary-term-meta-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  word-break: break-all;
 }
 
 .dictionary-term-meta-line,
@@ -474,30 +481,11 @@
   line-height: 1.75;
 }
 
-.dictionary-detail-tag-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.dictionary-detail-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .dictionary-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 22px;
+  margin-top: 18px;
 }
 
 .dictionary-detail-item {
@@ -580,8 +568,8 @@
   background: rgba(11, 24, 38, 0.03);
 }
 
-[data-theme="light"] .dictionary-detail-item,
-[data-theme="light"] .dictionary-detail-tag {
+[data-theme="light"] .dictionary-term-meta-block,
+[data-theme="light"] .dictionary-detail-item {
   background: rgba(11, 24, 38, 0.03);
 }
 
@@ -636,6 +624,7 @@
     grid-template-columns: 1fr;
   }
 
+  .dictionary-term-meta-grid,
   .dictionary-detail-grid {
     grid-template-columns: 1fr;
   }

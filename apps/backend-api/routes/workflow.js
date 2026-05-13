@@ -1,5 +1,5 @@
-const logger = require("../services/logger");
-const { recordSignedDppRelease } = require("../services/dpp-release-record-service");
+const logger = require("../src/infrastructure/logging/logger");
+const { recordSignedDppRelease } = require("../src/infrastructure/audit/dpp-release-record-service");
 
 module.exports = function registerWorkflowRoutes(app, {
   pool,
@@ -103,13 +103,6 @@ module.exports = function registerWorkflowRoutes(app, {
       const workflowTarget = await evaluateWorkflowReleaseCompliance({ companyId, dppId: dppId, passportType });
       if (!workflowTarget?.passport) {
         return res.status(404).json({ error: "Passport not found" });
-      }
-      if (!workflowTarget.compliance.workflowReleaseAllowed) {
-        return res.status(422).json({
-          error: "Passport failed compliance validation. Fix the blocking issues before submitting it to workflow.",
-          code: "PASSPORT_COMPLIANCE_FAILED",
-          compliance: workflowTarget.compliance
-        });
       }
 
       const result = await submitPassportToWorkflow({
@@ -292,13 +285,6 @@ module.exports = function registerWorkflowRoutes(app, {
           if (!reviewReleaseTarget?.passport) {
             return res.status(404).json({ error: "Passport not found" });
           }
-          if (!reviewReleaseTarget.compliance.workflowReleaseAllowed) {
-            return res.status(422).json({
-              error: "Passport still has blocking compliance issues. Fix them before final approval and release.",
-              code: "PASSPORT_COMPLIANCE_FAILED",
-              compliance: reviewReleaseTarget.compliance
-            });
-          }
         }
 
         await pool.query(
@@ -403,14 +389,6 @@ module.exports = function registerWorkflowRoutes(app, {
         if (!approvalReleaseTarget?.passport) {
           return res.status(404).json({ error: "Passport not found" });
         }
-        if (!approvalReleaseTarget.compliance.workflowReleaseAllowed) {
-          return res.status(422).json({
-            error: "Passport still has blocking compliance issues. Fix them before approval and release.",
-            code: "PASSPORT_COMPLIANCE_FAILED",
-            compliance: approvalReleaseTarget.compliance
-          });
-        }
-
         await pool.query(
           "UPDATE passport_workflow SET approval_status='approved', approver_comment=$1, approved_at=NOW(), overall_status='approved', updated_at=NOW() WHERE id=$2",
           [comment || null, wf.id]

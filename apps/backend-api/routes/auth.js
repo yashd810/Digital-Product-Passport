@@ -1,7 +1,7 @@
 "use strict";
 const { v4: uuidv4 } = require("uuid");
 const crypto = require("crypto");
-const logger = require("../services/logger");
+const logger = require("../src/infrastructure/logging/logger");
 
 module.exports = function registerAuthRoutes(app, {
   pool,

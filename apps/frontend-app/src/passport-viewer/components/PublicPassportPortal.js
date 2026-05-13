@@ -213,6 +213,18 @@ function buildTrustRows(passport, carrierAuthenticity, sigVerification) {
   ].filter(([, value]) => isFilled(value));
 }
 
+function buildVerificationRows(verificationBundle) {
+  if (!verificationBundle) return [];
+  return [
+    ["DPP integrity", verificationBundle.integrity || ""],
+    ["Signer", verificationBundle.signedBy === "did:web:www.claros-dpp.online" ? "Claros" : (verificationBundle.signedBy || "")],
+    ["Company trust level", verificationBundle.trustLevel || ""],
+    ["DPP data unchanged", verificationBundle.dppDataUnchanged ? "Yes" : "No"],
+    ["External company certificate", verificationBundle.externalCompanyCertificate || "Not provided"],
+    ["Verification status", verificationBundle.verificationStatus || ""],
+  ].filter(([, value]) => isFilled(value));
+}
+
 function buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, lang) {
   return fields
     .map((field) => {
@@ -446,6 +458,7 @@ export default function PublicPassportPortal({
   dynamicValues,
   lang,
   sigVerification,
+  verificationBundle,
   carrierAuthenticity,
   isPreviewMode = false,
   isInactiveView = false,
@@ -483,6 +496,7 @@ export default function PublicPassportPortal({
   const lifecycleEvents = buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues);
   const headerRows = buildHeaderRows(passport, typeDef);
   const trustRows = buildTrustRows(passport, carrierAuthenticity, sigVerification);
+  const verificationRows = buildVerificationRows(verificationBundle);
   const documentItems = buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, lang);
 
   const pages = [
@@ -623,6 +637,46 @@ export default function PublicPassportPortal({
                   </div>
                 </div>
               )}
+
+              {verificationBundle && (
+                <section className="verification-panel" aria-label="Verification">
+                  <div className="verification-panel-head">
+                    <span className="badge ok">Verification</span>
+                    <h3>This passport is signed by Claros.</h3>
+                    <p>You can independently verify the data using the links below.</p>
+                  </div>
+                  <div className="verification-grid">
+                    {verificationRows.map(([label, value]) => (
+                      <div key={label} className="verification-card">
+                        <span>{label}</span>
+                        <strong>{value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="verification-actions">
+                    {verificationBundle.canonicalDppJsonUrl && (
+                      <a className="pill-button" href={verificationBundle.canonicalDppJsonUrl} target="_blank" rel="noopener noreferrer">
+                        Download DPP JSON
+                      </a>
+                    )}
+                    {verificationBundle.signatureUrl && (
+                      <a className="pill-button" href={verificationBundle.signatureUrl} target="_blank" rel="noopener noreferrer">
+                        Download signature proof
+                      </a>
+                    )}
+                    {verificationBundle.verificationBundleUrl && (
+                      <a className="pill-button" href={verificationBundle.verificationBundleUrl} target="_blank" rel="noopener noreferrer">
+                        Download verification bundle
+                      </a>
+                    )}
+                    {verificationBundle.didDocumentUrl && (
+                      <a className="pill-button" href={verificationBundle.didDocumentUrl} target="_blank" rel="noopener noreferrer">
+                        View DID document / public key
+                      </a>
+                    )}
+                  </div>
+                </section>
+              )}
             </article>
 
             <article className="card">
@@ -713,8 +767,14 @@ export default function PublicPassportPortal({
             </div>
           </div>
           <section className="trust-panel">
+            {verificationBundle && (
+              <div className="verification-inline-note">
+                <strong>DPP integrity: {verificationBundle.integrity || "Unknown"}</strong>
+                <span>Signer: {verificationBundle.signedBy === "did:web:www.claros-dpp.online" ? "Claros" : (verificationBundle.signedBy || "Unknown")}</span>
+              </div>
+            )}
             <div className="trust-grid">
-              {trustRows.map(([label, value]) => (
+              {[...verificationRows, ...trustRows].map(([label, value]) => (
                 <div key={label} className="trust-card">
                   <span>{label}</span>
                   <strong>{value}</strong>

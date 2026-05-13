@@ -20,7 +20,7 @@ const pool = new Pool({
 async function fixAdminRole() {
   try {
     const adminEmail = process.env.ADMIN_EMAIL || "digitalproductpass@gmail.com";
-    
+
     console.log(`🔧 Fixing admin role for: ${adminEmail}`);
 
     // Check if user exists

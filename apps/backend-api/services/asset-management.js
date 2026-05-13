@@ -362,12 +362,16 @@ module.exports = function createAssetService({
           return;
         }
 
-        const passportCreate = {};
-        const errors = [];
+      const passportCreate = {};
+      const errors = [];
+      const isBlankAssetValue = (value) => {
+        if (value === null || value === undefined) return true;
+        return typeof value === "string" ? value.trim() === "" : false;
+      };
 
-        Object.entries(rawRecord).forEach(([key, value]) => {
-          if (ASSET_MATCH_FIELDS.has(key)) return;
-          if (ASSET_IGNORED_SYSTEM_COLUMNS.has(key)) return;
+      Object.entries(rawRecord).forEach(([key, value]) => {
+        if (ASSET_MATCH_FIELDS.has(key)) return;
+        if (ASSET_IGNORED_SYSTEM_COLUMNS.has(key)) return;
 
           let resolvedKey = key;
           let fieldDef = fieldMap.get(key);
@@ -392,6 +396,7 @@ module.exports = function createAssetService({
             return;
           }
 
+          if (isBlankAssetValue(value)) return;
           errors.push(`Unknown field "${key}"`);
         });
 
@@ -497,21 +502,22 @@ module.exports = function createAssetService({
               break;
             }
           }
-        }
+          }
 
-        if (fieldDef) {
-          if (resolvedKey === "product_id" && !matchGuid && !nextProductIdProvided) return;
-          const coerced = coerceAssetFieldValue(fieldDef, value);
+          if (fieldDef) {
+            if (resolvedKey === "product_id" && !matchGuid && !nextProductIdProvided) return;
+            const coerced = coerceAssetFieldValue(fieldDef, value);
           if (!coerced.ok) {
             errors.push(coerced.error);
             return;
           }
           passportUpdate[resolvedKey] = coerced.value;
-          return;
-        }
+            return;
+          }
 
-        errors.push(`Unknown field "${key}"`);
-      });
+          if (isBlankAssetValue(value)) return;
+          errors.push(`Unknown field "${key}"`);
+        });
 
       if (nextProductIdProvided) {
         const normalizedNextProductId = normalizeProductIdValue(rawRecord.next_product_id);

@@ -1,14 +1,14 @@
 "use strict";
-const logger = require("../services/logger");
+const logger = require("../src/infrastructure/logging/logger");
 const { randomUUID } = require("crypto");
 const {
   extractCarrierAuthenticityMutation,
   applyCarrierAuthenticityMutation,
-} = require("../helpers/carrier-authenticity");
+} = require("../src/shared/passports/carrier-authenticity");
 const {
   generateDppRecordId,
   isDppRecordId
-} = require("../services/dpp-record-id");
+} = require("../src/shared/identifiers/dpp-record-id");
 const registerDidRoutes = require("../src/modules/dpp-api/register-did-routes");
 const registerElementRoutes = require("../src/modules/dpp-api/register-element-routes");
 const registerMutationRoutes = require("../src/modules/dpp-api/register-mutation-routes");

@@ -69,6 +69,100 @@ function ComplianceFailureNotice({ error }) {
   );
 }
 
+function VerificationCheckerNotice({ verification, compliance }) {
+  if (!verification && !compliance) return null;
+
+  const blockingIssues = Array.isArray(compliance?.blockingIssues) ? compliance.blockingIssues : [];
+  const missingMandatoryFields = Array.isArray(compliance?.completeness?.missingMandatoryFields)
+    ? compliance.completeness.missingMandatoryFields
+    : [];
+  const missingOptionalFields = Array.isArray(compliance?.completeness?.missingVoluntaryFields)
+    ? compliance.completeness.missingVoluntaryFields
+    : [];
+  const passedChecks = Array.isArray(verification?.passedChecks) ? verification.passedChecks : [];
+
+  return (
+    <div className="wf-checker-panel">
+      <div className="wf-checker-header">
+        <div>
+          <strong>Verification checker</strong>
+          <div className="wf-checker-subtitle">
+            Advisory only. This helps you see what is complete and what is still missing.
+          </div>
+        </div>
+        <span className={`wf-checker-status ${verification?.status || "unknown"}`}>
+          {verification?.status === "ready"
+            ? "Ready"
+            : verification?.status === "missing_optional_fields"
+              ? "Missing optional fields"
+              : verification?.status === "missing_required_fields"
+                ? "Missing required fields"
+                : verification?.status === "issues_found"
+                  ? "Issues found"
+                  : "Not run yet"}
+        </span>
+      </div>
+
+      <div className="wf-checker-metrics">
+        <div><span>Completeness</span><strong>{verification?.completenessPercentage ?? 0}%</strong></div>
+        <div><span>Blocking issues</span><strong>{verification?.counts?.blockingIssues ?? blockingIssues.length}</strong></div>
+        <div><span>Missing required</span><strong>{verification?.counts?.missingRequiredFields ?? missingMandatoryFields.length}</strong></div>
+        <div><span>Missing optional</span><strong>{verification?.counts?.missingOptionalFields ?? missingOptionalFields.length}</strong></div>
+      </div>
+
+      {passedChecks.length > 0 && (
+        <div className="wf-error-section">
+          <div className="wf-error-heading">Good</div>
+          <ul className="wf-error-list">
+            {passedChecks.map((item, index) => <li key={`passed-${index}`}>{item}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {blockingIssues.length > 0 && (
+        <div className="wf-error-section">
+          <div className="wf-error-heading">Needs attention</div>
+          <ul className="wf-error-list">
+            {blockingIssues.map((issue, index) => (
+              <li key={`${issue.code || "issue"}-${issue.key || index}`}>
+                {formatComplianceIssueSummary(issue)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {missingMandatoryFields.length > 0 && (
+        <div className="wf-error-section">
+          <div className="wf-error-heading">Missing required fields</div>
+          <ul className="wf-error-list">
+            {missingMandatoryFields.map((field, index) => (
+              <li key={`${field.key || field.label || "required"}-${index}`}>
+                {field.label || field.key}
+                {field.section ? ` (${field.section})` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {missingOptionalFields.length > 0 && (
+        <div className="wf-error-section">
+          <div className="wf-error-heading">Missing optional fields</div>
+          <ul className="wf-error-list">
+            {missingOptionalFields.map((field, index) => (
+              <li key={`${field.key || field.label || "optional"}-${index}`}>
+                {field.label || field.key}
+                {field.section ? ` (${field.section})` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Release Modal with reviewer + approver selection ──────────
 export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
   const [teamUsers,    setTeamUsers]    = useState([]);
@@ -76,6 +170,9 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
   const [approverId,   setApproverId]   = useState("");
   const [submitting,   setSubmitting]   = useState(false);
   const [error,        setError]        = useState(null);
+  const [verification, setVerification] = useState(null);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const checkerOnly = Boolean(passport?.checkerOnly);
 
   useEffect(() => {
     // Load eligible users (editors + admins)
@@ -99,7 +196,35 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
       if (d.default_approver_id) setApproverId(String(d.default_approver_id));
     })
     .catch(() => {});
-  }, []);
+  }, [companyId, user?.id]);
+
+  const runVerificationCheck = useCallback(async () => {
+    setVerificationLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ passportType: passport.passport_type });
+      const response = await fetchWithAuth(
+        `${API}/api/companies/${companyId}/passports/${passport.dppId}/verification-check?${params.toString()}`,
+        { headers: authHeaders() }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(extractComplianceError(data, "Failed to run verification check"));
+        return;
+      }
+      setVerification(data);
+    } catch (err) {
+      setError({ message: err.message || "Failed to run verification check", blockingIssues: [], missingFields: [] });
+    } finally {
+      setVerificationLoading(false);
+    }
+  }, [companyId, passport.dppId, passport.passport_type]);
+
+  useEffect(() => {
+    if (checkerOnly) {
+      runVerificationCheck();
+    }
+  }, [checkerOnly, runVerificationCheck]);
 
   const handleRelease = async () => {
     setSubmitting(true); setError(null);
@@ -125,6 +250,28 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
           setSubmitting(false);
           return;
         }
+        if (d?.compliance) {
+          setVerification({
+            success: true,
+            compliance: d.compliance,
+            verification: {
+              status: d.compliance?.blockingIssues?.length
+                ? "issues_found"
+                : d.compliance?.completeness?.missingMandatoryFields?.length
+                  ? "missing_required_fields"
+                  : d.compliance?.completeness?.missingVoluntaryFields?.length
+                    ? "missing_optional_fields"
+                    : "ready",
+              passedChecks: [],
+              completenessPercentage: d.compliance?.completeness?.percentage ?? 0,
+              counts: {
+                blockingIssues: d.compliance?.blockingIssues?.length ?? 0,
+                missingRequiredFields: d.compliance?.completeness?.missingMandatoryFields?.length ?? 0,
+                missingOptionalFields: d.compliance?.completeness?.missingVoluntaryFields?.length ?? 0,
+              },
+            },
+          });
+        }
         onDone("Submitted for review/approval");
       } else {
         // Direct release (no workflow)
@@ -142,6 +289,13 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
           setSubmitting(false);
           return;
         }
+        if (d?.compliance || d?.verification) {
+          setVerification({
+            success: true,
+            compliance: d.compliance || null,
+            verification: d.verification || null,
+          });
+        }
         onDone("Released");
       }
     } catch (err) {
@@ -154,7 +308,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
         <div className="modal-header">
-          <h3>🎯 Release Passport</h3>
+          <h3>{checkerOnly ? "🧪 Verification Check" : "🎯 Release Passport"}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -163,58 +317,78 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
             <span className="modal-version"> v{passport.version_number}</span>
           </p>
           <p className="modal-hint">
-            Optionally assign a reviewer and/or approver. Leave both empty to release immediately.
+            {checkerOnly
+              ? "Run the verification checker to see what is good, what is missing, and what may need attention."
+              : "Optionally assign a reviewer and/or approver. Leave both empty to release immediately. Verification is advisory and does not block the workflow."}
           </p>
 
           <ComplianceFailureNotice error={error} />
+          <VerificationCheckerNotice verification={verification?.verification} compliance={verification?.compliance} />
 
-          <div className="wf-select-group">
-            <label>🔍 Reviewer <span className="wf-opt">(optional)</span></label>
-            <select value={reviewerId} onChange={e => setReviewerId(e.target.value)} disabled={submitting}>
-              <option value="">— Skip review —</option>
-              {teamUsers.map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.first_name} {u.last_name} — {u.role}
-                </option>
-              ))}
-            </select>
+          <div className="wf-checker-actions">
+            <button
+              className="btn-cancel-wf"
+              type="button"
+              onClick={runVerificationCheck}
+              disabled={verificationLoading || submitting}
+            >
+              {verificationLoading ? "Checking…" : verification ? "Run again" : "Run verification check"}
+            </button>
           </div>
 
-          <div className="wf-select-group">
-            <label>✅ Approver <span className="wf-opt">(optional)</span></label>
-            <select value={approverId} onChange={e => setApproverId(e.target.value)} disabled={submitting}>
-              <option value="">— Skip approval —</option>
-              {teamUsers.filter(u => !reviewerId || String(u.id) !== reviewerId).map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.first_name} {u.last_name} — {u.role}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!checkerOnly && (
+            <>
+              <div className="wf-select-group">
+                <label>🔍 Reviewer <span className="wf-opt">(optional)</span></label>
+                <select value={reviewerId} onChange={e => setReviewerId(e.target.value)} disabled={submitting}>
+                  <option value="">— Skip review —</option>
+                  {teamUsers.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.first_name} {u.last_name} — {u.role}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {!reviewerId && !approverId && (
-            <div className="wf-direct-note">
-              ⚡ No reviewer or approver selected — passport will be <strong>released immediately</strong>.
-            </div>
-          )}
-          {reviewerId && (
-            <div className="wf-flow-preview">
-              {reviewerId && <span className="wf-step">📤 Submitted</span>}
-              {reviewerId && <span className="wf-arrow">→</span>}
-              {reviewerId && <span className="wf-step">🔍 Review</span>}
-              {approverId && <span className="wf-arrow">→</span>}
-              {approverId && <span className="wf-step">✅ Approval</span>}
-              <span className="wf-arrow">→</span>
-              <span className="wf-step">🚀 Released</span>
-            </div>
+              <div className="wf-select-group">
+                <label>✅ Approver <span className="wf-opt">(optional)</span></label>
+                <select value={approverId} onChange={e => setApproverId(e.target.value)} disabled={submitting}>
+                  <option value="">— Skip approval —</option>
+                  {teamUsers.filter(u => !reviewerId || String(u.id) !== reviewerId).map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.first_name} {u.last_name} — {u.role}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {!reviewerId && !approverId && (
+                <div className="wf-direct-note">
+                  ⚡ No reviewer or approver selected — passport will be <strong>released immediately</strong>.
+                </div>
+              )}
+              {reviewerId && (
+                <div className="wf-flow-preview">
+                  {reviewerId && <span className="wf-step">📤 Submitted</span>}
+                  {reviewerId && <span className="wf-arrow">→</span>}
+                  {reviewerId && <span className="wf-step">🔍 Review</span>}
+                  {approverId && <span className="wf-arrow">→</span>}
+                  {approverId && <span className="wf-step">✅ Approval</span>}
+                  <span className="wf-arrow">→</span>
+                  <span className="wf-step">🚀 Released</span>
+                </div>
+              )}
+            </>
           )}
         </div>
         <div className="modal-footer">
           <button className="btn-cancel-wf" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button className="btn-release-wf" onClick={handleRelease} disabled={submitting}>
-            {submitting ? "Submitting…" :
-              reviewerId || approverId ? "Submit for Review" : "Release Now"}
-          </button>
+          {!checkerOnly && (
+            <button className="btn-release-wf" onClick={handleRelease} disabled={submitting}>
+              {submitting ? "Submitting…" :
+                reviewerId || approverId ? "Submit for Review" : "Release Now"}
+            </button>
+          )}
         </div>
       </div>
     </div>

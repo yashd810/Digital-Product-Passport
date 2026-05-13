@@ -5,14 +5,6 @@ import "./BatteryDictionaryBrowserPage.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-const DATA_TYPE_COLORS = {
-  string: "#4a9eff",
-  number: "#f59e0b",
-  integer: "#f59e0b",
-  array: "#8b5cf6",
-  uri: "#10b981",
-};
-
 function buildDictionaryBasePath(pathname) {
   if (pathname.startsWith("/admin/")) return "/admin/dictionary/battery/v1";
   if (pathname.startsWith("/dashboard/")) return "/dashboard/dictionary/battery/v1";
@@ -28,27 +20,17 @@ async function fetchJson(url) {
   return response.json();
 }
 
-function TypeBadge({ jsonType, format }) {
-  const display = format === "URI/URL" ? "URI" : jsonType || "string";
-  const typeKey = format === "URI/URL" ? "uri" : (jsonType || "string");
-  const color = DATA_TYPE_COLORS[typeKey] || "#6b7280";
-  return (
-    <span
-      className={`dictionary-type-badge dictionary-type-${typeKey.replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "default"}`}
-      style={{
-        "--dictionary-type-color": color,
-        "--dictionary-type-background": `${color}22`,
-        "--dictionary-type-border": `${color}44`,
-      }}
-    >
-      {display}
-    </span>
-  );
+function formatDataType(term) {
+  if (term.dataType?.format === "URI/URL") return "URI";
+  return term.dataType?.jsonType || term.dataType?.format || "string";
 }
 
 function TermCard({ term, unitsByKey, termHref }) {
   const unitObj = unitsByKey.get(term.unit);
-  const unitDisplay = term.unitDisplay || unitObj?.display || (term.unit === "none" ? null : term.unit);
+  const unitDisplay = term.unitDisplay || unitObj?.display || (term.unit === "none" ? "n.a." : term.unit || "n.a.");
+  const domainDisplay = term.domain?.curie || term.semanticBinding?.domain?.curie || term.domain?.label || "";
+  const rangeDisplay = term.range?.curie || term.semanticBinding?.range?.curie || term.range?.label || "";
+  const dataTypeDisplay = formatDataType(term);
 
   return (
     <article className="dictionary-term-card">
@@ -56,10 +38,26 @@ function TermCard({ term, unitsByKey, termHref }) {
         <div className="dictionary-term-main">
           <div className="dictionary-term-heading-row">
             <strong className="dictionary-term-title">{term.label}</strong>
-            <TypeBadge jsonType={term.dataType?.jsonType} format={term.dataType?.format} />
-            {unitDisplay && <span className="dictionary-term-unit">{unitDisplay}</span>}
           </div>
           <p className="dictionary-term-definition">{term.definition}</p>
+          <div className="dictionary-term-meta-grid">
+            <div className="dictionary-term-meta-block">
+              <span className="dictionary-term-meta-label">Data type</span>
+              <strong>{dataTypeDisplay}</strong>
+            </div>
+            <div className="dictionary-term-meta-block">
+              <span className="dictionary-term-meta-label">Unit</span>
+              <strong>{unitDisplay}</strong>
+            </div>
+            <div className="dictionary-term-meta-block">
+              <span className="dictionary-term-meta-label">Domain</span>
+              <strong className="dictionary-term-meta-mono">{domainDisplay || "Not specified"}</strong>
+            </div>
+            <div className="dictionary-term-meta-block">
+              <span className="dictionary-term-meta-label">Range</span>
+              <strong className="dictionary-term-meta-mono">{rangeDisplay || "Not specified"}</strong>
+            </div>
+          </div>
           <div className="dictionary-term-meta-line">
             <span className="dictionary-term-meta-label">IRI:</span>
             <a href={term.iri} target="_blank" rel="noopener noreferrer" className="dictionary-link dictionary-link-mono">
@@ -96,7 +94,10 @@ function DetailRow({ label, value, mono = false, empty = "Not specified" }) {
 
 function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath }) {
   const categoryLabel = categories.find((category) => category.key === term.category)?.label || term.categoryLabel || term.category;
-  const unitDisplay = term.unitDisplay || unitsByKey.get(term.unit)?.display || (term.unit === "none" ? "n.a." : term.unit);
+  const unitDisplay = term.unitDisplay || unitsByKey.get(term.unit)?.display || (term.unit === "none" ? "n.a." : term.unit || "n.a.");
+  const dataTypeDisplay = formatDataType(term);
+  const domainDisplay = term.domain?.curie || term.semanticBinding?.domain?.curie || term.domain?.label || "";
+  const rangeDisplay = term.range?.curie || term.semanticBinding?.range?.curie || term.range?.label || "";
 
   return (
     <>
@@ -122,20 +123,15 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath }) 
           <h1 className="dictionary-detail-title">{term.label}</h1>
           <p className="dictionary-detail-subtitle">{term.definition}</p>
 
-          <div className="dictionary-detail-tag-row">
-            <TypeBadge jsonType={term.dataType?.jsonType} format={term.dataType?.format} />
-            <span className="dictionary-detail-tag">{unitDisplay}</span>
-            {term.subcategory && <span className="dictionary-detail-tag">{term.subcategory}</span>}
-          </div>
-
           <div className="dictionary-detail-grid">
             <DetailRow label="Category" value={categoryLabel} />
             <DetailRow label="Subcategory" value={term.subcategory} />
+            <DetailRow label="Data type" value={dataTypeDisplay} />
             <DetailRow label="Data format" value={term.dataType?.format} />
             <DetailRow label="JSON type" value={term.dataType?.jsonType} />
             <DetailRow label="XSD datatype" value={term.dataType?.xsdType} mono />
-            <DetailRow label="Domain" value={term.domain?.curie || term.semanticBinding?.domain?.curie} mono />
-            <DetailRow label="Range" value={term.range?.curie || term.semanticBinding?.range?.curie} mono />
+            <DetailRow label="Domain" value={domainDisplay} mono />
+            <DetailRow label="Range" value={rangeDisplay} mono />
             <DetailRow label="Unit" value={unitDisplay} />
             <DetailRow label="Access rights" value={term.accessRights} />
             <DetailRow label="Static vs dynamic" value={term.staticOrDynamic} />

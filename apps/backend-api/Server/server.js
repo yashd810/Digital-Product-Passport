@@ -27,30 +27,30 @@ const { registerAppRoutes } = require("../src/bootstrap/register-routes");
 const { registerSupportRoutes } = require("../src/bootstrap/support-routes");
 
 const { initDb }               = require("../db/init");
-const createSigningService     = require("../services/signing-service");
-const createDidService         = require("../services/did-service");
-const createCanonicalPassportSerializer = require("../services/canonicalPassportSerializer");
-const createCacheService       = require("../services/cache-service");
-const createStorageService     = require("../services/storage-service");
-const createOauthService       = require("../services/oauth-service");
-const createPasswordService    = require("../services/password-service");
-const logger                   = require("../services/logger");
-const { createTransporter, brandedEmail, sendOtpEmail } = require("../services/email");
-const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../services/security-service");
+const createSigningService     = require("../src/infrastructure/signing/create-signing-service");
+const createDidService         = require("../src/infrastructure/identity/create-did-service");
+const createCanonicalPassportSerializer = require("../src/shared/passports/canonical-passport-serializer");
+const createCacheService       = require("../src/infrastructure/cache/create-cache-service");
+const createStorageService     = require("../src/infrastructure/storage/create-storage-service");
+const createOauthService       = require("../src/infrastructure/oauth/create-oauth-service");
+const createPasswordService    = require("../src/infrastructure/security/create-password-service");
+const logger                   = require("../src/infrastructure/logging/logger");
+const { createTransporter, brandedEmail, sendOtpEmail } = require("../src/infrastructure/email/email-service");
+const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../src/infrastructure/security/security-service");
 const createAuthMiddleware     = require("../middleware/auth");
 const { createRateLimiters, startRateLimitMaintenance } = require("../middleware/rate-limit");
-const createAssetService       = require("../services/asset-management");
-const createPassportService    = require("../services/passport-service");
-const { buildBatteryPassJsonExport, buildPassportJsonLdContext } = require("../services/battery-pass-export");
-const createPassportRepresentationService = require("../services/passport-representation-service");
-const dppIdentity                         = require("../services/dpp-identity-service");
-const createBatteryDictionaryService      = require("../services/battery-dictionary-service");
-const createComplianceService             = require("../services/compliance-service");
-const createAccessRightsService           = require("../services/access-rights-service");
-const createProductIdentifierService      = require("../services/product-identifier-service");
-const createBackupProviderService         = require("../services/backup-provider-service");
-const canonicalizeJson                    = require("../services/json-canonicalization");
-const { generateDppRecordId }             = require("../services/dpp-record-id");
+const createAssetService       = require("../src/infrastructure/assets/create-asset-service");
+const createPassportService    = require("../src/infrastructure/passports/create-passport-service");
+const { buildBatteryPassJsonExport, buildPassportJsonLdContext } = require("../src/shared/passports/battery-pass-export");
+const createPassportRepresentationService = require("../src/infrastructure/passports/create-passport-representation-service");
+const dppIdentity                         = require("../src/shared/identifiers/dpp-identity-service");
+const createBatteryDictionaryService      = require("../src/infrastructure/dictionary/create-battery-dictionary-service");
+const createComplianceService             = require("../src/infrastructure/compliance/create-compliance-service");
+const createAccessRightsService           = require("../src/infrastructure/security/create-access-rights-service");
+const createProductIdentifierService      = require("../src/infrastructure/identifiers/create-product-identifier-service");
+const createBackupProviderService         = require("../src/infrastructure/backup/create-backup-provider-service");
+const canonicalizeJson                    = require("../src/shared/passports/json-canonicalization");
+const { generateDppRecordId }             = require("../src/shared/identifiers/dpp-record-id");
 
 global.console = logger.console;
 
@@ -68,7 +68,7 @@ const {
   coerceBulkFieldValue, getHistoryFieldDefs, formatHistoryFieldValue, comparableHistoryFieldValue,
   isPlainObject, getAssetFieldMap, getValueAtPath, normalizeAssetHeaders,
   coerceAssetFieldValue, toDynamicStoredValue,
-} = require("../helpers/passport-helpers");
+} = require("../src/shared/passports/passport-helpers");
 
 // ─── DIRECTORIES ─────────────────────────────────────────────────────────────
 const RUNTIME_PATHS = deriveRuntimePaths(__dirname);
@@ -200,16 +200,16 @@ const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, ex
     amr: Array.isArray(extraClaims.amr) && extraClaims.amr.length ? extraClaims.amr : ["pwd"],
   };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
-  logger.info({ 
-    userId: payload.userId, 
-    payload: { 
-      sessionVersion: payload.sessionVersion, 
+  logger.info({
+    userId: payload.userId,
+    payload: {
+      sessionVersion: payload.sessionVersion,
       userId: payload.userId,
       email: payload.email,
       role: payload.role,
       mfaVerifiedAt: payload.mfaVerifiedAt,
     },
-    msg: "[TOKEN_CREATED] JWT payload for token" 
+    msg: "[TOKEN_CREATED] JWT payload for token"
   });
   return token;
 };

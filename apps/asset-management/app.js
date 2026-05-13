@@ -734,14 +734,26 @@ function renderGrid() {
    ═══════════════════════════════════════════════ */
 
 function createBlankRow() {
-  const row = { dppId: "", product_id: "", serial_number: "" };
-  buildFieldList().forEach(f => { if (!(f.key in row)) row[f.key] = ""; });
+  const row = {};
+  const fields = buildFieldList();
+  const fieldKeys = new Set(fields.map(f => f.key));
+
+  if (fieldKeys.has("dppId")) row.dppId = "";
+  else row.dppId = "";
+
+  if (fieldKeys.has("product_id")) row.product_id = "";
+  else row.product_id = "";
+
+  fields.forEach(f => {
+    if (!(f.key in row)) row[f.key] = "";
+  });
+
   state.rows.push(row);
   state.pendingGridFocus = { rowIndex: state.rows.length - 1, fieldKey: "product_id" };
   markDiffsAgainstBaseline();
   state.preview = null;
   renderGrid(); renderWorkspaceSummary(); renderPreview();
-  showToast("Draft row added. Fill product_id or an existing dppId, then validate.", "info");
+  showToast("Draft row added. Leave dppId blank for a new passport, fill product_id, then validate.", "info");
 }
 
 function parseCsv(text) {
@@ -952,7 +964,13 @@ async function pushBackend() {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ companyId: state.companyId, generated_payload: state.preview.generated_payload, sourceKind: state.sourceContext.sourceKind }),
   });
-  showToast("Push: " + payload.summary.passports_updated + " updated, " + payload.summary.dynamic_fields_pushed + " dynamic.", payload.status === "failed" ? "error" : "success");
+  showToast(
+    "Push: " + (payload.summary.passports_created || 0) + " created, "
+    + (payload.summary.passports_updated || 0) + " updated, "
+    + (payload.summary.dynamic_fields_pushed || 0) + " dynamic.",
+    payload.status === "failed" ? "error" : "success"
+  );
+  await loadPassports();
   await refreshJobsAndRuns();
 }
 

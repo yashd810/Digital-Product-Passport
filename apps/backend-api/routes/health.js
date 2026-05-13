@@ -3,16 +3,16 @@ module.exports = function registerHealthRoutes(app, pool) {
     try {
       // Check database connectivity
       await pool.query("SELECT 1");
-      res.json({ 
-        status: "OK", 
+      res.json({
+        status: "OK",
         architecture: "dynamic-per-company-tables",
-        database: "connected"
+        database: "connected",
       });
     } catch (err) {
-      res.status(503).json({ 
-        status: "UNAVAILABLE", 
+      res.status(503).json({
+        status: "UNAVAILABLE",
         database: "disconnected",
-        error: "Database connection failed"
+        error: "Database connection failed",
       });
     }
   });

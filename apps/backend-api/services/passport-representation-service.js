@@ -6,6 +6,16 @@ module.exports = function createPassportRepresentationService({
   productIdentifierService = null,
   buildCanonicalPassportPayload = null,
 } = {}) {
+  function slugify(value) {
+    return String(value || "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-+/g, "-");
+  }
+
   function toIsoTimestamp(value) {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value);
@@ -117,8 +127,18 @@ module.exports = function createPassportRepresentationService({
     const sections = typeDef?.fields_json?.sections || [];
     const userFields = {};
     const facilityId = passport.facility_id || null;
+    const companyStub = companyName ? {
+      company_name: companyName,
+      did_slug: slugify(companyName),
+      economic_operator_identifier: null,
+      default_granularity: resolvedGranularity,
+    } : null;
     const canonicalPayload = typeof buildCanonicalPassportPayload === "function"
-      ? buildCanonicalPassportPayload(passport, typeDef, { granularity: resolvedGranularity })
+      ? buildCanonicalPassportPayload(passport, typeDef, {
+        granularity: resolvedGranularity,
+        company: companyStub,
+        companyName,
+      })
       : null;
 
     for (const section of sections) {

@@ -18,6 +18,8 @@ describe("canonical passport JSON", () => {
         company_id: 5,
         passport_type: "battery",
         product_id: "BAT-2026-001",
+        product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
+        content_specification_ids: ["claros_test_v1"],
         version_number: 3,
         release_status: "released",
         updated_at: "2026-04-24T12:00:00.000Z",

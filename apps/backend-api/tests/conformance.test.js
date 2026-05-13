@@ -58,15 +58,24 @@ function createConformanceFixture() {
     buildOperationalDppPayload,
     passport,
     typeDef,
+    company: {
+      company_name: "Acme Energy",
+      did_slug: "acme-energy",
+      economic_operator_identifier: didService.generateCompanyDid("acme-energy"),
+      default_granularity: "item",
+    },
     expectedHeader: {
-      digitalProductPassportId: passport.guid,
+      digitalProductPassportId: didService.generateDppDid("item", passport.lineage_id),
       uniqueProductIdentifier: passport.product_identifier_did,
       localProductId: passport.product_id,
       dppSchemaVersion: "prEN 18223:2025",
       dppStatus: "Active",
       lastUpdate: passport.updated_at,
-      economicOperatorId: didService.generateCompanyDid("company-5"),
+      economicOperatorId: didService.generateCompanyDid("acme-energy"),
       contentSpecificationIds: ["claros_battery_dictionary_v1"],
+      subjectDid: didService.generateItemDid("battery", passport.lineage_id),
+      dppDid: didService.generateDppDid("item", passport.lineage_id),
+      companyDid: didService.generateCompanyDid("acme-energy"),
     },
   };
 }
@@ -86,7 +95,7 @@ describe("battery DPP conformance", () => {
       dppIdentity: {
         companyDid: () => expectedHeader.economicOperatorId,
         productModelDid: () => passport.product_identifier_did,
-        dppDid: () => expectedHeader.digitalProductPassportId,
+        dppDid: () => expectedHeader.dppDid,
         buildCanonicalPublicUrl: () => "https://app.example.test/dpp/acme-energy/battery/BAT-2026-001",
       },
     });
@@ -102,8 +111,19 @@ describe("battery DPP conformance", () => {
         lastUpdate: expectedHeader.lastUpdate,
         economicOperatorId: expectedHeader.economicOperatorId,
         contentSpecificationIds: expectedHeader.contentSpecificationIds,
+        dppDid: expectedHeader.dppDid,
+        productDid: expectedHeader.uniqueProductIdentifier,
+        publicUrl: "https://app.example.test/dpp/acme-energy/battery/BAT-2026-001",
         battery_mass: 450,
         battery_category: "EV",
+        extensions: expect.objectContaining({
+          claros: expect.objectContaining({
+            validation: expect.objectContaining({
+              valid: true,
+              issueCount: 0,
+            }),
+          }),
+        }),
       })
     );
     expect(payload.fields).toBeUndefined();
@@ -115,10 +135,11 @@ describe("battery DPP conformance", () => {
       serializer,
       passport,
       typeDef,
+      company,
       expectedHeader,
     } = createConformanceFixture();
 
-    const payload = serializer.buildExpandedPassportPayload(passport, typeDef);
+    const payload = serializer.buildExpandedPassportPayload(passport, typeDef, { company });
 
     expect(payload).toEqual(
       expect.objectContaining({
@@ -131,6 +152,19 @@ describe("battery DPP conformance", () => {
         lastUpdate: expectedHeader.lastUpdate,
         economicOperatorId: expectedHeader.economicOperatorId,
         contentSpecificationIds: expectedHeader.contentSpecificationIds,
+        subjectDid: expectedHeader.subjectDid,
+        dppDid: expectedHeader.dppDid,
+        companyDid: expectedHeader.companyDid,
+        complianceProfileKey: null,
+        carrierPolicyKey: null,
+        extensions: expect.objectContaining({
+          claros: expect.objectContaining({
+            validation: expect.objectContaining({
+              valid: true,
+              issueCount: 0,
+            }),
+          }),
+        }),
       })
     );
     expect(payload.fields).toBeUndefined();

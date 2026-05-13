@@ -1,7 +1,7 @@
 "use strict";
 
-const logger = require("../services/logger");
-const { generateDppRecordId } = require("../services/dpp-record-id");
+const logger = require("../src/infrastructure/logging/logger");
+const { generateDppRecordId } = require("../src/shared/identifiers/dpp-record-id");
 
 module.exports = function registerCompanyRoutes(app, {
   pool,

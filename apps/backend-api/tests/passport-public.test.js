@@ -154,6 +154,7 @@ function createTestApp(options = {}) {
     id: 5,
     company_name: "Acme Energy",
     did_slug: "acme-energy",
+    customer_trust_level: "BASIC",
     dpp_granularity: "item",
     default_granularity: "item",
     jsonld_export_enabled: true,
@@ -190,6 +191,25 @@ function createTestApp(options = {}) {
           }],
         };
       }
+      if (String(sql).includes("FROM passport_signatures ps")) {
+        return {
+          rows: [{
+            data_hash: "abc123hash",
+            signature: "proof-signature",
+            algorithm: "ES256",
+            signing_key_id: "test-key-001",
+            signature_released_at: "2026-04-27T10:00:00.000Z",
+            signed_at: "2026-04-27T10:00:05.000Z",
+            vc_json: JSON.stringify({
+              "@context": ["https://www.w3.org/ns/credentials/v2"],
+              id: "urn:test:credential:1",
+            }),
+            released_by_email: "user@supplier.com",
+            release_record_released_at: "2026-04-27T10:00:00.000Z",
+            companyname: "Acme Energy",
+          }],
+        };
+      }
       throw new Error(`Unexpected query: ${sql}`);
     }),
   };
@@ -213,7 +233,17 @@ function createTestApp(options = {}) {
     }),
     buildPassportVersionHistory: async () => ({ versions: [] }),
     resolvePublicPathToSubjects: async () => null,
-    verifyPassportSignature: async () => ({ status: "unsigned" }),
+    verifyPassportSignature: async () => ({
+      status: "valid",
+      signedAt: "2026-04-27T10:00:05.000Z",
+      keyId: "test-key-001",
+      dataHash: "abc123hash",
+      releasedAt: "2026-04-27T10:00:00.000Z",
+      algorithm: "ES256",
+      proofType: "JsonWebSignature2020",
+      issuer: didService.getPlatformDid(),
+      credentialId: "urn:test:credential:1",
+    }),
     buildJsonLdContext: () => [],
     buildBatteryPassJsonExport: (passports) => ({
       "@context": [{}],
@@ -366,6 +396,61 @@ describe("passport public routes", () => {
         verification: expect.objectContaining({
           oldKeysRetained: true,
         }),
+      })
+    );
+  });
+
+  test("GET /api/public/dpp/:dppId/verify returns a public verification summary", async () => {
+    const { app, passport } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/public/dpp/:dppId/verify",
+      params: { dppId: passport.guid },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        dppId: passport.guid,
+        companyId: 5,
+        companyName: "Acme Energy",
+        trustLevel: "BASIC",
+        releasedBy: "user@supplier.com",
+        releasedAt: "2026-04-27T10:00:00.000Z",
+        dppHash: "abc123hash",
+        signature: "proof-signature",
+        algorithm: "ES256",
+        signedBy: "did:web:www.claros-dpp.online",
+        publicKeyUrl: "https://www.claros-dpp.online/.well-known/did.json",
+        verificationStatus: "signed_by_claros",
+        dppDataUnchanged: true,
+      })
+    );
+  });
+
+  test("GET /api/public/dpp/:dppId/verification-bundle.json returns verification links and proof data", async () => {
+    const { app, passport } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/public/dpp/:dppId/verification-bundle.json",
+      params: { dppId: passport.guid },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        dppId: passport.guid,
+        dppUrl: "https://www.claros-dpp.online/dpp/acme-energy/battery-pack/bat-2026-001",
+        canonicalDppJsonUrl: "https://api.claros.test/api/public/dpp/72b99c83-952c-4179-96f6-54a513d39dbc.json",
+        signatureUrl: "https://api.claros.test/api/public/dpp/72b99c83-952c-4179-96f6-54a513d39dbc/signature.json",
+        didDocumentUrl: "https://www.claros-dpp.online/.well-known/did.json",
+        signedBy: "did:web:www.claros-dpp.online",
+        algorithm: "ES256",
+        hash: "abc123hash",
+        signature: "proof-signature",
+        issuer: "did:web:www.claros-dpp.online",
       })
     );
   });

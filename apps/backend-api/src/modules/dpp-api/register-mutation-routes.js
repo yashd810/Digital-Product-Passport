@@ -1,5 +1,9 @@
 "use strict";
 
+const { createValidationMiddleware } = require("../../shared/validation/request-schema");
+const { createDppUseCase } = require("./application/create-dpp");
+const { updateDppUseCase } = require("./application/update-dpp");
+
 module.exports = function registerMutationRoutes(app, deps) {
   const {
     pool,
@@ -47,210 +51,34 @@ module.exports = function registerMutationRoutes(app, deps) {
     MERGE_PATCH_CONTENT_TYPE,
   } = deps;
 
-  app.post("/api/v1/dpps", authenticateToken, requireEditor, async (req, res) => {
+  const createDpp = createDppUseCase(deps);
+  const updateDpp = updateDppUseCase(deps);
+  const dppCreateSchema = {
+    type: "object",
+    anyOf: [["passport_type", "passportType"], ["product_id", "localProductId", "productId", "productIdentifier"]],
+    properties: {
+      passport_type: { type: "string", minLength: 1 },
+      passportType: { type: "string", minLength: 1 },
+      product_id: { type: "string", minLength: 1 },
+      localProductId: { type: "string", minLength: 1 },
+      productId: { type: "string", minLength: 1 },
+      productIdentifier: { type: "string", minLength: 1 },
+    },
+  };
+  const dppPatchSchema = {
+    type: "object",
+    minProperties: 1,
+  };
+
+  app.post("/api/v1/dpps", authenticateToken, requireEditor, createValidationMiddleware({
+    body: dppCreateSchema,
+  }), async (req, res) => {
     try {
-      const normalizedBody = normalizePassportRequestBody ? normalizePassportRequestBody(req.body) : req.body || {};
-      const submittedCompanyId = normalizedBody.companyId ?? normalizedBody.company_id;
-      const companyId = req.user.role === "super_admin" ?
-        Number.parseInt(submittedCompanyId, 10) :
-        Number.parseInt(req.user.companyId, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "A valid companyId is required" });
-
-      const requestedPassportType = normalizedBody.passport_type || normalizedBody.passportType;
-      if (!requestedPassportType) return res.status(400).json({ error: "passportType is required" });
-      const typeSchema = await getPassportTypeSchema(requestedPassportType);
-      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
-
-      const productIdInput = normalizeProductIdValue(
-        normalizedBody.product_id || normalizedBody.localProductId || normalizedBody.productId || normalizedBody.productIdentifier
-      );
-      if (!productIdInput) return res.status(400).json({ error: "productId is required" });
-      const explicitUniqueProductIdentifier = normalizedBody.product_identifier_did || normalizedBody.uniqueProductIdentifier || normalizedBody.unique_product_identifier || null;
-      if (explicitUniqueProductIdentifier && !usesConfiguredGlobalProductIdentifierScheme(explicitUniqueProductIdentifier)) {
-        return res.status(400).json({ error: "uniqueProductIdentifier must use the configured global DID-based identifier scheme" });
-      }
-
-      const requestedGranularity = String(normalizedBody.granularity || "item").trim().toLowerCase() || "item";
-      if (!VALID_GRANULARITIES.has(requestedGranularity)) {
-        return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
-      }
-
-      const resolvedPassportType = typeSchema.typeName;
-      const tableName = getTable(resolvedPassportType);
-      const dppId = generateDppRecordId();
-      const lineageId = dppId;
-      const storedProductIdentifiers = productIdentifierService.normalizeProductIdentifiers({
-        companyId,
-        passportType: resolvedPassportType,
-        rawProductId: productIdInput,
-        uniqueProductIdentifier: explicitUniqueProductIdentifier,
-        granularity: requestedGranularity
-      });
-      const existingByProductId = await findExistingPassportByProductId({
-        tableName,
-        companyId,
-        productId: storedProductIdentifiers.productIdInput
-      });
-      if (existingByProductId) {
-        return res.status(409).json({
-          error: `A passport with Serial Number "${storedProductIdentifiers.productIdInput}" already exists.`,
-          existingDppId: existingByProductId.dppId,
-          release_status: existingByProductId.release_status || null
-        });
-      }
-
-      const {
-        passport_type,
-        passportType,
-        representation: requestedRepresentation,
-        companyId: ignoredCompanyId,
-        company_id,
-        product_id,
-        product_identifier_did,
-        productId,
-        productIdentifier,
-        model_name,
-        modelName,
-        granularity,
-        compliance_profile_key,
-        content_specification_ids,
-        carrier_policy_key,
-        carrier_authenticity,
-        economic_operator_id,
-        facility_id,
-        ...fields
-      } = normalizedBody;
-      void passport_type;
-      void passportType;
-      void requestedRepresentation;
-      void ignoredCompanyId;
-      void company_id;
-      void product_id;
-      void product_identifier_did;
-      void productId;
-      void productIdentifier;
-      void granularity;
-
-      const invalidFieldKeys = Object.keys(fields).filter((key) =>
-        !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key)
-      );
-      if (invalidFieldKeys.length) {
-        return res.status(400).json({ error: "Unknown passport field(s) in request body", fields: invalidFieldKeys });
-      }
-
-      const complianceManagedFields = await buildStandardsCreateFields({
-        companyId,
-        passportType: resolvedPassportType,
-        granularity: requestedGranularity,
-        requestedFields: {
-          ...fields,
-          compliance_profile_key,
-          content_specification_ids,
-          carrier_policy_key,
-          economic_operator_id,
-          facility_id
-        }
-      });
-      const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
-      const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
-      const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
-        ...normalizedBody,
-        carrier_authenticity,
-      });
-      const carrierAuthenticity = applyCarrierAuthenticityMutation(null, carrierAuthenticityMutation);
-      const allColumns = [
-        "dppId",
-        "lineage_id",
-        "company_id",
-        "model_name",
-        "product_id",
-        "product_identifier_did",
-        "compliance_profile_key",
-        "content_specification_ids",
-        "carrier_policy_key",
-        "carrier_authenticity",
-        "economic_operator_id",
-        "facility_id",
-        "granularity",
-        "created_by",
-        ...dataFields
-      ];
-
-      const allValues = [
-        dppId,
-        lineageId,
-        companyId,
-        model_name || modelName || null,
-        storedProductIdentifiers.productIdInput,
-        storedProductIdentifiers.productIdentifierDid,
-        complianceManagedFields.compliance_profile_key,
-        complianceManagedFields.content_specification_ids,
-        complianceManagedFields.carrier_policy_key,
-        carrierAuthenticity ? JSON.stringify(carrierAuthenticity) : null,
-        complianceManagedFields.economic_operator_id,
-        complianceManagedFields.facility_id,
-        requestedGranularity,
-        req.user.userId,
-        ...dataFields.map((key) => processedFields[key])
-      ];
-
-      const placeholders = allColumns.map((_, index) => `$${index + 1}`).join(", ");
-
-      const insertResult = await pool.query(
-        `INSERT INTO ${tableName} (${allColumns.join(", ")})
-         VALUES (${placeholders})
-         RETURNING *`,
-        allValues
-      );
-      await pool.query(
-        `INSERT INTO passport_registry (dpp_id, lineage_id, company_id, passport_type)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (dpp_id) DO NOTHING`,
-        [dppId, lineageId, companyId, resolvedPassportType]
-      );
-
-      const createdPassport = {
-        ...normalizePassportRow(insertResult.rows[0]),
-        passport_type: resolvedPassportType
-      };
-      const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
-      const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
-      const payload = buildMutationPassportPayload(
-        createdPassport,
-        typeDef,
-        companyName,
-        req.query.representation ?? requestedRepresentation
-      );
-
-      await logAudit(companyId, req.user.userId, "CREATE_DPP", tableName, dppId, null, {
-        passport_type: resolvedPassportType,
-        product_id: storedProductIdentifiers.productIdInput,
-        product_identifier_did: storedProductIdentifiers.productIdentifierDid,
-        granularity: requestedGranularity
-      });
-      await archivePassportSnapshot({
-        passport: insertResult.rows[0],
-        passportType: resolvedPassportType,
-        archivedBy: req.user.userId,
-        actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "after_standards_create",
-      });
-      await replicatePassportToBackup({
-        passport: createdPassport,
-        typeDef,
-        companyName,
-        reason: "standards_create",
-        snapshotScope: "editable_draft"
-      }).catch(() => {});
-
-      return res.status(201).json({
-        success: true,
-        ...buildDppIdentifierFields(createdPassport),
-        passport: payload
-      });
+      const result = await createDpp({ req });
+      return res.status(result.statusCode).json(result.body);
     } catch (e) {
       if (e.statusCode) {
-        return res.status(e.statusCode).json({ error: e.message });
+        return res.status(e.statusCode).json(e.payload ? { error: e.message, ...e.payload } : { error: e.message });
       }
       logger.error({ err: e }, "[Standards DPP create API]");
       return res.status(500).json({ error: "Failed to create DPP" });
@@ -263,228 +91,17 @@ module.exports = function registerMutationRoutes(app, deps) {
     return res.status(204).send();
   });
 
-  app.patch("/api/v1/dpps/:dppId", authenticateToken, requireEditor, async (req, res) => {
+  app.patch("/api/v1/dpps/:dppId", authenticateToken, requireEditor, createValidationMiddleware({
+    params: {
+      type: "object",
+      required: ["dppId"],
+      properties: { dppId: { type: "string", minLength: 1 } },
+    },
+    body: dppPatchSchema,
+  }), async (req, res) => {
     try {
-      setDppMergePatchHeaders(res);
-      if (!isSupportedPatchContentType(req)) {
-        return res.status(415).json({
-          error: "Unsupported Media Type",
-          supportedContentTypes: ["application/json", MERGE_PATCH_CONTENT_TYPE]
-        });
-      }
-
-      const dppId = decodeURIComponent(req.params.dppId || "");
-      if (!dppId) return res.status(400).json({ error: "dppId is required" });
-      if (!parseDppIdentifier(dppId)) return res.status(400).json({ error: "dppId must be a valid DPP identifier" });
-
-      const editable = await resolveEditablePassportByDppId(dppId);
-      if (!editable?.passport) return res.status(404).json({ error: "Editable passport not found" });
-      if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(editable.passport.company_id)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-      if (!isEditablePassportStatus(editable.passport.release_status)) {
-        return res.status(409).json({ error: "Passport is not editable" });
-      }
-
-      const normalizedBody = normalizePassportRequestBody ? normalizePassportRequestBody(req.body) : req.body || {};
-      const {
-        passport_type,
-        passportType,
-        representation: requestedRepresentation,
-        companyId,
-        company_id,
-        granularity,
-        product_id,
-        product_identifier_did,
-        productId,
-        productIdentifier,
-        model_name,
-        modelName,
-        compliance_profile_key,
-        content_specification_ids,
-        carrier_policy_key,
-        carrier_authenticity,
-        economic_operator_id,
-        facility_id,
-        ...fields
-      } = normalizedBody;
-      void passport_type;
-      void passportType;
-      void requestedRepresentation;
-      void companyId;
-      void company_id;
-      void product_identifier_did;
-
-      let nextGranularity = String(editable.passport.granularity || "item").trim().toLowerCase();
-      if (granularity !== undefined) {
-        const requestedGranularity = String(granularity || "").trim().toLowerCase();
-        if (!["model", "batch", "item"].includes(requestedGranularity)) {
-          return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
-        }
-        if (requestedGranularity !== nextGranularity) {
-          const releasedLineageRes = await pool.query(
-            `SELECT 1
-             FROM ${editable.tableName}
-             WHERE lineage_id = $1
-               AND release_status IN ('released', 'obsolete')
-               AND deleted_at IS NULL
-               AND dpp_id <> $2
-             LIMIT 1`,
-            [editable.passport.lineage_id, editable.passport.dppId || editable.passport.dpp_id]
-          );
-          if (releasedLineageRes.rows.length) {
-            return res.status(409).json({
-              error: "GRANULARITY_CHANGE_REQUIRES_NEW_IDENTIFIER",
-              detail: "Released DPP granularity cannot be changed in place. Create a linked successor identifier instead.",
-              currentGranularity: nextGranularity,
-              requestedGranularity,
-            });
-          }
-          nextGranularity = requestedGranularity;
-        }
-      }
-
-      const invalidFieldKeys = Object.keys(fields).filter((key) =>
-        !SYSTEM_PASSPORT_FIELDS.has(key) && !editable.typeDef?.fields_json?.sections?.some((section) => (section.fields || []).some((field) => field.key === key))
-      );
-      if (invalidFieldKeys.length) {
-        return res.status(400).json({ error: "Unknown passport field(s) in request body", fields: invalidFieldKeys });
-      }
-
-      const updateData = {};
-      if (nextGranularity !== String(editable.passport.granularity || "item").trim().toLowerCase()) {
-        updateData.granularity = nextGranularity;
-      }
-      if (model_name !== undefined || modelName !== undefined) {
-        updateData.model_name = model_name ?? modelName ?? null;
-      }
-      if (compliance_profile_key !== undefined) updateData.compliance_profile_key = compliance_profile_key || null;
-      if (content_specification_ids !== undefined) {
-        updateData.content_specification_ids = serializeProfileDefaultValue(content_specification_ids);
-      }
-      if (carrier_policy_key !== undefined) updateData.carrier_policy_key = carrier_policy_key || null;
-      const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
-        ...normalizedBody,
-        carrier_authenticity,
-      });
-      if (carrierAuthenticityMutation.provided) {
-        const nextCarrierAuthenticity = applyCarrierAuthenticityMutation(
-          editable.passport.carrier_authenticity,
-          carrierAuthenticityMutation
-        );
-        updateData.carrier_authenticity = nextCarrierAuthenticity ? JSON.stringify(nextCarrierAuthenticity) : null;
-      }
-      if (economic_operator_id !== undefined) updateData.economic_operator_id = economic_operator_id || null;
-      if (facility_id !== undefined || extractExplicitFacilityId(fields)) {
-        updateData.facility_id = await resolveManagedFacilityId({
-          companyId: editable.passport.company_id,
-          requestedFields: { ...fields, facility_id }
-        });
-      }
-
-      const explicitUniqueProductIdentifier = normalizedBody.product_identifier_did || normalizedBody.uniqueProductIdentifier || normalizedBody.unique_product_identifier || null;
-      const nextProductId = normalizeProductIdValue(product_id || normalizedBody.localProductId || productId || productIdentifier);
-      if (explicitUniqueProductIdentifier && !usesConfiguredGlobalProductIdentifierScheme(explicitUniqueProductIdentifier)) {
-        return res.status(400).json({ error: "uniqueProductIdentifier must use the configured global DID-based identifier scheme" });
-      }
-      if (product_id !== undefined || normalizedBody.localProductId !== undefined || productId !== undefined || productIdentifier !== undefined || explicitUniqueProductIdentifier !== null) {
-        if (!nextProductId) return res.status(400).json({ error: "productId cannot be blank" });
-        const existingByProductId = await findExistingPassportByProductId({
-          tableName: editable.tableName,
-          companyId: editable.passport.company_id,
-          productId: nextProductId,
-          excludeGuid: editable.passport.dppId,
-          excludeLineageId: editable.passport.lineage_id
-        });
-        if (existingByProductId) {
-          return res.status(409).json({
-            error: `A passport with Serial Number "${nextProductId}" already exists.`,
-            existingDppId: existingByProductId.dppId,
-            release_status: existingByProductId.release_status || null
-          });
-        }
-        const normalizedProductIdentifiers = productIdentifierService.normalizeProductIdentifiers({
-          companyId: editable.passport.company_id,
-          passportType: editable.passport.passport_type,
-          rawProductId: nextProductId,
-          uniqueProductIdentifier: explicitUniqueProductIdentifier,
-          granularity: nextGranularity
-        });
-        updateData.product_id = normalizedProductIdentifiers.productIdInput;
-        updateData.product_identifier_did = normalizedProductIdentifiers.productIdentifierDid;
-      } else if (updateData.granularity !== undefined) {
-        const normalizedProductIdentifiers = productIdentifierService.normalizeProductIdentifiers({
-          companyId: editable.passport.company_id,
-          passportType: editable.passport.passport_type,
-          rawProductId: editable.passport.product_id,
-          uniqueProductIdentifier: explicitUniqueProductIdentifier,
-          granularity: nextGranularity
-        });
-        updateData.product_identifier_did = normalizedProductIdentifiers.productIdentifierDid;
-      }
-
-      const dataFields = getWritablePassportColumns(fields).filter((key) =>
-        (editable.typeDef?.fields_json?.sections || []).some((section) => (section.fields || []).some((field) => field.key === key))
-      );
-      const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
-      Object.assign(updateData, processedFields);
-
-      await archivePassportSnapshot({
-        passport: editable.passport,
-        passportType: editable.passport.passport_type,
-        archivedBy: req.user.userId,
-        actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "before_standards_patch",
-      });
-
-      const updateResult = await updatePassportRowById({
-        tableName: editable.tableName,
-        rowId: editable.passport.id,
-        userId: req.user.userId,
-        data: updateData,
-        includeUpdatedRow: true,
-      });
-      const updatedFields = updateResult.updateCols || [];
-      if (!updatedFields.length) return res.status(400).json({ error: "No fields to update" });
-      if (updateResult.updatedRow) {
-        await archivePassportSnapshot({
-          passport: updateResult.updatedRow,
-          passportType: editable.passport.passport_type,
-          archivedBy: req.user.userId,
-          actorIdentifier: getActorIdentifier(req.user),
-          snapshotReason: "after_standards_patch",
-        });
-      }
-
-      const companyName = (await getCompanyNameMap([editable.passport.company_id])).get(String(editable.passport.company_id)) || "";
-      const updatedPassport = {
-        ...editable.passport,
-        ...updateData
-      };
-      const payload = buildMutationPassportPayload(
-        updatedPassport,
-        editable.typeDef,
-        companyName,
-        req.query.representation ?? requestedRepresentation
-      );
-
-      await logAudit(editable.passport.company_id, req.user.userId, "PATCH_DPP", editable.tableName, editable.passport.dppId, null, {
-        fields_updated: updatedFields
-      });
-      await replicatePassportToBackup({
-        passport: updatedPassport,
-        typeDef: editable.typeDef,
-        companyName,
-        reason: "standards_patch",
-        snapshotScope: "editable_draft"
-      }).catch(() => {});
-
-      return res.json({
-        success: true,
-        ...buildDppIdentifierFields(editable.passport),
-        updatedFields,
-        passport: payload
-      });
+      const result = await updateDpp({ req, res });
+      return res.status(result.statusCode).json(result.body);
     } catch (e) {
       if (e.statusCode) {
         return res.status(e.statusCode).json({ error: e.message });

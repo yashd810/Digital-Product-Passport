@@ -1,5 +1,8 @@
 "use strict";
 
+const { createValidationMiddleware } = require("../../shared/validation/request-schema");
+const { dppElementParamsSchema } = require("./request-schemas");
+
 module.exports = function registerElementRoutes(app, deps) {
   const {
     logger,
@@ -19,11 +22,12 @@ module.exports = function registerElementRoutes(app, deps) {
     updateEditableElement,
   } = deps;
 
-  app.get("/api/v1/dpps/:dppId/elements/:elementIdPath", publicReadRateLimit, async (req, res) => {
+  app.get("/api/v1/dpps/:dppId/elements/:elementIdPath", publicReadRateLimit, createValidationMiddleware({
+    params: dppElementParamsSchema,
+  }), async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
       const requestedElementIdPath = decodeURIComponent(req.params.elementIdPath || "");
-      if (!dppId || !requestedElementIdPath) return res.status(400).json({ error: "dppId and elementIdPath are required" });
       if (!parseDppIdentifier(dppId)) return res.status(400).json({ error: "dppId must be a valid DPP identifier" });
 
       const normalizedPath = normalizeSupportedElementIdPath(requestedElementIdPath);
@@ -65,13 +69,12 @@ module.exports = function registerElementRoutes(app, deps) {
     }
   });
 
-  app.get("/api/v1/dpps/:dppId/elements/:elementIdPath/authorized", authenticateToken, publicReadRateLimit, async (req, res) => {
+  app.get("/api/v1/dpps/:dppId/elements/:elementIdPath/authorized", authenticateToken, publicReadRateLimit, createValidationMiddleware({
+    params: dppElementParamsSchema,
+  }), async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
       const requestedElementIdPath = decodeURIComponent(req.params.elementIdPath || "");
-      if (!dppId || !requestedElementIdPath) {
-        return res.status(400).json({ error: "dppId and elementIdPath are required" });
-      }
       if (!parseDppIdentifier(dppId)) {
         return res.status(400).json({ error: "dppId must be a valid DPP identifier" });
       }
@@ -121,16 +124,16 @@ module.exports = function registerElementRoutes(app, deps) {
     }
   });
 
-  app.patch("/api/v1/dpps/:dppId/elements/:elementIdPath", authenticateToken, requireEditor, async (req, res) => {
+  app.patch("/api/v1/dpps/:dppId/elements/:elementIdPath", authenticateToken, requireEditor, createValidationMiddleware({
+    params: dppElementParamsSchema,
+    body: { type: "object", minProperties: 1 },
+  }), async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
       const requestedElementIdPath = decodeURIComponent(req.params.elementIdPath || "");
       const companyId = req.user.role === "super_admin" ?
         req.query.companyId ? Number.parseInt(req.query.companyId, 10) : null :
         Number.parseInt(req.user.companyId, 10);
-      if (!dppId || !requestedElementIdPath) {
-        return res.status(400).json({ error: "dppId and elementIdPath are required" });
-      }
       if (req.query.companyId && !Number.isFinite(companyId) && req.user.role === "super_admin") {
         return res.status(400).json({ error: "Invalid companyId" });
       }
