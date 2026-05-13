@@ -15,7 +15,7 @@ ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 REPO_URL="${REPO_URL:-https://github.com/yashd810/Digital-Product-Passport.git}"
 BRANCH="${BRANCH:-main}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 
 if [ -z "$DEPLOY_TARGET" ]; then
     echo "❌ DPP_DEPLOY_TARGET is required. Use one of: frontend, backend, all"
@@ -40,7 +40,7 @@ echo "  Environment File: $ENV_FILE"
 echo "  Repository: $REPO_URL"
 echo "  Branch: $BRANCH"
 echo "  Deploy Target: $DEPLOY_TARGET"
-echo "  Compose Project: $COMPOSE_PROJECT_NAME"
+echo "  Compose Project: ${COMPOSE_PROJECT_NAME:-auto-detect}"
 echo ""
 
 # Step 1: Check Docker
@@ -98,10 +98,16 @@ echo "Step 5: Starting deployment..."
 cd "$APP_DIR"
 
 echo "   Building Docker images..."
-DPP_ENV_FILE="$ENV_FILE" \
-COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
-DPP_DEPLOY_TARGET="$DEPLOY_TARGET" \
-  sudo -E bash ./infra/oracle/deploy-prod.sh
+if [ -n "$COMPOSE_PROJECT_NAME" ]; then
+  DPP_ENV_FILE="$ENV_FILE" \
+  COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
+  DPP_DEPLOY_TARGET="$DEPLOY_TARGET" \
+    sudo -E bash ./infra/oracle/deploy-prod.sh
+else
+  DPP_ENV_FILE="$ENV_FILE" \
+  DPP_DEPLOY_TARGET="$DEPLOY_TARGET" \
+    sudo -E bash ./infra/oracle/deploy-prod.sh
+fi
 
 echo ""
 echo "✅ Deployment scripts completed"
@@ -159,5 +165,5 @@ echo "Summary:"
 echo "  - Code updated from GitHub main branch"
 echo "  - Docker images rebuilt"
 echo "  - Services restarted"
-echo "  - Target '$DEPLOY_TARGET' was deployed using Compose project '$COMPOSE_PROJECT_NAME'"
+echo "  - Target '$DEPLOY_TARGET' was deployed using Compose project '${COMPOSE_PROJECT_NAME:-auto-detect}'"
 echo ""

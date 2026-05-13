@@ -9,7 +9,7 @@ OCI_USER="${OCI_USER:-ubuntu}"
 OCI_IP="${OCI_IP:-79.76.53.122}"
 SSH_KEY="${SSH_KEY:-$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
 APP_DIR="/opt/dpp"
 ENV_FILE="/etc/dpp/dpp.env"
@@ -48,7 +48,7 @@ echo "Configuration:"
 echo "  OCI IP: $OCI_IP"
 echo "  User: $OCI_USER"
 echo "  Deploy Target: $DEPLOY_TARGET"
-echo "  Compose Project: $COMPOSE_PROJECT_NAME"
+echo "  Compose Project: ${COMPOSE_PROJECT_NAME:-auto-detect}"
 echo "  App Dir: $APP_DIR"
 echo "  Env File: $ENV_FILE"
 echo "  Timeout: ${TIMEOUT_SECONDS}s"
@@ -97,7 +97,7 @@ ENV_FILE="/etc/dpp/dpp.env"
 REPO="https://github.com/yashd810/Digital-Product-Passport.git"
 BRANCH="main"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:?DPP_DEPLOY_TARGET is required}"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
 
 echo "📂 Checking application directory..."
@@ -129,10 +129,14 @@ echo ""
 # Run deployment with timeout
 echo "🐳 Building and starting Docker containers (this may take 10-15 minutes)..."
 cd "$APP_DIR"
-if [ -n "$REMOVE_ORPHANS" ]; then
+if [ -n "$REMOVE_ORPHANS" ] && [ -n "$COMPOSE_PROJECT_NAME" ]; then
     timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" DPP_REMOVE_ORPHANS="$REMOVE_ORPHANS" ./infra/oracle/deploy-prod.sh
-else
+elif [ -n "$REMOVE_ORPHANS" ]; then
+    timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" DPP_REMOVE_ORPHANS="$REMOVE_ORPHANS" ./infra/oracle/deploy-prod.sh
+elif [ -n "$COMPOSE_PROJECT_NAME" ]; then
     timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" ./infra/oracle/deploy-prod.sh
+else
+    timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" ./infra/oracle/deploy-prod.sh
 fi
 
 echo ""
@@ -158,7 +162,10 @@ echo "⏱️  Starting remote deployment (timeout: ${TIMEOUT_SECONDS}s)..."
 echo "---"
 
 # Execute with timeout
-REMOTE_ENV="DPP_DEPLOY_TARGET='$DEPLOY_TARGET' COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME'"
+REMOTE_ENV="DPP_DEPLOY_TARGET='$DEPLOY_TARGET'"
+if [ -n "$COMPOSE_PROJECT_NAME" ]; then
+    REMOTE_ENV="$REMOTE_ENV COMPOSE_PROJECT_NAME='$COMPOSE_PROJECT_NAME'"
+fi
 if [ -n "$REMOVE_ORPHANS" ]; then
     REMOTE_ENV="$REMOTE_ENV DPP_REMOVE_ORPHANS='$REMOVE_ORPHANS'"
 fi

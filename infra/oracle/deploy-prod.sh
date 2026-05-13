@@ -3,8 +3,20 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/dpp}"
 ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 LOCK_FILE="${DPP_DEPLOY_LOCK_FILE:-/tmp/dpp-deploy.lock}"
+
+read_env_var() {
+  local key="$1"
+  awk -F= -v target="$key" '
+    $1 ~ "^[[:space:]]*" target "[[:space:]]*$" {
+      value=$2
+      gsub(/^[[:space:]"'\''"]+|[[:space:]"'\''"]+$/, "", value)
+      print value
+      exit
+    }
+  ' "$ENV_FILE"
+}
 
 if [ ! -d "$APP_DIR" ]; then
   echo "Missing app directory: $APP_DIR"
@@ -17,16 +29,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 if [ -z "${DPP_DEPLOY_TARGET:-}" ]; then
-  DEPLOY_TARGET="$(
-    awk -F= '
-      /^[[:space:]]*DPP_DEPLOY_TARGET[[:space:]]*=/ {
-        value=$2
-        gsub(/^[[:space:]"'\'']+|[[:space:]"'\'']+$/, "", value)
-        print value
-        exit
-      }
-    ' "$ENV_FILE"
-  )"
+  DEPLOY_TARGET="$(read_env_var DPP_DEPLOY_TARGET)"
 else
   DEPLOY_TARGET="$DPP_DEPLOY_TARGET"
 fi
@@ -58,6 +61,49 @@ case "$DEPLOY_TARGET" in
     ;;
 esac
 
+if [ -z "$COMPOSE_PROJECT_NAME" ]; then
+  COMPOSE_PROJECT_NAME="$(read_env_var COMPOSE_PROJECT_NAME)"
+fi
+
+if [ -z "$COMPOSE_PROJECT_NAME" ]; then
+  case "$DEPLOY_TARGET" in
+    backend)
+      COMPOSE_PROJECT_NAME="$(
+        docker ps \
+          --filter "label=com.docker.compose.service=backend-api" \
+          --format '{{.Label "com.docker.compose.project"}}' \
+          | head -n1
+      )"
+      if [ -z "$COMPOSE_PROJECT_NAME" ]; then
+        COMPOSE_PROJECT_NAME="$(
+          docker ps \
+            --filter "label=com.docker.compose.service=postgres" \
+            --format '{{.Label "com.docker.compose.project"}}' \
+            | head -n1
+        )"
+      fi
+      ;;
+    frontend)
+      COMPOSE_PROJECT_NAME="$(
+        docker ps \
+          --filter "label=com.docker.compose.service=frontend-app" \
+          --format '{{.Label "com.docker.compose.project"}}' \
+          | head -n1
+      )"
+      ;;
+    all)
+      COMPOSE_PROJECT_NAME="$(
+        docker ps \
+          --filter "label=com.docker.compose.service=backend-api" \
+          --format '{{.Label "com.docker.compose.project"}}' \
+          | head -n1
+      )"
+      ;;
+  esac
+fi
+
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is not installed or not on PATH"
   exit 1
@@ -81,6 +127,18 @@ if [ "$REMOVE_ORPHANS" = "true" ]; then
 fi
 
 echo "Deploying target=$DEPLOY_TARGET compose=$COMPOSE_FILE project=$COMPOSE_PROJECT_NAME remove_orphans=$REMOVE_ORPHANS"
+
+if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
+  CURRENT_POSTGRES_VOLUMES="$(
+    docker volume ls --format '{{.Name}}' 2>/dev/null \
+      | grep -E '(^|_)(postgres_data)$' \
+      || true
+  )"
+  if [ -n "$CURRENT_POSTGRES_VOLUMES" ]; then
+    echo "Detected postgres volumes:"
+    echo "$CURRENT_POSTGRES_VOLUMES" | sed 's/^/  - /'
+  fi
+fi
 
 (
   flock -n 9 || {
