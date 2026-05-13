@@ -21,7 +21,8 @@ services:
       - local_storage_data:/data
     restart: unless-stopped
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:18-alpine
@@ -34,6 +35,12 @@ services:
       POSTGRES_DB: "${DB_NAME:-dpp_system}"
       POSTGRES_USER: "${DB_USER:-postgres}"
       POSTGRES_PASSWORD: "${DB_PASSWORD:-postgres}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
     volumes:
       - postgres_data:/var/lib/postgresql
     restart: unless-stopped

@@ -126,6 +126,11 @@ if [ "$REMOVE_ORPHANS" = "true" ]; then
   ORPHAN_ARGS=(--remove-orphans)
 fi
 
+EXPLICIT_POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-}"
+if [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
+  EXPLICIT_POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
+fi
+
 echo "Deploying target=$DEPLOY_TARGET compose=$COMPOSE_FILE project=$COMPOSE_PROJECT_NAME remove_orphans=$REMOVE_ORPHANS"
 
 if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
@@ -137,6 +142,13 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   if [ -n "$CURRENT_POSTGRES_VOLUMES" ]; then
     echo "Detected postgres volumes:"
     echo "$CURRENT_POSTGRES_VOLUMES" | sed 's/^/  - /'
+  fi
+  POSTGRES_VOLUME_COUNT="$(printf '%s\n' "$CURRENT_POSTGRES_VOLUMES" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [ "${POSTGRES_VOLUME_COUNT:-0}" -gt 1 ] && [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
+    echo "Refusing deployment: multiple postgres_data-style volumes were detected, but POSTGRES_VOLUME_NAME is not set."
+    echo "Set POSTGRES_VOLUME_NAME in $ENV_FILE to the exact live volume you intend to use before deploying."
+    echo "This guard prevents Docker Compose from attaching a fresh database volume by accident."
+    exit 1
   fi
 fi
 
