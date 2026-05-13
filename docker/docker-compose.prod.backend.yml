@@ -41,5 +41,7 @@ services:
 volumes:
   local_storage_data:
     name: "${LOCAL_STORAGE_VOLUME_NAME:-dpp_local_storage_data}"
+    external: true
   postgres_data:
     name: "${POSTGRES_VOLUME_NAME:-dpp_postgres_data}"
+    external: true
