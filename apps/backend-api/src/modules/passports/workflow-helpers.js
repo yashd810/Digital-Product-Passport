@@ -1,0 +1,161 @@
+"use strict";
+
+function createWorkflowHelpers({
+  pool,
+  logger,
+  createTransporter,
+  brandedEmail,
+  getTable,
+  normalizePassportRow,
+  normalizeReleaseStatus,
+  IN_REVISION_STATUS,
+  EDITABLE_RELEASE_STATUSES_SQL,
+  archivePassportSnapshot,
+  createNotification,
+  logAudit,
+}) {
+  async function submitPassportToWorkflow({
+    companyId,
+    dppId = null,
+    passportType,
+    userId,
+    reviewerId,
+    approverId,
+  }) {
+    const tableName = getTable(passportType);
+    const resolvedReviewerId = reviewerId ? parseInt(reviewerId, 10) : null;
+    const resolvedApproverId = approverId ? parseInt(approverId, 10) : null;
+
+    if (!resolvedReviewerId && !resolvedApproverId) {
+      throw new Error("At least one reviewer or approver is required to submit a revision to workflow.");
+    }
+
+    const pRes = await pool.query(
+      `SELECT * FROM ${tableName}
+       WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+       ORDER BY version_number DESC LIMIT 1`,
+      [dppId]
+    );
+    if (!pRes.rows.length) throw new Error("Editable passport not found");
+    const passport = normalizePassportRow(pRes.rows[0]);
+
+    await archivePassportSnapshot({
+      passport: pRes.rows[0],
+      passportType,
+      archivedBy: userId,
+      snapshotReason: "before_submit_review",
+    });
+
+    await pool.query(
+      `UPDATE ${tableName} SET release_status = 'in_review', updated_at = NOW()
+       WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
+      [dppId]
+    );
+
+    const updatedRes = await pool.query(
+      `SELECT *
+       FROM ${tableName}
+       WHERE dpp_id = $1
+       ORDER BY version_number DESC LIMIT 1`,
+      [dppId]
+    );
+    if (updatedRes.rows.length) {
+      await archivePassportSnapshot({
+        passport: updatedRes.rows[0],
+        passportType,
+        archivedBy: userId,
+        snapshotReason: "after_submit_review",
+      });
+    }
+
+    const wfRes = await pool.query(
+      `INSERT INTO passport_workflow
+         (passport_dpp_id, passport_type, company_id, submitted_by, reviewer_id, approver_id,
+          review_status, approval_status, overall_status, previous_release_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'in_progress',$9)
+       RETURNING id`,
+      [
+        dppId,
+        passportType,
+        companyId,
+        userId,
+        resolvedReviewerId,
+        resolvedApproverId,
+        resolvedReviewerId ? "pending" : "skipped",
+        resolvedApproverId ? "pending" : "skipped",
+        normalizeReleaseStatus(passport.release_status) || IN_REVISION_STATUS,
+      ]
+    );
+
+    const appUrl = process.env.APP_URL || "http://localhost:3000";
+
+    if (resolvedReviewerId) {
+      await createNotification(
+        resolvedReviewerId,
+        "workflow_review",
+        `Review requested: ${passport.product_id}`,
+        `v${passport.version_number} needs your review`,
+        dppId,
+        "/dashboard/workflow"
+      );
+      try {
+        const reviewer = await pool.query("SELECT email, first_name FROM users WHERE id = $1", [resolvedReviewerId]);
+        const submitter = await pool.query("SELECT first_name, last_name, email FROM users WHERE id = $1", [userId]);
+        if (reviewer.rows.length) {
+          const reviewerName = reviewer.rows[0].first_name || "Reviewer";
+          const submitterName =
+            `${submitter.rows[0]?.first_name || ""} ${submitter.rows[0]?.last_name || ""}`.trim() ||
+            submitter.rows[0]?.email ||
+            "A colleague";
+          await createTransporter().sendMail({
+            from: process.env.EMAIL_FROM || "noreply@example.com",
+            to: reviewer.rows[0].email,
+            subject: `[DPP] Review requested — ${passport.product_id}`,
+            html: brandedEmail({
+              preheader: `${submitterName} submitted a passport for your review`,
+              bodyHtml: `
+                <p>Hi <strong>${reviewerName}</strong>,</p>
+                <p><strong>${submitterName}</strong> has submitted a passport for your review.</p>
+                <div class="info-box">
+                  <div class="info-row"><span class="info-label">Serial Number</span><span class="info-value">${passport.product_id}</span></div>
+                  ${passport.model_name ? `<div class="info-row"><span class="info-label">Model</span><span class="info-value">${passport.model_name}</span></div>` : ""}
+                  <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.version_number}</span></div>
+                  <div class="info-row"><span class="info-label">Type</span><span class="info-value">${passportType}</span></div>
+                </div>
+                <div class="cta-wrap"><a href="${appUrl}/dashboard/workflow" class="cta-btn">🔍 Review Now →</a></div>`,
+            }),
+          });
+        }
+      } catch (e) {
+        logger.error("Review email error:", e.message);
+      }
+    }
+
+    if (resolvedApproverId && !resolvedReviewerId) {
+      await createNotification(
+        resolvedApproverId,
+        "workflow_approval",
+        `Approval requested: ${passport.product_id}`,
+        `v${passport.version_number} needs your approval`,
+        dppId,
+        "/dashboard/workflow"
+      );
+    }
+
+    await logAudit(companyId, userId, "SUBMIT_REVIEW", tableName, dppId, null, {
+      reviewerId: resolvedReviewerId,
+      approverId: resolvedApproverId,
+      status: "in_review",
+    });
+
+    return { workflowId: wfRes.rows[0].id };
+  }
+
+  return {
+    submitPassportToWorkflow,
+  };
+}
+
+module.exports = {
+  createWorkflowHelpers,
+};

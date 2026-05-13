@@ -1,0 +1,283 @@
+"use strict";
+
+module.exports = function registerDidRoutes(app, deps) {
+  const {
+    pool,
+    logger,
+    publicReadRateLimit,
+    getTable,
+    normalizePassportRow,
+    getCompanyNameMap,
+    loadCompanyById,
+    resolveLegacyPassportDidTarget,
+    dbLookupByCompanyAndProduct,
+    getAppUrl,
+    didService,
+    dppIdentity,
+  } = deps;
+
+  app.get("/did/company/:companyId/did.json", async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const company = await loadCompanyById(companyId);
+      if (!company?.is_active) return res.status(404).json({ error: "Company not found" });
+      const companySlug = didService.normalizeCompanySlug(
+        company.did_slug || company.company_name || `company-${company.id}`
+      );
+      return res.redirect(301, `/did/company/${encodeURIComponent(companySlug)}/did.json`);
+    } catch (e) {
+      logger.error({ err: e }, "[Company DID]");
+      res.status(500).json({ error: "Failed to resolve DID document" });
+    }
+  });
+
+  app.get("/did/battery/model/:companyId/:productId/did.json", async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const productId = decodeURIComponent(req.params.productId);
+      if (!productId) return res.status(400).json({ error: "productId is required" });
+
+      const target = await resolveLegacyPassportDidTarget(companyId, productId, "model");
+      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
+      return res.redirect(301, `/did/battery/model/${encodeURIComponent(target.stableId)}/did.json`);
+    } catch (e) {
+      logger.error({ err: e }, "[Battery Model DID]");
+      res.status(500).json({ error: "Failed to resolve DID document" });
+    }
+  });
+
+  app.get("/did/battery/item/:companyId/:productId/did.json", async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const productId = decodeURIComponent(req.params.productId);
+      if (!productId) return res.status(400).json({ error: "productId is required" });
+
+      const target = await resolveLegacyPassportDidTarget(companyId, productId, "item");
+      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
+      return res.redirect(301, `/did/battery/item/${encodeURIComponent(target.stableId)}/did.json`);
+    } catch (e) {
+      logger.error({ err: e }, "[Battery Item DID]");
+      res.status(500).json({ error: "Failed to resolve DID document" });
+    }
+  });
+
+  app.get("/did/battery/batch/:companyId/:productId/did.json", async (req, res) => {
+    try {
+      const companyId = parseInt(req.params.companyId, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const productId = decodeURIComponent(req.params.productId);
+      if (!productId) return res.status(400).json({ error: "productId is required" });
+
+      const target = await resolveLegacyPassportDidTarget(companyId, productId, "batch");
+      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
+      return res.redirect(301, `/did/battery/batch/${encodeURIComponent(target.stableId)}/did.json`);
+    } catch (e) {
+      logger.error({ err: e }, "[Battery Batch DID]");
+      res.status(500).json({ error: "Failed to resolve DID document" });
+    }
+  });
+
+  app.get("/did/dpp/:granularity/:companyId/:productId/did.json", async (req, res) => {
+    try {
+      const { granularity } = req.params;
+      const validGranularities = ["model", "item", "batch"];
+      if (!validGranularities.includes(granularity)) {
+        return res.status(400).json({ error: `granularity must be one of: ${validGranularities.join(", ")}` });
+      }
+
+      const companyId = parseInt(req.params.companyId, 10);
+      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+      const productId = decodeURIComponent(req.params.productId);
+      if (!productId) return res.status(400).json({ error: "productId is required" });
+
+      const target = await resolveLegacyPassportDidTarget(companyId, productId, granularity);
+      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
+      const nextGranularity = didService.normalizeGranularity(target.granularity || granularity);
+      return res.redirect(301, `/did/dpp/${encodeURIComponent(nextGranularity)}/${encodeURIComponent(target.stableId)}/did.json`);
+    } catch (e) {
+      logger.error({ err: e }, "[DPP DID]");
+      res.status(500).json({ error: "Failed to resolve DID document" });
+    }
+  });
+
+  app.get("/did/facility/:facilityId/did.json", async (req, res) => {
+    try {
+      const facilityId = decodeURIComponent(req.params.facilityId);
+      if (!facilityId) return res.status(400).json({ error: "facilityId is required" });
+
+      const appUrl = getAppUrl();
+      const fDid = dppIdentity.facilityDid(facilityId);
+      const controller = dppIdentity.platformDid();
+
+      const didDocument = {
+        "@context": ["https://www.w3.org/ns/did/v1"],
+        id: fDid,
+        controller,
+        service: [
+          {
+            id: `${fDid}#facility-profile`,
+            type: "LinkedDomains",
+            serviceEndpoint: `${appUrl}/api/facilities/${encodeURIComponent(facilityId)}`
+          }
+        ]
+      };
+
+      res.setHeader("Content-Type", "application/did+ld+json");
+      res.json(didDocument);
+    } catch (e) {
+      logger.error({ err: e }, "[Facility DID]");
+      res.status(500).json({ error: "Failed to generate DID document" });
+    }
+  });
+
+  app.get("/resolve", publicReadRateLimit, async (req, res) => {
+    try {
+      const { did } = req.query;
+      if (!did) return res.status(400).json({ error: "did query parameter required" });
+
+      if (!did.startsWith("did:web:")) {
+        return res.status(400).json({ error: "Only did:web method is supported" });
+      }
+
+      const parsed = dppIdentity.parseDid(did);
+      if (!parsed) {
+        return res.status(400).json({ error: "Invalid DID syntax — could not parse" });
+      }
+
+      const accept = req.headers.accept || "";
+      const wantsBrowser = accept.includes("text/html") &&
+        !accept.includes("application/json") &&
+        !accept.includes("application/did+ld+json");
+
+      if (parsed.type === "platform") {
+        const docUrl = dppIdentity.didToDocumentUrl(did);
+        return res.redirect(307, docUrl);
+      }
+
+      if (parsed.type === "company") {
+        const appUrl = getAppUrl();
+        if (wantsBrowser) {
+          return res.redirect(307, `${appUrl}/companies/${parsed.companyId}`);
+        }
+        const docUrl = dppIdentity.didToDocumentUrl(did);
+        if (!docUrl) return res.status(404).json({ error: "DID not resolvable" });
+        return res.redirect(307, docUrl);
+      }
+
+      if (parsed.type === "battery") {
+        if (wantsBrowser) {
+          const companyId = parseInt(parsed.companyId, 10);
+          const result = await dbLookupByCompanyAndProduct(companyId, parsed.productId).catch(() => null);
+          if (result) {
+            const publicUrl = dppIdentity.buildCanonicalPublicUrl(result.passport, result.companyName);
+            return res.redirect(307, publicUrl);
+          }
+        }
+        const docUrl = dppIdentity.didToDocumentUrl(did);
+        if (!docUrl) return res.status(404).json({ error: "DID not resolvable" });
+        return res.redirect(307, docUrl);
+      }
+
+      if (parsed.type === "dpp") {
+        if (wantsBrowser) {
+          const companyId = parseInt(parsed.companyId, 10);
+          const result = await dbLookupByCompanyAndProduct(companyId, parsed.productId).catch(() => null);
+          if (result) {
+            const publicUrl = dppIdentity.buildCanonicalPublicUrl(result.passport, result.companyName);
+            return res.redirect(307, publicUrl);
+          }
+        }
+        const docUrl = dppIdentity.didToDocumentUrl(did);
+        if (!docUrl) return res.status(404).json({ error: "DID not resolvable" });
+        return res.redirect(307, docUrl);
+      }
+
+      if (parsed.type === "facility") {
+        const docUrl = dppIdentity.didToDocumentUrl(did);
+        if (!docUrl) return res.status(404).json({ error: "DID not resolvable" });
+        return res.redirect(307, docUrl);
+      }
+
+      res.status(404).json({ error: "DID type not supported or not found" });
+    } catch (e) {
+      logger.error({ err: e }, "[Resolver]");
+      res.status(500).json({ error: "DID resolution failed" });
+    }
+  });
+
+  app.get("/api/passports/:dppId/public-url", publicReadRateLimit, async (req, res) => {
+    try {
+      const { dppId } = req.params;
+      if (!dppId) return res.status(400).json({ error: "dppId is required" });
+
+      const reg = await pool.query(
+        "SELECT passport_type, company_id FROM passport_registry WHERE dpp_id = $1",
+        [dppId]
+      );
+      if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
+
+      const { passport_type, company_id } = reg.rows[0];
+      const tableName = getTable(passport_type);
+
+      const r = await pool.query(
+        `SELECT dpp_id, product_id, model_name, company_id FROM ${tableName}
+         WHERE dpp_id = $1 AND deleted_at IS NULL
+         LIMIT 1`,
+        [dppId]
+      );
+      if (!r.rows.length) return res.status(404).json({ error: "Passport record not found" });
+
+      const passport = normalizePassportRow(r.rows[0]);
+      passport.passport_type = passport_type;
+
+      const companyNameMap = await getCompanyNameMap([company_id]);
+      const companyName = companyNameMap.get(String(company_id)) || "";
+
+      const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
+      const productDid = passport.product_identifier_did || (passport.product_id ?
+        dppIdentity.productModelDid(company_id, passport.product_id) :
+        null);
+      const pDppDid = passport.product_id ?
+        dppIdentity.dppDid("model", company_id, passport.product_id) :
+        null;
+
+      res.json({
+        publicUrl,
+        productId: passport.product_id || null,
+        productIdentifierDid: passport.product_identifier_did || null,
+        modelName: passport.model_name || null,
+        companyName,
+        dppDid: pDppDid,
+        productDid
+      });
+    } catch (e) {
+      logger.error({ err: e }, "[Public URL]");
+      res.status(500).json({ error: "Failed to resolve public URL" });
+    }
+  });
+
+  app.get("/did/org/:companyId/did.json", async (req, res) => {
+    const companyId = parseInt(req.params.companyId, 10);
+    if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
+
+    try {
+      const company = await loadCompanyById(companyId);
+      if (!company?.is_active) return res.status(404).json({ error: "Company not found" });
+      const companySlug = didService.normalizeCompanySlug(
+        company.did_slug || company.company_name || `company-${company.id}`
+      );
+      return res.redirect(301, `/did/company/${encodeURIComponent(companySlug)}/did.json`);
+    } catch (e) {
+      logger.error({ err: e }, "[Legacy Org DID]");
+      return res.status(500).json({ error: "Failed to resolve DID document" });
+    }
+  });
+};
