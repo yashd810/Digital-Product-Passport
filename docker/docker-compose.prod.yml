@@ -90,4 +90,6 @@ services:
 
 volumes:
   local_storage_data:
+    name: "${LOCAL_STORAGE_VOLUME_NAME:-dpp_local_storage_data}"
   postgres_data:
+    name: "${POSTGRES_VOLUME_NAME:-dpp_postgres_data}"

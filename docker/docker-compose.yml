@@ -95,7 +95,12 @@ services:
 
 volumes:
   frontend_node_modules:
+    name: "${FRONTEND_NODE_MODULES_VOLUME_NAME:-docker_frontend_node_modules}"
   backend_node_modules:
+    name: "${BACKEND_NODE_MODULES_VOLUME_NAME:-docker_backend_node_modules}"
   public_viewer_node_modules:
+    name: "${PUBLIC_VIEWER_NODE_MODULES_VOLUME_NAME:-docker_public_viewer_node_modules}"
   local_storage_data:
+    name: "${LOCAL_STORAGE_VOLUME_NAME:-docker_local_storage_data}"
   postgres_data:
+    name: "${POSTGRES_VOLUME_NAME:-docker_postgres_data}"
