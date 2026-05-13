@@ -329,8 +329,20 @@ describe("admin passport type validation", () => {
     expect(pool.query).not.toHaveBeenCalled();
   });
 
-  test("rejects passport type creation when field access or governance metadata is invalid", async () => {
+  test("creates passport types even when governance metadata needs review and returns checker issues", async () => {
     const { app, pool } = createTestApp();
+    pool.query.mockImplementation(async (sql, params = []) => {
+      if (String(sql).includes("INSERT INTO passport_types")) {
+        return {
+          rows: [{
+            id: 99,
+            type_name: params[0],
+            display_name: params[1],
+          }],
+        };
+      }
+      return { rows: [] };
+    });
 
     const response = await invokeRoute(app, {
       method: "post",
@@ -367,9 +379,15 @@ describe("admin passport type validation", () => {
       },
     });
 
-    expect(response.statusCode).toBe(400);
-    expect(response.body.error).toMatch(/invalid access or governance metadata/i);
-    expect(response.body.issues).toEqual(
+    expect(response.statusCode).toBe(201);
+    expect(response.body.warning).toMatch(/should be reviewed/i);
+    expect(response.body.verification).toEqual(
+      expect.objectContaining({
+        status: "attention_needed",
+        issueCount: 6,
+      })
+    );
+    expect(response.body.verification.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: "FIELD_ACCESS_MISSING", key: "manufacturer" }),
         expect.objectContaining({ code: "FIELD_CONFIDENTIALITY_MISSING", key: "manufacturer" }),
@@ -379,6 +397,40 @@ describe("admin passport type validation", () => {
         expect.objectContaining({ code: "FIELD_UPDATE_AUTHORITY_INVALID", key: "battery_category" }),
       ])
     );
-    expect(pool.query).not.toHaveBeenCalled();
+    expect(pool.query).toHaveBeenCalled();
+  });
+
+  test("runs passport type verification check without blocking save flows", async () => {
+    const { app } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "post",
+      path: "/api/admin/passport-types/verification-check",
+      body: {
+        sections: [
+          {
+            key: "overview",
+            label: "Overview",
+            fields: [{
+              key: "manufacturer",
+              label: "Manufacturer",
+              type: "text",
+              access: [],
+              confidentiality: "",
+              updateAuthority: [],
+            }],
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.status).toBe("attention_needed");
+    expect(response.body.governance).toEqual(
+      expect.objectContaining({
+        status: "attention_needed",
+        issueCount: 3,
+      })
+    );
   });
 });

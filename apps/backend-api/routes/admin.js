@@ -309,6 +309,15 @@ module.exports = function registerAdminRoutes(app, {
     return issues;
   }
 
+  function buildPassportTypeGovernanceCheck(sections = []) {
+    const issues = validatePassportTypeFieldGovernance(sections);
+    return {
+      status: issues.length ? "attention_needed" : "ok",
+      issueCount: issues.length,
+      issues,
+    };
+  }
+
   function normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion }) {
     const systemHeaderValidation = validateSystemPassportHeader(systemHeader || normalizeSystemPassportHeader());
     if (!systemHeaderValidation.valid) {
@@ -511,13 +520,6 @@ module.exports = function registerAdminRoutes(app, {
         }
         const sectionValidationError = validatePassportTypeSections(sections);
         if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
-        const fieldGovernanceIssues = validatePassportTypeFieldGovernance(sections);
-        if (fieldGovernanceIssues.length) {
-          return res.status(400).json({
-            error: "Passport type fields contain invalid access or governance metadata.",
-            issues: fieldGovernanceIssues
-          });
-        }
         const schemaChange = buildPassportTypeSchemaChange({
           currentFieldsJson: currentType.fields_json || {},
           nextSections: sections,
@@ -558,7 +560,18 @@ module.exports = function registerAdminRoutes(app, {
         });
       }
 
-      res.json({ success: true, passportType: r.rows[0] });
+      const verification = sections !== undefined
+        ? buildPassportTypeGovernanceCheck(sections)
+        : buildPassportTypeGovernanceCheck((r.rows[0]?.fields_json || {}).sections || []);
+
+      res.json({
+        success: true,
+        passportType: r.rows[0],
+        verification,
+        warning: verification.issueCount
+          ? "Passport type fields contain governance metadata that should be reviewed."
+          : null,
+      });
     } catch (e) {
       logger.error("Patch passport type error:", e.message);
       res.status(e.statusCode || 500).json({ error: e.statusCode ? e.message : "Failed to update passport type" });
@@ -622,13 +635,6 @@ module.exports = function registerAdminRoutes(app, {
 
       const sectionValidationError = validatePassportTypeSections(sections);
       if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
-      const fieldGovernanceIssues = validatePassportTypeFieldGovernance(sections);
-      if (fieldGovernanceIssues.length) {
-        return res.status(400).json({
-          error: "Passport type fields contain invalid access or governance metadata.",
-          issues: fieldGovernanceIssues
-        });
-      }
 
       const fields_json = normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion: 1 });
 
@@ -652,11 +658,40 @@ module.exports = function registerAdminRoutes(app, {
       await logAudit(null, req.user.userId, "CREATE_PASSPORT_TYPE", "passport_types", null, null,
       { type_name, display_name, product_category, semantic_model_key: semantic_model_key || null });
 
-      res.status(201).json({ success: true, passportType: r.rows[0] });
+      const verification = buildPassportTypeGovernanceCheck(sections);
+      res.status(201).json({
+        success: true,
+        passportType: r.rows[0],
+        verification,
+        warning: verification.issueCount
+          ? "Passport type fields contain governance metadata that should be reviewed."
+          : null,
+      });
     } catch (e) {
       if (e.code === "23505") return res.status(400).json({ error: "A passport type with this type_name already exists" });
       logger.error("Create passport type error:", e.message);
       res.status(e.statusCode || 500).json({ error: e.statusCode ? e.message : "Failed to create passport type" });
+    }
+  });
+
+  app.post("/api/admin/passport-types/verification-check", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const { sections } = req.body || {};
+      const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
+      const sectionValidationError = validatePassportTypeSections(sections);
+      const governance = buildPassportTypeGovernanceCheck(sections);
+
+      return res.json({
+        status: !reservedFieldConflicts.length && !sectionValidationError && governance.issueCount === 0
+          ? "ok"
+          : "attention_needed",
+        reservedFieldConflicts,
+        structuralError: sectionValidationError || null,
+        governance,
+      });
+    } catch (e) {
+      logger.error("Passport type verification check error:", e.message);
+      res.status(500).json({ error: "Failed to run passport type verification check" });
     }
   });
 
