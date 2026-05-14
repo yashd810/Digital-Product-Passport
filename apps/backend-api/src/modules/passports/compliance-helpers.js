@@ -188,7 +188,7 @@ function createComplianceHelpers({
 
     if (!companyPolicy.allow_granularity_override && normalizedRequested && normalizedRequested !== fallbackGranularity) {
       const error = new Error(`Granularity override is disabled for this company. The enforced value is "${fallbackGranularity}".`);
-      error.statusCode = 403;
+      error.statusCode = 400;
       throw error;
     }
 

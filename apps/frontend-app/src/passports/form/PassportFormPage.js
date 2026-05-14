@@ -39,6 +39,13 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const passportType = typeProp || typeParam ||
     new URLSearchParams(location.search).get("passportType");
   const templateId = new URLSearchParams(location.search).get("templateId");
+  const effectiveCompanyId = String(
+    companyId ||
+    user?.companyId ||
+    user?.company_id ||
+    localStorage.getItem("companyId") ||
+    ""
+  );
 
   // Support both static PASSPORT_SECTIONS_MAP and dynamic type definitions from DB
   const [dynamicSections, setDynamicSections] = useState(null);
@@ -90,16 +97,16 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   // Load symbols from company repository
   useEffect(() => {
-    if (!companyId) return;
-    fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols`, { headers: authHeaders() })
+    if (!effectiveCompanyId) return;
+    fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/repository/symbols`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setSymbols)
       .catch(() => {});
-  }, [companyId]);
+  }, [effectiveCompanyId]);
 
   useEffect(() => {
-    if (!companyId) return;
-    fetchWithAuth(`${API}/api/companies/${companyId}/compliance-identity`, { headers: authHeaders() })
+    if (!effectiveCompanyId) return;
+    fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/compliance-identity`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (!data) return;
@@ -125,7 +132,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         });
       })
       .catch(() => {});
-  }, [companyId]);
+  }, [effectiveCompanyId]);
 
   // Load dynamic type definition from server if not in static map
   useEffect(() => {
@@ -171,8 +178,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   // Load template pre-fill on create mode
   useEffect(() => {
-    if (mode !== "create" || !templateId || !companyId) return;
-    fetchWithAuth(`${API}/api/companies/${companyId}/templates/${templateId}`, { headers: authHeaders() })
+    if (mode !== "create" || !templateId || !effectiveCompanyId) return;
+    fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/templates/${templateId}`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(tmpl => {
         if (!tmpl) return;
@@ -187,14 +194,14 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         setModelDataKeys(modelKeys);
       })
       .catch(() => {});
-  }, [mode, templateId, companyId]);
+  }, [mode, templateId, effectiveCompanyId]);
 
   useEffect(() => {
     if (mode !== "edit" || !dppId || !passportType) return;
     (async () => {
       try {
         const r = await fetchWithAuth(
-          `${API}/api/companies/${companyId}/passports/${dppId}?passportType=${passportType}`,
+          `${API}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${passportType}`,
           { headers: authHeaders() }
         );
         if (!r.ok) throw new Error("Failed to load passport");
@@ -207,7 +214,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       } catch (e) { setError(e.message); }
       finally { setIsLoading(false); }
     })();
-  }, [dppId, mode, passportType, companyId, token]);
+  }, [dppId, mode, passportType, effectiveCompanyId, token]);
 
   const toggle      = (k)        => setExpanded(p => ({ ...p, [k]: !p[k] }));
   const handleField = (key, val) => {
@@ -229,7 +236,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     fd.append("file", file); fd.append("fieldKey", key); fd.append("passportType", passportType);
     setUploadProgress(p => ({ ...p, [key]: "uploading" }));
     const r = await fetchWithAuth(
-      `${API}/api/companies/${companyId}/passports/${guidToUse}/upload`,
+      `${API}/api/companies/${effectiveCompanyId}/passports/${guidToUse}/upload`,
       { method:"POST", headers: authHeaders(), body:fd }
     );
     if (!r.ok) throw new Error("Upload failed");
@@ -271,7 +278,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const refreshEditPresence = async (method = "GET") => {
-    if (mode !== "edit" || !dppId || !passportType || !companyId) return;
+    if (mode !== "edit" || !dppId || !passportType || !effectiveCompanyId) return;
     const init = method === "POST"
       ? {
           method,
@@ -282,7 +289,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           method,
           headers: authHeaders(),
         };
-    const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/edit-session`, init);
+    const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports/${dppId}/edit-session`, init);
     if (!r.ok) throw new Error("Failed to update edit presence");
     const data = await r.json();
     if (mountedRef.current) {
@@ -293,9 +300,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const releaseEditPresence = async () => {
-    if (mode !== "edit" || !dppId || !companyId || !sessionActiveRef.current) return;
+    if (mode !== "edit" || !dppId || !effectiveCompanyId || !sessionActiveRef.current) return;
     try {
-      await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/edit-session`, {
+      await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports/${dppId}/edit-session`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -311,7 +318,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
     try {
       const body = buildEditableBody();
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports/${dppId}`, {
         method:"PATCH",
         headers: authHeaders({ "Content-Type":"application/json" }),
         body: JSON.stringify(body),
@@ -361,7 +368,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   useEffect(() => {
-    if (mode !== "edit" || !dppId || !passportType || !companyId || isLoading) return;
+    if (mode !== "edit" || !dppId || !passportType || !effectiveCompanyId || isLoading) return;
 
     refreshEditPresence("POST").catch(() => {});
 
@@ -401,7 +408,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       window.removeEventListener("scroll", handleActivity);
       releaseEditPresence();
     };
-  }, [mode, dppId, passportType, companyId, isLoading, sessionExpired]);
+  }, [mode, dppId, passportType, effectiveCompanyId, isLoading, sessionExpired]);
 
   useEffect(() => {
     if (mode !== "edit" || !dppId || !passportType || isLoading || !dirtyRef.current) return;
@@ -410,13 +417,16 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       saveEditChanges();
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [mode, dppId, passportType, companyId, modelName, productId, formData, fileSelections, isLoading]);
+  }, [mode, dppId, passportType, effectiveCompanyId, modelName, productId, formData, fileSelections, isLoading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(""); setSuccess(""); setIsSaving(true);
 
     try {
+      if (!effectiveCompanyId) {
+        throw new Error("No company is attached to this session. Refresh the page and sign in again if needed.");
+      }
       let passportDppId = dppId;
       const trimmedProductId = productId.trim();
 
@@ -433,7 +443,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           product_id: trimmedProductId,
           ...serializedData,
         };
-        const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports`, {
+        const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
           body: JSON.stringify(body),
         });
@@ -977,7 +987,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       {repoPicker && (
         <RepositoryPicker
           token={token}
-          companyId={companyId}
+          companyId={effectiveCompanyId}
           onSelect={(url) => { handleField(repoPicker, url); setRepoPicker(null); }}
           onClose={() => setRepoPicker(null)}
         />

@@ -25,12 +25,9 @@ export async function fetchWithAuth(url, options = {}) {
     urlString.includes("/api/auth/sso") ||
     urlString.includes("/api/users/me");
 
-  // Redirect to login only for protected endpoints when already logged in but session expired
-  if (
-    (response.status === 401 || response.status === 403) &&
-    !isLoginPage &&
-    !isAuthBootstrapRequest
-  ) {
+  // Redirect to login only when the server indicates the session is no longer valid.
+  // Business-rule 403s should stay on the page and surface their actual error message.
+  if (response.status === 401 && !isLoginPage && !isAuthBootstrapRequest) {
     window.location.replace("/login?session=expired");
   }
 
