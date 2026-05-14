@@ -1164,6 +1164,14 @@ async function initDb(pool, {
   // Company-managed branding for public passport viewer and consumer pages
   await pool.query(`
     ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS company_logo TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS introduction_text TEXT
+  `);
+  await pool.query(`
+    ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS branding_json JSONB NOT NULL DEFAULT '{}'::jsonb
   `);
 
