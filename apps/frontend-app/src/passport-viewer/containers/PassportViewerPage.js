@@ -103,6 +103,16 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   }, [encodedPreviewId, encodedProductId, isPreviewMode, previewCompanyId, previewId, productId, versionNumber]);
 
   useEffect(() => {
+    if (!isPreviewMode || !previewCompanyId) return;
+    fetchWithAuth(`${API}/api/companies/${previewCompanyId}/profile`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setCompanyData(d);
+      })
+      .catch(() => {});
+  }, [isPreviewMode, previewCompanyId]);
+
+  useEffect(() => {
     fetchWithAuth(`${API}/api/users/me`, {
       headers: authHeaders(),
     })
