@@ -2814,6 +2814,28 @@
   border-color: rgba(23, 48, 74, 0.15);
 }
 
+[data-theme="light"] .intro-upload-btn {
+  background: linear-gradient(135deg, #0db5b0 0%, #0a9aa1 100%);
+  color: #07242a;
+  box-shadow: 0 10px 22px rgba(13, 181, 176, 0.16);
+}
+
+[data-theme="light"] .intro-upload-btn:hover {
+  box-shadow: 0 14px 26px rgba(13, 181, 176, 0.22);
+}
+
+[data-theme="light"] .intro-remove-btn {
+  background: #fff4f2;
+  color: #b42318;
+  border-color: rgba(180, 35, 24, 0.22);
+}
+
+[data-theme="light"] .intro-remove-btn:hover {
+  background: #ffe6e1;
+  color: #8f1c13;
+  border-color: rgba(180, 35, 24, 0.32);
+}
+
 [data-theme="light"] .intro-textarea {
   background: #ffffff;
   border-color: rgba(23, 48, 74, 0.15);
