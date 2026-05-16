@@ -73,6 +73,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         const r = await fetchWithAuth(endpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
         if (!r.ok) throw new Error("Passport not found");
         const data = await r.json();
+        const resolvedCompanyId = data?.company_id || data?.companyId || previewCompanyId || null;
         setPassport(data);
         if (!isPreviewMode && data?.company_profile) {
           setCompanyData(data.company_profile);
@@ -80,8 +81,8 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
         // 2. Fetch company branding in parallel with type definition
         const [profileRes, typeRes] = await Promise.all([
-          isPreviewMode && data.company_id
-            ? fetchWithAuth(`${API}/api/companies/${data.company_id}/profile`)
+          isPreviewMode && resolvedCompanyId
+            ? fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`)
             : Promise.resolve(null),
           fetchWithAuth(`${API}/api/passport-types/${data.passport_type}`),
         ]);
