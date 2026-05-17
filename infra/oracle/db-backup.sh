@@ -8,9 +8,10 @@ MODE="${1:-backup}"
 
 read_env_var() {
   local key="$1"
-  awk -F= -v target="$key" '
-    $1 ~ "^[[:space:]]*" target "[[:space:]]*$" {
-      value=$2
+  awk -v target="$key" '
+    $0 ~ "^[[:space:]]*" target "[[:space:]]*=" {
+      pos = index($0, "=")
+      value = substr($0, pos + 1)
       sub(/^[[:space:]]+/, "", value)
       sub(/[[:space:]]+$/, "", value)
       if (value ~ /^".*"$/) {
