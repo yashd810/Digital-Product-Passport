@@ -8,7 +8,9 @@ const {
   PutObjectCommand,
   GetObjectCommand,
   ListObjectsV2Command,
-  DeleteObjectsCommand
+  DeleteObjectsCommand,
+  HeadBucketCommand,
+  CreateBucketCommand
 } = require("@aws-sdk/client-s3");
 
 function readArg(flag, fallback = null) {
@@ -278,6 +280,48 @@ async function downloadLatest() {
   }) + "\n");
 }
 
+async function ensureBucket() {
+  const config = readConfig();
+  const bucket = readArg("--bucket", config.bucket);
+  const client = createClient(config);
+
+  try {
+    await client.send(new HeadBucketCommand({
+      Bucket: bucket
+    }));
+    process.stdout.write(JSON.stringify({
+      ok: true,
+      bucket,
+      exists: true
+    }) + "\n");
+    return;
+  } catch {
+    // Continue into create path.
+  }
+
+  try {
+    await client.send(new CreateBucketCommand({
+      Bucket: bucket
+    }));
+    process.stdout.write(JSON.stringify({
+      ok: true,
+      bucket,
+      created: true
+    }) + "\n");
+  } catch (error) {
+    const status = error && error.$metadata ? error.$metadata.httpStatusCode : null;
+    if (error.name === "BucketAlreadyOwnedByYou" || status === 409) {
+      process.stdout.write(JSON.stringify({
+        ok: true,
+        bucket,
+        exists: true
+      }) + "\n");
+      return;
+    }
+    throw error;
+  }
+}
+
 async function main() {
   const command = process.argv[2];
   if (command === "upload") {
@@ -288,8 +332,12 @@ async function main() {
     await downloadLatest();
     return;
   }
+  if (command === "ensure-bucket") {
+    await ensureBucket();
+    return;
+  }
 
-  throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest> [options]");
+  throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest|ensure-bucket> [options]");
 }
 
 main().catch((error) => {
