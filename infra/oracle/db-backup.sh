@@ -58,6 +58,34 @@ TS="$(date -u +%Y%m%dT%H%M%SZ)"
 HOST_DUMP="$WORK_DIR/${POSTGRES_DB}-${TS}.dump"
 HOST_MANIFEST="$WORK_DIR/${POSTGRES_DB}-${TS}.json"
 
+BACKUP_ENV_KEYS=(
+  "STORAGE_S3_ENDPOINT"
+  "STORAGE_S3_REGION"
+  "STORAGE_S3_BUCKET"
+  "STORAGE_S3_ACCESS_KEY_ID"
+  "STORAGE_S3_SECRET_ACCESS_KEY"
+  "STORAGE_S3_FORCE_PATH_STYLE"
+  "DB_BACKUP_S3_ENDPOINT"
+  "DB_BACKUP_S3_REGION"
+  "DB_BACKUP_S3_BUCKET"
+  "DB_BACKUP_S3_ACCESS_KEY_ID"
+  "DB_BACKUP_S3_SECRET_ACCESS_KEY"
+  "DB_BACKUP_S3_FORCE_PATH_STYLE"
+  "DB_BACKUP_S3_PREFIX"
+  "DB_BACKUP_PREFIX"
+  "DB_BACKUP_RETENTION_COUNT"
+  "DB_NAME"
+  "POSTGRES_DB"
+  "COMPOSE_PROJECT_NAME"
+)
+BACKUP_ENV_ARGS=()
+for key in "${BACKUP_ENV_KEYS[@]}"; do
+  value="$(read_env_var "$key")"
+  if [ -n "$value" ]; then
+    BACKUP_ENV_ARGS+=(-e "$key=$value")
+  fi
+done
+
 cleanup_file() {
   local target="${1:-}"
   if [ -n "$target" ] && [ -f "$target" ]; then
@@ -66,7 +94,6 @@ cleanup_file() {
 }
 
 cleanup_remote_temp() {
-  docker exec "$POSTGRES_CONTAINER" sh -lc "rm -f /tmp/dpp-db-backup.dump /tmp/dpp-db-restore.dump" >/dev/null 2>&1 || true
   docker exec "$BACKEND_CONTAINER" sh -lc "rm -f /tmp/dpp-db-backup.dump /tmp/dpp-db-backup-manifest.json /tmp/dpp-db-restore.dump /tmp/dpp-db-restore-manifest.json" >/dev/null 2>&1 || true
 }
 
@@ -74,17 +101,16 @@ trap cleanup_remote_temp EXIT
 
 run_backup() {
   echo "Creating PostgreSQL backup from $POSTGRES_CONTAINER..."
-  docker exec "$POSTGRES_CONTAINER" sh -lc "pg_dump -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -F c -f /tmp/dpp-db-backup.dump"
-  docker cp "$POSTGRES_CONTAINER:/tmp/dpp-db-backup.dump" "$HOST_DUMP"
+  docker exec "$POSTGRES_CONTAINER" sh -lc "pg_dump -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -F c" > "$HOST_DUMP"
   docker cp "$HOST_DUMP" "$BACKEND_CONTAINER:/tmp/dpp-db-backup.dump"
   echo "Uploading backup to OCI Object Storage through $BACKEND_CONTAINER..."
-  docker exec "$BACKEND_CONTAINER" sh -lc "node scripts/db-backup-object-storage.js upload --file /tmp/dpp-db-backup.dump"
+  docker exec "${BACKUP_ENV_ARGS[@]}" "$BACKEND_CONTAINER" sh -lc "node scripts/db-backup-object-storage.js upload --file /tmp/dpp-db-backup.dump"
   cleanup_file "$HOST_DUMP"
 }
 
 run_verify() {
   echo "Downloading latest backup from OCI Object Storage..."
-  docker exec "$BACKEND_CONTAINER" sh -lc "node scripts/db-backup-object-storage.js download-latest --output /tmp/dpp-db-restore.dump --manifest-output /tmp/dpp-db-restore-manifest.json"
+  docker exec "${BACKUP_ENV_ARGS[@]}" "$BACKEND_CONTAINER" sh -lc "node scripts/db-backup-object-storage.js download-latest --output /tmp/dpp-db-restore.dump --manifest-output /tmp/dpp-db-restore-manifest.json"
   docker cp "$BACKEND_CONTAINER:/tmp/dpp-db-restore.dump" "$HOST_DUMP"
   docker cp "$BACKEND_CONTAINER:/tmp/dpp-db-restore-manifest.json" "$HOST_MANIFEST"
   docker cp "$HOST_DUMP" "$POSTGRES_CONTAINER:/tmp/dpp-db-restore.dump"
