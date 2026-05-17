@@ -1,0 +1,11 @@
+[Unit]
+Description=Verify latest DPP PostgreSQL backup restore metadata
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dpp-db-backup verify
+WorkingDirectory=/opt/dpp
+User=root
+Group=root

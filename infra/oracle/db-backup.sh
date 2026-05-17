@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="${APP_DIR:-/opt/dpp}"
+ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
+WORK_DIR="${DB_BACKUP_WORK_DIR:-/var/lib/dpp-db-backups}"
+MODE="${1:-backup}"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Missing env file: $ENV_FILE"
+  exit 1
+fi
+
+set -a
+. "$ENV_FILE"
+set +a
+
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+DB_BACKUP_ENABLED="${DB_BACKUP_ENABLED:-true}"
+
+if [ "$DB_BACKUP_ENABLED" != "true" ]; then
+  echo "DB backup is disabled via DB_BACKUP_ENABLED=$DB_BACKUP_ENABLED"
+  exit 0
+fi
+
+mkdir -p "$WORK_DIR"
+
+POSTGRES_CONTAINER="$(docker ps --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.service=postgres" --format '{{.Names}}' | head -n1)"
+BACKEND_CONTAINER="$(docker ps --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.service=backend-api" --format '{{.Names}}' | head -n1)"
+
+if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$BACKEND_CONTAINER" ]; then
+  echo "Could not find backend/postgres containers for compose project $COMPOSE_PROJECT_NAME"
+  exit 1
+fi
+
+POSTGRES_USER="${POSTGRES_USER:-${DB_USER:-postgres}}"
+POSTGRES_DB="${POSTGRES_DB:-${DB_NAME:-dpp_system}}"
+TS="$(date -u +%Y%m%dT%H%M%SZ)"
+HOST_DUMP="$WORK_DIR/${POSTGRES_DB}-${TS}.dump"
+HOST_MANIFEST="$WORK_DIR/${POSTGRES_DB}-${TS}.json"
+
+cleanup_file() {
+  local target="${1:-}"
+  if [ -n "$target" ] && [ -f "$target" ]; then
+    rm -f "$target"
+  fi
+}
+
+cleanup_remote_temp() {
+  docker exec "$POSTGRES_CONTAINER" sh -lc "rm -f /tmp/dpp-db-backup.dump /tmp/dpp-db-restore.dump" >/dev/null 2>&1 || true
+  docker exec "$BACKEND_CONTAINER" sh -lc "rm -f /tmp/dpp-db-backup.dump /tmp/dpp-db-backup-manifest.json /tmp/dpp-db-restore.dump /tmp/dpp-db-restore-manifest.json" >/dev/null 2>&1 || true
+}
+
+trap cleanup_remote_temp EXIT
+
+run_backup() {
+  echo "Creating PostgreSQL backup from $POSTGRES_CONTAINER..."
+  docker exec "$POSTGRES_CONTAINER" sh -lc "pg_dump -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -F c -f /tmp/dpp-db-backup.dump"
+  docker cp "$POSTGRES_CONTAINER:/tmp/dpp-db-backup.dump" "$HOST_DUMP"
+  docker cp "$HOST_DUMP" "$BACKEND_CONTAINER:/tmp/dpp-db-backup.dump"
+  echo "Uploading backup to OCI Object Storage through $BACKEND_CONTAINER..."
+  docker exec "$BACKEND_CONTAINER" sh -lc "node scripts/db-backup-object-storage.js upload --file /tmp/dpp-db-backup.dump"
+  cleanup_file "$HOST_DUMP"
+}
+
+run_verify() {
+  echo "Downloading latest backup from OCI Object Storage..."
+  docker exec "$BACKEND_CONTAINER" sh -lc "node scripts/db-backup-object-storage.js download-latest --output /tmp/dpp-db-restore.dump --manifest-output /tmp/dpp-db-restore-manifest.json"
+  docker cp "$BACKEND_CONTAINER:/tmp/dpp-db-restore.dump" "$HOST_DUMP"
+  docker cp "$BACKEND_CONTAINER:/tmp/dpp-db-restore-manifest.json" "$HOST_MANIFEST"
+  docker cp "$HOST_DUMP" "$POSTGRES_CONTAINER:/tmp/dpp-db-restore.dump"
+  echo "Verifying PostgreSQL custom dump readability..."
+  docker exec "$POSTGRES_CONTAINER" sh -lc "pg_restore -l /tmp/dpp-db-restore.dump >/dev/null"
+  cleanup_file "$HOST_DUMP"
+  cleanup_file "$HOST_MANIFEST"
+}
+
+case "$MODE" in
+  backup)
+    run_backup
+    ;;
+  verify)
+    run_verify
+    ;;
+  *)
+    echo "Usage: $0 [backup|verify]"
+    exit 1
+    ;;
+esac
