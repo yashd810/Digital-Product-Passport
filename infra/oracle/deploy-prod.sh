@@ -126,6 +126,25 @@ if [ "$REMOVE_ORPHANS" = "true" ]; then
   ORPHAN_ARGS=(--remove-orphans)
 fi
 
+UP_ARGS=(up --build -d "${ORPHAN_ARGS[@]}")
+RECREATE_SERVICES=()
+
+case "$DEPLOY_TARGET" in
+  backend)
+    RECREATE_SERVICES=(backend-api)
+    ;;
+  frontend)
+    RECREATE_SERVICES=(frontend-app public-passport-viewer asset-management marketing-site)
+    ;;
+  all)
+    RECREATE_SERVICES=(backend-api frontend-app public-passport-viewer asset-management marketing-site)
+    ;;
+esac
+
+if [ "${#RECREATE_SERVICES[@]}" -gt 0 ]; then
+  UP_ARGS+=(--force-recreate "${RECREATE_SERVICES[@]}")
+fi
+
 EXPLICIT_POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-}"
 if [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
   EXPLICIT_POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
@@ -158,7 +177,7 @@ fi
     exit 1
   }
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --quiet
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up --build -d "${ORPHAN_ARGS[@]}"
+  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${UP_ARGS[@]}"
   if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
     APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-db-backup-jobs.sh"
   fi
