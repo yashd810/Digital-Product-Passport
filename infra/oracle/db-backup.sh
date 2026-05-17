@@ -6,16 +6,31 @@ ENV_FILE="${DPP_ENV_FILE:-/etc/dpp/dpp.env}"
 WORK_DIR="${DB_BACKUP_WORK_DIR:-/var/lib/dpp-db-backups}"
 MODE="${1:-backup}"
 
+read_env_var() {
+  local key="$1"
+  awk -F= -v target="$key" '
+    $1 ~ "^[[:space:]]*" target "[[:space:]]*$" {
+      value=$2
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      if (value ~ /^".*"$/) {
+        sub(/^"/, "", value)
+        sub(/"$/, "", value)
+      }
+      print value
+      exit
+    }
+  ' "$ENV_FILE"
+}
+
 if [ ! -f "$ENV_FILE" ]; then
   echo "Missing env file: $ENV_FILE"
   exit 1
 fi
 
-set -a
-. "$ENV_FILE"
-set +a
-
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-$(read_env_var COMPOSE_PROJECT_NAME)}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-dpp}"
+DB_BACKUP_ENABLED="${DB_BACKUP_ENABLED:-$(read_env_var DB_BACKUP_ENABLED)}"
 DB_BACKUP_ENABLED="${DB_BACKUP_ENABLED:-true}"
 
 if [ "$DB_BACKUP_ENABLED" != "true" ]; then
@@ -33,8 +48,12 @@ if [ -z "$POSTGRES_CONTAINER" ] || [ -z "$BACKEND_CONTAINER" ]; then
   exit 1
 fi
 
-POSTGRES_USER="${POSTGRES_USER:-${DB_USER:-postgres}}"
-POSTGRES_DB="${POSTGRES_DB:-${DB_NAME:-dpp_system}}"
+POSTGRES_USER="${POSTGRES_USER:-$(read_env_var POSTGRES_USER)}"
+POSTGRES_USER="${POSTGRES_USER:-$(read_env_var DB_USER)}"
+POSTGRES_USER="${POSTGRES_USER:-postgres}"
+POSTGRES_DB="${POSTGRES_DB:-$(read_env_var POSTGRES_DB)}"
+POSTGRES_DB="${POSTGRES_DB:-$(read_env_var DB_NAME)}"
+POSTGRES_DB="${POSTGRES_DB:-dpp_system}"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 HOST_DUMP="$WORK_DIR/${POSTGRES_DB}-${TS}.dump"
 HOST_MANIFEST="$WORK_DIR/${POSTGRES_DB}-${TS}.json"
