@@ -854,12 +854,6 @@ export function PrintView({ passport, companyData, sections }) {
           </div>
         </div>
       </div>
-      {companyData?.introduction_text && (
-        <div className="print-section">
-          <h2 className="print-section-title">Introduction</h2>
-          <p className="print-intro-text">{companyData.introduction_text}</p>
-        </div>
-      )}
       {sections.map(section => (
         <div key={section.key} className="print-section">
           <h2 className="print-section-title">{section.label}</h2>

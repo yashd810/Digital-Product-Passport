@@ -5,11 +5,9 @@ import "../../../passport-viewer/styles/PassportViewer.css";
  * Fully controlled component — no internal state.
  * Props:
  *   logoPreview  : string|null   current logo base64 or null
- *   introText    : string        current intro text
  *   onLogoChange : (v) => void   called with base64 string or null
- *   onTextChange : (v) => void   called with new text string
  */
-function IntroductionUpload({ logoPreview, introText, onLogoChange, onTextChange }) {
+function IntroductionUpload({ logoPreview, onLogoChange }) {
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -28,15 +26,11 @@ function IntroductionUpload({ logoPreview, introText, onLogoChange, onTextChange
 
   return (
     <div className="intro-upload-card">
-      <h3 className="intro-upload-title">Company Profile</h3>
+      <h3 className="intro-upload-title">Company Logo</h3>
 
       <div className="intro-upload-grid">
-
-        {/* ── Logo column ── */}
         <div className="intro-col">
           <p className="intro-col-label">Company Logo</p>
-
-          {/* Preview box — fixed height so both columns stay equal */}
           <div className="intro-logo-box">
             {logoPreview ? (
               <img
@@ -51,8 +45,6 @@ function IntroductionUpload({ logoPreview, introText, onLogoChange, onTextChange
               </div>
             )}
           </div>
-
-          {/* Buttons always sit below the preview box */}
           <div className="intro-logo-actions">
             <button
               type="button"
@@ -84,24 +76,6 @@ function IntroductionUpload({ logoPreview, introText, onLogoChange, onTextChange
             className="intro-upload-hidden-input"
           />
         </div>
-
-        {/* ── Text column ── */}
-        <div className="intro-col">
-          <p className="intro-col-label">Introduction Text</p>
-
-          {/* Textarea fills the same fixed height as the logo box */}
-          <textarea
-            className="intro-textarea"
-            value={introText}
-            onChange={e => onTextChange(e.target.value)}
-            placeholder="Write a compelling introduction about your company and products. Highlight key features, certifications, and sustainability commitments..."
-          />
-
-          <p className="intro-col-hint">
-            {introText.length} characters · Recommended: 300–800
-          </p>
-        </div>
-
       </div>
     </div>
   );

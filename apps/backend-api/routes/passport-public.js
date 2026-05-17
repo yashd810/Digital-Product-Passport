@@ -108,8 +108,6 @@ module.exports = function registerPassportPublicRoutes(app, {
       `SELECT c.id,
               c.company_name,
               c.company_logo,
-              c.introduction_text,
-              c.branding_json,
               c.did_slug,
               c.customer_trust_level,
               COALESCE(p.default_granularity, 'item') AS dpp_granularity,
@@ -144,8 +142,6 @@ module.exports = function registerPassportPublicRoutes(app, {
       `SELECT c.id,
               c.company_name,
               c.company_logo,
-              c.introduction_text,
-              c.branding_json,
               c.did_slug,
               c.customer_trust_level,
               COALESCE(p.default_granularity, 'item') AS dpp_granularity,
@@ -258,8 +254,6 @@ module.exports = function registerPassportPublicRoutes(app, {
     return {
       company_name: company.company_name || "",
       company_logo: company.company_logo || null,
-      introduction_text: company.introduction_text || "",
-      branding_json: company.branding_json || {},
       did_slug: company.did_slug || null,
     };
   }

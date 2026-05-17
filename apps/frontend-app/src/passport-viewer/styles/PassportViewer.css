@@ -2584,15 +2584,13 @@
   font-family: var(--font);
 }
 
-/* Two equal columns */
 .intro-upload-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 24px;
   align-items: start;
 }
 
-/* Each column is a flex column so textarea can fill the gap */
 .intro-col {
   display: flex;
   flex-direction: column;
@@ -2615,10 +2613,9 @@
   font-family: var(--font);
 }
 
-/* ── Logo preview box — fixed height ── */
 .intro-logo-box {
   width: 100%;
-  height: 220px;          /* fixed so both columns are same height */
+  height: 220px;
   border: 2px dashed rgba(13, 181, 176, 0.24);
   border-radius: 8px;
   background: rgba(20, 35, 55, 0.4);
@@ -2654,7 +2651,6 @@
   font-family: var(--font);
 }
 
-/* ── Buttons below the preview box ── */
 .intro-logo-actions {
   display: flex;
   gap: 8px;
@@ -2700,7 +2696,6 @@
   border-color: rgba(220, 38, 38, 0.5);
 }
 
-/* ── Textarea — matches logo box height ── */
 .intro-textarea {
   width: 100%;
   height: 220px;          /* same fixed height as logo box */

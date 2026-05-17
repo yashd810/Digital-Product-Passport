@@ -106,7 +106,7 @@ module.exports = function registerCompanyRoutes(app, {
   app.get("/api/companies/:companyId/profile", publicReadRateLimit, async (req, res) => {
     try {
       const r = await pool.query(
-        "SELECT id, company_name, company_logo, introduction_text, branding_json FROM companies WHERE id = $1",
+        "SELECT id, company_name, company_logo FROM companies WHERE id = $1",
         [req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
@@ -116,18 +116,14 @@ module.exports = function registerCompanyRoutes(app, {
 
   app.post("/api/companies/:companyId/profile", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { company_logo, introduction_text, branding_json } = req.body;
+      const { company_logo } = req.body;
       await pool.query(
         `UPDATE companies
          SET company_logo = $1,
-             introduction_text = COALESCE($2, introduction_text),
-             branding_json = COALESCE($3::jsonb, branding_json),
              updated_at = NOW()
-         WHERE id = $4`,
+         WHERE id = $2`,
         [
         company_logo !== undefined ? company_logo : null,
-        introduction_text || null,
-        branding_json ? JSON.stringify(branding_json) : null,
         req.params.companyId]
 
       );

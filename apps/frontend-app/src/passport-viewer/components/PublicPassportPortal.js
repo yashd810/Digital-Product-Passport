@@ -811,7 +811,7 @@ export default function PublicPassportPortal({
       <footer className="footer">
         <div className="footer-inner">
           <span>{companyData?.company_name || "ClarosDPP"} · Category-specific battery passport</span>
-          <span>{companyData?.branding_json?.footer_text || "Public passport viewer"}</span>
+          <span>Public passport viewer</span>
         </div>
       </footer>
     </div>

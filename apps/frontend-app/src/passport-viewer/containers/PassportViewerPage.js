@@ -246,7 +246,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   };
 
   // Derived viewer data
-  const brandTheme = getViewerBrandTheme(companyData?.branding_json);
+  const brandTheme = getViewerBrandTheme();
   const canonicalPublicPath = buildPublicPassportPath({
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
