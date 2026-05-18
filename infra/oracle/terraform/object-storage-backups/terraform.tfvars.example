@@ -1,0 +1,11 @@
+region                  = "eu-stockholm-1"
+compartment_ocid        = "ocid1.compartment.oc1..replace-me"
+namespace               = "axknlhgrqwn0"
+bucket_name             = "dpp-prod-db-backups"
+enable_lifecycle_delete = false
+lifecycle_delete_after_days = 90
+
+lifecycle_prefixes = [
+  "db-backups/",
+  "restore-drills/"
+]

@@ -5807,6 +5807,67 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
   cursor: not-allowed;
 }
 
+.continuity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.continuity-stat {
+  border: 1px solid rgba(13, 181, 176, 0.12);
+  border-radius: 10px;
+  padding: 14px;
+  background: rgba(20, 35, 55, 0.42);
+}
+
+.continuity-stat span {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.continuity-stat strong {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.continuity-stat .status-good {
+  color: #10b981;
+}
+
+.continuity-stat .status-warn {
+  color: #f59e0b;
+}
+
+.continuity-notes {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(13, 181, 176, 0.12);
+  background: rgba(12, 24, 38, 0.28);
+}
+
+.continuity-notes h4 {
+  margin: 0 0 10px 0;
+  color: var(--heading-display);
+  font-size: 15px;
+}
+
+.continuity-notes ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+}
+
+.continuity-notes li + li {
+  margin-top: 6px;
+}
+
 [data-theme="light"] .company-profile-wrapper .profile-header {
   border-bottom-color: rgba(23, 48, 74, 0.12);
 }
@@ -5882,6 +5943,32 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
   background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
   border-color: rgba(13, 181, 176, 0.42);
   box-shadow: 0 14px 28px rgba(13, 181, 176, 0.18);
+}
+
+[data-theme="light"] .continuity-stat {
+  background: #f8fbfd;
+  border-color: rgba(23, 48, 74, 0.12);
+}
+
+[data-theme="light"] .continuity-stat span {
+  color: #6b8195;
+}
+
+[data-theme="light"] .continuity-stat strong {
+  color: #10243a;
+}
+
+[data-theme="light"] .continuity-notes {
+  background: #f8fbfd;
+  border-color: rgba(23, 48, 74, 0.12);
+}
+
+[data-theme="light"] .continuity-notes h4 {
+  color: #10243a;
+}
+
+[data-theme="light"] .continuity-notes ul {
+  color: #5f7991;
 }
 
 @media (max-width: 768px) {

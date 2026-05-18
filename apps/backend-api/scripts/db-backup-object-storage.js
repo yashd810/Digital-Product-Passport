@@ -322,6 +322,34 @@ async function ensureBucket() {
   }
 }
 
+async function putObjectFile() {
+  const config = readConfig();
+  const filePath = requireArg("--file");
+  const key = requireArg("--key");
+  const contentType = readArg("--content-type", "application/octet-stream");
+  const client = createClient(config);
+  const fileBuffer = await fs.promises.readFile(filePath);
+  const checksum = sha256Hex(fileBuffer);
+
+  await client.send(new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: contentType,
+    Metadata: {
+      sha256: checksum,
+    }
+  }));
+
+  process.stdout.write(JSON.stringify({
+    ok: true,
+    bucket: config.bucket,
+    key,
+    sizeBytes: fileBuffer.length,
+    sha256: checksum,
+  }) + "\n");
+}
+
 async function main() {
   const command = process.argv[2];
   if (command === "upload") {
@@ -336,8 +364,12 @@ async function main() {
     await ensureBucket();
     return;
   }
+  if (command === "put-object") {
+    await putObjectFile();
+    return;
+  }
 
-  throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest|ensure-bucket> [options]");
+  throw new Error("Usage: node scripts/db-backup-object-storage.js <upload|download-latest|ensure-bucket|put-object> [options]");
 }
 
 main().catch((error) => {
