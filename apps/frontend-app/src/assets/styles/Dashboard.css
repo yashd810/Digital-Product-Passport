@@ -6679,6 +6679,104 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
 .msg-send-btn:hover:not(:disabled) { opacity: 0.85; }
 .msg-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+[data-theme="light"] .msg-conv-empty {
+  color: #5d7790;
+}
+
+[data-theme="light"] .msg-conv-item {
+  border-bottom-color: rgba(16, 36, 58, 0.08);
+}
+
+[data-theme="light"] .msg-conv-item:hover {
+  background: #eef7f7;
+}
+
+[data-theme="light"] .msg-conv-item.active {
+  background: #dff3f3;
+  box-shadow: inset 3px 0 0 #12b5b0;
+}
+
+[data-theme="light"] .msg-conv-item.unread {
+  background: #f2fbfb;
+}
+
+[data-theme="light"] .msg-conv-item.unread .msg-conv-preview {
+  color: #16324a;
+}
+
+[data-theme="light"] .msg-conv-time,
+[data-theme="light"] .msg-conv-preview,
+[data-theme="light"] .msg-empty-state,
+[data-theme="light"] .msg-loading,
+[data-theme="light"] .msg-no-msgs,
+[data-theme="light"] .msg-date-divider,
+[data-theme="light"] .msg-bubble-time,
+[data-theme="light"] .msg-chat-role {
+  color: #5d7790;
+}
+
+[data-theme="light"] .msg-chat {
+  background: #f8fbfd;
+}
+
+[data-theme="light"] .msg-chat-header,
+[data-theme="light"] .msg-input-bar {
+  background: #ffffff;
+  border-color: rgba(16, 36, 58, 0.10);
+}
+
+[data-theme="light"] .msg-date-divider::before,
+[data-theme="light"] .msg-date-divider::after {
+  background: rgba(16, 36, 58, 0.12);
+}
+
+[data-theme="light"] .msg-bubble-avatar {
+  background: linear-gradient(135deg, #1c7f8e, #145a71);
+}
+
+[data-theme="light"] .msg-bubble-them {
+  background: #e7f1f7;
+  border-color: #d4e3ee;
+  color: #0f243a;
+}
+
+[data-theme="light"] .msg-bubble-me {
+  background: #16b9b3;
+  color: #062a35;
+}
+
+[data-theme="light"] .msg-input {
+  background: #ffffff;
+  border-color: #cddbe6;
+  color: #0f243a;
+}
+
+[data-theme="light"] .msg-input::placeholder {
+  color: #6c879d;
+}
+
+[data-theme="light"] .msg-input:focus {
+  border-color: #12b5b0;
+  box-shadow: 0 0 0 3px rgba(18, 181, 176, 0.14);
+}
+
+[data-theme="light"] .msg-send-btn {
+  background: #16b9b3;
+  color: #062a35;
+}
+
+[data-theme="light"] .msg-send-btn:disabled {
+  background: #b8c3ce;
+  color: #f8fbfd;
+  opacity: 1;
+}
+
+[data-theme="light"] .msg-send-btn:hover:not(:disabled),
+[data-theme="light"] .msg-start-btn:hover {
+  opacity: 1;
+  filter: brightness(0.96);
+}
+
 .msg-modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
   display: flex; align-items: center; justify-content: center; z-index: 1000;
