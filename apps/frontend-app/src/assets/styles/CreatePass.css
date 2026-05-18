@@ -1314,6 +1314,88 @@
 
 .rp-crumb-sep { color: var(--text-secondary, #7aacbf); font-size: 13px; opacity: 0.5; }
 
+.rp-nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border, #2a4a5e);
+  background: rgba(255,255,255,0.02);
+}
+
+[data-theme="light"] .rp-nav-bar {
+  background: #f8fbfd;
+  border-bottom-color: rgba(23,48,74,0.10);
+}
+
+.rp-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #2a4a5e);
+  background: var(--bg-elevated, #152535);
+  color: var(--text-primary, #e8f4f8);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.rp-back-btn:hover:not(:disabled) {
+  background: rgba(13,181,176,0.14);
+  border-color: rgba(13,181,176,0.40);
+}
+
+.rp-back-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+[data-theme="light"] .rp-back-btn {
+  background: #ffffff;
+  border-color: rgba(23,48,74,0.14);
+  color: #143244;
+}
+
+[data-theme="light"] .rp-back-btn:hover:not(:disabled) {
+  background: rgba(13,181,176,0.10);
+  border-color: rgba(13,181,176,0.34);
+}
+
+.rp-folder-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.rp-folder-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-secondary, #7aacbf);
+}
+
+.rp-folder-name {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-primary, #e8f4f8);
+}
+
+[data-theme="light"] .rp-folder-label {
+  color: #6a8395;
+}
+
+[data-theme="light"] .rp-folder-name {
+  color: #143244;
+}
+
 .rp-list {
   flex: 1;
   overflow-y: auto;
@@ -1415,6 +1497,16 @@
 
 @media (max-width: 480px) {
   .rp-modal { max-height: 95vh; }
+  .rp-nav-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .rp-folder-state {
+    align-items: flex-start;
+  }
+  .rp-folder-name {
+    max-width: 100%;
+  }
   .rp-footer { flex-direction: column; align-items: stretch; }
   .rp-cancel-btn { width: 100%; text-align: center; }
 }

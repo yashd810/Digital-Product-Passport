@@ -17,6 +17,8 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
   const [currentFolder, setCurrentFolder] = useState(null);
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState("");
+  const canGoBack = breadcrumbs.length > 0;
+  const currentFolderName = breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1].name : "Repository root";
 
   const fetchItems = useCallback(async (parentId) => {
     setLoading(true); setError("");
@@ -54,6 +56,15 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
     onSelect(item.file_url, item.name);
   };
 
+  const goBack = () => {
+    if (!breadcrumbs.length) return;
+    if (breadcrumbs.length === 1) {
+      navigateTo(null);
+      return;
+    }
+    navigateTo(breadcrumbs[breadcrumbs.length - 2]);
+  };
+
   return (
     <div className="rp-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="rp-modal">
@@ -74,6 +85,22 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
             </React.Fragment>
           ))}
         </nav>
+
+        <div className="rp-nav-bar">
+          <button
+            type="button"
+            className="rp-back-btn"
+            onClick={goBack}
+            disabled={!canGoBack}
+            aria-label="Go back to previous folder"
+          >
+            ← Back
+          </button>
+          <div className="rp-folder-state">
+            <span className="rp-folder-label">Current folder</span>
+            <strong className="rp-folder-name">{currentFolderName}</strong>
+          </div>
+        </div>
 
         {/* File list */}
         <div className="rp-list">
@@ -96,7 +123,7 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
                   <span className="rp-pick-hint">Click to link</span>
                 )}
                 {item.type === "folder" && (
-                  <span className="rp-pick-hint">Open →</span>
+                  <span className="rp-pick-hint">Open folder →</span>
                 )}
               </div>
             ))
