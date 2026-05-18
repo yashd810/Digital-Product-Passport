@@ -145,6 +145,55 @@ if [ "${#RECREATE_SERVICES[@]}" -gt 0 ]; then
   UP_ARGS+=(--force-recreate "${RECREATE_SERVICES[@]}")
 fi
 
+wait_for_http() {
+  local url="$1"
+  local label="$2"
+  local attempts="${3:-30}"
+  local sleep_seconds="${4:-2}"
+  local tmp_file
+  tmp_file="$(mktemp)"
+  local attempt
+  for attempt in $(seq 1 "$attempts"); do
+    if curl -fsS "$url" >"$tmp_file" 2>/dev/null; then
+      echo "✅ $label ready"
+      cat "$tmp_file"
+      rm -f "$tmp_file"
+      return 0
+    fi
+    sleep "$sleep_seconds"
+  done
+  echo "❌ $label did not become ready: $url"
+  cat "$tmp_file" 2>/dev/null || true
+  rm -f "$tmp_file"
+  return 1
+}
+
+wait_for_container_health() {
+  local service_name="$1"
+  local label="$2"
+  local attempts="${3:-30}"
+  local sleep_seconds="${4:-2}"
+  local container_id=""
+  local attempt
+  for attempt in $(seq 1 "$attempts"); do
+    container_id="$(
+      docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps -q "$service_name" 2>/dev/null \
+        | head -n1
+    )"
+    if [ -n "$container_id" ]; then
+      local health_state
+      health_state="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null || echo "missing")"
+      if [ "$health_state" = "healthy" ] || [ "$health_state" = "none" ]; then
+        echo "✅ $label container ready"
+        return 0
+      fi
+    fi
+    sleep "$sleep_seconds"
+  done
+  echo "❌ $label container did not become healthy"
+  return 1
+}
+
 EXPLICIT_POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-}"
 if [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
   EXPLICIT_POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
@@ -181,12 +230,16 @@ fi
   if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
     APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-db-backup-jobs.sh"
     echo "Running storage probe health check..."
-    if ! curl -fsS "http://127.0.0.1:${BACKEND_PORT:-3001}/health/storage" >/tmp/dpp-storage-health.json; then
-      echo "Storage probe health check failed."
-      cat /tmp/dpp-storage-health.json 2>/dev/null || true
-      exit 1
-    fi
-    cat /tmp/dpp-storage-health.json
+    wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health" "Backend health" 40 2 >/tmp/dpp-backend-health.json
+    wait_for_http "http://127.0.0.1:${BACKEND_PORT:-3001}/health/storage" "Backend storage probe" 40 2 >/tmp/dpp-storage-health.json
+  fi
+  if [ "$DEPLOY_TARGET" = "frontend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
+    wait_for_container_health "frontend-app" "Frontend app" 50 2
+    wait_for_container_health "public-passport-viewer" "Public viewer" 50 2
+    wait_for_container_health "asset-management" "Asset management" 50 2
+    wait_for_http "http://127.0.0.1:${FRONTEND_PORT:-3000}/" "Frontend HTTP" 30 2 >/tmp/dpp-frontend-health.txt
+    wait_for_http "http://127.0.0.1:${PUBLIC_VIEWER_PORT:-3004}/" "Viewer HTTP" 30 2 >/tmp/dpp-viewer-health.txt
+    wait_for_http "http://127.0.0.1:${ASSET_MANAGEMENT_PORT:-3003}/" "Asset management HTTP" 30 2 >/tmp/dpp-asset-health.txt
   fi
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 ) 9>"$LOCK_FILE"
