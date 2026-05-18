@@ -510,17 +510,18 @@
 
 /* Buttons */
 .create-passport-btn {
-  padding: 11px 22px;
+  padding: 10px 18px;
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
   transition: all 0.25s ease;
   font-family: var(--font);
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: #0b1826;
   box-shadow: 0 14px 28px rgba(13,181,176,0.2);
+  min-height: 42px;
 }
 
 .create-passport-btn:hover {
@@ -531,12 +532,13 @@
 .csv-btn {
   padding: 10px 16px;
   border-radius: 12px;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: var(--font);
   white-space: nowrap;
+  min-height: 42px;
 }
 
 .csv-btn.export-btn {
@@ -552,15 +554,15 @@
 }
 
 .csv-btn.template-btn {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.04);
   color: var(--text-primary);
   border: 1px solid var(--border);
 }
 
 .csv-btn.template-btn:hover {
-  background: rgba(255,255,255,0.09);
-  border-color: rgba(13,181,176,0.24);
-  color: var(--accent);
+  background: rgba(13,181,176,0.10);
+  border-color: rgba(13,181,176,0.30);
+  color: var(--text-primary);
 }
 
 [data-theme="light"] .csv-btn.template-btn {
@@ -570,9 +572,9 @@
 }
 
 [data-theme="light"] .csv-btn.template-btn:hover {
-  background: rgba(13,181,176,0.07);
+  background: rgba(13,181,176,0.10);
   border-color: rgba(13,181,176,0.3);
-  color: var(--accent);
+  color: #143244;
 }
 
 [data-theme="light"] .passport-select-toggle.active {
@@ -967,8 +969,9 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--text-secondary);
+  border: 1px solid transparent;
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
   font-family: var(--font);
 }
 
@@ -976,8 +979,16 @@
   color: #24495a;
 }
 
-.sidebar-link:hover { background: rgba(28,55,56,0.1); color: var(--text-primary); }
-[data-theme="light"] .sidebar-link:hover { background: rgba(28,55,56,0.08); color: #102c3a; }
+.sidebar-link:hover {
+  background: rgba(13,181,176,0.12);
+  border-color: rgba(13,181,176,0.22);
+  color: var(--text-primary);
+}
+[data-theme="light"] .sidebar-link:hover {
+  background: rgba(13,181,176,0.10);
+  border-color: rgba(13,181,176,0.20);
+  color: #102c3a;
+}
 
 /* Create passport CTA in sidebar */
 .sidebar-create-btn {
@@ -1025,16 +1036,18 @@
 }
 
 .sidebar-link.active {
-  background: rgba(13, 181, 176, 0.18);
-  color: var(--accent);
-  font-weight: 600;
-  border: 1px solid rgba(13, 181, 176, 0.24);
+  background: rgba(13, 181, 176, 0.20);
+  color: #7ce3dc;
+  font-weight: 700;
+  border: 1px solid rgba(13, 181, 176, 0.34);
+  box-shadow: inset 3px 0 0 rgba(13,181,176,0.85);
 }
 
 [data-theme="light"] .sidebar-link.active {
-  background: rgba(13, 181, 176, 0.14);
-  color: #0b8e97;
-  border-color: rgba(13, 181, 176, 0.2);
+  background: rgba(13, 181, 176, 0.15);
+  color: #0a7880;
+  border-color: rgba(13, 181, 176, 0.28);
+  box-shadow: inset 3px 0 0 rgba(13,181,176,0.92);
 }
 
 .sidebar-link-productCategory {
@@ -2215,16 +2228,18 @@
 
 /* Modal buttons */
 .btn-cancel-wf {
-  padding: 9px 18px; background: rgba(255,255,255,0.05); color: var(--text-primary);
-  border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 16px; background: rgba(255,255,255,0.04); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 12px;
   font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--font);
+  min-height: 42px;
 }
 .btn-release-wf {
-  padding: 9px 20px;
+  padding: 10px 18px;
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
-  color: #0b1826; border: none; border-radius: 10px;
-  font-size: 14px; font-weight: 800; cursor: pointer; font-family: var(--font);
+  color: #0b1826; border: none; border-radius: 12px;
+  font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--font);
   transition: all 0.2s; box-shadow: 0 14px 28px rgba(13,181,176,0.18);
+  min-height: 42px;
 }
 .btn-release-wf:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 18px 34px rgba(13,181,176,0.24); }
 .btn-release-wf:disabled { opacity: 0.55; cursor: not-allowed; }
@@ -2961,6 +2976,7 @@
   transition: all 0.2s ease;
   font-family: var(--font);
   white-space: nowrap;
+  min-height: 42px;
 }
 
 .dashboard-btn-primary {
@@ -2976,26 +2992,27 @@
 }
 
 .dashboard-btn-secondary {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.04);
   color: var(--text-primary);
   border: 1px solid var(--border);
 }
 
 .dashboard-btn-secondary:hover {
-  background: rgba(255,255,255,0.09);
-  border-color: rgba(13,181,176,0.24);
-  color: var(--accent);
+  background: rgba(13,181,176,0.10);
+  border-color: rgba(13,181,176,0.30);
+  color: var(--text-primary);
 }
 
 .dashboard-btn-ghost {
-  background: rgba(255,255,255,0.03);
-  color: var(--text-secondary);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-primary);
   border: 1px solid var(--border);
 }
 
 .dashboard-btn-ghost:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(13,181,176,0.10);
   color: var(--text-primary);
+  border-color: rgba(13,181,176,0.30);
 }
 
 .dashboard-btn-danger {
@@ -5896,16 +5913,17 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
 }
 
 .profile-save-btn {
-  padding: 8px 18px;
+  padding: 10px 18px;
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
-  color: #ffffff;
+  color: #0b1826;
   border: 1px solid rgba(13, 181, 176, 0.34);
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.25s ease;
   margin-top: 12px;
+  min-height: 42px;
 }
 
 .profile-save-btn:hover:not(:disabled) {
@@ -6048,7 +6066,7 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
 
 [data-theme="light"] .profile-save-btn {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
-  color: #ffffff;
+  color: #0b1826;
   border-color: rgba(13, 181, 176, 0.3);
 }
 

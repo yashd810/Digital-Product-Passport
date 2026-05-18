@@ -23,7 +23,8 @@ export async function fetchWithAuth(url, options = {}) {
     urlString.includes("/api/auth/logout") ||
     urlString.includes("/api/auth/sso/providers") ||
     urlString.includes("/api/auth/sso") ||
-    urlString.includes("/api/users/me");
+    urlString.includes("/api/users/me") ||
+    urlString.includes("/api/users/me/token");
 
   // Redirect to login only when the server indicates the session is no longer valid.
   // Business-rule 403s should stay on the page and surface their actual error message.

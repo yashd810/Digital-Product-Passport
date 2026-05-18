@@ -302,6 +302,9 @@ function FilesTab({ token, companyId }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
 
+  const canGoBack = breadcrumbs.length > 0;
+  const currentFolderName = breadcrumbs[breadcrumbs.length - 1]?.name || "Repository root";
+
   const flash = (text, isErr = false) => {
     isErr ? setError(text) : setMsg(text);
     setTimeout(() => isErr ? setError("") : setMsg(""), 4000);
@@ -337,6 +340,18 @@ function FilesTab({ token, companyId }) {
       setCurrentFolder(folder.id);
     }
     setItems([]);
+  };
+
+  const goBack = () => {
+    if (!breadcrumbs.length) {
+      navigate(null);
+      return;
+    }
+    if (breadcrumbs.length === 1) {
+      navigate(null);
+      return;
+    }
+    navigate(breadcrumbs[breadcrumbs.length - 2]);
   };
 
   useEffect(() => { fetchItems(currentFolder); }, [currentFolder]); // eslint-disable-line
@@ -455,6 +470,20 @@ function FilesTab({ token, companyId }) {
           </React.Fragment>
         ))}
       </nav>
+
+      <div className="repo-folder-nav">
+        <button
+          className="repo-btn repo-btn-secondary repo-folder-back"
+          onClick={goBack}
+          disabled={!canGoBack}
+        >
+          ← Back
+        </button>
+        <div className="repo-folder-context">
+          <span className="repo-folder-label">Current folder</span>
+          <span className="repo-folder-name">{currentFolderName}</span>
+        </div>
+      </div>
 
       {loading ? (
         <div className="loading" style={{ padding: 40 }}>Loading…</div>

@@ -97,6 +97,48 @@
 .repo-crumb:hover { background: var(--bg-soft); }
 .repo-crumb-sep { color: var(--text-secondary); font-size: 14px; }
 
+.repo-folder-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(13, 181, 176, 0.08) 0%, var(--bg-card) 78%);
+}
+
+.repo-folder-back {
+  min-width: 108px;
+}
+
+.repo-folder-context {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-end;
+}
+
+.repo-folder-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.repo-folder-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  word-break: break-word;
+  text-align: right;
+}
+
 /* ── File Cards ── */
 .repo-card-grid {
   display: grid;
@@ -117,6 +159,20 @@
 .repo-card:hover {
   box-shadow: var(--panel-shadow-soft);
   border-color: rgba(13,181,176,0.25);
+}
+
+@media (max-width: 720px) {
+  .repo-folder-nav {
+    align-items: flex-start;
+  }
+
+  .repo-folder-context {
+    align-items: flex-start;
+  }
+
+  .repo-folder-name {
+    text-align: left;
+  }
 }
 
 .repo-card-body {

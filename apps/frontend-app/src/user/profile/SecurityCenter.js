@@ -59,12 +59,6 @@ function SecurityCenter({ user, companyId }) {
   const [copiedApiKey, setCopiedApiKey] = useState(false);
 
   useEffect(() => {
-    if (!bearerToken) {
-      fetchBearerToken();
-    }
-  }, []);
-
-  useEffect(() => {
     if (canManageCompanyKeys && resolvedCompanyId) {
       fetchApiKeys();
     }
@@ -211,6 +205,9 @@ function SecurityCenter({ user, companyId }) {
             Use this token for authenticated internal API calls in the <code>Authorization: Bearer &lt;token&gt;</code> header.
             It is separate from the company <code>X-API-Key</code> and should not be shared with external read-only consumers.
           </p>
+          <p className="profile-helper-text">
+            Bearer tokens are optional. They are only generated when you explicitly request one below.
+          </p>
 
           <div className="token-section">
             <div className="token-input-group">
@@ -235,9 +232,9 @@ function SecurityCenter({ user, companyId }) {
                 onClick={() => fetchBearerToken(true)}
                 className="btn-token-toggle"
                 disabled={loadingBearerToken}
-                title="Refresh bearer token"
+                title={bearerToken ? "Refresh bearer token" : "Generate bearer token"}
               >
-                {loadingBearerToken ? "Loading..." : "Refresh"}
+                {loadingBearerToken ? "Loading..." : bearerToken ? "Refresh" : "Generate"}
               </button>
             </div>
 
@@ -254,7 +251,7 @@ function SecurityCenter({ user, companyId }) {
             <h5>Usage Example (cURL):</h5>
             <code className="code-block">{bearerExample}</code>
             <p className="profile-helper-text" style={{ marginTop: 14 }}>
-              If the token field is empty, use <strong>Refresh</strong> to issue a fresh bearer token for this browser session.
+              If the token field is empty, use <strong>Generate</strong> to issue a bearer token for this browser session.
             </p>
           </div>
         </div>
