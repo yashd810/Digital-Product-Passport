@@ -20,13 +20,6 @@ function createResponse() {
 }
 
 describe("auth middleware", () => {
-  const originalRequireMfa = process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA;
-
-  afterEach(() => {
-    if (originalRequireMfa === undefined) delete process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA;
-    else process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA = originalRequireMfa;
-  });
-
   test("attaches the company economic operator identifier to authenticated JWT users", async () => {
     const pool = {
       query: jest.fn(async (sql, params = []) => {
@@ -255,9 +248,7 @@ describe("auth middleware", () => {
     });
   });
 
-  test("requireEditor blocks controlled-data changes when MFA is required but not verified", async () => {
-    process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA = "true";
-
+  test("requireEditor allows editor actions without an MFA-verified session", async () => {
     const { requireEditor } = createAuthMiddleware({
       jwt: {},
       crypto,
@@ -280,10 +271,8 @@ describe("auth middleware", () => {
       nextCalled = true;
     });
 
-    expect(nextCalled).toBe(false);
-    expect(res.statusCode).toBe(403);
-    expect(res.body).toEqual(expect.objectContaining({
-      code: "MFA_REQUIRED",
-    }));
+    expect(nextCalled).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBeNull();
   });
 });

@@ -30,7 +30,16 @@ function extractPct(s) {
  */
 export function parseCompositionFromTable(jsonStr) {
   let rows;
-  try { rows = JSON.parse(jsonStr); } catch { return null; }
+  if (Array.isArray(jsonStr)) {
+    rows = jsonStr;
+  } else if (jsonStr && typeof jsonStr === "object") {
+    rows = Array.isArray(jsonStr.rows) ? jsonStr.rows : null;
+  } else {
+    try { rows = JSON.parse(jsonStr); } catch { return null; }
+    if (rows && typeof rows === "object" && !Array.isArray(rows)) {
+      rows = Array.isArray(rows.rows) ? rows.rows : null;
+    }
+  }
   if (!Array.isArray(rows) || rows.length === 0) return null;
 
   // Auto-detect which column holds percentages by finding the one where

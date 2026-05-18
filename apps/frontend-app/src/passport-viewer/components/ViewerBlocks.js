@@ -11,6 +11,31 @@ import { getMarketingContactUrl } from "../utils/QRcode";
 const API = import.meta.env.VITE_API_URL || "";
 const PUBLIC_VIEWER_URL = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
 
+function parseStoredTableValue(raw) {
+  if (Array.isArray(raw)) return { columns: [], rows: raw };
+  if (raw && typeof raw === "object") {
+    return {
+      columns: Array.isArray(raw.columns) ? raw.columns : [],
+      rows: Array.isArray(raw.rows) ? raw.rows : [],
+    };
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return { columns: [], rows: parsed };
+      if (parsed && typeof parsed === "object") {
+        return {
+          columns: Array.isArray(parsed.columns) ? parsed.columns : [],
+          rows: Array.isArray(parsed.rows) ? parsed.rows : [],
+        };
+      }
+    } catch {
+      return { columns: [], rows: [] };
+    }
+  }
+  return { columns: [], rows: [] };
+}
+
 function getDomainIndicatorState() {
   if (typeof window === "undefined") {
     return { currentHost: "", expectedHost: "", trusted: true, label: "" };
@@ -515,13 +540,9 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     } else if (f.type === "file" && isFileUrl(raw)) {
       display = <FileCell url={raw} label={`${passport.model_name}_${f.key}`} />;
     } else if (f.type === "table") {
-      let tableData = null;
-      if (Array.isArray(raw)) tableData = raw;
-      else {
-        try { tableData = raw ? JSON.parse(raw) : null; } catch {}
-      }
+      const { columns: storedColumns, rows: tableData } = parseStoredTableValue(raw);
       if (Array.isArray(tableData) && tableData.length > 0) {
-        const cols = f.table_columns || [];
+        const cols = storedColumns.length ? storedColumns : (f.table_columns || []);
         display = (
           <div className="pv-field-table-wrap">
             <table className="field-table-display">
@@ -881,10 +902,9 @@ export function PrintView({ passport, companyData, sections }) {
                 } else if (f.type === "file" && isFileUrl(raw)) {
                   display = <a href={raw} target="_blank" rel="noopener noreferrer">{raw}</a>;
                 } else if (f.type === "table") {
-                  let tableData = null;
-                  try { tableData = raw ? JSON.parse(raw) : null; } catch {}
+                  const { columns: storedColumns, rows: tableData } = parseStoredTableValue(raw);
                   if (Array.isArray(tableData) && tableData.length > 0) {
-                    const cols = f.table_columns || [];
+                    const cols = storedColumns.length ? storedColumns : (f.table_columns || []);
                     display = (
                       <table className="field-table-display">
                         {cols.length > 0 && (

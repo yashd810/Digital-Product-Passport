@@ -126,11 +126,17 @@ function flattenSchemaFields(typeDef) {
 
 function parseTableValue(value) {
   if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") {
+    if (Array.isArray(value.rows)) return value.rows;
+    return [];
+  }
   const text = normalizeText(value);
   if (!text) return [];
   try {
     const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [];
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === "object" && Array.isArray(parsed.rows)) return parsed.rows;
+    return [];
   } catch {
     return [];
   }

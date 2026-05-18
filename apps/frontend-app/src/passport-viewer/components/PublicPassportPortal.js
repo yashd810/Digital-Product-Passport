@@ -105,6 +105,31 @@ function getCompositionItems(field, raw) {
   return field.type === "table" ? parseCompositionFromTable(raw) : parseCompositionFromText(raw);
 }
 
+function parseStoredTableValue(raw) {
+  if (Array.isArray(raw)) return { columns: [], rows: raw };
+  if (raw && typeof raw === "object") {
+    return {
+      columns: Array.isArray(raw.columns) ? raw.columns : [],
+      rows: Array.isArray(raw.rows) ? raw.rows : [],
+    };
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return { columns: [], rows: parsed };
+      if (parsed && typeof parsed === "object") {
+        return {
+          columns: Array.isArray(parsed.columns) ? parsed.columns : [],
+          rows: Array.isArray(parsed.rows) ? parsed.rows : [],
+        };
+      }
+    } catch {
+      return { columns: [], rows: [] };
+    }
+  }
+  return { columns: [], rows: [] };
+}
+
 function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues) {
   const manufactured = findFieldEntry(
     fields,
@@ -320,23 +345,15 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
   } else if (field.type === "boolean") {
     content = <strong className="field-value-strong">{translateFieldValue(lang, !!raw, "boolean")}</strong>;
   } else if (field.type === "table") {
-    let tableRows = null;
-    if (Array.isArray(raw)) {
-      tableRows = raw;
-    } else if (typeof raw === "string") {
-      try {
-        tableRows = JSON.parse(raw);
-      } catch {
-        tableRows = null;
-      }
-    }
+    const { columns: storedColumns, rows: tableRows } = parseStoredTableValue(raw);
+    const tableColumns = storedColumns.length ? storedColumns : (Array.isArray(field.table_columns) ? field.table_columns : []);
     content = Array.isArray(tableRows) && tableRows.length > 0 ? (
       <div className="inline-table-wrap">
         <table className="inline-table">
-          {Array.isArray(field.table_columns) && field.table_columns.length > 0 && (
+          {tableColumns.length > 0 && (
             <thead>
               <tr>
-                {field.table_columns.map((column) => (
+                {tableColumns.map((column) => (
                   <th key={column}>{translateSchemaLabel(lang, { label: column })}</th>
                 ))}
               </tr>

@@ -434,6 +434,9 @@ const formatHistoryFieldValue = (fieldDef, rawValue) => {
     if (typeof rawValue === "string") {
       try { rows = JSON.parse(rawValue); } catch { rows = rawValue; }
     }
+    if (rows && typeof rows === "object" && !Array.isArray(rows)) {
+      rows = Array.isArray(rows.rows) ? rows.rows : rows;
+    }
     if (Array.isArray(rows)) {
       const formatted = rows
         .map((row) => Array.isArray(row) ? row.filter(Boolean).join(" | ") : String(row || ""))
@@ -529,13 +532,17 @@ const coerceAssetFieldValue = (fieldDef, rawValue) => {
 
   if (type === "table") {
     if (Array.isArray(rawValue)) return { ok: true, value: rawValue };
+    if (rawValue && typeof rawValue === "object" && Array.isArray(rawValue.rows)) {
+      return { ok: true, value: rawValue };
+    }
     if (typeof rawValue === "string") {
       try {
         const parsed = JSON.parse(rawValue);
         if (Array.isArray(parsed)) return { ok: true, value: parsed };
+        if (parsed && typeof parsed === "object" && Array.isArray(parsed.rows)) return { ok: true, value: parsed };
       } catch {}
     }
-    return { ok: false, error: `Expected JSON array for ${fieldDef?.label || fieldDef?.key}` };
+    return { ok: false, error: `Expected table data for ${fieldDef?.label || fieldDef?.key}` };
   }
 
   if (type === "date") {

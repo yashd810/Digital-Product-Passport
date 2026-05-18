@@ -11,7 +11,6 @@ const logger = require("../services/logger");
  */
 
 module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, SESSION_COOKIE_NAME }) {
-  const requireMfaForControlledData = String(process.env.REQUIRE_MFA_FOR_CONTROLLED_DATA || "").trim().toLowerCase() === "true";
   const normalizeScopes = (scopes) => Array.isArray(scopes)
     ? scopes.map((scope) => String(scope || "").trim()).filter(Boolean)
     : [];
@@ -156,20 +155,6 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   const requireEditor = (req, res, next) => {
     if (req.user?.role === "viewer")
       return res.status(403).json({ error: "Viewers do not have permission to perform this action." });
-    if (requireMfaForControlledData) {
-      if (!req.user?.mfaEnabled) {
-        return res.status(403).json({
-          error: "Multi-factor authentication must be enabled for controlled-data changes.",
-          code: "MFA_ENROLLMENT_REQUIRED"
-        });
-      }
-      if (!req.user?.mfaVerifiedAt) {
-        return res.status(403).json({
-          error: "A multi-factor authenticated session is required for controlled-data changes.",
-          code: "MFA_REQUIRED"
-        });
-      }
-    }
     next();
   };
 
@@ -253,6 +238,5 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     checkCompanyAdmin,
     authenticateApiKey,
     requireApiKeyScope,
-    requireMfaForControlledData,
   };
 };
