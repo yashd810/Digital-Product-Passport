@@ -821,42 +821,32 @@ module.exports = function registerAdminRoutes(app, {
   });
 
   // ─── COMPANIES ─────────────────────────────────────────────────────────────
+  function normalizeCompanyIdentity(input = {}) {
+    const normalizeText = (value) => {
+      const normalized = String(value || "").trim();
+      return normalized || null;
+    };
+    const companyName = String(input.companyName || "").trim();
+    const trustLevel = String(input.customerTrustLevel || "").trim().toUpperCase();
+    return {
+      companyName,
+      legalName: normalizeText(input.legalName),
+      country: normalizeText(input.country)?.toUpperCase() || null,
+      companyRegistrationNumber: normalizeText(input.companyRegistrationNumber),
+      vatNumber: normalizeText(input.vatNumber),
+      websiteDomain: normalizeText(input.websiteDomain),
+      customerTrustLevel: trustLevel || "BASIC",
+      authorizedContactName: normalizeText(input.authorizedContactName),
+      authorizedContactEmail: normalizeText(input.authorizedContactEmail)?.toLowerCase() || null
+    };
+  }
+
   app.post("/api/admin/companies", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const {
-        companyName,
-        legalName,
-        country,
-        companyRegistrationNumber,
-        vatNumber,
-        websiteDomain,
-        customerTrustLevel,
-        authorizedContactName,
-        authorizedContactEmail
-      } = req.body || {};
-      const companyIdentity = {
-        companyName: String(companyName || "").trim(),
-        legalName: String(legalName || "").trim(),
-        country: String(country || "").trim().toUpperCase(),
-        companyRegistrationNumber: String(companyRegistrationNumber || "").trim(),
-        vatNumber: String(vatNumber || "").trim(),
-        websiteDomain: String(websiteDomain || "").trim(),
-        customerTrustLevel: String(customerTrustLevel || "").trim().toUpperCase(),
-        authorizedContactName: String(authorizedContactName || "").trim(),
-        authorizedContactEmail: String(authorizedContactEmail || "").trim().toLowerCase()
-      };
-      const requiredFields = [
-        ["companyName", "Company name"],
-        ["legalName", "Legal name"],
-        ["country", "Country"],
-        ["companyRegistrationNumber", "Company registration number"],
-        ["vatNumber", "VAT number"],
-        ["customerTrustLevel", "Customer trust level"],
-        ["authorizedContactName", "Authorized contact name"],
-        ["authorizedContactEmail", "Authorized contact email"]
-      ];
-      const missingField = requiredFields.find(([field]) => !companyIdentity[field]);
-      if (missingField) return res.status(400).json({ error: `${missingField[1]} required` });
+      const companyIdentity = normalizeCompanyIdentity(req.body || {});
+      if (!companyIdentity.companyName) {
+        return res.status(400).json({ error: "Company name required" });
+      }
       if (!COMPANY_TRUST_LEVELS.has(companyIdentity.customerTrustLevel)) {
         return res.status(400).json({ error: "Invalid customer trust level" });
       }
@@ -889,7 +879,99 @@ module.exports = function registerAdminRoutes(app, {
       );
       await ensureCompanyDppPolicy(r.rows[0].id);
       res.status(201).json({ success: true, company: r.rows[0] });
-    } catch (e) {res.status(500).json({ error: "Failed to create company" });}
+    } catch (e) {
+      if (e?.code === "23505") {
+        return res.status(409).json({ error: "Company name already exists" });
+      }
+      res.status(500).json({ error: "Failed to create company" });
+    }
+  });
+
+  app.get("/api/admin/companies/:companyId", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const companyId = Number(req.params.companyId);
+      if (!Number.isInteger(companyId) || companyId <= 0) {
+        return res.status(400).json({ error: "Invalid company id" });
+      }
+      const company = await pool.query(
+        `SELECT id,
+                company_name,
+                legal_name,
+                country,
+                company_registration_number,
+                vat_number,
+                website_domain,
+                customer_trust_level,
+                verification_status,
+                authorized_contact_name,
+                authorized_contact_email,
+                is_active,
+                created_at,
+                updated_at
+           FROM companies
+          WHERE id = $1`,
+        [companyId]
+      );
+      if (!company.rows.length) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      res.json(company.rows[0]);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch company" });
+    }
+  });
+
+  app.put("/api/admin/companies/:companyId", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const companyId = Number(req.params.companyId);
+      if (!Number.isInteger(companyId) || companyId <= 0) {
+        return res.status(400).json({ error: "Invalid company id" });
+      }
+      const companyIdentity = normalizeCompanyIdentity(req.body || {});
+      if (!companyIdentity.companyName) {
+        return res.status(400).json({ error: "Company name required" });
+      }
+      if (!COMPANY_TRUST_LEVELS.has(companyIdentity.customerTrustLevel)) {
+        return res.status(400).json({ error: "Invalid customer trust level" });
+      }
+
+      const updated = await pool.query(
+        `UPDATE companies
+            SET company_name = $1,
+                legal_name = $2,
+                country = $3,
+                company_registration_number = $4,
+                vat_number = $5,
+                website_domain = $6,
+                customer_trust_level = $7,
+                authorized_contact_name = $8,
+                authorized_contact_email = $9,
+                updated_at = NOW()
+          WHERE id = $10
+          RETURNING *`,
+        [
+          companyIdentity.companyName,
+          companyIdentity.legalName,
+          companyIdentity.country,
+          companyIdentity.companyRegistrationNumber,
+          companyIdentity.vatNumber,
+          companyIdentity.websiteDomain,
+          companyIdentity.customerTrustLevel,
+          companyIdentity.authorizedContactName,
+          companyIdentity.authorizedContactEmail,
+          companyId
+        ]
+      );
+      if (!updated.rows.length) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+      res.json({ success: true, company: updated.rows[0] });
+    } catch (e) {
+      if (e?.code === "23505") {
+        return res.status(409).json({ error: "Company name already exists" });
+      }
+      res.status(500).json({ error: "Failed to update company" });
+    }
   });
 
   app.get("/api/admin/companies", authenticateToken, isSuperAdmin, async (req, res) => {

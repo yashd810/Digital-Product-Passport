@@ -149,6 +149,7 @@ function registerAppRoutes(app, deps) {
     checkCompanyAccess: deps.checkCompanyAccess,
     checkCompanyAdmin: deps.checkCompanyAdmin,
     requireEditor: deps.requireEditor,
+    requireDraftEditor: deps.requireDraftEditor,
     authenticateApiKey: deps.authenticateApiKey,
     requireApiKeyScope: deps.requireApiKeyScope,
     publicReadRateLimit: deps.publicReadRateLimit,

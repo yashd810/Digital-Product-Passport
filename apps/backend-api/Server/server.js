@@ -253,7 +253,7 @@ const oauthService = createOauthService({
 // ─── AUTH MIDDLEWARE ─────────────────────────────────────────────────────────
 const {
   authenticateToken, isSuperAdmin, checkCompanyAccess,
-  requireEditor, checkCompanyAdmin, authenticateApiKey, requireApiKeyScope,
+  requireEditor, requireDraftEditor, checkCompanyAdmin, authenticateApiKey, requireApiKeyScope,
 } = createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, SESSION_COOKIE_NAME });
 
 // ─── RATE LIMITERS ───────────────────────────────────────────────────────────
@@ -541,6 +541,7 @@ registerAppRoutes(app, {
   isSuperAdmin,
   checkCompanyAccess,
   requireEditor,
+  requireDraftEditor,
   checkCompanyAdmin,
   authenticateApiKey,
   requireApiKeyScope,

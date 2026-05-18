@@ -65,6 +65,10 @@ function AdminCompanies() {
   const [openKebabId,    setOpenKebabId]    = useState(null);
   const [kebabPos,       setKebabPos]       = useState({ top: 0, left: 0 });
   const [assetConfirm,   setAssetConfirm]   = useState(null); // company to confirm asset toggle
+  const [editTarget,     setEditTarget]     = useState(null);
+  const [editForm,       setEditForm]       = useState(INITIAL_COMPANY_FORM);
+  const [editError,      setEditError]      = useState("");
+  const [editSaving,     setEditSaving]     = useState(false);
 
   const openKebab = (e, id) => {
     e.stopPropagation();
@@ -116,18 +120,8 @@ function AdminCompanies() {
 	  const handleCreateCompany = async (e) => {
 	    e.preventDefault();
 	    setError(""); setSuccessMsg(""); setIsLoading(true);
-	    const requiredFields = [
-	      ["companyName", "Company name"],
-	      ["legalName", "Legal name"],
-	      ["country", "Country"],
-	      ["companyRegistrationNumber", "Company registration number"],
-	      ["vatNumber", "VAT number"],
-	      ["authorizedContactName", "Authorized contact name"],
-	      ["authorizedContactEmail", "Authorized contact email"],
-	    ];
-	    const missingField = requiredFields.find(([field]) => !String(companyForm[field] || "").trim());
-	    if (missingField) {
-	      setError(`${missingField[1]} is required`);
+	    if (!String(companyForm.companyName || "").trim()) {
+	      setError("Company name is required");
 	      setIsLoading(false);
 	      return;
 	    }
@@ -156,6 +150,57 @@ function AdminCompanies() {
 	    setCompanyForm((prev) => ({ ...prev, [field]: value }));
 	    setCreatedCompany(null);
 	  };
+
+  const openEditCompany = (company) => {
+    setEditTarget(company);
+    setEditError("");
+    setEditForm({
+      companyName: company.company_name || "",
+      legalName: company.legal_name || "",
+      country: company.country || "",
+      companyRegistrationNumber: company.company_registration_number || "",
+      vatNumber: company.vat_number || "",
+      websiteDomain: company.website_domain || "",
+      customerTrustLevel: company.customer_trust_level || "BASIC",
+      authorizedContactName: company.authorized_contact_name || "",
+      authorizedContactEmail: company.authorized_contact_email || "",
+    });
+  };
+
+  const handleEditFormChange = (field, value) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+    setEditError("");
+  };
+
+  const saveEditedCompany = async (e) => {
+    e.preventDefault();
+    if (!editTarget) return;
+    if (!String(editForm.companyName || "").trim()) {
+      setEditError("Company name is required");
+      return;
+    }
+    try {
+      setEditSaving(true);
+      const response = await fetchWithAuth(`${API}/api/admin/companies/${editTarget.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          ...editForm,
+          country: editForm.country.trim().toUpperCase(),
+          websiteDomain: editForm.websiteDomain.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to update company");
+      setSuccessMsg(`Updated ${data.company.company_name}`);
+      setEditTarget(null);
+      await fetchCompanies();
+    } catch (e) {
+      setEditError(e.message || "Failed to update company");
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const handleDeleteCompany = async (company) => {
     setError("");
@@ -309,25 +354,25 @@ function AdminCompanies() {
 	              <label htmlFor="legalName">Legal Name</label>
 	              <input id="legalName" type="text" value={companyForm.legalName}
 	                onChange={e => handleCompanyFormChange("legalName", e.target.value)}
-	                placeholder="ABC Supplier AB" required disabled={isLoading} />
+	                placeholder="ABC Supplier AB" disabled={isLoading} />
 	            </div>
 	            <div className="form-group">
 	              <label htmlFor="country">Country</label>
 	              <input id="country" type="text" value={companyForm.country}
 	                onChange={e => handleCompanyFormChange("country", e.target.value)}
-	                placeholder="SE" maxLength={2} required disabled={isLoading} />
+	                placeholder="SE" maxLength={2} disabled={isLoading} />
 	            </div>
 	            <div className="form-group">
 	              <label htmlFor="companyRegistrationNumber">Registration Number</label>
 	              <input id="companyRegistrationNumber" type="text" value={companyForm.companyRegistrationNumber}
 	                onChange={e => handleCompanyFormChange("companyRegistrationNumber", e.target.value)}
-	                placeholder="556xxx-xxxx" required disabled={isLoading} />
+	                placeholder="556xxx-xxxx" disabled={isLoading} />
 	            </div>
 	            <div className="form-group">
 	              <label htmlFor="vatNumber">VAT Number</label>
 	              <input id="vatNumber" type="text" value={companyForm.vatNumber}
 	                onChange={e => handleCompanyFormChange("vatNumber", e.target.value)}
-	                placeholder="SE556xxxxxxx01" required disabled={isLoading} />
+	                placeholder="SE556xxxxxxx01" disabled={isLoading} />
 	            </div>
 	            <div className="form-group">
 	              <label htmlFor="websiteDomain">Website Domain</label>
@@ -349,13 +394,13 @@ function AdminCompanies() {
 	              <label htmlFor="authorizedContactName">Authorized Contact</label>
 	              <input id="authorizedContactName" type="text" value={companyForm.authorizedContactName}
 	                onChange={e => handleCompanyFormChange("authorizedContactName", e.target.value)}
-	                placeholder="Anna Andersson" required disabled={isLoading} />
+	                placeholder="Anna Andersson" disabled={isLoading} />
 	            </div>
 	            <div className="form-group company-form-span">
 	              <label htmlFor="authorizedContactEmail">Authorized Contact Email</label>
 	              <input id="authorizedContactEmail" type="email" value={companyForm.authorizedContactEmail}
 	                onChange={e => handleCompanyFormChange("authorizedContactEmail", e.target.value)}
-	                placeholder="anna@abc.se" required disabled={isLoading} />
+	                placeholder="anna@abc.se" disabled={isLoading} />
 	            </div>
 	          </div>
 	          <button type="submit" className="create-btn" disabled={isLoading}>
@@ -499,6 +544,12 @@ function AdminCompanies() {
                         onClick={() => { setOpenKebabId(null); navigate(`/admin/company/${company.id}/access`); }}
                       >
                         🔐 Access
+                      </button>
+                      <button
+                        className="menu-item"
+                        onClick={() => { setOpenKebabId(null); openEditCompany(company); }}
+                      >
+                        📝 Edit Company Info
                       </button>
                       <button
                         className="menu-item"
@@ -679,6 +730,70 @@ function AdminCompanies() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="apt-modal-overlay" onClick={() => !editSaving && setEditTarget(null)}>
+          <div className="apt-modal companies-delete-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="apt-modal-title">Edit Company Information</h3>
+            <p className="apt-modal-warning" style={{ background: "rgba(13,181,176,0.08)", borderColor: "rgba(13,181,176,0.28)", color: "var(--text-primary)" }}>
+              Update company identity details for <strong>{editTarget.company_name}</strong>. Only company name is mandatory.
+            </p>
+            <form onSubmit={saveEditedCompany} className="company-form">
+              {editError && <div className="alert alert-error admin-alert-inline-wide">{editError}</div>}
+              <div className="company-form-grid">
+                <div className="form-group">
+                  <label htmlFor="editCompanyName">Company Name</label>
+                  <input id="editCompanyName" type="text" value={editForm.companyName} onChange={e => handleEditFormChange("companyName", e.target.value)} required disabled={editSaving} />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editLegalName">Legal Name</label>
+                  <input id="editLegalName" type="text" value={editForm.legalName} onChange={e => handleEditFormChange("legalName", e.target.value)} disabled={editSaving} />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editCountry">Country</label>
+                  <input id="editCountry" type="text" value={editForm.country} onChange={e => handleEditFormChange("country", e.target.value)} maxLength={2} disabled={editSaving} />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editCompanyRegistrationNumber">Registration Number</label>
+                  <input id="editCompanyRegistrationNumber" type="text" value={editForm.companyRegistrationNumber} onChange={e => handleEditFormChange("companyRegistrationNumber", e.target.value)} disabled={editSaving} />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editVatNumber">VAT Number</label>
+                  <input id="editVatNumber" type="text" value={editForm.vatNumber} onChange={e => handleEditFormChange("vatNumber", e.target.value)} disabled={editSaving} />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editWebsiteDomain">Website Domain</label>
+                  <input id="editWebsiteDomain" type="text" value={editForm.websiteDomain} onChange={e => handleEditFormChange("websiteDomain", e.target.value)} disabled={editSaving} />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editCustomerTrustLevel">Trust Level</label>
+                  <select id="editCustomerTrustLevel" value={editForm.customerTrustLevel} onChange={e => handleEditFormChange("customerTrustLevel", e.target.value)} disabled={editSaving}>
+                    {TRUST_LEVEL_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editAuthorizedContactName">Authorized Contact</label>
+                  <input id="editAuthorizedContactName" type="text" value={editForm.authorizedContactName} onChange={e => handleEditFormChange("authorizedContactName", e.target.value)} disabled={editSaving} />
+                </div>
+                <div className="form-group company-form-span">
+                  <label htmlFor="editAuthorizedContactEmail">Authorized Contact Email</label>
+                  <input id="editAuthorizedContactEmail" type="email" value={editForm.authorizedContactEmail} onChange={e => handleEditFormChange("authorizedContactEmail", e.target.value)} disabled={editSaving} />
+                </div>
+              </div>
+              <div className="apt-modal-actions">
+                <button type="button" className="cancel-btn" onClick={() => setEditTarget(null)} disabled={editSaving}>
+                  Cancel
+                </button>
+                <button type="submit" className="apt-modal-confirm-btn" disabled={editSaving}>
+                  {editSaving ? "Saving…" : "Save Company"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

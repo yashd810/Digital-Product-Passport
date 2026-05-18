@@ -121,73 +121,75 @@ function CompanyProfile({ companyId, user }) {
           </button>
         </div>
 
-        <div className="profile-card">
-          <h3>Backup Continuity</h3>
-          <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 16 }}>
-            This shows whether your backup continuity evidence is production-ready, what is already proven, and what still needs manual OCI or restore-drill work.
-          </p>
+        {isSuperAdminView ? (
+          <div className="profile-card">
+            <h3>Backup Continuity</h3>
+            <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 16 }}>
+              This shows whether backup continuity evidence is production-ready, what is already proven, and what still needs manual OCI or restore-drill work.
+            </p>
 
-          {continuityEvidence ? (
-            <div className="continuity-grid">
-              <div className="continuity-stat">
-                <span>Readiness</span>
-                <strong className={continuityEvidence?.readiness?.status === "ready" ? "status-good" : "status-warn"}>
-                  {continuityEvidence?.readiness?.status === "ready" ? "Ready" : "Not ready"}
-                </strong>
+            {continuityEvidence ? (
+              <div className="continuity-grid">
+                <div className="continuity-stat">
+                  <span>Readiness</span>
+                  <strong className={continuityEvidence?.readiness?.status === "ready" ? "status-good" : "status-warn"}>
+                    {continuityEvidence?.readiness?.status === "ready" ? "Ready" : "Not ready"}
+                  </strong>
+                </div>
+                <div className="continuity-stat">
+                  <span>Backup provider</span>
+                  <strong>{continuityEvidence?.readiness?.backupProviderConfigured ? "Configured" : "Missing"}</strong>
+                </div>
+                <div className="continuity-stat">
+                  <span>Replication proof</span>
+                  <strong>{continuityEvidence?.replicationEvidence?.status === "proven" ? "Proven" : "Not proven"}</strong>
+                </div>
+                <div className="continuity-stat">
+                  <span>Restore drill</span>
+                  <strong>{continuityEvidence?.restoreDrillEvidence?.status === "proven" ? "Proven" : "Not proven"}</strong>
+                </div>
+                <div className="continuity-stat">
+                  <span>Immutability</span>
+                  <strong>{continuityEvidence?.immutableArchivalEvidence?.status === "proven" ? "Proven" : "Not proven"}</strong>
+                </div>
               </div>
-              <div className="continuity-stat">
-                <span>Backup provider</span>
-                <strong>{continuityEvidence?.readiness?.backupProviderConfigured ? "Configured" : "Missing"}</strong>
-              </div>
-              <div className="continuity-stat">
-                <span>Replication proof</span>
-                <strong>{continuityEvidence?.replicationEvidence?.status === "proven" ? "Proven" : "Not proven"}</strong>
-              </div>
-              <div className="continuity-stat">
-                <span>Restore drill</span>
-                <strong>{continuityEvidence?.restoreDrillEvidence?.status === "proven" ? "Proven" : "Not proven"}</strong>
-              </div>
-              <div className="continuity-stat">
-                <span>Immutability</span>
-                <strong>{continuityEvidence?.immutableArchivalEvidence?.status === "proven" ? "Proven" : "Not proven"}</strong>
-              </div>
-            </div>
-          ) : (
-            <p style={{ color: "var(--text-secondary)" }}>Continuity evidence is unavailable right now.</p>
-          )}
+            ) : (
+              <p style={{ color: "var(--text-secondary)" }}>Continuity evidence is unavailable right now.</p>
+            )}
 
-          {backupPolicy && (
+            {backupPolicy && (
+              <div className="continuity-notes">
+                <h4>Policy targets</h4>
+                <ul>
+                  <li>RPO target: {backupPolicy.rpoMinutes} minutes</li>
+                  <li>RTO target: {backupPolicy.rtoHours} hours</li>
+                  <li>Backup provider required: {backupPolicy.backupProviderRequired ? "Yes" : "No"}</li>
+                  <li>Automatic public handover: {backupPolicy.automaticPublicHandoverEnabled ? "Enabled" : "Disabled"}</li>
+                </ul>
+              </div>
+            )}
+
+            {continuityEvidence?.readiness?.missingEvidence?.length ? (
+              <div className="continuity-notes">
+                <h4>Still missing</h4>
+                <ul>
+                  {continuityEvidence.readiness.missingEvidence.map((item) => (
+                    <li key={item}>{item.replace(/_/g, " ")}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             <div className="continuity-notes">
-              <h4>Policy targets</h4>
+              <h4>What you need to do next</h4>
               <ul>
-                <li>RPO target: {backupPolicy.rpoMinutes} minutes</li>
-                <li>RTO target: {backupPolicy.rtoHours} hours</li>
-                <li>Backup provider required: {backupPolicy.backupProviderRequired ? "Yes" : "No"}</li>
-                <li>Automatic public handover: {backupPolicy.automaticPublicHandoverEnabled ? "Enabled" : "Disabled"}</li>
+                <li>Run the restore-drill command on the OCI backend host and record the evidence URI.</li>
+                <li>Configure OCI bucket retention or immutability on the dedicated DB backup bucket.</li>
+                <li>Add the resulting evidence URIs into the production env so readiness becomes fully proven.</li>
               </ul>
             </div>
-          )}
-
-          {continuityEvidence?.readiness?.missingEvidence?.length ? (
-            <div className="continuity-notes">
-              <h4>Still missing</h4>
-              <ul>
-                {continuityEvidence.readiness.missingEvidence.map((item) => (
-                  <li key={item}>{item.replace(/_/g, " ")}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          <div className="continuity-notes">
-            <h4>What you need to do next</h4>
-            <ul>
-              <li>Run the restore-drill command on the OCI backend host and record the evidence URI.</li>
-              <li>Configure OCI bucket retention or immutability on the dedicated DB backup bucket.</li>
-              <li>Add the resulting evidence URIs into the production env so readiness becomes fully proven.</li>
-            </ul>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

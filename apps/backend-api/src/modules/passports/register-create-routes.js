@@ -9,7 +9,7 @@ module.exports = function registerCreateRoutes(app, deps) {
     logger,
     authenticateToken,
     checkCompanyAccess,
-    requireEditor,
+    requireDraftEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
     createPassportTable,
@@ -51,7 +51,7 @@ module.exports = function registerCreateRoutes(app, deps) {
     required: ["passports"],
   };
 
-  app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+  app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireDraftEditor, createValidationMiddleware({
     params: companyParamSchema,
     body: createPassportSchema,
   }), async (req, res) => {
@@ -97,7 +97,7 @@ module.exports = function registerCreateRoutes(app, deps) {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+  app.post("/api/companies/:companyId/passports/bulk", authenticateToken, checkCompanyAccess, requireDraftEditor, createValidationMiddleware({
     params: companyParamSchema,
     body: bulkCreateSchema,
   }), async (req, res) => {

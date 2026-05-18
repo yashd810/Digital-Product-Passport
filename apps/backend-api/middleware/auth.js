@@ -173,6 +173,13 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     next();
   };
 
+  const requireDraftEditor = (req, res, next) => {
+    if (req.user?.role === "viewer") {
+      return res.status(403).json({ error: "Viewers do not have permission to perform this action." });
+    }
+    next();
+  };
+
   const checkCompanyAdmin = (req, res, next) => {
     if (req.user.role === "super_admin") return next();
     if (req.user.role !== "company_admin")
@@ -242,6 +249,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     isSuperAdmin,
     checkCompanyAccess,
     requireEditor,
+    requireDraftEditor,
     checkCompanyAdmin,
     authenticateApiKey,
     requireApiKeyScope,

@@ -10,7 +10,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
     logger,
     authenticateToken,
     checkCompanyAccess,
-    requireEditor,
+    requireDraftEditor,
     normalizePassportRequestBody,
     getPassportTypeSchema,
     createPassportTable,
@@ -86,7 +86,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
     },
   };
 
-  app.patch("/api/companies/:companyId/passports/bulk-update-all", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+  app.patch("/api/companies/:companyId/passports/bulk-update-all", authenticateToken, checkCompanyAccess, requireDraftEditor, createValidationMiddleware({
     params: companyParamSchema,
     body: bulkUpdateAllSchema,
   }), async (req, res) => {
@@ -199,7 +199,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
     }
   });
 
-  app.patch("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+  app.patch("/api/companies/:companyId/passports/:dppId", authenticateToken, checkCompanyAccess, requireDraftEditor, createValidationMiddleware({
     params: {
       type: "object",
       required: ["companyId", "dppId"],
@@ -222,7 +222,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
     }
   });
 
-  app.patch("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireEditor, createValidationMiddleware({
+  app.patch("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireDraftEditor, createValidationMiddleware({
     params: companyParamSchema,
     body: bulkPatchSchema,
   }), async (req, res) => {
