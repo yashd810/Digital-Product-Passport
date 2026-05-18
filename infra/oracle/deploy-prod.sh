@@ -111,8 +111,12 @@ fi
 
 AVAILABLE_KB="$(awk '/MemAvailable/ { print $2; exit }' /proc/meminfo 2>/dev/null || echo 0)"
 AVAILABLE_DISK_KB="$(df -Pk "$APP_DIR" | awk 'NR==2 { print $4 }')"
+SWAP_TOTAL_KB="$(awk '/SwapTotal/ { print $2; exit }' /proc/meminfo 2>/dev/null || echo 0)"
 if [ "${AVAILABLE_KB:-0}" -lt 524288 ]; then
   echo "Warning: less than 512MiB memory appears available; Docker builds may be slow or unstable."
+fi
+if [ "${SWAP_TOTAL_KB:-0}" -eq 0 ] && [ "${AVAILABLE_KB:-0}" -lt 1048576 ]; then
+  echo "Warning: no swap is configured and less than 1GiB memory is available; parallel frontend builds may cause timeouts."
 fi
 if [ "${AVAILABLE_DISK_KB:-0}" -lt 2097152 ]; then
   echo "Refusing deployment: less than 2GiB free disk available under $APP_DIR."
@@ -144,6 +148,40 @@ esac
 if [ "${#RECREATE_SERVICES[@]}" -gt 0 ]; then
   UP_ARGS+=(--force-recreate "${RECREATE_SERVICES[@]}")
 fi
+
+export COMPOSE_BAKE="${COMPOSE_BAKE:-false}"
+
+wait_for_service_http() {
+  local service_name="$1"
+  case "$service_name" in
+    frontend-app)
+      wait_for_http "http://127.0.0.1:${FRONTEND_PORT:-3000}/" "Frontend HTTP" 30 2 >/tmp/dpp-frontend-health.txt
+      ;;
+    public-passport-viewer)
+      wait_for_http "http://127.0.0.1:${PUBLIC_VIEWER_PORT:-3004}/" "Viewer HTTP" 30 2 >/tmp/dpp-viewer-health.txt
+      ;;
+    asset-management)
+      wait_for_http "http://127.0.0.1:${ASSET_MANAGEMENT_PORT:-3003}/" "Asset management HTTP" 30 2 >/tmp/dpp-asset-health.txt
+      ;;
+    marketing-site)
+      wait_for_http "http://127.0.0.1:${MARKETING_PORT:-8080}/" "Marketing HTTP" 30 2 >/tmp/dpp-marketing-health.txt
+      ;;
+  esac
+}
+
+deploy_frontend_sequentially() {
+  local services=(frontend-app public-passport-viewer asset-management marketing-site)
+  local service
+  for service in "${services[@]}"; do
+    echo "Building service sequentially: $service"
+    DOCKER_BUILDKIT=0 DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" build "$service"
+    echo "Recreating service sequentially: $service"
+    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-deps --force-recreate "$service"
+    wait_for_container_health "$service" "$service container" 50 2
+    wait_for_service_http "$service"
+    sleep 2
+  done
+}
 
 wait_for_http() {
   local url="$1"
@@ -226,7 +264,11 @@ fi
     exit 1
   }
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config --quiet
-  DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${UP_ARGS[@]}"
+  if [ "$DEPLOY_TARGET" = "frontend" ]; then
+    deploy_frontend_sequentially
+  else
+    DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${UP_ARGS[@]}"
+  fi
   if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
     APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-db-backup-jobs.sh"
     echo "Running storage probe health check..."
@@ -237,9 +279,11 @@ fi
     wait_for_container_health "frontend-app" "Frontend app" 50 2
     wait_for_container_health "public-passport-viewer" "Public viewer" 50 2
     wait_for_container_health "asset-management" "Asset management" 50 2
-    wait_for_http "http://127.0.0.1:${FRONTEND_PORT:-3000}/" "Frontend HTTP" 30 2 >/tmp/dpp-frontend-health.txt
-    wait_for_http "http://127.0.0.1:${PUBLIC_VIEWER_PORT:-3004}/" "Viewer HTTP" 30 2 >/tmp/dpp-viewer-health.txt
-    wait_for_http "http://127.0.0.1:${ASSET_MANAGEMENT_PORT:-3003}/" "Asset management HTTP" 30 2 >/tmp/dpp-asset-health.txt
+    wait_for_container_health "marketing-site" "Marketing site" 50 2
+    wait_for_service_http "frontend-app"
+    wait_for_service_http "public-passport-viewer"
+    wait_for_service_http "asset-management"
+    wait_for_service_http "marketing-site"
   fi
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 ) 9>"$LOCK_FILE"

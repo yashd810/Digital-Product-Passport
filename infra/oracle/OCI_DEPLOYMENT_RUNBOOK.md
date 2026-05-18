@@ -22,6 +22,7 @@ These scripts include:
 - force-recreate for app services so env changes take effect
 - readiness checks
 - storage verification on backend deploys
+- sequential frontend service builds on low-memory OCI hosts
 
 ## Standard local-to-OCI deploy
 
@@ -55,6 +56,7 @@ DPP_DEPLOY_TARGET=frontend OCI_IP=79.72.16.68 bash scripts/deploy/deploy-to-oci.
   - app
   - viewer
   - asset management
+- frontend services build and restart one at a time to reduce OCI memory pressure
 
 ## Why older deploys felt random
 
@@ -63,6 +65,16 @@ The earlier flow had two weak points:
 - frontend had no structured health verification, so a running build could look like a broken deploy
 
 Those are now handled by retry-based readiness waits.
+
+The frontend flow is also intentionally serialized now:
+- build `frontend-app`
+- recreate and verify it
+- build `public-passport-viewer`
+- recreate and verify it
+- then `asset-management`
+- then `marketing-site`
+
+This is slower, but it is much more stable on a small OCI VM.
 
 ## After deploy checks
 
@@ -100,6 +112,11 @@ If a deploy fails:
    - build resource pressure
    - readiness timeout
    - edge/domain routing issue
+
+If frontend deploys frequently stall:
+- check free memory and swap on the frontend host
+- prefer sequential scripted deploys only
+- avoid rebuilding all frontend services in parallel by hand
 
 ## Edge note
 
