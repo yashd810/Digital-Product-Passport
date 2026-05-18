@@ -120,7 +120,7 @@ Mapped components:
 
 Relevant routes:
 
-- `GET /api/companies/:companyId/backup-policy`
+- `GET /api/admin/companies/:companyId/backup-policy`
 - `GET /api/companies/:companyId/passports/:dppId/backup-replications`
 - `POST /api/companies/:companyId/passports/:dppId/backup-replications/verify`
 - `GET /api/companies/:companyId/passports/:dppId/backup-handover`

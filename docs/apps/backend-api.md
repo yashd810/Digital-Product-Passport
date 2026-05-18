@@ -51,7 +51,7 @@ npm run check:passport-storage
 
 ## Environment
 
-Local Docker development loads runtime values from `docker/.env`; production deployments load from `config/.env.production` locally or the configured server env file such as `/etc/dpp/dpp.env`.
+Local Docker development loads runtime values from `docker/.env`; production deployments load from `docker/.env.prod` locally or the configured server env file such as `/etc/dpp/dpp.env`.
 
 Production requires at least `JWT_SECRET`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `ALLOWED_ORIGINS`.
 

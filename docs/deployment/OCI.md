@@ -188,7 +188,7 @@ ls -la
 
 ```bash
 # Copy environment template
-cp config/.env.production /etc/dpp/dpp.env
+cp docker/.env.prod /etc/dpp/dpp.env
 
 # Edit with production values
 nano /etc/dpp/dpp.env
@@ -229,7 +229,7 @@ BACKUP_SCHEDULE=0 2 * * *  # Daily at 2 AM
 
 ### 8. Create Docker Compose Override
 
-Create `docker-compose.prod.yml`:
+Create `docker/docker-compose.prod.yml`:
 ```yaml
 version: '3.8'
 
@@ -312,7 +312,7 @@ www.claros-dpp.online {
 cd /opt/apps/Digital-Product-Passport
 
 # Start with production compose file
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml -f docker/docker-compose.prod.yml up -d
 
 # Check status
 docker-compose ps
@@ -483,7 +483,7 @@ git pull origin main
 docker-compose build --no-cache
 
 # Restart services
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml -f docker/docker-compose.prod.yml up -d
 
 # Verify deployment
 docker-compose ps
@@ -493,7 +493,7 @@ docker-compose ps
 
 ```bash
 # Run multiple backend instances (if needed)
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --scale backend-api=2
+docker-compose -f docker-compose.yml -f docker/docker-compose.prod.yml up -d --scale backend-api=2
 
 # View running instances
 docker-compose ps
@@ -520,7 +520,7 @@ git checkout <commit-hash>
 
 # Rebuild and restart
 docker-compose build --no-cache
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml -f docker/docker-compose.prod.yml up -d
 ```
 
 ---
@@ -540,7 +540,7 @@ docker-compose logs backend-api
 docker-compose build --no-cache
 
 # Try again
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml -f docker/docker-compose.prod.yml up -d
 ```
 
 ### Database Connection Error
@@ -637,7 +637,7 @@ docker-compose build --no-cache
 # Manual testing steps
 
 # 5. Deploy to production
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml -f docker/docker-compose.prod.yml up -d
 
 # 6. Verify
 docker-compose ps

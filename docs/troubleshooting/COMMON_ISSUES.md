@@ -273,7 +273,7 @@ sudo netstat -tlnp | grep -E ':80|:443|:3001|:5432'
 # Kill conflicting processes
 sudo kill -9 <PID>
 
-# Or change port mapping in docker-compose.prod.yml
+# Or change port mapping in docker/docker-compose.prod.yml
 ```
 
 **5. Database Connection Issues**
@@ -303,20 +303,20 @@ cd /opt/dpp
 git pull origin main
 
 # 4. Verify production environment file
-# Local template: config/.env.production
+# Local template: docker/.env.prod
 # OCI runtime path: /etc/dpp/dpp.env
 
 # 5. Build services
-sudo docker-compose -f docker-compose.prod.yml build --no-cache
+sudo docker compose -f docker/docker-compose.prod.backend.yml build --no-cache
 
 # 6. Start services
-sudo docker-compose -f docker-compose.prod.yml up -d
+sudo docker compose -f docker/docker-compose.prod.backend.yml up -d
 
 # 7. Verify services
-sudo docker-compose -f docker-compose.prod.yml ps
+sudo docker compose -f docker/docker-compose.prod.backend.yml ps
 
 # 8. Check logs
-sudo docker-compose -f docker-compose.prod.yml logs backend-api
+sudo docker compose -f docker/docker-compose.prod.backend.yml logs backend-api
 ```
 
 ---

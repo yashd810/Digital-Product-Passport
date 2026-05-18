@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 OCI_USER="${OCI_USER:-ubuntu}"
-OCI_IP="${OCI_IP:-79.76.53.122}"
+OCI_IP="${OCI_IP:-}"
 SSH_KEY="${SSH_KEY:-$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key}"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
@@ -25,6 +25,14 @@ fi
 
 if [ -z "$DEPLOY_TARGET" ]; then
     echo "❌ DPP_DEPLOY_TARGET is required. Use one of: frontend, backend, all"
+    echo "Examples:"
+    echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=79.72.16.68 bash scripts/deploy/deploy-to-oci.sh"
+    echo "  DPP_DEPLOY_TARGET=backend OCI_IP=82.70.54.173 bash scripts/deploy/deploy-to-oci.sh"
+    exit 1
+fi
+
+if [ -z "$OCI_IP" ]; then
+    echo "❌ OCI_IP is required."
     echo "Examples:"
     echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=79.72.16.68 bash scripts/deploy/deploy-to-oci.sh"
     echo "  DPP_DEPLOY_TARGET=backend OCI_IP=82.70.54.173 bash scripts/deploy/deploy-to-oci.sh"

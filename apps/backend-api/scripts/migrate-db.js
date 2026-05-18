@@ -30,7 +30,7 @@ const {
   getHistoryFieldDefs,
   formatHistoryFieldValue,
   comparableHistoryFieldValue,
-} = require("../helpers/passport-helpers");
+} = require("../src/shared/passports/passport-helpers");
 
 const pool = new Pool({
   user: process.env.DB_USER,

@@ -1,8 +1,8 @@
 function registerBackupRoutes(app, deps) {
   const {
     backupProviderService,
-    productIdentifierService,
     authenticateToken,
+    isSuperAdmin,
     checkCompanyAccess,
     checkCompanyAdmin,
     logAudit,
@@ -12,8 +12,10 @@ function registerBackupRoutes(app, deps) {
     getCompanyNameMap,
     replicatePassportToBackup,
   } = deps;
+  const backupAdminGuard = isSuperAdmin || checkCompanyAdmin;
+  const backupReadGuard = isSuperAdmin || checkCompanyAccess;
 
-  app.get("/api/companies/:companyId/backup-providers", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.get("/api/companies/:companyId/backup-providers", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.json([]);
       const providers = await backupProviderService.listProviders({ companyId: req.params.companyId });
@@ -23,48 +25,7 @@ function registerBackupRoutes(app, deps) {
     }
   });
 
-  app.get("/api/companies/:companyId/backup-policy", authenticateToken, checkCompanyAdmin, async (req, res) => {
-    try {
-      if (!backupProviderService?.getContinuityPolicy) {
-        return res.status(503).json({ error: "Backup provider service is unavailable" });
-      }
-      const policy = backupProviderService.getContinuityPolicy({ companyId: req.params.companyId });
-      res.json(policy);
-    } catch {
-      res.status(500).json({ error: "Failed to fetch backup continuity policy" });
-    }
-  });
-
-  app.get("/api/companies/:companyId/backup-continuity-evidence", authenticateToken, checkCompanyAdmin, async (req, res) => {
-    try {
-      if (!backupProviderService?.getContinuityEvidence) {
-        return res.status(503).json({ error: "Backup provider service is unavailable" });
-      }
-      const evidence = await backupProviderService.getContinuityEvidence({ companyId: req.params.companyId });
-      return res.json(evidence);
-    } catch (error) {
-      if ((error.message || "").includes("companyId")) {
-        return res.status(400).json({ error: error.message });
-      }
-      return res.status(500).json({ error: "Failed to fetch backup continuity evidence" });
-    }
-  });
-
-  app.get("/api/companies/:companyId/identifier-persistence-policy", authenticateToken, checkCompanyAdmin, async (req, res) => {
-    try {
-      if (!productIdentifierService?.getIdentifierPersistencePolicy) {
-        return res.status(503).json({ error: "Product identifier service is unavailable" });
-      }
-      const policy = productIdentifierService.getIdentifierPersistencePolicy({
-        companyId: req.params.companyId,
-      });
-      return res.json(policy);
-    } catch {
-      return res.status(500).json({ error: "Failed to fetch identifier persistence policy" });
-    }
-  });
-
-  app.post("/api/companies/:companyId/backup-providers", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.post("/api/companies/:companyId/backup-providers", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
       const provider = await backupProviderService.upsertProvider({
@@ -94,7 +55,7 @@ function registerBackupRoutes(app, deps) {
     }
   });
 
-  app.delete("/api/companies/:companyId/backup-providers/:providerKey", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.delete("/api/companies/:companyId/backup-providers/:providerKey", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
       const provider = await backupProviderService.revokeProvider({ providerKey: req.params.providerKey });
@@ -114,7 +75,7 @@ function registerBackupRoutes(app, deps) {
     }
   });
 
-  app.get("/api/companies/:companyId/passports/:dppId/backup-replications", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/backup-replications", authenticateToken, backupReadGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.json([]);
       const replications = await backupProviderService.listReplications({
@@ -127,7 +88,7 @@ function registerBackupRoutes(app, deps) {
     }
   });
 
-  app.get("/api/companies/:companyId/passports/:dppId/backup-handover", authenticateToken, checkCompanyAccess, async (req, res) => {
+  app.get("/api/companies/:companyId/passports/:dppId/backup-handover", authenticateToken, backupReadGuard, async (req, res) => {
     try {
       if (!backupProviderService) {
         return res.status(503).json({ error: "Backup provider service is unavailable" });
@@ -146,7 +107,7 @@ function registerBackupRoutes(app, deps) {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:dppId/backup-handover/activate", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/backup-handover/activate", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) {
         return res.status(503).json({ error: "Backup provider service is unavailable" });
@@ -217,7 +178,7 @@ function registerBackupRoutes(app, deps) {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:dppId/backup-handover/deactivate", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/backup-handover/deactivate", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) {
         return res.status(503).json({ error: "Backup provider service is unavailable" });
@@ -260,7 +221,7 @@ function registerBackupRoutes(app, deps) {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:dppId/backup-replications", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/backup-replications", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
       const passportType = req.body?.passportType || req.body?.passport_type;
@@ -297,7 +258,7 @@ function registerBackupRoutes(app, deps) {
     }
   });
 
-  app.post("/api/companies/:companyId/passports/:dppId/backup-replications/verify", authenticateToken, checkCompanyAdmin, async (req, res) => {
+  app.post("/api/companies/:companyId/passports/:dppId/backup-replications/verify", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
       const replicationId = req.body?.replicationId ?? req.body?.replication_id ?? null;

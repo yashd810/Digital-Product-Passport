@@ -1,27 +1,22 @@
 import React, { useRef } from "react";
 import "../../../passport-viewer/styles/PassportViewer.css";
 
-/**
- * Fully controlled component — no internal state.
- * Props:
- *   logoPreview  : string|null   current logo base64 or null
- *   onLogoChange : (v) => void   called with base64 string or null
- */
-function IntroductionUpload({ logoPreview, onLogoChange }) {
+function CompanyLogoUpload({ logoPreview, onLogoChange }) {
   const fileInputRef = useRef(null);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       alert("Image too large. Maximum size is 5 MB.");
-      e.target.value = "";
+      event.target.value = "";
       return;
     }
+
     const reader = new FileReader();
     reader.onloadend = () => onLogoChange(reader.result);
     reader.readAsDataURL(file);
-    e.target.value = ""; // allow re-selecting same file
+    event.target.value = "";
   };
 
   return (
@@ -45,6 +40,7 @@ function IntroductionUpload({ logoPreview, onLogoChange }) {
               </div>
             )}
           </div>
+
           <div className="intro-logo-actions">
             <button
               type="button"
@@ -54,7 +50,7 @@ function IntroductionUpload({ logoPreview, onLogoChange }) {
               {logoPreview ? "↺ Change Logo" : "⬆ Upload Logo"}
             </button>
 
-            {logoPreview && (
+            {logoPreview ? (
               <button
                 type="button"
                 className="intro-remove-btn"
@@ -62,12 +58,11 @@ function IntroductionUpload({ logoPreview, onLogoChange }) {
               >
                 ✕ Remove
               </button>
-            )}
+            ) : null}
           </div>
 
           <p className="intro-col-hint">JPG, PNG, SVG — max 5 MB</p>
 
-          {/* Hidden file input */}
           <input
             ref={fileInputRef}
             type="file"
@@ -81,4 +76,4 @@ function IntroductionUpload({ logoPreview, onLogoChange }) {
   );
 }
 
-export default IntroductionUpload;
+export default CompanyLogoUpload;

@@ -79,7 +79,7 @@ STORAGE_S3_FORCE_PATH_STYLE=true
 
 ```bash
 ssh -i <your-key>.pem ubuntu@<vm-public-ip> "sudo mkdir -p /etc/dpp && sudo chown ubuntu:ubuntu /etc/dpp"
-scp -i <your-key>.pem config/.env.production ubuntu@<vm-public-ip>:/etc/dpp/dpp.env
+scp -i <your-key>.pem docker/.env.prod ubuntu@<vm-public-ip>:/etc/dpp/dpp.env
 ```
 
 5. On the VM, run:
@@ -94,7 +94,7 @@ That will:
 - install/update Docker tooling if needed
 - clone or update the repo
 - verify `/etc/dpp/dpp.env` exists
-- start the production stack with `docker compose -f docker-compose.prod.yml --env-file /etc/dpp/dpp.env up --build -d`
+- start the production stack with `docker compose -f docker/docker-compose.prod.yml --env-file /etc/dpp/dpp.env up --build -d`
 
 ## Two-host OCI split
 
@@ -127,8 +127,8 @@ DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=backend ./infra/oracle/deploy-pr
 
 The matching compose files are:
 
-- `docker-compose.prod.frontend.yml`
-- `docker-compose.prod.backend.yml`
+- `docker/docker-compose.prod.frontend.yml`
+- `docker/docker-compose.prod.backend.yml`
 
 For the frontend host env file, set:
 

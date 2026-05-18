@@ -105,9 +105,10 @@
 }
 
 [data-theme="light"] .theme-toggle-header-btn {
-  background: rgba(13, 181, 176, 0.08);
-  color: var(--accent);
-  border-color: rgba(13, 181, 176, 0.25);
+  background: rgba(255, 255, 255, 0.96);
+  color: #143244;
+  border-color: rgba(23, 48, 74, 0.16);
+  box-shadow: 0 8px 20px rgba(16, 36, 58, 0.08);
 }
 
 .theme-toggle-header-btn:hover {
@@ -118,5 +119,7 @@
 }
 
 [data-theme="light"] .theme-toggle-header-btn:hover {
-  background: rgba(13, 181, 176, 0.15);
+  background: #ffffff;
+  color: #0d6f74;
+  border-color: rgba(13, 181, 176, 0.36);
 }

@@ -36,6 +36,7 @@ module.exports = function registerPassportRoutes(app, {
   fs,
   crypto,
   authenticateToken,
+  isSuperAdmin,
   checkCompanyAccess,
   checkCompanyAdmin,
   requireEditor,
@@ -470,8 +471,8 @@ module.exports = function registerPassportRoutes(app, {
   });
   registerBackupRoutes(app, {
     backupProviderService,
-    productIdentifierService,
     authenticateToken,
+    isSuperAdmin,
     checkCompanyAccess,
     checkCompanyAdmin,
     logAudit,

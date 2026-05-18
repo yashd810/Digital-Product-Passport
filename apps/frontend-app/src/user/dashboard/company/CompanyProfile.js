@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import IntroductionUpload from "./IntroductionUpload";
+import CompanyLogoUpload from "./CompanyLogoUpload";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../assets/styles/Dashboard.css";
 
@@ -21,10 +21,12 @@ function CompanyProfile({ companyId, user }) {
 
   useEffect(() => {
     fetchCompanyProfile();
-  }, [resolvedCompanyId]);
+  }, [resolvedCompanyId, isSuperAdminView]);
 
   const fetchCompanyProfile = async () => {
     try {
+      setBackupPolicy(null);
+      setContinuityEvidence(null);
       const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`, {
         headers: authHeaders(),
       });
@@ -34,20 +36,23 @@ function CompanyProfile({ companyId, user }) {
         setCompanyName(d.company_name || "");
       }
 
-      const [policyRes, evidenceRes] = await Promise.all([
-        fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/backup-policy`, {
-          headers: authHeaders(),
-        }).catch(() => null),
-        fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/backup-continuity-evidence`, {
-          headers: authHeaders(),
-        }).catch(() => null),
-      ]);
+      if (isSuperAdminView) {
+        const adminBase = `${API}/api/admin/companies/${resolvedCompanyId}`;
+        const [policyRes, evidenceRes] = await Promise.all([
+          fetchWithAuth(`${adminBase}/backup-policy`, {
+            headers: authHeaders(),
+          }).catch(() => null),
+          fetchWithAuth(`${adminBase}/backup-continuity-evidence`, {
+            headers: authHeaders(),
+          }).catch(() => null),
+        ]);
 
-      if (policyRes?.ok) {
-        setBackupPolicy(await policyRes.json());
-      }
-      if (evidenceRes?.ok) {
-        setContinuityEvidence(await evidenceRes.json());
+        if (policyRes?.ok) {
+          setBackupPolicy(await policyRes.json());
+        }
+        if (evidenceRes?.ok) {
+          setContinuityEvidence(await evidenceRes.json());
+        }
       }
     } catch (error) {
     } finally {
@@ -86,7 +91,7 @@ function CompanyProfile({ companyId, user }) {
   return (
     <div className="company-profile-wrapper">
       <div className="profile-header">
-        <h2>{isSuperAdminView ? "🏢 Company Profile" : "🏢 Company Profile"}</h2>
+        <h2>🏢 Company Profile</h2>
         <p>{isSuperAdminView ? `Manage the public company logo for ${companyName || "this company"}` : "Manage your company logo for passport viewing"}</p>
       </div>
 
@@ -112,7 +117,7 @@ function CompanyProfile({ companyId, user }) {
           <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 16 }}>
             Upload the company logo that will be displayed in the public and preview passport viewer.
           </p>
-          <IntroductionUpload
+          <CompanyLogoUpload
             logoPreview={logoPreview}
             onLogoChange={setLogoPreview}
           />

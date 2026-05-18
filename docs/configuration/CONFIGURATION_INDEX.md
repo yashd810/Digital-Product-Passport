@@ -22,7 +22,7 @@ This index provides quick navigation and comprehensive reference for system conf
 | Configuration | File | Focus | Environment |
 |---------------|------|-------|-------------|
 | [Local Development](#local-development) | configuration-files.md | docker/.env setup | Development |
-| [Production Deployment](#production) | configuration-files.md | config/.env.production setup | OCI |
+| [Production Deployment](#production) | configuration-files.md | docker/.env.prod setup | OCI |
 
 ---
 
@@ -67,7 +67,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 **Purpose:** Complete reference for environment configuration files and variables for local and production deployment.
 
 **Topics Covered:**
-- Files overview (docker/.env, config/.env.production)
+- Files overview (docker/.env, docker/.env.prod)
 - Local development environment setup
 - Production environment configuration
 - Using configuration files (Docker, OCI deployment)
@@ -83,13 +83,13 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 
 **Configuration Files Documented:**
 - `docker/.env` - Local development (Docker Compose)
-- `config/.env.production` - Production (OCI deployment)
+- `docker/.env.prod` - Production (OCI deployment)
 
 **Environment Variables:** 20+ documented with explanations
 
 **Key Sections:**
 - Local Development (docker/.env) with local Docker variables
-- Production (config/.env.production) with security templates
+- Production (docker/.env.prod) with security templates
 - Using Configuration Files (deployment procedures)
 - Environment Variable Reference (5 categories)
 - Security Best Practices (5 key practices)
@@ -179,7 +179,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 **Goal:** Secure production configuration for OCI
 
 **Steps:**
-1. Create or update `config/.env.production`
+1. Create or update `docker/.env.prod`
 2. Set NODE_ENV=production
 3. Set DEBUG=false
 4. Set DB_HOST=localhost (after SSH)
@@ -234,7 +234,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 
 **Steps:**
 1. Read [Production section](configuration-files.md#production-envproduction)
-2. Create `config/.env.production` template
+2. Create `docker/.env.prod` template
 3. Generate strong secrets (32+ chars)
 4. Set domain to production URL
 5. Enable security features
@@ -280,7 +280,7 @@ The Claros DPP configuration documentation provides comprehensive guidance for s
 | Total Configuration Files | 1 |
 | Files with Table of Contents | 1/1 (100%) |
 | Files with Related Documentation | 1/1 (100%) |
-| Configuration File Types | 2 (docker/.env, config/.env.production) |
+| Configuration File Types | 2 (docker/.env, docker/.env.prod) |
 | Environment Variables | 20+ |
 | Variable Categories | 5 |
 | Core Settings | 2 |

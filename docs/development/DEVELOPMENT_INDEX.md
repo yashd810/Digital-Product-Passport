@@ -156,7 +156,7 @@ Database and utility automation scripts for bulk operations and administrative t
 
 **Topics Covered:**
 - Script directory structure
-- Deployment automation scripts (deploy-to-oci.sh, deploy-oci.sh, deploy-manual.sh, CRITICAL_COOKIE_FIX.sh)
+- Deployment automation scripts (standard remote OCI deployment and host-side deployment workflow)
 - Utility scripts (bulk-update-fetch.js, fix-admin-role.js)
 - Configuration and setup
 - Quick reference commands

@@ -3,7 +3,7 @@
 const express = require("express");
 
 const registerDppApiRoutes = require("../routes/dpp-api");
-const { extractExplicitFacilityId, normalizePassportRequestBody } = require("../helpers/passport-helpers");
+const { extractExplicitFacilityId, normalizePassportRequestBody } = require("../src/shared/passports/passport-helpers");
 
 function createMockResponse() {
   return {

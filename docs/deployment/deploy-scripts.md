@@ -1,96 +1,66 @@
 # Deployment Scripts
 
-Automated and manual deployment scripts for OCI production environment.
+Production deployment is intentionally standardized. The goal is one repeatable procedure, not multiple competing scripts.
 
-## Table of Contents
+## Supported Paths
 
-1. [Quick Start](#quick-start)
-2. [Scripts Overview](#scripts-overview)
-3. [Environment Configuration](#environment-configuration)
-4. [Troubleshooting Deployments](#troubleshooting-deployments)
+### 1. Local-to-OCI Deployment
 
----
-
-## Quick Start
+Use this from your machine:
 
 ```bash
-# Deploy the frontend OCI host
+# Frontend OCI host
 DPP_DEPLOY_TARGET=frontend OCI_IP="79.72.16.68" bash scripts/deploy/deploy-to-oci.sh
 
-# Deploy the backend OCI host
+# Backend OCI host
 DPP_DEPLOY_TARGET=backend OCI_IP="82.70.54.173" bash scripts/deploy/deploy-to-oci.sh
-
-# Manual step-by-step
-DPP_DEPLOY_TARGET=frontend bash scripts/deploy/deploy-manual.sh
 ```
 
-## Scripts Overview
+### 2. Host-side Deployment
+
+Use this only when you are already SSHed into the OCI host:
+
+```bash
+cd /opt/dpp
+sudo DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=backend ./infra/oracle/deploy-prod.sh
+```
+
+## Current Script Overview
 
 | Script | Purpose | When to Use |
 |--------|---------|------------|
-| `deploy-to-oci.sh` | Full automated deployment with explicit target selection | First deployment or major updates |
-| `deploy-oci.sh` | Simplified deployment | Quick redeploy with existing config |
-| `deploy-manual.sh` | Manual steps | Understanding deployment process |
-| `CRITICAL_COOKIE_FIX.sh` | Fix auth cookies | If authentication fails after deploy |
+| `scripts/deploy/deploy-to-oci.sh` | Standard remote deploy entrypoint | Normal OCI deployments from your machine |
+| `infra/oracle/deploy-prod.sh` | Hardened host-side deploy workflow | When already on the OCI host |
 
-## Environment Configuration
+## Why This Was Simplified
 
-Before deploying, set these variables:
+Older deployment helpers were removed because they caused operational drift:
+- they described different procedures
+- some edited production env directly
+- some used older compose files or stale assumptions
+- they made deploys feel random and brittle
+
+The repository now supports one documented production path.
+
+## Verification
+
+After deployment:
 
 ```bash
-export OCI_IP="79.72.16.68"
-export SSH_KEY="$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key"
-export OCI_USER="ubuntu"
-export DPP_DEPLOY_TARGET="frontend"
+curl -s https://api.claros-dpp.online/health
+curl -s https://api.claros-dpp.online/health/storage
+curl -I https://app.claros-dpp.online/
+curl -I https://viewer.claros-dpp.online/
 ```
 
-Or add to `.env`:
-```
-OCI_IP=79.72.16.68
-SSH_KEY=$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key
-OCI_USER=ubuntu
-DPP_DEPLOY_TARGET=frontend
-```
+## Troubleshooting
 
-`DPP_DEPLOY_TARGET` is required for the main deploy scripts. Use `frontend` on the frontend host, `backend` on the backend host, and `all` only for a single-host deployment.
+If a deploy fails:
+- check the host logs
+- check container health
+- use the runbook instead of improvising manual compose commands
 
-## Troubleshooting Deployments
-
-**SSH Connection Fails**:
-```bash
-# Check SSH key permissions
-chmod 600 "$SSH_KEY"
-
-# Test connection
-ssh -i "$SSH_KEY" $OCI_USER@$OCI_IP
-```
-
-**Docker Build Fails**:
-```bash
-# Clear cache and retry
-docker system prune -a
-bash deploy-to-oci.sh
-```
-
-**Services Won't Start**:
-```bash
-# Check logs
-ssh -i "$SSH_KEY" $OCI_USER@$OCI_IP
-cd /opt/dpp
-sudo docker-compose -f docker-compose.prod.yml logs backend-api
-```
-
----
-
-**[← Back to Scripts](../README.md)
-
----
-
-## Related Documentation
-
-- [OCI.md](OCI.md) - OCI production deployment guide
-- [LOCAL.md](LOCAL.md) - Local development deployment
-- [DISTRIBUTED_DEPLOYMENT_GUIDE.md](DISTRIBUTED_DEPLOYMENT_GUIDE.md) - Distributed infrastructure setup
-- [DEPLOYMENT_INSTRUCTIONS.md](DEPLOYMENT_INSTRUCTIONS.md) - Critical authentication fixes
-- [production-domain-and-did-setup.md](production-domain-and-did-setup.md) - Domain and environment configuration
-- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Authentication requirements**
+Primary references:
+- [OCI.md](OCI.md)
+- [OCI_DEPLOYMENT_RUNBOOK.md](../../infra/oracle/OCI_DEPLOYMENT_RUNBOOK.md)
+- [PRODUCTION_BACKUP_RUNBOOK.md](../../infra/oracle/PRODUCTION_BACKUP_RUNBOOK.md)

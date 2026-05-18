@@ -1,244 +1,54 @@
-# Deployment Instructions - JWT & Cross-Domain Authentication Fix
+# Deployment Instructions - Production Notes
 
-**Date**: May 2, 2026  
-**Status**: CRITICAL FIX - Required for production API authentication  
-**Commit**: 9b82448
+This document replaces older issue-specific deployment notes. Production deployment and authentication fixes are now part of the normal documented workflow, not separate emergency procedures.
 
-## Table of Contents
+## Standard Production Deployment
 
-1. [Issue Summary](#issue-summary)
-2. [Infrastructure Setup](#infrastructure-setup)
-3. [How to Deploy](#how-to-deploy)
-4. [Configuration Details](#configuration-details)
-5. [Verification Checklist](#verification-checklist)
-6. [Rollback Plan](#rollback-plan)
-7. [Technical Details](#technical-details)
-8. [Questions](#questions)
+Use one of these supported paths:
 
----
-
-## Issue Summary
-
-All API requests from the frontend (`app.claros-dpp.online`) to the backend (`api.claros-dpp.online`) were returning `403 Forbidden` with error message: `Invalid or expired token`
-
-### Root Causes Fixed:
-
-1. **Missing COOKIE_DOMAIN** - Session cookies were not being sent across subdomains
-2. **Missing DB_HOST** - Database connection was using default "postgres" name resolution
-3. **Missing REQUIRE_MFA_FOR_CONTROLLED_DATA** - MFA policy was not configured
-
----
-
-## Infrastructure Setup
-
-Your system is distributed across two instances:
-- **82.70.54.173** - Backend API + Postgres + Local Storage ⭐ **DEPLOY HERE**
-- **79.72.16.68** - Frontend + Asset Management + Marketing Site
-
-This fix must be deployed on **82.70.54.173** (backend server) only.
-
----
-
-## How to Deploy
-
-### Option 1: Automated SSH Deployment (Recommended)
-
-#### Step 1: SSH into Backend Server
 ```bash
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
+# Frontend OCI host
+DPP_DEPLOY_TARGET=frontend OCI_IP=79.72.16.68 bash scripts/deploy/deploy-to-oci.sh
+
+# Backend OCI host
+DPP_DEPLOY_TARGET=backend OCI_IP=82.70.54.173 bash scripts/deploy/deploy-to-oci.sh
 ```
 
-#### Step 2: Update Environment Configuration
+Or, when already on the host:
 
-Edit the production environment file:
 ```bash
-sudo nano /etc/dpp/dpp.env
+cd /opt/dpp
+sudo DPP_ENV_FILE=/etc/dpp/dpp.env DPP_DEPLOY_TARGET=backend ./infra/oracle/deploy-prod.sh
 ```
 
-**Locate this section:**
-```
-SESSION_COOKIE_NAME=dpp_session
+## Authentication and Runtime Requirements
+
+These settings belong in `/etc/dpp/dpp.env` on the OCI host:
+
+```env
+COOKIE_DOMAIN=.claros-dpp.online
 COOKIE_SECURE=true
 COOKIE_SAME_SITE=None
-```
-
-**ADD these lines immediately after:**
-```
-COOKIE_DOMAIN=.claros-dpp.online
-REQUIRE_MFA_FOR_CONTROLLED_DATA=true
-```
-
-**Also verify these settings exist (add if missing):**
-```
 DB_HOST=postgres
-JWT_SECRET=ecefa7dd3bfb1b8ec68bf4c9a5b2b4c1ee898d7ded698f1e9a1ca67693eab91e
 ```
 
-**Save the file**: `Ctrl+X` → `Y` → `Enter`
-
-#### Step 3: Restart Backend Services
-
-```bash
-cd /opt/dpp
-
-# Stop and rebuild
-docker-compose -f docker-compose.prod.yml down backend-api
-docker-compose -f docker-compose.prod.yml up -d backend-api
-
-# Wait 5 seconds for startup
-sleep 5
-
-# Verify it's running
-docker logs -f backend-api | head -30
-```
-
-You should see logs like:
-```
-[production] Backend API listening on port 3001
-...
-Database connection established
-```
-
-#### Step 4: Verify the Fix
-
-Test the API endpoint in browser DevTools or curl:
-
-```bash
-# From your local machine:
-curl -b cookies.txt https://api.claros-dpp.online/api/users/me/notifications?limit=25 \
-  -H "Cookie: dpp_session=<your-token-here>"
-```
-
-Expected response: `200 OK` with notifications array (not 403)
-
----
-
-### Option 2: Automated Deployment (Using script)
-
-```bash
-# From your local machine, in the repository root:
-./deploy-oci.sh 82.70.54.173 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
-```backend server
-scp -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key \
-    /Users/yashdesai/Desktop/Passport/Claude/files/files/config/.env.production \
-    ubuntu@82.70.54.173:/etc/dpp/dpp.env
-
-# 2. SSH and restart
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
-
-If you're deploying from this repository:
-
-```bash
-# 1. Copy the corrected production env to OCI
-scp -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key \
-    /Users/yashdesai/Desktop/Passport/Claude/files/files/config/.env.production \
-    ubuntu@79.76.53.122:/etc/dpp/dpp.env
-
-# 2. SSH and restart
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.76.53.122
-
-cd /opt/dpp
-docker-compose -f docker-compose.prod.yml restart backend-api
-docker logs -f backend-api | grep -E "listening|error|CRITICAL"
-```
-
----
-
-## Configuration Details
-
-### New Environment Variables Added
-
-| Variable | Value | Purpose |
-|----------|-------|---------|
-| `COOKIE_DOMAIN` | `.claros-dpp.online` | Enables cross-subdomain cookie sharing (CRITICAL FIX) |
-| `DB_HOST` | `postgres` | Docker service name for database connection |
-| `REQUIRE_MFA_FOR_CONTROLLED_DATA` | `true` | Enforce MFA for sensitive operations |
-
-### Existing Production Secrets
-
-Keep existing production secret values in `/etc/dpp/dpp.env`; do not commit them to the repository.
-
----
+They are no longer treated as one-off fixes.
 
 ## Verification Checklist
 
-After deployment, verify these work:
+After deployment, confirm:
 
-- [ ] GET `/api/users/me` → 200 OK (not 403)
-- [ ] GET `/api/users/me/notifications?limit=25` → 200 OK with data
-- [ ] GET `/api/companies/2/activity` → 200 OK
-- [ ] GET `/api/messaging/unread` → 200 OK
-- [ ] Browser DevTools shows cookies being sent with cross-domain requests
-- [ ] No 403 Forbidden errors in backend logs
-- [ ] No JWT verification errors in logs
+- `https://api.claros-dpp.online/health` returns OK
+- `https://api.claros-dpp.online/health/storage` returns `storage: ok`
+- `https://app.claros-dpp.online/` returns `200`
+- `https://viewer.claros-dpp.online/` returns `200`
+- authenticated app requests no longer fail because cookies are missing across subdomains
 
----
+## Important Rule
 
-## Rollback Plan
+Do not use ad hoc production deploy steps or old helper scripts. This repository intentionally removed those paths to keep deployment predictable.
 
-If anything goes wrong:
-
-```bash
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.76.53.122
-
-# Restore the server environment file from your backup or copy config/.env.production again
-
-# Restart
-cd /opt/dpp
-docker-compose -f docker-compose.prod.yml restart backend-api
-```
-
----
-
-## Technical Details (For Reference)
-
-### Cookie Domain Behavior
-
-**Without `COOKIE_DOMAIN`:**
-```
-Browser at app.claros-dpp.online
-  ↓ fetch("https://api.claros-dpp.online/api/users/me")
-Browser: "I won't send cookies to a different domain"
-Backend: No cookies = 403 Unauthorized
-```
-
-**With `COOKIE_DOMAIN=.claros-dpp.online`:**
-```
-Browser at app.claros-dpp.online
-  ↓ fetch("https://api.claros-dpp.online/api/users/me")
-Browser: "Cookie domain matches .claros-dpp.online ✓ I'll send it"
-Backend: Receives dpp_session cookie → JWT verified → 200 OK
-```
-
-### JWT Verification Flow (Code Path)
-
-[See middleware/auth.js lines 115-171 for full implementation]
-
-1. Extract JWT from cookie or Authorization header
-2. Call `jwt.verify(token, JWT_SECRET)`
-3. If verification fails → 403 "Invalid or expired token"
-4. Query database for user and check `session_version`
-5. If `session_version` matches token → Attach user context to request
-6. Proceed to route handler
-
----
-
-## Questions?
-
-Refer to:
-- `CRITICAL_COOKIE_DOMAIN_FIX.md` - Original issue documentation
-- `CRITICAL_COOKIE_FIX.sh` - Shell script for automated fix
-- `DEPLOYMENT_FIX_GUIDE.md` - Extended deployment guide
-
----
-
-## Related Documentation
-
-- [OCI.md](OCI.md) - OCI deployment guide
-- [LOCAL.md](LOCAL.md) - Local development setup
-- [DISTRIBUTED_DEPLOYMENT_GUIDE.md](DISTRIBUTED_DEPLOYMENT_GUIDE.md) - Multi-server infrastructure
-- [production-domain-and-did-setup.md](production-domain-and-did-setup.md) - Domain and environment configuration
-- [AUTHENTICATION.md](../security/AUTHENTICATION.md) - Authentication mechanisms
-- [AUDIT_LOGGING.md](../security/AUDIT_LOGGING.md) - Login and authentication event logging
-
-**Git Commit**: `9b82448` - See what changed in this commit
+Use these documents instead:
+- [OCI.md](OCI.md)
+- [deploy-scripts.md](deploy-scripts.md)
+- [OCI_DEPLOYMENT_RUNBOOK.md](../../infra/oracle/OCI_DEPLOYMENT_RUNBOOK.md)

@@ -26,7 +26,7 @@ const {
   getHistoryFieldDefs,
   formatHistoryFieldValue,
   comparableHistoryFieldValue,
-} = require("../helpers/passport-helpers");
+} = require("../src/shared/passports/passport-helpers");
 const logger = require("../services/logger");
 
 const pool = new Pool({

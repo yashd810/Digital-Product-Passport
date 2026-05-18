@@ -66,9 +66,9 @@ This means persistence depends on both identifier design and the supporting arch
 
 ## Admin/API visibility
 
-Company admins can read the effective policy at:
+Superadmins can read the effective policy at:
 
-- `GET /api/companies/:companyId/identifier-persistence-policy`
+- `GET /api/admin/companies/:companyId/identifier-persistence-policy`
 - `GET /api/companies/:companyId/passports/:dppId/identifier-lineage`
 
 Standards/public clients can read identifier lineage at:

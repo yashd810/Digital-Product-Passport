@@ -72,7 +72,7 @@ docker-compose -f docker/docker-compose.yml up -d
 
 **Deployment Method**: `deploy-to-oci.sh` script
 - Pushes Docker images to OCI Registry
-- Uses `docker-compose.prod.yml` with volume persistence
+- Uses `docker/docker-compose.prod.yml` with volume persistence
 - TLS/HTTPS via Caddy reverse proxy
 - Domain configuration via environment variables
 

@@ -6,7 +6,7 @@ Environment configuration files for local development and production deployment.
 
 1. [Files Overview](#files-overview)
 2. [Local Development (docker/.env)](#local-development-dockerenv)
-3. [Production (config/.env.production)](#production-configenvproduction)
+3. [Production (docker/.env.prod)](#production-configenvproduction)
 4. [Using Configuration Files](#using-configuration-files)
 5. [Environment Variable Reference](#environment-variable-reference)
 6. [Security Best Practices](#security-best-practices)
@@ -19,7 +19,7 @@ Environment configuration files for local development and production deployment.
 | File | Purpose | When Needed |
 |------|---------|------------|
 | `docker/.env` | Local Docker Compose environment variables | Local development |
-| `config/.env.production` | Production environment variables | OCI deployment |
+| `docker/.env.prod` | Production environment variables | OCI deployment |
 
 ## Local Development (docker/.env)
 
@@ -51,7 +51,7 @@ DEBUG=true
 REQUIRE_MFA_FOR_CONTROLLED_DATA=false
 ```
 
-## Production (config/.env.production)
+## Production (docker/.env.prod)
 
 Used for OCI deployment - NEVER commit actual secrets!
 
@@ -98,14 +98,14 @@ docker compose -f docker/docker-compose.yml --env-file docker/.env up -d
 ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 
 # Copy production config to the server runtime env path
-cp config/.env.production /etc/dpp/dpp.env
+cp docker/.env.prod /etc/dpp/dpp.env
 
 # Edit with actual secrets
 nano /etc/dpp/dpp.env
 
 # Start services
 cd /opt/dpp
-sudo DPP_ENV_FILE=/etc/dpp/dpp.env docker compose -f docker-compose.prod.yml --env-file /etc/dpp/dpp.env up -d
+sudo DPP_ENV_FILE=/etc/dpp/dpp.env docker compose -f docker/docker-compose.prod.yml --env-file /etc/dpp/dpp.env up -d
 ```
 
 ## Environment Variable Reference

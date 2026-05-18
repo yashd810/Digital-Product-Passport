@@ -94,7 +94,7 @@ The Claros DPP deployment documentation system comprises **8 comprehensive guide
 
 **Pattern 2: Centralized Production**
 - All services on single OCI instance
-- Docker Compose with docker-compose.prod.yml
+- Docker Compose with docker/docker-compose.prod.yml
 - Caddy reverse proxy on same instance
 - Used in: OCI.md
 
@@ -291,7 +291,7 @@ The Claros DPP deployment documentation system comprises **8 comprehensive guide
 
 **Key Topics**:
 - Quick start with scripts
-- Scripts overview (deploy-to-oci.sh, deploy-oci.sh, deploy-manual.sh)
+- Standard deployment entrypoints (deploy-to-oci.sh and deploy-prod.sh)
 - Each script's purpose and use cases
 - Environment configuration requirements
 - Troubleshooting deployment failures

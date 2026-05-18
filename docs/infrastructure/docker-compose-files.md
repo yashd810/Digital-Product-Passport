@@ -18,9 +18,9 @@ All Docker Compose files for local development and production deployment.
 | File | Purpose | When to Use |
 |------|---------|------------|
 | `docker-compose.yml` | Local development environment | `docker-compose up -d` |
-| `docker-compose.prod.yml` | Production deployment main config | OCI production server |
-| `docker-compose.prod.backend.yml` | Backend-specific prod config | Backend service customization |
-| `docker-compose.prod.frontend.yml` | Frontend-specific prod config | Frontend service customization |
+| `docker/docker-compose.prod.yml` | Production deployment main config | OCI production server |
+| `docker/docker-compose.prod.backend.yml` | Backend-specific prod config | Backend service customization |
+| `docker/docker-compose.prod.frontend.yml` | Frontend-specific prod config | Frontend service customization |
 
 ## Quick Commands
 
@@ -46,10 +46,10 @@ ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 
 # Start services
 cd /opt/dpp
-sudo docker-compose -f docker-compose.prod.yml up -d
+sudo docker-compose -f docker/docker-compose.prod.yml up -d
 
 # View logs
-sudo docker-compose -f docker-compose.prod.yml logs -f backend-api
+sudo docker-compose -f docker/docker-compose.prod.yml logs -f backend-api
 ```
 
 ## Configuration
@@ -57,7 +57,7 @@ sudo docker-compose -f docker-compose.prod.yml logs -f backend-api
 ### Environment Variables
 Set in environment files:
 - `docker/.env` - Local Docker Compose values
-- `config/.env.production` - Production deployment values; OCI can override this with `DPP_ENV_FILE=/etc/dpp/dpp.env`
+- `docker/.env.prod` - Production deployment values; OCI can override this with `DPP_ENV_FILE=/etc/dpp/dpp.env`
 
 ### Services Defined
 
@@ -68,7 +68,7 @@ Set in environment files:
 - marketing-site (Static, port 8080)
 - postgres (Database, port 5432)
 
-**Production** (docker-compose.prod.yml):
+**Production** (docker/docker-compose.prod.yml):
 - All services optimized for production
 - Health checks enabled
 - Resource limits configured

@@ -45,9 +45,9 @@ For attachment/document persistence requirements and the backup-document manifes
 
 ## Admin/API visibility
 
-Company admins can read the effective continuity policy at:
+Superadmins can read the effective continuity policy at:
 
-- `GET /api/companies/:companyId/backup-policy`
+- `GET /api/admin/companies/:companyId/backup-policy`
 
 That response includes:
 
