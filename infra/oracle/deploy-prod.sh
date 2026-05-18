@@ -180,6 +180,13 @@ fi
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "${UP_ARGS[@]}"
   if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
     APP_DIR="$APP_DIR" "$APP_DIR/infra/oracle/install-db-backup-jobs.sh"
+    echo "Running storage probe health check..."
+    if ! curl -fsS "http://127.0.0.1:${BACKEND_PORT:-3001}/health/storage" >/tmp/dpp-storage-health.json; then
+      echo "Storage probe health check failed."
+      cat /tmp/dpp-storage-health.json 2>/dev/null || true
+      exit 1
+    fi
+    cat /tmp/dpp-storage-health.json
   fi
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
 ) 9>"$LOCK_FILE"

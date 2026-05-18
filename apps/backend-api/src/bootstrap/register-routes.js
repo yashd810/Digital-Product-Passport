@@ -311,7 +311,10 @@ function registerAppRoutes(app, deps) {
     batteryDictionaryService: deps.batteryDictionaryService,
   });
 
-  registerHealthRoutes(app, deps.pool);
+  registerHealthRoutes(app, {
+    pool: deps.pool,
+    storageService: deps.storageService,
+  });
 }
 
 module.exports = {

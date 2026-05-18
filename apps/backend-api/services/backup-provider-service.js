@@ -63,6 +63,14 @@ module.exports = function createBackupProviderService({
     }
   }
 
+  function isBackupProviderRequired() {
+    return toBoolean(process.env.BACKUP_PROVIDER_REQUIRED, false);
+  }
+
+  function isAutomaticPublicHandoverEnabled() {
+    return toBoolean(process.env.BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE, true);
+  }
+
   function getContinuityPolicy({ companyId = null } = {}) {
     const rpoMinutes = parsePositiveInteger(process.env.BACKUP_POLICY_RPO_MINUTES, 15);
     const rtoHours = parsePositiveInteger(process.env.BACKUP_POLICY_RTO_HOURS, 4);
@@ -105,7 +113,9 @@ module.exports = function createBackupProviderService({
         retentionDays: archivalRetentionDays || null,
         immutabilityEvidenceUri: normalizeText(process.env.BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI, "") || null,
       },
-      backupProviderRequired: toBoolean(process.env.BACKUP_PROVIDER_ENABLED, false),
+      backupProviderEnabled: toBoolean(process.env.BACKUP_PROVIDER_ENABLED, false),
+      backupProviderRequired: isBackupProviderRequired(),
+      automaticPublicHandoverEnabled: isAutomaticPublicHandoverEnabled(),
       evidenceSource: "application_policy",
     };
   }
@@ -146,10 +156,22 @@ module.exports = function createBackupProviderService({
     const lastRestoreDrillAt = normalizeText(process.env.BACKUP_LAST_RESTORE_DRILL_AT, "");
     const immutableEvidenceUri = normalizeText(process.env.BACKUP_ARCHIVAL_IMMUTABILITY_EVIDENCE_URI, "");
     const archivalStorageMode = normalizeText(process.env.BACKUP_ARCHIVAL_STORAGE_MODE, "");
+    const backupProviderConfigured = Number(row.replication_count) > 0 || buildImplicitProvider(normalizedCompanyId) !== null;
+    const missingEvidence = [];
+    if (policy.backupProviderRequired && !backupProviderConfigured) missingEvidence.push("backup_provider");
+    if (!(Number(row.verified_replication_count) > 0 && latestVerificationAt)) missingEvidence.push("replication_verification");
+    if (!(lastRestoreDrillAt && restoreDrillEvidenceUri)) missingEvidence.push("restore_drill_evidence");
+    if (!(archivalStorageMode && immutableEvidenceUri)) missingEvidence.push("immutability_evidence");
+    const readinessStatus = missingEvidence.length ? "not_ready" : "ready";
 
     return {
       companyId: normalizedCompanyId,
       policy,
+      readiness: {
+        status: readinessStatus,
+        backupProviderConfigured,
+        missingEvidence,
+      },
       replicationEvidence: {
         status: evidenceStatus(Number(row.synced_replication_count) > 0 && observedReplicationAgeMinutes !== null && observedReplicationAgeMinutes <= policy.rpoMinutes),
         rpoMinutes: policy.rpoMinutes,
@@ -230,6 +252,19 @@ module.exports = function createBackupProviderService({
       rows.unshift(implicitProvider);
     }
     return rows;
+  }
+
+  function buildNoProviderResult(reason = "NO_BACKUP_PROVIDER") {
+    if (isBackupProviderRequired()) {
+      return {
+        success: false,
+        skipped: false,
+        reason,
+        error: "A backup provider is required in this environment, but none is configured.",
+        results: [],
+      };
+    }
+    return { success: true, skipped: true, reason, results: [] };
   }
 
   function buildBackupEnvelope({
@@ -630,7 +665,7 @@ module.exports = function createBackupProviderService({
     filter((provider) => !providerKey || provider.provider_key === providerKey);
 
     if (!providers.length) {
-      return { success: true, skipped: true, reason: "NO_BACKUP_PROVIDER", results: [] };
+      return buildNoProviderResult("NO_BACKUP_PROVIDER");
     }
 
     const results = [];
@@ -725,7 +760,7 @@ module.exports = function createBackupProviderService({
       filter((provider) => !providerKey || provider.provider_key === providerKey);
 
     if (!providers.length) {
-      return { success: true, skipped: true, reason: "NO_BACKUP_PROVIDER", results: [] };
+      return buildNoProviderResult("NO_BACKUP_PROVIDER");
     }
 
     const results = [];
@@ -805,7 +840,7 @@ module.exports = function createBackupProviderService({
       filter((provider) => !providerKey || provider.provider_key === providerKey);
 
     if (!providers.length) {
-      return { success: true, skipped: true, reason: "NO_BACKUP_PROVIDER", results: [] };
+      return buildNoProviderResult("NO_BACKUP_PROVIDER");
     }
 
     const results = [];
@@ -1263,6 +1298,80 @@ module.exports = function createBackupProviderService({
     };
   }
 
+  async function ensureAutomaticPublicHandover({
+    passportDppId = null,
+    productId = null,
+    versionNumber = null,
+  }) {
+    if (!isAutomaticPublicHandoverEnabled()) return null;
+    if (!passportDppId && !productId) return null;
+
+    const filters = ["replication_status = 'synced'", "verification_status = 'verified'"];
+    const params = [];
+
+    if (passportDppId) {
+      params.push(normalizeText(passportDppId));
+      filters.push(`passport_dpp_id = $${params.length}`);
+    }
+    if (productId) {
+      params.push(normalizeText(productId));
+      filters.push(`product_id = $${params.length}`);
+    }
+    if (versionNumber !== null && versionNumber !== undefined) {
+      params.push(Number.parseInt(versionNumber, 10) || 1);
+      filters.push(`version_number = $${params.length}`);
+    }
+
+    const replicationResult = await pool.query(
+      `SELECT id, backup_provider_id, backup_provider_key, passport_dpp_id, lineage_id, company_id, passport_type,
+              product_id, version_number, public_url, verification_status, payload_json, updated_at
+       FROM passport_backup_replications
+       WHERE ${filters.join(" AND ")}
+       ORDER BY updated_at DESC, id DESC
+       LIMIT 10`,
+      params
+    ).catch(() => ({ rows: [] }));
+
+    for (const replication of replicationResult.rows) {
+      const existing = await getActivePublicHandover({
+        companyId: replication.company_id,
+        passportDppId: replication.passport_dpp_id,
+      });
+      if (existing) return existing;
+
+      const companyResult = await pool.query(
+        `SELECT id, company_name, is_active
+         FROM companies
+         WHERE id = $1
+         LIMIT 1`,
+        [replication.company_id]
+      ).catch(() => ({ rows: [] }));
+      const company = companyResult.rows[0] || null;
+      if (!company || company.is_active !== false) continue;
+
+      const payloadJson = parseStoredJson(replication.payload_json, {});
+      const publicRowData = payloadJson?.passport && typeof payloadJson.passport === "object" ? payloadJson.passport : null;
+      const payloadSource = payloadJson?.source && typeof payloadJson.source === "object" ? payloadJson.source : {};
+      if (!publicRowData) continue;
+
+      return activatePublicHandover({
+        companyId: replication.company_id,
+        passportDppId: replication.passport_dpp_id,
+        lineageId: replication.lineage_id || payloadSource.lineageId || replication.passport_dpp_id,
+        passportType: replication.passport_type || payloadSource.passportType,
+        productId: replication.product_id || publicRowData.product_id || publicRowData.productId,
+        versionNumber: replication.version_number || payloadSource.versionNumber || 1,
+        publicRowData,
+        publicCompanyName: company.company_name || "",
+        activatedBy: null,
+        actorIdentifier: "system:auto-backup-handover",
+        notes: "Automatically activated from verified backup replication because the economic operator is inactive.",
+      });
+    }
+
+    return null;
+  }
+
   async function verifyReplications({
     companyId,
     passportDppId,
@@ -1375,10 +1484,12 @@ module.exports = function createBackupProviderService({
   return {
     activatePublicHandover,
     deactivatePublicHandover,
+    ensureAutomaticPublicHandover,
     findLatestVerifiedPublicReplication,
     getActivePublicHandover,
     getContinuityEvidence,
     getContinuityPolicy,
+    isBackupProviderRequired,
     listPublicHandovers,
     listProviders,
     listReplications,

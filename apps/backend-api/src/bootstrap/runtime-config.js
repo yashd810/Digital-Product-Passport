@@ -157,6 +157,8 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
   const storageProvider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
   const allowLocalStorage = toBooleanEnv(process.env.ALLOW_LOCAL_STORAGE_IN_PRODUCTION, false);
   const allowMissingBackupProvider = toBooleanEnv(process.env.ALLOW_MISSING_BACKUP_PROVIDER_IN_PRODUCTION, false);
+  const backupProviderEnabled = toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false);
+  const backupProviderRequired = toBooleanEnv(process.env.BACKUP_PROVIDER_REQUIRED, false);
   const missing = [];
 
   if (storageProvider === "local" && !allowLocalStorage) {
@@ -175,10 +177,10 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
     }
   }
 
-  if (!toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false) && !allowMissingBackupProvider) {
+  if (backupProviderRequired && !backupProviderEnabled && !allowMissingBackupProvider) {
     missing.push("BACKUP_PROVIDER_ENABLED=true");
   }
-  if (toBooleanEnv(process.env.BACKUP_PROVIDER_ENABLED, false) && !process.env.BACKUP_PROVIDER_OBJECT_PREFIX) {
+  if (backupProviderEnabled && !process.env.BACKUP_PROVIDER_OBJECT_PREFIX) {
     missing.push("BACKUP_PROVIDER_OBJECT_PREFIX");
   }
 

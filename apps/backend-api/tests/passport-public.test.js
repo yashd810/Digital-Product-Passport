@@ -507,4 +507,60 @@ describe("passport public routes", () => {
       })
     );
   });
+
+  test("GET /api/passports/:dppId/canonical auto-activates backup handover when no active record exists yet", async () => {
+    const handoverPassport = {
+      dppId: "dpp_handover_auto_001",
+      guid: "dpp_handover_auto_001",
+      lineage_id: "dpp_handover_auto_001",
+      company_id: 5,
+      passport_type: "battery",
+      product_id: "BAT-2026-002",
+      release_status: "released",
+      version_number: 3,
+      granularity: "item",
+      battery_mass: "462",
+    };
+
+    const ensureAutomaticPublicHandover = jest.fn(async () => ({
+      company_id: 5,
+      passport_dpp_id: "dpp_handover_auto_001",
+      lineage_id: "dpp_handover_auto_001",
+      passport_type: "battery",
+      product_id: "BAT-2026-002",
+      version_number: 3,
+      public_url: "https://backup.example/passports/dpp_handover_auto_001",
+      backup_provider_key: "oci-primary",
+      source_replication_id: 88,
+      verification_status: "verified",
+      public_row_data: handoverPassport,
+    }));
+
+    const { app } = createTestApp({
+      company: { is_active: false },
+      backupProviderService: {
+        getActivePublicHandover: jest.fn(async () => null),
+        ensureAutomaticPublicHandover,
+      },
+      resolvePublicPassportByDppId: async () => null,
+    });
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/passports/:dppId/canonical",
+      params: { dppId: "dpp_handover_auto_001" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(ensureAutomaticPublicHandover).toHaveBeenCalledWith({
+      passportDppId: "dpp_handover_auto_001",
+      productId: null,
+      versionNumber: null,
+    });
+    expect(response.body.fields).toEqual(
+      expect.objectContaining({
+        battery_mass: 462,
+      })
+    );
+  });
 });

@@ -19,6 +19,7 @@ module.exports = {
     "<rootDir>/tests/conformance.test.js",
     "<rootDir>/tests/dpp-api.test.js",
     "<rootDir>/tests/backup-provider-service.test.js",
+    "<rootDir>/tests/health-routes.test.js",
     "<rootDir>/tests/auth-middleware.test.js",
     "<rootDir>/tests/rate-limit.test.js",
     "<rootDir>/tests/security-service.test.js",

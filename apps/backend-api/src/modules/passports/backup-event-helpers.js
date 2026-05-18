@@ -4,6 +4,15 @@ function createBackupEventHelpers({
   getCompanyNameMap,
   normalizePassportRow,
 }) {
+  function assertBackupReplicationResult(result, contextLabel) {
+    if (!result || result.success !== false) return result;
+    const message = result.error || result.reason || `${contextLabel} backup replication failed`;
+    const error = new Error(message);
+    error.code = result.reason || "BACKUP_PROVIDER_REQUIRED";
+    error.backupResult = result;
+    throw error;
+  }
+
   function getActorIdentifier(user) {
     return user?.actorIdentifier ||
       user?.globallyUniqueOperatorId ||
@@ -34,13 +43,13 @@ function createBackupEventHelpers({
       || (await getCompanyNameMap([passport.company_id])).get(String(passport.company_id))
       || "";
 
-    return backupProviderService.replicatePassportSnapshot({
+    return assertBackupReplicationResult(await backupProviderService.replicatePassportSnapshot({
       passport: { ...normalizePassportRow(passport), passport_type: resolvedPassportType },
       typeDef,
       companyName: resolvedCompanyName,
       reason,
       snapshotScope,
-    });
+    }), "Passport");
   }
 
   async function replicateAccessControlEventToBackup({
@@ -63,7 +72,7 @@ function createBackupEventHelpers({
       return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
     }
 
-    return backupProviderService.replicateAccessControlEvent({
+    return assertBackupReplicationResult(await backupProviderService.replicateAccessControlEvent({
       companyId,
       eventType,
       severity,
@@ -78,7 +87,7 @@ function createBackupEventHelpers({
       revocationMode,
       reason,
       metadata,
-    });
+    }), "Access-control");
   }
 
   async function replicateAuditAnchorToBackup({
@@ -91,13 +100,13 @@ function createBackupEventHelpers({
     if (!backupProviderService || !companyId || !backupProviderService.replicateAuditAnchorEvent) {
       return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
     }
-    return backupProviderService.replicateAuditAnchorEvent({
+    return assertBackupReplicationResult(await backupProviderService.replicateAuditAnchorEvent({
       companyId,
       actorUserId: anchoredBy,
       actorIdentifier,
       anchor,
       summary,
-    });
+    }), "Audit-anchor");
   }
 
   function withAuditActorAliases(row) {

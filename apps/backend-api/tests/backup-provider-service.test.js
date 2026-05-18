@@ -129,10 +129,170 @@ describe("backup provider service", () => {
     });
 
     await expect(service.getContinuityEvidence({ companyId: 5 })).resolves.toMatchObject({
+      readiness: {
+        status: "not_ready",
+        missingEvidence: expect.arrayContaining([
+          "replication_verification",
+          "restore_drill_evidence",
+          "immutability_evidence",
+        ]),
+      },
       replicationEvidence: { status: "not_proven" },
       verificationEvidence: { status: "not_proven" },
       restoreDrillEvidence: { status: "not_proven", evidenceUri: null },
       immutableArchivalEvidence: { status: "not_proven", evidenceUri: null },
+    });
+  });
+
+  test("fails replication when backup provider is required but missing", async () => {
+    process.env.BACKUP_PROVIDER_REQUIRED = "true";
+    delete process.env.BACKUP_PROVIDER_ENABLED;
+
+    const service = createBackupProviderService({
+      pool: {
+        query: jest.fn(async (sql) => {
+          if (String(sql).includes("FROM backup_service_providers")) return { rows: [] };
+          throw new Error(`Unexpected query: ${sql}`);
+        }),
+      },
+      storageService: {},
+      buildCanonicalPassportPayload: () => ({}),
+    });
+
+    const result = await service.replicatePassportSnapshot({
+      passport: {
+        dppId: "dpp_required_1",
+        company_id: 5,
+        passport_type: "battery",
+        version_number: 1,
+      },
+      typeDef: { type_name: "battery" },
+      companyName: "Acme Energy",
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      reason: "NO_BACKUP_PROVIDER",
+      error: expect.stringContaining("required"),
+    });
+  });
+
+  test("automatically activates public handover from a verified replication for an inactive company", async () => {
+    process.env.BACKUP_PUBLIC_HANDOVER_AUTO_ENABLE = "true";
+
+    const replicationPayload = {
+      source: {
+        lineageId: "lineage_1",
+        passportType: "battery",
+        versionNumber: 2,
+      },
+      passport: {
+        dppId: "dpp_auto_1",
+        company_id: 5,
+        passport_type: "battery",
+        product_id: "BAT-2026-001",
+        version_number: 2,
+      },
+    };
+
+    const pool = {
+      query: jest.fn(async (sql, params = []) => {
+        const text = String(sql);
+        if (text.includes("FROM passport_backup_replications")) {
+          return {
+            rows: [{
+              id: 73,
+              backup_provider_id: 1,
+              backup_provider_key: "oci-primary",
+              passport_dpp_id: "dpp_auto_1",
+              lineage_id: "lineage_1",
+              company_id: 5,
+              passport_type: "battery",
+              product_id: "BAT-2026-001",
+              version_number: 2,
+              public_url: "https://backup.example/dpp_auto_1",
+              verification_status: "verified",
+              payload_json: replicationPayload,
+              updated_at: new Date().toISOString(),
+            }],
+          };
+        }
+        if (text.includes("FROM backup_public_handovers") && text.includes("handover_status = 'active'")) {
+          return { rows: [] };
+        }
+        if (text.includes("FROM companies")) {
+          return { rows: [{ id: 5, company_name: "Acme Energy", is_active: false }] };
+        }
+        if (text.includes("UPDATE backup_public_handovers")) {
+          return { rows: [] };
+        }
+        if (text.includes("backup_provider_id, backup_provider_key") && text.includes("payload_hash")) {
+          return {
+            rows: [{
+              id: 73,
+              backup_provider_id: 1,
+              backup_provider_key: "oci-primary",
+              passport_dpp_id: "dpp_auto_1",
+              lineage_id: "lineage_1",
+              company_id: 5,
+              passport_type: "battery",
+              version_number: 2,
+              dpp_id: "did:web:www.example.test:did:dpp:item:dpp_auto_1",
+              snapshot_scope: "released_current",
+              replication_status: "synced",
+              storage_provider: "s3",
+              storage_key: "oci-backups/company-5/passport-lineage_1/v2/released_current.json",
+              public_url: "https://backup.example/dpp_auto_1",
+              payload_hash: "abc123",
+              payload_json: replicationPayload,
+              verification_status: "verified",
+              verified_payload_hash: "abc123",
+              updated_at: new Date().toISOString(),
+            }],
+          };
+        }
+        if (text.includes("INSERT INTO backup_public_handovers")) {
+          return {
+            rows: [{
+              company_id: params[0],
+              passport_dpp_id: params[1],
+              lineage_id: params[2],
+              passport_type: params[3],
+              product_id: params[4],
+              version_number: params[5],
+              backup_provider_id: params[6],
+              backup_provider_key: params[7],
+              source_replication_id: params[8],
+              storage_key: params[9],
+              public_url: params[10],
+              public_company_name: params[11],
+              public_row_data: JSON.parse(params[12]),
+              handover_status: "active",
+              verification_status: "verified",
+            }],
+          };
+        }
+        if (text.includes("FROM backup_service_providers")) {
+          return { rows: [] };
+        }
+        throw new Error(`Unexpected query: ${sql}`);
+      }),
+    };
+
+    const service = createBackupProviderService({
+      pool,
+      storageService: {},
+      buildCanonicalPassportPayload: () => replicationPayload.passport,
+    });
+
+    const result = await service.ensureAutomaticPublicHandover({
+      passportDppId: "dpp_auto_1",
+    });
+
+    expect(result).toMatchObject({
+      passport_dpp_id: "dpp_auto_1",
+      handover_status: "active",
+      verification_status: "verified",
     });
   });
 

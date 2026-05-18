@@ -483,11 +483,18 @@ module.exports = function registerPassportPublicRoutes(app, {
   }) {
     if (!backupProviderService?.getActivePublicHandover) return null;
 
-    const handover = await backupProviderService.getActivePublicHandover({
+    let handover = await backupProviderService.getActivePublicHandover({
       passportDppId,
       productId,
       versionNumber,
     });
+    if (!handover && backupProviderService?.ensureAutomaticPublicHandover) {
+      handover = await backupProviderService.ensureAutomaticPublicHandover({
+        passportDppId,
+        productId,
+        versionNumber,
+      });
+    }
     if (!handover) return null;
 
     const rawRow = typeof handover.public_row_data === "string" ?
