@@ -48,6 +48,54 @@ function alignRecordToSchemaKeys(record, sections) {
   return aligned;
 }
 
+function buildClonePrefill(record, sections) {
+  if (!record || typeof record !== "object") {
+    return { modelName: "", productId: "", formData: {} };
+  }
+
+  const aligned = alignRecordToSchemaKeys(record, sections);
+  const schemaFieldKeys = new Set(
+    Object.values(sections || {})
+      .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
+      .map((field) => field?.key)
+      .filter(Boolean)
+  );
+  const managedEditableKeys = new Set([
+    "economic_operator_id",
+    "economic_operator_identifier_scheme",
+    "facility_id",
+    "granularity",
+    "product_image",
+  ]);
+  const excludedKeys = new Set([
+    "id",
+    "dppId",
+    "dpp_id",
+    "lineage_id",
+    "created_at",
+    "updated_at",
+    "release_status",
+    "version_number",
+    "archived_at",
+    "released_at",
+    "deleted_at",
+  ]);
+
+  const formData = Object.fromEntries(
+    Object.entries(aligned).filter(([key, value]) => {
+      if (excludedKeys.has(key)) return false;
+      if (value === undefined) return false;
+      return schemaFieldKeys.has(key) || managedEditableKeys.has(key);
+    })
+  );
+
+  return {
+    modelName: aligned?.model_name || "",
+    productId: aligned?.product_id || "",
+    formData,
+  };
+}
+
 function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -105,6 +153,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const sessionActiveRef   = useRef(false);
   const mountedRef         = useRef(true);
   const draftHydratedRef   = useRef(false);
+  const cloneHydratedRef   = useRef(false);
 
   const draftStorageKey = buildDraftStorageKey({
     mode,
@@ -291,6 +340,30 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       })
       .catch(() => {});
   }, [mode, templateId, effectiveCompanyId]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (cloneHydratedRef.current) return;
+    if (loadingType) return;
+    if (!activePassportType) return;
+
+    const cloneData = location.state?.cloneData;
+    if (!cloneData) return;
+
+    const { modelName: nextModelName, productId: nextProductId, formData: nextFormData } =
+      buildClonePrefill(cloneData, SECTIONS);
+
+    setModelName(nextModelName);
+    setProductId(nextProductId);
+    setFormData(nextFormData);
+    setModelDataKeys(new Set());
+    setTemplateName("");
+    draftHydratedRef.current = true;
+    cloneHydratedRef.current = true;
+    dirtyRef.current = false;
+    setAutoSaveState("idle");
+    setSuccess("Passport cloned. Update the copied values and save as a new passport.");
+  }, [mode, location.state, loadingType, activePassportType, SECTIONS]);
 
   useEffect(() => {
     if (mode !== "edit" || !dppId || !activePassportType) return;
