@@ -31,33 +31,79 @@ function buildDraftStorageKey({ mode, companyId, passportType, dppId }) {
   ].join(":");
 }
 
+function normalizeSchemaAlias(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function getSchemaFieldDescriptors(sections) {
+  return Object.values(sections || {})
+    .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
+    .filter((field) => field?.key)
+    .map((field) => ({
+      key: field.key,
+      aliases: [
+        field.key,
+        field.elementId,
+        field.element_id,
+        field.semanticId,
+        field.semantic_id,
+      ].filter(Boolean),
+    }));
+}
+
+function buildSchemaAliasMap(sections) {
+  const aliasToKey = new Map();
+  for (const field of getSchemaFieldDescriptors(sections)) {
+    for (const alias of field.aliases) {
+      aliasToKey.set(normalizeSchemaAlias(alias), field.key);
+    }
+  }
+  return aliasToKey;
+}
+
 function alignRecordToSchemaKeys(record, sections) {
   if (!record || typeof record !== "object") return record || {};
   const aligned = { ...record };
-  const schemaFields = Object.values(sections || {})
-    .flatMap((section) => Array.isArray(section?.fields) ? section.fields : []);
-  const compactRecordEntries = new Map(
-    Object.entries(aligned).map(([key, value]) => [
-      String(key).toLowerCase().replace(/[^a-z0-9]/g, ""),
-      value,
-    ])
-  );
+  const aliasToKey = buildSchemaAliasMap(sections);
 
-  for (const field of schemaFields) {
-    const key = field?.key;
-    if (!key || aligned[key] !== undefined) continue;
-    const foldedKey = String(key).toLowerCase();
-    if (aligned[foldedKey] !== undefined) {
-      aligned[key] = aligned[foldedKey];
-      continue;
-    }
-    const compactKey = String(key).toLowerCase().replace(/[^a-z0-9]/g, "");
-    if (compactRecordEntries.has(compactKey)) {
-      aligned[key] = compactRecordEntries.get(compactKey);
+  for (const [rawKey, value] of Object.entries(record)) {
+    const canonicalKey = aliasToKey.get(normalizeSchemaAlias(rawKey));
+    if (canonicalKey && aligned[canonicalKey] === undefined) {
+      aligned[canonicalKey] = value;
     }
   }
 
   return aligned;
+}
+
+function extractFieldValuesFromElements(elements, aliasToKey = new Map(), values = {}) {
+  if (!Array.isArray(elements)) return values;
+  for (const element of elements) {
+    if (!element || typeof element !== "object") continue;
+    const candidateAliases = [
+      element.elementId,
+      element.element_id,
+      element.dictionaryReference,
+    ].filter((entry) => typeof entry === "string" && entry.trim());
+    const canonicalKey = candidateAliases
+      .map((alias) => aliasToKey.get(normalizeSchemaAlias(alias)))
+      .find(Boolean);
+    const rawElementId = typeof element.elementId === "string" ? element.elementId.trim() : "";
+    const targetKey = canonicalKey || rawElementId;
+
+    if (Array.isArray(element.elements) && element.elements.length) {
+      extractFieldValuesFromElements(element.elements, aliasToKey, values);
+    }
+
+    if (!targetKey) continue;
+    if (element.value !== undefined) {
+      values[targetKey] = element.value;
+    }
+  }
+  return values;
 }
 
 function buildClonePrefill(record, sections) {
@@ -65,7 +111,13 @@ function buildClonePrefill(record, sections) {
     return { modelName: "", productId: "", formData: {} };
   }
 
-  const aligned = alignRecordToSchemaKeys(record, sections);
+  const aliasToKey = buildSchemaAliasMap(sections);
+  const mergedRecord = {
+    ...record,
+    ...(record.fields && typeof record.fields === "object" ? record.fields : {}),
+    ...extractFieldValuesFromElements(record.elements, aliasToKey),
+  };
+  const aligned = alignRecordToSchemaKeys(mergedRecord, sections);
   const excludedKeys = new Set([
     "id",
     "dppId",
@@ -80,6 +132,15 @@ function buildClonePrefill(record, sections) {
     "archived_at",
     "released_at",
     "deleted_at",
+    "elements",
+    "fields",
+    "linked_data",
+    "company_profile",
+    "digitalProductPassportId",
+    "uniqueProductIdentifier",
+    "subjectDid",
+    "dppDid",
+    "companyDid",
   ]);
 
   const formData = Object.fromEntries(
@@ -91,8 +152,8 @@ function buildClonePrefill(record, sections) {
   );
 
   return {
-    modelName: aligned?.model_name || "",
-    productId: aligned?.product_id || "",
+    modelName: aligned?.model_name || record?.model_name || "",
+    productId: aligned?.product_id || record?.product_id || "",
     formData,
   };
 }
@@ -348,23 +409,43 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     if (loadingType) return;
     if (!activePassportType) return;
 
-    const cloneData = location.state?.cloneData;
-    if (!cloneData) return;
+    const hydrateClone = async () => {
+      let source = location.state?.cloneData || null;
+      const cloneSource = location.state?.cloneSource || null;
 
-    const { modelName: nextModelName, productId: nextProductId, formData: nextFormData } =
-      buildClonePrefill(cloneData, SECTIONS);
+      if (cloneSource?.dppId && effectiveCompanyId) {
+        try {
+          const response = await fetchWithAuth(
+            `${API}/api/companies/${effectiveCompanyId}/passports/${cloneSource.dppId}?passportType=${cloneSource.passportType || activePassportType}&representation=full`,
+            { headers: authHeaders() }
+          );
+          if (response.ok) {
+            source = await response.json();
+          }
+        } catch {
+          // Keep the navigation-state fallback if refetching the clone source fails.
+        }
+      }
 
-    setModelName(nextModelName);
-    setProductId(nextProductId);
-    setFormData(nextFormData);
-    setModelDataKeys(new Set());
-    setTemplateName("");
-    draftHydratedRef.current = true;
-    cloneHydratedRef.current = true;
-    dirtyRef.current = false;
-    setAutoSaveState("idle");
-    setSuccess("Passport cloned. Update the copied values and save as a new passport.");
-  }, [mode, location.state, loadingType, activePassportType, SECTIONS]);
+      if (!source) return;
+
+      const { modelName: nextModelName, productId: nextProductId, formData: nextFormData } =
+        buildClonePrefill(source, SECTIONS);
+
+      setModelName(nextModelName);
+      setProductId(nextProductId);
+      setFormData(nextFormData);
+      setModelDataKeys(new Set());
+      setTemplateName("");
+      draftHydratedRef.current = true;
+      cloneHydratedRef.current = true;
+      dirtyRef.current = false;
+      setAutoSaveState("idle");
+      setSuccess("Passport cloned. Update the copied values and save as a new passport.");
+    };
+
+    hydrateClone().catch(() => {});
+  }, [mode, location.state, loadingType, activePassportType, SECTIONS, effectiveCompanyId]);
 
   useEffect(() => {
     if (mode !== "edit" || !dppId || !activePassportType) return;

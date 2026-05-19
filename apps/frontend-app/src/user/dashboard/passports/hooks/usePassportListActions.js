@@ -47,12 +47,20 @@ export function usePassportListActions({
   const handleClone = useCallback(async (passport, passportType) => {
     try {
       const response = await fetchWithAuth(
-        `${API}/api/companies/${companyId}/passports/${passport.dppId}?passportType=${passportType}`,
+        `${API}/api/companies/${companyId}/passports/${passport.dppId}?passportType=${passportType}&representation=full`,
         { headers: authHeaders() }
       );
       if (!response.ok) throw new Error("Failed to fetch passport data");
       const data = await response.json();
-      navigate(`/create/${passportType}`, { state: { cloneData: data } });
+      navigate(`/create/${passportType}`, {
+        state: {
+          cloneData: data,
+          cloneSource: {
+            dppId: passport.dppId,
+            passportType,
+          },
+        },
+      });
     } catch {
       showError("Failed to clone passport — could not fetch data");
     }
