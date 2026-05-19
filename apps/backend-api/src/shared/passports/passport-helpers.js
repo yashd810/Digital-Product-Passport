@@ -214,7 +214,7 @@ const getWritablePassportColumns = (data, excluded = SYSTEM_PASSPORT_FIELDS) =>
   Object.keys(data).filter((key) =>
     data[key] !== undefined &&
     !excluded.has(key) &&
-    /^[a-z][a-z0-9_]*$/.test(key)
+    /^[a-z][A-Za-z0-9_]*$/.test(key)
   );
 
 const getStoredPassportValues = (keys, data) =>

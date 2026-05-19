@@ -30,6 +30,24 @@ function buildDraftStorageKey({ mode, companyId, passportType, dppId }) {
   ].join(":");
 }
 
+function alignRecordToSchemaKeys(record, sections) {
+  if (!record || typeof record !== "object") return record || {};
+  const aligned = { ...record };
+  const schemaFields = Object.values(sections || {})
+    .flatMap((section) => Array.isArray(section?.fields) ? section.fields : []);
+
+  for (const field of schemaFields) {
+    const key = field?.key;
+    if (!key || aligned[key] !== undefined) continue;
+    const foldedKey = String(key).toLowerCase();
+    if (aligned[foldedKey] !== undefined) {
+      aligned[key] = aligned[foldedKey];
+    }
+  }
+
+  return aligned;
+}
+
 function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -138,15 +156,16 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const hydrateFromPassportRecord = (data, { allowDraftRestore = false } = {}) => {
-    const restored = allowDraftRestore ? restoreLocalDraft(data) : false;
+    const alignedData = alignRecordToSchemaKeys(data, SECTIONS);
+    const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
     if (!restored) {
-      setModelName(data?.model_name || "");
-      setProductId(data?.product_id || "");
-      setFormData(data || {});
+      setModelName(alignedData?.model_name || "");
+      setProductId(alignedData?.product_id || "");
+      setFormData(alignedData || {});
       dirtyRef.current = false;
       setAutoSaveState("idle");
     }
-    setLastSavedAt(data?.updated_at || null);
+    setLastSavedAt(alignedData?.updated_at || null);
     draftHydratedRef.current = true;
   };
 
@@ -264,13 +283,15 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   useEffect(() => {
     if (mode !== "edit" || !dppId || !passportType) return;
+    if (loadingType) return;
+    if (!PASSPORT_SECTIONS_MAP[passportType] && !dynamicSections) return;
     (async () => {
       try {
         await fetchPassportRecord({ allowDraftRestore: true });
       } catch (e) { setError(e.message); }
       finally { setIsLoading(false); }
     })();
-  }, [dppId, mode, passportType, effectiveCompanyId, token]);
+  }, [dppId, mode, passportType, effectiveCompanyId, token, loadingType, dynamicSections]);
 
   useEffect(() => {
     if (mode !== "edit") return;
