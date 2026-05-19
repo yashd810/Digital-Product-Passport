@@ -254,6 +254,14 @@ function parseStructuredValue(field, value) {
   return value;
 }
 
+function getPassportFieldValue(passport, key) {
+  if (!passport || !key) return undefined;
+  if (Object.prototype.hasOwnProperty.call(passport, key)) return passport[key];
+  const foldedKey = typeof key === "string" ? key.toLowerCase() : key;
+  if (foldedKey && Object.prototype.hasOwnProperty.call(passport, foldedKey)) return passport[foldedKey];
+  return undefined;
+}
+
 function isExplicitMultiLanguageField(field) {
   const key = normalizeText(field?.key).toLowerCase();
   const valueKind = normalizeText(field?.valueKind || field?.value_kind || field?.expandedObjectType || field?.objectTypeHint).toLowerCase();
@@ -534,7 +542,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       }
 
       applicableFields += 1;
-      const value = passport?.[field.key];
+      const value = getPassportFieldValue(passport, field.key);
       if (hasMeaningfulValue(field, value)) {
         filledFields += 1;
         applicableFieldDetails.push({
@@ -792,7 +800,7 @@ function validateSemanticData(fields, passport) {
         }));
       }
 
-      const value = parseStructuredValue(field, passport?.[field.key]);
+      const value = parseStructuredValue(field, getPassportFieldValue(passport, field.key));
       if (!hasMeaningfulValue(field, value)) continue;
 
       if (Array.isArray(value) && hasMixedArrayItemTypes(value)) {
@@ -965,7 +973,7 @@ function validateSemanticData(fields, passport) {
             requirementLevel: applicability.requirementLevel,
             applicable: applicability.applicable,
             mandatory: applicability.mandatory,
-            filled: applicability.applicable ? hasMeaningfulValue(field, passport?.[field.key]) : null,
+            filled: applicability.applicable ? hasMeaningfulValue(field, getPassportFieldValue(passport, field.key)) : null,
           };
         })
         .filter(Boolean)

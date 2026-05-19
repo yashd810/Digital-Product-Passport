@@ -76,7 +76,8 @@ export function parseCsvText(text) {
 }
 
 function getFieldCandidates(key) {
-  return [key, ...(FIELD_KEY_ALIASES[key] || [])].filter(Boolean);
+  const foldedKey = typeof key === "string" ? key.toLowerCase() : key;
+  return [...new Set([key, foldedKey, ...(FIELD_KEY_ALIASES[key] || [])].filter(Boolean))];
 }
 
 function getPassportFieldValue(passport, key) {

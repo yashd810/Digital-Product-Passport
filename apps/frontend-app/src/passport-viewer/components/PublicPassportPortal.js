@@ -65,6 +65,14 @@ function flattenSections(sections) {
   );
 }
 
+function getSchemaFieldValue(source, key) {
+  if (!source || !key) return undefined;
+  if (Object.prototype.hasOwnProperty.call(source, key)) return source[key];
+  const foldedKey = typeof key === "string" ? key.toLowerCase() : key;
+  if (foldedKey && Object.prototype.hasOwnProperty.call(source, foldedKey)) return source[foldedKey];
+  return undefined;
+}
+
 function resolveFieldValue(field, passport, unlockedPassport, dynamicValues) {
   const access = field.access || ["public"];
   const isPublic = access.includes("public");
@@ -72,7 +80,7 @@ function resolveFieldValue(field, passport, unlockedPassport, dynamicValues) {
   const dynEntry = isDynamic ? dynamicValues?.[field.key] : null;
   const source = unlockedPassport || passport;
   const raw = isPublic || unlockedPassport
-    ? (isDynamic ? (dynEntry?.value ?? null) : source?.[field.key])
+    ? (isDynamic ? (dynEntry?.value ?? null) : getSchemaFieldValue(source, field.key))
     : null;
 
   return {
