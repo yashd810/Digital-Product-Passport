@@ -24,6 +24,7 @@ function updateEditablePassportUseCase(deps) {
     updatePassportRowById,
     logAudit,
     getActorIdentifier,
+    normalizePassportRow = (row) => row,
   } = deps;
 
   return async function updateEditablePassport({ req }) {
@@ -213,7 +214,12 @@ function updateEditablePassportUseCase(deps) {
     }
 
     await logAudit(companyId, userId, "UPDATE", tableName, dppId, null, { fields_updated: updateFields });
-    return { success: true };
+    return {
+      success: true,
+      passport: updateResult.updatedRow
+        ? { ...normalizePassportRow(updateResult.updatedRow), passport_type: typeSchema.typeName }
+        : null,
+    };
   };
 }
 

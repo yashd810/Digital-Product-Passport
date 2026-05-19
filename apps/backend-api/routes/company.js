@@ -327,8 +327,8 @@ module.exports = function registerCompanyRoutes(app, {
       );
       if (!existing.rows.length) return res.status(404).json({ error: "Not found" });
 
-      await pool.query(
-        `UPDATE passport_templates SET name=$1, description=$2, updated_at=NOW() WHERE id=$3`,
+      const updated = await pool.query(
+        `UPDATE passport_templates SET name=$1, description=$2, updated_at=NOW() WHERE id=$3 RETURNING *`,
         [name?.trim() || "Untitled", description || null, id]
       );
 
@@ -343,7 +343,11 @@ module.exports = function registerCompanyRoutes(app, {
           );
         }
       }
-      res.json({ success: true });
+      const fieldRows = await pool.query(
+        "SELECT field_key, field_value, is_model_data FROM passport_template_fields WHERE template_id=$1 ORDER BY field_key",
+        [id]
+      );
+      res.json({ success: true, template: { ...updated.rows?.[0], fields: fieldRows.rows } });
     } catch (e) {res.status(500).json({ error: "Failed" });}
   });
 

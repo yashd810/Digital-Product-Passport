@@ -153,6 +153,7 @@ function createTestApp() {
     checkCompanyAccess: noopMiddleware,
     checkCompanyAdmin: noopMiddleware,
     requireEditor: noopMiddleware,
+    requireDraftEditor: noopMiddleware,
     authenticateApiKey: noopMiddleware,
     requireApiKeyScope: () => noopMiddleware,
     publicReadRateLimit: noopMiddleware,
@@ -341,6 +342,7 @@ function createReleaseTestApp() {
     checkCompanyAccess: noopMiddleware,
     checkCompanyAdmin: noopMiddleware,
     requireEditor: noopMiddleware,
+    requireDraftEditor: noopMiddleware,
     authenticateApiKey: noopMiddleware,
     requireApiKeyScope: () => noopMiddleware,
     publicReadRateLimit: noopMiddleware,
@@ -457,6 +459,34 @@ describe("passport patch governance", () => {
     expect(facilityValidationCalls).toHaveLength(0);
   });
 
+  test("PATCH /api/companies/:companyId/passports/:dppId returns the updated passport row for immediate form rehydration", async () => {
+    const { app, updatePassportRowById } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/companies/:companyId/passports/:dppId",
+      params: { companyId: "5", dppId: "dpp_test_1" },
+      body: {
+        passportType: "battery",
+        model_name: "Updated model",
+        manufacturer: "Updated manufacturer",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.passport).toMatchObject({
+      dpp_id: "dpp_test_1",
+      passport_type: "battery",
+      model_name: "Updated model",
+      manufacturer: "Updated manufacturer",
+    });
+    expect(updatePassportRowById.mock.calls[0][0].data).toMatchObject({
+      model_name: "Updated model",
+      manufacturer: "Updated manufacturer",
+    });
+  });
+
   test("PATCH /api/companies/:companyId/passports/:dppId preserves stored inactive facility when request does not change facility", async () => {
     const { app, pool, updatePassportRowById } = createTestApp();
 
@@ -471,7 +501,13 @@ describe("passport patch governance", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.body).toEqual({ success: true });
+    expect(response.body.success).toBe(true);
+    expect(response.body.passport).toMatchObject({
+      dpp_id: "dpp_test_1",
+      passport_type: "battery",
+      manufacturer: "Updated manufacturer",
+      facility_id: "FAC-INACTIVE",
+    });
     expect(updatePassportRowById).toHaveBeenCalled();
     expect(updatePassportRowById.mock.calls[0][0].data.facility_id).toBe("FAC-INACTIVE");
 

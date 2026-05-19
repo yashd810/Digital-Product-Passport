@@ -79,6 +79,20 @@ function alignRecordToSchemaKeys(record, sections) {
   return aligned;
 }
 
+function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
+  const rawFields = rawRecord?.fields && typeof rawRecord.fields === "object" ? rawRecord.fields : {};
+  const fullFields = fullRecord?.fields && typeof fullRecord.fields === "object" ? fullRecord.fields : {};
+  return {
+    ...fullRecord,
+    ...rawRecord,
+    fields: {
+      ...fullFields,
+      ...rawFields,
+    },
+    elements: fullRecord?.elements || rawRecord?.elements,
+  };
+}
+
 function extractFieldValuesFromElements(elements, aliasToKey = new Map(), values = {}) {
   if (!Array.isArray(elements)) return values;
   for (const element of elements) {
@@ -153,10 +167,45 @@ function buildClonePrefill(record, sections) {
 
   return {
     modelName: aligned?.model_name || record?.model_name || "",
-    productId: aligned?.product_id || record?.product_id || "",
+    productId: "",
     formData,
   };
 }
+
+const NON_EDITABLE_FORM_KEYS = new Set([
+  "id",
+  "dppId",
+  "dpp_id",
+  "companyId",
+  "company_id",
+  "lineage_id",
+  "created_by",
+  "created_by_email",
+  "created_at",
+  "updated_by",
+  "updated_at",
+  "release_status",
+  "version_number",
+  "archived",
+  "archived_at",
+  "released_at",
+  "deleted_at",
+  "passport_type",
+  "passportType",
+  "qr_code",
+  "product_identifier_did",
+  "digitalProductPassportId",
+  "uniqueProductIdentifier",
+  "subjectDid",
+  "dppDid",
+  "companyDid",
+  "elements",
+  "fields",
+  "linked_data",
+  "company_profile",
+  "first_name",
+  "last_name",
+]);
 
 function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
@@ -286,12 +335,15 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const fetchPassportRecord = async ({ allowDraftRestore = false } = {}) => {
-    const r = await fetchWithAuth(
-      `${API}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${activePassportType}`,
-      { headers: authHeaders() }
-    );
-    if (!r.ok) throw new Error("Failed to load passport");
-    const data = await r.json();
+    const baseUrl = `${API}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${activePassportType}`;
+    const [rawResponse, fullResponse] = await Promise.all([
+      fetchWithAuth(baseUrl, { headers: authHeaders() }),
+      fetchWithAuth(`${baseUrl}&representation=full`, { headers: authHeaders() }),
+    ]);
+    if (!rawResponse.ok && !fullResponse.ok) throw new Error("Failed to load passport");
+    const rawData = rawResponse.ok ? await rawResponse.json() : {};
+    const fullData = fullResponse.ok ? await fullResponse.json() : {};
+    const data = mergePassportRepresentations(rawData, fullData);
     const nextPassportType = data?.passport_type || data?.passportType || "";
     if (nextPassportType && nextPassportType !== resolvedPassportType) {
       setResolvedPassportType(nextPassportType);
@@ -424,15 +476,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           const rawData = rawResponse.ok ? await rawResponse.json() : {};
           const fullData = fullResponse.ok ? await fullResponse.json() : {};
           if (rawResponse.ok || fullResponse.ok) {
-            source = {
-              ...fullData,
-              ...rawData,
-              elements: fullData.elements || rawData.elements,
-              fields: {
-                ...(fullData.fields && typeof fullData.fields === "object" ? fullData.fields : {}),
-                ...(rawData.fields && typeof rawData.fields === "object" ? rawData.fields : {}),
-              },
-            };
+            source = mergePassportRepresentations(rawData, fullData);
           }
         } catch {
           // Keep the navigation-state fallback if refetching the clone source fails.
@@ -532,10 +576,15 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       "granularity",
       "product_image",
     ]);
+    const hasSchemaKeys = schemaFieldKeys.size > 0;
     const allowedKeys = new Set([...schemaFieldKeys, ...managedEditableKeys]);
     const cleanData = Object.fromEntries(
       Object.entries(formData)
-        .filter(([key]) => allowedKeys.has(key))
+        .filter(([key]) => {
+          if (NON_EDITABLE_FORM_KEYS.has(key)) return false;
+          if (hasSchemaKeys) return allowedKeys.has(key);
+          return true;
+        })
         .map(([key, value]) => {
           const normalizedValue = typeof value === "string"
             ? value.trim()
@@ -702,7 +751,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
       dirtyRef.current = false;
       clearLocalDraft();
-      const refreshed = await fetchPassportRecord({ allowDraftRestore: false });
+      const responsePayload = await r.json().catch(() => ({}));
+      const refreshed = uploadedKeys.length
+        ? await fetchPassportRecord({ allowDraftRestore: false })
+        : responsePayload?.passport
+        ? hydrateFromPassportRecord(responsePayload.passport, { allowDraftRestore: false }) || responsePayload.passport
+        : await fetchPassportRecord({ allowDraftRestore: false });
       const nowIso = refreshed?.updated_at || new Date().toISOString();
       if (mountedRef.current) {
         setLastSavedAt(nowIso);

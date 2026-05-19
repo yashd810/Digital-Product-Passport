@@ -322,10 +322,15 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
   // Pre-fill values when editing or cloning into a new template.
   useEffect(() => {
     const sourceTemplate = editingTemplate || cloneTemplate;
-    if (!sourceTemplate?.fields) return;
+    if (!sourceTemplate) return;
+    if (editingTemplate) {
+      setPassportType(editingTemplate.passport_type || "");
+      setName(editingTemplate.name || "");
+      setDescription(editingTemplate.description || "");
+    }
     const vals = {};
     const model = new Set();
-    for (const f of sourceTemplate.fields) {
+    for (const f of sourceTemplate.fields || []) {
       vals[f.field_key] = f.field_value || "";
       if (f.is_model_data) model.add(f.field_key);
     }
@@ -712,6 +717,9 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
 
   if (view === "create" || view === "edit") {
     const cloneTemplate = view === "create" ? location.state?.cloneTemplate || null : null;
+    if (view === "edit" && !editingTemplate) {
+      return <div className="tmpl-editor"><div className="tmpl-empty">Loading template…</div></div>;
+    }
     return (
       <TemplateEditor
         companyId={companyId}
