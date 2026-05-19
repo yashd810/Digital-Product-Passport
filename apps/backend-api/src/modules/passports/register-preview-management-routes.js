@@ -27,17 +27,19 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const sourcePassport = resolved.passport;
+      const resolvedCompanyId = sourcePassport.company_id ?? sourcePassport.companyId ?? companyId ?? null;
       const passport = await stripRestrictedFieldsForPublicView(sourcePassport, sourcePassport.passport_type);
-      const companyResult = await pool.query(
-        `SELECT id, company_name, company_logo, did_slug
-         FROM companies
-         WHERE id = $1
-         LIMIT 1`,
-        [sourcePassport.company_id]
-      );
-      const company = companyResult.rows[0] || null;
-      const companyNameMap = await getCompanyNameMap([sourcePassport.company_id]);
-      const companyName = company?.company_name || companyNameMap.get(String(sourcePassport.company_id)) || "";
+      const company = resolvedCompanyId
+        ? (await pool.query(
+            `SELECT id, company_name, company_logo, did_slug
+             FROM companies
+             WHERE id = $1
+             LIMIT 1`,
+            [resolvedCompanyId]
+          )).rows[0] || null
+        : null;
+      const companyNameMap = resolvedCompanyId ? await getCompanyNameMap([resolvedCompanyId]) : new Map();
+      const companyName = company?.company_name || (resolvedCompanyId ? companyNameMap.get(String(resolvedCompanyId)) : "") || "";
       const typeDefResult = await pool.query(
         `SELECT id, type_name, display_name, product_category, product_icon, fields_json
          FROM passport_types
@@ -48,7 +50,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const typeDef = typeDefResult.rows[0] || null;
       const canonicalPayload = typeof buildCanonicalPassportPayload === "function"
         ? buildCanonicalPassportPayload(sourcePassport, typeDef || resolved.typeDef || null, {
-            company: company || { company_name: companyName },
+            company: company || (companyName ? { company_name: companyName } : null),
             companyName,
             granularity: sourcePassport.granularity || "item",
           })

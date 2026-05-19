@@ -58,10 +58,13 @@ const isEditablePassportStatus = (status) =>
 const normalizePassportRow = (row) => {
   if (!row) return row;
   const dppId = row.dppId ?? row.dpp_id ?? null;
+  const companyId = row.companyId ?? row.company_id ?? null;
   const normalized = {
     ...row,
     dpp_id: row.dpp_id ?? dppId,
     dppId,
+    company_id: row.company_id ?? companyId,
+    companyId,
     release_status: normalizeReleaseStatus(row.release_status),
   };
   return normalized;
