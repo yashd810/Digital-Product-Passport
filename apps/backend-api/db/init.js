@@ -970,6 +970,22 @@ async function initDb(pool, {
     CREATE INDEX IF NOT EXISTS idx_repo_company_parent
       ON company_repository(company_id, parent_id)
   `);
+  await pool.query(`
+    ALTER TABLE company_repository
+    ADD COLUMN IF NOT EXISTS repository_scope VARCHAR(20) NOT NULL DEFAULT 'files'
+  `);
+  await pool.query(`
+    UPDATE company_repository
+    SET repository_scope = CASE
+      WHEN mime_type LIKE 'image/%' THEN 'symbols'
+      ELSE 'files'
+    END
+    WHERE repository_scope IS NULL OR repository_scope = ''
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_repo_company_scope_parent
+      ON company_repository(company_id, repository_scope, parent_id)
+  `);
 
   // Global symbol repository (super-admin managed, visible to all users)
   await pool.query(`

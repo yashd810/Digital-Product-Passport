@@ -263,7 +263,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 🔐 Security
               </NavLink>
               <NavLink to="/dashboard/profile" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                {t("myProfile")}
+                👤 {t("myProfile")}
               </NavLink>
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Logs & Support</p>

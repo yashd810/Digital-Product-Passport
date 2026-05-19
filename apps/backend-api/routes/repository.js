@@ -46,7 +46,7 @@ module.exports = function registerRepositoryRoutes(app, {
       const r = await pool.query(
         `SELECT id, company_id, parent_id, name, type, file_url, storage_key, file_path, mime_type, size_bytes, created_at
          FROM company_repository
-         WHERE company_id = $1 AND parent_id IS NOT DISTINCT FROM $2
+         WHERE company_id = $1 AND repository_scope = 'files' AND parent_id IS NOT DISTINCT FROM $2
          ORDER BY type DESC, name ASC`,
         [companyId, parentId]
       );
@@ -58,10 +58,11 @@ module.exports = function registerRepositoryRoutes(app, {
 
   app.get("/api/companies/:companyId/repository/tree", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
+      const scope = req.query.scope === "symbols" ? "symbols" : "files";
       const r = await pool.query(
         `SELECT id, parent_id, name, type FROM company_repository
-         WHERE company_id = $1 ORDER BY type DESC, name ASC`,
-        [req.params.companyId]
+         WHERE company_id = $1 AND repository_scope = $2 ORDER BY type DESC, name ASC`,
+        [req.params.companyId, scope]
       );
       res.json(r.rows);
     } catch {
@@ -76,7 +77,7 @@ module.exports = function registerRepositoryRoutes(app, {
 
       const dup = await pool.query(
         `SELECT id FROM company_repository
-         WHERE company_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND name = $3`,
+         WHERE company_id = $1 AND repository_scope = 'files' AND parent_id IS NOT DISTINCT FROM $2 AND name = $3`,
         [req.params.companyId, parentId || null, name.trim()]
       );
       if (dup.rows.length) {
@@ -84,8 +85,8 @@ module.exports = function registerRepositoryRoutes(app, {
       }
 
       const r = await pool.query(
-        `INSERT INTO company_repository (company_id, parent_id, name, type, created_by)
-         VALUES ($1, $2, $3, 'folder', $4) RETURNING *`,
+        `INSERT INTO company_repository (company_id, parent_id, name, type, repository_scope, created_by)
+         VALUES ($1, $2, $3, 'folder', 'files', $4) RETURNING *`,
         [req.params.companyId, parentId || null, name.trim(), req.user.userId]
       );
       res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
@@ -115,8 +116,8 @@ module.exports = function registerRepositoryRoutes(app, {
 
         const r = await pool.query(
           `INSERT INTO company_repository
-             (company_id, parent_id, name, type, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, created_by)
-           VALUES ($1, $2, $3, 'file', $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+             (company_id, parent_id, name, type, repository_scope, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, created_by)
+           VALUES ($1, $2, $3, 'file', 'files', $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
           [
             companyId,
             parentId || null,
@@ -146,8 +147,8 @@ module.exports = function registerRepositoryRoutes(app, {
       if (!sourceUrl || !name?.trim()) return res.status(400).json({ error: "sourceUrl and name required" });
       const r = await pool.query(
         `INSERT INTO company_repository
-           (company_id, parent_id, name, type, file_url, mime_type, created_by)
-         VALUES ($1, $2, $3, 'file', $4, 'application/pdf', $5) RETURNING *`,
+           (company_id, parent_id, name, type, repository_scope, file_url, mime_type, created_by)
+         VALUES ($1, $2, $3, 'file', 'files', $4, 'application/pdf', $5) RETURNING *`,
         [req.params.companyId, parentId || null, name.trim(), sourceUrl, req.user.userId]
       );
       res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
@@ -209,16 +210,54 @@ module.exports = function registerRepositoryRoutes(app, {
 
   app.get("/api/companies/:companyId/repository/symbols", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      const r = await pool.query(
-        `SELECT id, company_id, name, mime_type, file_url, storage_key, file_path, size_bytes, created_at
-         FROM company_repository
-         WHERE company_id = $1 AND type = 'file' AND mime_type LIKE 'image/%'
-         ORDER BY name ASC`,
-        [req.params.companyId]
-      );
+      const flat = String(req.query.flat || "").toLowerCase() === "true";
+      const parentId = req.query.parentId ? parseInt(req.query.parentId, 10) : null;
+      const r = flat
+        ? await pool.query(
+            `SELECT id, company_id, parent_id, name, type, mime_type, file_url, storage_key, file_path, size_bytes, created_at
+             FROM company_repository
+             WHERE company_id = $1 AND repository_scope = 'symbols' AND type = 'file' AND mime_type LIKE 'image/%'
+             ORDER BY name ASC`,
+            [req.params.companyId]
+          )
+        : await pool.query(
+            `SELECT id, company_id, parent_id, name, type, mime_type, file_url, storage_key, file_path, size_bytes, created_at
+             FROM company_repository
+             WHERE company_id = $1
+               AND repository_scope = 'symbols'
+               AND parent_id IS NOT DISTINCT FROM $2
+               AND (type = 'folder' OR mime_type LIKE 'image/%')
+             ORDER BY type DESC, name ASC`,
+            [req.params.companyId, parentId]
+          );
       res.json(r.rows.map((row) => withResolvedFileUrl(req, row)));
     } catch {
       res.status(500).json({ error: "Failed to fetch symbols" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/repository/symbols/folder", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
+    try {
+      const { name, parentId } = req.body;
+      if (!name?.trim()) return res.status(400).json({ error: "Folder name required" });
+
+      const dup = await pool.query(
+        `SELECT id FROM company_repository
+         WHERE company_id = $1 AND repository_scope = 'symbols' AND parent_id IS NOT DISTINCT FROM $2 AND name = $3`,
+        [req.params.companyId, parentId || null, name.trim()]
+      );
+      if (dup.rows.length) {
+        return res.status(409).json({ error: "A folder with that name already exists here" });
+      }
+
+      const r = await pool.query(
+        `INSERT INTO company_repository (company_id, parent_id, name, type, repository_scope, created_by)
+         VALUES ($1, $2, $3, 'folder', 'symbols', $4) RETURNING *`,
+        [req.params.companyId, parentId || null, name.trim(), req.user.userId]
+      );
+      res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
+    } catch {
+      res.status(500).json({ error: "Failed to create symbol folder" });
     }
   });
 
@@ -232,6 +271,7 @@ module.exports = function registerRepositoryRoutes(app, {
       try {
         if (!req.file) return res.status(400).json({ error: "No file uploaded" });
         const { companyId } = req.params;
+        const parentId = req.body.parentId ? parseInt(req.body.parentId, 10) : null;
         const displayName = req.body.name?.trim() || req.file.originalname.replace(/\.[^.]+$/, "");
         const stored = await storageService.saveRepositorySymbol({
           companyId,
@@ -241,10 +281,11 @@ module.exports = function registerRepositoryRoutes(app, {
         });
         const r = await pool.query(
           `INSERT INTO company_repository
-             (company_id, parent_id, name, type, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, created_by)
-           VALUES ($1, NULL, $2, 'file', $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+             (company_id, parent_id, name, type, repository_scope, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, created_by)
+           VALUES ($1, $2, $3, 'file', 'symbols', $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
           [
             companyId,
+            parentId,
             displayName,
             stored.path,
             stored.storageKey,

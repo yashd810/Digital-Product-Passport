@@ -276,24 +276,24 @@ function SecurityCenter({ user, companyId }) {
           {resolvedCompanyId && canManageCompanyKeys && (
             <>
               {newKey && (
-                <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: 8, padding: 16, marginBottom: 20 }}>
-                  <p style={{ margin: "0 0 6px", fontWeight: 700, color: "#86efac", fontSize: 14 }}>
+                <div className="security-key-reveal">
+                  <p className="security-key-reveal-title">
                     Key created: {newKey.name}
                   </p>
-                  <p style={{ margin: "0 0 10px", color: "#86efac", fontSize: 13 }}>
+                  <p className="security-key-reveal-copy">
                     This is the only time this key will be shown. Copy it now.
                   </p>
-                  <p style={{ margin: "0 0 10px", color: "var(--text-secondary)", fontSize: 12 }}>
+                  <p className="security-key-reveal-meta">
                     {humanizeOption(newKey.operatorType, OPERATOR_TYPE_OPTIONS)} · {humanizeOption(newKey.accessMode, ACCESS_MODE_OPTIONS)} · Up to {humanizeOption(newKey.maxConfidentiality, CONFIDENTIALITY_OPTIONS)}
                   </p>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <code style={{ flex: 1, background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: 6, padding: "8px 12px", fontSize: 13, fontFamily: "monospace", wordBreak: "break-all", color: "var(--text-primary)" }}>
+                  <div className="security-key-reveal-actions">
+                    <code className="security-key-reveal-code">
                       {newKey.key}
                     </code>
                     <button
                       type="button"
                       onClick={() => { navigator.clipboard.writeText(newKey.key); setCopiedApiKey(true); }}
-                      style={{ padding: "8px 14px", background: copiedApiKey ? "rgba(16, 185, 129, 0.25)" : "var(--accent)", color: "#ffffff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "var(--font)" }}
+                      className={`security-key-reveal-copy-btn${copiedApiKey ? " copied" : ""}`}
                     >
                       {copiedApiKey ? "✓ Copied" : "Copy"}
                     </button>
@@ -301,7 +301,7 @@ function SecurityCenter({ user, companyId }) {
                   <button
                     type="button"
                     onClick={() => { setNewKey(null); setCopiedApiKey(false); }}
-                    style={{ marginTop: 12, background: "none", border: "none", color: "#86efac", fontSize: 13, cursor: "pointer", textDecoration: "underline", fontFamily: "var(--font)", padding: 0 }}
+                    className="security-key-reveal-dismiss"
                   >
                     I&apos;ve saved the key — dismiss
                   </button>

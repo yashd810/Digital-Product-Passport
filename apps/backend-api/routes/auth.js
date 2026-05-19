@@ -558,7 +558,6 @@ module.exports = function registerAuthRoutes(app, {
         mfaVerifiedAt: req.user?.mfaVerifiedAt || null,
         amr: req.user?.authenticationMethods || ["pwd"]
       });
-      setAuthCookie(res, freshToken);
       res.json({ token: freshToken });
     } catch {
       res.status(500).json({ error: "Failed to issue bearer token" });

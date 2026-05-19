@@ -34,39 +34,76 @@ function copyText(value) {
 
 // ─── Symbols Tab ─────────────────────────────────────────────────────────────
 function SymbolsTab({ token, companyId }) {
-  const [symbols,     setSymbols]     = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [uploading,   setUploading]   = useState(false);
-  const [deletingId,  setDeletingId]  = useState(null);
-  const [confirmSym,  setConfirmSym]  = useState(null);
-  const [previewSym,  setPreviewSym]  = useState(null);
-  const [renamingId,  setRenamingId]  = useState(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [msg,         setMsg]         = useState("");
-  const [error,       setError]       = useState("");
+  const [symbols,       setSymbols]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [uploading,     setUploading]     = useState(false);
+  const [deletingId,    setDeletingId]    = useState(null);
+  const [confirmSym,    setConfirmSym]    = useState(null);
+  const [previewSym,    setPreviewSym]    = useState(null);
+  const [renamingId,    setRenamingId]    = useState(null);
+  const [renameValue,   setRenameValue]   = useState("");
+  const [msg,           setMsg]           = useState("");
+  const [error,         setError]         = useState("");
+  const [breadcrumbs,   setBreadcrumbs]   = useState([]);
+  const [currentFolder, setCurrentFolder] = useState(null);
+  const [showFolderForm, setShowFolderForm] = useState(false);
+  const [folderName,    setFolderName]    = useState("");
+  const [folderSaving,  setFolderSaving]  = useState(false);
 
-  // Upload form
   const [name,     setName]     = useState("");
   const [file,     setFile]     = useState(null);
   const [preview,  setPreview]  = useState(null);
   const fileRef = useRef(null);
+  const canGoBack = breadcrumbs.length > 0;
+  const currentFolderName = breadcrumbs[breadcrumbs.length - 1]?.name || "Symbols root";
 
   const flash = (text, isErr = false) => {
     isErr ? setError(text) : setMsg(text);
     setTimeout(() => isErr ? setError("") : setMsg(""), 4000);
   };
 
-  const fetchSymbols = useCallback(async () => {
+  const fetchSymbols = useCallback(async (parentId = currentFolder) => {
     setLoading(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols`,
+      const qs = parentId != null ? `?parentId=${parentId}` : "";
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols${qs}`,
         { headers: { Authorization: `Bearer ${token}` } });
       if (r.ok) setSymbols(await r.json());
     } catch {}
     finally { setLoading(false); }
-  }, [companyId, token]);
+  }, [companyId, token, currentFolder]);
 
   useEffect(() => { fetchSymbols(); }, [fetchSymbols]);
+
+  const navigate = (folder) => {
+    if (folder === null) {
+      setBreadcrumbs([]);
+      setCurrentFolder(null);
+    } else {
+      const idx = breadcrumbs.findIndex((crumb) => crumb.id === folder.id);
+      if (idx >= 0) {
+        setBreadcrumbs(breadcrumbs.slice(0, idx + 1));
+      } else {
+        setBreadcrumbs((prev) => [...prev, { id: folder.id, name: folder.name }]);
+      }
+      setCurrentFolder(folder.id);
+    }
+    setSymbols([]);
+  };
+
+  const goBack = () => {
+    if (!breadcrumbs.length) {
+      navigate(null);
+      return;
+    }
+    if (breadcrumbs.length === 1) {
+      navigate(null);
+      return;
+    }
+    navigate(breadcrumbs[breadcrumbs.length - 2]);
+  };
+
+  useEffect(() => { fetchSymbols(currentFolder); }, [currentFolder]); // eslint-disable-line
 
   const handleFileChange = (e) => {
     const f = e.target.files[0];
@@ -87,6 +124,7 @@ function SymbolsTab({ token, companyId }) {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("name", name.trim());
+      if (currentFolder != null) fd.append("parentId", currentFolder);
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -100,6 +138,26 @@ function SymbolsTab({ token, companyId }) {
       fetchSymbols();
     } catch (err) { flash(err.message, true); }
     finally { setUploading(false); }
+  };
+
+  const handleCreateFolder = async (e) => {
+    e.preventDefault();
+    if (!folderName.trim()) return;
+    setFolderSaving(true);
+    try {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols/folder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: folderName.trim(), parentId: currentFolder }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Failed");
+      setFolderName("");
+      setShowFolderForm(false);
+      flash(`Folder "${data.name}" created`);
+      fetchSymbols();
+    } catch (err) { flash(err.message, true); }
+    finally { setFolderSaving(false); }
   };
 
   const startRename = (sym) => { setRenamingId(sym.id); setRenameValue(sym.name); };
@@ -134,6 +192,51 @@ function SymbolsTab({ token, companyId }) {
     <div>
       {error && <div className="alert alert-error">{error}</div>}
       {msg   && <div className="alert alert-success">{msg}</div>}
+
+      <div className="repo-toolbar" style={{ marginBottom: 16 }}>
+        <button className="repo-btn repo-btn-secondary" onClick={() => { setShowFolderForm((open) => !open); setFolderName(""); }}>
+          {showFolderForm ? "✕ Cancel" : "+ New Folder"}
+        </button>
+      </div>
+
+      {showFolderForm && (
+        <form className="repo-folder-form" onSubmit={handleCreateFolder}>
+          <input
+            autoFocus
+            className="repo-folder-input"
+            value={folderName}
+            onChange={(e) => setFolderName(e.target.value)}
+            placeholder="Folder name…"
+          />
+          <button type="submit" className="repo-btn repo-btn-primary" disabled={folderSaving || !folderName.trim()}>
+            {folderSaving ? "Creating…" : "Create"}
+          </button>
+        </form>
+      )}
+
+      <nav className="repo-breadcrumb">
+        <button className="repo-crumb" onClick={() => navigate(null)}>🏠 Symbols</button>
+        {breadcrumbs.map((crumb) => (
+          <React.Fragment key={crumb.id}>
+            <span className="repo-crumb-sep">/</span>
+            <button className="repo-crumb" onClick={() => navigate(crumb)}>{crumb.name}</button>
+          </React.Fragment>
+        ))}
+      </nav>
+
+      <div className="repo-folder-nav">
+        <button
+          className="repo-btn repo-btn-secondary repo-folder-back"
+          onClick={goBack}
+          disabled={!canGoBack}
+        >
+          ← Back
+        </button>
+        <div className="repo-folder-context">
+          <span className="repo-folder-label">Current folder</span>
+          <span className="repo-folder-name">{currentFolderName}</span>
+        </div>
+      </div>
 
       {/* Upload card */}
       <div className="sym-card sym-upload-card">
@@ -177,15 +280,22 @@ function SymbolsTab({ token, companyId }) {
       {loading ? (
         <div className="loading" style={{ padding: 40 }}>Loading…</div>
       ) : symbols.length === 0 ? (
-        <div className="repo-empty"><p>No symbols yet — upload one above.</p></div>
+        <div className="repo-empty"><p>{currentFolder ? "This folder is empty." : "No symbols yet — upload one above or create a folder to get started."}</p></div>
       ) : (
         <div className="repo-card-grid">
           {symbols.map(sym => (
-            <div key={sym.id} className="repo-card sym-card-item">
-              <div className="repo-card-body repo-card-body-clickable" onClick={() => !renamingId && setPreviewSym(sym)}>
-                <div className="sym-card-img-wrap">
-                  <img src={sym.file_url} alt={sym.name} className="sym-card-img" loading="lazy" />
-                </div>
+            <div key={sym.id} className={`repo-card ${sym.type === "folder" ? "folder" : "sym-card-item"}`}>
+              <div className={`repo-card-body${sym.type !== "folder" && sym.file_url ? " repo-card-body-clickable" : ""}`} onClick={() => {
+                if (sym.type === "folder") navigate(sym);
+                else if (!renamingId) setPreviewSym(sym);
+              }}>
+                {sym.type === "folder" ? (
+                  <div className="repo-card-icon">📁</div>
+                ) : (
+                  <div className="sym-card-img-wrap">
+                    <img src={sym.file_url} alt={sym.name} className="sym-card-img" loading="lazy" />
+                  </div>
+                )}
                 <div className="repo-card-info">
                   {renamingId === sym.id ? (
                     <input
@@ -195,6 +305,11 @@ function SymbolsTab({ token, companyId }) {
                     />
                   ) : (
                     <span className="repo-card-name" title={sym.name}>{sym.name}</span>
+                  )}
+                  {sym.type !== "folder" && (
+                    <span className="repo-card-meta">
+                      {sym.created_at && new Date(sym.created_at).toLocaleDateString()}
+                    </span>
                   )}
                 </div>
               </div>
@@ -206,9 +321,11 @@ function SymbolsTab({ token, companyId }) {
                   </>
                 ) : (
                   <>
-                    <button className="repo-card-btn repo-card-btn-copy" onClick={() => {
-                      copyText(sym.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
-                    }}>Copy Link</button>
+                    {sym.type !== "folder" && sym.file_url && (
+                      <button className="repo-card-btn repo-card-btn-copy" onClick={() => {
+                        copyText(sym.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
+                      }}>Copy Link</button>
+                    )}
                     <button className="repo-card-btn repo-card-btn-rename" onClick={() => startRename(sym)}>Rename</button>
                     <button className="repo-card-btn repo-card-btn-remove"
                       disabled={deletingId === sym.id}
@@ -227,7 +344,7 @@ function SymbolsTab({ token, companyId }) {
 
       {confirmSym && (
         <ConfirmDialog
-          message={`Remove symbol "${confirmSym.name}"?`}
+          message={`Remove "${confirmSym.name}"${confirmSym.type === "folder" ? " (folder must be empty)" : ""}?`}
           onConfirm={() => handleDelete(confirmSym)}
           onCancel={() => setConfirmSym(null)}
         />

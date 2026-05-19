@@ -2,17 +2,31 @@ import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
+import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
 import "../../../assets/styles/Dashboard.css";
+import "../../../assets/styles/CreatePass.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-// ── Field renderer (mirrors PassportForm logic, simplified for templates) ──
-function TemplateField({ field, value, isModelData, onValueChange, onModelDataToggle }) {
+// ── Field renderer (mirrors PassportForm logic for templates) ──
+function TemplateField({
+  field,
+  value,
+  isModelData,
+  disabled = false,
+  symbols = [],
+  onValueChange,
+  onModelDataToggle,
+  onOpenRepositoryPicker,
+  onOpenSymbolPicker,
+}) {
   const renderInput = () => {
     if (field.type === "boolean") {
       return (
         <label className="tmpl-bool-label">
           <input type="checkbox" checked={!!value}
+            disabled={disabled}
             onChange={e => onValueChange(e.target.checked)} />
           <span>{field.label}</span>
         </label>
@@ -24,6 +38,7 @@ function TemplateField({ field, value, isModelData, onValueChange, onModelDataTo
           className="tmpl-field-input"
           value={value || ""}
           placeholder={`Enter ${field.label.toLowerCase()}`}
+          disabled={disabled}
           onChange={e => onValueChange(e.target.value)}
           rows={2}
         />
@@ -33,29 +48,209 @@ function TemplateField({ field, value, isModelData, onValueChange, onModelDataTo
       return (
         <input type="date" className="tmpl-field-input"
           value={value || ""}
+          disabled={disabled}
           onChange={e => onValueChange(e.target.value)} />
       );
     }
-    if (field.type === "file" || field.type === "symbol") {
+    if (field.type === "file") {
+      const linkedUrl = typeof value === "string" && value.startsWith("http") ? value : null;
+      const fileName = linkedUrl ? linkedUrl.split("/").pop() : null;
       return (
-        <input type="text" className="tmpl-field-input"
-          value={value || ""}
-          placeholder="Paste URL or leave blank"
-          onChange={e => onValueChange(e.target.value)} />
+        <div className="file-upload-widget">
+          {linkedUrl ? (
+            <div className="file-existing">
+              <a href={linkedUrl} target="_blank" rel="noopener noreferrer" className="file-existing-link">
+                📄 {decodeURIComponent(fileName || "Document")}
+              </a>
+              <button type="button" className="file-clear-btn" disabled={disabled} onClick={() => onValueChange("")}>✕ Remove</button>
+            </div>
+          ) : (
+            <button type="button" className="file-upload-label" disabled={disabled} onClick={onOpenRepositoryPicker}>
+              <span className="file-placeholder">📁 Link PDF from Repository</span>
+            </button>
+          )}
+          {linkedUrl && (
+            <button type="button" className="file-upload-label file-replace-label" disabled={disabled} onClick={onOpenRepositoryPicker}>
+              <span className="file-placeholder">↺ Change</span>
+            </button>
+          )}
+          <div className="file-link-paste">
+            <input
+              type="text"
+              className="file-link-input"
+              placeholder="Or paste a repository link here…"
+              disabled={disabled}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text").trim();
+                if (text.startsWith("http")) { e.preventDefault(); onValueChange(text); }
+              }}
+              onBlur={(e) => {
+                const text = e.target.value.trim();
+                if (text.startsWith("http")) { onValueChange(text); e.target.value = ""; }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const text = e.target.value.trim();
+                  if (text.startsWith("http")) { onValueChange(text); e.target.value = ""; }
+                }
+              }}
+            />
+          </div>
+        </div>
+      );
+    }
+    if (field.type === "symbol") {
+      const linkedUrl = typeof value === "string" && value.startsWith("http") ? value : null;
+      const picked = linkedUrl ? symbols.find((symbol) => symbol.file_url === linkedUrl) : null;
+      return (
+        <div className="file-upload-widget">
+          {linkedUrl ? (
+            <div className="file-existing">
+              <img src={linkedUrl} alt={picked?.name || "symbol"} className="pf-symbol-thumb" />
+              <span className="file-existing-link">{picked?.name || "Symbol"}</span>
+              <button type="button" className="file-clear-btn" disabled={disabled} onClick={() => onValueChange("")}>✕ Remove</button>
+            </div>
+          ) : (
+            <button type="button" className="file-upload-label" disabled={disabled} onClick={onOpenSymbolPicker}>
+              <span className="file-placeholder">🔣 Link Symbol from Repository</span>
+            </button>
+          )}
+          {linkedUrl && (
+            <button type="button" className="file-upload-label file-replace-label" disabled={disabled} onClick={onOpenSymbolPicker}>
+              <span className="file-placeholder">↺ Change</span>
+            </button>
+          )}
+          <div className="file-link-paste">
+            <input
+              type="text"
+              className="file-link-input"
+              placeholder="Or paste a repository link here…"
+              disabled={disabled}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text").trim();
+                if (text.startsWith("http")) { e.preventDefault(); onValueChange(text); }
+              }}
+              onBlur={(e) => {
+                const text = e.target.value.trim();
+                if (text.startsWith("http")) { onValueChange(text); e.target.value = ""; }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const text = e.target.value.trim();
+                  if (text.startsWith("http")) { onValueChange(text); e.target.value = ""; }
+                }
+              }}
+            />
+          </div>
+        </div>
       );
     }
     if (field.type === "table") {
+      const fallbackColumns = field.table_columns?.length
+        ? field.table_columns
+        : Array.from({ length: field.table_cols || 2 }, (_, i) => `Column ${i + 1}`);
+      let parsed = value;
+      if (typeof value === "string" && (value.startsWith("[") || value.startsWith("{"))) {
+        try { parsed = JSON.parse(value); } catch { parsed = null; }
+      }
+      const columns = Array.isArray(parsed?.columns) && parsed.columns.length
+        ? parsed.columns.map((name, index) => {
+            const rawName = String(name ?? "");
+            return rawName.trim() ? rawName : `Column ${index + 1}`;
+          })
+        : fallbackColumns;
+      const defaultRows = Array.isArray(field.table_default_rows) && field.table_default_rows.length
+        ? field.table_default_rows.map((row) => Array.from({ length: columns.length }, (_, i) => row[i] ?? ""))
+        : [Array(columns.length).fill("")];
+      const parsedRowsSource = Array.isArray(parsed?.rows) ? parsed.rows : (Array.isArray(parsed) ? parsed : null);
+      const rows = Array.isArray(parsedRowsSource) && parsedRowsSource.length
+        ? parsedRowsSource.map((row) => Array.from({ length: columns.length }, (_, i) => Array.isArray(row) ? (row[i] ?? "") : ""))
+        : defaultRows;
+
+      const commitTable = (nextColumns, nextRows) => onValueChange({ columns: nextColumns, rows: nextRows });
+      const updateCell = (ri, ci, nextValue) => {
+        const nextRows = rows.map((row) => [...row]);
+        nextRows[ri][ci] = nextValue;
+        commitTable(columns, nextRows);
+      };
+      const updateColumnName = (ci, nextValue) => {
+        const nextColumns = columns.map((name, index) => index === ci ? nextValue : name);
+        commitTable(nextColumns, rows);
+      };
+      const addRow = () => commitTable(columns, [...rows, Array(columns.length).fill("")]);
+      const removeRow = (ri) => {
+        const nextRows = rows.filter((_, index) => index !== ri);
+        commitTable(columns, nextRows.length ? nextRows : [Array(columns.length).fill("")]);
+      };
+      const addColumn = () => {
+        const nextColumns = [...columns, `Column ${columns.length + 1}`];
+        const nextRows = rows.map((row) => [...row, ""]);
+        commitTable(nextColumns, nextRows);
+      };
+      const removeColumn = (ci) => {
+        if (columns.length <= 1) return;
+        const nextColumns = columns.filter((_, index) => index !== ci);
+        const nextRows = rows.map((row) => row.filter((_, index) => index !== ci));
+        commitTable(nextColumns, nextRows);
+      };
+
       return (
-        <input type="text" className="tmpl-field-input"
-          value={value || ""}
-          placeholder="Table data (filled on passport creation)"
-          onChange={e => onValueChange(e.target.value)} />
+        <div className="pf-table-wrap">
+          <div className="pf-table-toolbar">
+            <button type="button" className="pf-table-add-col" onClick={addColumn} disabled={disabled}>+ Add Column</button>
+          </div>
+          <table className="pf-table">
+            <thead>
+              <tr>
+                {columns.map((name, ci) => (
+                  <th key={ci}>
+                    <div className="pf-table-head-cell">
+                      <input
+                        type="text"
+                        value={name}
+                        disabled={disabled}
+                        onChange={(e) => updateColumnName(ci, e.target.value)}
+                        className="pf-table-head-input"
+                        placeholder={`Column ${ci + 1}`}
+                      />
+                      <button type="button" className="pf-table-remove-col" disabled={disabled || columns.length <= 1} onClick={() => removeColumn(ci)} title="Remove column">✕</button>
+                    </div>
+                  </th>
+                ))}
+                <th className="pf-table-action-col" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, ri) => (
+                <tr key={ri}>
+                  {Array(columns.length).fill(null).map((_, ci) => (
+                    <td key={ci}>
+                      <input
+                        type="text"
+                        value={row[ci] ?? ""}
+                        disabled={disabled}
+                        placeholder="—"
+                        onChange={(e) => updateCell(ri, ci, e.target.value)}
+                        className="pf-table-cell-input"
+                      />
+                    </td>
+                  ))}
+                  <td className="pf-table-action-col">
+                    <button type="button" className="pf-table-remove-row" onClick={() => removeRow(ri)} disabled={disabled} title="Remove row">✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" className="pf-table-add-row" onClick={addRow} disabled={disabled}>+ Add Row</button>
+        </div>
       );
     }
     return (
       <input type="text" className="tmpl-field-input"
         value={value || ""}
         placeholder={`Enter ${field.label.toLowerCase()}`}
+        disabled={disabled}
         onChange={e => onValueChange(e.target.value)} />
     );
   };
@@ -77,12 +272,18 @@ function TemplateField({ field, value, isModelData, onValueChange, onModelDataTo
 
 // ── Template editor (create or edit) ──
 function TemplateEditor({ companyId, passportTypes, editingTemplate, onSave, onCancel }) {
+  const token = typeof window !== "undefined"
+    ? (window.localStorage.getItem("token") || "")
+    : "";
   const [passportType,  setPassportType]  = useState(editingTemplate?.passport_type || "");
   const [name,          setName]          = useState(editingTemplate?.name || "");
   const [description,   setDescription]  = useState(editingTemplate?.description || "");
   const [sections,      setSections]      = useState(null);
   const [fieldValues,   setFieldValues]   = useState({});   // fieldKey → value
   const [modelDataKeys, setModelDataKeys] = useState(new Set()); // Set of field keys marked as model data
+  const [symbols,       setSymbols]       = useState([]);
+  const [repoPicker,    setRepoPicker]    = useState(null);
+  const [symbolPicker,  setSymbolPicker]  = useState(null);
   const [saving,        setSaving]        = useState(false);
   const [error,         setError]         = useState("");
   const [loadingFields, setLoadingFields] = useState(false);
@@ -109,6 +310,14 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, onSave, onC
       .catch(() => setSections(null))
       .finally(() => setLoadingFields(false));
   }, [passportType]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols?flat=true`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : [])
+      .then(setSymbols)
+      .catch(() => {});
+  }, [companyId]);
 
   // Pre-fill values when editing
   useEffect(() => {
@@ -237,8 +446,12 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, onSave, onC
                     field={f}
                     value={fieldValues[f.key] ?? ""}
                     isModelData={modelDataKeys.has(f.key)}
+                    disabled={saving}
+                    symbols={symbols}
                     onValueChange={val => setFieldValue(f.key, val)}
                     onModelDataToggle={on => toggleModelData(f.key, on)}
+                    onOpenRepositoryPicker={() => setRepoPicker(f.key)}
+                    onOpenSymbolPicker={() => setSymbolPicker(f.key)}
                   />
                 ))}
               </div>
@@ -257,6 +470,24 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, onSave, onC
           {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Template"}
         </button>
       </div>
+
+      {repoPicker && (
+        <RepositoryPicker
+          token={token}
+          companyId={companyId}
+          onSelect={(url) => { setFieldValue(repoPicker, url); setRepoPicker(null); }}
+          onClose={() => setRepoPicker(null)}
+        />
+      )}
+
+      {symbolPicker && (
+        <SymbolRepositoryPicker
+          token={token}
+          companyId={companyId}
+          onSelect={(url) => { setFieldValue(symbolPicker, url); setSymbolPicker(null); }}
+          onClose={() => setSymbolPicker(null)}
+        />
+      )}
     </div>
   );
 }

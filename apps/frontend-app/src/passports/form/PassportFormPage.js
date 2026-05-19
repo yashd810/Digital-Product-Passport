@@ -7,6 +7,7 @@ import {
   normalizeSystemPassportHeader,
 } from "../../admin/passport-types/builderHelpers";
 import RepositoryPicker from "./components/RepositoryPicker";
+import SymbolRepositoryPicker from "./components/SymbolRepositoryPicker";
 import "../../assets/styles/CreatePass.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -35,6 +36,12 @@ function alignRecordToSchemaKeys(record, sections) {
   const aligned = { ...record };
   const schemaFields = Object.values(sections || {})
     .flatMap((section) => Array.isArray(section?.fields) ? section.fields : []);
+  const compactRecordEntries = new Map(
+    Object.entries(aligned).map(([key, value]) => [
+      String(key).toLowerCase().replace(/[^a-z0-9]/g, ""),
+      value,
+    ])
+  );
 
   for (const field of schemaFields) {
     const key = field?.key;
@@ -42,6 +49,11 @@ function alignRecordToSchemaKeys(record, sections) {
     const foldedKey = String(key).toLowerCase();
     if (aligned[foldedKey] !== undefined) {
       aligned[key] = aligned[foldedKey];
+      continue;
+    }
+    const compactKey = String(key).toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (compactRecordEntries.has(compactKey)) {
+      aligned[key] = compactRecordEntries.get(compactKey);
     }
   }
 
@@ -54,23 +66,12 @@ function buildClonePrefill(record, sections) {
   }
 
   const aligned = alignRecordToSchemaKeys(record, sections);
-  const schemaFieldKeys = new Set(
-    Object.values(sections || {})
-      .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
-      .map((field) => field?.key)
-      .filter(Boolean)
-  );
-  const managedEditableKeys = new Set([
-    "economic_operator_id",
-    "economic_operator_identifier_scheme",
-    "facility_id",
-    "granularity",
-    "product_image",
-  ]);
   const excludedKeys = new Set([
     "id",
     "dppId",
     "dpp_id",
+    "companyId",
+    "company_id",
     "lineage_id",
     "created_at",
     "updated_at",
@@ -85,7 +86,7 @@ function buildClonePrefill(record, sections) {
     Object.entries(aligned).filter(([key, value]) => {
       if (excludedKeys.has(key)) return false;
       if (value === undefined) return false;
-      return schemaFieldKeys.has(key) || managedEditableKeys.has(key);
+      return true;
     })
   );
 
@@ -241,7 +242,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   // Load symbols from company repository
   useEffect(() => {
     if (!effectiveCompanyId) return;
-    fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/repository/symbols`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/repository/symbols?flat=true`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setSymbols)
       .catch(() => {});
@@ -1301,33 +1302,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
       {/* ── Symbol Picker ── */}
       {symbolPicker && (
-        <div className="rp-overlay" onClick={e => e.target === e.currentTarget && setSymbolPicker(null)}>
-          <div className="rp-modal" role="dialog" aria-modal="true" aria-labelledby="symbol-picker-title">
-            <div className="rp-modal-header">
-              <h3 id="symbol-picker-title">🔣 Pick a Symbol</h3>
-              <button type="button" className="rp-close-btn" onClick={() => setSymbolPicker(null)} aria-label="Close symbol picker">✕</button>
-            </div>
-            <div className="pf-symbol-grid">
-              {symbols.length === 0 ? (
-                <div className="rp-empty">No symbols in repository yet.</div>
-              ) : symbols.map(s => (
-                <button
-                  key={s.id}
-                  type="button"
-                  className={`pf-symbol-item${formData[symbolPicker] === s.file_url ? " selected" : ""}`}
-                  onClick={() => { handleField(symbolPicker, s.file_url); setSymbolPicker(null); }}
-                >
-                  <img src={s.file_url} alt={s.name} className="pf-symbol-grid-img" />
-                  <span className="pf-symbol-name">{s.name}</span>
-                  {s.category && <span className="pf-symbol-cat">{s.category}</span>}
-                </button>
-              ))}
-            </div>
-            <div className="rp-footer">
-              <button type="button" className="rp-cancel-btn" onClick={() => setSymbolPicker(null)}>Cancel</button>
-            </div>
-          </div>
-        </div>
+        <SymbolRepositoryPicker
+          token={token}
+          companyId={effectiveCompanyId}
+          onSelect={(url) => { handleField(symbolPicker, url); setSymbolPicker(null); }}
+          onClose={() => setSymbolPicker(null)}
+        />
       )}
     </div>
   );

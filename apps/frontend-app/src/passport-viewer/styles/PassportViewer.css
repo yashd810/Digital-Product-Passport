@@ -287,7 +287,8 @@
   display: none;
 }
 
-.passport-portal .product-photo.has-img {
+.passport-portal .product-photo.has-img,
+.passport-portal .energy-art.has-img {
   background:
     radial-gradient(circle at 14% 12%, rgba(13, 181, 176, 0.12), transparent 34%),
     linear-gradient(180deg, #ffffff 0%, #f4f9fc 100%);
@@ -906,10 +907,10 @@
 }
 
 .passport-portal .artifact-image {
-  max-height: 86px;
-  max-width: 86px;
-  width: 86px;
-  height: 86px;
+  max-height: 100px;
+  max-width: 100px;
+  width: 100px;
+  height: 100px;
   object-fit: contain;
   border-radius: 12px;
   border: 1px solid var(--line);
@@ -2640,8 +2641,8 @@
 }
 
 .intro-logo-box {
-  width: 100%;
-  height: 220px;
+  width: min(100%, 420px);
+  height: 168px;
   border: 2px dashed rgba(13, 181, 176, 0.24);
   border-radius: 8px;
   background: rgba(20, 35, 55, 0.4);
@@ -2649,6 +2650,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  margin-right: auto;
 }
 
 .intro-logo-img {
@@ -2901,7 +2903,7 @@
 /* Responsive */
 @media (max-width: 768px) {
   .intro-upload-grid { grid-template-columns: 1fr; }
-  .intro-logo-box    { height: 180px; }
+  .intro-logo-box    { width: 100%; height: 180px; }
   .intro-textarea    { height: 160px; }
 }
 
