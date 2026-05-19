@@ -1,6 +1,7 @@
 "use strict";
 
 const logger = require("../src/infrastructure/logging/logger");
+const { buildCanonicalIdentityBundle } = require("../src/shared/identifiers/canonical-identity-bundle");
 const { isPublicVersionVisible } = require("../src/modules/public-passports/visibility");
 
 module.exports = function registerPassportPublicRoutes(app, {
@@ -27,7 +28,8 @@ module.exports = function registerPassportPublicRoutes(app, {
   buildExpandedPassportPayload,
   backupProviderService,
   signingService,
-  didService
+  didService,
+  productIdentifierService
 }) {
   const API_ORIGIN = didService.getApiOrigin();
   const DID_DOMAIN = didService.getDidDomain();
@@ -243,10 +245,26 @@ module.exports = function registerPassportPublicRoutes(app, {
   function buildRequestedPassportPayload(req, passport, typeDef, company) {
     const granularity = company?.default_granularity || passport?.granularity || "model";
     const serializerOptions = { company, granularity };
-    if (getRepresentation(req) === "full" && typeof buildExpandedPassportPayload === "function") {
-      return buildExpandedPassportPayload(passport, typeDef, serializerOptions);
-    }
-    return buildCanonicalPassportPayload(passport, typeDef, serializerOptions);
+    const payload = getRepresentation(req) === "full" && typeof buildExpandedPassportPayload === "function"
+      ? buildExpandedPassportPayload(passport, typeDef, serializerOptions)
+      : buildCanonicalPassportPayload(passport, typeDef, serializerOptions);
+    const identityBundle = buildCanonicalIdentityBundle({
+      passport,
+      company,
+      companyName: company?.company_name || "",
+      granularity,
+      passportType: passport?.passport_type || typeDef?.type_name || "battery",
+      didService,
+      productIdentifierService,
+    });
+    return {
+      ...payload,
+      digitalProductPassportId: payload?.digitalProductPassportId || identityBundle.digitalProductPassportId || null,
+      uniqueProductIdentifier: payload?.uniqueProductIdentifier || identityBundle.uniqueProductIdentifier || passport?.product_identifier_did || passport?.product_id || null,
+      subjectDid: payload?.subjectDid || identityBundle.subjectDid || null,
+      dppDid: payload?.dppDid || identityBundle.dppDid || null,
+      companyDid: payload?.companyDid || identityBundle.companyDid || null,
+    };
   }
 
   function buildPublicCompanyProfile(company) {
@@ -697,10 +715,27 @@ module.exports = function registerPassportPublicRoutes(app, {
       const linkedSubjects = publicPath ?
       await resolvePublicPathToSubjects({ pool, publicPath, getTable, didService }) :
       null;
-      const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, {
+      const canonicalPayloadRaw = buildCanonicalPassportPayload(passport, typeDef, {
         company,
         granularity: company?.default_granularity || passport.granularity || "model"
       });
+      const canonicalIdentity = buildCanonicalIdentityBundle({
+        passport,
+        company,
+        companyName,
+        granularity: company?.default_granularity || passport.granularity || "model",
+        passportType: passport.passport_type,
+        didService,
+        productIdentifierService,
+      });
+      const canonicalPayload = {
+        ...canonicalPayloadRaw,
+        digitalProductPassportId: canonicalPayloadRaw?.digitalProductPassportId || canonicalIdentity.digitalProductPassportId || null,
+        uniqueProductIdentifier: canonicalPayloadRaw?.uniqueProductIdentifier || canonicalIdentity.uniqueProductIdentifier || linkedSubjects?.productDid || passport.product_identifier_did || passport.product_id || null,
+        subjectDid: canonicalPayloadRaw?.subjectDid || canonicalIdentity.subjectDid || linkedSubjects?.productDid || null,
+        dppDid: canonicalPayloadRaw?.dppDid || canonicalIdentity.dppDid || linkedSubjects?.dppDid || null,
+        companyDid: canonicalPayloadRaw?.companyDid || canonicalIdentity.companyDid || linkedSubjects?.companyDid || null,
+      };
       const requestedPayload = buildRequestedPassportPayload(req, sanitizedPassport, typeDef, company);
 
       const basePayload = {
@@ -731,9 +766,9 @@ module.exports = function registerPassportPublicRoutes(app, {
           public_source_mode: sanitizedPassport.backup_public_handover ? "backup_handover" : "economic_operator",
           related_subjects: linkedSubjects,
           canonical_subjects: {
-            subjectDid: canonicalPayload.subjectDid,
-            dppDid: canonicalPayload.dppDid,
-            companyDid: canonicalPayload.companyDid,
+            subjectDid: canonicalPayload.subjectDid || linkedSubjects?.productDid || null,
+            dppDid: canonicalPayload.dppDid || linkedSubjects?.dppDid || null,
+            companyDid: canonicalPayload.companyDid || linkedSubjects?.companyDid || null,
             facilityDid: linkedSubjects?.facilityDid
               || (canonicalPayload.facilityId && String(canonicalPayload.facilityId).startsWith("did:")
                 ? canonicalPayload.facilityId

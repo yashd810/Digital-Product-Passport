@@ -1,5 +1,7 @@
 "use strict";
 
+const { buildCanonicalIdentityBundle } = require("../../shared/identifiers/canonical-identity-bundle");
+
 module.exports = function registerPreviewManagementRoutes(app, deps) {
   const {
     pool,
@@ -17,6 +19,8 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     buildCurrentPublicPassportPath,
     buildInactivePublicPassportPath,
     buildCanonicalPassportPayload,
+    didService,
+    productIdentifierService,
     logAudit,
   } = deps;
 
@@ -55,24 +59,33 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
             granularity: sourcePassport.granularity || "item",
           })
         : null;
+      const canonicalIdentity = buildCanonicalIdentityBundle({
+        passport: sourcePassport,
+        company: company || (companyName ? { company_name: companyName } : null),
+        companyName,
+        granularity: sourcePassport.granularity || "item",
+        passportType: sourcePassport.passport_type,
+        didService,
+        productIdentifierService,
+      });
 
       res.json({
         ...passport,
         digitalProductPassportId: canonicalPayload?.digitalProductPassportId || passport.dppId || passport.dpp_id || null,
-        uniqueProductIdentifier: canonicalPayload?.uniqueProductIdentifier || passport.product_identifier_did || passport.product_id || null,
-        subjectDid: canonicalPayload?.subjectDid || null,
-        dppDid: canonicalPayload?.dppDid || null,
-        companyDid: canonicalPayload?.companyDid || null,
+        uniqueProductIdentifier: canonicalPayload?.uniqueProductIdentifier || canonicalIdentity.uniqueProductIdentifier || passport.product_identifier_did || passport.product_id || null,
+        subjectDid: canonicalPayload?.subjectDid || canonicalIdentity.subjectDid || null,
+        dppDid: canonicalPayload?.dppDid || canonicalIdentity.dppDid || null,
+        companyDid: canonicalPayload?.companyDid || canonicalIdentity.companyDid || null,
         company_profile: company ? {
           company_name: company.company_name || "",
           company_logo: company.company_logo || null,
           did_slug: company.did_slug || null,
         } : null,
-        linked_data: canonicalPayload ? {
+        linked_data: (canonicalPayload || canonicalIdentity.subjectDid || canonicalIdentity.dppDid || canonicalIdentity.companyDid) ? {
           canonical_subjects: {
-            subjectDid: canonicalPayload.subjectDid || null,
-            dppDid: canonicalPayload.dppDid || null,
-            companyDid: canonicalPayload.companyDid || null,
+            subjectDid: canonicalPayload?.subjectDid || canonicalIdentity.subjectDid || null,
+            dppDid: canonicalPayload?.dppDid || canonicalIdentity.dppDid || null,
+            companyDid: canonicalPayload?.companyDid || canonicalIdentity.companyDid || null,
           },
         } : undefined,
         preview_mode: true,

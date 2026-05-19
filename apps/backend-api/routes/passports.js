@@ -105,6 +105,7 @@ module.exports = function registerPassportRoutes(app, {
   storageService,
   complianceService,
   accessRightsService,
+  didService,
   productIdentifierService,
   backupProviderService,
   buildExpandedPassportPayload,
@@ -289,6 +290,8 @@ module.exports = function registerPassportRoutes(app, {
     buildCurrentPublicPassportPath,
     buildInactivePublicPassportPath,
     buildCanonicalPassportPayload,
+    didService,
+    productIdentifierService,
     logAudit,
   });
 

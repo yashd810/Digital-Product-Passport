@@ -181,6 +181,7 @@ function createTestApp() {
     checkCompanyAccess: (_req, _res, next) => next(),
     checkCompanyAdmin: (_req, _res, next) => next(),
     requireEditor: (_req, _res, next) => next(),
+    requireDraftEditor: (_req, _res, next) => next(),
     authenticateApiKey: (_req, _res, next) => next(),
     requireApiKeyScope: () => (_req, _res, next) => next(),
     publicReadRateLimit: (_req, _res, next) => next(),

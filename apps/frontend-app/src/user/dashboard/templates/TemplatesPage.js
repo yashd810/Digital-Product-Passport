@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
@@ -271,13 +271,13 @@ function TemplateField({
 }
 
 // ── Template editor (create or edit) ──
-function TemplateEditor({ companyId, passportTypes, editingTemplate, onSave, onCancel }) {
+function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTemplate, onSave, onCancel }) {
   const token = typeof window !== "undefined"
     ? (window.localStorage.getItem("token") || "")
     : "";
-  const [passportType,  setPassportType]  = useState(editingTemplate?.passport_type || "");
-  const [name,          setName]          = useState(editingTemplate?.name || "");
-  const [description,   setDescription]  = useState(editingTemplate?.description || "");
+  const [passportType,  setPassportType]  = useState(editingTemplate?.passport_type || cloneTemplate?.passport_type || "");
+  const [name,          setName]          = useState(editingTemplate?.name || (cloneTemplate?.name ? `Copy of ${cloneTemplate.name}` : ""));
+  const [description,   setDescription]  = useState(editingTemplate?.description || cloneTemplate?.description || "");
   const [sections,      setSections]      = useState(null);
   const [fieldValues,   setFieldValues]   = useState({});   // fieldKey → value
   const [modelDataKeys, setModelDataKeys] = useState(new Set()); // Set of field keys marked as model data
@@ -319,18 +319,24 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, onSave, onC
       .catch(() => {});
   }, [companyId]);
 
-  // Pre-fill values when editing
+  // Pre-fill values when editing or cloning into a new template.
   useEffect(() => {
-    if (!editingTemplate?.fields) return;
+    const sourceTemplate = editingTemplate || cloneTemplate;
+    if (!sourceTemplate?.fields) return;
     const vals = {};
     const model = new Set();
-    for (const f of editingTemplate.fields) {
+    for (const f of sourceTemplate.fields) {
       vals[f.field_key] = f.field_value || "";
       if (f.is_model_data) model.add(f.field_key);
     }
+    if (!editingTemplate && cloneTemplate) {
+      setPassportType(cloneTemplate.passport_type || "");
+      setName(cloneTemplate.name ? `Copy of ${cloneTemplate.name}` : "");
+      setDescription(cloneTemplate.description || "");
+    }
     setFieldValues(vals);
     setModelDataKeys(model);
-  }, [editingTemplate]);
+  }, [editingTemplate, cloneTemplate]);
 
   const setFieldValue   = (key, val) => setFieldValues(p => ({ ...p, [key]: val }));
   const toggleModelData = (key, on) => setModelDataKeys(p => {
@@ -604,6 +610,7 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
 // ── Main templates page ──
 export default function TemplatesPage({ user, companyId, view = "list", editTemplateId = null }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [templates,     setTemplates]     = useState([]);
   const [passportTypes, setPassportTypes] = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -643,6 +650,17 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
 
   const openEdit = (tmpl) => {
     navigate(`/dashboard/templates/${tmpl.id}/edit`);
+  };
+
+  const openClone = async (tmpl) => {
+    try {
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
+      if (!r.ok) throw new Error("Failed to load template");
+      const cloneTemplate = await r.json();
+      navigate("/dashboard/templates/new", { state: { cloneTemplate } });
+    } catch {
+      // Keep the list stable if the clone source cannot be fetched.
+    }
   };
 
   const openBulk = async (tmpl) => {
@@ -693,11 +711,13 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
   }, {});
 
   if (view === "create" || view === "edit") {
+    const cloneTemplate = view === "create" ? location.state?.cloneTemplate || null : null;
     return (
       <TemplateEditor
         companyId={companyId}
         passportTypes={passportTypes}
         editingTemplate={view === "edit" ? editingTemplate : null}
+        cloneTemplate={cloneTemplate}
         onSave={handleSaved}
         onCancel={handleCancel}
       />
@@ -798,6 +818,9 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
                     <div className="tmpl-card-actions tmpl-card-actions-row2">
                       <button className="tmpl-action-btn" onClick={() => openEdit(t)} title="Edit template">
                         ✏️ Edit
+                      </button>
+                      <button className="tmpl-action-btn" onClick={() => openClone(t)} title="Clone template">
+                        ⧉ Clone
                       </button>
                       <button
                         className="tmpl-action-btn tmpl-action-delete"

@@ -5,6 +5,7 @@ const express = require("express");
 const registerPassportPublicRoutes = require("../routes/passport-public");
 const createDidService = require("../services/did-service");
 const createCanonicalPassportSerializer = require("../services/canonicalPassportSerializer");
+const createProductIdentifierService = require("../services/product-identifier-service");
 
 function createMockResponse() {
   return {
@@ -111,7 +112,8 @@ function createTestApp(options = {}) {
     publicOrigin: "https://www.claros-dpp.online",
     apiOrigin: "https://api.claros.test",
   });
-  const serializer = createCanonicalPassportSerializer({ didService });
+  const productIdentifierService = createProductIdentifierService({ didService });
+  const serializer = createCanonicalPassportSerializer({ didService, productIdentifierService });
 
   const passport = {
     guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
@@ -232,7 +234,7 @@ function createTestApp(options = {}) {
       return { passport };
     }),
     buildPassportVersionHistory: async () => ({ versions: [] }),
-    resolvePublicPathToSubjects: async () => null,
+    resolvePublicPathToSubjects: options.resolvePublicPathToSubjects || (async () => null),
     verifyPassportSignature: async () => ({
       status: "valid",
       signedAt: "2026-04-27T10:00:05.000Z",
@@ -249,8 +251,8 @@ function createTestApp(options = {}) {
       "@context": [{}],
       "@graph": passports,
     }),
-    buildCanonicalPassportPayload: serializer.buildCanonicalPassportPayload,
-    buildExpandedPassportPayload: serializer.buildExpandedPassportPayload,
+    buildCanonicalPassportPayload: options.buildCanonicalPassportPayload || serializer.buildCanonicalPassportPayload,
+    buildExpandedPassportPayload: options.buildExpandedPassportPayload || serializer.buildExpandedPassportPayload,
     backupProviderService: options.backupProviderService,
     signingService: {
       getSigningKey: () => null,
@@ -266,6 +268,7 @@ function createTestApp(options = {}) {
       }),
     },
     didService,
+    productIdentifierService,
   });
 
   return { app, passport };
@@ -325,6 +328,48 @@ describe("passport public routes", () => {
       })
     );
     expect(response.body.elements).toBeUndefined();
+  });
+
+  test("GET /api/passports/by-product/:productId falls back to derived DIDs when canonical serializer leaves them blank", async () => {
+    const { app, passport } = createTestApp({
+      buildCanonicalPassportPayload: () => ({
+        digitalProductPassportId: null,
+        uniqueProductIdentifier: null,
+        localProductId: passport.product_id,
+        economicOperatorId: null,
+        facilityId: null,
+        subjectDid: null,
+        dppDid: null,
+        companyDid: null,
+        fields: {},
+      }),
+      resolvePublicPathToSubjects: async () => ({
+        productDid: "did:web:www.claros-dpp.online:did:acme-energy:item:72b99c83-952c-4179-96f6-54a513d39dbc",
+        dppDid: "did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc",
+        companyDid: "did:web:www.claros-dpp.online:did:company:acme-energy",
+        facilityDid: null,
+      }),
+    });
+
+    const response = await invokeRoute(app, {
+      method: "get",
+      path: "/api/passports/by-product/:productId",
+      params: { productId: passport.product_id },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.uniqueProductIdentifier).toMatch(
+      /^did:web:www\.claros-dpp\.online:did:acme-energy:item:c5-bat-2026-001-[a-f0-9]{12}$/
+    );
+    expect(response.body.subjectDid).toBe(
+      "did:web:www.claros-dpp.online:did:acme-energy:item:72b99c83-952c-4179-96f6-54a513d39dbc"
+    );
+    expect(response.body.dppDid).toBe(
+      "did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc"
+    );
+    expect(response.body.companyDid).toBe(
+      "did:web:www.claros-dpp.online:did:company:acme-energy"
+    );
   });
 
   test("GET /api/passports/:dppId/canonical with representation=full returns full elements", async () => {

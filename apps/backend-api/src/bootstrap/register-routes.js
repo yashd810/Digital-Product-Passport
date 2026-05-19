@@ -246,6 +246,7 @@ function registerAppRoutes(app, deps) {
     backupProviderService: deps.backupProviderService,
     signingService: deps.signingService,
     didService: deps.didService,
+    productIdentifierService: deps.productIdentifierService,
   });
 
   registerCompanyRoutes(app, {

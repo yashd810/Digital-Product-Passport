@@ -46,12 +46,23 @@ export function usePassportListActions({
 
   const handleClone = useCallback(async (passport, passportType) => {
     try {
-      const response = await fetchWithAuth(
-        `${API}/api/companies/${companyId}/passports/${passport.dppId}?passportType=${passportType}&representation=full`,
-        { headers: authHeaders() }
-      );
-      if (!response.ok) throw new Error("Failed to fetch passport data");
-      const data = await response.json();
+      const baseUrl = `${API}/api/companies/${companyId}/passports/${passport.dppId}?passportType=${passportType}`;
+      const [rawResponse, fullResponse] = await Promise.all([
+        fetchWithAuth(baseUrl, { headers: authHeaders() }),
+        fetchWithAuth(`${baseUrl}&representation=full`, { headers: authHeaders() }),
+      ]);
+      if (!rawResponse.ok && !fullResponse.ok) throw new Error("Failed to fetch passport data");
+      const rawData = rawResponse.ok ? await rawResponse.json() : {};
+      const fullData = fullResponse.ok ? await fullResponse.json() : {};
+      const data = {
+        ...fullData,
+        ...rawData,
+        elements: fullData.elements || rawData.elements,
+        fields: {
+          ...(fullData.fields && typeof fullData.fields === "object" ? fullData.fields : {}),
+          ...(rawData.fields && typeof rawData.fields === "object" ? rawData.fields : {}),
+        },
+      };
       navigate(`/create/${passportType}`, {
         state: {
           cloneData: data,

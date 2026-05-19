@@ -408,6 +408,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     if (cloneHydratedRef.current) return;
     if (loadingType) return;
     if (!activePassportType) return;
+    if (!sectionKeys.length) return;
 
     const hydrateClone = async () => {
       let source = location.state?.cloneData || null;
@@ -415,12 +416,23 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
       if (cloneSource?.dppId && effectiveCompanyId) {
         try {
-          const response = await fetchWithAuth(
-            `${API}/api/companies/${effectiveCompanyId}/passports/${cloneSource.dppId}?passportType=${cloneSource.passportType || activePassportType}&representation=full`,
-            { headers: authHeaders() }
-          );
-          if (response.ok) {
-            source = await response.json();
+          const baseUrl = `${API}/api/companies/${effectiveCompanyId}/passports/${cloneSource.dppId}?passportType=${cloneSource.passportType || activePassportType}`;
+          const [rawResponse, fullResponse] = await Promise.all([
+            fetchWithAuth(baseUrl, { headers: authHeaders() }),
+            fetchWithAuth(`${baseUrl}&representation=full`, { headers: authHeaders() }),
+          ]);
+          const rawData = rawResponse.ok ? await rawResponse.json() : {};
+          const fullData = fullResponse.ok ? await fullResponse.json() : {};
+          if (rawResponse.ok || fullResponse.ok) {
+            source = {
+              ...fullData,
+              ...rawData,
+              elements: fullData.elements || rawData.elements,
+              fields: {
+                ...(fullData.fields && typeof fullData.fields === "object" ? fullData.fields : {}),
+                ...(rawData.fields && typeof rawData.fields === "object" ? rawData.fields : {}),
+              },
+            };
           }
         } catch {
           // Keep the navigation-state fallback if refetching the clone source fails.
@@ -445,7 +457,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     };
 
     hydrateClone().catch(() => {});
-  }, [mode, location.state, loadingType, activePassportType, SECTIONS, effectiveCompanyId]);
+  }, [mode, location.state, loadingType, activePassportType, SECTIONS, sectionKeys.length, effectiveCompanyId]);
 
   useEffect(() => {
     if (mode !== "edit" || !dppId || !activePassportType) return;
