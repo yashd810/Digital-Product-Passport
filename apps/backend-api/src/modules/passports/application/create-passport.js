@@ -42,6 +42,7 @@ function createDraftPassportUseCase(deps) {
     const {
       model_name,
       product_id,
+      product_image,
       granularity: requestedGranularity,
       compliance_profile_key,
       content_specification_ids,
@@ -52,6 +53,7 @@ function createDraftPassportUseCase(deps) {
       facility_id,
       ...fields
     } = item;
+    if (product_image !== undefined) fields.product_image = product_image;
 
     const dppId = generateDppRecordId();
     const lineageId = dppId;
@@ -73,8 +75,9 @@ function createDraftPassportUseCase(deps) {
       throw error;
     }
 
+    const BUILT_IN_EDITABLE_FIELDS = new Set(["product_image"]);
     const invalidFieldKeys = Object.keys(fields).filter(
-      (key) => !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key)
+      (key) => !SYSTEM_PASSPORT_FIELDS.has(key) && !BUILT_IN_EDITABLE_FIELDS.has(key) && !typeSchema.allowedKeys.has(key)
     );
     if (invalidFieldKeys.length) {
       const error = new Error(
@@ -112,7 +115,7 @@ function createDraftPassportUseCase(deps) {
       },
     });
 
-    const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
+    const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key) || BUILT_IN_EDITABLE_FIELDS.has(key));
     const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
     const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
       ...item,

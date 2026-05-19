@@ -363,6 +363,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       "economic_operator_identifier_scheme",
       "facility_id",
       "granularity",
+      "product_image",
     ]);
     const allowedKeys = new Set([...schemaFieldKeys, ...managedEditableKeys]);
     const cleanData = Object.fromEntries(
@@ -381,6 +382,86 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       product_id: productId.trim() || null,
       ...cleanData,
     };
+  };
+
+  const renderProductImagePicker = () => {
+    const linkedUrl = typeof formData.product_image === "string" && formData.product_image.startsWith("http")
+      ? formData.product_image
+      : null;
+    const disabled = isSaving || (mode === "edit" && isLoading);
+
+    return (
+      <div className="passport-field-group passport-product-image-group">
+        <label>Product Image</label>
+        <div className="file-upload-widget">
+          {linkedUrl ? (
+            <div className="file-existing image-existing">
+              <img src={linkedUrl} alt="Product" className="pf-product-image-thumb" />
+              <span className="file-existing-link">Repository image linked</span>
+              <button
+                type="button"
+                className="file-clear-btn"
+                disabled={disabled}
+                onClick={() => handleField("product_image", "")}
+              >
+                ✕ Remove
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="file-upload-label"
+              disabled={disabled}
+              onClick={() => setRepoPicker("product_image")}
+            >
+              <span className="file-placeholder">🖼 Link Product Image from Repository</span>
+            </button>
+          )}
+          {linkedUrl && (
+            <button
+              type="button"
+              className="file-upload-label file-replace-label"
+              disabled={disabled}
+              onClick={() => setRepoPicker("product_image")}
+            >
+              <span className="file-placeholder">↺ Change</span>
+            </button>
+          )}
+          <div className="file-link-paste">
+            <input
+              type="text"
+              className="file-link-input"
+              placeholder="Or paste a repository image link here…"
+              disabled={disabled}
+              data-field-key="product_image"
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text").trim();
+                if (text.startsWith("http")) {
+                  e.preventDefault();
+                  handleField("product_image", text);
+                }
+              }}
+              onBlur={(e) => {
+                const text = e.target.value.trim();
+                if (text.startsWith("http")) {
+                  handleField("product_image", text);
+                  e.target.value = "";
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const text = e.target.value.trim();
+                  if (text.startsWith("http")) {
+                    handleField("product_image", text);
+                    e.target.value = "";
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const refreshEditPresence = async (method = "GET") => {
@@ -1050,6 +1131,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
               </div>
             </div>
           </div>
+
+          {renderProductImagePicker()}
 
           {templateName && (
             <div className="pf-template-banner">

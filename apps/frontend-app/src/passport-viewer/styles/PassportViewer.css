@@ -645,6 +645,7 @@
   object-fit: contain;
   margin-top: 4px;
   align-self: flex-start;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 .passport-portal .timeline {
@@ -891,15 +892,36 @@
   gap: 10px;
 }
 
+.passport-portal .artifact-image-button,
+.passport-portal .overview-symbol-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  width: fit-content;
+  justify-content: flex-start;
+}
+
+.passport-portal .artifact-image-button {
+  border-radius: 14px;
+}
+
+.passport-portal .artifact-image-button:hover .artifact-image,
+.passport-portal .overview-symbol-button:hover .overview-symbol-image {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(16, 36, 58, 0.12);
+}
+
 .passport-portal .artifact-image {
-  max-height: 56px;
-  max-width: 56px;
+  max-height: 64px;
+  max-width: 64px;
   width: auto;
   object-fit: contain;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: #fff;
   padding: 6px;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 .passport-portal .artifact-link {
@@ -4664,6 +4686,60 @@
   color: #5f7e9d;
   font-size: 0.88rem;
   font-weight: 700;
+}
+
+.passport-portal .pv-image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(5, 18, 32, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.passport-portal .pv-image-lightbox-card {
+  position: relative;
+  max-width: min(88vw, 920px);
+  max-height: 88vh;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 24px;
+  padding: 22px 22px 16px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
+  display: grid;
+  gap: 12px;
+}
+
+.passport-portal .pv-image-lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(23, 48, 74, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--navy);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.passport-portal .pv-image-lightbox-img {
+  max-width: min(82vw, 860px);
+  max-height: calc(88vh - 90px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.passport-portal .pv-image-lightbox-label {
+  color: var(--navy);
+  font-weight: 900;
+  text-align: center;
 }
 
 @media (max-width: 900px) {

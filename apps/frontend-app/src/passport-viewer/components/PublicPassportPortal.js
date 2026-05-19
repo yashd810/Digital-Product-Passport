@@ -287,7 +287,7 @@ function buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, l
     .filter(Boolean);
 }
 
-function DataArtifactPreview({ field, raw, label }) {
+function DataArtifactPreview({ field, raw, label, onPreviewImage }) {
   if (!isFilled(raw)) return null;
   if (field.type === "file" || isPdfLikeUrl(raw)) {
     return <FileCell url={raw} label={label} />;
@@ -295,7 +295,14 @@ function DataArtifactPreview({ field, raw, label }) {
   if (field.type === "symbol" || isImageLikeUrl(raw)) {
     return (
       <div className="artifact-image-wrap">
-        <img src={raw} alt={label} className="artifact-image" />
+        <button
+          type="button"
+          className="artifact-image-button"
+          onClick={() => onPreviewImage?.(raw, label)}
+          aria-label={`Open larger preview for ${label}`}
+        >
+          <img src={raw} alt={label} className="artifact-image" />
+        </button>
       </div>
     );
   }
@@ -310,7 +317,7 @@ function DataArtifactPreview({ field, raw, label }) {
   return null;
 }
 
-function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang }) {
+function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, onPreviewImage }) {
   const [expandedHistory, setExpandedHistory] = useState(false);
   const [chartType, setChartType] = useState("line");
   const [historyState, setHistoryState] = useState({ loading: false, loaded: false, data: [] });
@@ -383,7 +390,7 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
       <span className="field-value-empty">—</span>
     );
   } else if (field.type === "symbol" || field.type === "file" || field.type === "url" || isImageLikeUrl(raw) || isPdfLikeUrl(raw) || isUrlLike(raw)) {
-    content = <DataArtifactPreview field={field} raw={raw} label={translateSchemaLabel(lang, field)} />;
+    content = <DataArtifactPreview field={field} raw={raw} label={translateSchemaLabel(lang, field)} onPreviewImage={onPreviewImage} />;
   } else if (typeof raw === "string" && raw.includes("\n")) {
     content = renderTextBlock(raw, "field-value-text");
   } else if (isFilled(raw)) {
@@ -499,6 +506,7 @@ export default function PublicPassportPortal({
   canonicalPublicPath = "",
 }) {
   const [activePage, setActivePage] = useState("overview");
+  const [previewImage, setPreviewImage] = useState(null);
   const sections = typeDef?.fields_json?.sections || typeDef?.sections || [];
   const fields = useMemo(() => flattenSections(sections), [sections]);
 
@@ -516,7 +524,12 @@ export default function PublicPassportPortal({
     unlockedPassport,
     dynamicValues,
     (raw) => isImageLikeUrl(raw) || isUrlLike(raw)
-  );
+  ) || (passport?.product_image
+    ? {
+        raw: passport.product_image,
+        field: { key: "product_image", label: "Product image", type: "image" },
+      }
+    : null);
   const overviewSymbols = fields
     .map((field) => ({ field, ...resolveFieldValue(field, passport, unlockedPassport, dynamicValues) }))
     .filter((entry) => {
@@ -659,7 +672,14 @@ export default function PublicPassportPortal({
                         <div>
                           <span>{translateSchemaLabel(lang, entry.field)}</span>
                           {entry.field.type === "symbol" || isImageLikeUrl(entry.raw) ? (
-                            <img src={entry.raw} alt={translateSchemaLabel(lang, entry.field)} className="overview-symbol-image" />
+                            <button
+                              type="button"
+                              className="overview-symbol-button"
+                              onClick={() => setPreviewImage({ src: entry.raw, label: translateSchemaLabel(lang, entry.field) })}
+                              aria-label={`Open larger preview for ${translateSchemaLabel(lang, entry.field)}`}
+                            >
+                              <img src={entry.raw} alt={translateSchemaLabel(lang, entry.field)} className="overview-symbol-image" />
+                            </button>
                           ) : (
                             <strong>{formatValue(entry.raw)}</strong>
                           )}
@@ -778,6 +798,7 @@ export default function PublicPassportPortal({
                           onRequestUnlock={onRequestUnlock}
                           dynamicValues={dynamicValues}
                           lang={lang}
+                          onPreviewImage={(src, label) => setPreviewImage({ src, label })}
                         />
                       </div>
                     </li>
@@ -844,6 +865,29 @@ export default function PublicPassportPortal({
           <span>Public passport viewer</span>
         </div>
       </footer>
+
+      {previewImage && (
+        <div
+          className="pv-image-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={previewImage.label || "Image preview"}
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="pv-image-lightbox-card" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="pv-image-lightbox-close"
+              onClick={() => setPreviewImage(null)}
+              aria-label="Close image preview"
+            >
+              ×
+            </button>
+            <img src={previewImage.src} alt={previewImage.label || "Image preview"} className="pv-image-lightbox-img" />
+            {previewImage.label && <div className="pv-image-lightbox-label">{previewImage.label}</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

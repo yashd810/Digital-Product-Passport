@@ -1167,6 +1167,21 @@
 
 /* Existing file link */
 .file-existing { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.image-existing {
+  align-items: center;
+}
+.pf-product-image-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255,255,255,0.16));
+  background: rgba(255,255,255,0.04);
+}
+[data-theme="light"] .pf-product-image-thumb {
+  border-color: rgba(23,48,74,0.14);
+  background: #f4fbfb;
+}
 .file-existing-link {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 14px;
