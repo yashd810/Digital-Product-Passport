@@ -119,7 +119,7 @@ describe("canonical passport JSON", () => {
     );
 
     expect(payload.granularity).toBe("Batch");
-    expect(payload.subjectDid).toBe("did:web:www.claros-dpp.online:did:battery:batch:batch-lineage-001");
+    expect(payload.subjectDid).toBe("did:web:www.claros-dpp.online:did:acme-energy:batch:batch-lineage-001");
     expect(payload.dppDid).toBe("did:web:www.claros-dpp.online:did:dpp:batch:batch-lineage-001");
   });
 

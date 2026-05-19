@@ -592,14 +592,14 @@
 }
 
 .passport-portal .symbol-item {
-  display: grid;
-  grid-template-columns: 36px 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: start;
+  align-items: stretch;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 11px;
+  padding: 14px;
 }
 
 .passport-portal .symbol-icon {
@@ -612,6 +612,14 @@
   color: var(--teal-dark);
   font-size: 0.7rem;
   font-weight: 950;
+}
+
+.passport-portal .symbol-item > div {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
 }
 
 .passport-portal .symbol-item span {
@@ -632,9 +640,11 @@
 }
 
 .passport-portal .overview-symbol-image {
-  max-height: 64px;
+  max-height: 96px;
+  max-width: 100%;
   object-fit: contain;
   margin-top: 4px;
+  align-self: flex-start;
 }
 
 .passport-portal .timeline {
@@ -988,6 +998,22 @@
 
 .passport-portal .doc-preview-area {
   grid-column: 1 / -1;
+}
+
+.passport-portal .doc-asset-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.passport-portal .doc-asset-visual {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.passport-portal .doc-asset-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .passport-portal .footer {
@@ -1419,9 +1445,12 @@
 .pdf-cell-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.passport-portal .doc-card .pdf-cell-actions {
+  justify-content: flex-end;
 }
 
 .pdf-open-link {

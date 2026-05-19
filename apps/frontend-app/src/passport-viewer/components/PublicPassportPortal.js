@@ -448,24 +448,38 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
 
 function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang }) {
   const { field, fieldLabel, isLocked } = item;
+  const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
+  const documentValue = !isLocked && isFilled(resolved.raw) ? resolved.raw : null;
 
   return (
     <article className="doc-card">
       <div className="doc-icon">{field.type === "symbol" ? "IMG" : field.type === "file" ? "PDF" : "LINK"}</div>
       <div>
         <h3>{fieldLabel}</h3>
-        <p>{translateSchemaLabel(lang, field._section || { label: "Passport data" })}</p>
       </div>
       <span className="badge neutral">{field.type}</span>
       <div className="doc-preview-area">
-        <DataFieldValue
-          field={field}
-          passport={passport}
-          unlockedPassport={unlockedPassport}
-          onRequestUnlock={onRequestUnlock}
-          dynamicValues={dynamicValues}
-          lang={lang}
-        />
+        {documentValue && (field.type === "symbol" || isImageLikeUrl(documentValue)) ? (
+          <div className="doc-asset-shell">
+            <div className="doc-asset-visual">
+              <img src={documentValue} alt={fieldLabel} className="artifact-image" />
+            </div>
+            <div className="doc-asset-actions">
+              <a href={documentValue} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
+                Open
+              </a>
+            </div>
+          </div>
+        ) : (
+          <DataFieldValue
+            field={field}
+            passport={passport}
+            unlockedPassport={unlockedPassport}
+            onRequestUnlock={onRequestUnlock}
+            dynamicValues={dynamicValues}
+            lang={lang}
+          />
+        )}
       </div>
     </article>
   );

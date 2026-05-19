@@ -941,7 +941,6 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const company = options.company || null;
     const companyName = String(options.companyName || "").trim();
     const passportType = String(passport?.passport_type || typeDef?.type_name || options.passportType || "battery").trim().toLowerCase() || "battery";
-    const didPassportType = "battery";
     const stableId = didService?.normalizeStableId?.(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.guid);
     const resolvedGranularity = String(
       options.granularity
@@ -954,12 +953,15 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const companySlug = companySlugSource
       ? didService.normalizeCompanySlug(companySlugSource)
       : null;
+    const didSubjectNamespace = companySlug
+      ? didService.normalizePassportTypeSegment(companySlug)
+      : "battery";
     const companyDid = companySlug ? didService.generateCompanyDid(companySlug) : null;
     const subjectDid = resolvedGranularity === "item"
-      ? didService.generateItemDid(didPassportType, stableId)
+      ? didService.generateItemDid(didSubjectNamespace, stableId)
       : resolvedGranularity === "batch"
-        ? didService.generateBatchDid(didPassportType, stableId)
-        : didService.generateModelDid(didPassportType, stableId);
+        ? didService.generateBatchDid(didSubjectNamespace, stableId)
+        : didService.generateModelDid(didSubjectNamespace, stableId);
     const dppDid = didService.generateDppDid(resolvedGranularity, stableId);
     const derivedProductIdentifierDid = passport?.product_id
       ? productIdentifierService?.buildCanonicalProductDid?.({

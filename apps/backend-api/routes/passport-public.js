@@ -1101,7 +1101,8 @@ module.exports = function registerPassportPublicRoutes(app, {
     try {
       const loaded = await loadPublicPassportByLineage(req.params.stableId);
       if (!loaded?.passport) return res.status(404).json({ error: "DID not found" });
-      const did = didService.generateModelDid("battery", loaded.passport.lineage_id);
+      const subjectNamespace = didService.normalizePassportTypeSegment(loaded.company?.company_name || loaded.company?.did_slug || "battery");
+      const did = didService.generateModelDid(subjectNamespace, loaded.passport.lineage_id);
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({
         id: did,
@@ -1116,7 +1117,8 @@ module.exports = function registerPassportPublicRoutes(app, {
     try {
       const loaded = await loadPublicPassportByLineage(req.params.stableId);
       if (!loaded?.passport) return res.status(404).json({ error: "DID not found" });
-      const did = didService.generateItemDid("battery", loaded.passport.lineage_id);
+      const subjectNamespace = didService.normalizePassportTypeSegment(loaded.company?.company_name || loaded.company?.did_slug || "battery");
+      const did = didService.generateItemDid(subjectNamespace, loaded.passport.lineage_id);
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({
         id: did,
@@ -1131,7 +1133,8 @@ module.exports = function registerPassportPublicRoutes(app, {
     try {
       const loaded = await loadPublicPassportByLineage(req.params.stableId);
       if (!loaded?.passport) return res.status(404).json({ error: "DID not found" });
-      const did = didService.generateBatchDid("battery", loaded.passport.lineage_id);
+      const subjectNamespace = didService.normalizePassportTypeSegment(loaded.company?.company_name || loaded.company?.did_slug || "battery");
+      const did = didService.generateBatchDid(subjectNamespace, loaded.passport.lineage_id);
       res.setHeader("Content-Type", "application/did+ld+json");
       return res.json(buildDidDocument({
         id: did,

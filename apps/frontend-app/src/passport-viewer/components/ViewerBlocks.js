@@ -748,7 +748,7 @@ export function FileCell({ url, label }) {
       )}
       <div className="pdf-cell-actions">
         <a href={url} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
-          Open document
+          Open
         </a>
         <button
           type="button"

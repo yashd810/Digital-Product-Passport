@@ -27,11 +27,27 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const passport = await stripRestrictedFieldsForPublicView(resolved.passport, resolved.passport.passport_type);
+      const companyResult = await pool.query(
+        `SELECT id, company_name, company_logo, did_slug
+         FROM companies
+         WHERE id = $1
+         LIMIT 1`,
+        [passport.company_id]
+      );
+      const company = companyResult.rows[0] || null;
       const companyNameMap = await getCompanyNameMap([passport.company_id]);
-      const companyName = companyNameMap.get(String(passport.company_id)) || "";
+      const companyName = company?.company_name || companyNameMap.get(String(passport.company_id)) || "";
+      const typeDefResult = await pool.query(
+        `SELECT id, type_name, display_name, product_category, product_icon, fields_json
+         FROM passport_types
+         WHERE type_name = $1
+         LIMIT 1`,
+        [passport.passport_type]
+      );
+      const typeDef = typeDefResult.rows[0] || null;
       const canonicalPayload = typeof buildCanonicalPassportPayload === "function"
-        ? buildCanonicalPassportPayload(passport, resolved.typeDef || null, {
-            company: { company_name: companyName },
+        ? buildCanonicalPassportPayload(passport, typeDef || resolved.typeDef || null, {
+            company: company || { company_name: companyName },
             companyName,
             granularity: passport.granularity || "item",
           })
@@ -44,6 +60,18 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         subjectDid: canonicalPayload?.subjectDid || null,
         dppDid: canonicalPayload?.dppDid || null,
         companyDid: canonicalPayload?.companyDid || null,
+        company_profile: company ? {
+          company_name: company.company_name || "",
+          company_logo: company.company_logo || null,
+          did_slug: company.did_slug || null,
+        } : null,
+        linked_data: canonicalPayload ? {
+          canonical_subjects: {
+            subjectDid: canonicalPayload.subjectDid || null,
+            dppDid: canonicalPayload.dppDid || null,
+            companyDid: canonicalPayload.companyDid || null,
+          },
+        } : undefined,
         preview_mode: true,
         preview_path: buildPreviewPassportPath({
           companyName,

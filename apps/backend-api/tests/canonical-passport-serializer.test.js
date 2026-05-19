@@ -91,7 +91,7 @@ test("preserves typed field values and required headers", () => {
   assert.strictEqual(payload.localProductId, "PID-72b99c83");
   assert.strictEqual(payload.granularity, "Item");
   assert.strictEqual(payload.dppStatus, "Active");
-  assert.strictEqual(payload.subjectDid, "did:web:www.claros-dpp.online:did:battery:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
+  assert.strictEqual(payload.subjectDid, "did:web:www.claros-dpp.online:did:example-corp:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
   assert.strictEqual(payload.dppDid, "did:web:www.claros-dpp.online:did:dpp:item:dpp_72b99c83-952c-4179-96f6-54a513d39dbc");
   assert.strictEqual(payload.companyDid, "did:web:www.claros-dpp.online:did:company:example-corp");
   assert.strictEqual(payload.lastUpdate, "2026-04-24T10:00:00.000Z");

@@ -364,15 +364,16 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
         const companySlug = didService.normalizeCompanySlug(company.company_name || company.did_slug || `company-${company.id}`);
         const facilityStableId = inferFacilityStableId(passport);
 
+        const subjectNamespace = didService.normalizePassportTypeSegment(company.company_name || company.did_slug || "battery");
         return {
           passportDppId: passport.dppId,
           passportType: registryRow.passport_type,
           companyId: company.id,
           productDid: granularity === "item"
-            ? didService.generateItemDid("battery", stableId)
+            ? didService.generateItemDid(subjectNamespace, stableId)
             : granularity === "batch"
-              ? didService.generateBatchDid("battery", stableId)
-              : didService.generateModelDid("battery", stableId),
+              ? didService.generateBatchDid(subjectNamespace, stableId)
+              : didService.generateModelDid(subjectNamespace, stableId),
           dppDid: didService.generateDppDid(granularity, stableId),
           companyDid: didService.generateCompanyDid(companySlug),
           facilityDid: facilityStableId ? didService.generateFacilityDid(facilityStableId) : null,
