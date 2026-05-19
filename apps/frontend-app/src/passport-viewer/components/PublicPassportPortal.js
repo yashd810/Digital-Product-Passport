@@ -274,13 +274,8 @@ function buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, l
     .map((field) => {
       const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
       const rawText = formatValue(resolved.raw);
-      const looksLinkedArtifact = field.type === "file"
-        || field.type === "symbol"
-        || field.type === "url"
-        || isImageLikeUrl(rawText)
-        || isPdfLikeUrl(rawText)
-        || isUrlLike(rawText);
-      if (!resolved.isLocked && !looksLinkedArtifact) return null;
+      const isDocumentArtifact = field.type === "file" || isPdfLikeUrl(rawText);
+      if (!resolved.isLocked && !isDocumentArtifact) return null;
       if (!resolved.isLocked && !isFilled(resolved.raw)) return null;
 
       return {
