@@ -697,9 +697,9 @@ module.exports = function registerPassportPublicRoutes(app, {
       const linkedSubjects = publicPath ?
       await resolvePublicPathToSubjects({ pool, publicPath, getTable, didService }) :
       null;
-      const canonicalPayload = buildCanonicalPassportPayload(sanitizedPassport, typeDef, {
+      const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, {
         company,
-        granularity: company?.default_granularity || sanitizedPassport.granularity || "model"
+        granularity: company?.default_granularity || passport.granularity || "model"
       });
       const requestedPayload = buildRequestedPassportPayload(req, sanitizedPassport, typeDef, company);
 

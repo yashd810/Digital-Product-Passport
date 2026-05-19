@@ -26,30 +26,31 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const resolved = await resolveCompanyPreviewPassport({ companyId, passportKey });
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
-      const passport = await stripRestrictedFieldsForPublicView(resolved.passport, resolved.passport.passport_type);
+      const sourcePassport = resolved.passport;
+      const passport = await stripRestrictedFieldsForPublicView(sourcePassport, sourcePassport.passport_type);
       const companyResult = await pool.query(
         `SELECT id, company_name, company_logo, did_slug
          FROM companies
          WHERE id = $1
          LIMIT 1`,
-        [passport.company_id]
+        [sourcePassport.company_id]
       );
       const company = companyResult.rows[0] || null;
-      const companyNameMap = await getCompanyNameMap([passport.company_id]);
-      const companyName = company?.company_name || companyNameMap.get(String(passport.company_id)) || "";
+      const companyNameMap = await getCompanyNameMap([sourcePassport.company_id]);
+      const companyName = company?.company_name || companyNameMap.get(String(sourcePassport.company_id)) || "";
       const typeDefResult = await pool.query(
         `SELECT id, type_name, display_name, product_category, product_icon, fields_json
          FROM passport_types
          WHERE type_name = $1
          LIMIT 1`,
-        [passport.passport_type]
+        [sourcePassport.passport_type]
       );
       const typeDef = typeDefResult.rows[0] || null;
       const canonicalPayload = typeof buildCanonicalPassportPayload === "function"
-        ? buildCanonicalPassportPayload(passport, typeDef || resolved.typeDef || null, {
+        ? buildCanonicalPassportPayload(sourcePassport, typeDef || resolved.typeDef || null, {
             company: company || { company_name: companyName },
             companyName,
-            granularity: passport.granularity || "item",
+            granularity: sourcePassport.granularity || "item",
           })
         : null;
 
