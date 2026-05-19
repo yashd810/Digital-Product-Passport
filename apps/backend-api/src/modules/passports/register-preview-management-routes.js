@@ -16,6 +16,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     buildPreviewPassportPath,
     buildCurrentPublicPassportPath,
     buildInactivePublicPassportPath,
+    buildCanonicalPassportPayload,
     logAudit,
   } = deps;
 
@@ -28,9 +29,21 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const passport = await stripRestrictedFieldsForPublicView(resolved.passport, resolved.passport.passport_type);
       const companyNameMap = await getCompanyNameMap([passport.company_id]);
       const companyName = companyNameMap.get(String(passport.company_id)) || "";
+      const canonicalPayload = typeof buildCanonicalPassportPayload === "function"
+        ? buildCanonicalPassportPayload(passport, resolved.typeDef || null, {
+            company: { company_name: companyName },
+            companyName,
+            granularity: passport.granularity || "item",
+          })
+        : null;
 
       res.json({
         ...passport,
+        digitalProductPassportId: canonicalPayload?.digitalProductPassportId || passport.dppId || passport.dpp_id || null,
+        uniqueProductIdentifier: canonicalPayload?.uniqueProductIdentifier || passport.product_identifier_did || passport.product_id || null,
+        subjectDid: canonicalPayload?.subjectDid || null,
+        dppDid: canonicalPayload?.dppDid || null,
+        companyDid: canonicalPayload?.companyDid || null,
         preview_mode: true,
         preview_path: buildPreviewPassportPath({
           companyName,

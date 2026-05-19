@@ -34,6 +34,8 @@ function createProductIdentifierService({ didService, pool = null }) {
 
   function buildCanonicalProductDid({
     companyId,
+    companySlug = null,
+    companyName = null,
     passportType = "battery",
     rawProductId,
     granularity = "item",
@@ -43,20 +45,26 @@ function createProductIdentifierService({ didService, pool = null }) {
     if (isDidIdentifier(normalized)) return normalized;
 
     const stableId = buildStableProductId({ companyId, rawProductId: normalized });
-    const normalizedPassportType = didService.normalizePassportTypeSegment(passportType || "battery");
+    const namespaceSegment = companySlug
+      ? didService.normalizePassportTypeSegment(companySlug)
+      : companyName
+        ? didService.normalizePassportTypeSegment(companyName)
+        : didService.normalizePassportTypeSegment(passportType || "battery");
     const normalizedGranularity = normalizeGranularity(granularity);
 
     if (normalizedGranularity === "model") {
-      return didService.generateModelDid(normalizedPassportType, stableId);
+      return didService.generateModelDid(namespaceSegment, stableId);
     }
     if (normalizedGranularity === "batch") {
-      return didService.generateBatchDid(normalizedPassportType, stableId);
+      return didService.generateBatchDid(namespaceSegment, stableId);
     }
-    return didService.generateItemDid(normalizedPassportType, stableId);
+    return didService.generateItemDid(namespaceSegment, stableId);
   }
 
   function normalizeProductIdentifiers({
     companyId,
+    companySlug = null,
+    companyName = null,
     passportType = "battery",
     rawProductId,
     uniqueProductIdentifier = null,
@@ -68,6 +76,8 @@ function createProductIdentifierService({ didService, pool = null }) {
       ? explicitUniqueIdentifier
       : buildCanonicalProductDid({
       companyId,
+      companySlug,
+      companyName,
       passportType,
       rawProductId: productIdInput,
       granularity,

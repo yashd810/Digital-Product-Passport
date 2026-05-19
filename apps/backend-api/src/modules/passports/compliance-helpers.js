@@ -12,9 +12,11 @@ function createComplianceHelpers({
 }) {
   const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
 
-  function buildStoredProductIdentifiers({ companyId, passportType, productId, granularity }) {
+  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, productId, granularity }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
+      companySlug,
+      companyName,
       passportType,
       rawProductId: productId,
       granularity,

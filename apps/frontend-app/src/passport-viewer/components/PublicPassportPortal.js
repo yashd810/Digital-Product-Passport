@@ -168,6 +168,17 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues)
     dynamicValues
   );
   const updatedAt = passport?.updated_at || passport?.created_at || "";
+  const serviceContextText = serviceContext
+    ? (() => {
+        const contextLabel = normalizeText(serviceContext.field?.label || serviceContext.field?.key || "");
+        const value = formatValue(serviceContext.raw);
+        if (!value) return "";
+        if (contextLabel.includes("warranty")) return `Warranty: ${value}`;
+        if (contextLabel.includes("status")) return `Status: ${value}`;
+        if (contextLabel.includes("service")) return `Service: ${value}`;
+        return value;
+      })()
+    : "";
 
   return [
     {
@@ -178,7 +189,7 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues)
     {
       date: putIntoService ? formatValue(putIntoService.raw) : "",
       title: "Put into service",
-      text: serviceContext ? formatValue(serviceContext.raw) : "",
+      text: serviceContextText,
     },
     {
       date: updatedAt ? new Date(updatedAt).toISOString().slice(0, 10) : "",
@@ -282,7 +293,6 @@ function buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, l
 }
 
 function DataArtifactPreview({ field, raw, label }) {
-  const href = toHref(raw);
   if (!isFilled(raw)) return null;
   if (field.type === "file" || isPdfLikeUrl(raw)) {
     return <FileCell url={raw} label={label} />;
@@ -291,14 +301,10 @@ function DataArtifactPreview({ field, raw, label }) {
     return (
       <div className="artifact-image-wrap">
         <img src={raw} alt={label} className="artifact-image" />
-        {href && (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="artifact-link">
-            Open original
-          </a>
-        )}
       </div>
     );
   }
+  const href = toHref(raw);
   if (field.type === "url" && href) {
     return (
       <a href={href} target="_blank" rel="noopener noreferrer" className="artifact-link">
@@ -442,8 +448,6 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
 
 function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang }) {
   const { field, fieldLabel, isLocked } = item;
-  const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
-  const href = toHref(resolved.raw);
 
   return (
     <article className="doc-card">
@@ -463,11 +467,6 @@ function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynam
           lang={lang}
         />
       </div>
-      {!isLocked && href && (
-        <a href={href} target="_blank" rel="noopener noreferrer">
-          Open resource
-        </a>
-      )}
     </article>
   );
 }
@@ -648,7 +647,6 @@ export default function PublicPassportPortal({
                   <div className="symbol-list">
                     {overviewSymbols.map((entry) => (
                       <div key={entry.field.key} className="symbol-item">
-                        <div className="symbol-icon">{entry.field.type === "symbol" ? "IMG" : "TAG"}</div>
                         <div>
                           <span>{translateSchemaLabel(lang, entry.field)}</span>
                           {entry.field.type === "symbol" || isImageLikeUrl(entry.raw) ? (
@@ -744,7 +742,6 @@ export default function PublicPassportPortal({
 
         <section className={`page${activePage === "data" ? " active" : ""}`} id="data" role="tabpanel" hidden={activePage !== "data"}>
           <h2 className="data-title">Battery data by category</h2>
-          <p className="data-subtitle">All current passport sections and fields are rendered here using their configured data type, including documents, symbols, tables, and charts.</p>
           <div className="category-stack">
             {sections.map((section, sectionIndex) => (
               <details key={section.key || sectionIndex} className="category" open={sectionIndex === 0}>
@@ -753,12 +750,11 @@ export default function PublicPassportPortal({
                     <span className="cat-index">{String(sectionIndex + 1).padStart(2, "0")}</span>
                     <div>
                       <h3>{translateSchemaLabel(lang, section)}</h3>
-                      <p>{(section.fields || []).length} configured fields</p>
                     </div>
                   </div>
                   <div className="cat-meta">
                     <span className="badge neutral">{(section.fields || []).length} fields</span>
-                    <span className="chevron">⌄</span>
+                    <span className="chevron" aria-hidden="true" />
                   </div>
                 </summary>
                 <ul className="field-list">

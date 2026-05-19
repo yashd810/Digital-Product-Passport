@@ -89,8 +89,10 @@ function createDraftPassportUseCase(deps) {
     }
 
     const effectiveGranularity = resolveGranularityForCreate(companyPolicy, requestedGranularity);
+    const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
     const storedProductIdentifiers = buildStoredProductIdentifiers({
       companyId,
+      companyName,
       passportType: resolvedPassportType,
       productId: normalizedProductId,
       granularity: effectiveGranularity,
@@ -116,7 +118,6 @@ function createDraftPassportUseCase(deps) {
       ...item,
       carrier_authenticity,
     });
-    const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
     const carrierAuthenticity = await maybeSignCarrierPayload({
       passport: {
         dppId,

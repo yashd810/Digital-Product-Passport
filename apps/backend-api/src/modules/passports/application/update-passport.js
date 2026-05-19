@@ -63,6 +63,12 @@ function updateEditablePassportUseCase(deps) {
     if (!current.rows.length) throw Object.assign(new Error("Passport not found or not editable."), { statusCode: 404 });
     const rowId = current.rows[0].id;
     const currentGranularity = String(current.rows[0].granularity || "item").trim().toLowerCase();
+    let cachedCompanyName;
+    const getResolvedCompanyName = async () => {
+      if (cachedCompanyName !== undefined) return cachedCompanyName;
+      cachedCompanyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
+      return cachedCompanyName;
+    };
 
     if (granularity !== undefined) {
       const requestedGranularity = String(granularity || "").trim().toLowerCase();
@@ -88,6 +94,7 @@ function updateEditablePassportUseCase(deps) {
         }
         const storedProductIdentifiers = buildStoredProductIdentifiers({
           companyId,
+          companyName: await getResolvedCompanyName(),
           passportType: typeSchema.typeName,
           productId: nextProductIdForGranularity,
           granularity: requestedGranularity,
@@ -118,6 +125,7 @@ function updateEditablePassportUseCase(deps) {
       }
       const storedProductIdentifiers = buildStoredProductIdentifiers({
         companyId,
+        companyName: await getResolvedCompanyName(),
         passportType: typeSchema.typeName,
         productId: normalizedProductId,
         granularity: fields.granularity || current.rows[0].granularity || "item",
@@ -127,6 +135,7 @@ function updateEditablePassportUseCase(deps) {
     } else if (!current.rows[0].product_identifier_did && current.rows[0].product_id) {
       const storedProductIdentifiers = buildStoredProductIdentifiers({
         companyId,
+        companyName: await getResolvedCompanyName(),
         passportType: typeSchema.typeName,
         productId: current.rows[0].product_id,
         granularity: fields.granularity || current.rows[0].granularity || "item",
@@ -139,7 +148,7 @@ function updateEditablePassportUseCase(deps) {
       carrier_authenticity,
     });
     if (carrierAuthenticityMutation.provided) {
-      const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
+      const companyName = await getResolvedCompanyName();
       const nextCarrierAuthenticity = await maybeSignCarrierPayload({
         passport: {
           ...current.rows[0],

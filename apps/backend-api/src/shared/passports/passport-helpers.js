@@ -361,7 +361,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
 
         const stableId = didService.normalizeStableId(passport.lineage_id || passport.dppId);
         const granularity = didService.normalizeGranularity(passport.granularity || "model");
-        const companySlug = didService.normalizeCompanySlug(company.did_slug || company.company_name || `company-${company.id}`);
+        const companySlug = didService.normalizeCompanySlug(company.company_name || company.did_slug || `company-${company.id}`);
         const facilityStableId = inferFacilityStableId(passport);
 
         return {

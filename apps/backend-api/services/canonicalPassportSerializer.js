@@ -950,7 +950,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       || passport?.granularity
       || "model"
     ).trim().toLowerCase() || "model";
-    const companySlugSource = company?.did_slug || company?.company_name || companyName || "";
+    const companySlugSource = company?.company_name || companyName || company?.did_slug || "";
     const companySlug = companySlugSource
       ? didService.normalizeCompanySlug(companySlugSource)
       : null;
@@ -964,6 +964,8 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const derivedProductIdentifierDid = passport?.product_id
       ? productIdentifierService?.buildCanonicalProductDid?.({
           companyId: passport.company_id,
+          companySlug,
+          companyName: company?.company_name || companyName || null,
           passportType,
           rawProductId: passport.product_id,
           granularity: resolvedGranularity,

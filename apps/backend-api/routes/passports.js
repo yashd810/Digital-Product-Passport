@@ -288,6 +288,7 @@ module.exports = function registerPassportRoutes(app, {
     buildPreviewPassportPath,
     buildCurrentPublicPassportPath,
     buildInactivePublicPassportPath,
+    buildCanonicalPassportPayload,
     logAudit,
   });
 

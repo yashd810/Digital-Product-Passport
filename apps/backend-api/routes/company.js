@@ -60,9 +60,11 @@ module.exports = function registerCompanyRoutes(app, {
     return `Schema governance fields (${keys.join(", ")}) cannot be imported as passport row data. Configure access, confidentiality, and updateAuthority on the passport type in admin instead.`;
   }
 
-  function buildStoredProductIdentifiers({ companyId, passportType, productId, granularity = "item" }) {
+  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, productId, granularity = "item" }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
+      companySlug,
+      companyName,
       passportType,
       rawProductId: productId,
       granularity

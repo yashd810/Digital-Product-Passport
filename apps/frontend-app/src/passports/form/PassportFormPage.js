@@ -695,7 +695,10 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         try { parsed = JSON.parse(val); } catch { parsed = null; }
       }
       const parsedColumns = Array.isArray(parsed?.columns) && parsed.columns.length
-        ? parsed.columns.map((name, index) => String(name || "").trim() || `Column ${index + 1}`)
+        ? parsed.columns.map((name, index) => {
+            const rawName = String(name ?? "");
+            return rawName.trim() ? rawName : `Column ${index + 1}`;
+          })
         : fallbackColumns;
       const defaultRows = Array.isArray(field.table_default_rows) && field.table_default_rows.length
         ? field.table_default_rows.map(r => Array.from({ length: cols }, (_, i) => r[i] ?? ""))

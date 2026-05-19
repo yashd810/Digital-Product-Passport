@@ -86,7 +86,7 @@ module.exports = function createAssetService({
     return effectiveGranularity;
   }
 
-  function buildStoredProductIdentifiers({ companyId, passportType, productId, granularity }) {
+  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, productId, granularity }) {
     if (!productIdentifierService?.normalizeProductIdentifiers) {
       return {
         product_id: productId || null,
@@ -96,6 +96,8 @@ module.exports = function createAssetService({
 
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
+      companySlug,
+      companyName,
       passportType,
       rawProductId: productId,
       granularity,

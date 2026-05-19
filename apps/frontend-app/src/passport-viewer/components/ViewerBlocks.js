@@ -742,6 +742,10 @@ export function FileCell({ url, label }) {
 
   return (
     <div className="pdf-cell">
+      {err && <div className="pdf-err" role="alert">{err}</div>}
+      {open && blobUrl && (
+        <iframe id={previewId} src={blobUrl} title={label} className="pdf-iframe" />
+      )}
       <div className="pdf-cell-actions">
         <a href={url} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
           Open document
@@ -754,13 +758,9 @@ export function FileCell({ url, label }) {
           aria-expanded={open}
           aria-controls={previewId}
         >
-          {loading ? "Loading…" : open ? "▲ Hide preview" : "▼ Show preview"}
+          {loading ? "Loading…" : open ? "Hide preview" : "Show preview"}
         </button>
       </div>
-      {err && <div className="pdf-err" role="alert">{err}</div>}
-      {open && blobUrl && (
-        <iframe id={previewId} src={blobUrl} title={label} className="pdf-iframe" />
-      )}
     </div>
   );
 }
