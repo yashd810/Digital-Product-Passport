@@ -55,6 +55,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const passportType = typeProp || typeParam ||
     new URLSearchParams(location.search).get("passportType");
+  const [resolvedPassportType, setResolvedPassportType] = useState(() => passportType || "");
   const templateId = new URLSearchParams(location.search).get("templateId");
   const effectiveCompanyId = String(
     companyId ||
@@ -64,13 +65,17 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     ""
   );
 
+  const activePassportType = mode === "edit"
+    ? (resolvedPassportType || passportType || "")
+    : (passportType || "");
+
   // Support both static PASSPORT_SECTIONS_MAP and dynamic type definitions from DB
   const [dynamicSections, setDynamicSections] = useState(null);
   const [loadingType,     setLoadingType]     = useState(false);
   const [systemHeader,    setSystemHeader]    = useState(() => normalizeSystemPassportHeader());
   const [complianceContext, setComplianceContext] = useState({ company: null, facilities: [] });
 
-  const SECTIONS    = dynamicSections || PASSPORT_SECTIONS_MAP[passportType] || {};
+  const SECTIONS    = dynamicSections || PASSPORT_SECTIONS_MAP[activePassportType] || {};
   const sectionKeys = Object.keys(SECTIONS);
 
   const [expanded,       setExpanded]       = useState({});
@@ -104,7 +109,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const draftStorageKey = buildDraftStorageKey({
     mode,
     companyId: effectiveCompanyId,
-    passportType,
+    passportType: activePassportType,
     dppId,
   });
 
@@ -171,11 +176,15 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const fetchPassportRecord = async ({ allowDraftRestore = false } = {}) => {
     const r = await fetchWithAuth(
-      `${API}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${passportType}`,
+      `${API}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${activePassportType}`,
       { headers: authHeaders() }
     );
     if (!r.ok) throw new Error("Failed to load passport");
     const data = await r.json();
+    const nextPassportType = data?.passport_type || data?.passportType || "";
+    if (nextPassportType && nextPassportType !== resolvedPassportType) {
+      setResolvedPassportType(nextPassportType);
+    }
     hydrateFromPassportRecord(data, { allowDraftRestore });
     return data;
   };
@@ -219,17 +228,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       .catch(() => {});
   }, [effectiveCompanyId]);
 
-  // Load dynamic type definition from server if not in static map
+  // Load passport type definition from the server; fall back to static config only if needed.
   useEffect(() => {
-    if (!passportType) return;
-    if (PASSPORT_SECTIONS_MAP[passportType]) {
-      setDynamicSections(null); // Use static map
-      setSystemHeader(normalizeSystemPassportHeader());
-      return;
-    }
-    // Try fetching from server
+    if (!activePassportType) return;
     setLoadingType(true);
-    fetchWithAuth(`${API}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${API}/api/passport-types/${activePassportType}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fields_json?.sections) {
@@ -243,16 +246,24 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           }
           setDynamicSections(sections);
           setSystemHeader(normalizeSystemPassportHeader(data.fields_json.systemHeader));
-          setDisplayName(data.display_name || passportType);
+          setDisplayName(data.display_name || activePassportType);
           // Expand first section by default
           if (data.fields_json.sections.length > 0) {
             setExpanded({ [data.fields_json.sections[0].key]: true });
           }
+        } else {
+          setDynamicSections(null);
+          setSystemHeader(normalizeSystemPassportHeader());
+          setDisplayName(activePassportType);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setDynamicSections(null);
+        setSystemHeader(normalizeSystemPassportHeader());
+        setDisplayName(activePassportType);
+      })
       .finally(() => setLoadingType(false));
-  }, [passportType]);
+  }, [activePassportType]);
 
   // Set first section expanded by default when sections load
   useEffect(() => {
@@ -282,16 +293,16 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   }, [mode, templateId, effectiveCompanyId]);
 
   useEffect(() => {
-    if (mode !== "edit" || !dppId || !passportType) return;
+    if (mode !== "edit" || !dppId || !activePassportType) return;
     if (loadingType) return;
-    if (!PASSPORT_SECTIONS_MAP[passportType] && !dynamicSections) return;
+    if (!PASSPORT_SECTIONS_MAP[activePassportType] && !dynamicSections) return;
     (async () => {
       try {
         await fetchPassportRecord({ allowDraftRestore: true });
       } catch (e) { setError(e.message); }
       finally { setIsLoading(false); }
     })();
-  }, [dppId, mode, passportType, effectiveCompanyId, token, loadingType, dynamicSections]);
+  }, [dppId, mode, activePassportType, effectiveCompanyId, token, loadingType, dynamicSections]);
 
   useEffect(() => {
     if (mode !== "edit") return;
@@ -328,7 +339,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const uploadFile = async (key, file, guidToUse) => {
     const fd = new FormData();
-    fd.append("file", file); fd.append("fieldKey", key); fd.append("passportType", passportType);
+    fd.append("file", file); fd.append("fieldKey", key); fd.append("passportType", activePassportType);
     setUploadProgress(p => ({ ...p, [key]: "uploading" }));
     const r = await fetchWithAuth(
       `${API}/api/companies/${effectiveCompanyId}/passports/${guidToUse}/upload`,
@@ -365,7 +376,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         })
     );
     return {
-      passportType,
+      passportType: activePassportType,
       model_name: modelName.trim() || null,
       product_id: productId.trim() || null,
       ...cleanData,
@@ -373,12 +384,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const refreshEditPresence = async (method = "GET") => {
-    if (mode !== "edit" || !dppId || !passportType || !effectiveCompanyId) return;
+    if (mode !== "edit" || !dppId || !activePassportType || !effectiveCompanyId) return;
     const init = method === "POST"
       ? {
           method,
           headers: authHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ passportType }),
+          body: JSON.stringify({ passportType: activePassportType }),
         }
       : {
           method,
@@ -406,7 +417,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const saveEditChanges = async ({ showSuccessMessage = false } = {}) => {
-    if (mode !== "edit" || !dppId || !passportType || saveInFlightRef.current) return false;
+    if (mode !== "edit" || !dppId || !activePassportType || saveInFlightRef.current) return false;
 
     saveInFlightRef.current = true;
       if (mountedRef.current) setAutoSaveState("saving");
@@ -465,7 +476,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   useEffect(() => {
-    if (mode !== "edit" || !dppId || !passportType || !effectiveCompanyId || isLoading) return;
+    if (mode !== "edit" || !dppId || !activePassportType || !effectiveCompanyId || isLoading) return;
 
     refreshEditPresence("POST").catch(() => {});
 
@@ -506,7 +517,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       window.removeEventListener("scroll", handleActivity);
       releaseEditPresence();
     };
-  }, [mode, dppId, passportType, effectiveCompanyId, isLoading, sessionExpired]);
+  }, [mode, dppId, activePassportType, effectiveCompanyId, isLoading, sessionExpired]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -527,7 +538,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           Object.entries(formData).map(([k, v]) => [k, Array.isArray(v) ? JSON.stringify(v) : v])
         );
         const body = {
-          passport_type: passportType,
+          passport_type: activePassportType,
           model_name: modelName.trim() || null,
           product_id: trimmedProductId,
           ...serializedData,
@@ -983,14 +994,14 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     </div>
   );
 
-  const typeLabel = displayName || (passportType
-    ? passportType.charAt(0).toUpperCase() + passportType.slice(1)
+  const typeLabel = displayName || (activePassportType
+    ? activePassportType.charAt(0).toUpperCase() + activePassportType.slice(1)
     : "");
 
   return (
     <div className="createpass-page">
       <header className="createpass-header">
-        <button className="back-btn" onClick={() => navigate(`/dashboard/passports/${passportType}`)}>
+        <button className="back-btn" onClick={() => navigate(`/dashboard/passports/${activePassportType}`)}>
           ← Back
         </button>
         <h1>{mode==="create" ? "Create New" : "Edit"} {typeLabel} Passport</h1>
@@ -1107,7 +1118,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
             <div className="form-actions">
               <button type="button" className="cancel-btn"
-                onClick={() => navigate(`/dashboard/passports/${passportType}`)} disabled={isSaving}>
+                onClick={() => navigate(`/dashboard/passports/${activePassportType}`)} disabled={isSaving}>
                 Cancel
               </button>
               <button type="submit" className="submit-btn" disabled={isSaving}>
