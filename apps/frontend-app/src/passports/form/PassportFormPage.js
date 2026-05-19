@@ -20,6 +20,16 @@ const HEADER_SOURCE_LABELS = {
   company_or_passport: "From company or passport",
 };
 
+function buildDraftStorageKey({ mode, companyId, passportType, dppId }) {
+  return [
+    "passport-form-draft",
+    mode || "create",
+    companyId || "no-company",
+    passportType || "no-type",
+    dppId || "new",
+  ].join(":");
+}
+
 function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -71,10 +81,18 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const saveInFlightRef    = useRef(false);
   const sessionActiveRef   = useRef(false);
   const mountedRef         = useRef(true);
+  const draftHydratedRef   = useRef(false);
+
+  const draftStorageKey = buildDraftStorageKey({
+    mode,
+    companyId: effectiveCompanyId,
+    passportType,
+    dppId,
+  });
 
   const markDirty = () => {
     dirtyRef.current = true;
-    if (mode === "edit") setAutoSaveState("pending");
+    setAutoSaveState("pending");
   };
 
   useEffect(() => {
@@ -82,6 +100,66 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       mountedRef.current = false;
     };
   }, []);
+
+  const clearLocalDraft = () => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.removeItem(draftStorageKey);
+  };
+
+  const persistLocalDraft = () => {
+    if (typeof window === "undefined") return;
+    if (!dirtyRef.current) return;
+    const payload = {
+      modelName,
+      productId,
+      formData,
+      savedAt: new Date().toISOString(),
+    };
+    window.sessionStorage.setItem(draftStorageKey, JSON.stringify(payload));
+  };
+
+  const restoreLocalDraft = (fallbackData = null) => {
+    if (typeof window === "undefined") return false;
+    const raw = window.sessionStorage.getItem(draftStorageKey);
+    if (!raw) return false;
+    try {
+      const draft = JSON.parse(raw);
+      setModelName(draft.modelName ?? fallbackData?.model_name ?? "");
+      setProductId(draft.productId ?? fallbackData?.product_id ?? "");
+      setFormData(draft.formData && typeof draft.formData === "object" ? draft.formData : (fallbackData || {}));
+      dirtyRef.current = true;
+      setAutoSaveState("pending");
+      setSuccess("Unsaved changes from this browser were restored.");
+      return true;
+    } catch {
+      window.sessionStorage.removeItem(draftStorageKey);
+      return false;
+    }
+  };
+
+  const hydrateFromPassportRecord = (data, { allowDraftRestore = false } = {}) => {
+    const restored = allowDraftRestore ? restoreLocalDraft(data) : false;
+    if (!restored) {
+      setModelName(data?.model_name || "");
+      setProductId(data?.product_id || "");
+      setFormData(data || {});
+      dirtyRef.current = false;
+      setAutoSaveState("idle");
+    }
+    setLastSavedAt(data?.updated_at || null);
+    draftHydratedRef.current = true;
+  };
+
+  const fetchPassportRecord = async ({ allowDraftRestore = false } = {}) => {
+    const r = await fetchWithAuth(
+      `${API}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${passportType}`,
+      { headers: authHeaders() }
+    );
+    if (!r.ok) throw new Error("Failed to load passport");
+    const data = await r.json();
+    hydrateFromPassportRecord(data, { allowDraftRestore });
+    return data;
+  };
 
   // Load symbols from company repository
   useEffect(() => {
@@ -188,21 +266,29 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     if (mode !== "edit" || !dppId || !passportType) return;
     (async () => {
       try {
-        const r = await fetchWithAuth(
-          `${API}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${passportType}`,
-          { headers: authHeaders() }
-        );
-        if (!r.ok) throw new Error("Failed to load passport");
-        const data = await r.json();
-        setModelName(data.model_name || "");
-        setProductId(data.product_id || "");
-        setFormData(data);
-        dirtyRef.current = false;
-        setLastSavedAt(data.updated_at || null);
+        await fetchPassportRecord({ allowDraftRestore: true });
       } catch (e) { setError(e.message); }
       finally { setIsLoading(false); }
     })();
   }, [dppId, mode, passportType, effectiveCompanyId, token]);
+
+  useEffect(() => {
+    if (mode !== "edit") return;
+    if (isLoading || loadingType) return;
+    if (!draftHydratedRef.current) return;
+    persistLocalDraft();
+  }, [mode, isLoading, loadingType, modelName, productId, formData, draftStorageKey]);
+
+  useEffect(() => {
+    if (mode !== "edit") return undefined;
+    const handleBeforeUnload = (event) => {
+      if (!dirtyRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [mode]);
 
   const toggle      = (k)        => setExpanded(p => ({ ...p, [k]: !p[k] }));
   const handleField = (key, val) => {
@@ -335,7 +421,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       }
 
       dirtyRef.current = false;
-      const nowIso = new Date().toISOString();
+      clearLocalDraft();
+      const refreshed = await fetchPassportRecord({ allowDraftRestore: false });
+      const nowIso = refreshed?.updated_at || new Date().toISOString();
       if (mountedRef.current) {
         setLastSavedAt(nowIso);
         setAutoSaveState("saved");
@@ -446,6 +534,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         setModelName("");
         setProductId("");
         setFormData({});
+        clearLocalDraft();
       } else {
         window.scrollTo({ top: 0, behavior: "smooth" });
         setSuccess("Changes saved successfully");
@@ -888,7 +977,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           {mode === "edit" && (
             <div className="edit-session-banner">
               <div className="edit-session-copy">
-                <strong>Edit session notice:</strong> this edit session ends automatically after 12 hours of inactivity. Changes are logged only when you press <strong>Save Changes</strong>.
+                <strong>Edit session notice:</strong> this edit session ends automatically after 12 hours of inactivity. Changes are logged only when you press <strong>Save Changes</strong>, and unsaved edits stay in this browser until then.
               </div>
               <div className="edit-session-meta">
                 {activeEditors.length > 0
