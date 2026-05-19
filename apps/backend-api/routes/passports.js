@@ -107,8 +107,8 @@ module.exports = function registerPassportRoutes(app, {
   accessRightsService,
   productIdentifierService,
   backupProviderService,
-  buildExpandedPassportPayload
-  ,
+  buildExpandedPassportPayload,
+  buildCanonicalPassportPayload,
   createPassportTable = null
 }) {
   const insertPassportRegistry = (params = {}) => insertPassportRegistryWithClient({
