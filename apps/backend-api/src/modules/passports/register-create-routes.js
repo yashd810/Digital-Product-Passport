@@ -89,7 +89,7 @@ module.exports = function registerCreateRoutes(app, deps) {
 
       res.status(201).json({ success: true, passport: created.passport });
     } catch (error) {
-      logger.error("Create passport error:", error.message);
+      logger.error({ err: error, invalidFieldKeys: error?.invalidFieldKeys }, "Create passport error");
       if (error?.payload) {
         return res.status(error.statusCode || 500).json({ error: error.message, ...error.payload });
       }

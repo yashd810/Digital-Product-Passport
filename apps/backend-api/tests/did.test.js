@@ -3,6 +3,8 @@
 const supertest = require("supertest");
 
 const createDidService = require("../services/did-service");
+const createProductIdentifierService = require("../services/product-identifier-service");
+const { buildCanonicalIdentityBundle } = require("../src/shared/identifiers/canonical-identity-bundle");
 
 function createJsonHandler(fn) {
   return (req, res) => {
@@ -100,5 +102,35 @@ describe("DID routes", () => {
     expect(didService.publicUrlToSubjects("https://www.claros-dpp.online/did/battery/batch/BATCH-2026-001/did.json")).toEqual([
       "did:web:www.claros-dpp.online:did:battery:batch:BATCH-2026-001",
     ]);
+  });
+
+  test("canonical identity bundle always derives company and DPP DIDs for passport headers", () => {
+    const didService = createDidService({
+      didDomain: "www.claros-dpp.online",
+      publicOrigin: "https://www.claros-dpp.online",
+      apiOrigin: "https://api.claros.test",
+    });
+    const productIdentifierService = createProductIdentifierService({ didService });
+
+    const bundle = buildCanonicalIdentityBundle({
+      passport: {
+        dpp_id: "dpp_9f863d0d-bc74-4c34-9925-2470f18c3f00",
+        lineage_id: "dpp_9f863d0d-bc74-4c34-9925-2470f18c3f00",
+        company_id: 1,
+        passport_type: "trial_1_dbp",
+        product_id: "123456789",
+        granularity: "item",
+      },
+      company: {
+        id: 1,
+        company_name: "King Kong",
+      },
+      didService,
+      productIdentifierService,
+    });
+
+    expect(bundle.companyDid).toBe("did:web:www.claros-dpp.online:did:company:king-kong");
+    expect(bundle.dppDid).toBe("did:web:www.claros-dpp.online:did:dpp:item:dpp_9f863d0d-bc74-4c34-9925-2470f18c3f00");
+    expect(bundle.uniqueProductIdentifier).toMatch(/^did:web:www\.claros-dpp\.online:did:king-kong:item:/);
   });
 });

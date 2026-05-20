@@ -198,10 +198,15 @@ const NON_EDITABLE_FORM_KEYS = new Set([
   "uniqueProductIdentifier",
   "subjectDid",
   "dppDid",
-  "companyDid",
-  "elements",
-  "fields",
-  "linked_data",
+    "companyDid",
+    "model_name",
+    "modelName",
+    "product_id",
+    "productId",
+    "localProductId",
+    "elements",
+    "fields",
+    "linked_data",
   "company_profile",
   "first_name",
   "last_name",
@@ -321,7 +326,13 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const hydrateFromPassportRecord = (data, { allowDraftRestore = false } = {}) => {
-    const alignedData = alignRecordToSchemaKeys(data, SECTIONS);
+    const aliasToKey = buildSchemaAliasMap(SECTIONS);
+    const flattenedData = {
+      ...(data || {}),
+      ...(data?.fields && typeof data.fields === "object" ? data.fields : {}),
+      ...extractFieldValuesFromElements(data?.elements, aliasToKey),
+    };
+    const alignedData = alignRecordToSchemaKeys(flattenedData, SECTIONS);
     const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
     if (!restored) {
       setModelName(alignedData?.model_name || "");
@@ -594,9 +605,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     );
     return {
       passportType: activePassportType,
+      ...cleanData,
       model_name: modelName.trim() || null,
       product_id: productId.trim() || null,
-      ...cleanData,
     };
   };
 
@@ -841,9 +852,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         );
         const body = {
           passport_type: activePassportType,
+          ...serializedData,
           model_name: modelName.trim() || null,
           product_id: trimmedProductId,
-          ...serializedData,
         };
         const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),

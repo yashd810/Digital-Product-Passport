@@ -216,6 +216,42 @@ function formatHeaderValue(value) {
   return String(value);
 }
 
+function slugifyDidSegment(value, fallback = "company") {
+  const slug = String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
+  return slug || fallback;
+}
+
+function stableDidSegment(value, fallback = "passport") {
+  const segment = String(value || "")
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return segment || fallback;
+}
+
+function buildViewerDidFallbacks(passport) {
+  const didDomain = "www.claros-dpp.online";
+  const companyName = passport?.company_profile?.company_name
+    || passport?.companyName
+    || passport?.company_name
+    || passport?.company_id
+    || passport?.companyId
+    || "company";
+  const companySlug = slugifyDidSegment(passport?.company_profile?.did_slug || companyName);
+  const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
+  const stableId = stableDidSegment(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.product_id);
+  return {
+    companyDid: `did:web:${didDomain}:did:company:${companySlug}`,
+    dppDid: `did:web:${didDomain}:did:dpp:${granularity}:${stableId}`,
+  };
+}
+
 function parseHeaderArray(value) {
   if (Array.isArray(value)) return value;
   if (typeof value !== "string") return value ? [value] : [];
@@ -237,10 +273,11 @@ export function PassportHeaderPanel({ passport, typeDef }) {
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
   const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields : [];
   const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
-  const resolvedCompanyDid = passport.companyDid || passport.company_did || canonicalSubjects.companyDid || null;
+  const fallbackDids = buildViewerDidFallbacks(passport);
+  const resolvedCompanyDid = passport.companyDid || passport.company_did || canonicalSubjects.companyDid || fallbackDids.companyDid;
   const resolvedFacilityDid = passport.facilityDid || passport.facility_did || canonicalSubjects.facilityDid || null;
   const resolvedSubjectDid = passport.subjectDid || passport.subject_did || canonicalSubjects.subjectDid || passport.product_identifier_did || null;
-  const resolvedDppDid = passport.dppDid || passport.dpp_did || canonicalSubjects.dppDid || null;
+  const resolvedDppDid = passport.dppDid || passport.dpp_did || canonicalSubjects.dppDid || fallbackDids.dppDid;
   const headerValues = {
     digitalProductPassportId: passport.digitalProductPassportId || passport.dppId || passport.dpp_id,
     uniqueProductIdentifier: passport.uniqueProductIdentifier || passport.product_identifier_did || passport.product_id,
