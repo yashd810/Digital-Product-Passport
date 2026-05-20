@@ -47,6 +47,7 @@ function createWorkflowHelpers({
     );
     if (!pRes.rows.length) throw new Error("Editable passport not found");
     const passport = normalizePassportRow(pRes.rows[0]);
+    const previousReleaseStatus = normalizeReleaseStatus(passport.release_status) || IN_REVISION_STATUS;
 
     await runBestEffort("Workflow archive before submit error", async () => archivePassportSnapshot({
       passport: pRes.rows[0],
@@ -55,11 +56,41 @@ function createWorkflowHelpers({
       snapshotReason: "before_submit_review",
     }));
 
-    await pool.query(
-      `UPDATE ${tableName} SET release_status = 'in_review', updated_at = NOW()
-       WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
-      [dppId]
-    );
+    const client = await pool.connect();
+    let wfRes;
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `UPDATE ${tableName} SET release_status = 'in_review', updated_at = NOW()
+         WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
+        [dppId]
+      );
+
+      wfRes = await client.query(
+        `INSERT INTO passport_workflow
+           (passport_dpp_id, passport_type, company_id, submitted_by, reviewer_id, approver_id,
+            review_status, approval_status, overall_status, previous_release_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'in_progress',$9)
+         RETURNING id`,
+        [
+          dppId,
+          passportType,
+          companyId,
+          userId,
+          resolvedReviewerId,
+          resolvedApproverId,
+          resolvedReviewerId ? "pending" : "skipped",
+          resolvedApproverId ? "pending" : "skipped",
+          previousReleaseStatus,
+        ]
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
 
     const updatedRes = await pool.query(
       `SELECT *
@@ -76,25 +107,6 @@ function createWorkflowHelpers({
         snapshotReason: "after_submit_review",
       }));
     }
-
-    const wfRes = await pool.query(
-      `INSERT INTO passport_workflow
-         (passport_dpp_id, passport_type, company_id, submitted_by, reviewer_id, approver_id,
-          review_status, approval_status, overall_status, previous_release_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'in_progress',$9)
-       RETURNING id`,
-      [
-        dppId,
-        passportType,
-        companyId,
-        userId,
-        resolvedReviewerId,
-        resolvedApproverId,
-        resolvedReviewerId ? "pending" : "skipped",
-        resolvedApproverId ? "pending" : "skipped",
-        normalizeReleaseStatus(passport.release_status) || IN_REVISION_STATUS,
-      ]
-    );
 
     const appUrl = process.env.APP_URL || "http://localhost:3000";
 

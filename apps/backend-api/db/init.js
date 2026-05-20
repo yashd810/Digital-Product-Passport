@@ -1368,6 +1368,45 @@ async function initDb(pool, {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS passport_workflow (
+      id                      SERIAL PRIMARY KEY,
+      passport_dpp_id         TEXT NOT NULL,
+      passport_type           VARCHAR(100) NOT NULL,
+      company_id              INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      submitted_by            INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      reviewer_id             INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      approver_id             INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      review_status           VARCHAR(30) NOT NULL DEFAULT 'pending',
+      approval_status         VARCHAR(30) NOT NULL DEFAULT 'pending',
+      overall_status          VARCHAR(30) NOT NULL DEFAULT 'in_progress',
+      reviewer_comment        TEXT,
+      approver_comment        TEXT,
+      previous_release_status VARCHAR(30),
+      reviewed_at             TIMESTAMPTZ,
+      approved_at             TIMESTAMPTZ,
+      rejected_at             TIMESTAMPTZ,
+      created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_workflow_company_status
+      ON passport_workflow(company_id, overall_status, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_workflow_passport_created
+      ON passport_workflow(passport_dpp_id, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_workflow_reviewer_pending
+      ON passport_workflow(reviewer_id, review_status, created_at DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_passport_workflow_approver_pending
+      ON passport_workflow(approver_id, approval_status, created_at DESC)
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_revision_batches (
       id                SERIAL PRIMARY KEY,
       company_id        INTEGER REFERENCES companies(id) ON DELETE CASCADE,
