@@ -506,23 +506,41 @@ module.exports = function registerWorkflowRoutes(app, {
 
       const inProgress = await pool.query(
         `SELECT pw.*,
+           pw.passport_dpp_id AS passport_guid,
            CONCAT(ur.first_name,' ',ur.last_name) AS reviewer_name,
-           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name
+           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name,
+           CONCAT(us.first_name,' ',us.last_name) AS submitter_name
          FROM passport_workflow pw
          LEFT JOIN users ur ON ur.id = pw.reviewer_id
          LEFT JOIN users ua ON ua.id = pw.approver_id
-         WHERE pw.company_id = $1 AND pw.overall_status = 'in_progress' AND pw.submitted_by = $2
+         LEFT JOIN users us ON us.id = pw.submitted_by
+         WHERE pw.company_id = $1
+           AND pw.overall_status = 'in_progress'
+           AND (
+             pw.submitted_by = $2 OR
+             pw.reviewer_id = $2 OR
+             pw.approver_id = $2
+           )
          ORDER BY pw.created_at DESC`,
         [companyId, userId]
       );
       const history = await pool.query(
         `SELECT pw.*,
+           pw.passport_dpp_id AS passport_guid,
            CONCAT(ur.first_name,' ',ur.last_name) AS reviewer_name,
-           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name
+           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name,
+           CONCAT(us.first_name,' ',us.last_name) AS submitter_name
          FROM passport_workflow pw
          LEFT JOIN users ur ON ur.id = pw.reviewer_id
          LEFT JOIN users ua ON ua.id = pw.approver_id
-         WHERE pw.company_id = $1 AND pw.overall_status != 'in_progress' AND pw.submitted_by = $2
+         LEFT JOIN users us ON us.id = pw.submitted_by
+         WHERE pw.company_id = $1
+           AND pw.overall_status != 'in_progress'
+           AND (
+             pw.submitted_by = $2 OR
+             pw.reviewer_id = $2 OR
+             pw.approver_id = $2
+           )
          ORDER BY pw.updated_at DESC LIMIT 50`,
         [companyId, userId]
       );
@@ -541,11 +559,14 @@ module.exports = function registerWorkflowRoutes(app, {
       const userId = req.user.userId;
       const r = await pool.query(
         `SELECT pw.*,
+           pw.passport_dpp_id AS passport_guid,
            CONCAT(ur.first_name,' ',ur.last_name) AS reviewer_name,
-           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name
+           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name,
+           CONCAT(us.first_name,' ',us.last_name) AS submitter_name
          FROM passport_workflow pw
          LEFT JOIN users ur ON ur.id = pw.reviewer_id
          LEFT JOIN users ua ON ua.id = pw.approver_id
+         LEFT JOIN users us ON us.id = pw.submitted_by
          WHERE pw.overall_status = 'in_progress'
            AND (
              (pw.reviewer_id = $1 AND pw.review_status = 'pending') OR

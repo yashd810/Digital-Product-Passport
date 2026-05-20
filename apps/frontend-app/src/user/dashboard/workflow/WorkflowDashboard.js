@@ -17,6 +17,8 @@ const STATUS_MAP = {
   rejected:                { label:"Rejected",    icon:"❌" },
 };
 
+const getWorkflowPassportId = (wf) => wf?.passport_guid || wf?.passport_dpp_id || null;
+
 function WorkflowBadge({ status }) {
   const s = STATUS_MAP[status] || { label: status, icon:"📄" };
   return (
@@ -404,7 +406,13 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
   const handle = async () => {
     setSubmitting(true); setError(null);
     try {
-      const r = await fetchWithAuth(`${API}/api/passports/${wf.passport_guid}/workflow/${action}`, {
+      const workflowPassportId = getWorkflowPassportId(wf);
+      if (!workflowPassportId) {
+        setError({ message: "Workflow passport ID is missing", blockingIssues: [], missingFields: [] });
+        setSubmitting(false);
+        return;
+      }
+      const r = await fetchWithAuth(`${API}/api/passports/${workflowPassportId}/workflow/${action}`, {
         method: "POST",
         headers: authHeaders({ "Content-Type":"application/json" }),
         body: JSON.stringify({ comment, passportType: wf.passport_type }),
@@ -498,7 +506,13 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
 
   const handleRemove = async (wf) => {
     try {
-      const r = await fetchWithAuth(`${API}/api/passports/${wf.passport_guid}/workflow`, {
+      const workflowPassportId = getWorkflowPassportId(wf);
+      if (!workflowPassportId) {
+        setFlash("Error: Workflow passport ID is missing");
+        setTimeout(() => setFlash(""), 4000);
+        return;
+      }
+      const r = await fetchWithAuth(`${API}/api/passports/${workflowPassportId}/workflow`, {
         method: "DELETE",
         headers: authHeaders()
       });
@@ -524,7 +538,8 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     { id:"history",    label:"History",       count: data.history.length },
   ];
   const openPassportViewer = (wf) => {
-    if (!wf?.passport_guid) return;
+    const workflowPassportId = getWorkflowPassportId(wf);
+    if (!workflowPassportId) return;
     const normalizedStatus = normalizePassportStatus(wf.release_status);
     const path = normalizedStatus === "released" && wf.product_id
       ? buildPublicPassportPath({
@@ -543,7 +558,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
           companyName: user?.company_name,
           modelName: wf.model_name,
           productId: wf.product_id,
-          previewId: wf.passport_guid,
+          previewId: workflowPassportId,
         });
     if (!path) return;
     const url = normalizedStatus === "released" || isObsoletePassportStatus(normalizedStatus)
@@ -554,14 +569,15 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   };
 
   const renderRow = (wf, showActions) => {
-    const needsMyReview    = showActions && wf.reviewer_id === user?.id && wf.review_status === "pending";
-    const needsMyApproval  = showActions && wf.approver_id === user?.id && wf.approval_status === "pending" && wf.review_status !== "pending";
+    const needsMyReview = showActions && String(wf.reviewer_id) === String(user?.id) && wf.review_status === "pending";
+    const needsMyApproval = showActions && String(wf.approver_id) === String(user?.id) && wf.approval_status === "pending" && wf.review_status !== "pending";
+    const workflowPassportId = getWorkflowPassportId(wf);
     return (
       <tr key={wf.id}>
         <td>
           <button className="model-link-btn"
             onClick={() => openPassportViewer(wf)}>
-            {wf.serial_number || wf.product_id || wf.passport_guid}
+            {wf.serial_number || wf.product_id || workflowPassportId}
           </button>
           <div className="workflow-meta-copy">
             {wf.passport_type} · v{wf.version_number}
