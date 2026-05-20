@@ -44,6 +44,18 @@ After deployment, confirm:
 - `https://viewer.claros-dpp.online/` returns `200`
 - authenticated app requests no longer fail because cookies are missing across subdomains
 
+## Manual Repair Commands
+
+Use one-off repair commands only when an older environment or restored database needs explicit cleanup.
+
+```bash
+# Repair legacy battery field keys in the database
+cd /opt/dpp/apps/backend-api
+docker exec dpp-backend-api-1 npm run repair:battery-fields
+```
+
+This command is intentionally manual. `init.js` does not auto-repair legacy battery field keys during normal startup.
+
 ## Important Rule
 
 Do not use ad hoc production deploy steps or old helper scripts. This repository intentionally removed those paths to keep deployment predictable.

@@ -17,6 +17,15 @@ module.exports = function registerWorkflowRoutes(app, {
   complianceService,
   archivePassportSnapshot
 }) {
+  const runBestEffort = async (label, operation) => {
+    try {
+      return await operation();
+    } catch (error) {
+      logger.error(`${label}:`, error.message);
+      return null;
+    }
+  };
+
   const getActorIdentifier = (user) =>
     user?.actorIdentifier ||
     user?.globallyUniqueOperatorId ||
@@ -151,13 +160,13 @@ module.exports = function registerWorkflowRoutes(app, {
         const originalStatus = wf.previous_release_status || "in_revision";
         const currentPassport = await loadLivePassportRow({ dppId, passportType });
         if (currentPassport) {
-          await archivePassportSnapshot({
+          await runBestEffort("Workflow remove archive before revert error", async () => archivePassportSnapshot({
             passport: currentPassport,
             passportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
             snapshotReason: "before_workflow_remove_revert",
-          });
+          }));
         }
         await pool.query(
           `UPDATE ${tableName} SET release_status=$1, updated_at=NOW() WHERE dpp_id=$2`,
@@ -165,13 +174,13 @@ module.exports = function registerWorkflowRoutes(app, {
         );
         const revertedPassport = await loadLivePassportRow({ dppId, passportType });
         if (revertedPassport) {
-          await archivePassportSnapshot({
+          await runBestEffort("Workflow remove archive after revert error", async () => archivePassportSnapshot({
             passport: revertedPassport,
             passportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
             snapshotReason: "after_workflow_remove_revert",
-          });
+          }));
         }
       }
 
@@ -235,13 +244,13 @@ module.exports = function registerWorkflowRoutes(app, {
           [comment || null, wf.id]
         );
         if (currentPassport) {
-          await archivePassportSnapshot({
+          await runBestEffort("Workflow reject archive before revert error", async () => archivePassportSnapshot({
             passport: currentPassport,
             passportType: resolvedPassportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
             snapshotReason: "before_workflow_reject_revert",
-          });
+          }));
         }
         await pool.query(
           `UPDATE ${tableName}
@@ -251,25 +260,25 @@ module.exports = function registerWorkflowRoutes(app, {
         );
         const revertedPassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType });
         if (revertedPassport) {
-          await archivePassportSnapshot({
+          await runBestEffort("Workflow reject archive after revert error", async () => archivePassportSnapshot({
             passport: revertedPassport,
             passportType: resolvedPassportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
             snapshotReason: "after_workflow_reject_revert",
-          });
+          }));
         }
         if (wf.submitted_by) {
           const actor = await pool.query("SELECT first_name, last_name FROM users WHERE id=$1", [userId]);
           const actorName = `${actor.rows[0]?.first_name || ""} ${actor.rows[0]?.last_name || ""}`.trim() || "Reviewer";
-          await createNotification(
+          await runBestEffort("Workflow reject notification error", async () => createNotification(
             wf.submitted_by,
             "workflow_rejected",
             `❌ ${pInfo.model_name} was rejected`,
             `${isReviewer ? "Review" : "Approval"} rejected by ${actorName}${comment ? ` — ${comment.substring(0, 80)}` : ""}`,
             dppId,
             `/dashboard/passports/${resolvedPassportType}`
-          );
+          ));
         }
         return res.json({ success: true, status: "rejected" });
       }
@@ -294,13 +303,13 @@ module.exports = function registerWorkflowRoutes(app, {
         if (!wf.approver_id || wf.approval_status === "skipped") {
           const beforeReleasePassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType, status: "in_review" });
           if (beforeReleasePassport) {
-            await archivePassportSnapshot({
+            await runBestEffort("Workflow review archive before release error", async () => archivePassportSnapshot({
               passport: beforeReleasePassport,
               passportType: resolvedPassportType,
               archivedBy: userId,
               actorIdentifier: getActorIdentifier(req.user),
               snapshotReason: "before_workflow_review_release",
-            });
+            }));
           }
           const relRes = await pool.query(
             `UPDATE ${tableName} SET release_status='released', updated_at=NOW() WHERE dpp_id=$1 AND release_status='in_review' RETURNING *`,
@@ -308,17 +317,21 @@ module.exports = function registerWorkflowRoutes(app, {
           );
           if (relRes.rows.length) {
             const released = relRes.rows[0];
-            await archivePassportSnapshot({
+            await runBestEffort("Workflow review archive after release error", async () => archivePassportSnapshot({
               passport: released,
               passportType: resolvedPassportType,
               archivedBy: userId,
               actorIdentifier: getActorIdentifier(req.user),
               snapshotReason: "after_workflow_review_release",
-            });
-            const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
-            const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null);
+            }));
+            const typeDef = await runBestEffort("Workflow review type definition load error", async () =>
+              complianceService.loadPassportTypeDefinition(resolvedPassportType)
+            );
+            const sigData = await runBestEffort("Workflow review signing error", async () =>
+              signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null)
+            );
             if (sigData) {
-              await recordSignedDppRelease(pool, {
+              await runBestEffort("Workflow review release record error", async () => recordSignedDppRelease(pool, {
                 passportDppId: dppId,
                 companyId: wf.company_id,
                 releasedByUserId: userId,
@@ -326,8 +339,8 @@ module.exports = function registerWorkflowRoutes(app, {
                 versionNumber: released.version_number,
                 sigData,
                 releaseNote: comment || null
-              });
-              await logAudit(
+              }));
+              await runBestEffort("Workflow review sign audit error", async () => logAudit(
                 wf.company_id,
                 userId,
                 "SIGN_PASSPORT",
@@ -340,10 +353,12 @@ module.exports = function registerWorkflowRoutes(app, {
                   signature_algorithm: sigData.signatureAlgorithm,
                   via: "workflow_review"
                 }
-              );
+              ));
             }
-            await markOlderVersionsObsolete(tableName, dppId, released.version_number, resolvedPassportType);
-            await logAudit(
+            await runBestEffort("Workflow review obsolete version update error", async () =>
+              markOlderVersionsObsolete(tableName, dppId, released.version_number, resolvedPassportType)
+            );
+            await runBestEffort("Workflow review release audit error", async () => logAudit(
               wf.company_id,
               userId,
               "RELEASE",
@@ -351,7 +366,7 @@ module.exports = function registerWorkflowRoutes(app, {
               dppId,
               { release_status: "in_review" },
               { release_status: "released", via: "workflow_review" }
-            );
+            ));
           }
           await pool.query("UPDATE passport_workflow SET overall_status='approved', updated_at=NOW() WHERE id=$1", [wf.id]);
           if (wf.submitted_by) {
@@ -360,24 +375,24 @@ module.exports = function registerWorkflowRoutes(app, {
               modelName: pInfo.model_name,
               productId: pInfo.product_id || dppId
             });
-            await createNotification(
+            await runBestEffort("Workflow review approved notification error", async () => createNotification(
               wf.submitted_by,
               "workflow_approved",
               `✅ ${pInfo.model_name} reviewed and released!`,
               null,
               dppId,
               releasePath
-            );
+            ));
           }
         } else {
-          await createNotification(
+          await runBestEffort("Workflow approval-request notification error", async () => createNotification(
             wf.approver_id,
             "workflow_approval",
             `Approval needed: ${pInfo.model_name}`,
             "Review passed — your approval is required",
             dppId,
             "/dashboard/workflow"
-          );
+          ));
         }
       } else if (isApprover) {
         const approvalReleaseTarget = await evaluateWorkflowReleaseCompliance({
@@ -395,13 +410,13 @@ module.exports = function registerWorkflowRoutes(app, {
         );
         const beforeReleasePassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType, status: "in_review" });
         if (beforeReleasePassport) {
-          await archivePassportSnapshot({
+          await runBestEffort("Workflow approval archive before release error", async () => archivePassportSnapshot({
             passport: beforeReleasePassport,
             passportType: resolvedPassportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
             snapshotReason: "before_workflow_approval_release",
-          });
+          }));
         }
         const relRes = await pool.query(
           `UPDATE ${tableName} SET release_status='released', updated_at=NOW() WHERE dpp_id=$1 AND release_status='in_review' RETURNING *`,
@@ -409,17 +424,21 @@ module.exports = function registerWorkflowRoutes(app, {
         );
         if (relRes.rows.length) {
           const released = relRes.rows[0];
-          await archivePassportSnapshot({
+          await runBestEffort("Workflow approval archive after release error", async () => archivePassportSnapshot({
             passport: released,
             passportType: resolvedPassportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
             snapshotReason: "after_workflow_approval_release",
-          });
-          const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
-          const sigData = await signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null);
+          }));
+          const typeDef = await runBestEffort("Workflow approval type definition load error", async () =>
+            complianceService.loadPassportTypeDefinition(resolvedPassportType)
+          );
+          const sigData = await runBestEffort("Workflow approval signing error", async () =>
+            signPassport({ ...released, passport_type: resolvedPassportType }, typeDef || null)
+          );
           if (sigData) {
-            await recordSignedDppRelease(pool, {
+            await runBestEffort("Workflow approval release record error", async () => recordSignedDppRelease(pool, {
               passportDppId: dppId,
               companyId: wf.company_id,
               releasedByUserId: userId,
@@ -427,8 +446,8 @@ module.exports = function registerWorkflowRoutes(app, {
               versionNumber: released.version_number,
               sigData,
               releaseNote: comment || null
-            });
-            await logAudit(
+            }));
+            await runBestEffort("Workflow approval sign audit error", async () => logAudit(
               wf.company_id,
               userId,
               "SIGN_PASSPORT",
@@ -437,14 +456,16 @@ module.exports = function registerWorkflowRoutes(app, {
               null,
               {
                 version_number: released.version_number,
-                signing_key_id: sigData.keyId,
-                signature_algorithm: sigData.signatureAlgorithm,
-                via: "workflow_approval"
-              }
-            );
+                  signing_key_id: sigData.keyId,
+                  signature_algorithm: sigData.signatureAlgorithm,
+                  via: "workflow_approval"
+                }
+              ));
           }
-          await markOlderVersionsObsolete(tableName, dppId, released.version_number, resolvedPassportType);
-          await logAudit(
+          await runBestEffort("Workflow approval obsolete version update error", async () =>
+            markOlderVersionsObsolete(tableName, dppId, released.version_number, resolvedPassportType)
+          );
+          await runBestEffort("Workflow approval release audit error", async () => logAudit(
             wf.company_id,
             userId,
             "RELEASE",
@@ -452,7 +473,7 @@ module.exports = function registerWorkflowRoutes(app, {
             dppId,
             { release_status: "in_review" },
             { release_status: "released", via: "workflow_approval" }
-          );
+          ));
         }
         if (wf.submitted_by) {
           const releasePath = buildCurrentPublicPassportPath({
@@ -460,14 +481,14 @@ module.exports = function registerWorkflowRoutes(app, {
             modelName: pInfo.model_name,
             productId: pInfo.product_id || dppId
           });
-          await createNotification(
+          await runBestEffort("Workflow approval approved notification error", async () => createNotification(
             wf.submitted_by,
             "workflow_approved",
             `🚀 ${pInfo.model_name} approved and released!`,
             null,
             dppId,
             releasePath
-          );
+          ));
         }
       }
 

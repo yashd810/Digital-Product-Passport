@@ -14,6 +14,15 @@ function createWorkflowHelpers({
   createNotification,
   logAudit,
 }) {
+  async function runBestEffort(label, operation) {
+    try {
+      return await operation();
+    } catch (error) {
+      logger.error(`${label}:`, error.message);
+      return null;
+    }
+  }
+
   async function submitPassportToWorkflow({
     companyId,
     dppId = null,
@@ -39,12 +48,12 @@ function createWorkflowHelpers({
     if (!pRes.rows.length) throw new Error("Editable passport not found");
     const passport = normalizePassportRow(pRes.rows[0]);
 
-    await archivePassportSnapshot({
+    await runBestEffort("Workflow archive before submit error", async () => archivePassportSnapshot({
       passport: pRes.rows[0],
       passportType,
       archivedBy: userId,
       snapshotReason: "before_submit_review",
-    });
+    }));
 
     await pool.query(
       `UPDATE ${tableName} SET release_status = 'in_review', updated_at = NOW()
@@ -60,12 +69,12 @@ function createWorkflowHelpers({
       [dppId]
     );
     if (updatedRes.rows.length) {
-      await archivePassportSnapshot({
+      await runBestEffort("Workflow archive after submit error", async () => archivePassportSnapshot({
         passport: updatedRes.rows[0],
         passportType,
         archivedBy: userId,
         snapshotReason: "after_submit_review",
-      });
+      }));
     }
 
     const wfRes = await pool.query(
@@ -90,14 +99,14 @@ function createWorkflowHelpers({
     const appUrl = process.env.APP_URL || "http://localhost:3000";
 
     if (resolvedReviewerId) {
-      await createNotification(
+      await runBestEffort("Workflow reviewer notification error", async () => createNotification(
         resolvedReviewerId,
         "workflow_review",
         `Review requested: ${passport.product_id}`,
         `v${passport.version_number} needs your review`,
         dppId,
         "/dashboard/workflow"
-      );
+      ));
       try {
         const reviewer = await pool.query("SELECT email, first_name FROM users WHERE id = $1", [resolvedReviewerId]);
         const submitter = await pool.query("SELECT first_name, last_name, email FROM users WHERE id = $1", [userId]);
@@ -132,21 +141,21 @@ function createWorkflowHelpers({
     }
 
     if (resolvedApproverId && !resolvedReviewerId) {
-      await createNotification(
+      await runBestEffort("Workflow approver notification error", async () => createNotification(
         resolvedApproverId,
         "workflow_approval",
         `Approval requested: ${passport.product_id}`,
         `v${passport.version_number} needs your approval`,
         dppId,
         "/dashboard/workflow"
-      );
+      ));
     }
 
-    await logAudit(companyId, userId, "SUBMIT_REVIEW", tableName, dppId, null, {
+    await runBestEffort("Workflow submit audit error", async () => logAudit(companyId, userId, "SUBMIT_REVIEW", tableName, dppId, null, {
       reviewerId: resolvedReviewerId,
       approverId: resolvedApproverId,
       status: "in_review",
-    });
+    }));
 
     return { workflowId: wfRes.rows[0].id };
   }
