@@ -5,6 +5,102 @@ import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySeman
 
 const API = import.meta.env.VITE_API_URL || "";
 
+function normalizeSchemaAlias(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function getSchemaFieldDescriptors(sections) {
+  return (sections || [])
+    .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
+    .filter((field) => field?.key)
+    .map((field) => ({
+      key: field.key,
+      aliases: [
+        field.key,
+        field.elementId,
+        field.element_id,
+        field.semanticId,
+        field.semantic_id,
+      ].filter(Boolean),
+    }));
+}
+
+function buildSchemaAliasMap(sections) {
+  const aliasToKey = new Map();
+  for (const field of getSchemaFieldDescriptors(sections)) {
+    for (const alias of field.aliases) {
+      aliasToKey.set(normalizeSchemaAlias(alias), field.key);
+    }
+  }
+  return aliasToKey;
+}
+
+function alignRecordToSchemaKeys(record, sections) {
+  if (!record || typeof record !== "object") return record || {};
+  const aligned = { ...record };
+  const aliasToKey = buildSchemaAliasMap(sections);
+
+  for (const [rawKey, value] of Object.entries(record)) {
+    const canonicalKey = aliasToKey.get(normalizeSchemaAlias(rawKey));
+    if (canonicalKey && aligned[canonicalKey] === undefined) {
+      aligned[canonicalKey] = value;
+    }
+  }
+
+  return aligned;
+}
+
+function extractFieldValuesFromElements(elements, aliasToKey = new Map(), values = {}) {
+  if (!Array.isArray(elements)) return values;
+  for (const element of elements) {
+    if (!element || typeof element !== "object") continue;
+    const candidateAliases = [
+      element.elementId,
+      element.element_id,
+      element.dictionaryReference,
+    ].filter((entry) => typeof entry === "string" && entry.trim());
+    const canonicalKey = candidateAliases
+      .map((alias) => aliasToKey.get(normalizeSchemaAlias(alias)))
+      .find(Boolean);
+    const rawElementId = typeof element.elementId === "string" ? element.elementId.trim() : "";
+    const targetKey = canonicalKey || rawElementId;
+
+    if (Array.isArray(element.elements) && element.elements.length) {
+      extractFieldValuesFromElements(element.elements, aliasToKey, values);
+    }
+
+    if (!targetKey) continue;
+    if (element.value !== undefined) {
+      values[targetKey] = element.value;
+    }
+  }
+  return values;
+}
+
+function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
+  const rawFields = rawRecord?.fields && typeof rawRecord.fields === "object" ? rawRecord.fields : {};
+  const fullFields = fullRecord?.fields && typeof fullRecord.fields === "object" ? fullRecord.fields : {};
+  return {
+    ...fullRecord,
+    ...rawRecord,
+    fields: {
+      ...fullFields,
+      ...rawFields,
+    },
+    elements: fullRecord?.elements || rawRecord?.elements,
+  };
+}
+
+function normalizeCsvCell(value) {
+  if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+    return JSON.stringify(value);
+  }
+  return String(value ?? "");
+}
+
 export function ExportModal({ passports, filteredPassports, pagePassports, selectedPassports, activeType, allPassportTypes, companyId, onClose, onDone }) {
   const [scope, setScope] = useState("all");
   const [format, setFormat] = useState("csv");
@@ -34,19 +130,69 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
 
   const exportList = scopePassports[scope] || [];
 
-  const exportTypeToCSV = async (type, list) => {
+  const loadTypeSchema = async (type) => {
     const r = await fetchWithAuth(`${API}/api/passport-types/${type}`);
     if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
-    const data = await r.json();
-    const allFields = (data.fields_json?.sections || []).flatMap((section) => section.fields || []);
+    return r.json();
+  };
+
+  const loadFullPassportPayload = async (type, passport) => {
+    const targetCompanyId = passport.company_id || companyId;
+    if (!targetCompanyId) {
+      throw new Error("A company identifier is required for export.");
+    }
+    const baseUrl = `${API}/api/companies/${targetCompanyId}/passports/${passport.dppId}?passportType=${type}`;
+    const query = new URLSearchParams({
+      passportType: type,
+      representation: "full",
+    });
+    if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
+      query.set("versionNumber", String(passport.version_number));
+    }
+    const [rawResponse, fullResponse] = await Promise.all([
+      fetchWithAuth(baseUrl, { headers: authHeaders() }),
+      fetchWithAuth(`${API}/api/companies/${targetCompanyId}/passports/${passport.dppId}?${query.toString()}`, { headers: authHeaders() }),
+    ]);
+    const rawData = rawResponse.ok ? await rawResponse.json() : {};
+    const fullData = fullResponse.ok ? await fullResponse.json() : {};
+    if (!rawResponse.ok && !fullResponse.ok) {
+      const payloadData = fullData && Object.keys(fullData).length ? fullData : rawData;
+      throw new Error(payloadData.error || `Failed to fetch full export payload for ${passport.dppId}`);
+    }
+    return mergePassportRepresentations(rawData, fullData);
+  };
+
+  const exportTypeToCSV = async (type, list) => {
+    const data = await loadTypeSchema(type);
+    const sections = data.fields_json?.sections || [];
+    const allFields = sections.flatMap((section) => section.fields || []);
+    const aliasToKey = buildSchemaAliasMap(sections);
+    const normalizedRecords = await Promise.all(list.map(async (passport) => {
+      const payload = await loadFullPassportPayload(type, passport);
+      const flattened = {
+        ...payload,
+        ...(payload?.fields && typeof payload.fields === "object" ? payload.fields : {}),
+        ...extractFieldValuesFromElements(payload?.elements, aliasToKey),
+      };
+      return alignRecordToSchemaKeys(flattened, sections);
+    }));
     const rows = [
-      ["Field Name", ...list.map((passport) => passport.model_name)],
-      ["dppId", ...list.map((passport) => passport.dppId)],
-      ["model_name", ...list.map((passport) => passport.model_name || "")],
-      ["product_id", ...list.map((passport) => passport.product_id || "")],
+      ["Field Name", ...normalizedRecords.map((passport) => passport.model_name || passport.product_id || passport.dppId || "")],
+      ["dppId", ...normalizedRecords.map((passport) => passport.dppId || passport.dpp_id || "")],
+      ["model_name", ...normalizedRecords.map((passport) => passport.model_name || "")],
+      ["product_id", ...normalizedRecords.map((passport) => passport.product_id || "")],
       ...allFields
         .filter((field) => field.type !== "table")
-        .map((field) => [field.label, ...list.map((passport) => field.type === "boolean" ? (passport[field.key] ? "true" : "false") : (passport[field.key] || ""))]),
+        .map((field) => [
+          field.label,
+          ...normalizedRecords.map((passport) => {
+            const value = passport[field.key];
+            if (field.type === "boolean") {
+              return value === true ? "true" : (value === false ? "false" : "");
+            }
+            return normalizeCsvCell(value);
+          }),
+        ]),
     ];
     const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -58,34 +204,10 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   };
 
   const exportTypeToJsonLd = async (type, list) => {
-    const r = await fetchWithAuth(`${API}/api/passport-types/${type}`);
-    if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
-    const data = await r.json();
+    const data = await loadTypeSchema(type);
     const semanticModelKey = data.semantic_model_key || allPassportTypes.find((item) => item.type_name === type)?.semantic_model_key || "";
     const productCategory = data.product_category || allPassportTypes.find((item) => item.type_name === type)?.product_category || "";
-    const output = [];
-    for (const passport of list) {
-      const targetCompanyId = passport.company_id || companyId;
-      if (!targetCompanyId) {
-        throw new Error("A company identifier is required for JSON-LD export.");
-      }
-      const query = new URLSearchParams({
-        passportType: type,
-        representation: "full",
-      });
-      if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
-        query.set("versionNumber", String(passport.version_number));
-      }
-      const payloadResponse = await fetchWithAuth(
-        `${API}/api/companies/${targetCompanyId}/passports/${passport.dppId}?${query.toString()}`,
-        { headers: authHeaders() }
-      );
-      const payloadData = await payloadResponse.json().catch(() => ({}));
-      if (!payloadResponse.ok) {
-        throw new Error(payloadData.error || `Failed to fetch full export payload for ${passport.dppId}`);
-      }
-      output.push(payloadData);
-    }
+    const output = await Promise.all(list.map((passport) => loadFullPassportPayload(type, passport)));
     const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, productCategory });
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
     const link = document.createElement("a");
