@@ -13,6 +13,7 @@
     "lint": "npm run check:syntax && npm run check:style && npm run check:boundaries",
     "format:check": "npm run check:style",
     "repair:passport-storage": "node scripts/check-passport-storage.js --repair",
+    "repair:battery-fields": "node scripts/repair-battery-field-keys.js",
     "dev": "nodemon Server/server.js",
     "test": "jest --runInBand",
     "generate:battery-dictionary": "node ../../scripts/generate-battery-dictionary.js"
