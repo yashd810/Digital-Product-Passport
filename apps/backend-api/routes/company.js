@@ -11,6 +11,7 @@ module.exports = function registerCompanyRoutes(app, {
   publicReadRateLimit,
   // passport helpers
   getTable,
+  getPassportFieldValue,
   getPassportTypeSchema,
   normalizePassportRequestBody,
   normalizeProductIdValue,
@@ -24,6 +25,7 @@ module.exports = function registerCompanyRoutes(app, {
   EDITABLE_RELEASE_STATUSES_SQL,
   SYSTEM_PASSPORT_FIELDS,
   buildBatteryPassJsonExport,
+  buildExpandedPassportPayload,
   productIdentifierService,
   complianceService,
   accessRightsService
@@ -386,11 +388,8 @@ module.exports = function registerCompanyRoutes(app, {
       filter((f) => f.type !== "file" && f.type !== "table");
 
       const tableName = getTable(tmpl.passport_type);
-      const cols = ["dppId", "model_name", "product_id", ...schemaFields.map((f) => f.key)];
-      const safeColsSql = cols.map((c) => /^[a-z][a-z0-9_]*$/.test(c) ? c : null).filter(Boolean);
-
       const passRes = await pool.query(
-        `SELECT ${safeColsSql.join(", ")} FROM ${tableName}
+        `SELECT * FROM ${tableName}
          WHERE company_id=$1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
          ORDER BY created_at DESC`,
         [companyId]
@@ -400,21 +399,33 @@ module.exports = function registerCompanyRoutes(app, {
       if (fmt === "json" || fmt === "jsonld") {
         res.setHeader("Content-Type", "application/ld+json");
         res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passport_type}_drafts.jsonld"`);
-        return res.json(buildBatteryPassJsonExport(rows, tmpl.passport_type, {
+        const exportRows = rows.map((row) => buildExpandedPassportPayload(
+          { ...row, passport_type: tmpl.passport_type },
+          typeRes.rows[0],
+          {
+            granularity: row.granularity || "model",
+          }
+        ));
+        return res.json(buildBatteryPassJsonExport(exportRows, tmpl.passport_type, {
           semanticModelKey: typeRes.rows[0]?.semantic_model_key || null,
           productCategory: typeRes.rows[0]?.product_category || null
         }));
       }
 
-      const escCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const escCell = (v) => {
+        const stringValue = Array.isArray(v) || (typeof v === "object" && v !== null)
+          ? JSON.stringify(v)
+          : String(v ?? "");
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      };
 
       const fieldRows = [
-      ["dppId", ...rows.map((r) => r.dppId)],
+      ["dppId", ...rows.map((r) => r.dppId ?? r.dpp_id ?? "")],
       ["model_name", ...rows.map((r) => r.model_name || "")],
       ["product_id", ...rows.map((r) => r.product_id || "")],
       ...schemaFields.map((f) => [
       f.label,
-      ...rows.map((r) => r[f.key] ?? templateFields[f.key] ?? "")]
+      ...rows.map((r) => getPassportFieldValue(r, f.key) ?? templateFields[f.key] ?? "")]
       )];
 
       const headerRow = ["Field Name", ...rows.map((_, i) => `Passport ${i + 1}`)];
