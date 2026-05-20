@@ -66,7 +66,7 @@ const {
   buildCurrentPublicPassportPath, buildInactivePublicPassportPath, buildPreviewPassportPath,
   resolvePublicPathToSubjects,
   coerceBulkFieldValue, getHistoryFieldDefs, formatHistoryFieldValue, comparableHistoryFieldValue,
-  isPlainObject, getAssetFieldMap, getValueAtPath, normalizeAssetHeaders,
+  isPlainObject, getPassportFieldValue, getAssetFieldMap, getValueAtPath, normalizeAssetHeaders,
   coerceAssetFieldValue, toDynamicStoredValue,
 } = require("../src/shared/passports/passport-helpers");
 
@@ -579,6 +579,7 @@ registerAppRoutes(app, {
   createAccessKeyMaterial,
   createDeviceKeyMaterial,
   getTable,
+  getPassportFieldValue,
   normalizePassportRow,
   normalizeReleaseStatus,
   isEditablePassportStatus,

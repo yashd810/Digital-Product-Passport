@@ -4,6 +4,7 @@ const {
   BATTERY_DICTIONARY_MODEL_KEY,
   shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
 } = require("./battery-dictionary-targeting");
+const { getPassportFieldValue } = require("../src/shared/passports/passport-helpers");
 
 const VALID_ACCESS_LEVELS = new Set([
   "public",
@@ -252,14 +253,6 @@ function parseStructuredValue(field, value) {
     }
   }
   return value;
-}
-
-function getPassportFieldValue(passport, key) {
-  if (!passport || !key) return undefined;
-  if (Object.prototype.hasOwnProperty.call(passport, key)) return passport[key];
-  const foldedKey = typeof key === "string" ? key.toLowerCase() : key;
-  if (foldedKey && Object.prototype.hasOwnProperty.call(passport, foldedKey)) return passport[foldedKey];
-  return undefined;
 }
 
 function isExplicitMultiLanguageField(field) {

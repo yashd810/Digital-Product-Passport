@@ -9,6 +9,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
     normalizePassportRequestBody,
     getTable,
     normalizePassportRow,
+    getPassportFieldValue,
     normalizeReleaseStatus,
     normalizeProductIdValue,
     getPassportTypeSchema,
@@ -24,18 +25,6 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
     EDITABLE_RELEASE_STATUSES_SQL,
     ARCHIVED_HISTORY_FILTER_SQL,
   } = deps;
-
-  const getPassportFieldValue = (passport, fieldKey) => {
-    if (!passport || !fieldKey) return undefined;
-    if (Object.prototype.hasOwnProperty.call(passport, fieldKey)) {
-      return passport[fieldKey];
-    }
-    const lowerKey = String(fieldKey).toLowerCase();
-    if (Object.prototype.hasOwnProperty.call(passport, lowerKey)) {
-      return passport[lowerKey];
-    }
-    return undefined;
-  };
 
   app.get("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {

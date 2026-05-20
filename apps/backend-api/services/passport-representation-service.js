@@ -1,6 +1,7 @@
 "use strict";
 
 const { buildCarrierAuthenticityResponseFields } = require("../helpers/carrier-authenticity");
+const { getPassportFieldValue } = require("../src/shared/passports/passport-helpers");
 
 module.exports = function createPassportRepresentationService({
   productIdentifierService = null,
@@ -68,18 +69,6 @@ module.exports = function createPassportRepresentationService({
       issueCount: issues.length,
       countsByCode,
     };
-  }
-
-  function getPassportFieldValue(passport, fieldKey) {
-    if (!passport || !fieldKey) return undefined;
-    if (Object.prototype.hasOwnProperty.call(passport, fieldKey)) {
-      return passport[fieldKey];
-    }
-    const lowerKey = String(fieldKey).toLowerCase();
-    if (Object.prototype.hasOwnProperty.call(passport, lowerKey)) {
-      return passport[lowerKey];
-    }
-    return undefined;
   }
 
   // Build a canonical JTC 18223-style operational DPP payload.

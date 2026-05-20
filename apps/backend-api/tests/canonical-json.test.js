@@ -258,6 +258,75 @@ describe("canonical passport JSON", () => {
     );
   });
 
+  test("resolves expanded element values from lowercased production-style passport columns", () => {
+    const didService = createDidService({
+      didDomain: "www.claros-dpp.online",
+      publicOrigin: "https://www.claros-dpp.online",
+      apiOrigin: "https://api.claros.test",
+    });
+    const serializer = createCanonicalPassportSerializer({ didService });
+    const payload = serializer.buildExpandedPassportPayload(
+      {
+        guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
+        lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
+        company_id: 5,
+        passport_type: "trial_1_dbp",
+        product_id: "BAT-2026-001",
+        version_number: 3,
+        release_status: "released",
+        batterymodelidentifier: "MODEL-X",
+        manufacturingdate: "2026-04",
+        batterychemistry: "NMC",
+        ratedcapacity: "95",
+      },
+      {
+        type_name: "trial_1_dbp",
+        semantic_model_key: "claros_battery_dictionary_v1",
+        fields_json: {
+          sections: [
+            {
+              fields: [
+                { key: "batteryModelIdentifier", semanticId: "urn:test:battery-model-identifier", elementId: "batteryModelIdentifier" },
+                { key: "manufacturingDate", semanticId: "urn:test:manufacturing-date", elementId: "manufacturingDate" },
+                { key: "batteryChemistry", semanticId: "urn:test:battery-chemistry", elementId: "batteryChemistry" },
+                { key: "ratedCapacity", dataType: "integer", semanticId: "urn:test:rated-capacity", elementId: "ratedCapacity" },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        company: { company_name: "Acme Energy", did_slug: "acme-energy", dpp_granularity: "item" },
+      }
+    );
+
+    expect(payload.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          elementId: "batteryModelIdentifier",
+          dictionaryReference: "urn:test:battery-model-identifier",
+          value: "MODEL-X",
+        }),
+        expect.objectContaining({
+          elementId: "manufacturingDate",
+          dictionaryReference: "urn:test:manufacturing-date",
+          value: "2026-04",
+        }),
+        expect.objectContaining({
+          elementId: "batteryChemistry",
+          dictionaryReference: "urn:test:battery-chemistry",
+          value: "NMC",
+        }),
+        expect.objectContaining({
+          elementId: "ratedCapacity",
+          dictionaryReference: "urn:test:rated-capacity",
+          valueDataType: "Integer",
+          value: 95,
+        }),
+      ])
+    );
+  });
+
   test("classifies related resources and multilingual values with explicit standard object types", () => {
     const didService = createDidService({
       didDomain: "www.claros-dpp.online",

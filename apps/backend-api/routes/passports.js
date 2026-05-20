@@ -60,6 +60,7 @@ module.exports = function registerPassportRoutes(app, {
   SYSTEM_PASSPORT_FIELDS,
   // pure helpers from passport-helpers.js
   getTable,
+  getPassportFieldValue,
   normalizePassportRow,
   normalizeReleaseStatus,
   isEditablePassportStatus,
@@ -257,6 +258,7 @@ module.exports = function registerPassportRoutes(app, {
     checkCompanyAccess,
     normalizePassportRequestBody,
     getTable,
+    getPassportFieldValue,
     normalizePassportRow,
     normalizeReleaseStatus,
     normalizeProductIdValue,

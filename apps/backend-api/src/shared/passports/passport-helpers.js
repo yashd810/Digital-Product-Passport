@@ -70,6 +70,40 @@ const normalizePassportRow = (row) => {
   return normalized;
 };
 
+const toSnakeCaseFieldKey = (value) =>
+  String(value || "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
+    .toLowerCase();
+
+const toCompactFieldKey = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+const getPassportFieldLookupKeys = (fieldKey) => {
+  const exactKey = String(fieldKey || "").trim();
+  if (!exactKey) return [];
+  return [...new Set([
+    exactKey,
+    exactKey.toLowerCase(),
+    toSnakeCaseFieldKey(exactKey),
+    toCompactFieldKey(exactKey),
+  ].filter(Boolean))];
+};
+
+const getPassportFieldValue = (passport, fieldKey) => {
+  if (!passport || !fieldKey) return undefined;
+  for (const lookupKey of getPassportFieldLookupKeys(fieldKey)) {
+    if (Object.prototype.hasOwnProperty.call(passport, lookupKey)) {
+      return passport[lookupKey];
+    }
+  }
+  return undefined;
+};
+
 const toStoredPassportValue = (value) =>
   (Array.isArray(value) || (typeof value === "object" && value !== null))
     ? JSON.stringify(value)
@@ -600,6 +634,8 @@ module.exports = {
   formatHistoryFieldValue,
   comparableHistoryFieldValue,
   isPlainObject,
+  getPassportFieldLookupKeys,
+  getPassportFieldValue,
   getAssetFieldMap,
   getValueAtPath,
   normalizeAssetHeaders,
