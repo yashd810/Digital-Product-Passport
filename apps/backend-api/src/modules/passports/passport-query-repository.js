@@ -309,9 +309,12 @@ function createPassportQueryRepository({
             productId: normalizedProductId,
             granularity,
           }) || [normalizedProductId];
-    const matchSql = strictProductId
+    const liveMatchSql = strictProductId
       ? "product_id = ANY($1::text[])"
       : "(product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))";
+    const archiveMatchSql = strictProductId
+      ? "pa.product_id = ANY($1::text[])"
+      : "(pa.product_id = ANY($1::text[]) OR pa.product_identifier_did = ANY($1::text[]))";
 
     const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
     const matches = [];
@@ -335,7 +338,7 @@ function createPassportQueryRepository({
         liveRes = await pool.query(
           `SELECT *
            FROM ${tableName}
-           WHERE ${matchSql}
+           WHERE ${liveMatchSql}
              AND ${
                versionNumber !== null && versionNumber !== undefined
                  ? "release_status IN ('released', 'obsolete')"
@@ -363,12 +366,14 @@ function createPassportQueryRepository({
 
       const archiveParams = [candidates, type_name];
       let archiveCompanySql = "";
+      let archiveVersionSql = "";
       if (companyId !== null && companyId !== undefined) {
         archiveParams.push(companyId);
-        archiveCompanySql = ` AND company_id = $${archiveParams.length}`;
+        archiveCompanySql = ` AND pa.company_id = $${archiveParams.length}`;
       }
       if (versionNumber !== null && versionNumber !== undefined) {
         archiveParams.push(versionNumber);
+        archiveVersionSql = ` AND pa.version_number = $${archiveParams.length}`;
       }
       const archiveRes = await pool.query(
         `SELECT pa.product_identifier_did,
@@ -379,9 +384,9 @@ function createPassportQueryRepository({
          LEFT JOIN passport_history_visibility phv
            ON phv.passport_dpp_id = pa.dpp_id
           AND phv.version_number = pa.version_number
-         WHERE ${matchSql.replaceAll("product_identifier_did", "pa.product_identifier_did").replaceAll("product_id", "pa.product_id")}
+         WHERE ${archiveMatchSql}
            AND pa.passport_type = $2${archiveCompanySql}
-           ${versionNumber !== null && versionNumber !== undefined ? ` AND pa.version_number = $${archiveParams.length}` : ""}
+           ${archiveVersionSql}
          ORDER BY pa.version_number DESC, pa.archived_at DESC
          LIMIT 1`,
         archiveParams
