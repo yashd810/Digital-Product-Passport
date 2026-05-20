@@ -2,6 +2,7 @@
 
 const createDidService = require("../services/did-service");
 const createProductIdentifierService = require("../services/product-identifier-service");
+const { generateProductIdValue } = require("../src/shared/passports/passport-helpers");
 
 describe("product identifier service", () => {
   const didService = createDidService({
@@ -87,6 +88,11 @@ describe("product identifier service", () => {
 
     expect(service.normalizeGranularity("batch")).toBe("batch");
     expect(did).toContain("did:web:www.example.test:did:battery:batch:");
+  });
+
+  test("uses the generated DPP ID as the fallback local product ID", () => {
+    expect(generateProductIdValue("dpp_c9808ead-1d18-4329-8347-428b526e957a"))
+      .toBe("dpp_c9808ead-1d18-4329-8347-428b526e957a");
   });
 
   test("records and lists identifier lineage links", async () => {

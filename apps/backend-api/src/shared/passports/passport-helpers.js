@@ -221,7 +221,7 @@ const normalizeProductIdValue = (value) =>
   typeof value === "string" ? value.trim() : "";
 
 const generateProductIdValue = (dppId) =>
-  `PID-${String(dppId || "").replace(/^dpp_/i, "").slice(0, 8)}`;
+  String(dppId || "").trim();
 
 const FACILITY_FIELD_CANDIDATES = [
   "facility_id",
