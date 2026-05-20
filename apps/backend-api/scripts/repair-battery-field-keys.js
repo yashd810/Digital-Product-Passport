@@ -141,6 +141,27 @@ const BATTERY_FIELD_RENAME_SOURCES = Object.entries(BATTERY_FIELD_UPGRADES_BY_KE
   .filter(([sourceKey, upgrade]) => sourceKey !== upgrade.key)
   .map(([sourceKey, upgrade]) => ({ sourceKey, upgrade }));
 
+function normalizeAliasKey(value) {
+  return String(value || "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+function toSnakeCase(value) {
+  return String(value || "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
+    .toLowerCase();
+}
+
+function dbIdentifier(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function isBatteryPassportTypeRow(typeRow) {
   return String(typeRow?.semantic_model_key || "").trim() === BATTERY_DICTIONARY_MODEL_KEY
     || /battery/i.test(String(typeRow?.product_category || ""));
@@ -150,7 +171,51 @@ function isSafeSqlIdentifier(value) {
   return /^[a-z][a-z0-9_]*$/i.test(String(value || ""));
 }
 
-function normalizeBatteryPassportFieldsJson(fieldsJson = {}) {
+function buildBatteryFieldUpgradeMap(typeRow) {
+  const upgradeMap = new Map(Object.entries(BATTERY_FIELD_UPGRADES_BY_KEY));
+  const sections = Array.isArray(typeRow?.fields_json?.sections) ? typeRow.fields_json.sections : [];
+
+  for (const section of sections) {
+    for (const field of Array.isArray(section?.fields) ? section.fields : []) {
+      if (!field?.key) continue;
+      const canonical = {
+        key: field.key,
+        label: field.label,
+        type: field.type || "text",
+        semanticId: field.semanticId || null,
+      };
+      const aliases = new Set([
+        field.key,
+        dbIdentifier(field.key),
+        toSnakeCase(field.key),
+        normalizeAliasKey(field.key),
+        normalizeAliasKey(field.label),
+      ]);
+      for (const alias of aliases) {
+        if (alias) upgradeMap.set(alias, canonical);
+      }
+    }
+  }
+
+  return upgradeMap;
+}
+
+function buildBatteryFieldRenameSources(fieldUpgradeMap) {
+  const seen = new Set();
+  const renameSources = [];
+
+  for (const [sourceKey, upgrade] of fieldUpgradeMap.entries()) {
+    if (!sourceKey || !upgrade?.key) continue;
+    const signature = `${sourceKey}=>${upgrade.key}`;
+    if (sourceKey === upgrade.key || seen.has(signature)) continue;
+    seen.add(signature);
+    renameSources.push({ sourceKey, upgrade });
+  }
+
+  return renameSources;
+}
+
+function normalizeBatteryPassportFieldsJson(fieldsJson = {}, fieldUpgradeMap = new Map()) {
   const sections = Array.isArray(fieldsJson?.sections) ? fieldsJson.sections : [];
   let changed = false;
 
@@ -162,7 +227,11 @@ function normalizeBatteryPassportFieldsJson(fieldsJson = {}) {
     for (const field of fields) {
       if (!field || !field.key) continue;
       const fieldKey = String(field.key).trim();
-      const upgrade = BATTERY_FIELD_UPGRADES_BY_KEY[fieldKey] || null;
+      const upgrade = fieldUpgradeMap.get(fieldKey)
+        || fieldUpgradeMap.get(dbIdentifier(fieldKey))
+        || fieldUpgradeMap.get(toSnakeCase(fieldKey))
+        || fieldUpgradeMap.get(normalizeAliasKey(fieldKey))
+        || null;
       const nextField = upgrade
         ? {
             ...field,
@@ -220,10 +289,11 @@ async function repairBatteryPassportTypes(db) {
 
   for (const typeRow of typeRows.rows) {
     if (!isBatteryPassportTypeRow(typeRow)) continue;
+    const fieldUpgradeMap = buildBatteryFieldUpgradeMap(typeRow);
     const currentFieldsJson = typeRow.fields_json && typeof typeRow.fields_json === "object"
       ? typeRow.fields_json
       : { sections: [] };
-    const normalized = normalizeBatteryPassportFieldsJson(currentFieldsJson);
+    const normalized = normalizeBatteryPassportFieldsJson(currentFieldsJson, fieldUpgradeMap);
     if (!normalized.changed) continue;
 
     const nextSchemaVersion = Number.parseInt(currentFieldsJson.schemaVersion, 10);
@@ -262,13 +332,15 @@ async function repairBatteryPassportValues(db) {
 
     const tableName = getTable(typeRow.type_name);
     if (!isSafeSqlIdentifier(tableName)) continue;
+    const fieldUpgradeMap = buildBatteryFieldUpgradeMap(typeRow);
+    const renameSources = buildBatteryFieldRenameSources(fieldUpgradeMap);
 
-    for (const upgrade of Object.values(BATTERY_FIELD_UPGRADES_BY_KEY)) {
+    for (const upgrade of new Map(Array.from(fieldUpgradeMap.values()).map((field) => [field.key, field])).values()) {
       if (!isSafeSqlIdentifier(upgrade.key)) continue;
       await db.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${upgrade.key} TEXT`);
     }
 
-    for (const { sourceKey, upgrade } of BATTERY_FIELD_RENAME_SOURCES) {
+    for (const { sourceKey, upgrade } of renameSources) {
       if (!isSafeSqlIdentifier(sourceKey) || !isSafeSqlIdentifier(upgrade.key)) continue;
 
       const oldColumnExists = await db.query(
@@ -281,6 +353,7 @@ async function repairBatteryPassportValues(db) {
         [tableName, sourceKey]
       );
       if (!oldColumnExists.rows.length) continue;
+      if (dbIdentifier(sourceKey) === dbIdentifier(upgrade.key)) continue;
 
       await db.query(
         `UPDATE ${tableName}
