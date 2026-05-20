@@ -160,12 +160,11 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const schemaFields = sections.flatMap((section) => section.fields || []);
       const wantsFullRepresentation = isFullRepresentationRequest(req.query.representation);
       const tableName = getTable(passportType);
-      const columns = wantsFullRepresentation
-        ? ["*"]
-        : ["dpp_id", "model_name", "product_id", "release_status", ...schemaFields.map((field) => field.key)];
-      const safeColumns = columns[0] === "*"
-        ? columns
-        : columns.map((column) => (/^[a-z][a-z0-9_]*$/.test(column) ? column : null)).filter(Boolean);
+      // Export needs the full row because stored passport columns may be normalized
+      // differently than the schema field keys (for example lowercased identifiers).
+      // Limiting the SELECT list here causes many values to disappear before the
+      // CSV/JSON-LD serializers have a chance to resolve them.
+      const safeColumns = ["*"];
 
       let statusSql;
       if (statusFilter === "all") {
