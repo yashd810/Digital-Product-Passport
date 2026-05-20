@@ -17,6 +17,7 @@ const LEGACY_TERMS_PATH = path.join(OUTPUT_DIR, "terms.json");
 const LEGACY_CATEGORIES_PATH = path.join(OUTPUT_DIR, "categories.json");
 const LEGACY_UNITS_PATH = path.join(OUTPUT_DIR, "units.json");
 const LEGACY_FIELD_MAP_PATH = path.join(OUTPUT_DIR, "field-map.json");
+const CATEGORY_RULES_PATH = path.join(OUTPUT_DIR, "category-rules.json");
 
 const BASE_IRI = "https://www.claros-dpp.online/dictionary/battery/v1";
 const TERM_BASE_IRI = `${BASE_IRI}/terms/`;
@@ -131,6 +132,17 @@ const DATA_TYPE_MAP = {
   "ID (string)": { format: "ID (string)", jsonType: "string", xsdType: "xsd:string" },
   "Array (string)": { format: "Array (string)", jsonType: "array", xsdType: "xsd:string", items: { type: "string" } },
   "Date[YYYY-MM]": { format: "Date[YYYY-MM]", jsonType: "string", xsdType: "xsd:gYearMonth" },
+};
+
+const CANONICAL_APP_FIELD_KEYS_BY_TERM_NUMBER = {
+  28: ["battery_carbon_footprint_per_functional_unit"],
+  29: ["contribution_of_raw_material_and_preprocessing_lifecycle_stage"],
+  30: ["contribution_of_main_product_production_lifecycle_stage"],
+  31: ["contribution_of_distribution_lifecycle_stage"],
+  32: ["contribution_of_end_of_life_and_recycling_lifecycle_stage"],
+  33: ["carbon_footprint_performance_class"],
+  34: ["web_link_to_public_carbon_footprint_study"],
+  35: ["absolute_carbon_footprint"],
 };
 
 function readJson(filePath, fallback = null) {
@@ -521,6 +533,41 @@ function buildSemanticBinding(term) {
   };
 }
 
+function buildCategoryRules({ terms, workbookMetadataByNumber }) {
+  const requirementsByFieldKey = {};
+
+  for (const term of terms) {
+    const workbookMetadata = workbookMetadataByNumber.get(Number(term.number)) || {};
+    const requirements = workbookMetadata.batteryCategoryRequirements || {};
+    for (const fieldKey of term.appFieldKeys || []) {
+      requirementsByFieldKey[fieldKey] = {
+        termNumber: term.number,
+        termLabel: term.label,
+        sourceAttribute: workbookMetadata.sourceAttributeName || term.attributeName || term.label,
+        requirements: {
+          EV: requirements.EV || null,
+          LMT: requirements.LMT || null,
+          Industrial: requirements.Industrial || null,
+          Stationary: requirements.Stationary || null,
+        },
+      };
+    }
+  }
+
+  return {
+    sourceWorkbook: path.basename(SOURCE_WORKBOOK_PATH),
+    sheetName: WORKBOOK_SHEET_NAME,
+    categories: ["EV", "LMT", "Industrial", "Stationary"],
+    legend: {
+      mandatory_battreg: "x",
+      mandatory_espr_jtc24: "(x)",
+      voluntary: "o",
+      not_applicable: "",
+    },
+    requirementsByFieldKey,
+  };
+}
+
 function buildDcatCatalog({ manifest, terms, generatedAt }) {
   const datasetId = `${BASE_IRI}/dataset`;
   return {
@@ -658,7 +705,6 @@ async function main() {
   const legacyTerms = ensureArray(readJson(LEGACY_TERMS_PATH, []), "legacy terms");
   const legacyCategories = ensureArray(readJson(LEGACY_CATEGORIES_PATH, []), "legacy categories");
   const legacyUnits = ensureArray(readJson(LEGACY_UNITS_PATH, []), "legacy units");
-  const legacyFieldMap = readJson(LEGACY_FIELD_MAP_PATH, {}) || {};
   const workbookRows = await readBatteryPassWorkbookRows(SOURCE_WORKBOOK_PATH);
   const workbookMetadataByNumber = buildWorkbookMetadataByNumber(workbookRows);
 
@@ -693,7 +739,9 @@ async function main() {
         throw new Error(`Unsupported data_format "${sourceTerm.data_format}" for term #${number}`);
       }
 
-      const appFieldKeys = Array.isArray(legacy.appFieldKeys) && legacy.appFieldKeys.length
+      const appFieldKeys = Array.isArray(CANONICAL_APP_FIELD_KEYS_BY_TERM_NUMBER[number]) && CANONICAL_APP_FIELD_KEYS_BY_TERM_NUMBER[number].length
+        ? CANONICAL_APP_FIELD_KEYS_BY_TERM_NUMBER[number].slice()
+        : Array.isArray(legacy.appFieldKeys) && legacy.appFieldKeys.length
         ? legacy.appFieldKeys.slice().sort()
         : [toSnakeCase(attributeName)];
 
@@ -961,6 +1009,7 @@ async function main() {
   };
 
   const dcatCatalog = buildDcatCatalog({ manifest, terms, generatedAt });
+  const categoryRules = buildCategoryRules({ terms, workbookMetadataByNumber });
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   fs.mkdirSync(FRONTEND_SEMANTICS_DIR, { recursive: true });
@@ -970,6 +1019,7 @@ async function main() {
   fs.writeFileSync(path.join(OUTPUT_DIR, "units.json"), stableStringify(units));
   fs.writeFileSync(path.join(OUTPUT_DIR, "context.jsonld"), stableStringify(context));
   fs.writeFileSync(path.join(OUTPUT_DIR, "catalog.jsonld"), stableStringify(dcatCatalog));
+  fs.writeFileSync(CATEGORY_RULES_PATH, stableStringify(categoryRules));
   fs.writeFileSync(path.join(OUTPUT_DIR, "field-map.json"), stableStringify(fieldMap));
   fs.writeFileSync(path.join(FRONTEND_SEMANTICS_DIR, "battery-dictionary-terms.generated.json"), stableStringify(terms));
 

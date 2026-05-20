@@ -3067,8 +3067,7 @@
     ],
     "sourceWorkbookRow": 35,
     "appFieldKeys": [
-      "battery_carbon_footprint_per_functional_unit",
-      "battery_carbon_functional_unit"
+      "battery_carbon_footprint_per_functional_unit"
     ]
   },
   {
@@ -3179,7 +3178,6 @@
     ],
     "sourceWorkbookRow": 36,
     "appFieldKeys": [
-      "contribution_of_and_preprocessing",
       "contribution_of_raw_material_and_preprocessing_lifecycle_stage"
     ]
   },
@@ -3291,8 +3289,7 @@
     ],
     "sourceWorkbookRow": 37,
     "appFieldKeys": [
-      "contribution_of_main_product_production_lifecycle_stage",
-      "contribution_of_product_production"
+      "contribution_of_main_product_production_lifecycle_stage"
     ]
   },
   {
@@ -3403,7 +3400,6 @@
     ],
     "sourceWorkbookRow": 38,
     "appFieldKeys": [
-      "contribution_of_distribution",
       "contribution_of_distribution_lifecycle_stage"
     ]
   },
@@ -3515,7 +3511,6 @@
     ],
     "sourceWorkbookRow": 39,
     "appFieldKeys": [
-      "contribution_of_and_recycling",
       "contribution_of_end_of_life_and_recycling_lifecycle_stage"
     ]
   },
@@ -3736,7 +3731,6 @@
     ],
     "sourceWorkbookRow": 41,
     "appFieldKeys": [
-      "web_link_footprint_study",
       "web_link_to_public_carbon_footprint_study"
     ]
   },
@@ -3845,7 +3839,7 @@
     ],
     "sourceWorkbookRow": 42,
     "appFieldKeys": [
-      "absolute_battery_carbon_footprint"
+      "absolute_carbon_footprint"
     ]
   },
   {

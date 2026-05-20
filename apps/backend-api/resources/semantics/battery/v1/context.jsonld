@@ -305,15 +305,7 @@
       "@id": "clarosBattery:carbon-footprint-per-kwh",
       "@type": "xsd:decimal"
     },
-    "battery_carbon_functional_unit": {
-      "@id": "clarosBattery:carbon-footprint-per-kwh",
-      "@type": "xsd:decimal"
-    },
     "rawMaterialsLifecycleCarbonContribution": {
-      "@id": "clarosBattery:carbon-footprint-raw-materials",
-      "@type": "xsd:decimal"
-    },
-    "contribution_of_and_preprocessing": {
       "@id": "clarosBattery:carbon-footprint-raw-materials",
       "@type": "xsd:decimal"
     },
@@ -329,15 +321,7 @@
       "@id": "clarosBattery:carbon-footprint-production",
       "@type": "xsd:decimal"
     },
-    "contribution_of_product_production": {
-      "@id": "clarosBattery:carbon-footprint-production",
-      "@type": "xsd:decimal"
-    },
     "distributionLifecycleCarbonContribution": {
-      "@id": "clarosBattery:carbon-footprint-distribution",
-      "@type": "xsd:decimal"
-    },
-    "contribution_of_distribution": {
       "@id": "clarosBattery:carbon-footprint-distribution",
       "@type": "xsd:decimal"
     },
@@ -346,10 +330,6 @@
       "@type": "xsd:decimal"
     },
     "endOfLifeLifecycleCarbonContribution": {
-      "@id": "clarosBattery:carbon-footprint-end-of-life",
-      "@type": "xsd:decimal"
-    },
-    "contribution_of_and_recycling": {
       "@id": "clarosBattery:carbon-footprint-end-of-life",
       "@type": "xsd:decimal"
     },
@@ -369,10 +349,6 @@
       "@id": "clarosBattery:carbon-footprint-study-url",
       "@type": "xsd:anyURI"
     },
-    "web_link_footprint_study": {
-      "@id": "clarosBattery:carbon-footprint-study-url",
-      "@type": "xsd:anyURI"
-    },
     "web_link_to_public_carbon_footprint_study": {
       "@id": "clarosBattery:carbon-footprint-study-url",
       "@type": "xsd:anyURI"
@@ -381,7 +357,7 @@
       "@id": "clarosBattery:absolute-carbon-footprint",
       "@type": "xsd:integer"
     },
-    "absolute_battery_carbon_footprint": {
+    "absolute_carbon_footprint": {
       "@id": "clarosBattery:absolute-carbon-footprint",
       "@type": "xsd:integer"
     },

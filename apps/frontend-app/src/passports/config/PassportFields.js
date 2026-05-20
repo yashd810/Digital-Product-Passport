@@ -71,12 +71,13 @@ export const BATTERY_SECTIONS = {
   carbonFootprint: {
     label: "Carbon Footprint",
     fields: [
-      { key: "raw_material_cf", label: "Raw Material Carbon Footprint", type: "text" },
-      { key: "lifetime_cf",     label: "Lifetime Carbon Footprint",     type: "text" },
-      { key: "recycling_cf",    label: "Recycling Carbon Footprint",    type: "text" },
-      { key: "total_cf",        label: "Total Carbon Footprint",        type: "text" },
-      { key: "cf_class",        label: "Carbon Footprint Class",        type: "text" },
-      { key: "reference_study", label: "Reference Study",               type: "textarea" },
+      { key: "battery_carbon_footprint_per_functional_unit", label: "Battery carbon footprint per Functional Unit", type: "text" },
+      { key: "contribution_of_raw_material_and_preprocessing_lifecycle_stage", label: "Contribution of raw material acquisition and pre-processing lifecycle stage", type: "text" },
+      { key: "contribution_of_main_product_production_lifecycle_stage", label: "Contribution of main product production lifecycle stage", type: "text" },
+      { key: "contribution_of_distribution_lifecycle_stage", label: "Contribution of distribution lifecycle stage", type: "text" },
+      { key: "contribution_of_end_of_life_and_recycling_lifecycle_stage", label: "Contribution of end of life and recycling lifecycle stage", type: "text" },
+      { key: "carbon_footprint_performance_class", label: "Carbon footprint performance class", type: "text" },
+      { key: "web_link_to_public_carbon_footprint_study", label: "Web link to public carbon footprint study", type: "text" },
     ],
   },
 };
@@ -299,4 +300,3 @@ export const PASSPORT_SECTIONS_MAP = {
   toys:         TOYS_SECTIONS,
   construction: CONSTRUCTION_SECTIONS,
 };
-

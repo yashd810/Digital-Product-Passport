@@ -421,28 +421,6 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "battery_carbon_functional_unit": {
-      "termNumber": 28,
-      "termLabel": "Carbon Footprint per Functional Unit",
-      "sourceAttribute": "Battery carbon footprint per Functional Unit",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "contribution_of_and_preprocessing": {
-      "termNumber": 29,
-      "termLabel": "Raw Materials Lifecycle Carbon Contribution",
-      "sourceAttribute": "Contribution of raw material acquisition and pre-processing lifecycle stage",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
     "contribution_of_raw_material_and_preprocessing_lifecycle_stage": {
       "termNumber": 29,
       "termLabel": "Raw Materials Lifecycle Carbon Contribution",
@@ -465,43 +443,10 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "contribution_of_product_production": {
-      "termNumber": 30,
-      "termLabel": "Production Lifecycle Carbon Contribution",
-      "sourceAttribute": "Contribution of main product production lifecycle stage",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "contribution_of_distribution": {
-      "termNumber": 31,
-      "termLabel": "Distribution Lifecycle Carbon Contribution",
-      "sourceAttribute": "Contribution of distribution lifecycle stage",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
     "contribution_of_distribution_lifecycle_stage": {
       "termNumber": 31,
       "termLabel": "Distribution Lifecycle Carbon Contribution",
       "sourceAttribute": "Contribution of distribution lifecycle stage",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "contribution_of_and_recycling": {
-      "termNumber": 32,
-      "termLabel": "End-of-life Lifecycle Carbon Contribution",
-      "sourceAttribute": "Contribution of end of life and recycling lifecycle stage",
       "requirements": {
         "EV": "mandatory_battreg",
         "LMT": "mandatory_battreg",
@@ -531,17 +476,6 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "web_link_footprint_study": {
-      "termNumber": 34,
-      "termLabel": "Public Carbon Footprint Study URL",
-      "sourceAttribute": "Web link to public carbon footprint study",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
     "web_link_to_public_carbon_footprint_study": {
       "termNumber": 34,
       "termLabel": "Public Carbon Footprint Study URL",
@@ -553,7 +487,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "absolute_battery_carbon_footprint": {
+    "absolute_carbon_footprint": {
       "termNumber": 35,
       "termLabel": "Absolute Carbon Footprint",
       "sourceAttribute": "Absolute battery carbon footprint",
@@ -1007,7 +941,7 @@
     "capacity_fade": {
       "termNumber": 61,
       "termLabel": "Capacity Fade",
-      "sourceAttribute": "Capacity fade ",
+      "sourceAttribute": "Capacity fade",
       "requirements": {
         "EV": "mandatory_battreg",
         "LMT": "mandatory_battreg",
@@ -1021,9 +955,9 @@
       "sourceAttribute": "Certified usable battery energy",
       "requirements": {
         "EV": "voluntary",
-        "LMT": "not_applicable",
-        "Industrial": "not_applicable",
-        "Stationary": "not_applicable"
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "remaining_usable_battery_energy": {
@@ -1032,9 +966,9 @@
       "sourceAttribute": "Remaining usable battery energy",
       "requirements": {
         "EV": "voluntary",
-        "LMT": "not_applicable",
-        "Industrial": "not_applicable",
-        "Stationary": "not_applicable"
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "state_of_certified_energy_soce": {
@@ -1043,9 +977,9 @@
       "sourceAttribute": "State of certified energy (SOCE)",
       "requirements": {
         "EV": "mandatory_battreg",
-        "LMT": "not_applicable",
-        "Industrial": "not_applicable",
-        "Stationary": "not_applicable"
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "state_of_energy_soce": {
@@ -1054,9 +988,9 @@
       "sourceAttribute": "State of certified energy (SOCE)",
       "requirements": {
         "EV": "mandatory_battreg",
-        "LMT": "not_applicable",
-        "Industrial": "not_applicable",
-        "Stationary": "not_applicable"
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "state_of_charge_soc": {
@@ -1073,7 +1007,7 @@
     "minimum_voltage": {
       "termNumber": 66,
       "termLabel": "Minimum Voltage",
-      "sourceAttribute": "Minimum voltage ",
+      "sourceAttribute": "Minimum voltage",
       "requirements": {
         "EV": "mandatory_battreg",
         "LMT": "mandatory_battreg",
@@ -1172,7 +1106,7 @@
     "initial_round_energy_efficiency": {
       "termNumber": 74,
       "termLabel": "Initial Round-trip Energy Efficiency",
-      "sourceAttribute": "Initial round trip energy efficiency ",
+      "sourceAttribute": "Initial round trip energy efficiency",
       "requirements": {
         "EV": "mandatory_battreg",
         "LMT": "mandatory_battreg",
@@ -1183,7 +1117,7 @@
     "initial_round_trip_energy_efficiency": {
       "termNumber": 74,
       "termLabel": "Initial Round-trip Energy Efficiency",
-      "sourceAttribute": "Initial round trip energy efficiency ",
+      "sourceAttribute": "Initial round trip energy efficiency",
       "requirements": {
         "EV": "mandatory_battreg",
         "LMT": "mandatory_battreg",
@@ -1216,23 +1150,23 @@
     "remaining_round_energy_efficiency": {
       "termNumber": 76,
       "termLabel": "Remaining Round-trip Energy Efficiency",
-      "sourceAttribute": "Remaining round trip energy efficiency ",
+      "sourceAttribute": "Remaining round trip energy efficiency",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "remaining_round_trip_energy_efficiency": {
       "termNumber": 76,
       "termLabel": "Remaining Round-trip Energy Efficiency",
-      "sourceAttribute": "Remaining round trip energy efficiency ",
+      "sourceAttribute": "Remaining round trip energy efficiency",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "energy_round_efficiency_fade": {
@@ -1262,10 +1196,10 @@
       "termLabel": "Initial Self-discharge Rate",
       "sourceAttribute": "Initial self-discharge rate",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "voluntary",
-        "Industrial": "not_applicable",
-        "Stationary": "voluntary"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "current_selfdischarge_rate": {
@@ -1273,10 +1207,10 @@
       "termLabel": "Current Self-discharge Rate",
       "sourceAttribute": "Current self-discharge rate",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "voluntary",
-        "Industrial": "not_applicable",
-        "Stationary": "voluntary"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "evolution_of_selfdischarge_rates": {
@@ -1284,10 +1218,10 @@
       "termLabel": "Self-discharge Rate Evolution",
       "sourceAttribute": "Evolution of self-discharge rates",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "initial_internal_module_recommended": {
@@ -1337,7 +1271,7 @@
     "expected_lifetime_calendar_years": {
       "termNumber": 83,
       "termLabel": "Expected Lifetime (years)",
-      "sourceAttribute": "Expected lifetime in calendar years ",
+      "sourceAttribute": "Expected lifetime in calendar years",
       "requirements": {
         "EV": "mandatory_battreg",
         "LMT": "mandatory_battreg",
@@ -1348,7 +1282,7 @@
     "expected_lifetime_in_calendar_years": {
       "termNumber": 83,
       "termLabel": "Expected Lifetime (years)",
-      "sourceAttribute": "Expected lifetime in calendar years ",
+      "sourceAttribute": "Expected lifetime in calendar years",
       "requirements": {
         "EV": "mandatory_battreg",
         "LMT": "mandatory_battreg",
@@ -1436,23 +1370,23 @@
     "energy_throughput": {
       "termNumber": 88,
       "termLabel": "Energy Throughput",
-      "sourceAttribute": "Energy throughput  ",
+      "sourceAttribute": "Energy throughput",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "capacity_throughput": {
       "termNumber": 89,
       "termLabel": "Capacity Throughput",
-      "sourceAttribute": "Capacity throughput  ",
+      "sourceAttribute": "Capacity throughput",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "capacity_threshold_for_exhaustion": {
@@ -1461,9 +1395,9 @@
       "sourceAttribute": "Capacity threshold for exhaustion",
       "requirements": {
         "EV": "mandatory_battreg",
-        "LMT": "not_applicable",
-        "Industrial": "not_applicable",
-        "Stationary": "not_applicable"
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "temperature_information": {
@@ -1526,10 +1460,10 @@
       "termLabel": "Time in High Temperature",
       "sourceAttribute": "Time spent in extreme temperatures above boundary",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "time_spent_in_extreme_temperatures_above_boundary": {
@@ -1537,10 +1471,10 @@
       "termLabel": "Time in High Temperature",
       "sourceAttribute": "Time spent in extreme temperatures above boundary",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "time_spent_below_boundary": {
@@ -1548,10 +1482,10 @@
       "termLabel": "Time in Low Temperature",
       "sourceAttribute": "Time spent in extreme temperatures below boundary",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "time_spent_in_extreme_temperatures_below_boundary": {
@@ -1559,10 +1493,10 @@
       "termLabel": "Time in Low Temperature",
       "sourceAttribute": "Time spent in extreme temperatures below boundary",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "time_spent_above_boundar": {
@@ -1570,10 +1504,10 @@
       "termLabel": "Time Charging in High Temperature",
       "sourceAttribute": "Time spent charging during extreme temperatures above boundary",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "time_spent_charging_during_extreme_temperatures_above_boundary": {
@@ -1581,10 +1515,10 @@
       "termLabel": "Time Charging in High Temperature",
       "sourceAttribute": "Time spent charging during extreme temperatures above boundary",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "time_spent_charging_during_extreme_temperatures_below_boundary": {
@@ -1592,10 +1526,10 @@
       "termLabel": "Time Charging in Low Temperature",
       "sourceAttribute": "Time spent charging during extreme temperatures below boundary",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "time_spent_temperatures_below_boundary": {
@@ -1603,10 +1537,10 @@
       "termLabel": "Time Charging in Low Temperature",
       "sourceAttribute": "Time spent charging during extreme temperatures below boundary",
       "requirements": {
-        "EV": "not_applicable",
-        "LMT": "mandatory_battreg",
-        "Industrial": "not_applicable",
-        "Stationary": "mandatory_battreg"
+        "EV": null,
+        "LMT": null,
+        "Industrial": null,
+        "Stationary": null
       }
     },
     "number_of_deep_discharge_events": {
