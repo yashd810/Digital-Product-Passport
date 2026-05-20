@@ -356,9 +356,9 @@ export function PassportIntro({
     passport.weight ||
     "—";
   const serialNumber =
-    passport.product_id ||
     passport.serial_number ||
     passport.serial ||
+    passport.batterySerialNumber ||
     passport.battery_serial_number ||
     "—";
   const manufacturerInfo =
@@ -907,7 +907,7 @@ export function PrintView({ passport, companyData, sections }) {
             <span><strong>Type:</strong> {passport.passport_type}</span>
             <span><strong>Version:</strong> v{passport.version_number}</span>
             <span><strong>Status:</strong> {statusLabel}</span>
-            {passport.product_id && <span><strong>Serial Number:</strong> {passport.product_id}</span>}
+            {passport.product_id && <span><strong>Local Passport ID:</strong> {passport.product_id}</span>}
             <span><strong>DPP ID:</strong> {passport.dppId}</span>
           </div>
         </div>

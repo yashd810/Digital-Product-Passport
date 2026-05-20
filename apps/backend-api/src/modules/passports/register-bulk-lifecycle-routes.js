@@ -98,7 +98,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
         const sections = typeRes.rows[0]?.fields_json?.sections || [];
         const fieldMap = new Map(sections.flatMap((section) => section.fields || []).map((field) => [field.key, field]));
         fieldMap.set("model_name", { key: "model_name", label: "Model Name", type: "text" });
-        fieldMap.set("product_id", { key: "product_id", label: "Serial Number", type: "text" });
+        fieldMap.set("product_id", { key: "product_id", label: "Local Passport ID", type: "text" });
 
         const applicableChanges = Object.entries(changes).filter(([key]) => fieldMap.has(key) && /^[a-z][a-z0-9_]*$/.test(key));
 

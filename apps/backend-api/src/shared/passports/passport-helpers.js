@@ -448,7 +448,7 @@ const coerceBulkFieldValue = (fieldDef, rawValue) => {
 const getHistoryFieldDefs = (typeRow) => {
   const baseFields = [
     { key: "model_name", label: "Model Name", type: "text" },
-    { key: "product_id", label: "Serial Number", type: "text" },
+    { key: "product_id", label: "Local Passport ID", type: "text" },
   ];
   const schemaFields = (typeRow?.fields_json?.sections || [])
     .flatMap((section) => section.fields || [])
@@ -519,7 +519,7 @@ const getAssetFieldMap = (typeSchema) => {
   const map = new Map();
   [
     { key: "dppId", label: "Passport DPP ID", type: "text", system: true },
-    { key: "product_id", label: "Serial Number", type: "text", system: true },
+    { key: "product_id", label: "Local Passport ID", type: "text", system: true },
     { key: "model_name", label: "Model Name", type: "text", system: true },
   ].forEach((field) => map.set(field.key, field));
   (typeSchema?.schemaFields || []).forEach((field) => {

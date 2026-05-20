@@ -63,8 +63,8 @@ function createDraftPassportUseCase(deps) {
     if (existingByProductId) {
       const error = new Error(
         isBulk
-          ? `A passport with Serial Number "${normalizedProductId}" already exists — skipped`
-          : `A passport with Serial Number "${normalizedProductId}" already exists.`
+          ? `A passport with Local Passport ID "${normalizedProductId}" already exists — skipped`
+          : `A passport with Local Passport ID "${normalizedProductId}" already exists.`
       );
       error.statusCode = 409;
       error.payload = isBulk ? null : {

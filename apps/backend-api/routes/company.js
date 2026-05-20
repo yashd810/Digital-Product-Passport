@@ -539,7 +539,7 @@ module.exports = function registerCompanyRoutes(app, {
                 tableName, companyId, productId: normalizedProductId, excludeGuid: incomingGuid
               });
               if (existingByProductId) {
-                details.push({ dppId: incomingGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
+                details.push({ dppId: incomingGuid, product_id: normalizedProductId, status: "failed", error: `Local Passport ID "${normalizedProductId}" already belongs to another passport` });
                 failed++;continue;
               }
             }
@@ -560,7 +560,7 @@ module.exports = function registerCompanyRoutes(app, {
             updated++;
           } else {
             if (!normalizedProductId) {
-              details.push({ status: "skipped", reason: "Serial Number is required to create a new passport" });
+              details.push({ status: "skipped", reason: "Local Passport ID is required to create a new passport" });
               skipped++;continue;
             }
             const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
@@ -730,7 +730,7 @@ module.exports = function registerCompanyRoutes(app, {
                 tableName, companyId, productId: normalizedProductId, excludeGuid: incomingGuid
               });
               if (existingByProductId) {
-                details.push({ dppId: incomingGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
+                details.push({ dppId: incomingGuid, product_id: normalizedProductId, status: "failed", error: `Local Passport ID "${normalizedProductId}" already belongs to another passport` });
                 failed++;continue;
               }
             }
@@ -754,7 +754,7 @@ module.exports = function registerCompanyRoutes(app, {
             updated++;
           } else {
             if (!normalizedProductId) {
-              details.push({ status: "skipped", reason: "Serial Number is required to create a new passport" });
+              details.push({ status: "skipped", reason: "Local Passport ID is required to create a new passport" });
               skipped++;continue;
             }
             const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });

@@ -5,6 +5,7 @@ import { buildPassportJsonLdExport } from "../../../shared/utils/batterySemantic
 import { formatPassportStatus, isPublishedPassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode";
+import { getPassportSerialNumber } from "../passports/utils/passportListHelpers";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -295,7 +296,7 @@ function ArchivedPassports({ user, companyId }) {
 
   const tableColumns = useMemo(() => [
     { key: "version_number", type: "number", getValue: group => group.latest?.version_number },
-    { key: "product_id", type: "string", getValue: group => group.latest?.product_id || "" },
+    { key: "serial_number", type: "string", getValue: group => getPassportSerialNumber(group.latest) },
     { key: "model_name", type: "string", getValue: group => group.latest?.model_name || "" },
     { key: "passport_type", type: "string", getValue: group => group.latest?.passport_type || "" },
     { key: "release_status", type: "string", getValue: group => group.latest?.release_status || "" },
@@ -418,7 +419,7 @@ function ArchivedPassports({ user, companyId }) {
           <span className="version-badge">v{passport.version_number}</span>
         </div>
       </td>
-      <td>{passport.product_id ? <span className="product-id-badge">{passport.product_id}</span> : <span className="no-product-id">—</span>}</td>
+      <td>{getPassportSerialNumber(passport) ? <span className="product-id-badge">{getPassportSerialNumber(passport)}</span> : <span className="no-product-id">—</span>}</td>
       <td>{passport.model_name || "—"}</td>
       <td><span className="type-badge passport-type-badge">{passport.passport_type}</span></td>
       <td>
@@ -540,7 +541,7 @@ function ArchivedPassports({ user, companyId }) {
                         onChange={toggleSelectAll} title="Select All" />
                     </th>}
                     <th className="passport-version-col"><button type="button" className="table-sort-btn" onClick={() => toggleSort("version_number")}>Ver.{sortIndicator(sortConfig, "version_number") && ` ${sortIndicator(sortConfig, "version_number")}`}</button></th>
-                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("product_id")}>Serial Number{sortIndicator(sortConfig, "product_id") && ` ${sortIndicator(sortConfig, "product_id")}`}</button></th>
+                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("serial_number")}>Serial Number{sortIndicator(sortConfig, "serial_number") && ` ${sortIndicator(sortConfig, "serial_number")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("model_name")}>Model{sortIndicator(sortConfig, "model_name") && ` ${sortIndicator(sortConfig, "model_name")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("passport_type")}>Type{sortIndicator(sortConfig, "passport_type") && ` ${sortIndicator(sortConfig, "passport_type")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("release_status")}>Last Status{sortIndicator(sortConfig, "release_status") && ` ${sortIndicator(sortConfig, "release_status")}`}</button></th>
@@ -551,7 +552,7 @@ function ArchivedPassports({ user, companyId }) {
                   {showFilters && <tr className="table-filter-row">
                     {selectionMode && <th></th>}
                     <th><input className="table-filter-input" value={columnFilters.version_number || ""} onChange={e => setColumnFilters(prev => ({ ...prev, version_number: e.target.value }))} placeholder="Filter" /></th>
-                    <th><input className="table-filter-input" value={columnFilters.product_id || ""} onChange={e => setColumnFilters(prev => ({ ...prev, product_id: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={columnFilters.serial_number || ""} onChange={e => setColumnFilters(prev => ({ ...prev, serial_number: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.model_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, model_name: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.passport_type || ""} onChange={e => setColumnFilters(prev => ({ ...prev, passport_type: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.release_status || ""} onChange={e => setColumnFilters(prev => ({ ...prev, release_status: e.target.value }))} placeholder="Filter" /></th>

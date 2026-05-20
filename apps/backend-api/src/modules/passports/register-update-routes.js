@@ -319,7 +319,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
             }
             const dup = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId, excludeGuid: matchedGuid, excludeLineageId: matchedLineageId });
             if (dup) {
-              details.push({ dppId: matchedGuid, product_id: normalizedProductId, status: "failed", error: `Serial Number "${normalizedProductId}" already belongs to another passport` });
+              details.push({ dppId: matchedGuid, product_id: normalizedProductId, status: "failed", error: `Local Passport ID "${normalizedProductId}" already belongs to another passport` });
               failed += 1;
               continue;
             }

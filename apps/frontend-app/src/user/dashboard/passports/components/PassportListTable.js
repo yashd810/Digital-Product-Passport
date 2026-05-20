@@ -48,7 +48,7 @@ export function PassportListTable({
             )}
             <th className="passport-table-pin-col"></th>
             <th className="passport-version-col"><SortableHeader columnKey="version_number" label="Ver." sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            <th><SortableHeader columnKey="product_id" label="Serial Number" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th><SortableHeader columnKey="serial_number" label="Serial Number" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
             <th><SortableHeader columnKey="model_name" label="Model" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
             {filterByUser && <th><SortableHeader columnKey="passport_type" label="Type" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
             <th><SortableHeader columnKey="created_at" label="Date" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
@@ -62,7 +62,7 @@ export function PassportListTable({
               {user?.role !== "viewer" && selectionMode && <th></th>}
               <th></th>
               <th><input className="table-filter-input" value={columnFilters.version_number || ""} onChange={(e) => updateColumnFilter("version_number", e.target.value)} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.product_id || ""} onChange={(e) => updateColumnFilter("product_id", e.target.value)} placeholder="Filter" /></th>
+              <th><input className="table-filter-input" value={columnFilters.serial_number || ""} onChange={(e) => updateColumnFilter("serial_number", e.target.value)} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.model_name || ""} onChange={(e) => updateColumnFilter("model_name", e.target.value)} placeholder="Filter" /></th>
               {filterByUser && <th><input className="table-filter-input" value={columnFilters.passport_type || ""} onChange={(e) => updateColumnFilter("passport_type", e.target.value)} placeholder="Filter" /></th>}
               <th><input className="table-filter-input" value={columnFilters.created_at || ""} onChange={(e) => updateColumnFilter("created_at", e.target.value)} placeholder="Filter" /></th>

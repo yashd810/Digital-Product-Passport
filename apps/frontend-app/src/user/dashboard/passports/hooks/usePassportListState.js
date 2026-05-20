@@ -9,6 +9,7 @@ import {
   calcCompleteness,
   formatPassportTypeLabel,
   getPassportGroupKey,
+  getPassportSerialNumber,
   sortPassportsByVersionDesc,
 } from "../utils/passportListHelpers";
 
@@ -293,7 +294,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const tableColumns = useMemo(() => {
     const columns = [
       { key: "version_number", type: "number", getValue: (group) => group.latest?.version_number },
-      { key: "product_id", type: "string", getValue: (group) => group.latest?.product_id || "" },
+      { key: "serial_number", type: "string", getValue: (group) => getPassportSerialNumber(group.latest) },
       { key: "model_name", type: "string", getValue: (group) => group.latest?.model_name || "" },
       { key: "created_at", type: "date", getValue: (group) => group.latest?.created_at },
       { key: "release_status", type: "string", getValue: (group) => group.latest?.release_status || "" },

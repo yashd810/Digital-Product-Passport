@@ -138,7 +138,7 @@ function createWorkflowHelpers({
                 <p>Hi <strong>${reviewerName}</strong>,</p>
                 <p><strong>${submitterName}</strong> has submitted a passport for your review.</p>
                 <div class="info-box">
-                  <div class="info-row"><span class="info-label">Serial Number</span><span class="info-value">${passport.product_id}</span></div>
+                  <div class="info-row"><span class="info-label">Local Passport ID</span><span class="info-value">${passport.product_id}</span></div>
                   ${passport.model_name ? `<div class="info-row"><span class="info-label">Model</span><span class="info-value">${passport.model_name}</span></div>` : ""}
                   <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.version_number}</span></div>
                   <div class="info-row"><span class="info-label">Type</span><span class="info-value">${passportType}</span></div>

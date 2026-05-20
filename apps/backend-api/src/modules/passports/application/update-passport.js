@@ -116,7 +116,7 @@ function updateEditablePassportUseCase(deps) {
         excludeLineageId: current.rows[0].lineage_id,
       });
       if (existingByProductId) {
-        const error = new Error(`A passport with Serial Number "${normalizedProductId}" already exists.`);
+        const error = new Error(`A passport with Local Passport ID "${normalizedProductId}" already exists.`);
         error.statusCode = 409;
         error.payload = {
           existing_dpp_id: existingByProductId.dppId,

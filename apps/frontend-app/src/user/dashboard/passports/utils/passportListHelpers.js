@@ -3,7 +3,6 @@ import { isReleasedPassportStatus } from "../../../../passports/utils/passportSt
 
 const BASE_COMPLETENESS_FIELDS = [
   { key: "model_name", type: "text" },
-  { key: "product_id", type: "text" },
 ];
 
 const FIELD_KEY_ALIASES = {
@@ -16,6 +15,10 @@ const FIELD_KEY_ALIASES = {
   model_name: ["modelName"],
   productId: ["product_id", "localProductId"],
   product_id: ["productId", "localProductId"],
+  serial_number: ["serialNumber", "serial", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"],
+  serialNumber: ["serial_number", "serial", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"],
+  batterySerialNumber: ["battery_serial_number", "serial_number", "serial", "serialNumber"],
+  battery_serial_number: ["batterySerialNumber", "serial_number", "serial", "serialNumber"],
   dppStatus: ["release_status"],
   release_status: ["dppStatus"],
   lastUpdate: ["updated_at", "created_at"],
@@ -87,6 +90,11 @@ function getPassportFieldValue(passport, key) {
     }
   }
   return undefined;
+}
+
+export function getPassportSerialNumber(passport) {
+  const value = getPassportFieldValue(passport || {}, "serial_number");
+  return value == null ? "" : String(value).trim();
 }
 
 function hasCompletionValue(value, field = {}) {

@@ -593,7 +593,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Know which identifier is which",
           items: [
             "`dppId` is the internal passport record identifier used by dashboard rows and most company APIs.",
-            "`product_id` is the local product, serial, model, or batch identifier that users recognize operationally.",
+            "`product_id` is the local passport ID used internally for routing, uniqueness, and draft creation.",
             "`product_identifier_did` is the global product identifier used by DID/standards flows when available.",
             "`granularity` says whether the DPP represents a model, batch, or item. Released granularity changes use a linked successor flow instead of silent in-place mutation.",
           ],
@@ -638,7 +638,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       facts: [
         { label: "Best use case", value: "Bulk updates on existing passports, especially when rows already have dppId or product_id" },
         { label: "Launch path", value: "Open from the company dashboard. The tool authenticates automatically from the dashboard launch." },
-        { label: "Matching rule", value: "dppId is safest. product_id works as the fallback match key for ERP and spreadsheet updates." },
+        { label: "Matching rule", value: "dppId is safest. product_id works as the fallback local passport ID match key for ERP and spreadsheet updates." },
         { label: "Safety rule", value: "Unknown columns are rejected. Nothing changes until Push to Backend is used." },
       ],
       journeys: [
@@ -662,7 +662,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Work in the Asset Grid",
           items: [
-            "The grid behaves like a simple spreadsheet. Row, Passport DPP ID, and Serial Number stay visible while you scroll.",
+            "The grid behaves like a simple spreadsheet. Row, Passport DPP ID, and Local Passport ID stay visible while you scroll.",
             "Use Create Passport Row when you want to stage a new row manually before previewing it.",
             "Use Export CSV to create a safe base file. Filtered columns export still keeps `dppId` and `product_id` so the file can be matched on import.",
             "Keep `dppId` whenever possible. If your incoming data does not have `dppId`, make sure `product_id` is present and stable.",

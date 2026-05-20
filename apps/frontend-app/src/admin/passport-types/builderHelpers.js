@@ -309,7 +309,7 @@ export const downloadTemplate = () => {
     "Field Label,Section,Type,Access,Confidentiality,Update Authority",
     "Manufacturer,General,text,manufacturer|market_surveillance,regulated,economic_operator|market_surveillance",
     "Model Number,General,text,public,public,economic_operator",
-    "Serial Number,General,text,public,public,economic_operator",
+    "Local Passport ID,General,text,public,public,economic_operator",
     "Weight (kg),Technical Specifications,text,public,public,economic_operator",
     "Dimensions,Technical Specifications,text,public,public,economic_operator",
     "Material Composition,Technical Specifications,textarea,public,public,economic_operator",

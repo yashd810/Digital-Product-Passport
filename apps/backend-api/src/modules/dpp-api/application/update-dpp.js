@@ -178,7 +178,7 @@ function updateDppUseCase(deps) {
         return {
           statusCode: 409,
           body: {
-            error: `A passport with Serial Number "${nextProductId}" already exists.`,
+            error: `A passport with Local Passport ID "${nextProductId}" already exists.`,
             existingDppId: existingByProductId.dppId,
             release_status: existingByProductId.release_status || null,
           },

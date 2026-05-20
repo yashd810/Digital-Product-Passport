@@ -5,6 +5,7 @@ import {
 } from "../../../../passports/utils/passportStatus";
 import { CompletenessBar } from "./PassportListComponents";
 import { PassportListRowMenu } from "./PassportListRowMenu";
+import { getPassportSerialNumber } from "../utils/passportListHelpers";
 
 export function PassportListRow({
   passport,
@@ -51,6 +52,7 @@ export function PassportListRow({
   const isExpanded = expandedPassportGroups.has(parentGuid);
   const normalizedStatus = normalizePassportStatus(passport.release_status);
   const showOlderVersionsToggle = hasOlderVersions && !isHistorical;
+  const serialNumber = getPassportSerialNumber(passport);
 
   return (
     <tr
@@ -106,7 +108,7 @@ export function PassportListRow({
           <span className="version-badge">v{passport.version_number}</span>
         </div>
       </td>
-      <td>{passport.product_id ? <span className="product-id-badge">{passport.product_id}</span> : <span className="no-product-id">—</span>}</td>
+      <td>{serialNumber ? <span className="product-id-badge">{serialNumber}</span> : <span className="no-product-id">—</span>}</td>
       <td>
         <button className="model-link-btn" onClick={e => { e.stopPropagation(); openPassportViewer(passport); }}>
           {passport.model_name}

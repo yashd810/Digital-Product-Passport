@@ -75,7 +75,7 @@ function createDppUseCase(deps) {
       productId: storedProductIdentifiers.productIdInput,
     });
     if (existingByProductId) {
-      const conflict = new Error(`A passport with Serial Number "${storedProductIdentifiers.productIdInput}" already exists.`);
+      const conflict = new Error(`A passport with Local Passport ID "${storedProductIdentifiers.productIdInput}" already exists.`);
       conflict.statusCode = 409;
       conflict.payload = {
         existingDppId: existingByProductId.dppId,

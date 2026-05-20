@@ -383,7 +383,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
       if (existingByProductId) {
         return res.status(409).json({
-          error: `A passport with Serial Number "${requestedProductId}" already exists.`,
+          error: `A passport with Local Passport ID "${requestedProductId}" already exists.`,
           existing_dpp_id: existingByProductId.dppId,
           release_status: normalizeReleaseStatus(existingByProductId.release_status),
         });

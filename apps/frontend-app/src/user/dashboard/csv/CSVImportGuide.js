@@ -280,7 +280,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               <div className="subsection">
                 <h3>Required Fields</h3>
                 <ul>
-                  <li><strong>product_id</strong> — The unique serial number for the passport (required)</li>
+                  <li><strong>product_id</strong> — The unique local passport ID used internally by the platform (required)</li>
                   <li><strong>model_name</strong> — Display name or model label for the product (optional)</li>
                 </ul>
               </div>
@@ -313,7 +313,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
             <section className="guide-section tips-section">
               <h2>💡 Tips</h2>
               <ul>
-                <li><strong>Serial Number drives uniqueness</strong> — use a stable unit identifier; model names can repeat</li>
+                <li><strong>Local Passport ID drives uniqueness</strong> — use a stable internal identifier; model names can repeat</li>
                 <li><strong>Boolean fields:</strong> use "true"/"false" or "1"/"0"</li>
                 <li><strong>Save as CSV</strong>, not .xlsx or .xls</li>
                 <li><strong>Partial fields supported</strong> — missing cells stay empty</li>

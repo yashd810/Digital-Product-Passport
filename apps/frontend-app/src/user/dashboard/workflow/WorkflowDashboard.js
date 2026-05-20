@@ -6,6 +6,7 @@ import { isObsoletePassportStatus, normalizePassportStatus } from "../../../pass
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { extractComplianceError, formatComplianceIssueSummary } from "../../../shared/utils/complianceErrors";
+import { getPassportSerialNumber } from "../passports/utils/passportListHelpers";
 import "../../../admin/styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -572,12 +573,13 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     const needsMyReview = showActions && String(wf.reviewer_id) === String(user?.id) && wf.review_status === "pending";
     const needsMyApproval = showActions && String(wf.approver_id) === String(user?.id) && wf.approval_status === "pending" && wf.review_status !== "pending";
     const workflowPassportId = getWorkflowPassportId(wf);
+    const serialNumber = getPassportSerialNumber(wf);
     return (
       <tr key={wf.id}>
         <td>
           <button className="model-link-btn"
             onClick={() => openPassportViewer(wf)}>
-            {wf.serial_number || wf.product_id || workflowPassportId}
+            {serialNumber || wf.model_name || workflowPassportId}
           </button>
           <div className="workflow-meta-copy">
             {wf.passport_type} · v{wf.version_number}
@@ -632,6 +634,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
                     : data.history;
 
   const workflowColumns = useMemo(() => ([
+    { key: "serial_number", type: "string", getValue: (wf) => getPassportSerialNumber(wf) },
     { key: "model_name", type: "string", getValue: (wf) => wf.model_name || "" },
     { key: "status", type: "string", getValue: (wf) => (
       wf.overall_status === "rejected" ? "rejected" :
