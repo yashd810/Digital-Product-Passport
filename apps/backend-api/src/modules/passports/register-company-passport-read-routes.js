@@ -157,9 +157,14 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
 
       const sections = typeResult.rows[0]?.fields_json?.sections || [];
       const schemaFields = sections.flatMap((section) => section.fields || []);
+      const wantsFullRepresentation = isFullRepresentationRequest(req.query.representation);
       const tableName = getTable(passportType);
-      const columns = ["dpp_id", "model_name", "product_id", "release_status", ...schemaFields.map((field) => field.key)];
-      const safeColumns = columns.map((column) => (/^[a-z][a-z0-9_]*$/.test(column) ? column : null)).filter(Boolean);
+      const columns = wantsFullRepresentation
+        ? ["*"]
+        : ["dpp_id", "model_name", "product_id", "release_status", ...schemaFields.map((field) => field.key)];
+      const safeColumns = columns[0] === "*"
+        ? columns
+        : columns.map((column) => (/^[a-z][a-z0-9_]*$/.test(column) ? column : null)).filter(Boolean);
 
       let statusSql;
       if (statusFilter === "all") {
@@ -183,7 +188,20 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       if (format === "json" || format === "jsonld") {
         res.setHeader("Content-Type", "application/ld+json");
         res.setHeader("Content-Disposition", `attachment; filename="${passportType}_export.jsonld"`);
-        return res.json(buildBatteryPassJsonExport(rows, passportType, {
+        const company = wantsFullRepresentation
+          ? await loadCompanySerializationContext(companyId)
+          : null;
+        const exportRows = wantsFullRepresentation
+          ? rows.map((row) => buildExpandedPassportPayload(
+              { ...normalizePassportRow(row), passport_type: passportType },
+              typeResult.rows[0],
+              {
+                company,
+                granularity: company?.default_granularity || row.granularity || "model",
+              }
+            ))
+          : rows;
+        return res.json(buildBatteryPassJsonExport(exportRows, passportType, {
           semanticModelKey: typeResult.rows[0]?.semantic_model_key || null,
           productCategory: typeResult.rows[0]?.product_category || null,
         }));
