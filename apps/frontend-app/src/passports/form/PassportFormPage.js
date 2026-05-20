@@ -573,7 +573,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     return url;
   };
 
-  const buildEditableBody = () => {
+  const buildPersistedBody = () => {
     const schemaFieldKeys = new Set(
       Object.values(SECTIONS || {})
         .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
@@ -731,7 +731,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       if (mountedRef.current) setAutoSaveState("saving");
 
     try {
-      const body = buildEditableBody();
+      const body = buildPersistedBody();
       const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports/${dppId}`, {
         method:"PATCH",
         headers: authHeaders({ "Content-Type":"application/json" }),
@@ -847,15 +847,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         if (!trimmedProductId) {
           throw new Error("Serial Number is required");
         }
-        const serializedData = Object.fromEntries(
-          Object.entries(formData).map(([k, v]) => [k, Array.isArray(v) ? JSON.stringify(v) : v])
-        );
-        const body = {
-          passport_type: activePassportType,
-          ...serializedData,
-          model_name: modelName.trim() || null,
-          product_id: trimmedProductId,
-        };
+        const body = buildPersistedBody();
         const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
           body: JSON.stringify(body),
