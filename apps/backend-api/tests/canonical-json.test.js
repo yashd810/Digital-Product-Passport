@@ -327,6 +327,62 @@ describe("canonical passport JSON", () => {
     );
   });
 
+  test("keeps expanded element values even when semantic validation reports issues", () => {
+    const didService = createDidService({
+      didDomain: "www.claros-dpp.online",
+      publicOrigin: "https://www.claros-dpp.online",
+      apiOrigin: "https://api.claros.test",
+    });
+    const serializer = createCanonicalPassportSerializer({ didService });
+    const payload = serializer.buildExpandedPassportPayload(
+      {
+        guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
+        lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
+        company_id: 5,
+        passport_type: "trial_1_dbp",
+        product_id: "BAT-2026-001",
+        version_number: 3,
+        release_status: "released",
+        updated_at: "2026-04-24T12:00:00.000Z",
+        batterycategory: "car",
+      },
+      {
+        type_name: "trial_1_dbp",
+        semantic_model_key: "claros_battery_dictionary_v1",
+        fields_json: {
+          sections: [
+            {
+              fields: [
+                { key: "batteryCategory", semanticId: "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-category", elementId: "batteryCategory" },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        company: { company_name: "Acme Energy", did_slug: "acme-energy", dpp_granularity: "item" },
+      }
+    );
+
+    expect(payload.elements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          elementId: "batteryCategory",
+          dictionaryReference: "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-category",
+          value: "car",
+        }),
+      ])
+    );
+    expect(payload.extensions?.claros?.validationIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "batteryCategory",
+          code: "SEMANTIC_ALLOWED_VALUE_MISMATCH",
+        }),
+      ])
+    );
+  });
+
   test("classifies related resources and multilingual values with explicit standard object types", () => {
     const didService = createDidService({
       didDomain: "www.claros-dpp.online",

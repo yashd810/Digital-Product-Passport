@@ -1114,7 +1114,16 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const elements = getSchemaFieldDefinitions(typeDef)
       .map((fieldDef) => ({
         fieldDef,
-        value: canonicalPayload.fields?.[fieldDef.key],
+        value: (() => {
+          const rawValue = getPassportFieldValue(passport, fieldDef.key);
+          if (isBlankValue(rawValue)) return undefined;
+          const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key);
+          const typedValue = coerceValueToSemanticType(
+            coerceTypedFieldValue(fieldDef, rawValue),
+            semanticTerm
+          );
+          return typedValue === null ? undefined : typedValue;
+        })(),
       }))
       .filter(({ value }) => value !== undefined && value !== null)
       .map(({ fieldDef, value }) => buildExpandedDataElement({
