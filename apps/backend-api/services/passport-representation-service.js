@@ -70,6 +70,18 @@ module.exports = function createPassportRepresentationService({
     };
   }
 
+  function getPassportFieldValue(passport, fieldKey) {
+    if (!passport || !fieldKey) return undefined;
+    if (Object.prototype.hasOwnProperty.call(passport, fieldKey)) {
+      return passport[fieldKey];
+    }
+    const lowerKey = String(fieldKey).toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(passport, lowerKey)) {
+      return passport[lowerKey];
+    }
+    return undefined;
+  }
+
   // Build a canonical JTC 18223-style operational DPP payload.
   // Internal fields (dppId, company_id, etc.) are mapped to the
   // standard external names. User-defined passport fields are
@@ -146,7 +158,7 @@ module.exports = function createPassportRepresentationService({
         if (field.dynamic) continue;
         const v = canonicalPayload?.fields && Object.prototype.hasOwnProperty.call(canonicalPayload.fields, field.key)
           ? canonicalPayload.fields[field.key]
-          : passport[field.key];
+          : getPassportFieldValue(passport, field.key);
         if (v !== null && v !== undefined && v !== "") {
           userFields[field.key] = v;
         }

@@ -25,6 +25,18 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
     ARCHIVED_HISTORY_FILTER_SQL,
   } = deps;
 
+  const getPassportFieldValue = (passport, fieldKey) => {
+    if (!passport || !fieldKey) return undefined;
+    if (Object.prototype.hasOwnProperty.call(passport, fieldKey)) {
+      return passport[fieldKey];
+    }
+    const lowerKey = String(fieldKey).toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(passport, lowerKey)) {
+      return passport[lowerKey];
+    }
+    return undefined;
+  };
+
   app.get("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { companyId } = req.params;
@@ -219,7 +231,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         ["model_name", ...rows.map((row) => row.model_name || "")],
         ["product_id", ...rows.map((row) => row.product_id || "")],
         ["release_status", ...rows.map((row) => row.release_status || "")],
-        ...schemaFields.map((field) => [field.label || field.key, ...rows.map((row) => row[field.key] ?? "")]),
+        ...schemaFields.map((field) => [field.label || field.key, ...rows.map((row) => getPassportFieldValue(row, field.key) ?? "")]),
       ];
 
       const headerRow = ["Field Name", ...rows.map((_, index) => `Passport ${index + 1}`)];

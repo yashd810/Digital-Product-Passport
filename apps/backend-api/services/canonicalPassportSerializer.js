@@ -937,6 +937,18 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     });
   }
 
+  function getPassportFieldValue(passport, fieldKey) {
+    if (!passport || !fieldKey) return undefined;
+    if (Object.prototype.hasOwnProperty.call(passport, fieldKey)) {
+      return passport[fieldKey];
+    }
+    const lowerKey = String(fieldKey).toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(passport, lowerKey)) {
+      return passport[lowerKey];
+    }
+    return undefined;
+  }
+
   function buildCanonicalPassportPayload(passport, typeDef, options = {}) {
     const company = options.company || null;
     const companyName = String(options.companyName || "").trim();
@@ -979,7 +991,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
         });
         continue;
       }
-      const rawValue = passport?.[fieldDef.key];
+      const rawValue = getPassportFieldValue(passport, fieldDef.key);
       if (isRequiredField(fieldDef, categoryRequirement) && isBlankValue(rawValue)) {
         validationIssues.push({
           key: fieldDef.key,
