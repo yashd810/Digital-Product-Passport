@@ -172,6 +172,15 @@ function buildClonePrefill(record, sections) {
   };
 }
 
+function generateDraftLocalPassportId() {
+  if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
+    return `dpp_${globalThis.crypto.randomUUID()}`;
+  }
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  const timestampPart = Date.now().toString(36);
+  return `dpp_${timestampPart}${randomPart}`;
+}
+
 const NON_EDITABLE_FORM_KEYS = new Set([
   "id",
   "dppId",
@@ -244,7 +253,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const [expanded,       setExpanded]       = useState({});
   const [modelName,      setModelName]      = useState("");
-  const [productId,      setProductId]      = useState("");
+  const [productId,      setProductId]      = useState(() => mode === "create" ? generateDraftLocalPassportId() : "");
   const [formData,       setFormData]       = useState({});
   const [modelDataKeys,  setModelDataKeys]  = useState(new Set()); // fields locked from template
   const [templateName,   setTemplateName]   = useState("");
@@ -532,6 +541,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     if (!draftHydratedRef.current) return;
     persistLocalDraft();
   }, [mode, isLoading, loadingType, modelName, productId, formData, draftStorageKey]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (productId.trim()) return;
+    setProductId(generateDraftLocalPassportId());
+  }, [mode, productId]);
 
   useEffect(() => {
     if (mode !== "edit") return undefined;
@@ -841,12 +856,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         throw new Error("No company is attached to this session. Refresh the page and sign in again if needed.");
       }
       let passportDppId = dppId;
-      const trimmedProductId = productId.trim();
 
       if (mode === "create") {
-        if (!trimmedProductId) {
-          throw new Error("Serial Number is required");
-        }
         const body = buildPersistedBody();
         const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
@@ -869,7 +880,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         setSuccess("Passport created successfully");
         setTimeout(() => setSuccess(""), 4000);
         setModelName("");
-        setProductId("");
+        setProductId(generateDraftLocalPassportId());
         setFormData({});
         clearLocalDraft();
       } else {
@@ -1157,8 +1168,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const releaseStatus = formData.release_status || (mode === "create" ? "draft" : "");
     const values = {
       digitalProductPassportId: formData.dppId || formData.dpp_id || (mode === "create" ? "Generated when passport is saved" : ""),
-      uniqueProductIdentifier: productId || formData.product_id || "Uses Serial Number",
-      localProductId: productId || formData.product_id || "Uses Serial Number",
+      uniqueProductIdentifier: productId || formData.product_id || "Generated local passport ID",
+      localProductId: productId || formData.product_id || "Generated local passport ID",
       granularity: formData.granularity || "Resolved from company DPP policy",
       dppSchemaVersion: formData.dpp_schema_version || formData.schema_version || "Resolved from passport type",
       dppStatus: releaseStatus,
@@ -1334,12 +1345,13 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           {/* Identity row */}
           <div className="passport-identity-row">
             <div className="passport-field-group">
-              <label htmlFor="productId">Serial Number</label>
+              <label htmlFor="productId">Local Passport ID</label>
               <input id="productId" type="text" value={productId}
                 className="passport-model-input"
-                placeholder="Enter serial number"
+                placeholder="Generated automatically"
                 onChange={e => { markDirty(); setProductId(e.target.value); }} disabled={isSaving}
-                required />
+              />
+              <small className="passport-field-help">A unique `dpp_...` ID is created automatically so you can save a blank draft.</small>
             </div>
             <div className="passport-field-group">
               <label htmlFor="modelName">Model Name</label>
