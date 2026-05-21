@@ -105,18 +105,18 @@ module.exports = function createPassportRepresentationService({
       productDid = passport.product_identifier_did;
     }
 
-    if (!productDid && passport.product_id) {
+    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
+    if (!productDid && businessIdentifier) {
       productDid = productIdentifierService?.buildCanonicalProductDid?.({
         companyId: passport.company_id,
         passportType: passport.passport_type || typeDef?.type_name || "battery",
-        rawProductId: passport.product_id,
+        rawProductId: businessIdentifier,
         granularity: resolvedGranularity,
       }) || null;
     }
 
     if (dppIdentity && passport.product_id) {
       try {
-        productDid  = productDid || dppIdentity.productModelDid(passport.company_id, passport.product_id);
         dppDidValue = dppIdentity.dppDid(resolvedGranularity, passport.company_id, passport.product_id);
         publicUrl   = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       } catch {

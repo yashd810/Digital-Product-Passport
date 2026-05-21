@@ -48,11 +48,12 @@ describe("product identifier service", () => {
     const normalized = service.normalizeProductIdentifiers({
       companyId: 4,
       passportType: "battery",
-      rawProductId: existingDid,
+      rawProductId: "LOCAL-7788",
+      uniqueProductIdentifier: existingDid,
       granularity: "item",
     });
 
-    expect(normalized.productIdInput).toBe(existingDid);
+    expect(normalized.productIdInput).toBe("LOCAL-7788");
     expect(normalized.productIdentifierDid).toBe(existingDid);
   });
 

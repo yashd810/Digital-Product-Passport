@@ -594,7 +594,7 @@ export default function PublicPassportPortal({
   const currentStatus = formatPassportStatus(passport?.release_status || "");
   const heroMetrics = [
     ["Manufacturer", companyData?.company_name || passport?.manufacturer || passport?.manufactured_by || ""],
-    ["Serial number", passport?.serial_number || passport?.serial || passport?.batterySerialNumber || passport?.battery_serial_number || ""],
+    ["Serial number", passport?.serial_number || passport?.product_serial_number || passport?.serial || passport?.batterySerialNumber || passport?.battery_serial_number || passport?.productSerialNumber || ""],
     ["Status", currentStatus || ""],
     ["Last update", passport?.updated_at ? new Date(passport.updated_at).toISOString().slice(0, 10) : ""],
   ];

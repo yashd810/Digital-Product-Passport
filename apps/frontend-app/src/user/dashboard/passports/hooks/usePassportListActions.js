@@ -168,13 +168,13 @@ export function usePassportListActions({
 
         context.font = `600 ${guidFontSize}px monospace`;
         context.fillStyle = isBlackAndWhite ? "#000000" : (format === "jpeg" ? "#35586a" : "#b8ccd9");
-        context.fillText(passport.product_id || passport.dppId, widthPx / 2, heightPx - bottomPadding);
+        context.fillText(passport.dppId || passport.dpp_id || "", widthPx / 2, heightPx - bottomPadding);
 
         const dataUrl = canvas.toDataURL(mimeType, format === "jpeg" ? 0.95 : undefined);
         const link = document.createElement("a");
         const safeType = (passport.passport_type || activeType || "passport").replace(/[^a-z0-9-_]+/gi, "_").toLowerCase();
         link.href = dataUrl;
-        link.download = `${safeType}_${passport.product_id || passport.dppId}.${format}`;
+        link.download = `${safeType}_${passport.dppId || passport.dpp_id || "passport"}.${format}`;
         link.click();
         await new Promise((resolve) => setTimeout(resolve, 100));
       }

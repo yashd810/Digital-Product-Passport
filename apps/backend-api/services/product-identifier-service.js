@@ -18,11 +18,11 @@ function createProductIdentifierService({ didService, pool = null }) {
   function extractBusinessProductIdentifier(source = {}) {
     const candidates = [
       source.serial_number,
+      source.product_serial_number,
+      source.battery_serial_number,
       source.serialNumber,
       source.serial,
-      source.battery_serial_number,
       source.batterySerialNumber,
-      source.product_serial_number,
       source.productSerialNumber,
     ];
     for (const candidate of candidates) {
@@ -94,8 +94,7 @@ function createProductIdentifierService({ didService, pool = null }) {
   }) {
     const productIdInput = normalizeRawProductId(rawProductId);
     const explicitUniqueIdentifier = normalizeRawProductId(uniqueProductIdentifier);
-    const canonicalSource = normalizeRawProductId(canonicalProductIdSource)
-      || (isGeneratedLocalPassportId(productIdInput) ? "" : productIdInput);
+    const canonicalSource = normalizeRawProductId(canonicalProductIdSource);
     const productIdentifierDid = explicitUniqueIdentifier
       ? explicitUniqueIdentifier
       : (canonicalSource

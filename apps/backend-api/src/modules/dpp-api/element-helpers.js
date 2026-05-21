@@ -296,11 +296,11 @@ function createElementHelpers({
     const fieldDef = normalizedPath?.childSegments?.length ? null : findSchemaFieldDefinition(typeDef, elementIdPath);
     const granularity = String(passport?.granularity || "item").trim().toLowerCase() || "item";
     const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
-    const derivedProductIdentifier = (businessIdentifier || (passport?.product_id && !productIdentifierService?.isGeneratedLocalPassportId?.(passport.product_id))) ?
+    const derivedProductIdentifier = businessIdentifier ?
       productIdentifierService?.buildCanonicalProductDid?.({
         companyId: passport.company_id,
         passportType: passport.passport_type || typeDef?.type_name || "battery",
-        rawProductId: businessIdentifier || passport.product_id,
+        rawProductId: businessIdentifier,
         granularity
       }) || null :
       null;

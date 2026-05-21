@@ -121,6 +121,7 @@ function createTestApp(options = {}) {
     company_id: 5,
     passport_type: "battery",
     product_id: "BAT-2026-001",
+    serial_number: "SN-2026-001",
     product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
     release_status: "released",
     version_number: 2,
@@ -359,7 +360,7 @@ describe("passport public routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body.uniqueProductIdentifier).toMatch(
-      /^did:web:www\.claros-dpp\.online:did:acme-energy:item:c5-bat-2026-001-[a-f0-9]{12}$/
+      /^did:web:www\.claros-dpp\.online:did:acme-energy:item:c5-sn-2026-001-[a-f0-9]{12}$/
     );
     expect(response.body.subjectDid).toBe(
       "did:web:www.claros-dpp.online:did:acme-energy:item:72b99c83-952c-4179-96f6-54a513d39dbc"

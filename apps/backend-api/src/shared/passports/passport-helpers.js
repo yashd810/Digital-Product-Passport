@@ -127,6 +127,14 @@ const normalizePassportRequestBody = (body = {}) => {
     if (normalized.uniqueProductIdentifier !== undefined) normalized.product_identifier_did = normalized.uniqueProductIdentifier;
     else if (normalized.unique_product_identifier !== undefined) normalized.product_identifier_did = normalized.unique_product_identifier;
   }
+  if (normalized.serial_number === undefined) {
+    if (normalized.product_serial_number !== undefined) normalized.serial_number = normalized.product_serial_number;
+    else if (normalized.battery_serial_number !== undefined) normalized.serial_number = normalized.battery_serial_number;
+    else if (normalized.serialNumber !== undefined) normalized.serial_number = normalized.serialNumber;
+    else if (normalized.serial !== undefined) normalized.serial_number = normalized.serial;
+    else if (normalized.batterySerialNumber !== undefined) normalized.serial_number = normalized.batterySerialNumber;
+    else if (normalized.productSerialNumber !== undefined) normalized.serial_number = normalized.productSerialNumber;
+  }
   if (normalized.economic_operator_id === undefined && normalized.economicOperatorId !== undefined) {
     normalized.economic_operator_id = normalized.economicOperatorId;
   }

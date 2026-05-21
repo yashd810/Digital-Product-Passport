@@ -128,7 +128,7 @@ export function TrustedEntryPanel({
         <div className="trusted-entry-card">
           <span className="trusted-entry-label">Counterfeit risk</span>
           <strong>{carrierAuthenticity?.counterfeitRiskLevel || "medium"}</strong>
-          <p className="trusted-entry-copy">Product ID: {passport?.product_id || "—"}</p>
+          <p className="trusted-entry-copy">Digital Passport ID: {passport?.dppId || passport?.dpp_id || "—"}</p>
         </div>
         <div className="trusted-entry-card">
           <span className="trusted-entry-label">Protected verification</span>
@@ -271,7 +271,7 @@ function parseHeaderArray(value) {
 export function PassportHeaderPanel({ passport, typeDef }) {
   if (!passport) return null;
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
-  const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields : [];
+  const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields.filter((field) => field?.key !== "localProductId") : [];
   const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport);
   const resolvedCompanyDid = passport.companyDid || passport.company_did || canonicalSubjects.companyDid || fallbackDids.companyDid;
@@ -346,9 +346,10 @@ export function PassportIntro({
     passport.date_of_manufacture ||
     "—";
   const uniqueBatteryIdentifier =
+    passport.uniqueProductIdentifier ||
+    passport.product_identifier_did ||
     passport.unique_battery_identifier ||
     passport.battery_identifier ||
-    passport.product_id ||
     "—";
   const batteryMass =
     passport.battery_mass ||
@@ -357,9 +358,11 @@ export function PassportIntro({
     "—";
   const serialNumber =
     passport.serial_number ||
+    passport.product_serial_number ||
     passport.serial ||
     passport.batterySerialNumber ||
     passport.battery_serial_number ||
+    passport.productSerialNumber ||
     "—";
   const manufacturerInfo =
     companyData?.company_name ||
@@ -378,7 +381,7 @@ export function PassportIntro({
     passport.chemistry ||
     "—";
   const summaryStats = [
-    { label: "Unique Passport Identifier", value: passport.dppId || "—" },
+    { label: "Digital Passport ID", value: passport.dppId || passport.dpp_id || "—" },
     { label: "Manufacturing Date", value: manufacturingDate },
     { label: "Unique Battery Identifier", value: uniqueBatteryIdentifier },
     { label: "Serial Number", value: serialNumber },
@@ -907,8 +910,7 @@ export function PrintView({ passport, companyData, sections }) {
             <span><strong>Type:</strong> {passport.passport_type}</span>
             <span><strong>Version:</strong> v{passport.version_number}</span>
             <span><strong>Status:</strong> {statusLabel}</span>
-            {passport.product_id && <span><strong>Local Passport ID:</strong> {passport.product_id}</span>}
-            <span><strong>DPP ID:</strong> {passport.dppId}</span>
+            {(passport.dppId || passport.dpp_id) && <span><strong>Digital Passport ID:</strong> {passport.dppId || passport.dpp_id}</span>}
           </div>
         </div>
       </div>

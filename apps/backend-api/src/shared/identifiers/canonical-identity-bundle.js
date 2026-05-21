@@ -95,14 +95,14 @@ function buildCanonicalIdentityBundle({
     }
   }
 
-  if ((businessIdentifier || (passport?.product_id && !productIdentifierService?.isGeneratedLocalPassportId?.(passport.product_id))) && productIdentifierService?.buildCanonicalProductDid) {
+  if (businessIdentifier && productIdentifierService?.buildCanonicalProductDid) {
     try {
       uniqueProductIdentifier = productIdentifierService.buildCanonicalProductDid({
         companyId: passport.company_id ?? passport.companyId ?? company?.id ?? null,
         companySlug,
         companyName: resolvedCompanyName,
         passportType: passportType || passport?.passport_type || "battery",
-        rawProductId: businessIdentifier || passport.product_id,
+        rawProductId: businessIdentifier,
         granularity: resolvedGranularity,
       }) || uniqueProductIdentifier;
     } catch {

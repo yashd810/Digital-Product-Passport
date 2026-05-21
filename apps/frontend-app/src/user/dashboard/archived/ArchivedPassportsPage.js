@@ -254,7 +254,7 @@ function ArchivedPassports({ user, companyId }) {
         });
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
-        link.download = `archived_${p.product_id || p.dppId}_v${getArchivedPublicVersionNumber(p)}.png`;
+        link.download = `archived_${p.dppId || p.dpp_id || "passport"}_v${getArchivedPublicVersionNumber(p)}.png`;
         link.click();
         await new Promise(r => setTimeout(r, 100));
       }

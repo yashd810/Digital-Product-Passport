@@ -49,7 +49,6 @@ export function isHeroSummaryField(field, fieldLabel = "") {
 
   if ([
     "dppId",
-    "product_id",
     "passport_identifier",
     "unique_passport_identifier",
     "manufactured_date",
