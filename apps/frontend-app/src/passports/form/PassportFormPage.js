@@ -1168,7 +1168,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const releaseStatus = formData.release_status || (mode === "create" ? "draft" : "");
     const values = {
       digitalProductPassportId: formData.dppId || formData.dpp_id || (mode === "create" ? "Generated when passport is saved" : ""),
-      uniqueProductIdentifier: productId || formData.product_id || "Generated local passport ID",
+      uniqueProductIdentifier: formData.product_identifier_did || formData.uniqueProductIdentifier || "Generated from serial number when available",
       localProductId: productId || formData.product_id || "Generated local passport ID",
       granularity: formData.granularity || "Resolved from company DPP policy",
       dppSchemaVersion: formData.dpp_schema_version || formData.schema_version || "Resolved from passport type",
@@ -1187,7 +1187,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const renderPassportHeaderSection = () => {
     const section = systemHeader?.section || {};
     const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields : [];
-    if (!fields.length) return null;
+    const visibleFields = fields.filter((field) => field?.key !== "localProductId");
+    if (!visibleFields.length) return null;
 
     return (
       <div className="form-section passport-header-section">
@@ -1200,7 +1201,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
             These JSON-LD header fields are mandatory for compliant passports. Locked values are generated or resolved by the platform so they cannot be missed during editing.
           </p>
           <div className="pf-header-grid">
-            {fields.map((field) => (
+            {visibleFields.map((field) => (
               <div key={field.key} className="pf-header-field-card">
                 <div className="pf-header-field-top">
                   <div>
@@ -1344,15 +1345,6 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
           {/* Identity row */}
           <div className="passport-identity-row">
-            <div className="passport-field-group">
-              <label htmlFor="productId">Local Passport ID</label>
-              <input id="productId" type="text" value={productId}
-                className="passport-model-input"
-                placeholder="Generated automatically"
-                onChange={e => { markDirty(); setProductId(e.target.value); }} disabled={isSaving}
-              />
-              <small className="passport-field-help">A unique `dpp_...` ID is created automatically so you can save a blank draft.</small>
-            </div>
             <div className="passport-field-group">
               <label htmlFor="modelName">Model Name</label>
               <input id="modelName" type="text" value={modelName}

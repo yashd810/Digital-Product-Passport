@@ -99,11 +99,14 @@ function updateEditablePassportUseCase(deps) {
           passportType: typeSchema.typeName,
           productId: nextProductIdForGranularity,
           granularity: requestedGranularity,
+          passportLike: { ...current.rows[0], ...fields, product_id: nextProductIdForGranularity },
         });
         fields.product_id = storedProductIdentifiers.product_id;
         fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
       }
     }
+
+    const hasBusinessIdentifierUpdate = ["serial_number", "serial", "serialNumber", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"].some((key) => fields[key] !== undefined);
 
     if (fields.product_id !== undefined) {
       const normalizedProductId = normalizeProductIdValue(fields.product_id);
@@ -130,16 +133,18 @@ function updateEditablePassportUseCase(deps) {
         passportType: typeSchema.typeName,
         productId: normalizedProductId,
         granularity: fields.granularity || current.rows[0].granularity || "item",
+        passportLike: { ...current.rows[0], ...fields, product_id: normalizedProductId },
       });
       fields.product_id = storedProductIdentifiers.product_id;
       fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
-    } else if (!current.rows[0].product_identifier_did && current.rows[0].product_id) {
+    } else if ((hasBusinessIdentifierUpdate || !current.rows[0].product_identifier_did) && current.rows[0].product_id) {
       const storedProductIdentifiers = buildStoredProductIdentifiers({
         companyId,
         companyName: await getResolvedCompanyName(),
         passportType: typeSchema.typeName,
         productId: current.rows[0].product_id,
         granularity: fields.granularity || current.rows[0].granularity || "item",
+        passportLike: { ...current.rows[0], ...fields },
       });
       fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
     }

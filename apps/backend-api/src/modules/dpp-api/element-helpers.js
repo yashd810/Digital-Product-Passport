@@ -295,11 +295,12 @@ function createElementHelpers({
     const elementIdPath = normalizedPath?.path || String(normalizedPath || "");
     const fieldDef = normalizedPath?.childSegments?.length ? null : findSchemaFieldDefinition(typeDef, elementIdPath);
     const granularity = String(passport?.granularity || "item").trim().toLowerCase() || "item";
-    const derivedProductIdentifier = passport?.product_id ?
+    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
+    const derivedProductIdentifier = (businessIdentifier || (passport?.product_id && !productIdentifierService?.isGeneratedLocalPassportId?.(passport.product_id))) ?
       productIdentifierService?.buildCanonicalProductDid?.({
         companyId: passport.company_id,
         passportType: passport.passport_type || typeDef?.type_name || "battery",
-        rawProductId: passport.product_id,
+        rawProductId: businessIdentifier || passport.product_id,
         granularity
       }) || null :
       null;
@@ -311,7 +312,7 @@ function createElementHelpers({
     } catch {}
 
     return {
-      productIdentifier: passport?.product_identifier_did || derivedProductIdentifier || passport?.product_id || null,
+      productIdentifier: passport?.product_identifier_did || derivedProductIdentifier || null,
       localProductId: passport?.product_id || null,
       dppId,
       elementIdPath,

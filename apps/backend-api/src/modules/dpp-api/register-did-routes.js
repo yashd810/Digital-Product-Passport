@@ -285,9 +285,7 @@ module.exports = function registerDidRoutes(app, deps) {
       const companyName = companyNameMap.get(String(company_id)) || "";
 
       const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
-      const productDid = passport.product_identifier_did || (passport.product_id ?
-        dppIdentity.productModelDid(company_id, passport.product_id) :
-        null);
+      const productDid = passport.product_identifier_did || null;
       const pDppDid = passport.product_id ?
         dppIdentity.dppDid("model", company_id, passport.product_id) :
         null;

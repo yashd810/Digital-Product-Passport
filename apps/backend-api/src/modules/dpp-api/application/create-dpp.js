@@ -66,6 +66,7 @@ function createDppUseCase(deps) {
       companyId,
       passportType: resolvedPassportType,
       rawProductId: productIdInput,
+      canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.(normalizedBody) || null,
       uniqueProductIdentifier: explicitUniqueProductIdentifier,
       granularity: requestedGranularity,
     });

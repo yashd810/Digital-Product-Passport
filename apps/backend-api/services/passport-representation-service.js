@@ -173,7 +173,7 @@ module.exports = function createPassportRepresentationService({
     }
 
     const localProductId = passport.product_id || null;
-    const uniqueProductIdentifier = canonicalPayload?.uniqueProductIdentifier || passport.product_identifier_did || productDid || localProductId || null;
+    const uniqueProductIdentifier = canonicalPayload?.uniqueProductIdentifier || passport.product_identifier_did || productDid || null;
 
     return {
       // JTC 18223 canonical header fields

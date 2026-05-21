@@ -99,6 +99,7 @@ function createDraftPassportUseCase(deps) {
       passportType: resolvedPassportType,
       productId: normalizedProductId,
       granularity: effectiveGranularity,
+      passportLike: { ...fields, product_id: normalizedProductId },
     });
     const complianceManagedFields = await buildComplianceManagedFields({
       companyId,

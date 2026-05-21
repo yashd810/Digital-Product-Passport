@@ -11,6 +11,27 @@ function createProductIdentifierService({ didService, pool = null }) {
     return typeof value === "string" && value.trim().startsWith("did:");
   }
 
+  function isGeneratedLocalPassportId(value) {
+    return typeof value === "string" && value.trim().toLowerCase().startsWith("dpp_");
+  }
+
+  function extractBusinessProductIdentifier(source = {}) {
+    const candidates = [
+      source.serial_number,
+      source.serialNumber,
+      source.serial,
+      source.battery_serial_number,
+      source.batterySerialNumber,
+      source.product_serial_number,
+      source.productSerialNumber,
+    ];
+    for (const candidate of candidates) {
+      const normalized = normalizeRawProductId(candidate);
+      if (normalized) return normalized;
+    }
+    return "";
+  }
+
   function buildStableProductId({ companyId, rawProductId }) {
     const normalized = normalizeRawProductId(rawProductId);
     if (!normalized) return "";
@@ -67,21 +88,26 @@ function createProductIdentifierService({ didService, pool = null }) {
     companyName = null,
     passportType = "battery",
     rawProductId,
+    canonicalProductIdSource = null,
     uniqueProductIdentifier = null,
     granularity = "item",
   }) {
     const productIdInput = normalizeRawProductId(rawProductId);
     const explicitUniqueIdentifier = normalizeRawProductId(uniqueProductIdentifier);
+    const canonicalSource = normalizeRawProductId(canonicalProductIdSource)
+      || (isGeneratedLocalPassportId(productIdInput) ? "" : productIdInput);
     const productIdentifierDid = explicitUniqueIdentifier
       ? explicitUniqueIdentifier
-      : buildCanonicalProductDid({
-      companyId,
-      companySlug,
-      companyName,
-      passportType,
-      rawProductId: productIdInput,
-      granularity,
-    }) || null;
+      : (canonicalSource
+          ? buildCanonicalProductDid({
+              companyId,
+              companySlug,
+              companyName,
+              passportType,
+              rawProductId: canonicalSource,
+              granularity,
+            }) || null
+          : null);
 
     return {
       productIdInput,
@@ -270,6 +296,8 @@ function createProductIdentifierService({ didService, pool = null }) {
   return {
     normalizeRawProductId,
     isDidIdentifier,
+    isGeneratedLocalPassportId,
+    extractBusinessProductIdentifier,
     buildStableProductId,
     normalizeGranularity,
     buildCanonicalProductDid,

@@ -246,7 +246,7 @@ function buildHeaderRows(passport, typeDef, companyData) {
   const resolvedDppDid = passport?.dppDid || passport?.dpp_did || canonicalSubjects.dppDid || fallbackDids.dppDid;
   const values = {
     digitalProductPassportId: passport?.digitalProductPassportId || passport?.dppId || passport?.dpp_id,
-    uniqueProductIdentifier: passport?.uniqueProductIdentifier || passport?.product_identifier_did || passport?.product_id,
+    uniqueProductIdentifier: passport?.uniqueProductIdentifier || passport?.product_identifier_did || null,
     localProductId: passport?.product_id,
     granularity: passport?.granularity || "item",
     dppSchemaVersion: passport?.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",

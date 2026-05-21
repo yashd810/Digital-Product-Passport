@@ -67,6 +67,7 @@ function buildCanonicalIdentityBundle({
   let subjectDid = null;
   let dppDid = null;
   let uniqueProductIdentifier = passport?.product_identifier_did || null;
+  const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
 
   try {
     companyDid = companySlug ? didService?.generateCompanyDid?.(companySlug) || null : null;
@@ -94,14 +95,14 @@ function buildCanonicalIdentityBundle({
     }
   }
 
-  if (passport?.product_id && productIdentifierService?.buildCanonicalProductDid) {
+  if ((businessIdentifier || (passport?.product_id && !productIdentifierService?.isGeneratedLocalPassportId?.(passport.product_id))) && productIdentifierService?.buildCanonicalProductDid) {
     try {
       uniqueProductIdentifier = productIdentifierService.buildCanonicalProductDid({
         companyId: passport.company_id ?? passport.companyId ?? company?.id ?? null,
         companySlug,
         companyName: resolvedCompanyName,
         passportType: passportType || passport?.passport_type || "battery",
-        rawProductId: passport.product_id,
+        rawProductId: businessIdentifier || passport.product_id,
         granularity: resolvedGranularity,
       }) || uniqueProductIdentifier;
     } catch {
@@ -123,7 +124,7 @@ function buildCanonicalIdentityBundle({
     companySlug,
     subjectNamespace,
     digitalProductPassportId,
-    uniqueProductIdentifier: uniqueProductIdentifier || passport?.product_id || null,
+    uniqueProductIdentifier: uniqueProductIdentifier || null,
     subjectDid,
     dppDid,
     companyDid,

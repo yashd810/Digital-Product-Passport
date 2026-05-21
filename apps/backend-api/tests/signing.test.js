@@ -102,6 +102,7 @@ const PASSPORT = {
   company_id: 7,
   passport_type: "battery",
   product_id: "BAT-2026-001",
+  product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c7-bat-2026-001",
   version_number: 2,
   release_status: "released",
   updated_at: "2026-04-24T12:00:00.000Z",
@@ -286,7 +287,7 @@ describe("signing service", () => {
       subjectId: "https://www.claros-dpp.online/dpp/acme-energy/battery-pack/BAT-2026-001#carrier",
       payload: {
         digitalProductPassportId: PASSPORT.dppId,
-        uniqueProductIdentifier: PASSPORT.product_id,
+        uniqueProductIdentifier: PASSPORT.product_identifier_did,
         publicAccessUrl: "https://www.claros-dpp.online/dpp/acme-energy/battery-pack/BAT-2026-001",
       },
     });
@@ -300,7 +301,7 @@ describe("signing service", () => {
           type: ["VerifiableCredential", "DataCarrierBindingCredential"],
           credentialSubject: expect.objectContaining({
             digitalProductPassportId: PASSPORT.dppId,
-            uniqueProductIdentifier: PASSPORT.product_id,
+            uniqueProductIdentifier: PASSPORT.product_identifier_did,
           }),
           proof: expect.objectContaining({
             issuerCertificateId: "qsealc-cert-001",

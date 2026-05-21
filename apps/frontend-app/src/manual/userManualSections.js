@@ -594,7 +594,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "`dppId` is the internal passport record identifier used by dashboard rows and most company APIs.",
             "`product_id` is the local passport ID used internally for routing, uniqueness, and draft creation.",
-            "`product_identifier_did` is the global product identifier used by DID/standards flows when available.",
+            "`product_identifier_did` is the global product identifier DID, and it should be derived from the real serial/business identifier when one exists.",
             "`granularity` says whether the DPP represents a model, batch, or item. Released granularity changes use a linked successor flow instead of silent in-place mutation.",
           ],
         },
@@ -662,7 +662,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Work in the Asset Grid",
           items: [
-            "The grid behaves like a simple spreadsheet. Row, Passport DPP ID, and Local Passport ID stay visible while you scroll.",
+            "The grid behaves like a simple spreadsheet. Row and Passport DPP ID stay visible while you scroll.",
             "Use Create Passport Row when you want to stage a new row manually before previewing it.",
             "Use Export CSV to create a safe base file. Filtered columns export still keeps `dppId` and `product_id` so the file can be matched on import.",
             "Keep `dppId` whenever possible. If your incoming data does not have `dppId`, make sure `product_id` is present and stable.",

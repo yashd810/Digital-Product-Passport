@@ -407,13 +407,13 @@ function createTestApp(options = {}) {
     signingService: {},
     buildOperationalDppPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_identifier_did || passport.product_id,
+      uniqueProductIdentifier: passport.product_identifier_did || null,
       localProductId: passport.product_id,
       product_id: passport.product_id,
     }),
     buildCanonicalPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_identifier_did || passport.product_id,
+      uniqueProductIdentifier: passport.product_identifier_did || null,
       localProductId: passport.product_id,
       subjectDid: "did:web:www.example.test:did:battery:item:fixture",
       dppDid: "did:web:www.example.test:did:dpp:item:fixture",
@@ -443,7 +443,7 @@ function createTestApp(options = {}) {
     }),
     buildExpandedPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_identifier_did || passport.product_id,
+      uniqueProductIdentifier: passport.product_identifier_did || null,
       localProductId: passport.product_id,
       subjectDid: "did:web:www.example.test:did:battery:item:fixture",
       dppDid: "did:web:www.example.test:did:dpp:item:fixture",

@@ -442,7 +442,7 @@ export const BACKEND_OPERATION_FLOWS = [
     steps: [
       "The company record stores a DID slug plus economic-operator identifier and scheme.",
       "The company DPP policy chooses default granularity: model, batch, or item.",
-      "Passport creation stores product_identifier_did, granularity, economic_operator_id, and facility_id when those values are supplied or resolved from company policy.",
+      "Passport creation stores product_identifier_did, granularity, economic_operator_id, and facility_id. The product DID should follow the real serial/business identifier rather than the internal local passport ID.",
       "Public DID URLs expose platform, company, product model/batch/item, DPP, and facility DID documents.",
       "The `/resolve?did=...` endpoint redirects browsers to the public passport where possible and API clients to the DID document URL.",
     ],

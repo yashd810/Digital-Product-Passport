@@ -329,6 +329,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
               passportType: typeSchema.typeName,
               productId: normalizedProductId,
               granularity: matchedGranularityRes.rows[0]?.granularity || "item",
+              passportLike: { ...currentRow, ...fields, product_id: normalizedProductId },
             });
             fields.product_id = storedProductIdentifiers.product_id;
             fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;

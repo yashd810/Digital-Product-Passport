@@ -394,6 +394,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         passportType,
         productId: requestedProductId,
         granularity: requestedGranularity,
+        passportLike: src,
       });
       const newGuid = generateDppRecordId();
       const newVersion = src.version_number + 1;

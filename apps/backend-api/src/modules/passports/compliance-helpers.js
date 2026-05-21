@@ -12,13 +12,18 @@ function createComplianceHelpers({
 }) {
   const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
 
-  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, productId, granularity }) {
+  function extractBusinessIdentifierSource(source = null) {
+    return productIdentifierService.extractBusinessProductIdentifier?.(source || {}) || "";
+  }
+
+  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, productId, granularity, passportLike = null }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
       companySlug,
       companyName,
       passportType,
       rawProductId: productId,
+      canonicalProductIdSource: extractBusinessIdentifierSource(passportLike),
       granularity,
     });
     return {
@@ -251,6 +256,7 @@ function createComplianceHelpers({
         passportType: typeSchema.typeName,
         productId: normalizedProductId,
         granularity: effectiveGranularity,
+        passportLike: passport,
       });
       if (storedProductIdentifiers.product_id && storedProductIdentifiers.product_id !== passport.product_id) {
         nextFields.product_id = storedProductIdentifiers.product_id;

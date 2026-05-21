@@ -188,6 +188,7 @@ function updateDppUseCase(deps) {
         companyId: editable.passport.company_id,
         passportType: editable.passport.passport_type,
         rawProductId: nextProductId,
+        canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.(normalizedBody) || null,
         uniqueProductIdentifier: explicitUniqueProductIdentifier,
         granularity: nextGranularity,
       });
@@ -198,6 +199,7 @@ function updateDppUseCase(deps) {
         companyId: editable.passport.company_id,
         passportType: editable.passport.passport_type,
         rawProductId: editable.passport.product_id,
+        canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.({ ...editable.passport, ...fields }) || null,
         uniqueProductIdentifier: explicitUniqueProductIdentifier,
         granularity: nextGranularity,
       });
