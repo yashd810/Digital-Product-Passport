@@ -102,6 +102,7 @@ function createTestApp() {
     compliance_profile_key: "battery_dpp_v1",
     economic_operator_id: "EO-1",
     economic_operator_identifier_scheme: "uri",
+    traceability_table: "{\"columns\":[\"Step\",\"Place\"],\"rows\":[[\"Assembled\",\"Factory A\"]]}",
   };
 
   const pool = {
@@ -193,7 +194,7 @@ function createTestApp() {
     logAudit: jest.fn(async () => {}),
     getPassportTypeSchema: jest.fn(async () => ({
       typeName: "battery",
-      allowedKeys: new Set(["manufacturer", "model_name", "internal_alias_id"]),
+      allowedKeys: new Set(["manufacturer", "model_name", "internal_alias_id", "traceability_table"]),
     })),
     findExistingPassportByInternalAliasId: jest.fn(async () => null),
     getPassportLineageContext: jest.fn(async () => null),
@@ -508,6 +509,29 @@ describe("passport patch governance", () => {
       model_name: "Updated model",
     });
     expect(updatePassportRowById.mock.calls[0][0].data.unsupported_runtime_key).toBeUndefined();
+  });
+
+  test("PATCH /api/companies/:companyId/passports/:dppId preserves existing structured field when browser submits [object Object]", async () => {
+    const { app, updatePassportRowById } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/companies/:companyId/passports/:dppId",
+      params: { companyId: "5", dppId: "dpp_test_1" },
+      body: {
+        passportType: "battery",
+        manufacturer: "Updated manufacturer",
+        traceability_table: "[object Object]",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(updatePassportRowById).toHaveBeenCalled();
+    expect(updatePassportRowById.mock.calls[0][0].data).toMatchObject({
+      manufacturer: "Updated manufacturer",
+      traceability_table: "{\"columns\":[\"Step\",\"Place\"],\"rows\":[[\"Assembled\",\"Factory A\"]]}",
+    });
   });
 
   test("PATCH /api/companies/:companyId/passports/:dppId preserves stored inactive facility when request does not change facility", async () => {

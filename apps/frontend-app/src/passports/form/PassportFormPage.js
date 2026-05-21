@@ -615,7 +615,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           const normalizedValue = typeof value === "string"
             ? value.trim()
             : value;
-          return [key, Array.isArray(normalizedValue) ? JSON.stringify(normalizedValue) : normalizedValue];
+          return [
+            key,
+            (Array.isArray(normalizedValue) || (typeof normalizedValue === "object" && normalizedValue !== null))
+              ? JSON.stringify(normalizedValue)
+              : normalizedValue,
+          ];
         })
     );
     return {
