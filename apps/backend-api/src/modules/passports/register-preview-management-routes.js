@@ -72,7 +72,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       res.json({
         ...passport,
         digitalProductPassportId: canonicalPayload?.digitalProductPassportId || passport.dppId || passport.dpp_id || null,
-        uniqueProductIdentifier: canonicalPayload?.uniqueProductIdentifier || canonicalIdentity.uniqueProductIdentifier || passport.product_identifier_did || null,
+        uniqueProductIdentifier: canonicalPayload?.uniqueProductIdentifier || canonicalIdentity.uniqueProductIdentifier || null,
         subjectDid: canonicalPayload?.subjectDid || canonicalIdentity.subjectDid || null,
         dppDid: canonicalPayload?.dppDid || canonicalIdentity.dppDid || null,
         companyDid: canonicalPayload?.companyDid || canonicalIdentity.companyDid || null,

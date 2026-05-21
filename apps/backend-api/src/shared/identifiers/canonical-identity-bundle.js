@@ -66,7 +66,7 @@ function buildCanonicalIdentityBundle({
   let companyDid = null;
   let subjectDid = null;
   let dppDid = null;
-  let uniqueProductIdentifier = passport?.product_identifier_did || null;
+  let uniqueProductIdentifier = null;
   const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
 
   try {
@@ -104,9 +104,9 @@ function buildCanonicalIdentityBundle({
         passportType: passportType || passport?.passport_type || "battery",
         rawProductId: businessIdentifier,
         granularity: resolvedGranularity,
-      }) || uniqueProductIdentifier;
+      }) || null;
     } catch {
-      // Keep any stored identifier fallback if canonical derivation fails.
+      uniqueProductIdentifier = null;
     }
   }
 

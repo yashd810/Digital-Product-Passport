@@ -285,7 +285,8 @@ module.exports = function registerDidRoutes(app, deps) {
       const companyName = companyNameMap.get(String(company_id)) || "";
 
       const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
-      const productDid = passport.product_identifier_did || null;
+      const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
+      const productDid = businessIdentifier ? (passport.product_identifier_did || null) : null;
       const pDppDid = passport.internal_alias_id ?
         dppIdentity.dppDid("model", company_id, passport.internal_alias_id) :
         null;
@@ -293,7 +294,7 @@ module.exports = function registerDidRoutes(app, deps) {
       res.json({
         publicUrl,
         internalAliasId: passport.internal_alias_id || null,
-        productIdentifierDid: passport.product_identifier_did || null,
+        productIdentifierDid: businessIdentifier ? (passport.product_identifier_did || null) : null,
         modelName: passport.model_name || null,
         companyName,
         dppDid: pDppDid,

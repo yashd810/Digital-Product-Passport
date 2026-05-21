@@ -261,7 +261,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     return addLegacyInternalAliasAliases({
       ...payload,
       digitalProductPassportId: payload?.digitalProductPassportId || identityBundle.digitalProductPassportId || null,
-      uniqueProductIdentifier: payload?.uniqueProductIdentifier || identityBundle.uniqueProductIdentifier || passport?.product_identifier_did || null,
+      uniqueProductIdentifier: payload?.uniqueProductIdentifier || identityBundle.uniqueProductIdentifier || null,
       subjectDid: payload?.subjectDid || identityBundle.subjectDid || null,
       dppDid: payload?.dppDid || identityBundle.dppDid || null,
       companyDid: payload?.companyDid || identityBundle.companyDid || null,
@@ -732,7 +732,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       const canonicalPayload = {
         ...canonicalPayloadRaw,
         digitalProductPassportId: canonicalPayloadRaw?.digitalProductPassportId || canonicalIdentity.digitalProductPassportId || null,
-        uniqueProductIdentifier: canonicalPayloadRaw?.uniqueProductIdentifier || canonicalIdentity.uniqueProductIdentifier || linkedSubjects?.productDid || passport.product_identifier_did || null,
+        uniqueProductIdentifier: canonicalPayloadRaw?.uniqueProductIdentifier || canonicalIdentity.uniqueProductIdentifier || null,
         subjectDid: canonicalPayloadRaw?.subjectDid || canonicalIdentity.subjectDid || linkedSubjects?.productDid || null,
         dppDid: canonicalPayloadRaw?.dppDid || canonicalIdentity.dppDid || linkedSubjects?.dppDid || null,
         companyDid: canonicalPayloadRaw?.companyDid || canonicalIdentity.companyDid || linkedSubjects?.companyDid || null,

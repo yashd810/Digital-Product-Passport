@@ -1039,10 +1039,11 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     });
 
     const internalAliasId = passport.internal_alias_id || null;
+    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
     const storedProductIdentifier = isUriLikeValue(passport.product_identifier_did)
       ? passport.product_identifier_did
       : null;
-    const uniqueProductIdentifier = derivedProductIdentifierDid || storedProductIdentifier || null;
+    const uniqueProductIdentifier = derivedProductIdentifierDid || (businessIdentifier ? storedProductIdentifier : null) || null;
     const storedPassportIdentifier = isUriLikeValue(passport?.dppId || passport?.dpp_id || passport?.guid)
       ? (passport?.dppId || passport?.dpp_id || passport?.guid)
       : null;

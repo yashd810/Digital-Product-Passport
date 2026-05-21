@@ -101,12 +101,8 @@ module.exports = function createPassportRepresentationService({
     let dppDidValue = null;
     let publicUrl = null;
 
-    if (passport.product_identifier_did) {
-      productDid = passport.product_identifier_did;
-    }
-
     const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
-    if (!productDid && businessIdentifier) {
+    if (businessIdentifier) {
       productDid = productIdentifierService?.buildCanonicalProductDid?.({
         companyId: passport.company_id,
         passportType: passport.passport_type || typeDef?.type_name || "battery",
@@ -173,7 +169,7 @@ module.exports = function createPassportRepresentationService({
     }
 
     const internalAliasId = passport.internal_alias_id || null;
-    const uniqueProductIdentifier = canonicalPayload?.uniqueProductIdentifier || passport.product_identifier_did || productDid || null;
+    const uniqueProductIdentifier = canonicalPayload?.uniqueProductIdentifier || productDid || null;
 
     return {
       // JTC 18223 canonical header fields
