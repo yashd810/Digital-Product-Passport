@@ -2245,11 +2245,30 @@
 .btn-release-wf:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .btn-approve-wf {
-  padding: 9px 20px; background: rgba(16,185,129,0.14); color: #9ff0ca;
-  border: 1px solid rgba(16,185,129,0.24); border-radius: 10px; font-size: 14px; font-weight: 700;
-  cursor: pointer; font-family: var(--font); transition: all 0.2s;
+  padding: 9px 20px;
+  background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+  color: #ffffff;
+  border: 1px solid #115c39;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.2s;
+  box-shadow: 0 12px 24px rgba(20,108,67,0.18);
 }
-.btn-approve-wf:hover { background: rgba(16,185,129,0.22); color: white; }
+.btn-approve-wf:hover:not(:disabled) {
+  background: linear-gradient(135deg, #157347 0%, #0f5132 100%);
+  border-color: #0f5132;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(15,81,50,0.22);
+}
+.btn-approve-wf:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 .btn-reject-wf {
   padding: 9px 20px; background: rgba(239,68,68,0.12); color: #ffb7b7;
