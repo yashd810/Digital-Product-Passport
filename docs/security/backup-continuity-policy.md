@@ -39,9 +39,9 @@ The app also supports verification of stored replicas by fetching the stored obj
 
 - `POST /api/companies/:companyId/passports/:dppId/backup-replications/verify`
 
-For the separate public failover workflow used when an economic operator is no longer active, see [backup-public-handover.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/security/backup-public-handover.md:1).
+For the separate public failover workflow used when an economic operator is no longer active, see [backup-public-handover.md](backup-public-handover.md).
 
-For attachment/document persistence requirements and the backup-document manifest, see [document-persistence-and-backup.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/security/document-persistence-and-backup.md:1).
+For attachment/document persistence requirements and the backup-document manifest, see [document-persistence-and-backup.md](document-persistence-and-backup.md).
 
 ## Admin/API visibility
 

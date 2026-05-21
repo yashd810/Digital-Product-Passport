@@ -304,7 +304,7 @@ env | grep -E "JWT|COOKIE|DB_"
 lsof -i :3001 | grep -v COMMAND | awk '{print $2}' | xargs kill -9
 
 # SSH to production
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
+ssh -i ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 ```
 
 ---

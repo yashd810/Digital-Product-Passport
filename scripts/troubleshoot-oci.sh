@@ -5,7 +5,14 @@
 set -e
 
 OCI_IP="${OCI_IP:-79.72.16.68}"
-SSH_KEY="${SSH_KEY:-$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_FILES_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+DEFAULT_SSH_KEY="$PROJECT_FILES_ROOT/AMD keys/ssh-key-2026-04-27.key"
+LEGACY_SSH_KEY="$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key"
+SSH_KEY="${SSH_KEY:-$DEFAULT_SSH_KEY}"
+if [ ! -f "$SSH_KEY" ] && [ -f "$LEGACY_SSH_KEY" ]; then
+    SSH_KEY="$LEGACY_SSH_KEY"
+fi
 OCI_USER="ubuntu"
 
 echo "=================================="

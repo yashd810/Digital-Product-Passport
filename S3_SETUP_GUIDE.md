@@ -31,7 +31,7 @@ Run this command on your LOCAL machine:
 
 ```bash
 # SSH to OCI backend
-ssh -i "/Users/yashdesai/Desktop/AMD keys/ssh-key-2026-04-27.key" ubuntu@82.70.54.173
+ssh -i "~/Desktop/Digital Product Passport/Project Files/AMD keys/ssh-key-2026-04-27.key" ubuntu@82.70.54.173
 ```
 
 Then on the OCI backend:

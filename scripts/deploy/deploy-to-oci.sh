@@ -7,7 +7,14 @@ set -e
 # Configuration
 OCI_USER="${OCI_USER:-ubuntu}"
 OCI_IP="${OCI_IP:-}"
-SSH_KEY="${SSH_KEY:-$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_FILES_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+DEFAULT_SSH_KEY="$PROJECT_FILES_ROOT/AMD keys/ssh-key-2026-04-27.key"
+LEGACY_SSH_KEY="$HOME/Desktop/AMD keys/ssh-key-2026-04-27.key"
+SSH_KEY="${SSH_KEY:-$DEFAULT_SSH_KEY}"
+if [ ! -f "$SSH_KEY" ] && [ -f "$LEGACY_SSH_KEY" ]; then
+    SSH_KEY="$LEGACY_SSH_KEY"
+fi
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"

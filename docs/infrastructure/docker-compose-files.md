@@ -42,7 +42,7 @@ docker-compose restart backend-api
 ### Production (OCI)
 ```bash
 # SSH to OCI
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
+ssh -i ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 
 # Start services
 cd /opt/dpp

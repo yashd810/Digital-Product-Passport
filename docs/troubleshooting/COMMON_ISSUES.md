@@ -231,14 +231,14 @@ curl -i \
 **1. SSH Key Issues**
 ```bash
 # Check SSH key permissions
-ls -la ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
+ls -la ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key
 # Should be 600 permissions
 
 # Fix permissions
-chmod 600 ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key
+chmod 600 ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key
 
 # Test SSH connection
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
+ssh -i ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 ```
 
 **2. Docker Build Failures**
@@ -279,7 +279,7 @@ sudo kill -9 <PID>
 **5. Database Connection Issues**
 ```bash
 # SSH into OCI instance
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
+ssh -i ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 
 # Check if database is running
 docker-compose ps postgres
@@ -294,7 +294,7 @@ psql -h localhost -U postgres -d dpp_system -c "SELECT version();"
 **Deployment Procedure**:
 ```bash
 # 1. SSH to OCI instance
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
+ssh -i ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 
 # 2. Navigate to project directory
 cd /opt/dpp

@@ -30,9 +30,9 @@ In this platform, the effective SIP is the controlled DPP change entering the pr
 
 Typical SIP entry points:
 
-- company passport mutation routes in [passports.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/routes/passports.js:1)
-- standards-facing mutation routes in [dpp-api.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/routes/dpp-api.js:1)
-- workflow transitions in [workflow.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/routes/workflow.js:1)
+- company passport mutation routes in [passports.js](../../apps/backend-api/routes/passports.js)
+- standards-facing mutation routes in [dpp-api.js](../../apps/backend-api/routes/dpp-api.js)
+- workflow transitions in [workflow.js](../../apps/backend-api/routes/workflow.js)
 
 ### AIP: Archival Information Package
 
@@ -50,18 +50,18 @@ The backup envelope contains:
 
 Relevant implementation:
 
-- snapshot archival in [passport-service.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/services/passport-service.js:445)
-- backup replication in [backup-provider-service.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/services/backup-provider-service.js:359)
+- snapshot archival in [passport-service.js](../../apps/backend-api/services/passport-service.js)
+- backup replication in [backup-provider-service.js](../../apps/backend-api/services/backup-provider-service.js)
 
 ### DIP: Dissemination Information Package
 
 The platform disseminates preserved information through:
 
-- public read routes in [passport-public.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/routes/passport-public.js:1)
-- standards API read routes in [dpp-api.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/routes/dpp-api.js:1)
-- attachment downloads through `/public-files/:publicId` in [server.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/Server/server.js:1032)
+- public read routes in [passport-public.js](../../apps/backend-api/routes/passport-public.js)
+- standards API read routes in [dpp-api.js](../../apps/backend-api/routes/dpp-api.js)
+- attachment downloads through `/public-files/:publicId` in [server.js](../../apps/backend-api/Server/server.js)
 
-When the economic operator is inactive, the DIP can be served from the verified backup handover snapshot rather than the live record. That mapping is documented in [backup-public-handover.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/security/backup-public-handover.md:1).
+When the economic operator is inactive, the DIP can be served from the verified backup handover snapshot rather than the live record. That mapping is documented in [backup-public-handover.md](../security/backup-public-handover.md).
 
 ## OAIS functional entities
 
@@ -77,10 +77,10 @@ Mapped components:
 
 Main code paths:
 
-- [passports.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/routes/passports.js:1)
-- [dpp-api.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/routes/dpp-api.js:1)
-- [passport-service.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/services/passport-service.js:445)
-- [backup-provider-service.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/services/backup-provider-service.js:135)
+- [passports.js](../../apps/backend-api/routes/passports.js)
+- [dpp-api.js](../../apps/backend-api/routes/dpp-api.js)
+- [passport-service.js](../../apps/backend-api/services/passport-service.js)
+- [backup-provider-service.js](../../apps/backend-api/services/backup-provider-service.js)
 
 ### Archival Storage
 
@@ -92,8 +92,8 @@ Mapped components:
 
 Main code/data paths:
 
-- [init.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/db/init.js:1227)
-- [backup-provider-service.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/services/backup-provider-service.js:359)
+- [init.js](../../apps/backend-api/db/init.js)
+- [backup-provider-service.js](../../apps/backend-api/services/backup-provider-service.js)
 
 ### Data Management
 
@@ -126,7 +126,7 @@ Relevant routes:
 - `GET /api/companies/:companyId/passports/:dppId/backup-handover`
 - `POST /api/companies/:companyId/passports/:dppId/backup-handover/activate`
 - `POST /api/companies/:companyId/passports/:dppId/backup-handover/deactivate`
-- audit-log integrity/root/anchor routes in [passports.js](/Users/yashdesai/Desktop/Passport/Claude/files/files/apps/backend-api/routes/passports.js:2988)
+- audit-log integrity/root/anchor routes in [passports.js](../../apps/backend-api/routes/passports.js)
 
 ### Preservation Planning
 
@@ -140,10 +140,10 @@ Mapped components:
 
 Current repo evidence:
 
-- [backup-continuity-policy.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/security/backup-continuity-policy.md:1)
-- [document-persistence-and-backup.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/security/document-persistence-and-backup.md:1)
-- [signing-and-verification.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/security/signing-and-verification.md:1)
-- [audit-logging-and-anchoring.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/security/audit-logging-and-anchoring.md:1)
+- [backup-continuity-policy.md](../security/backup-continuity-policy.md)
+- [document-persistence-and-backup.md](../security/document-persistence-and-backup.md)
+- [signing-and-verification.md](../security/signing-and-verification.md)
+- [audit-logging-and-anchoring.md](../security/audit-logging-and-anchoring.md)
 
 What is still operational rather than code-enforced:
 

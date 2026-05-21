@@ -35,4 +35,4 @@ Configuration requirements:
 Resolution notes:
 - Numeric company/product DID routes are redirected to canonical stable-id forms where possible.
 - Public URL resolution now has a dedicated path-to-subject helper in `passport-helpers.js`.
-- The formal identifier persistence policy, including archive and EO-inactive backup continuity, is documented in [identifier-persistence-policy.md](/Users/yashdesai/Desktop/Passport/Claude/files/files/docs/security/identifier-persistence-policy.md:1).
+- The formal identifier persistence policy, including archive and EO-inactive backup continuity, is documented in [identifier-persistence-policy.md](../security/identifier-persistence-policy.md).

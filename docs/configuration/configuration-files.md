@@ -95,7 +95,7 @@ docker compose -f docker/docker-compose.yml --env-file docker/.env up -d
 ### Production (OCI)
 ```bash
 # SSH to OCI
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
+ssh -i ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key ubuntu@79.72.16.68
 
 # Copy production config to the server runtime env path
 cp docker/.env.prod /etc/dpp/dpp.env

@@ -77,7 +77,7 @@ DPP_DEPLOY_TARGET=backend OCI_IP=82.70.54.173 bash scripts/deploy/deploy-to-oci.
 ### View Service Logs on OCI
 
 ```bash
-ssh -i ~/Desktop/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
+ssh -i ~/Desktop/Digital Product Passport/Project Files/AMD\ keys/ssh-key-2026-04-27.key ubuntu@82.70.54.173
 cd /opt/dpp
 sudo docker compose -f docker/docker-compose.prod.backend.yml logs -f backend-api
 ```
