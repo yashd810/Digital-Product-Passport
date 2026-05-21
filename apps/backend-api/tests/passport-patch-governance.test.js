@@ -194,7 +194,7 @@ function createTestApp() {
     logAudit: jest.fn(async () => {}),
     getPassportTypeSchema: jest.fn(async () => ({
       typeName: "battery",
-      allowedKeys: new Set(["manufacturer", "model_name", "internal_alias_id", "traceability_table"]),
+      allowedKeys: new Set(["manufacturer", "traceability_table"]),
     })),
     findExistingPassportByInternalAliasId: jest.fn(async () => null),
     getPassportLineageContext: jest.fn(async () => null),

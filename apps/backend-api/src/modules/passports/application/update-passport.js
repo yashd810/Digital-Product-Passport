@@ -48,7 +48,11 @@ function updateEditablePassportUseCase(deps) {
     const requestedPassportType = passport_type || passportType;
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
-    const BUILT_IN_EDITABLE_FIELDS = new Set(["product_image"]);
+    const BUILT_IN_EDITABLE_FIELDS = new Set([
+      "model_name",
+      "internal_alias_id",
+      "product_image",
+    ]);
     if (createPassportTable) {
       await createPassportTable(typeSchema.typeName, {
         createdBy: userId,

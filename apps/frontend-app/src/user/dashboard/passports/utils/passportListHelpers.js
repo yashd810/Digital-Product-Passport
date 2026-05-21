@@ -97,6 +97,39 @@ export function getPassportSerialNumber(passport) {
   return value == null ? "" : String(value).trim();
 }
 
+function normalizeSerialHint(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function isLikelySerialField(field = {}) {
+  const hints = [
+    field.key,
+    field.label,
+    field.elementId,
+    field.element_id,
+    field.semanticId,
+    field.semantic_id,
+    field.dictionaryReference,
+  ];
+  return hints.some((hint) => {
+    const normalized = normalizeSerialHint(hint);
+    return normalized.includes("serialnumber") || normalized === "serial";
+  });
+}
+
+export function getPassportSerialNumberForType(passport, typeDefinitions = []) {
+  const explicitSerial = getPassportSerialNumber(passport);
+  if (explicitSerial) return explicitSerial;
+
+  const passportType = passport?.passport_type || passport?.passportType;
+  const typeFields = passportType ? getTypeFields(passportType, typeDefinitions) : [];
+  const serialField = typeFields.find(isLikelySerialField);
+  if (!serialField?.key) return "";
+
+  const value = getPassportFieldValue(passport || {}, serialField.key);
+  return value == null ? "" : String(value).trim();
+}
+
 function hasCompletionValue(value, field = {}) {
   if (value === null || value === undefined) return false;
   if (typeof value === "boolean") return true;

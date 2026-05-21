@@ -5,7 +5,7 @@ import { buildPassportJsonLdExport } from "../../../shared/utils/batterySemantic
 import { formatPassportStatus, isPublishedPassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode";
-import { getPassportSerialNumber } from "../passports/utils/passportListHelpers";
+import { getPassportSerialNumberForType } from "../passports/utils/passportListHelpers";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -296,7 +296,7 @@ function ArchivedPassports({ user, companyId }) {
 
   const tableColumns = useMemo(() => [
     { key: "version_number", type: "number", getValue: group => group.latest?.version_number },
-    { key: "serial_number", type: "string", getValue: group => getPassportSerialNumber(group.latest) },
+    { key: "serial_number", type: "string", getValue: group => getPassportSerialNumberForType(group.latest, passportTypes) },
     { key: "model_name", type: "string", getValue: group => group.latest?.model_name || "" },
     { key: "passport_type", type: "string", getValue: group => group.latest?.passport_type || "" },
     { key: "release_status", type: "string", getValue: group => group.latest?.release_status || "" },
@@ -419,7 +419,7 @@ function ArchivedPassports({ user, companyId }) {
           <span className="version-badge">v{passport.version_number}</span>
         </div>
       </td>
-      <td>{getPassportSerialNumber(passport) ? <span className="product-id-badge">{getPassportSerialNumber(passport)}</span> : <span className="no-product-id">—</span>}</td>
+      <td>{getPassportSerialNumberForType(passport, passportTypes) ? <span className="product-id-badge">{getPassportSerialNumberForType(passport, passportTypes)}</span> : <span className="no-product-id">—</span>}</td>
       <td>{passport.model_name || "—"}</td>
       <td><span className="type-badge passport-type-badge">{passport.passport_type}</span></td>
       <td>

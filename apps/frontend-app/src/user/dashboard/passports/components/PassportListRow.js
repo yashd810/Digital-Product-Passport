@@ -5,7 +5,7 @@ import {
 } from "../../../../passports/utils/passportStatus";
 import { CompletenessBar } from "./PassportListComponents";
 import { PassportListRowMenu } from "./PassportListRowMenu";
-import { getPassportSerialNumber } from "../utils/passportListHelpers";
+import { getPassportSerialNumberForType } from "../utils/passportListHelpers";
 
 export function PassportListRow({
   passport,
@@ -52,7 +52,7 @@ export function PassportListRow({
   const isExpanded = expandedPassportGroups.has(parentGuid);
   const normalizedStatus = normalizePassportStatus(passport.release_status);
   const showOlderVersionsToggle = hasOlderVersions && !isHistorical;
-  const serialNumber = getPassportSerialNumber(passport);
+  const serialNumber = getPassportSerialNumberForType(passport, allPassportTypes);
 
   return (
     <tr
