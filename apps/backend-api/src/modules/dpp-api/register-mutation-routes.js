@@ -14,7 +14,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     getPassportTypeSchema,
     getTable,
     normalizePassportRow,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     resolveEditablePassportByDppId,
     resolveActiveReleasedPassportByDppId,
     resolveReleasedPassportForIdentifier,
@@ -23,7 +23,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     archivePassportSnapshot,
     updatePassportRowById,
     logAudit,
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     productIdentifierService,
     complianceService,
     SYSTEM_PASSPORT_FIELDS,
@@ -55,13 +55,13 @@ module.exports = function registerMutationRoutes(app, deps) {
   const updateDpp = updateDppUseCase(deps);
   const dppCreateSchema = {
     type: "object",
-    anyOf: [["passport_type", "passportType"], ["product_id", "localProductId", "productId", "productIdentifier"]],
+    anyOf: [["passport_type", "passportType"], ["internal_alias_id", "internalAliasId", "internalAliasId", "productIdentifier"]],
     properties: {
       passport_type: { type: "string", minLength: 1 },
       passportType: { type: "string", minLength: 1 },
-      product_id: { type: "string", minLength: 1 },
-      localProductId: { type: "string", minLength: 1 },
-      productId: { type: "string", minLength: 1 },
+      internal_alias_id: { type: "string", minLength: 1 },
+      internalAliasId: { type: "string", minLength: 1 },
+      internalAliasId: { type: "string", minLength: 1 },
       productIdentifier: { type: "string", minLength: 1 },
     },
   };
@@ -331,7 +331,7 @@ module.exports = function registerMutationRoutes(app, deps) {
       const registrationPayload = {
         digitalProductPassportId: canonicalPayload.digitalProductPassportId,
         uniqueProductIdentifier: canonicalPayload.uniqueProductIdentifier,
-        localProductId: canonicalPayload.localProductId || result.passport.product_id || null,
+        internalAliasId: canonicalPayload.internalAliasId || result.passport.internal_alias_id || null,
         subjectDid: canonicalPayload.subjectDid,
         dppDid: canonicalPayload.dppDid,
         companyDid: canonicalPayload.companyDid,

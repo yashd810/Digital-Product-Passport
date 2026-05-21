@@ -258,7 +258,7 @@ async function initDb(pool, {
       id              SERIAL PRIMARY KEY,
       company_id      INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
       passport_dpp_id   TEXT NOT NULL,
-      product_id      TEXT NOT NULL,
+      internal_alias_id      TEXT NOT NULL,
       product_identifier_did TEXT,
       granularity     VARCHAR(20) NOT NULL DEFAULT 'model',
       product_did     TEXT NOT NULL,
@@ -266,8 +266,22 @@ async function initDb(pool, {
       company_did     TEXT NOT NULL,
       created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(company_id, product_id)
+      UNIQUE(company_id, internal_alias_id)
     )
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'dpp_subject_registry' AND column_name = 'product_id'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'dpp_subject_registry' AND column_name = 'internal_alias_id'
+      ) THEN
+        ALTER TABLE dpp_subject_registry RENAME COLUMN product_id TO internal_alias_id;
+      END IF;
+    END $$;
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dpp_subject_registry_guid
@@ -275,7 +289,7 @@ async function initDb(pool, {
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dpp_subject_registry_product
-      ON dpp_subject_registry(company_id, product_id)
+      ON dpp_subject_registry(company_id, internal_alias_id)
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dpp_registry_registrations (
@@ -440,7 +454,7 @@ async function initDb(pool, {
       passport_dpp_id       TEXT NOT NULL REFERENCES passport_registry(dpp_id) ON DELETE CASCADE,
       lineage_id            TEXT,
       passport_type         VARCHAR(100) NOT NULL,
-      product_id            TEXT NOT NULL,
+      internal_alias_id            TEXT NOT NULL,
       version_number        INTEGER NOT NULL DEFAULT 1,
       backup_provider_id    INTEGER REFERENCES backup_service_providers(id) ON DELETE SET NULL,
       backup_provider_key   VARCHAR(100) NOT NULL,
@@ -461,12 +475,26 @@ async function initDb(pool, {
     )
   `);
   await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'backup_public_handovers' AND column_name = 'product_id'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'backup_public_handovers' AND column_name = 'internal_alias_id'
+      ) THEN
+        ALTER TABLE backup_public_handovers RENAME COLUMN product_id TO internal_alias_id;
+      END IF;
+    END $$;
+  `);
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_backup_public_handovers_company
       ON backup_public_handovers(company_id, activated_at DESC, id DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_backup_public_handovers_product
-      ON backup_public_handovers(product_id, handover_status, activated_at DESC, id DESC)
+      ON backup_public_handovers(internal_alias_id, handover_status, activated_at DESC, id DESC)
   `);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_backup_public_handovers_active_passport
@@ -824,8 +852,8 @@ async function initDb(pool, {
       replacement_passport_dpp_id  TEXT    NOT NULL,
       previous_identifier          TEXT    NOT NULL,
       replacement_identifier       TEXT    NOT NULL,
-      previous_local_product_id    TEXT,
-      replacement_local_product_id TEXT,
+      previous_internal_alias_id    TEXT,
+      replacement_internal_alias_id TEXT,
       previous_granularity         VARCHAR(20) NOT NULL CHECK (previous_granularity IN ('model', 'batch', 'item')),
       replacement_granularity      VARCHAR(20) NOT NULL CHECK (replacement_granularity IN ('model', 'batch', 'item')),
       transition_reason            TEXT,
@@ -835,6 +863,30 @@ async function initDb(pool, {
     )
   `);
   await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'product_identifier_lineage' AND column_name = 'previous_local_product_id'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'product_identifier_lineage' AND column_name = 'previous_internal_alias_id'
+      ) THEN
+        ALTER TABLE product_identifier_lineage RENAME COLUMN previous_local_product_id TO previous_internal_alias_id;
+      END IF;
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'product_identifier_lineage' AND column_name = 'replacement_local_product_id'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'product_identifier_lineage' AND column_name = 'replacement_internal_alias_id'
+      ) THEN
+        ALTER TABLE product_identifier_lineage RENAME COLUMN replacement_local_product_id TO replacement_internal_alias_id;
+      END IF;
+    END $$;
+  `);
+  await pool.query(`
+
     CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_company
       ON product_identifier_lineage(company_id)
   `);
@@ -1475,7 +1527,7 @@ async function initDb(pool, {
       passport_type    VARCHAR(100) NOT NULL,
       version_number   INTEGER NOT NULL DEFAULT 1,
       model_name       VARCHAR(255),
-      product_id       VARCHAR(255),
+      internal_alias_id       VARCHAR(255),
       product_identifier_did TEXT,
       actor_identifier TEXT,
       snapshot_reason VARCHAR(100),
@@ -1488,6 +1540,20 @@ async function initDb(pool, {
   await pool.query(`
     ALTER TABLE passport_archives
     ADD COLUMN IF NOT EXISTS lineage_id TEXT
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'passport_archives' AND column_name = 'product_id'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'passport_archives' AND column_name = 'internal_alias_id'
+      ) THEN
+        ALTER TABLE passport_archives RENAME COLUMN product_id TO internal_alias_id;
+      END IF;
+    END $$;
   `);
   await pool.query(`
     ALTER TABLE passport_archives
@@ -1522,6 +1588,23 @@ async function initDb(pool, {
   for (const { type_name } of ptRows.rows) {
     const tableName = getTable(type_name);
     try {
+      const legacyAliasColumn = await pool.query(
+        `SELECT 1
+         FROM information_schema.columns
+         WHERE table_name = $1
+           AND column_name = 'product_id'`,
+        [tableName]
+      );
+      const currentAliasColumn = await pool.query(
+        `SELECT 1
+         FROM information_schema.columns
+         WHERE table_name = $1
+           AND column_name = 'internal_alias_id'`,
+        [tableName]
+      );
+      if (legacyAliasColumn.rows.length && !currentAliasColumn.rows.length) {
+        await pool.query(`ALTER TABLE ${tableName} RENAME COLUMN product_id TO internal_alias_id`);
+      }
       await pool.query(`
         ALTER TABLE ${tableName}
         ADD COLUMN IF NOT EXISTS lineage_id TEXT
@@ -1576,17 +1659,17 @@ async function initDb(pool, {
       if (productIdentifierService) {
         await runMigration(pool, `2026-04-27.backfill-product-identifier-did.${type_name}`, async (db) => {
           const liveRows = await db.query(
-            `SELECT id, company_id, product_id, granularity
+            `SELECT id, company_id, internal_alias_id, granularity
              FROM ${tableName}
              WHERE deleted_at IS NULL
-               AND COALESCE(TRIM(product_id), '') <> ''
+               AND COALESCE(TRIM(internal_alias_id), '') <> ''
                AND COALESCE(TRIM(product_identifier_did), '') = ''`
           );
           for (const row of liveRows.rows) {
             const canonicalDid = productIdentifierService.buildCanonicalProductDid({
               companyId: row.company_id,
               passportType: type_name,
-              rawProductId: row.product_id,
+              rawProductId: row.internal_alias_id,
               granularity: row.granularity || "item",
             });
             if (!canonicalDid) continue;
@@ -1599,10 +1682,10 @@ async function initDb(pool, {
           }
 
           const archiveRows = await db.query(
-            `SELECT id, company_id, product_id, row_data
+            `SELECT id, company_id, internal_alias_id, row_data
              FROM passport_archives
              WHERE passport_type = $1
-               AND COALESCE(TRIM(product_id), '') <> ''
+               AND COALESCE(TRIM(internal_alias_id), '') <> ''
                AND COALESCE(TRIM(product_identifier_did), '') = ''`,
             [type_name]
           );
@@ -1611,7 +1694,7 @@ async function initDb(pool, {
             const canonicalDid = productIdentifierService.buildCanonicalProductDid({
               companyId: row.company_id,
               passportType: type_name,
-              rawProductId: row.product_id,
+              rawProductId: row.internal_alias_id,
               granularity: rowData?.granularity || "item",
             });
             if (!canonicalDid) continue;

@@ -43,7 +43,7 @@ function createArchiveHistoryHelpers({
     await client.query(
       `INSERT INTO passport_archives
          (dpp_id, lineage_id, company_id, passport_type, version_number, model_name,
-          product_id, product_identifier_did, release_status, row_data, archived_by,
+          internal_alias_id, product_identifier_did, release_status, row_data, archived_by,
           actor_identifier, snapshot_reason)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
@@ -53,7 +53,7 @@ function createArchiveHistoryHelpers({
         passportType,
         Number.isFinite(Number(rowData.version_number)) ? Number(rowData.version_number) : 1,
         rowData.model_name || null,
-        rowData.product_id || null,
+        rowData.internal_alias_id || null,
         rowData.product_identifier_did || null,
         rowData.release_status || null,
         JSON.stringify(rowData),
@@ -220,14 +220,14 @@ function createArchiveHistoryHelpers({
             manufacturerName: version.manufacturer,
             manufacturedBy: version.manufactured_by,
             modelName: version.model_name,
-            productId: version.product_id,
+            internalAliasId: version.internal_alias_id,
           }),
           inactive_path: buildInactivePublicPassportPath({
             companyName: companyNameMap.get(String(version.company_id)) || "",
             manufacturerName: version.manufacturer,
             manufacturedBy: version.manufactured_by,
             modelName: version.model_name,
-            productId: version.product_id,
+            internalAliasId: version.internal_alias_id,
             versionNumber,
           }),
           changed_fields: changedFields,

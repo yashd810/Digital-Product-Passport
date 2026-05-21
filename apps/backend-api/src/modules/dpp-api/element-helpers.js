@@ -306,14 +306,14 @@ function createElementHelpers({
       null;
     let dppId = null;
     try {
-      if (passport?.company_id && passport?.product_id) {
-        dppId = dppIdentity.dppDid(granularity, passport.company_id, passport.product_id);
+      if (passport?.company_id && passport?.internal_alias_id) {
+        dppId = dppIdentity.dppDid(granularity, passport.company_id, passport.internal_alias_id);
       }
     } catch {}
 
     return {
       productIdentifier: passport?.product_identifier_did || derivedProductIdentifier || null,
-      localProductId: passport?.product_id || null,
+      internalAliasId: passport?.internal_alias_id || null,
       dppId,
       elementIdPath,
       ...buildExpandedDataElement({

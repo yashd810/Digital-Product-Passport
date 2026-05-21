@@ -88,7 +88,7 @@ module.exports = function createBatteryDictionaryService() {
       passport_type: "dpp:passportType",
       semantic_model: "dpp:semanticModel",
       model_name: "dpp:modelName",
-      product_id: "dpp:productId",
+      internal_alias_id: "dpp:internalAliasId",
       release_status: "dpp:releaseStatus",
       version_number: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
       created_at: { "@id": "dpp:createdAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },

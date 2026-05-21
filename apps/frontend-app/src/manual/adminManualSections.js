@@ -561,7 +561,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       table: ASSET_MANAGEMENT_API_TABLE,
       warnings: [
         "Asset Management should only be enabled for companies that actually need high-volume operational updates.",
-        "Because this layer can update many passports in one run, support teams should ask companies to preview first and use stable match keys such as dppId or product_id.",
+        "Because this layer can update many passports in one run, support teams should ask companies to preview first and use stable match keys such as dppId or internal_alias_id.",
       ],
     },
     {

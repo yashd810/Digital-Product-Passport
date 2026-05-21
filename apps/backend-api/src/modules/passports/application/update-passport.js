@@ -10,9 +10,9 @@ function updateEditablePassportUseCase(deps) {
     VALID_GRANULARITIES,
     EDITABLE_RELEASE_STATUSES_SQL,
     hasReleasedLineageVersion,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     buildStoredProductIdentifiers,
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     normalizeReleaseStatus,
     getCompanyNameMap,
     maybeSignCarrierPayload,
@@ -89,37 +89,37 @@ function updateEditablePassportUseCase(deps) {
           throw error;
         }
         fields.granularity = requestedGranularity;
-        const nextProductIdForGranularity = normalizeProductIdValue(fields.product_id || current.rows[0].product_id);
+        const nextProductIdForGranularity = normalizeInternalAliasIdValue(fields.internal_alias_id || current.rows[0].internal_alias_id);
         if (!nextProductIdForGranularity) {
-          throw Object.assign(new Error("product_id cannot be blank when changing granularity"), { statusCode: 400 });
+          throw Object.assign(new Error("internal_alias_id cannot be blank when changing granularity"), { statusCode: 400 });
         }
         const storedProductIdentifiers = buildStoredProductIdentifiers({
           companyId,
           companyName: await getResolvedCompanyName(),
           passportType: typeSchema.typeName,
-          productId: nextProductIdForGranularity,
+          internalAliasId: nextProductIdForGranularity,
           granularity: requestedGranularity,
-          passportLike: { ...current.rows[0], ...fields, product_id: nextProductIdForGranularity },
+          passportLike: { ...current.rows[0], ...fields, internal_alias_id: nextProductIdForGranularity },
         });
-        fields.product_id = storedProductIdentifiers.product_id;
+        fields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
         fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
       }
     }
 
     const hasBusinessIdentifierUpdate = ["serial_number", "serial", "serialNumber", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"].some((key) => fields[key] !== undefined);
 
-    if (fields.product_id !== undefined) {
-      const normalizedProductId = normalizeProductIdValue(fields.product_id);
-      if (!normalizedProductId) throw Object.assign(new Error("product_id cannot be blank"), { statusCode: 400 });
-      const existingByProductId = await findExistingPassportByProductId({
+    if (fields.internal_alias_id !== undefined) {
+      const normalizedProductId = normalizeInternalAliasIdValue(fields.internal_alias_id);
+      if (!normalizedProductId) throw Object.assign(new Error("internal_alias_id cannot be blank"), { statusCode: 400 });
+      const existingByProductId = await findExistingPassportByInternalAliasId({
         tableName,
         companyId,
-        productId: normalizedProductId,
+        internalAliasId: normalizedProductId,
         excludeGuid: dppId,
         excludeLineageId: current.rows[0].lineage_id,
       });
       if (existingByProductId) {
-        const error = new Error(`A passport with Local Passport ID "${normalizedProductId}" already exists.`);
+        const error = new Error(`A passport with Internal Alias ID "${normalizedProductId}" already exists.`);
         error.statusCode = 409;
         error.payload = {
           existing_dpp_id: existingByProductId.dppId,
@@ -131,18 +131,18 @@ function updateEditablePassportUseCase(deps) {
         companyId,
         companyName: await getResolvedCompanyName(),
         passportType: typeSchema.typeName,
-        productId: normalizedProductId,
+        internalAliasId: normalizedProductId,
         granularity: fields.granularity || current.rows[0].granularity || "item",
-        passportLike: { ...current.rows[0], ...fields, product_id: normalizedProductId },
+        passportLike: { ...current.rows[0], ...fields, internal_alias_id: normalizedProductId },
       });
-      fields.product_id = storedProductIdentifiers.product_id;
+      fields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
       fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
-    } else if ((hasBusinessIdentifierUpdate || !current.rows[0].product_identifier_did) && current.rows[0].product_id) {
+    } else if ((hasBusinessIdentifierUpdate || !current.rows[0].product_identifier_did) && current.rows[0].internal_alias_id) {
       const storedProductIdentifiers = buildStoredProductIdentifiers({
         companyId,
         companyName: await getResolvedCompanyName(),
         passportType: typeSchema.typeName,
-        productId: current.rows[0].product_id,
+        internalAliasId: current.rows[0].internal_alias_id,
         granularity: fields.granularity || current.rows[0].granularity || "item",
         passportLike: { ...current.rows[0], ...fields },
       });
@@ -161,7 +161,7 @@ function updateEditablePassportUseCase(deps) {
           dppId,
           dpp_id: dppId,
           company_id: companyId,
-          product_id: fields.product_id || current.rows[0].product_id,
+          internal_alias_id: fields.internal_alias_id || current.rows[0].internal_alias_id,
           model_name: fields.model_name || current.rows[0].model_name,
         },
         companyName,

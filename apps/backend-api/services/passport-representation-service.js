@@ -115,12 +115,12 @@ module.exports = function createPassportRepresentationService({
       }) || null;
     }
 
-    if (dppIdentity && passport.product_id) {
+    if (dppIdentity && passport.internal_alias_id) {
       try {
-        dppDidValue = dppIdentity.dppDid(resolvedGranularity, passport.company_id, passport.product_id);
+        dppDidValue = dppIdentity.dppDid(resolvedGranularity, passport.company_id, passport.internal_alias_id);
         publicUrl   = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       } catch {
-        // product_id may be malformed; leave DIDs null
+        // internal_alias_id may be malformed; leave DIDs null
       }
     }
 
@@ -172,14 +172,14 @@ module.exports = function createPassportRepresentationService({
       extensions.claros.validation = buildValidationSummary();
     }
 
-    const localProductId = passport.product_id || null;
+    const internalAliasId = passport.internal_alias_id || null;
     const uniqueProductIdentifier = canonicalPayload?.uniqueProductIdentifier || passport.product_identifier_did || productDid || null;
 
     return {
       // JTC 18223 canonical header fields
       digitalProductPassportId:  passport.dppId || passport.dpp_id || canonicalPayload?.digitalProductPassportId || dppDidValue || null,
       uniqueProductIdentifier,
-      localProductId,
+      internalAliasId,
       granularity:               resolvedGranularity,
       dppSchemaVersion:          passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
       dppStatus:                 canonicalPayload?.dppStatus || toStandardDppStatus(passport.release_status),

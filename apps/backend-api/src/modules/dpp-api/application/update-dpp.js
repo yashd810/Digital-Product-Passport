@@ -4,14 +4,14 @@ function updateDppUseCase(deps) {
   const {
     pool,
     normalizePassportRequestBody,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     resolveEditablePassportByDppId,
     isEditablePassportStatus,
     getCompanyNameMap,
     archivePassportSnapshot,
     updatePassportRowById,
     logAudit,
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     productIdentifierService,
     SYSTEM_PASSPORT_FIELDS,
     getWritablePassportColumns,
@@ -66,9 +66,9 @@ function updateDppUseCase(deps) {
       companyId,
       company_id,
       granularity,
-      product_id,
+      internal_alias_id,
       product_identifier_did,
-      productId,
+      internalAliasId,
       productIdentifier,
       model_name,
       modelName,
@@ -161,16 +161,16 @@ function updateDppUseCase(deps) {
       || normalizedBody.uniqueProductIdentifier
       || normalizedBody.unique_product_identifier
       || null;
-    const nextProductId = normalizeProductIdValue(product_id || normalizedBody.localProductId || productId || productIdentifier);
+    const nextProductId = normalizeInternalAliasIdValue(internal_alias_id || normalizedBody.internalAliasId || internalAliasId || productIdentifier);
     if (explicitUniqueProductIdentifier && !usesConfiguredGlobalProductIdentifierScheme(explicitUniqueProductIdentifier)) {
       return { statusCode: 400, body: { error: "uniqueProductIdentifier must use the configured global DID-based identifier scheme" } };
     }
-    if (product_id !== undefined || normalizedBody.localProductId !== undefined || productId !== undefined || productIdentifier !== undefined || explicitUniqueProductIdentifier !== null) {
-      if (!nextProductId) return { statusCode: 400, body: { error: "productId cannot be blank" } };
-      const existingByProductId = await findExistingPassportByProductId({
+    if (internal_alias_id !== undefined || normalizedBody.internalAliasId !== undefined || internalAliasId !== undefined || productIdentifier !== undefined || explicitUniqueProductIdentifier !== null) {
+      if (!nextProductId) return { statusCode: 400, body: { error: "internalAliasId cannot be blank" } };
+      const existingByProductId = await findExistingPassportByInternalAliasId({
         tableName: editable.tableName,
         companyId: editable.passport.company_id,
-        productId: nextProductId,
+        internalAliasId: nextProductId,
         excludeGuid: editable.passport.dppId,
         excludeLineageId: editable.passport.lineage_id,
       });
@@ -178,7 +178,7 @@ function updateDppUseCase(deps) {
         return {
           statusCode: 409,
           body: {
-            error: `A passport with Local Passport ID "${nextProductId}" already exists.`,
+            error: `A passport with Internal Alias ID "${nextProductId}" already exists.`,
             existingDppId: existingByProductId.dppId,
             release_status: existingByProductId.release_status || null,
           },
@@ -192,13 +192,13 @@ function updateDppUseCase(deps) {
         uniqueProductIdentifier: explicitUniqueProductIdentifier,
         granularity: nextGranularity,
       });
-      updateData.product_id = normalizedProductIdentifiers.productIdInput;
+      updateData.internal_alias_id = normalizedProductIdentifiers.internalAliasIdInput;
       updateData.product_identifier_did = normalizedProductIdentifiers.productIdentifierDid;
     } else if (updateData.granularity !== undefined) {
       const normalizedProductIdentifiers = productIdentifierService.normalizeProductIdentifiers({
         companyId: editable.passport.company_id,
         passportType: editable.passport.passport_type,
-        rawProductId: editable.passport.product_id,
+        rawProductId: editable.passport.internal_alias_id,
         canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.({ ...editable.passport, ...fields }) || null,
         uniqueProductIdentifier: explicitUniqueProductIdentifier,
         granularity: nextGranularity,

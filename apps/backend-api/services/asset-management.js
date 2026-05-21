@@ -20,10 +20,10 @@ module.exports = function createAssetService({
   assertCompanyAssetPassportTypeAccess,
   assertAssetManagementEnabled,
   getLatestCompanyPassports,
-  findExistingPassportByProductId,
+  findExistingPassportByInternalAliasId,
   updatePassportRowById,
-  normalizeProductIdValue,
-  generateProductIdValue,
+  normalizeInternalAliasIdValue,
+  generateInternalAliasIdValue,
   generateDppRecordId,
   productIdentifierService,
   createPassportTable,
@@ -86,10 +86,10 @@ module.exports = function createAssetService({
     return effectiveGranularity;
   }
 
-  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, productId, granularity }) {
+  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, internalAliasId, granularity }) {
     if (!productIdentifierService?.normalizeProductIdentifiers) {
       return {
-        product_id: productId || null,
+        internal_alias_id: internalAliasId || null,
         product_identifier_did: null,
       };
     }
@@ -99,11 +99,11 @@ module.exports = function createAssetService({
       companySlug,
       companyName,
       passportType,
-      rawProductId: productId,
+      rawProductId: internalAliasId,
       granularity,
     });
     return {
-      product_id: normalized.productIdInput || null,
+      internal_alias_id: normalized.internalAliasIdInput || null,
       product_identifier_did: normalized.productIdentifierDid || null,
     };
   }
@@ -294,8 +294,8 @@ module.exports = function createAssetService({
     const currentByGuid = new Map(currentRows.map((row) => [row.dppId, row]));
     const currentByProductId = new Map(
       currentRows.
-      filter((row) => normalizeProductIdValue(row.product_id)).
-      map((row) => [normalizeProductIdValue(row.product_id), row])
+      filter((row) => normalizeInternalAliasIdValue(row.internal_alias_id)).
+      map((row) => [normalizeInternalAliasIdValue(row.internal_alias_id), row])
     );
 
     const batchTargets = new Set();
@@ -320,17 +320,17 @@ module.exports = function createAssetService({
       }
 
       const matchGuid = String(rawRecord.match_dpp_id || rawRecord.match_guid || rawRecord.dppId || rawRecord.dpp_id || rawRecord.guid || "").trim();
-      const matchProductId = normalizeProductIdValue(
+      const matchProductId = normalizeInternalAliasIdValue(
         rawRecord.match_product_id !== undefined ?
         rawRecord.match_product_id :
-        !matchGuid ? rawRecord.product_id : ""
+        !matchGuid ? rawRecord.internal_alias_id : ""
       );
 
       if (!matchGuid && !matchProductId) {
         details.push({
           row_index: index + 1,
           status: "failed",
-          error: "Each asset row needs dppId/dpp_id/guid, match_dpp_id/match_guid, product_id, or match_product_id"
+          error: "Each asset row needs dppId/dpp_id/guid, match_dpp_id/match_guid, internal_alias_id, or match_product_id"
         });
         summary.failed += 1;
         return;
@@ -345,7 +345,7 @@ module.exports = function createAssetService({
           details.push({
             row_index: index + 1,
             dppId: matchGuid || undefined,
-            product_id: matchProductId || undefined,
+            internal_alias_id: matchProductId || undefined,
             status: "skipped",
             reason: "No matching passport was found"
           });
@@ -358,7 +358,7 @@ module.exports = function createAssetService({
             row_index: index + 1,
             dppId: matchGuid || undefined,
             status: "failed",
-            error: "A new passport needs product_id or match_product_id so a draft can be created"
+            error: "A new passport needs internal_alias_id or match_product_id so a draft can be created"
           });
           summary.failed += 1;
           return;
@@ -402,11 +402,11 @@ module.exports = function createAssetService({
           errors.push(`Unknown field "${key}"`);
         });
 
-        const normalizedProductId = normalizeProductIdValue(passportCreate.product_id || matchProductId);
+        const normalizedProductId = normalizeInternalAliasIdValue(passportCreate.internal_alias_id || matchProductId);
         if (!normalizedProductId) {
-          errors.push("product_id cannot be blank");
+          errors.push("internal_alias_id cannot be blank");
         } else {
-          passportCreate.product_id = normalizedProductId;
+          passportCreate.internal_alias_id = normalizedProductId;
           const duplicate = currentByProductId.get(normalizedProductId);
           if (duplicate) {
             errors.push(`Serial Number "${normalizedProductId}" already belongs to another passport`);
@@ -427,7 +427,7 @@ module.exports = function createAssetService({
         if (errors.length) {
           details.push({
             row_index: index + 1,
-            product_id: normalizedProductId || matchProductId || undefined,
+            internal_alias_id: normalizedProductId || matchProductId || undefined,
             status: "failed",
             error: errors.join("; ")
           });
@@ -440,20 +440,20 @@ module.exports = function createAssetService({
         const resolvedProductIdentifiers = buildStoredProductIdentifiers({
           companyId,
           passportType: typeSchema.typeName,
-          productId: passportCreate.product_id || generateProductIdValue(generatedDppId),
+          internalAliasId: passportCreate.internal_alias_id || generateInternalAliasIdValue(generatedDppId),
           granularity: effectiveGranularity,
         });
 
-        passportCreate.product_id = resolvedProductIdentifiers.product_id;
+        passportCreate.internal_alias_id = resolvedProductIdentifiers.internal_alias_id;
         if (passportCreate.model_name === undefined) passportCreate.model_name = "";
-        batchProductIds.set(resolvedProductIdentifiers.product_id, generatedDppId);
+        batchProductIds.set(resolvedProductIdentifiers.internal_alias_id, generatedDppId);
         generatedRecords.push({
           row_index: index + 1,
           action: "create",
           generated_dpp_id: generatedDppId,
           generated_lineage_id: lineageId,
           generated_granularity: effectiveGranularity,
-          product_id: resolvedProductIdentifiers.product_id,
+          internal_alias_id: resolvedProductIdentifiers.internal_alias_id,
           product_identifier_did: resolvedProductIdentifiers.product_identifier_did,
           passport_create: passportCreate
         });
@@ -463,7 +463,7 @@ module.exports = function createAssetService({
         details.push({
           row_index: index + 1,
           dppId: generatedDppId,
-          product_id: resolvedProductIdentifiers.product_id,
+          internal_alias_id: resolvedProductIdentifiers.internal_alias_id,
           status: "ready",
           action: "create",
           generated_dpp_id: generatedDppId,
@@ -507,7 +507,7 @@ module.exports = function createAssetService({
           }
 
           if (fieldDef) {
-            if (resolvedKey === "product_id" && !matchGuid && !nextProductIdProvided) return;
+            if (resolvedKey === "internal_alias_id" && !matchGuid && !nextProductIdProvided) return;
             const coerced = coerceAssetFieldValue(fieldDef, value);
           if (!coerced.ok) {
             errors.push(coerced.error);
@@ -522,11 +522,11 @@ module.exports = function createAssetService({
         });
 
       if (nextProductIdProvided) {
-        const normalizedNextProductId = normalizeProductIdValue(rawRecord.next_product_id);
+        const normalizedNextProductId = normalizeInternalAliasIdValue(rawRecord.next_product_id);
         if (!normalizedNextProductId) {
           errors.push("next_product_id cannot be blank");
         } else {
-          passportUpdate.product_id = normalizedNextProductId;
+          passportUpdate.internal_alias_id = normalizedNextProductId;
         }
       }
 
@@ -546,12 +546,12 @@ module.exports = function createAssetService({
         errors.push(`Passport is ${matchedRow.release_status} and can only receive dynamic pushes right now`);
       }
 
-      if (passportUpdate.product_id !== undefined) {
-        const normalizedNextProductId = normalizeProductIdValue(passportUpdate.product_id);
+      if (passportUpdate.internal_alias_id !== undefined) {
+        const normalizedNextProductId = normalizeInternalAliasIdValue(passportUpdate.internal_alias_id);
         if (!normalizedNextProductId) {
-          errors.push("product_id cannot be blank");
+          errors.push("internal_alias_id cannot be blank");
         } else {
-          passportUpdate.product_id = normalizedNextProductId;
+          passportUpdate.internal_alias_id = normalizedNextProductId;
           const duplicate = currentByProductId.get(normalizedNextProductId);
           if (duplicate && duplicate.dppId !== matchedRow.dppId) {
             errors.push(`Serial Number "${normalizedNextProductId}" already belongs to another passport`);
@@ -569,7 +569,7 @@ module.exports = function createAssetService({
         details.push({
           row_index: index + 1,
           dppId: matchedRow.dppId,
-          product_id: matchedRow.product_id,
+          internal_alias_id: matchedRow.internal_alias_id,
           status: "failed",
           error: errors.join("; ")
         });
@@ -581,7 +581,7 @@ module.exports = function createAssetService({
         details.push({
           row_index: index + 1,
           dppId: matchedRow.dppId,
-          product_id: matchedRow.product_id,
+          internal_alias_id: matchedRow.internal_alias_id,
           status: "skipped",
           reason: "No changes detected for this row"
         });
@@ -594,13 +594,13 @@ module.exports = function createAssetService({
         row_index: index + 1,
         action: "update",
         matched_dpp_id: matchedRow.dppId,
-        matched_product_id: matchedRow.product_id,
+        matched_product_id: matchedRow.internal_alias_id,
         matched_release_status: matchedRow.release_status,
         is_editable: matchedRow.is_editable,
         match: {
           dppId: matchGuid || null,
-          product_id: matchProductId || null,
-          matched_by: matchGuid ? "dppId" : "product_id"
+          internal_alias_id: matchProductId || null,
+          matched_by: matchGuid ? "dppId" : "internal_alias_id"
         },
         passport_update: passportUpdate,
         dynamic_values: dynamicValues
@@ -612,7 +612,7 @@ module.exports = function createAssetService({
       details.push({
         row_index: index + 1,
         dppId: matchedRow.dppId,
-        product_id: matchedRow.product_id,
+        internal_alias_id: matchedRow.internal_alias_id,
         status: "ready",
         passport_fields: Object.keys(passportUpdate),
         dynamic_fields: Object.keys(dynamicValues)
@@ -669,9 +669,9 @@ module.exports = function createAssetService({
 
       try {
         if (action === "create") {
-          const normalizedProductId = normalizeProductIdValue(passportCreate.product_id || item.product_id);
+          const normalizedProductId = normalizeInternalAliasIdValue(passportCreate.internal_alias_id || item.internal_alias_id);
           if (!normalizedProductId) {
-            throw new Error("product_id is required to create a passport");
+            throw new Error("internal_alias_id is required to create a passport");
           }
 
           if (typeof createPassportTable === "function") {
@@ -681,10 +681,10 @@ module.exports = function createAssetService({
             });
           }
 
-          const duplicate = await findExistingPassportByProductId({
+          const duplicate = await findExistingPassportByInternalAliasId({
             tableName,
             companyId,
-            productId: normalizedProductId,
+            internalAliasId: normalizedProductId,
           });
           if (duplicate) {
             throw new Error(`Serial Number "${normalizedProductId}" already belongs to another passport`);
@@ -699,7 +699,7 @@ module.exports = function createAssetService({
           const storedProductIdentifiers = buildStoredProductIdentifiers({
             companyId,
             passportType,
-            productId: normalizedProductId,
+            internalAliasId: normalizedProductId,
             granularity: effectiveGranularity,
           });
 
@@ -708,7 +708,7 @@ module.exports = function createAssetService({
             "lineage_id",
             "company_id",
             "model_name",
-            "product_id",
+            "internal_alias_id",
             "product_identifier_did",
             "granularity",
             "created_by"
@@ -718,14 +718,14 @@ module.exports = function createAssetService({
             lineageId,
             companyId,
             passportCreate.model_name || null,
-            storedProductIdentifiers.product_id,
+            storedProductIdentifiers.internal_alias_id,
             storedProductIdentifiers.product_identifier_did,
             effectiveGranularity,
             userId || null
           ];
 
           Object.entries(passportCreate).forEach(([key, value]) => {
-            if (["dpp_id", "dppId", "lineage_id", "lineageId", "company_id", "model_name", "product_id", "product_identifier_did", "granularity"].includes(key)) return;
+            if (["dpp_id", "dppId", "lineage_id", "lineageId", "company_id", "model_name", "internal_alias_id", "product_identifier_did", "granularity"].includes(key)) return;
             insertCols.push(key);
             insertVals.push(value);
           });
@@ -764,7 +764,7 @@ module.exports = function createAssetService({
             null,
             {
               source,
-              product_id: storedProductIdentifiers.product_id,
+              internal_alias_id: storedProductIdentifiers.internal_alias_id,
               product_identifier_did: storedProductIdentifiers.product_identifier_did,
               granularity: effectiveGranularity,
             }
@@ -783,7 +783,7 @@ module.exports = function createAssetService({
           details.push({
             ...detail,
             status: "created",
-            product_id: storedProductIdentifiers.product_id,
+            internal_alias_id: storedProductIdentifiers.internal_alias_id,
             generated_dpp_id: dppId,
           });
           continue;
@@ -812,15 +812,15 @@ module.exports = function createAssetService({
             detail.passport_status = "skipped";
             detail.passport_reason = "Passport is no longer editable";
           } else {
-            if (passportUpdate.product_id !== undefined) {
-              const duplicate = await findExistingPassportByProductId({
+            if (passportUpdate.internal_alias_id !== undefined) {
+              const duplicate = await findExistingPassportByInternalAliasId({
                 tableName,
                 companyId,
-                productId: normalizeProductIdValue(passportUpdate.product_id),
+                internalAliasId: normalizeInternalAliasIdValue(passportUpdate.internal_alias_id),
                 excludeGuid: matchedGuid
               });
               if (duplicate) {
-                throw new Error(`Serial Number "${passportUpdate.product_id}" already belongs to another passport`);
+                throw new Error(`Serial Number "${passportUpdate.internal_alias_id}" already belongs to another passport`);
               }
             }
 

@@ -94,7 +94,7 @@ function createTestApp() {
     company_id: 5,
     granularity: "item",
     release_status: "draft",
-    product_id: "SKU-1",
+    internal_alias_id: "SKU-1",
     model_name: "Original model",
     facility_id: "FAC-INACTIVE",
     content_specification_ids: "[\"spec-a\"]",
@@ -174,8 +174,8 @@ function createTestApp() {
     normalizePassportRow: (row) => row,
     normalizeReleaseStatus: (value) => value,
     isEditablePassportStatus: (value) => value === "draft" || value === "in_revision",
-    normalizeProductIdValue: (value) => String(value || "").trim(),
-    generateProductIdValue: (value) => `PID-${value}`,
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
+    generateInternalAliasIdValue: (value) => `PID-${value}`,
     normalizePassportRequestBody: (body) => body,
     extractExplicitFacilityId: (source) => {
       const value = source?.facility_id;
@@ -193,9 +193,9 @@ function createTestApp() {
     logAudit: jest.fn(async () => {}),
     getPassportTypeSchema: jest.fn(async () => ({
       typeName: "battery",
-      allowedKeys: new Set(["manufacturer", "model_name", "product_id"]),
+      allowedKeys: new Set(["manufacturer", "model_name", "internal_alias_id"]),
     })),
-    findExistingPassportByProductId: jest.fn(async () => null),
+    findExistingPassportByInternalAliasId: jest.fn(async () => null),
     getPassportLineageContext: jest.fn(async () => null),
     getPassportVersionsByLineage: jest.fn(async () => []),
     fetchCompanyPassportRecord: jest.fn(async () => null),
@@ -231,10 +231,10 @@ function createTestApp() {
     },
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId }) => ({
-        productIdInput: rawProductId,
+        internalAliasIdInput: rawProductId,
         productIdentifierDid: `did:product:${rawProductId}`,
       }),
-      buildLookupCandidates: ({ productId }) => [productId],
+      buildLookupCandidates: ({ internalAliasId }) => [internalAliasId],
     },
     backupProviderService: null,
     buildExpandedPassportPayload: jest.fn(() => ({})),
@@ -254,7 +254,7 @@ function createReleaseTestApp() {
     version_number: 3,
     granularity: "item",
     release_status: "draft",
-    product_id: "SKU-REL-1",
+    internal_alias_id: "SKU-REL-1",
     product_identifier_did: "SKU-REL-1",
     compliance_profile_key: "generic_dpp_v1",
     content_specification_ids: null,
@@ -363,8 +363,8 @@ function createReleaseTestApp() {
     normalizePassportRow: (row) => row,
     normalizeReleaseStatus: (value) => value,
     isEditablePassportStatus: (value) => value === "draft" || value === "in_revision",
-    normalizeProductIdValue: (value) => String(value || "").trim(),
-    generateProductIdValue: (value) => `PID-${value}`,
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
+    generateInternalAliasIdValue: (value) => `PID-${value}`,
     normalizePassportRequestBody: (body) => body,
     extractExplicitFacilityId: (source) => {
       const value = source?.facility_id;
@@ -382,9 +382,9 @@ function createReleaseTestApp() {
     logAudit: jest.fn(async () => {}),
     getPassportTypeSchema: jest.fn(async () => ({
       typeName: "battery",
-      allowedKeys: new Set(["manufacturer", "model_name", "product_id"]),
+      allowedKeys: new Set(["manufacturer", "model_name", "internal_alias_id"]),
     })),
-    findExistingPassportByProductId: jest.fn(async () => null),
+    findExistingPassportByInternalAliasId: jest.fn(async () => null),
     getPassportLineageContext: jest.fn(async () => null),
     getPassportVersionsByLineage: jest.fn(async () => []),
     fetchCompanyPassportRecord: jest.fn(async () => null),
@@ -422,10 +422,10 @@ function createReleaseTestApp() {
     },
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId }) => ({
-        productIdInput: rawProductId,
+        internalAliasIdInput: rawProductId,
         productIdentifierDid: `did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc`,
       }),
-      buildLookupCandidates: ({ productId }) => [productId],
+      buildLookupCandidates: ({ internalAliasId }) => [internalAliasId],
     },
     backupProviderService: null,
     buildExpandedPassportPayload: jest.fn(() => ({})),

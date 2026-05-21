@@ -75,19 +75,19 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     if (!passport?.dppId) return null;
 
     const normalizedStatus = normalizePassportStatus(passport.release_status);
-    if (!forcePreview && normalizedStatus === "released" && passport.product_id) {
+    if (!forcePreview && normalizedStatus === "released" && passport.internal_alias_id) {
       return buildPublicPassportPath({
         companyName: user?.company_name,
         modelName: passport.model_name,
-        productId: passport.product_id,
+        internalAliasId: passport.internal_alias_id,
       });
     }
 
-    if (!forcePreview && isObsoletePassportStatus(normalizedStatus) && passport.product_id && passport.version_number != null) {
+    if (!forcePreview && isObsoletePassportStatus(normalizedStatus) && passport.internal_alias_id && passport.version_number != null) {
       return buildInactivePassportPath({
         companyName: user?.company_name,
         modelName: passport.model_name,
-        productId: passport.product_id,
+        internalAliasId: passport.internal_alias_id,
         versionNumber: passport.version_number,
       });
     }
@@ -95,7 +95,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     return buildPreviewPassportPath({
       companyName: user?.company_name,
       modelName: passport.model_name,
-      productId: passport.product_id,
+      internalAliasId: passport.internal_alias_id,
       previewId: passport.dppId,
     });
   }, [user?.company_name]);

@@ -17,7 +17,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
     getTable,
     getWritablePassportColumns,
     getStoredPassportValues,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     normalizeReleaseStatus,
     isEditablePassportStatus,
     updatePassportRowById,
@@ -30,7 +30,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
     VALID_GRANULARITIES,
     hasReleasedLineageVersion,
     buildStoredProductIdentifiers,
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     extractCarrierAuthenticityMutation,
     applyCarrierAuthenticityMutation,
     maybeSignCarrierPayload,
@@ -100,9 +100,9 @@ module.exports = function registerUpdateRoutes(app, deps) {
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(typeSchema.typeName);
 
-      const invalidKeys = Object.keys(update).filter((key) => !typeSchema.allowedKeys.has(key) && key !== "model_name" && key !== "product_id");
+      const invalidKeys = Object.keys(update).filter((key) => !typeSchema.allowedKeys.has(key) && key !== "model_name" && key !== "internal_alias_id");
       if (invalidKeys.length) return res.status(400).json({ error: `Unknown field(s): ${invalidKeys.join(", ")}` });
-      if (update.product_id !== undefined) return res.status(400).json({ error: "Cannot bulk-update product_id — it must be unique per passport." });
+      if (update.internal_alias_id !== undefined) return res.status(400).json({ error: "Cannot bulk-update internal_alias_id — it must be unique per passport." });
       if (update.granularity !== undefined) {
         return res.status(400).json({ error: "Cannot bulk-update granularity. Use the granularity transition workflow for linked successor identifiers." });
       }
@@ -124,7 +124,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
 
       if (filterObj.product_id_like) {
         params.push(`%${filterObj.product_id_like}%`);
-        filterSql += ` AND (product_id ILIKE $${params.length} OR product_identifier_did ILIKE $${params.length})`;
+        filterSql += ` AND (internal_alias_id ILIKE $${params.length} OR product_identifier_did ILIKE $${params.length})`;
       }
       if (filterObj.model_name_like) {
         params.push(`%${filterObj.model_name_like}%`);
@@ -258,21 +258,21 @@ module.exports = function registerUpdateRoutes(app, deps) {
       for (const item of passports) {
         const normalizedItem = normalizePassportRequestBody(item || {});
         const { dppId: incomingGuid, passport_type: _pt, passportType: _pt2, carrier_authenticity, ...fields } = normalizedItem;
-        const normalizedProductId = normalizeProductIdValue(fields.product_id);
+        const normalizedProductId = normalizeInternalAliasIdValue(fields.internal_alias_id);
 
         try {
           if (!incomingGuid && !normalizedProductId) {
-            details.push({ status: "failed", error: "Each item needs a dppId or product_id to match against" });
+            details.push({ status: "failed", error: "Each item needs a dppId or internal_alias_id to match against" });
             failed += 1;
             continue;
           }
 
-          const builtInCols = new Set(["product_id", "model_name"]);
+          const builtInCols = new Set(["internal_alias_id", "model_name"]);
           const invalidKeys = Object.keys(fields).filter((key) =>
             !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key) && !builtInCols.has(key)
           );
           if (invalidKeys.length) {
-            details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: `Unknown field(s): ${invalidKeys.join(", ")}` });
+            details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "failed", error: `Unknown field(s): ${invalidKeys.join(", ")}` });
             failed += 1;
             continue;
           }
@@ -294,7 +294,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
             }
           }
           if (!rowId && normalizedProductId) {
-            const byProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
+            const byProductId = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId });
             if (byProductId && isEditablePassportStatus(normalizeReleaseStatus(byProductId.release_status))) {
               currentRow = byProductId;
               rowId = byProductId.id;
@@ -303,7 +303,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
             }
           }
           if (!rowId) {
-            details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "No matching editable passport found" });
+            details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "skipped", reason: "No matching editable passport found" });
             skipped += 1;
             continue;
           }
@@ -311,15 +311,15 @@ module.exports = function registerUpdateRoutes(app, deps) {
             const fullRowRes = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [rowId]);
             currentRow = fullRowRes.rows[0] || currentRow;
           }
-          if (fields.product_id !== undefined) {
+          if (fields.internal_alias_id !== undefined) {
             if (!normalizedProductId) {
-              details.push({ dppId: matchedGuid, status: "failed", error: "product_id cannot be blank" });
+              details.push({ dppId: matchedGuid, status: "failed", error: "internal_alias_id cannot be blank" });
               failed += 1;
               continue;
             }
-            const dup = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId, excludeGuid: matchedGuid, excludeLineageId: matchedLineageId });
+            const dup = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: matchedGuid, excludeLineageId: matchedLineageId });
             if (dup) {
-              details.push({ dppId: matchedGuid, product_id: normalizedProductId, status: "failed", error: `Local Passport ID "${normalizedProductId}" already belongs to another passport` });
+              details.push({ dppId: matchedGuid, internal_alias_id: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
               failed += 1;
               continue;
             }
@@ -327,11 +327,11 @@ module.exports = function registerUpdateRoutes(app, deps) {
             const storedProductIdentifiers = buildStoredProductIdentifiers({
               companyId,
               passportType: typeSchema.typeName,
-              productId: normalizedProductId,
+              internalAliasId: normalizedProductId,
               granularity: matchedGranularityRes.rows[0]?.granularity || "item",
-              passportLike: { ...currentRow, ...fields, product_id: normalizedProductId },
+              passportLike: { ...currentRow, ...fields, internal_alias_id: normalizedProductId },
             });
-            fields.product_id = storedProductIdentifiers.product_id;
+            fields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
             fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
           }
 
@@ -347,7 +347,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
                 dppId: matchedGuid,
                 dpp_id: matchedGuid,
                 company_id: companyId,
-                product_id: fields.product_id || currentRow?.product_id,
+                internal_alias_id: fields.internal_alias_id || currentRow?.internal_alias_id,
                 model_name: fields.model_name || currentRow?.model_name,
               },
               companyName,
@@ -368,7 +368,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
           const updateResult = await updatePassportRowById({ tableName, rowId, userId, data: fields, includeUpdatedRow: true });
           const updateCols = updateResult.updateCols || [];
           if (!updateCols.length) {
-            details.push({ dppId: matchedGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "No changes detected" });
+            details.push({ dppId: matchedGuid, internal_alias_id: normalizedProductId || undefined, status: "skipped", reason: "No changes detected" });
             skipped += 1;
             continue;
           }
@@ -383,11 +383,11 @@ module.exports = function registerUpdateRoutes(app, deps) {
           }
 
           await logAudit(companyId, userId, "UPDATE", tableName, matchedGuid, null, { source: "bulk_patch", fields_updated: updateCols });
-          details.push({ dppId: matchedGuid, product_id: normalizedProductId || undefined, status: "updated", fields_updated: updateCols });
+          details.push({ dppId: matchedGuid, internal_alias_id: normalizedProductId || undefined, status: "updated", fields_updated: updateCols });
           updated += 1;
         } catch (error) {
           logger.error("Bulk PATCH item error:", error.message);
-          details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "failed", error: error.message });
+          details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "failed", error: error.message });
           failed += 1;
         }
       }

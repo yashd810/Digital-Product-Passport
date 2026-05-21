@@ -176,8 +176,8 @@ function createTestApp() {
     normalizePassportRow: (row) => row,
     normalizeReleaseStatus: (value) => value,
     isEditablePassportStatus: (value) => value === "draft" || value === "in_revision",
-    normalizeProductIdValue: (value) => String(value || "").trim(),
-    generateProductIdValue: (value) => `PID-${value}`,
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
+    generateInternalAliasIdValue: (value) => `PID-${value}`,
     normalizePassportRequestBody: (body) => body,
     extractExplicitFacilityId: () => null,
     getWritablePassportColumns: (data) => Object.keys(data || {}),
@@ -190,7 +190,7 @@ function createTestApp() {
     isPublicHistoryStatus: () => true,
     logAudit: jest.fn(async () => {}),
     getPassportTypeSchema: jest.fn(async () => null),
-    findExistingPassportByProductId: jest.fn(async () => null),
+    findExistingPassportByInternalAliasId: jest.fn(async () => null),
     getPassportLineageContext: jest.fn(async () => null),
     getPassportVersionsByLineage: jest.fn(async () => []),
     fetchCompanyPassportRecord: jest.fn(async () => null),
@@ -220,10 +220,10 @@ function createTestApp() {
     },
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId }) => ({
-        productIdInput: rawProductId,
+        internalAliasIdInput: rawProductId,
         productIdentifierDid: rawProductId,
       }),
-      buildLookupCandidates: ({ productId }) => [productId],
+      buildLookupCandidates: ({ internalAliasId }) => [internalAliasId],
     },
     backupProviderService: {
       getContinuityPolicy: jest.fn(({ companyId }) => ({

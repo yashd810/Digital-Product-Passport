@@ -1,5 +1,7 @@
 "use strict";
 
+const { collectRequestedInternalAliasIds } = require("../../shared/passports/passport-helpers");
+
 const nonEmptyString = { type: "string", minLength: 1 };
 
 const dppIdParamsSchema = {
@@ -12,9 +14,9 @@ const dppIdParamsSchema = {
 
 const productIdParamsSchema = {
   type: "object",
-  required: ["productId"],
+  required: ["internalAliasId"],
   properties: {
-    productId: nonEmptyString,
+    internalAliasId: nonEmptyString,
   },
 };
 
@@ -39,12 +41,15 @@ const dppElementParamsSchema = {
 const batchLookupBodySchema = {
   type: "object",
   custom: (value) => {
-    const productIds = value?.productId;
-    if (!Array.isArray(productIds) || !productIds.length) {
-      return [{ path: "body.productId", message: "productId must be a non-empty array" }];
+    const productIds = collectRequestedInternalAliasIds(value);
+    if (!productIds.length) {
+      return [{
+        path: "body.internalAliasId",
+        message: "Provide a non-empty identifier array using internalAliasId, localProductId, or productId."
+      }];
     }
     if (productIds.length > 1000) {
-      return [{ path: "body.productId", message: "productId may contain at most 1000 entries" }];
+      return [{ path: "body.internalAliasId", message: "Identifier arrays may contain at most 1000 entries." }];
     }
     return [];
   },

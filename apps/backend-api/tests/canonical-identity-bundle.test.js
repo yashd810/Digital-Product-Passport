@@ -19,7 +19,7 @@ describe("buildCanonicalIdentityBundle", () => {
         lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
         company_id: 5,
         passport_type: "trial_1_dbp",
-        product_id: "123456789",
+        internal_alias_id: "123456789",
         granularity: "item",
       },
       company: {

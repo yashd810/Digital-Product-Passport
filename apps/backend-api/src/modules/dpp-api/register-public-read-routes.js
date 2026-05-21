@@ -12,7 +12,7 @@ module.exports = function registerPublicReadRoutes(app, deps) {
   const {
     logger,
     publicReadRateLimit,
-    dbLookupByProductIdOnly,
+    dbLookupByInternalAliasIdOnly,
     buildPassportResponse,
     acceptsJsonLd,
     buildPassportJsonLdContext,
@@ -29,13 +29,13 @@ module.exports = function registerPublicReadRoutes(app, deps) {
     buildIdentifierLineageEnvelope,
   } = deps;
 
-  app.get("/api/v1/dppsByProductId/:productId", publicReadRateLimit, createValidationMiddleware({
+  app.get("/api/v1/dppsByProductId/:internalAliasId", publicReadRateLimit, createValidationMiddleware({
     params: productIdParamsSchema,
   }), async (req, res) => {
     try {
-      const productId = decodeURIComponent(req.params.productId);
+      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
 
-      const result = await dbLookupByProductIdOnly(productId);
+      const result = await dbLookupByInternalAliasIdOnly(internalAliasId);
       if (!result) return res.status(404).json({ error: "Passport not found or not released" });
 
       const payload = await buildPassportResponse(req, result.passport, result.typeDef, result.companyName);
@@ -51,7 +51,7 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       if (e.code === "AMBIGUOUS_PRODUCT_ID") {
         return res.status(409).json({
           error: "AMBIGUOUS_PRODUCT_ID",
-          message: "Multiple active passports match this productId."
+          message: "Multiple active passports match this internalAliasId."
         });
       }
       logger.error({ err: e }, "[Standards DPP by-product-id API]");
@@ -68,7 +68,7 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       const offset = decodeBatchCursor(req.body?.cursor);
 
       if (productIds.length > 1000) {
-        return res.status(400).json({ error: "productId may contain at most 1000 entries" });
+        return res.status(400).json({ error: "internalAliasId may contain at most 1000 entries" });
       }
       if (limit === null) {
         return res.status(400).json({ error: "limit must be an integer between 1 and 100" });
@@ -80,9 +80,9 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       const pageProductIds = productIds.slice(offset, offset + limit);
       const identifiers = [];
 
-      for (const productId of pageProductIds) {
+      for (const internalAliasId of pageProductIds) {
         try {
-          const result = await dbLookupByProductIdOnly(productId);
+          const result = await dbLookupByInternalAliasIdOnly(internalAliasId);
           const resolvedDppId = result?.passport?.dppId || result?.passport?.dpp_id || null;
           if (resolvedDppId) {
             identifiers.push(resolvedDppId);
@@ -120,7 +120,7 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       const offset = decodeBatchCursor(req.body?.cursor);
 
       if (productIds.length > 1000) {
-        return res.status(400).json({ error: "productId may contain at most 1000 entries" });
+        return res.status(400).json({ error: "internalAliasId may contain at most 1000 entries" });
       }
       if (req.body?.companyId !== undefined && !Number.isFinite(companyId)) {
         return res.status(400).json({ error: "Invalid companyId" });
@@ -137,8 +137,8 @@ module.exports = function registerPublicReadRoutes(app, deps) {
 
       const results = [];
       const pageProductIds = productIds.slice(offset, offset + limit);
-      for (const productId of pageProductIds) {
-        results.push(await buildBatchLookupResult(productId, {
+      for (const internalAliasId of pageProductIds) {
+        results.push(await buildBatchLookupResult(internalAliasId, {
           companyId,
           versionNumber,
           representation,
@@ -200,17 +200,17 @@ module.exports = function registerPublicReadRoutes(app, deps) {
     }
   });
 
-  app.get("/api/v1/dppsByProductIdAndDate/:productId", publicReadRateLimit, createValidationMiddleware({
+  app.get("/api/v1/dppsByProductIdAndDate/:internalAliasId", publicReadRateLimit, createValidationMiddleware({
     params: productIdParamsSchema,
   }), async (req, res) => {
     try {
-      const productId = decodeURIComponent(req.params.productId);
+      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
       const rawDate = String(req.query.date || "").trim();
       if (!rawDate) return res.status(400).json({ error: "date query parameter is required" });
       const atDate = new Date(rawDate);
       if (Number.isNaN(atDate.getTime())) return res.status(400).json({ error: "Invalid date" });
 
-      const result = await loadReleasedPassportAtDate(productId, atDate, { strictProductId: true });
+      const result = await loadReleasedPassportAtDate(internalAliasId, atDate, { strictProductId: true });
       if (!result) return res.status(404).json({ error: "Passport not found for the requested date" });
 
       const payload = await buildPassportResponse(req, result.passport, result.typeDef, result.companyName);

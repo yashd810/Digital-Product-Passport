@@ -10,8 +10,8 @@ function createService(pool) {
     normalizeReleaseStatus: (value) => value,
     isPublicHistoryStatus: () => true,
     isEditablePassportStatus: () => true,
-    normalizeProductIdValue: (value) => value,
-    generateProductIdValue: (value) => value,
+    normalizeInternalAliasIdValue: (value) => value,
+    generateInternalAliasIdValue: (value) => value,
     IN_REVISION_STATUS: "in_revision",
     SYSTEM_PASSPORT_FIELDS: new Set(),
     getWritablePassportColumns: () => [],
@@ -25,7 +25,7 @@ function createService(pool) {
     buildInactivePublicPassportPath: () => "/dpp/inactive/test",
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId }) => ({
-        productIdInput: rawProductId,
+        internalAliasIdInput: rawProductId,
         productIdentifierDid: rawProductId,
       }),
     },

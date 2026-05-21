@@ -2,7 +2,7 @@
 
 // ─── DPP IDENTITY SERVICE ─────────────────────────────────────────────────────
 // Stable, product-id-based DID generation for the Claros DPP platform.
-// All DIDs use companyId + product_id — never the record ID.
+// All DIDs use companyId + internal_alias_id — never the record ID.
 //
 // Domain is derived from APP_URL env var at call time (not module load time)
 // so that tests or server can override APP_URL after require().
@@ -65,10 +65,10 @@ function companyDid(companyId) {
  * Product model DID.
  * did:web:www.claros-dpp.online:did:battery:model:<companyId>:<encodedProductId>
  */
-function productModelDid(companyId, productId) {
+function productModelDid(companyId, internalAliasId) {
   assertId(companyId, "companyId");
-  assertId(productId, "productId");
-  const encodedProductId = encodeURIComponent(String(productId));
+  assertId(internalAliasId, "internalAliasId");
+  const encodedProductId = encodeURIComponent(String(internalAliasId));
   return `did:web:${getDomain()}:did:battery:model:${companyId}:${encodedProductId}`;
 }
 
@@ -76,10 +76,10 @@ function productModelDid(companyId, productId) {
  * Product item DID.
  * did:web:www.claros-dpp.online:did:battery:item:<companyId>:<encodedProductId>
  */
-function productItemDid(companyId, productId) {
+function productItemDid(companyId, internalAliasId) {
   assertId(companyId, "companyId");
-  assertId(productId, "productId");
-  const encodedProductId = encodeURIComponent(String(productId));
+  assertId(internalAliasId, "internalAliasId");
+  const encodedProductId = encodeURIComponent(String(internalAliasId));
   return `did:web:${getDomain()}:did:battery:item:${companyId}:${encodedProductId}`;
 }
 
@@ -87,10 +87,10 @@ function productItemDid(companyId, productId) {
  * Product batch DID.
  * did:web:www.claros-dpp.online:did:battery:batch:<companyId>:<encodedProductId>
  */
-function productBatchDid(companyId, productId) {
+function productBatchDid(companyId, internalAliasId) {
   assertId(companyId, "companyId");
-  assertId(productId, "productId");
-  const encodedProductId = encodeURIComponent(String(productId));
+  assertId(internalAliasId, "internalAliasId");
+  const encodedProductId = encodeURIComponent(String(internalAliasId));
   return `did:web:${getDomain()}:did:battery:batch:${companyId}:${encodedProductId}`;
 }
 
@@ -100,11 +100,11 @@ function productBatchDid(companyId, productId) {
  *
  * @param {string} granularity - 'model', 'item', or 'batch'
  */
-function dppDid(granularity, companyId, productId) {
+function dppDid(granularity, companyId, internalAliasId) {
   assertId(granularity, "granularity");
   assertId(companyId, "companyId");
-  assertId(productId, "productId");
-  const encodedProductId = encodeURIComponent(String(productId));
+  assertId(internalAliasId, "internalAliasId");
+  const encodedProductId = encodeURIComponent(String(internalAliasId));
   return `did:web:${getDomain()}:did:dpp:${granularity}:${companyId}:${encodedProductId}`;
 }
 
@@ -127,10 +127,10 @@ function facilityDid(facilityId) {
  * Recognised shapes:
  *   did:web:<domain>                                         → { type: 'platform' }
  *   did:web:<domain>:did:company:<companyId>                 → { type: 'company', companyId }
- *   did:web:<domain>:did:battery:model:<cId>:<pId>           → { type: 'battery', level: 'model', companyId, productId }
- *   did:web:<domain>:did:battery:batch:<cId>:<pId>           → { type: 'battery', level: 'batch', companyId, productId }
- *   did:web:<domain>:did:battery:item:<cId>:<pId>            → { type: 'battery', level: 'item',  companyId, productId }
- *   did:web:<domain>:did:dpp:<granularity>:<cId>:<pId>       → { type: 'dpp', granularity, companyId, productId }
+ *   did:web:<domain>:did:battery:model:<cId>:<pId>           → { type: 'battery', level: 'model', companyId, internalAliasId }
+ *   did:web:<domain>:did:battery:batch:<cId>:<pId>           → { type: 'battery', level: 'batch', companyId, internalAliasId }
+ *   did:web:<domain>:did:battery:item:<cId>:<pId>            → { type: 'battery', level: 'item',  companyId, internalAliasId }
+ *   did:web:<domain>:did:dpp:<granularity>:<cId>:<pId>       → { type: 'dpp', granularity, companyId, internalAliasId }
  *   did:web:<domain>:did:facility:<facilityId>               → { type: 'facility', facilityId }
  */
 function parseDid(did) {
@@ -178,7 +178,7 @@ function parseDid(did) {
       domain,
       level,
       companyId: rest[3],
-      productId: decodeURIComponent(rest[4]),
+      internalAliasId: decodeURIComponent(rest[4]),
     };
   }
 
@@ -189,7 +189,7 @@ function parseDid(did) {
       domain,
       granularity: rest[2],
       companyId: rest[3],
-      productId: decodeURIComponent(rest[4]),
+      internalAliasId: decodeURIComponent(rest[4]),
     };
   }
 
@@ -240,12 +240,12 @@ function didToDocumentUrl(did) {
   }
 
   if (parsed.type === "battery") {
-    const encodedPid = encodeURIComponent(parsed.productId);
+    const encodedPid = encodeURIComponent(parsed.internalAliasId);
     return `${base}/did/battery/${parsed.level}/${parsed.companyId}/${encodedPid}/did.json`;
   }
 
   if (parsed.type === "dpp") {
-    const encodedPid = encodeURIComponent(parsed.productId);
+    const encodedPid = encodeURIComponent(parsed.internalAliasId);
     return `${base}/did/dpp/${parsed.granularity}/${parsed.companyId}/${encodedPid}/did.json`;
   }
 
@@ -264,16 +264,16 @@ function didToDocumentUrl(did) {
  *
  * Pattern: <appUrl>/dpp/<manufacturerSlug>/<modelSlug>/<encodedProductId>
  *
- * Uses product_id (NOT the record ID). Falls back to the record DPP ID only if no product_id exists.
+ * Uses internal_alias_id (NOT the record ID). Falls back to the record DPP ID only if no internal_alias_id exists.
  *
- * @param {object} passport  - passport row (must have product_id, model_name, dppId, company_id)
+ * @param {object} passport  - passport row (must have internal_alias_id, model_name, dppId, company_id)
  * @param {string} companyName - human-readable company name (used to derive manufacturerSlug)
  */
 function buildCanonicalPublicUrl(passport, companyName) {
   const appUrl = getAppUrl();
 
-  const productId = passport.product_id;
-  const routeProductId = productId || passport.dppId || passport.dpp_id || passport.guid;
+  const internalAliasId = passport.internal_alias_id;
+  const routeProductId = internalAliasId || passport.dppId || passport.dpp_id || passport.guid;
 
   const manufacturerSlug = slugify(companyName || String(passport.company_id));
   const modelSlug        = slugify(passport.model_name || routeProductId);

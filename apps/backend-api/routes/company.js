@@ -14,10 +14,10 @@ module.exports = function registerCompanyRoutes(app, {
   getPassportFieldValue,
   getPassportTypeSchema,
   normalizePassportRequestBody,
-  normalizeProductIdValue,
+  normalizeInternalAliasIdValue,
   normalizeReleaseStatus,
   isEditablePassportStatus,
-  findExistingPassportByProductId,
+  findExistingPassportByInternalAliasId,
   updatePassportRowById,
   getWritablePassportColumns,
   getStoredPassportValues,
@@ -62,17 +62,17 @@ module.exports = function registerCompanyRoutes(app, {
     return `Schema governance fields (${keys.join(", ")}) cannot be imported as passport row data. Configure access, confidentiality, and updateAuthority on the passport type in admin instead.`;
   }
 
-  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, productId, granularity = "item" }) {
+  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, internalAliasId, granularity = "item" }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
       companySlug,
       companyName,
       passportType,
-      rawProductId: productId,
+      rawProductId: internalAliasId,
       granularity
     });
     return {
-      product_id: normalized.productIdInput || null,
+      internal_alias_id: normalized.internalAliasIdInput || null,
       product_identifier_did: normalized.productIdentifierDid || null
     };
   }
@@ -422,7 +422,7 @@ module.exports = function registerCompanyRoutes(app, {
       const fieldRows = [
       ["dppId", ...rows.map((r) => r.dppId ?? r.dpp_id ?? "")],
       ["model_name", ...rows.map((r) => r.model_name || "")],
-      ["product_id", ...rows.map((r) => r.product_id || "")],
+      ["internal_alias_id", ...rows.map((r) => r.internal_alias_id || "")],
       ...schemaFields.map((f) => [
       f.label,
       ...rows.map((r) => getPassportFieldValue(r, f.key) ?? templateFields[f.key] ?? "")]
@@ -506,7 +506,7 @@ module.exports = function registerCompanyRoutes(app, {
           allFields.find((f) => f.label?.trim().toLowerCase() === normalized) ||
           allFields.find((f) => f.key?.toLowerCase() === normalized) || (
           normalized === "model_name" ? { key: "model_name" } : null) || (
-          normalized === "product_id" ? { key: "product_id" } : null) || (
+          normalized === "internal_alias_id" ? { key: "internal_alias_id" } : null) || (
           normalized === "dppId" ? { key: "dppId" } : null);
 
           if (field && value) {
@@ -516,8 +516,8 @@ module.exports = function registerCompanyRoutes(app, {
           }
         });
 
-        const { dppId: incomingGuid, model_name, product_id, ...fields } = passport;
-        const normalizedProductId = normalizeProductIdValue(product_id);
+        const { dppId: incomingGuid, model_name, internal_alias_id, ...fields } = passport;
+        const normalizedProductId = normalizeInternalAliasIdValue(internal_alias_id);
 
         try {
           if (incomingGuid) {
@@ -530,65 +530,65 @@ module.exports = function registerCompanyRoutes(app, {
               skipped++;continue;
             }
             const rowId = existing.rows[0].id;
-            if (product_id !== undefined) {
+            if (internal_alias_id !== undefined) {
               if (!normalizedProductId) {
-                details.push({ dppId: incomingGuid, status: "failed", error: "product_id cannot be blank" });
+                details.push({ dppId: incomingGuid, status: "failed", error: "internal_alias_id cannot be blank" });
                 failed++;continue;
               }
-              const existingByProductId = await findExistingPassportByProductId({
-                tableName, companyId, productId: normalizedProductId, excludeGuid: incomingGuid
+              const existingByProductId = await findExistingPassportByInternalAliasId({
+                tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: incomingGuid
               });
               if (existingByProductId) {
-                details.push({ dppId: incomingGuid, product_id: normalizedProductId, status: "failed", error: `Local Passport ID "${normalizedProductId}" already belongs to another passport` });
+                details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
                 failed++;continue;
               }
             }
             const updateData = { model_name, ...fields };
-            if (product_id !== undefined) {
+            if (internal_alias_id !== undefined) {
               const storedProductIdentifiers = buildStoredProductIdentifiers({
                 companyId,
                 passportType: resolvedPassportType,
-                productId: normalizedProductId
+                internalAliasId: normalizedProductId
               });
-              updateData.product_id = storedProductIdentifiers.product_id;
+              updateData.internal_alias_id = storedProductIdentifiers.internal_alias_id;
               updateData.product_identifier_did = storedProductIdentifiers.product_identifier_did;
             }
             const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: updateData, excluded });
             if (!updateCols.length) {skipped++;continue;}
             await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "csv_upsert" });
-            details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "updated" });
+            details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "updated" });
             updated++;
           } else {
             if (!normalizedProductId) {
-              details.push({ status: "skipped", reason: "Local Passport ID is required to create a new passport" });
+              details.push({ status: "skipped", reason: "Internal Alias ID is required to create a new passport" });
               skipped++;continue;
             }
-            const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
+            const existingByProductId = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId });
             if (existingByProductId) {
               const existingStatus = normalizeReleaseStatus(existingByProductId.release_status);
               if (isEditablePassportStatus(existingStatus)) {
                 const storedProductIdentifiers = buildStoredProductIdentifiers({
                   companyId,
                   passportType: resolvedPassportType,
-                  productId: normalizedProductId
+                  internalAliasId: normalizedProductId
                 });
                 const updateData = {
                   model_name,
-                  product_id: storedProductIdentifiers.product_id,
+                  internal_alias_id: storedProductIdentifiers.internal_alias_id,
                   product_identifier_did: storedProductIdentifiers.product_identifier_did,
                   ...fields
                 };
                 const updateCols = await updatePassportRowById({ tableName, rowId: existingByProductId.id, userId, data: updateData, excluded });
                 if (!updateCols.length) {
-                  details.push({ dppId: existingByProductId.dppId, product_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
+                  details.push({ dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
                   skipped++;continue;
                 }
-                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "csv_upsert", matched_by: "product_id" });
-                details.push({ dppId: existingByProductId.dppId, product_id: normalizedProductId, status: "updated" });
+                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "csv_upsert", matched_by: "internal_alias_id" });
+                details.push({ dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "updated" });
                 updated++;continue;
               }
               details.push({
-                dppId: existingByProductId.dppId, product_id: normalizedProductId, status: "skipped",
+                dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "skipped",
                 reason: existingStatus === "in_review" ?
                 "matching passport is in review and cannot be edited" :
                 "matching passport already exists; revise it before importing changes"
@@ -601,14 +601,14 @@ module.exports = function registerCompanyRoutes(app, {
             const storedProductIdentifiers = buildStoredProductIdentifiers({
               companyId,
               passportType: resolvedPassportType,
-              productId: normalizedProductId
+              internalAliasId: normalizedProductId
             });
             const complianceManagedFields = await buildComplianceManagedFields({
               companyId,
               passportType: resolvedPassportType
             });
             const allCols = [
-            "dppId", "lineage_id", "company_id", "model_name", "product_id", "product_identifier_did",
+            "dppId", "lineage_id", "company_id", "model_name", "internal_alias_id", "product_identifier_did",
             "compliance_profile_key", "content_specification_ids", "carrier_policy_key", "economic_operator_id", "facility_id",
             "created_by", ...dataFields];
 
@@ -617,7 +617,7 @@ module.exports = function registerCompanyRoutes(app, {
             lineageId,
             companyId,
             model_name || null,
-            storedProductIdentifiers.product_id,
+            storedProductIdentifiers.internal_alias_id,
             storedProductIdentifiers.product_identifier_did,
             complianceManagedFields.compliance_profile_key,
             complianceManagedFields.content_specification_ids,
@@ -635,7 +635,7 @@ module.exports = function registerCompanyRoutes(app, {
               `INSERT INTO passport_registry (dpp_id,lineage_id,company_id,passport_type) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
               [newGuid, lineageId, companyId, resolvedPassportType]
             );
-            details.push({ dppId: newGuid, product_id: normalizedProductId, model_name, status: "created" });
+            details.push({ dppId: newGuid, internal_alias_id: normalizedProductId, model_name, status: "created" });
             created++;
           }
         } catch (e) {
@@ -684,8 +684,8 @@ module.exports = function registerCompanyRoutes(app, {
 
       for (const item of passports) {
         const normalizedItem = normalizePassportRequestBody(item || {});
-        const { dppId: incomingGuid, model_name, product_id, ...fields } = normalizedItem;
-        const normalizedProductId = normalizeProductIdValue(product_id);
+        const { dppId: incomingGuid, model_name, internal_alias_id, ...fields } = normalizedItem;
+        const normalizedProductId = normalizeInternalAliasIdValue(internal_alias_id);
         const governanceFieldKeys = Object.keys(fields).filter((key) => isSchemaGovernanceKey(key, typeSchema));
         const invalidFieldKeys = Object.keys(fields).filter((key) =>
         !SYSTEM_PASSPORT_FIELDS.has(key) &&
@@ -695,7 +695,7 @@ module.exports = function registerCompanyRoutes(app, {
           if (governanceFieldKeys.length) {
             details.push({
               dppId: incomingGuid || undefined,
-              product_id: normalizedProductId || undefined,
+              internal_alias_id: normalizedProductId || undefined,
               status: "failed",
               error: buildGovernanceImportErrorMessage(governanceFieldKeys)
             });
@@ -705,7 +705,7 @@ module.exports = function registerCompanyRoutes(app, {
           if (invalidFieldKeys.length) {
             details.push({
               dppId: incomingGuid || undefined,
-              product_id: normalizedProductId || undefined,
+              internal_alias_id: normalizedProductId || undefined,
               status: "failed",
               error: `Unknown passport field(s): ${invalidFieldKeys.join(", ")}`
             });
@@ -721,68 +721,68 @@ module.exports = function registerCompanyRoutes(app, {
               details.push({ dppId: incomingGuid, status: "skipped", reason: "not found or not editable" });
               skipped++;continue;
             }
-            if (product_id !== undefined) {
+            if (internal_alias_id !== undefined) {
               if (!normalizedProductId) {
-                details.push({ dppId: incomingGuid, status: "failed", error: "product_id cannot be blank" });
+                details.push({ dppId: incomingGuid, status: "failed", error: "internal_alias_id cannot be blank" });
                 failed++;continue;
               }
-              const existingByProductId = await findExistingPassportByProductId({
-                tableName, companyId, productId: normalizedProductId, excludeGuid: incomingGuid
+              const existingByProductId = await findExistingPassportByInternalAliasId({
+                tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: incomingGuid
               });
               if (existingByProductId) {
-                details.push({ dppId: incomingGuid, product_id: normalizedProductId, status: "failed", error: `Local Passport ID "${normalizedProductId}" already belongs to another passport` });
+                details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
                 failed++;continue;
               }
             }
             const updateData = { model_name, ...fields };
-            if (product_id !== undefined) {
+            if (internal_alias_id !== undefined) {
               const storedProductIdentifiers = buildStoredProductIdentifiers({
                 companyId,
                 passportType: resolvedPassportType,
-                productId: normalizedProductId
+                internalAliasId: normalizedProductId
               });
-              updateData.product_id = storedProductIdentifiers.product_id;
+              updateData.internal_alias_id = storedProductIdentifiers.internal_alias_id;
               updateData.product_identifier_did = storedProductIdentifiers.product_identifier_did;
             }
             const updateCols = await updatePassportRowById({ tableName, rowId: existing.rows[0].id, userId, data: updateData, excluded });
             if (!updateCols.length) {
-              details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "skipped", reason: "no changes detected" });
+              details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "skipped", reason: "no changes detected" });
               skipped++;continue;
             }
             await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "json_upsert" });
-            details.push({ dppId: incomingGuid, product_id: normalizedProductId || undefined, status: "updated" });
+            details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "updated" });
             updated++;
           } else {
             if (!normalizedProductId) {
-              details.push({ status: "skipped", reason: "Local Passport ID is required to create a new passport" });
+              details.push({ status: "skipped", reason: "Internal Alias ID is required to create a new passport" });
               skipped++;continue;
             }
-            const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
+            const existingByProductId = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId });
             if (existingByProductId) {
               const existingStatus = normalizeReleaseStatus(existingByProductId.release_status);
               if (isEditablePassportStatus(existingStatus)) {
                 const storedProductIdentifiers = buildStoredProductIdentifiers({
                   companyId,
                   passportType: resolvedPassportType,
-                  productId: normalizedProductId
+                  internalAliasId: normalizedProductId
                 });
                 const allData = {
                   model_name,
-                  product_id: storedProductIdentifiers.product_id,
+                  internal_alias_id: storedProductIdentifiers.internal_alias_id,
                   product_identifier_did: storedProductIdentifiers.product_identifier_did,
                   ...fields
                 };
                 const updateCols = await updatePassportRowById({ tableName, rowId: existingByProductId.id, userId, data: allData, excluded });
                 if (!updateCols.length) {
-                  details.push({ dppId: existingByProductId.dppId, product_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
+                  details.push({ dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
                   skipped++;continue;
                 }
-                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "json_upsert", matched_by: "product_id" });
-                details.push({ dppId: existingByProductId.dppId, product_id: normalizedProductId, status: "updated" });
+                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "json_upsert", matched_by: "internal_alias_id" });
+                details.push({ dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "updated" });
                 updated++;continue;
               }
               details.push({
-                dppId: existingByProductId.dppId, product_id: normalizedProductId, status: "skipped",
+                dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "skipped",
                 reason: existingStatus === "in_review" ?
                 "matching passport is in review and cannot be edited" :
                 "matching passport already exists; revise it before importing changes"
@@ -795,14 +795,14 @@ module.exports = function registerCompanyRoutes(app, {
             const storedProductIdentifiers = buildStoredProductIdentifiers({
               companyId,
               passportType: resolvedPassportType,
-              productId: normalizedProductId
+              internalAliasId: normalizedProductId
             });
             const complianceManagedFields = await buildComplianceManagedFields({
               companyId,
               passportType: resolvedPassportType
             });
             const allCols = [
-            "dppId", "lineage_id", "company_id", "model_name", "product_id", "product_identifier_did",
+            "dppId", "lineage_id", "company_id", "model_name", "internal_alias_id", "product_identifier_did",
             "compliance_profile_key", "content_specification_ids", "carrier_policy_key", "economic_operator_id", "facility_id",
             "created_by", ...dataFields];
 
@@ -811,7 +811,7 @@ module.exports = function registerCompanyRoutes(app, {
             lineageId,
             companyId,
             model_name || null,
-            storedProductIdentifiers.product_id,
+            storedProductIdentifiers.internal_alias_id,
             storedProductIdentifiers.product_identifier_did,
             complianceManagedFields.compliance_profile_key,
             complianceManagedFields.content_specification_ids,
@@ -829,7 +829,7 @@ module.exports = function registerCompanyRoutes(app, {
               `INSERT INTO passport_registry (dpp_id,lineage_id,company_id,passport_type) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
               [newGuid, lineageId, companyId, resolvedPassportType]
             );
-            details.push({ dppId: newGuid, product_id: normalizedProductId, model_name, status: "created" });
+            details.push({ dppId: newGuid, internal_alias_id: normalizedProductId, model_name, status: "created" });
             created++;
           }
         } catch (e) {

@@ -1092,7 +1092,7 @@ module.exports = function createBackupProviderService({
     }
 
     const result = await pool.query(
-      `SELECT id, company_id, passport_dpp_id, lineage_id, passport_type, product_id, version_number,
+      `SELECT id, company_id, passport_dpp_id, lineage_id, passport_type, internal_alias_id, version_number,
               backup_provider_id, backup_provider_key, source_replication_id, storage_key, public_url,
               public_company_name, public_row_data, handover_status, verification_status, notes,
               activated_by, deactivated_by, activated_at, deactivated_at, created_at, updated_at
@@ -1111,7 +1111,7 @@ module.exports = function createBackupProviderService({
   async function getActivePublicHandover({
     companyId = null,
     passportDppId = null,
-    productId = null,
+    internalAliasId = null,
     versionNumber = null
   }) {
     const params = [];
@@ -1125,19 +1125,19 @@ module.exports = function createBackupProviderService({
       params.push(normalizeText(passportDppId));
       filters.push(`passport_dpp_id = $${params.length}`);
     }
-    if (productId) {
-      params.push(normalizeText(productId));
-      filters.push(`product_id = $${params.length}`);
+    if (internalAliasId) {
+      params.push(normalizeText(internalAliasId));
+      filters.push(`internal_alias_id = $${params.length}`);
     }
     if (versionNumber !== null && versionNumber !== undefined) {
       params.push(Number.parseInt(versionNumber, 10));
       filters.push(`version_number = $${params.length}`);
     }
 
-    if (!passportDppId && !productId) return null;
+    if (!passportDppId && !internalAliasId) return null;
 
     const result = await pool.query(
-      `SELECT id, company_id, passport_dpp_id, lineage_id, passport_type, product_id, version_number,
+      `SELECT id, company_id, passport_dpp_id, lineage_id, passport_type, internal_alias_id, version_number,
               backup_provider_id, backup_provider_key, source_replication_id, storage_key, public_url,
               public_company_name, public_row_data, handover_status, verification_status, notes,
               activated_by, deactivated_by, activated_at, deactivated_at, created_at, updated_at
@@ -1148,7 +1148,7 @@ module.exports = function createBackupProviderService({
     ).catch(() => ({ rows: [] }));
 
     if (!result.rows.length) return null;
-    if (productId && !passportDppId && result.rows.length > 1) {
+    if (internalAliasId && !passportDppId && result.rows.length > 1) {
       const error = new Error("Multiple backup public handovers match this product identifier.");
       error.code = "AMBIGUOUS_PRODUCT_ID";
       throw error;
@@ -1166,7 +1166,7 @@ module.exports = function createBackupProviderService({
     passportDppId,
     lineageId = null,
     passportType,
-    productId,
+    internalAliasId,
     versionNumber = 1,
     publicRowData,
     publicCompanyName = "",
@@ -1185,8 +1185,8 @@ module.exports = function createBackupProviderService({
     if (!normalizeText(passportType)) {
       throw new Error("passportType is required");
     }
-    if (!normalizeText(productId)) {
-      throw new Error("productId is required");
+    if (!normalizeText(internalAliasId)) {
+      throw new Error("internalAliasId is required");
     }
     if (!publicRowData || typeof publicRowData !== "object") {
       throw new Error("publicRowData is required");
@@ -1230,7 +1230,7 @@ module.exports = function createBackupProviderService({
 
     const result = await pool.query(
       `INSERT INTO backup_public_handovers (
-         company_id, passport_dpp_id, lineage_id, passport_type, product_id, version_number,
+         company_id, passport_dpp_id, lineage_id, passport_type, internal_alias_id, version_number,
          backup_provider_id, backup_provider_key, source_replication_id, storage_key, public_url,
          public_company_name, public_row_data, handover_status, verification_status, notes,
          activated_by, activated_at, created_at, updated_at
@@ -1242,7 +1242,7 @@ module.exports = function createBackupProviderService({
         normalizedPassportDppId,
         normalizeText(lineageId || normalizedPassportDppId),
         normalizeText(passportType),
-        normalizeText(productId),
+        normalizeText(internalAliasId),
         Number.parseInt(versionNumber, 10) || 1,
         replication.backup_provider_id || null,
         replication.backup_provider_key,
@@ -1300,11 +1300,11 @@ module.exports = function createBackupProviderService({
 
   async function ensureAutomaticPublicHandover({
     passportDppId = null,
-    productId = null,
+    internalAliasId = null,
     versionNumber = null,
   }) {
     if (!isAutomaticPublicHandoverEnabled()) return null;
-    if (!passportDppId && !productId) return null;
+    if (!passportDppId && !internalAliasId) return null;
 
     const filters = ["replication_status = 'synced'", "verification_status = 'verified'"];
     const params = [];
@@ -1313,9 +1313,9 @@ module.exports = function createBackupProviderService({
       params.push(normalizeText(passportDppId));
       filters.push(`passport_dpp_id = $${params.length}`);
     }
-    if (productId) {
-      params.push(normalizeText(productId));
-      filters.push(`product_id = $${params.length}`);
+    if (internalAliasId) {
+      params.push(normalizeText(internalAliasId));
+      filters.push(`internal_alias_id = $${params.length}`);
     }
     if (versionNumber !== null && versionNumber !== undefined) {
       params.push(Number.parseInt(versionNumber, 10) || 1);
@@ -1324,7 +1324,7 @@ module.exports = function createBackupProviderService({
 
     const replicationResult = await pool.query(
       `SELECT id, backup_provider_id, backup_provider_key, passport_dpp_id, lineage_id, company_id, passport_type,
-              product_id, version_number, public_url, verification_status, payload_json, updated_at
+              internal_alias_id, version_number, public_url, verification_status, payload_json, updated_at
        FROM passport_backup_replications
        WHERE ${filters.join(" AND ")}
        ORDER BY updated_at DESC, id DESC
@@ -1359,7 +1359,7 @@ module.exports = function createBackupProviderService({
         passportDppId: replication.passport_dpp_id,
         lineageId: replication.lineage_id || payloadSource.lineageId || replication.passport_dpp_id,
         passportType: replication.passport_type || payloadSource.passportType,
-        productId: replication.product_id || publicRowData.product_id || publicRowData.productId,
+        internalAliasId: replication.internal_alias_id || publicRowData.internal_alias_id || publicRowData.internalAliasId,
         versionNumber: replication.version_number || payloadSource.versionNumber || 1,
         publicRowData,
         publicCompanyName: company.company_name || "",

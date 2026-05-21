@@ -117,11 +117,11 @@ const normalizePassportRequestBody = (body = {}) => {
   if (normalized.model_name === undefined && normalized.modelName !== undefined) {
     normalized.model_name = normalized.modelName;
   }
-  if (normalized.product_id === undefined && normalized.productId !== undefined) {
-    normalized.product_id = normalized.productId;
-  }
-  if (normalized.product_id === undefined && normalized.localProductId !== undefined) {
-    normalized.product_id = normalized.localProductId;
+  if (normalized.internal_alias_id === undefined) {
+    if (normalized.internalAliasId !== undefined) normalized.internal_alias_id = normalized.internalAliasId;
+    else if (normalized.product_id !== undefined) normalized.internal_alias_id = normalized.product_id;
+    else if (normalized.productId !== undefined) normalized.internal_alias_id = normalized.productId;
+    else if (normalized.localProductId !== undefined) normalized.internal_alias_id = normalized.localProductId;
   }
   if (normalized.product_identifier_did === undefined) {
     if (normalized.uniqueProductIdentifier !== undefined) normalized.product_identifier_did = normalized.uniqueProductIdentifier;
@@ -198,6 +198,8 @@ const normalizePassportRequestBody = (body = {}) => {
   }
   delete normalized.passportType;
   delete normalized.modelName;
+  delete normalized.internalAliasId;
+  delete normalized.product_id;
   delete normalized.productId;
   delete normalized.localProductId;
   delete normalized.uniqueProductIdentifier;
@@ -225,10 +227,49 @@ const normalizePassportRequestBody = (body = {}) => {
   return normalized;
 };
 
-const normalizeProductIdValue = (value) =>
+const normalizeInternalAliasIdValue = (value) =>
   typeof value === "string" ? value.trim() : "";
 
-const generateProductIdValue = (dppId) =>
+const INTERNAL_ALIAS_REQUEST_ARRAY_KEYS = [
+  "internalAliasId",
+  "internalAliasIds",
+  "localProductId",
+  "localProductIds",
+  "productId",
+  "productIds",
+  "productIdentifiers",
+];
+
+const collectRequestedInternalAliasIds = (body = {}) => {
+  for (const key of INTERNAL_ALIAS_REQUEST_ARRAY_KEYS) {
+    const candidate = body?.[key];
+    if (!Array.isArray(candidate)) continue;
+    return candidate
+      .map((value) => {
+        const normalized = normalizeInternalAliasIdValue(String(value ?? ""));
+        try {
+          return decodeURIComponent(normalized);
+        } catch {
+          return normalized;
+        }
+      })
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const addLegacyInternalAliasAliases = (payload) => {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
+  const internalAliasId = payload.internalAliasId ?? payload.internal_alias_id ?? null;
+  if (!internalAliasId) return payload;
+  return {
+    ...payload,
+    ...(payload.localProductId === undefined ? { localProductId: internalAliasId } : {}),
+    ...(payload.productId === undefined ? { productId: internalAliasId } : {}),
+  };
+};
+
+const generateInternalAliasIdValue = (dppId) =>
   String(dppId || "").trim();
 
 const FACILITY_FIELD_CANDIDATES = [
@@ -283,9 +324,9 @@ const buildCurrentPublicPassportPath = ({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
 }) => {
-  const resolvedProductId = normalizeProductIdValue(productId);
+  const resolvedProductId = normalizeInternalAliasIdValue(internalAliasId);
   if (!resolvedProductId) return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
   const modelSlug = slugifyRouteSegment(modelName || resolvedProductId, "product");
@@ -297,10 +338,10 @@ const buildInactivePublicPassportPath = ({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
   versionNumber,
 }) => {
-  const resolvedProductId = normalizeProductIdValue(productId);
+  const resolvedProductId = normalizeInternalAliasIdValue(internalAliasId);
   if (!resolvedProductId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
   const modelSlug = slugifyRouteSegment(modelName || resolvedProductId, "product");
@@ -312,10 +353,10 @@ const buildPreviewPassportPath = ({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
   fallbackDppId = "",
 }) => {
-  const routeKey = normalizeProductIdValue(productId) || String(fallbackDppId || "").trim();
+  const routeKey = normalizeInternalAliasIdValue(internalAliasId) || String(fallbackDppId || "").trim();
   if (!routeKey) return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
   const modelSlug = slugifyRouteSegment(modelName || routeKey, "product");
@@ -348,9 +389,9 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
 
   const manufacturerSlug = String(match[1] || "").toLowerCase();
   const modelSlug = String(match[2] || "").toLowerCase();
-  const productId = normalizeProductIdValue(decodePathSegment(match[3]));
+  const internalAliasId = normalizeInternalAliasIdValue(decodePathSegment(match[3]));
   const versionNumber = inactiveMatch ? Number.parseInt(decodePathSegment(match[4]), 10) : null;
-  if (!productId) return null;
+  if (!internalAliasId) return null;
 
   const companyRows = await pool.query(
     `SELECT id, company_name, did_slug
@@ -377,7 +418,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
     for (const registryRow of registryRows.rows) {
       const tableName = getTable(registryRow.passport_type);
       try {
-        const params = [company.id, productId];
+        const params = [company.id, internalAliasId];
         let versionClause = "";
         let statusClause = "release_status = 'released'";
 
@@ -388,10 +429,10 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
         }
 
         const row = await pool.query(
-          `SELECT dpp_id AS "dppId", lineage_id, company_id, product_id, model_name, granularity, release_status, version_number, *
+          `SELECT dpp_id AS "dppId", lineage_id, company_id, internal_alias_id, model_name, granularity, release_status, version_number, *
            FROM ${tableName}
            WHERE company_id = $1
-             AND product_id = $2
+             AND internal_alias_id = $2
              AND deleted_at IS NULL
              AND ${statusClause}${versionClause}
            ORDER BY version_number DESC, updated_at DESC
@@ -401,7 +442,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
         const passport = row.rows[0];
         if (!passport) continue;
 
-        const actualModelSlug = slugifyRouteSegment(passport.model_name || passport.product_id, "product");
+        const actualModelSlug = slugifyRouteSegment(passport.model_name || passport.internal_alias_id, "product");
         if (actualModelSlug !== modelSlug) continue;
 
         const stableId = didService.normalizeStableId(passport.lineage_id || passport.dppId);
@@ -456,7 +497,7 @@ const coerceBulkFieldValue = (fieldDef, rawValue) => {
 const getHistoryFieldDefs = (typeRow) => {
   const baseFields = [
     { key: "model_name", label: "Model Name", type: "text" },
-    { key: "product_id", label: "Local Passport ID", type: "text" },
+    { key: "internal_alias_id", label: "Internal Alias ID", type: "text" },
   ];
   const schemaFields = (typeRow?.fields_json?.sections || [])
     .flatMap((section) => section.fields || [])
@@ -527,7 +568,7 @@ const getAssetFieldMap = (typeSchema) => {
   const map = new Map();
   [
     { key: "dppId", label: "Passport DPP ID", type: "text", system: true },
-    { key: "product_id", label: "Local Passport ID", type: "text", system: true },
+    { key: "internal_alias_id", label: "Internal Alias ID", type: "text", system: true },
     { key: "model_name", label: "Model Name", type: "text", system: true },
   ].forEach((field) => map.set(field.key, field));
   (typeSchema?.schemaFields || []).forEach((field) => {
@@ -627,8 +668,10 @@ module.exports = {
   normalizePassportRow,
   toStoredPassportValue,
   normalizePassportRequestBody,
-  normalizeProductIdValue,
-  generateProductIdValue,
+  normalizeInternalAliasIdValue,
+  collectRequestedInternalAliasIds,
+  addLegacyInternalAliasAliases,
+  generateInternalAliasIdValue,
   extractExplicitFacilityId,
   getWritablePassportColumns,
   getStoredPassportValues,

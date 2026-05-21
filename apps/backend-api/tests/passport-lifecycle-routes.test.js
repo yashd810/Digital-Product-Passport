@@ -85,7 +85,7 @@ function createApp(options = {}) {
     passport_type: "battery",
     version_number: 2,
     release_status: "released",
-    product_id: "SKU-REL-1",
+    internal_alias_id: "SKU-REL-1",
     product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:5:sku-rel-1",
     granularity: "item",
     compliance_profile_key: "battery_dpp_v1",
@@ -159,17 +159,17 @@ function createApp(options = {}) {
     generateDppRecordId: jest.fn(() => "dpp_revision_2"),
     normalizePassportRequestBody: (body) => body,
     getTable: () => "battery_passports",
-    normalizeProductIdValue: (value) => String(value || "").trim(),
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
     normalizePassportRow: (row) => row,
     normalizeReleaseStatus: (value) => value,
-    findExistingPassportByProductId: jest.fn(async () => null),
-    buildStoredProductIdentifiers: jest.fn(({ productId }) => ({
-      product_id: productId,
-      product_identifier_did: `did:web:www.claros-dpp.online:did:battery:item:5:${String(productId).toLowerCase()}`,
+    findExistingPassportByInternalAliasId: jest.fn(async () => null),
+    buildStoredProductIdentifiers: jest.fn(({ internalAliasId }) => ({
+      internal_alias_id: internalAliasId,
+      product_identifier_did: `did:web:www.claros-dpp.online:did:battery:item:5:${String(internalAliasId).toLowerCase()}`,
     })),
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId, granularity }) => ({
-        productIdInput: rawProductId,
+        internalAliasIdInput: rawProductId,
         productIdentifierDid: `did:web:www.claros-dpp.online:did:battery:${granularity}:5:${String(rawProductId).toLowerCase()}`,
       }),
     },

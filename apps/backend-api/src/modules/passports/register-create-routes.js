@@ -14,13 +14,13 @@ module.exports = function registerCreateRoutes(app, deps) {
     getPassportTypeSchema,
     createPassportTable,
     getTable,
-    normalizeProductIdValue,
-    generateProductIdValue,
+    normalizeInternalAliasIdValue,
+    generateInternalAliasIdValue,
     getCompanyDppPolicy,
     resolveGranularityForCreate,
     buildStoredProductIdentifiers,
     buildComplianceManagedFields,
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     logAudit,
   } = deps;
 
@@ -137,7 +137,7 @@ module.exports = function registerCreateRoutes(app, deps) {
             index,
             success: true,
             dppId: createdPassport.dppId,
-            product_id: createdPassport.storedProductIdentifiers.product_id,
+            internal_alias_id: createdPassport.storedProductIdentifiers.internal_alias_id,
             product_identifier_did: createdPassport.storedProductIdentifiers.product_identifier_did,
             model_name: createdPassport.model_name,
             granularity: createdPassport.effectiveGranularity,
@@ -148,7 +148,7 @@ module.exports = function registerCreateRoutes(app, deps) {
           const isDuplicate = error.statusCode === 409;
           results.push({
             index,
-            product_id: error.normalizedProductId || undefined,
+            internal_alias_id: error.normalizedProductId || undefined,
             success: false,
             ...(error.invalidFieldKeys && !isDuplicate ? { fields: error.invalidFieldKeys } : {}),
             error: error.message,

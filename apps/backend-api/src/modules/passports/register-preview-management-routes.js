@@ -94,7 +94,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
           modelName: passport.model_name,
-          productId: passport.product_id,
+          internalAliasId: passport.internal_alias_id,
           fallbackGuid: passport.dppId,
         }),
         public_path: buildCurrentPublicPassportPath({
@@ -102,14 +102,14 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
           modelName: passport.model_name,
-          productId: passport.product_id,
+          internalAliasId: passport.internal_alias_id,
         }),
         inactive_path: buildInactivePublicPassportPath({
           companyName,
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
           modelName: passport.model_name,
-          productId: passport.product_id,
+          internalAliasId: passport.internal_alias_id,
           versionNumber: passport.version_number,
         }),
       });

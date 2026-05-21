@@ -5,7 +5,7 @@ const batteryDictionaryTerms = require("../resources/semantics/battery/v1/terms.
 const batteryCategoryRules = require("../resources/semantics/battery/v1/category-rules.json");
 const { buildCarrierAuthenticityResponseFields } = require("../helpers/carrier-authenticity");
 const { buildCanonicalIdentityBundle } = require("../src/shared/identifiers/canonical-identity-bundle");
-const { getPassportFieldValue } = require("../src/shared/passports/passport-helpers");
+const { getPassportFieldValue, addLegacyInternalAliasAliases } = require("../src/shared/passports/passport-helpers");
 const {
   BATTERY_DICTIONARY_MODEL_KEY,
   shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
@@ -1038,7 +1038,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       });
     });
 
-    const localProductId = passport.product_id || null;
+    const internalAliasId = passport.internal_alias_id || null;
     const storedProductIdentifier = isUriLikeValue(passport.product_identifier_did)
       ? passport.product_identifier_did
       : null;
@@ -1051,7 +1051,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const headerValues = {
       digitalProductPassportId,
       uniqueProductIdentifier,
-      localProductId,
+      internalAliasId,
       granularity: toTitleCaseGranularity(resolvedGranularity),
       dppSchemaVersion,
       dppStatus,
@@ -1087,10 +1087,10 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       }
     }
 
-    return {
+    return addLegacyInternalAliasAliases({
       digitalProductPassportId,
       uniqueProductIdentifier,
-      localProductId,
+      internalAliasId,
       granularity: headerValues.granularity,
       dppSchemaVersion,
       dppStatus,
@@ -1106,7 +1106,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       companyDid,
       fields,
       ...(extensions ? { extensions } : {}),
-    };
+    });
   }
 
   function buildExpandedPassportPayload(passport, typeDef, options = {}) {

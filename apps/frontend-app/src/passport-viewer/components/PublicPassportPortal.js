@@ -89,7 +89,7 @@ function buildViewerDidFallbacks(passport, companyData) {
     || "company";
   const companySlug = slugifyDidSegment(companyData?.did_slug || passport?.company_profile?.did_slug || companyName);
   const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
-  const stableId = stableDidSegment(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.product_id);
+  const stableId = stableDidSegment(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.internal_alias_id);
   return {
     companyDid: `did:web:${didDomain}:did:company:${companySlug}`,
     dppDid: `did:web:${didDomain}:did:dpp:${granularity}:${stableId}`,
@@ -247,7 +247,7 @@ function buildHeaderRows(passport, typeDef, companyData) {
   const values = {
     digitalProductPassportId: passport?.digitalProductPassportId || passport?.dppId || passport?.dpp_id,
     uniqueProductIdentifier: passport?.uniqueProductIdentifier || passport?.product_identifier_did || null,
-    localProductId: passport?.product_id,
+    internalAliasId: passport?.internal_alias_id,
     granularity: passport?.granularity || "item",
     dppSchemaVersion: passport?.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
     dppStatus: formatPassportStatus(passport?.release_status),

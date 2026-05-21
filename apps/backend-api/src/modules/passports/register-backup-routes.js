@@ -132,7 +132,7 @@ function registerBackupRoutes(app, deps) {
         passportDppId: req.params.dppId,
         lineageId: normalizedPassport.lineage_id || normalizedPassport.dppId,
         passportType,
-        productId: normalizedPassport.product_id,
+        internalAliasId: normalizedPassport.internal_alias_id,
         versionNumber: normalizedPassport.version_number,
         publicRowData,
         publicCompanyName: companyName,

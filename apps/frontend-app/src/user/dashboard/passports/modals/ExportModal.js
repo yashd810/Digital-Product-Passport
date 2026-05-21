@@ -177,10 +177,10 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
       return alignRecordToSchemaKeys(flattened, sections);
     }));
     const rows = [
-      ["Field Name", ...normalizedRecords.map((passport) => passport.model_name || passport.product_id || passport.dppId || "")],
+      ["Field Name", ...normalizedRecords.map((passport) => passport.model_name || passport.internal_alias_id || passport.dppId || "")],
       ["dppId", ...normalizedRecords.map((passport) => passport.dppId || passport.dpp_id || "")],
       ["model_name", ...normalizedRecords.map((passport) => passport.model_name || "")],
-      ["product_id", ...normalizedRecords.map((passport) => passport.product_id || "")],
+      ["internal_alias_id", ...normalizedRecords.map((passport) => passport.internal_alias_id || "")],
       ...allFields
         .filter((field) => field.type !== "table")
         .map((field) => [

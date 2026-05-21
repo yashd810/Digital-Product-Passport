@@ -26,7 +26,7 @@ describe("frontend accessibility", () => {
   test("trusted entry panel has no obvious axe violations", async () => {
     const { container } = render(
       <TrustedEntryPanel
-        passport={{ product_id: "BAT-2026-001" }}
+        passport={{ internal_alias_id: "BAT-2026-001" }}
         carrierAuthenticity={{
           trustedViewerHost: "www.claros-dpp.online",
           trustedViewerOrigin: "https://www.claros-dpp.online",

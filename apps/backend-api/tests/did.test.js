@@ -118,7 +118,7 @@ describe("DID routes", () => {
         lineage_id: "dpp_9f863d0d-bc74-4c34-9925-2470f18c3f00",
         company_id: 1,
         passport_type: "trial_1_dbp",
-        product_id: "123456789",
+        internal_alias_id: "123456789",
         granularity: "item",
       },
       company: {

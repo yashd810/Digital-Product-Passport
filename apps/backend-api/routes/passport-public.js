@@ -3,6 +3,7 @@
 const logger = require("../src/infrastructure/logging/logger");
 const { buildCanonicalIdentityBundle } = require("../src/shared/identifiers/canonical-identity-bundle");
 const { isPublicVersionVisible } = require("../src/modules/public-passports/visibility");
+const { addLegacyInternalAliasAliases } = require("../src/shared/passports/passport-helpers");
 
 module.exports = function registerPassportPublicRoutes(app, {
   pool,
@@ -11,12 +12,12 @@ module.exports = function registerPassportPublicRoutes(app, {
   publicUnlockRateLimit,
   getTable,
   normalizePassportRow,
-  normalizeProductIdValue,
+  normalizeInternalAliasIdValue,
   buildCurrentPublicPassportPath,
   buildInactivePublicPassportPath,
   stripRestrictedFieldsForPublicView,
   getCompanyNameMap,
-  resolveReleasedPassportByProductId,
+  resolveReleasedPassportByInternalAliasId,
   resolvePublicPassportByDppId,
   buildPassportVersionHistory,
   resolvePublicPathToSubjects,
@@ -177,7 +178,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       manufacturerName: passport.manufacturer,
       manufacturedBy: passport.manufactured_by,
       modelName: passport.model_name,
-      productId: passport.product_id,
+      internalAliasId: passport.internal_alias_id,
       versionNumber: passport.version_number
     }) :
     buildCurrentPublicPassportPath({
@@ -185,7 +186,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       manufacturerName: passport.manufacturer,
       manufacturedBy: passport.manufactured_by,
       modelName: passport.model_name,
-      productId: passport.product_id
+      internalAliasId: passport.internal_alias_id
     });
     return didService.buildPublicPassportUrl(path);
   }
@@ -257,14 +258,14 @@ module.exports = function registerPassportPublicRoutes(app, {
       didService,
       productIdentifierService,
     });
-    return {
+    return addLegacyInternalAliasAliases({
       ...payload,
       digitalProductPassportId: payload?.digitalProductPassportId || identityBundle.digitalProductPassportId || null,
       uniqueProductIdentifier: payload?.uniqueProductIdentifier || identityBundle.uniqueProductIdentifier || passport?.product_identifier_did || null,
       subjectDid: payload?.subjectDid || identityBundle.subjectDid || null,
       dppDid: payload?.dppDid || identityBundle.dppDid || null,
       companyDid: payload?.companyDid || identityBundle.companyDid || null,
-    };
+    });
   }
 
   function buildPublicCompanyProfile(company) {
@@ -496,20 +497,20 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   async function loadBackupHandoverPassport({
     passportDppId = null,
-    productId = null,
+    internalAliasId = null,
     versionNumber = null
   }) {
     if (!backupProviderService?.getActivePublicHandover) return null;
 
     let handover = await backupProviderService.getActivePublicHandover({
       passportDppId,
-      productId,
+      internalAliasId,
       versionNumber,
     });
     if (!handover && backupProviderService?.ensureAutomaticPublicHandover) {
       handover = await backupProviderService.ensureAutomaticPublicHandover({
         passportDppId,
-        productId,
+        internalAliasId,
         versionNumber,
       });
     }
@@ -526,7 +527,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       lineage_id: rawRow?.lineage_id || rawRow?.lineageId || handover.lineage_id || handover.passport_dpp_id,
       company_id: rawRow?.company_id || rawRow?.companyId || handover.company_id,
       passport_type: rawRow?.passport_type || rawRow?.passportType || handover.passport_type,
-      product_id: rawRow?.product_id || rawRow?.productId || handover.product_id,
+      internal_alias_id: rawRow?.internal_alias_id || rawRow?.internalAliasId || handover.internal_alias_id,
       version_number: rawRow?.version_number || rawRow?.versionNumber || handover.version_number,
       backup_public_handover: true,
       backup_public_url: handover.public_url || null,
@@ -629,7 +630,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       const tableName = getTable(typeDef.type_name);
       const selectFields = facilityFieldKeys.join(", ");
       const candidateRes = await pool.query(
-        `SELECT dpp_id, lineage_id, company_id, model_name, product_id, release_status, version_number, updated_at, created_at, ${selectFields}
+        `SELECT dpp_id, lineage_id, company_id, model_name, internal_alias_id, release_status, version_number, updated_at, created_at, ${selectFields}
          FROM ${tableName}
          WHERE deleted_at IS NULL
            AND release_status IN ('released', 'obsolete')
@@ -680,21 +681,21 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   // ─── BY PRODUCT ID ───────────────────────────────────────────────────────
 
-  app.get("/api/passports/by-product/:productId", publicReadRateLimit, async (req, res) => {
+  app.get("/api/passports/by-product/:internalAliasId", publicReadRateLimit, async (req, res) => {
     try {
-      const productId = normalizeProductIdValue(req.params.productId);
+      const internalAliasId = normalizeInternalAliasIdValue(req.params.internalAliasId);
       const version = req.query.version ? parseInt(req.query.version, 10) : null;
-      if (!productId) return res.status(400).json({ error: "productId is required" });
+      if (!internalAliasId) return res.status(400).json({ error: "internalAliasId is required" });
       if (req.query.version && !Number.isFinite(version)) {
         return res.status(400).json({ error: "version must be a valid integer" });
       }
 
-      let resolved = await loadBackupHandoverPassport({ productId, versionNumber: version });
+      let resolved = await loadBackupHandoverPassport({ internalAliasId, versionNumber: version });
       if (!resolved?.passport) {
-        resolved = await resolveReleasedPassportByProductId(productId, { versionNumber: version });
+        resolved = await resolveReleasedPassportByInternalAliasId(internalAliasId, { versionNumber: version });
       }
       if (!resolved?.passport) {
-        resolved = await resolvePublicPassportByDppId(req.params.productId, { versionNumber: version });
+        resolved = await resolvePublicPassportByDppId(req.params.internalAliasId, { versionNumber: version });
       }
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
@@ -710,7 +711,7 @@ module.exports = function registerPassportPublicRoutes(app, {
         manufacturerName: sanitizedPassport.manufacturer,
         manufacturedBy: sanitizedPassport.manufactured_by,
         modelName: sanitizedPassport.model_name,
-        productId: sanitizedPassport.product_id
+        internalAliasId: sanitizedPassport.internal_alias_id
       });
       const linkedSubjects = publicPath ?
       await resolvePublicPathToSubjects({ pool, publicPath, getTable, didService }) :
@@ -738,11 +739,11 @@ module.exports = function registerPassportPublicRoutes(app, {
       };
       const requestedPayload = buildRequestedPassportPayload(req, sanitizedPassport, typeDef, company);
 
-      const basePayload = {
+      const basePayload = addLegacyInternalAliasAliases({
         ...sanitizedPassport,
         digitalProductPassportId: canonicalPayload.digitalProductPassportId,
         uniqueProductIdentifier: canonicalPayload.uniqueProductIdentifier,
-        localProductId: canonicalPayload.localProductId,
+        internalAliasId: canonicalPayload.internalAliasId,
         economicOperatorId: canonicalPayload.economicOperatorId,
         facilityId: canonicalPayload.facilityId,
         subjectDid: canonicalPayload.subjectDid,
@@ -755,7 +756,7 @@ module.exports = function registerPassportPublicRoutes(app, {
           manufacturerName: sanitizedPassport.manufacturer,
           manufacturedBy: sanitizedPassport.manufactured_by,
           modelName: sanitizedPassport.model_name,
-          productId: sanitizedPassport.product_id,
+          internalAliasId: sanitizedPassport.internal_alias_id,
           versionNumber: sanitizedPassport.version_number
         }),
         inactive_public_version: version !== null && Number(version) === Number(sanitizedPassport.version_number),
@@ -775,7 +776,7 @@ module.exports = function registerPassportPublicRoutes(app, {
                 : (sanitizedPassport.facility_id ? didService.generateFacilityDid(sanitizedPassport.facility_id) : null))
           }
         }
-      };
+      });
       delete basePayload.company_id;
       delete basePayload.companyId;
 
@@ -812,17 +813,17 @@ module.exports = function registerPassportPublicRoutes(app, {
       if (error.code === "AMBIGUOUS_PRODUCT_ID") {
         return res.status(409).json({ error: error.message });
       }
-      logger.error({ err: error, productId: req.params.productId, version: req.query.version || null }, "GET /api/passports/by-product/:productId failed");
+      logger.error({ err: error, internalAliasId: req.params.internalAliasId, version: req.query.version || null }, "GET /api/passports/by-product/:internalAliasId failed");
       res.status(500).json({ error: "Failed to fetch passport" });
     }
   });
 
-  app.get("/api/passports/by-product/:productId/history", publicReadRateLimit, async (req, res) => {
+  app.get("/api/passports/by-product/:internalAliasId/history", publicReadRateLimit, async (req, res) => {
     try {
-      const productId = normalizeProductIdValue(req.params.productId);
-      if (!productId) return res.status(400).json({ error: "productId is required" });
+      const internalAliasId = normalizeInternalAliasIdValue(req.params.internalAliasId);
+      if (!internalAliasId) return res.status(400).json({ error: "internalAliasId is required" });
 
-      const { passport } = await resolveReleasedPassportByProductId(productId);
+      const { passport } = await resolveReleasedPassportByInternalAliasId(internalAliasId);
       if (!passport) return res.status(404).json({ error: "Passport not found" });
 
       const historyPayload = await buildPassportVersionHistory({

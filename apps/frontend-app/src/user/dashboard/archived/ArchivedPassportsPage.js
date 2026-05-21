@@ -22,7 +22,7 @@ function sortPassportsByVersionDesc(a, b) {
 
 function getPassportGroupKey(passport) {
   if (passport?.lineage_id) return `lineage:${passport.lineage_id}`;
-  if (passport?.product_id) return `product:${passport.passport_type || "passport"}:${passport.product_id}`;
+  if (passport?.internal_alias_id) return `product:${passport.passport_type || "passport"}:${passport.internal_alias_id}`;
   return `dppId:${passport?.dppId || ""}`;
 }
 
@@ -73,7 +73,7 @@ function ArchivedPassports({ user, companyId }) {
     return null;
   }, []);
   const canOpenArchivedPublicVersion = useCallback((passport) => (
-    !!passport?.product_id && !!getArchivedPublicVersionNumber(passport)
+    !!passport?.internal_alias_id && !!getArchivedPublicVersionNumber(passport)
   ), [getArchivedPublicVersionNumber]);
 
   // Data loading

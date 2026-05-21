@@ -112,8 +112,8 @@ function App() {
         <Route path="/oauth/callback"  element={<OAuthCallback setToken={setToken} setUser={setUser} setCompanyId={setCompanyId} />} />
 
         {/* Consumer QR landing page */}
-        <Route path="/p/:productId" element={<PublicPassportRedirectPage />} />
-        <Route path="/p/inactive/:productId/:versionNumber" element={<PublicPassportRedirectPage />} />
+        <Route path="/p/:internalAliasId" element={<PublicPassportRedirectPage />} />
+        <Route path="/p/inactive/:internalAliasId/:versionNumber" element={<PublicPassportRedirectPage />} />
 
         {/* Passport viewer — public */}
         <Route path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId/technical/*" element={
@@ -126,10 +126,10 @@ function App() {
             <PassportViewer previewMode={true} previewCompanyId={companyId} />
           </ProtectedRoute>
         } />
-        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber/technical/*" element={<PassportViewer />} />
-        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber" element={<PassportViewer />} />
-        <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId/technical/*" element={<PassportViewer />} />
-        <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId" element={<PassportViewer />} />
+        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:internalAliasId/:versionNumber/technical/*" element={<PassportViewer />} />
+        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:internalAliasId/:versionNumber" element={<PassportViewer />} />
+        <Route path="/dpp/:manufacturerSlug/:modelSlug/:internalAliasId/technical/*" element={<PassportViewer />} />
+        <Route path="/dpp/:manufacturerSlug/:modelSlug/:internalAliasId" element={<PassportViewer />} />
 
         {/* CSV Import */}
         <Route path="/csv-import/:passportType" element={

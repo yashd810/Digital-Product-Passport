@@ -51,7 +51,7 @@ function registerCarrierSecurityRoutes(app, deps) {
 
       const tableName = getTable(resolvedPassportType);
       const currentPassportResult = await pool.query(
-        `SELECT dpp_id, product_id, model_name, release_status, company_id, carrier_authenticity
+        `SELECT dpp_id, internal_alias_id, model_name, release_status, company_id, carrier_authenticity
          FROM ${tableName}
          WHERE dpp_id = $1 AND deleted_at IS NULL
          LIMIT 1`,

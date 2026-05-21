@@ -10,11 +10,11 @@ const FIELD_KEY_ALIASES = {
   dppId: ["dpp_id", "digitalProductPassportId"],
   dpp_id: ["dppId", "digitalProductPassportId"],
   uniqueProductIdentifier: ["product_identifier_did"],
-  localProductId: ["product_id"],
+  internalAliasId: ["internal_alias_id"],
   modelName: ["model_name"],
   model_name: ["modelName"],
-  productId: ["product_id", "localProductId"],
-  product_id: ["productId", "localProductId"],
+  internalAliasId: ["internal_alias_id", "internalAliasId"],
+  internal_alias_id: ["internalAliasId", "internalAliasId"],
   serial_number: ["serialNumber", "serial", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"],
   serialNumber: ["serial_number", "serial", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"],
   batterySerialNumber: ["battery_serial_number", "serial_number", "serial", "serialNumber"],
@@ -45,7 +45,7 @@ export function sortPassportsByVersionDesc(a, b) {
 
 export function getPassportGroupKey(passport) {
   if (passport?.lineage_id) return `lineage:${passport.lineage_id}`;
-  if (passport?.product_id) return `product:${passport.passport_type || "passport"}:${passport.product_id}`;
+  if (passport?.internal_alias_id) return `product:${passport.passport_type || "passport"}:${passport.internal_alias_id}`;
   return `dppId:${passport?.dppId || ""}`;
 }
 

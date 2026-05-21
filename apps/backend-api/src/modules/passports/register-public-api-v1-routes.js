@@ -54,7 +54,7 @@ function registerPublicApiV1Routes(app, deps) {
         params.push(status);
       }
       if (search) {
-        q += ` AND (model_name ILIKE $${i} OR product_id ILIKE $${i} OR product_identifier_did ILIKE $${i})`;
+        q += ` AND (model_name ILIKE $${i} OR internal_alias_id ILIKE $${i} OR product_identifier_did ILIKE $${i})`;
         params.push(`%${search}%`);
         i++;
       }

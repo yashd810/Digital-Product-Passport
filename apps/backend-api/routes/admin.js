@@ -39,7 +39,7 @@ const ARCHIVED_HISTORY_FILTER_SQL = `(snapshot_reason IS NULL OR snapshot_reason
 const RESERVED_PASSPORT_FIELD_KEYS = [
 ...SYSTEM_PASSPORT_FIELDS,
 "model_name",
-"product_id",
+"internal_alias_id",
 "product_identifier_did",
 "compliance_profile_key",
 "content_specification_ids",
@@ -74,7 +74,7 @@ const RESERVED_PASSPORT_SEMANTIC_IDS = [
 "dpp:dppDid",
 "dpp:companyDid",
 "dpp:dppId",
-"dpp:productId"];
+"dpp:internalAliasId"];
 
 
 function normalizeReservedToken(value) {

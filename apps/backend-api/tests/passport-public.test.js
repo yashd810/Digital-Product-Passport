@@ -120,7 +120,7 @@ function createTestApp(options = {}) {
     lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
     company_id: 5,
     passport_type: "battery",
-    product_id: "BAT-2026-001",
+    internal_alias_id: "BAT-2026-001",
     serial_number: "SN-2026-001",
     product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
     release_status: "released",
@@ -224,12 +224,12 @@ function createTestApp(options = {}) {
     publicUnlockRateLimit: (_req, _res, next) => next(),
     getTable: (passportType) => `${passportType}_passports`,
     normalizePassportRow: (row) => row,
-    normalizeProductIdValue: (value) => String(value || "").trim(),
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
     buildCurrentPublicPassportPath: () => "/dpp/acme-energy/battery-pack/bat-2026-001",
     buildInactivePublicPassportPath: () => "/dpp/inactive/acme-energy/battery-pack/bat-2026-001/2",
     stripRestrictedFieldsForPublicView: async (row) => row,
     getCompanyNameMap: async () => new Map([["5", "Acme Energy"]]),
-    resolveReleasedPassportByProductId: options.resolveReleasedPassportByProductId || (async () => ({ passport })),
+    resolveReleasedPassportByInternalAliasId: options.resolveReleasedPassportByInternalAliasId || (async () => ({ passport })),
     resolvePublicPassportByDppId: options.resolvePublicPassportByDppId || (async (dppId) => {
       if (dppId !== passport.guid) return null;
       return { passport };
@@ -276,15 +276,15 @@ function createTestApp(options = {}) {
 }
 
 describe("passport public routes", () => {
-  test("GET /api/passports/by-product/:productId omits company_id and includes public company profile plus canonical DIDs", async () => {
+  test("GET /api/passports/by-product/:internalAliasId omits company_id and includes public company profile plus canonical DIDs", async () => {
     const { app, passport } = createTestApp({
-      resolveReleasedPassportByProductId: async () => ({ passport }),
+      resolveReleasedPassportByInternalAliasId: async () => ({ passport }),
     });
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/passports/by-product/:productId",
-      params: { productId: passport.product_id },
+      path: "/api/passports/by-product/:internalAliasId",
+      params: { internalAliasId: passport.internal_alias_id },
     });
 
     expect(response.statusCode).toBe(200);
@@ -297,6 +297,9 @@ describe("passport public routes", () => {
     );
     expect(response.body.companyDid).toBe("did:web:www.claros-dpp.online:did:company:acme-energy");
     expect(response.body.dppDid).toBe("did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc");
+    expect(response.body.internalAliasId).toBe(passport.internal_alias_id);
+    expect(response.body.localProductId).toBe(passport.internal_alias_id);
+    expect(response.body.productId).toBe(passport.internal_alias_id);
     expect(response.body.linked_data?.canonical_subjects).toEqual(
       expect.objectContaining({
         companyDid: "did:web:www.claros-dpp.online:did:company:acme-energy",
@@ -331,12 +334,12 @@ describe("passport public routes", () => {
     expect(response.body.elements).toBeUndefined();
   });
 
-  test("GET /api/passports/by-product/:productId falls back to derived DIDs when canonical serializer leaves them blank", async () => {
+  test("GET /api/passports/by-product/:internalAliasId falls back to derived DIDs when canonical serializer leaves them blank", async () => {
     const { app, passport } = createTestApp({
       buildCanonicalPassportPayload: () => ({
         digitalProductPassportId: null,
         uniqueProductIdentifier: null,
-        localProductId: passport.product_id,
+        internalAliasId: passport.internal_alias_id,
         economicOperatorId: null,
         facilityId: null,
         subjectDid: null,
@@ -354,8 +357,8 @@ describe("passport public routes", () => {
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/passports/by-product/:productId",
-      params: { productId: passport.product_id },
+      path: "/api/passports/by-product/:internalAliasId",
+      params: { internalAliasId: passport.internal_alias_id },
     });
 
     expect(response.statusCode).toBe(200);
@@ -508,7 +511,7 @@ describe("passport public routes", () => {
       lineage_id: "dpp_handover_001",
       company_id: 5,
       passport_type: "battery",
-      product_id: "BAT-2026-001",
+      internal_alias_id: "BAT-2026-001",
       release_status: "released",
       version_number: 2,
       granularity: "item",
@@ -526,7 +529,7 @@ describe("passport public routes", () => {
             passport_dpp_id: "dpp_handover_001",
             lineage_id: "dpp_handover_001",
             passport_type: "battery",
-            product_id: "BAT-2026-001",
+            internal_alias_id: "BAT-2026-001",
             version_number: 2,
             public_url: "https://backup.example/passports/dpp_handover_001",
             backup_provider_key: "oci-primary",
@@ -561,7 +564,7 @@ describe("passport public routes", () => {
       lineage_id: "dpp_handover_auto_001",
       company_id: 5,
       passport_type: "battery",
-      product_id: "BAT-2026-002",
+      internal_alias_id: "BAT-2026-002",
       release_status: "released",
       version_number: 3,
       granularity: "item",
@@ -573,7 +576,7 @@ describe("passport public routes", () => {
       passport_dpp_id: "dpp_handover_auto_001",
       lineage_id: "dpp_handover_auto_001",
       passport_type: "battery",
-      product_id: "BAT-2026-002",
+      internal_alias_id: "BAT-2026-002",
       version_number: 3,
       public_url: "https://backup.example/passports/dpp_handover_auto_001",
       backup_provider_key: "oci-primary",
@@ -600,7 +603,7 @@ describe("passport public routes", () => {
     expect(response.statusCode).toBe(200);
     expect(ensureAutomaticPublicHandover).toHaveBeenCalledWith({
       passportDppId: "dpp_handover_auto_001",
-      productId: null,
+      internalAliasId: null,
       versionNumber: null,
     });
     expect(response.body.fields).toEqual(

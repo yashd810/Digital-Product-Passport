@@ -17,7 +17,7 @@ const registerMutationRoutes = require("../src/modules/dpp-api/register-mutation
 const registerPublicReadRoutes = require("../src/modules/dpp-api/register-public-read-routes");
 
 // ─── DPP API ROUTES ───────────────────────────────────────────────────────────
-// All DID paths use companyId + product_id — never the record ID.
+// All DID paths use companyId + internal_alias_id — never the record ID.
 // Conforms to the did:web spec for DID document resolution.
 
 module.exports = function registerDppApiRoutes(app, {
@@ -27,11 +27,11 @@ module.exports = function registerDppApiRoutes(app, {
   requireEditor,
   getTable,
   normalizePassportRow,
-  normalizeProductIdValue,
+  normalizeInternalAliasIdValue,
   extractExplicitFacilityId,
   stripRestrictedFieldsForPublicView,
   getCompanyNameMap,
-  resolveReleasedPassportByProductId,
+  resolveReleasedPassportByInternalAliasId,
   signingService,
   buildOperationalDppPayload,
   buildCanonicalPassportPayload,
@@ -51,7 +51,7 @@ module.exports = function registerDppApiRoutes(app, {
   getWritablePassportColumns,
   toStoredPassportValue,
   getPassportTypeSchema,
-  findExistingPassportByProductId,
+  findExistingPassportByInternalAliasId,
   complianceService,
   backupProviderService
 }) {
@@ -103,14 +103,14 @@ module.exports = function registerDppApiRoutes(app, {
     buildMutationPassportPayload,
     buildPassportResponse,
     dbLookupByCompanyAndProduct,
-    dbLookupByProductIdOnly,
+    dbLookupByInternalAliasIdOnly,
   } = createRequestResponseHelpers({
     pool,
     getTable,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     stripRestrictedFieldsForPublicView,
     getCompanyNameMap,
-    resolveReleasedPassportByProductId,
+    resolveReleasedPassportByInternalAliasId,
     buildOperationalDppPayload,
     buildCanonicalPassportPayload,
     buildExpandedPassportPayload,
@@ -144,14 +144,14 @@ module.exports = function registerDppApiRoutes(app, {
     getTable,
     normalizePassportRow,
     getCompanyNameMap,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     productIdentifierService,
     didService,
     dppIdentity,
     isDppRecordId,
     loadReleasedPassport,
     dbLookupByCompanyAndProduct,
-    dbLookupByProductIdOnly,
+    dbLookupByInternalAliasIdOnly,
     buildPassportResponse,
     getRepresentationFromValue,
     buildPassportJsonLdContext,
@@ -344,7 +344,7 @@ module.exports = function registerDppApiRoutes(app, {
   registerPublicReadRoutes(app, {
     logger,
     publicReadRateLimit,
-    dbLookupByProductIdOnly,
+    dbLookupByInternalAliasIdOnly,
     buildPassportResponse,
     acceptsJsonLd,
     buildPassportJsonLdContext,
@@ -370,7 +370,7 @@ module.exports = function registerDppApiRoutes(app, {
     getPassportTypeSchema,
     getTable,
     normalizePassportRow,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     resolveEditablePassportByDppId,
     resolveActiveReleasedPassportByDppId,
     resolveReleasedPassportForIdentifier,
@@ -379,7 +379,7 @@ module.exports = function registerDppApiRoutes(app, {
     archivePassportSnapshot,
     updatePassportRowById,
     logAudit,
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     productIdentifierService,
     complianceService,
     SYSTEM_PASSPORT_FIELDS,

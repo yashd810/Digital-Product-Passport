@@ -10,10 +10,10 @@ module.exports = function registerDeleteRoutes(app, deps) {
     normalizePassportRequestBody,
     getPassportTypeSchema,
     getTable,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     normalizeReleaseStatus,
     isEditablePassportStatus,
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     archivePassportSnapshot,
     getActorIdentifier,
     logAudit,
@@ -127,12 +127,12 @@ module.exports = function registerDeleteRoutes(app, deps) {
       const details = [];
 
       for (const item of identifiers) {
-        const raw = typeof item === "string" ? { product_id: item } : item || {};
+        const raw = typeof item === "string" ? { internal_alias_id: item } : item || {};
         const dppId = raw.dppId;
-        const productId = normalizeProductIdValue(raw.product_id || raw.productId);
+        const internalAliasId = normalizeInternalAliasIdValue(raw.internal_alias_id || raw.internalAliasId);
         try {
-          if (!dppId && !productId) {
-            details.push({ status: "failed", error: "Each item needs a dppId or product_id" });
+          if (!dppId && !internalAliasId) {
+            details.push({ status: "failed", error: "Each item needs a dppId or internal_alias_id" });
             failed += 1;
             continue;
           }
@@ -184,8 +184,8 @@ module.exports = function registerDeleteRoutes(app, deps) {
             }
           }
 
-          if (!matchedGuid && productId) {
-            const existing = await findExistingPassportByProductId({ tableName, companyId, productId });
+          if (!matchedGuid && internalAliasId) {
+            const existing = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId });
             if (existing && isEditablePassportStatus(normalizeReleaseStatus(existing.release_status))) {
               const isDraft = normalizeReleaseStatus(existing.release_status) === "draft";
               const fullRowRes = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [existing.id]);
@@ -199,7 +199,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
                     await client.query("COMMIT");
                     if (deletedRow.rows.length) {
                       matchedGuid = deletedRow.rows[0].dppId || deletedRow.rows[0].dpp_id;
-                      await logAudit(companyId, userId, "BULK_HARD_DELETE", tableName, matchedGuid, { productId }, null);
+                      await logAudit(companyId, userId, "BULK_HARD_DELETE", tableName, matchedGuid, { internalAliasId }, null);
                     }
                   } catch (error) {
                     await client.query("ROLLBACK");
@@ -228,16 +228,16 @@ module.exports = function registerDeleteRoutes(app, deps) {
           }
 
           if (!matchedGuid) {
-            details.push({ dppId: dppId || undefined, product_id: productId || undefined, status: "skipped", reason: "Not found or not deletable" });
+            details.push({ dppId: dppId || undefined, internal_alias_id: internalAliasId || undefined, status: "skipped", reason: "Not found or not deletable" });
             skipped += 1;
             continue;
           }
 
           await logAudit(companyId, userId, "DELETE", tableName, matchedGuid, { dppId: matchedGuid }, null);
-          details.push({ dppId: matchedGuid, product_id: productId || undefined, status: "deleted" });
+          details.push({ dppId: matchedGuid, internal_alias_id: internalAliasId || undefined, status: "deleted" });
           deleted += 1;
         } catch (error) {
-          details.push({ dppId: dppId || undefined, product_id: productId || undefined, status: "failed", error: error.message });
+          details.push({ dppId: dppId || undefined, internal_alias_id: internalAliasId || undefined, status: "failed", error: error.message });
           failed += 1;
         }
       }

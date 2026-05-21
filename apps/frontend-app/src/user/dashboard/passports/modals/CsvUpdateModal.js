@@ -41,7 +41,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
   const downloadCurrent = () => {
     const rows = [["Field Name", "Value"]];
     rows.push(["model_name", passport.model_name || ""]);
-    rows.push(["product_id", passport.product_id || ""]);
+    rows.push(["internal_alias_id", passport.internal_alias_id || ""]);
     allFields.forEach((field) => {
       const value = passport[field.key];
       rows.push([field.label, value === null || value === undefined ? "" : String(value)]);
@@ -107,7 +107,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
         allFields.find((item) => item.label?.trim().toLowerCase() === normalized) ||
         allFields.find((item) => item.key?.toLowerCase() === normalized) ||
         (normalized === "model_name" ? { key: "model_name", type: "text" } : null) ||
-        (normalized === "product_id" ? { key: "product_id", type: "text" } : null);
+        (normalized === "internal_alias_id" ? { key: "internal_alias_id", type: "text" } : null);
 
       if (!field) return;
       parsedData[field.key] = field.type === "boolean"

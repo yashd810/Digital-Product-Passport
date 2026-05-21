@@ -542,23 +542,23 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     const workflowPassportId = getWorkflowPassportId(wf);
     if (!workflowPassportId) return;
     const normalizedStatus = normalizePassportStatus(wf.release_status);
-    const path = normalizedStatus === "released" && wf.product_id
+    const path = normalizedStatus === "released" && wf.internal_alias_id
       ? buildPublicPassportPath({
           companyName: user?.company_name,
           modelName: wf.model_name,
-          productId: wf.product_id,
+          internalAliasId: wf.internal_alias_id,
         })
-      : isObsoletePassportStatus(normalizedStatus) && wf.product_id && wf.version_number != null
+      : isObsoletePassportStatus(normalizedStatus) && wf.internal_alias_id && wf.version_number != null
         ? buildInactivePassportPath({
             companyName: user?.company_name,
             modelName: wf.model_name,
-            productId: wf.product_id,
+            internalAliasId: wf.internal_alias_id,
             versionNumber: wf.version_number,
           })
       : buildPreviewPassportPath({
           companyName: user?.company_name,
           modelName: wf.model_name,
-          productId: wf.product_id,
+          internalAliasId: wf.internal_alias_id,
           previewId: workflowPassportId,
         });
     if (!path) return;

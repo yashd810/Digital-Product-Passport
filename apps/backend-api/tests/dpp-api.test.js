@@ -165,7 +165,7 @@ function createTestApp(options = {}) {
     lineage_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
     company_id: 5,
     passport_type: "battery",
-    product_id: "BAT-2026-001",
+    internal_alias_id: "BAT-2026-001",
     product_identifier_did: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
     release_status: options.releasedStatus || "released",
     version_number: 2,
@@ -287,7 +287,7 @@ function createTestApp(options = {}) {
           lineage_id: params[1],
           company_id: params[2],
           model_name: params[3],
-          product_id: params[4],
+          internal_alias_id: params[4],
           product_identifier_did: params[5],
           compliance_profile_key: params[6],
           content_specification_ids: params[7],
@@ -394,13 +394,13 @@ function createTestApp(options = {}) {
     requireEditor: (_req, _res, next) => next(),
     getTable: (typeName) => `${typeName}_passports`,
     normalizePassportRow: (row) => row,
-    normalizeProductIdValue: (value) => String(value || "").trim(),
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
     extractExplicitFacilityId,
     stripRestrictedFieldsForPublicView: async (passport) => passport,
     getCompanyNameMap: async () => new Map([["5", "Acme Energy"]]),
-    resolveReleasedPassportByProductId: async (productId, { companyId = null, strictProductId = false } = {}) => {
-      if (strictProductId && productId === releasedPassport.product_identifier_did) return null;
-      if (productId !== "BAT-2026-001" && productId !== releasedPassport.product_identifier_did) return null;
+    resolveReleasedPassportByInternalAliasId: async (internalAliasId, { companyId = null, strictProductId = false } = {}) => {
+      if (strictProductId && internalAliasId === releasedPassport.product_identifier_did) return null;
+      if (internalAliasId !== "BAT-2026-001" && internalAliasId !== releasedPassport.product_identifier_did) return null;
       if (companyId !== null && Number(companyId) !== 5) return null;
       return { passport: { ...releasedPassport } };
     },
@@ -408,13 +408,13 @@ function createTestApp(options = {}) {
     buildOperationalDppPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
       uniqueProductIdentifier: passport.product_identifier_did || null,
-      localProductId: passport.product_id,
-      product_id: passport.product_id,
+      internalAliasId: passport.internal_alias_id,
+      internal_alias_id: passport.internal_alias_id,
     }),
     buildCanonicalPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
       uniqueProductIdentifier: passport.product_identifier_did || null,
-      localProductId: passport.product_id,
+      internalAliasId: passport.internal_alias_id,
       subjectDid: "did:web:www.example.test:did:battery:item:fixture",
       dppDid: "did:web:www.example.test:did:dpp:item:fixture",
       companyDid: "did:web:www.example.test:did:company:5",
@@ -444,7 +444,7 @@ function createTestApp(options = {}) {
     buildExpandedPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
       uniqueProductIdentifier: passport.product_identifier_did || null,
-      localProductId: passport.product_id,
+      internalAliasId: passport.internal_alias_id,
       subjectDid: "did:web:www.example.test:did:battery:item:fixture",
       dppDid: "did:web:www.example.test:did:dpp:item:fixture",
       companyDid: "did:web:www.example.test:did:company:5",
@@ -523,7 +523,7 @@ function createTestApp(options = {}) {
       platformDid: () => "did:web:www.example.test",
       parseDid: (value) => {
         if (value === "dpp_72b99c83-952c-4179-96f6-54a513d39dbc") {
-          return { type: "dpp", granularity: "item", companyId: "5", productId: "BAT-2026-001" };
+          return { type: "dpp", granularity: "item", companyId: "5", internalAliasId: "BAT-2026-001" };
         }
         return null;
       },
@@ -532,10 +532,10 @@ function createTestApp(options = {}) {
     productIdentifierService: {
       isDidIdentifier: (value) => String(value || "").startsWith("did:"),
       normalizeProductIdentifiers: ({ rawProductId, uniqueProductIdentifier }) => ({
-        productIdInput: rawProductId,
+        internalAliasIdInput: rawProductId,
         productIdentifierDid: uniqueProductIdentifier || `did:web:www.example.test:did:battery:item:c5-${String(rawProductId).toLowerCase()}`,
       }),
-      buildLookupCandidates: ({ productId }) => [productId, releasedPassport.product_identifier_did],
+      buildLookupCandidates: ({ internalAliasId }) => [internalAliasId, releasedPassport.product_identifier_did],
       listIdentifierLineage: jest.fn(async () => identifierLineage),
     },
     archivePassportSnapshot: jest.fn(async () => {}),
@@ -590,7 +590,7 @@ function createTestApp(options = {}) {
       typeName: "battery",
       allowedKeys: new Set(["manufacturer", "public_summary", "battery_profile"]),
     }),
-    findExistingPassportByProductId: async () => null,
+    findExistingPassportByInternalAliasId: async () => null,
     complianceService: {
       loadPassportTypeDefinition: async () => ({
         type_name: "battery",
@@ -627,7 +627,7 @@ describe("DPP standards API", () => {
       path: "/api/v1/dpps",
       body: {
         passportType: "battery",
-        productId: "BAT-NEW-001",
+        internalAliasId: "BAT-NEW-001",
         public_summary: "Fresh battery passport",
       },
     });
@@ -638,7 +638,7 @@ describe("DPP standards API", () => {
     expect(response.body.dppId).toBe(response.body.digitalProductPassportId);
     expect(response.body.passport.digitalProductPassportId).toBe(response.body.digitalProductPassportId);
     expect(response.body.passport.uniqueProductIdentifier).toMatch(/^did:/);
-    expect(response.body.passport.localProductId).toBe("BAT-NEW-001");
+    expect(response.body.passport.internalAliasId).toBe("BAT-NEW-001");
   });
 
   test("POST /api/v1/dpps returns full elements when representation=full is requested", async () => {
@@ -652,7 +652,7 @@ describe("DPP standards API", () => {
       },
       body: {
         passportType: "battery",
-        productId: "BAT-NEW-002",
+        internalAliasId: "BAT-NEW-002",
         public_summary: "Expanded battery passport",
       },
     });
@@ -669,7 +669,7 @@ describe("DPP standards API", () => {
     );
   });
 
-  test("POST /api/v1/dpps accepts explicit localProductId and uniqueProductIdentifier", async () => {
+  test("POST /api/v1/dpps accepts explicit internalAliasId and uniqueProductIdentifier", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
@@ -677,7 +677,7 @@ describe("DPP standards API", () => {
       path: "/api/v1/dpps",
       body: {
         passportType: "battery",
-        localProductId: "BAT-NEW-003",
+        internalAliasId: "BAT-NEW-003",
         uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-new-003-explicit",
         public_summary: "Explicit identifier battery passport",
       },
@@ -686,7 +686,7 @@ describe("DPP standards API", () => {
     expect(response.statusCode).toBe(201);
     expect(response.body.passport).toMatchObject({
       uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-new-003-explicit",
-      localProductId: "BAT-NEW-003",
+      internalAliasId: "BAT-NEW-003",
     });
   });
 
@@ -698,7 +698,7 @@ describe("DPP standards API", () => {
       path: "/api/v1/dpps",
       body: {
         passportType: "battery",
-        localProductId: "BAT-NEW-004",
+        internalAliasId: "BAT-NEW-004",
         uniqueProductIdentifier: "BAT-NEW-004",
       },
     });
@@ -712,14 +712,14 @@ describe("DPP standards API", () => {
     });
   });
 
-  test("GET /api/v1/dppsByProductId/:productId returns the current released passport by productId", async () => {
+  test("GET /api/v1/dppsByProductId/:internalAliasId returns the current released passport by internalAliasId", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/v1/dppsByProductId/:productId",
+      path: "/api/v1/dppsByProductId/:internalAliasId",
       params: {
-        productId: "BAT-2026-001",
+        internalAliasId: "BAT-2026-001",
       },
       query: {
         representation: "full",
@@ -742,14 +742,14 @@ describe("DPP standards API", () => {
     );
   });
 
-  test("GET /api/v1/dppsByProductId/:productId accepts representation=full for full DPP payloads", async () => {
+  test("GET /api/v1/dppsByProductId/:internalAliasId accepts representation=full for full DPP payloads", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/v1/dppsByProductId/:productId",
+      path: "/api/v1/dppsByProductId/:internalAliasId",
       params: {
-        productId: "BAT-2026-001",
+        internalAliasId: "BAT-2026-001",
       },
       query: {
         representation: "full",
@@ -768,14 +768,14 @@ describe("DPP standards API", () => {
     );
   });
 
-  test("GET /api/v1/dppsByProductId/:productId only resolves raw productId values", async () => {
+  test("GET /api/v1/dppsByProductId/:internalAliasId only resolves raw internalAliasId values", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/v1/dppsByProductId/:productId",
+      path: "/api/v1/dppsByProductId/:internalAliasId",
       params: {
-        productId: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+        internalAliasId: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
       },
     });
 
@@ -788,14 +788,14 @@ describe("DPP standards API", () => {
     });
   });
 
-  test("GET /api/v1/dppsByProductIdAndDate/:productId returns the released passport version for the requested date", async () => {
+  test("GET /api/v1/dppsByProductIdAndDate/:internalAliasId returns the released passport version for the requested date", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/v1/dppsByProductIdAndDate/:productId",
+      path: "/api/v1/dppsByProductIdAndDate/:internalAliasId",
       params: {
-        productId: "BAT-2026-001",
+        internalAliasId: "BAT-2026-001",
       },
       query: {
         date: "2026-04-28T00:00:00.000Z",
@@ -808,7 +808,7 @@ describe("DPP standards API", () => {
       statusCode: "Success",
       digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
       uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
-      localProductId: "BAT-2026-001",
+      internalAliasId: "BAT-2026-001",
     });
     expect(response.body.fields).toBeUndefined();
     expect(response.body.elements).toEqual(
@@ -822,14 +822,14 @@ describe("DPP standards API", () => {
     );
   });
 
-  test("GET /api/v1/dppsByProductIdAndDate/:productId only resolves raw productId values", async () => {
+  test("GET /api/v1/dppsByProductIdAndDate/:internalAliasId only resolves raw internalAliasId values", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "get",
-      path: "/api/v1/dppsByProductIdAndDate/:productId",
+      path: "/api/v1/dppsByProductIdAndDate/:internalAliasId",
       params: {
-        productId: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+        internalAliasId: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
       },
       query: {
         date: "2026-04-28T00:00:00.000Z",
@@ -848,17 +848,17 @@ describe("DPP standards API", () => {
   test("does not register removed product lookup GET routes", () => {
     const app = createTestApp();
 
-    expect(() => findRouteLayer(app, "get", "/api/dpp/by-product/:productId")).toThrow(
-      "Route not found for GET /api/dpp/by-product/:productId"
+    expect(() => findRouteLayer(app, "get", "/api/dpp/by-product/:internalAliasId")).toThrow(
+      "Route not found for GET /api/dpp/by-product/:internalAliasId"
     );
-    expect(() => findRouteLayer(app, "get", "/api/dpp/:companyId/:productId")).toThrow(
-      "Route not found for GET /api/dpp/:companyId/:productId"
+    expect(() => findRouteLayer(app, "get", "/api/dpp/:companyId/:internalAliasId")).toThrow(
+      "Route not found for GET /api/dpp/:companyId/:internalAliasId"
     );
     expect(() => findRouteLayer(app, "get", "/api/v1/dpps/:productIdentifier")).toThrow(
       "Route not found for GET /api/v1/dpps/:productIdentifier"
     );
-    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductId/:productId").length).toBeGreaterThan(0);
-    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductIdAndDate/:productId").length).toBeGreaterThan(0);
+    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductId/:internalAliasId").length).toBeGreaterThan(0);
+    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductIdAndDate/:internalAliasId").length).toBeGreaterThan(0);
   });
 
   test("does not register removed /api/v1/dppsByIdAndDate/:dppId route", () => {
@@ -867,17 +867,17 @@ describe("DPP standards API", () => {
     expect(() => findRouteLayer(app, "get", "/api/v1/dppsByIdAndDate/:dppId")).toThrow(
       "Route not found for GET /api/v1/dppsByIdAndDate/:dppId"
     );
-    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductIdAndDate/:productId").length).toBeGreaterThan(0);
+    expect(findRouteLayer(app, "get", "/api/v1/dppsByProductIdAndDate/:internalAliasId").length).toBeGreaterThan(0);
   });
 
-  test("POST /api/v1/dppsByProductIds returns paged DPP identifiers for productId input", async () => {
+  test("POST /api/v1/dppsByProductIds returns paged DPP identifiers for internalAliasId input", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
       method: "post",
       path: "/api/v1/dppsByProductIds",
       body: {
-        productId: ["BAT-2026-001", "UNKNOWN-001"],
+        internalAliasId: ["BAT-2026-001", "UNKNOWN-001"],
         limit: 1,
       },
     });
@@ -892,7 +892,7 @@ describe("DPP standards API", () => {
     });
   });
 
-  test("POST /api/v1/dppsByProductIds requires canonical productId request key", async () => {
+  test("POST /api/v1/dppsByProductIds accepts legacy product identifier array keys", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
@@ -903,10 +903,10 @@ describe("DPP standards API", () => {
       },
     });
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({
-      error: "VALIDATION_ERROR",
-      detail: "productId must be a non-empty array",
+      statusCode: "Success",
+      identifiers: ["dpp_72b99c83-952c-4179-96f6-54a513d39dbc"],
     });
   });
 
@@ -917,7 +917,7 @@ describe("DPP standards API", () => {
       method: "post",
       path: "/api/v1/dppsByProductIds",
       body: {
-        productId: ["BAT-2026-001", "UNKNOWN-001"],
+        internalAliasId: ["BAT-2026-001", "UNKNOWN-001"],
         limit: 1,
         cursor: Buffer.from(JSON.stringify({ offset: 1 }), "utf8").toString("base64url"),
       },
@@ -939,7 +939,7 @@ describe("DPP standards API", () => {
       method: "post",
       path: "/api/v1/dppsByProductIds/search",
       body: {
-        productId: ["BAT-2026-001", "UNKNOWN-001"],
+        internalAliasId: ["BAT-2026-001", "UNKNOWN-001"],
         representation: "compressed",
       },
     });
@@ -957,7 +957,7 @@ describe("DPP standards API", () => {
     });
   });
 
-  test("POST /api/v1/dppsByProductIds/search requires canonical productId request key", async () => {
+  test("POST /api/v1/dppsByProductIds/search accepts legacy product identifier array keys", async () => {
     const app = createTestApp();
 
     const response = await invokeRoute(app, {
@@ -968,10 +968,11 @@ describe("DPP standards API", () => {
       },
     });
 
-    expect(response.statusCode).toBe(400);
-    expect(response.body).toMatchObject({
-      error: "VALIDATION_ERROR",
-      detail: "productId must be a non-empty array",
+    expect(response.statusCode).toBe(200);
+    expect(response.body.results).toHaveLength(1);
+    expect(response.body.results[0]).toMatchObject({
+      productIdentifier: "BAT-2026-001",
+      found: true,
     });
   });
 
@@ -1010,7 +1011,7 @@ describe("DPP standards API", () => {
     expect(response.body.payload).toMatchObject({
       digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
       uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
-      localProductId: "BAT-2026-001",
+      internalAliasId: "BAT-2026-001",
     });
   });
 
@@ -1333,7 +1334,7 @@ describe("DPP standards API", () => {
       dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
       digitalProductPassportId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
       uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
-      localProductId: "BAT-2026-001",
+      internalAliasId: "BAT-2026-001",
       granularity: "item",
       identifierLineage: [
         expect.objectContaining({

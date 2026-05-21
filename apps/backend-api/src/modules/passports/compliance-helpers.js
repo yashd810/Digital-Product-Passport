@@ -6,7 +6,7 @@ function createComplianceHelpers({
   getTable,
   getPassportTypeSchema,
   normalizePassportRow,
-  normalizeProductIdValue,
+  normalizeInternalAliasIdValue,
   normalizeReleaseStatus,
   updatePassportRowById,
 }) {
@@ -16,18 +16,18 @@ function createComplianceHelpers({
     return productIdentifierService.extractBusinessProductIdentifier?.(source || {}) || "";
   }
 
-  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, productId, granularity, passportLike = null }) {
+  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, internalAliasId, granularity, passportLike = null }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
       companySlug,
       companyName,
       passportType,
-      rawProductId: productId,
+      rawProductId: internalAliasId,
       canonicalProductIdSource: extractBusinessIdentifierSource(passportLike),
       granularity,
     });
     return {
-      product_id: normalized.productIdInput || null,
+      internal_alias_id: normalized.internalAliasIdInput || null,
       product_identifier_did: normalized.productIdentifierDid || null,
     };
   }
@@ -248,18 +248,18 @@ function createComplianceHelpers({
 
     const nextFields = {};
     const effectiveGranularity = passport.granularity || "item";
-    const normalizedProductId = normalizeProductIdValue(passport.product_id);
+    const normalizedProductId = normalizeInternalAliasIdValue(passport.internal_alias_id);
 
     if (normalizedProductId) {
       const storedProductIdentifiers = buildStoredProductIdentifiers({
         companyId,
         passportType: typeSchema.typeName,
-        productId: normalizedProductId,
+        internalAliasId: normalizedProductId,
         granularity: effectiveGranularity,
         passportLike: passport,
       });
-      if (storedProductIdentifiers.product_id && storedProductIdentifiers.product_id !== passport.product_id) {
-        nextFields.product_id = storedProductIdentifiers.product_id;
+      if (storedProductIdentifiers.internal_alias_id && storedProductIdentifiers.internal_alias_id !== passport.internal_alias_id) {
+        nextFields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
       }
       if (storedProductIdentifiers.product_identifier_did !== passport.product_identifier_did) {
         nextFields.product_identifier_did = storedProductIdentifiers.product_identifier_did;

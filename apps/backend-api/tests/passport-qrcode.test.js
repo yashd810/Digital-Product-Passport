@@ -109,7 +109,7 @@ function createTestApp() {
     passport: {
       dpp_id: "dpp_test_qr_1",
       dppId: "dpp_test_qr_1",
-      product_id: "BAT-2026-001",
+      internal_alias_id: "BAT-2026-001",
       model_name: "Battery Pack",
       company_id: 5,
       release_status: "draft",
@@ -131,7 +131,7 @@ function createTestApp() {
       if (text.includes("SELECT passport_type FROM passport_registry")) {
         return { rows: [{ passport_type: "battery" }] };
       }
-      if (text.includes("SELECT dpp_id, product_id, model_name, release_status, company_id, carrier_authenticity")) {
+      if (text.includes("SELECT dpp_id, internal_alias_id, model_name, release_status, company_id, carrier_authenticity")) {
         return { rows: [{ ...state.passport }] };
       }
       if (text.includes("SELECT qr_code, carrier_authenticity")) {
@@ -202,21 +202,21 @@ function createTestApp() {
     normalizePassportRow: (row) => ({ ...row, dppId: row.dppId || row.dpp_id, dpp_id: row.dpp_id || row.dppId }),
     normalizeReleaseStatus: (value) => value,
     isEditablePassportStatus: () => true,
-    normalizeProductIdValue: (value) => String(value || "").trim(),
-    generateProductIdValue: () => "BAT-2026-001",
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
+    generateInternalAliasIdValue: () => "BAT-2026-001",
     normalizePassportRequestBody: (body) => body || {},
     extractExplicitFacilityId: () => null,
     getWritablePassportColumns: (data, excluded = new Set()) => Object.keys(data).filter((key) => data[key] !== undefined && !excluded.has(key)),
     getStoredPassportValues: () => [],
     toStoredPassportValue: (value) => value,
     coerceBulkFieldValue: (value) => value,
-    buildCurrentPublicPassportPath: ({ productId }) => `/dpp/acme-energy/battery-pack/${encodeURIComponent(productId)}`,
+    buildCurrentPublicPassportPath: ({ internalAliasId }) => `/dpp/acme-energy/battery-pack/${encodeURIComponent(internalAliasId)}`,
     buildInactivePublicPassportPath: () => null,
-    buildPreviewPassportPath: ({ productId }) => `/dpp/preview/acme-energy/battery-pack/${encodeURIComponent(productId)}`,
+    buildPreviewPassportPath: ({ internalAliasId }) => `/dpp/preview/acme-energy/battery-pack/${encodeURIComponent(internalAliasId)}`,
     isPublicHistoryStatus: () => false,
     logAudit: jest.fn(async () => {}),
     getPassportTypeSchema: async () => ({ typeName: "battery", allowedKeys: new Set() }),
-    findExistingPassportByProductId: async () => null,
+    findExistingPassportByInternalAliasId: async () => null,
     getPassportLineageContext: async () => null,
     getPassportVersionsByLineage: async () => [],
     fetchCompanyPassportRecord: async () => null,
@@ -256,7 +256,7 @@ function createTestApp() {
       VALID_AUDIENCES: new Set(["consumers", "importers", "recyclers", "legitimate_interest"]),
     },
     productIdentifierService: {
-      normalizeProductIdentifiers: ({ rawProductId }) => ({ productIdInput: rawProductId, productIdentifierDid: null }),
+      normalizeProductIdentifiers: ({ rawProductId }) => ({ internalAliasIdInput: rawProductId, productIdentifierDid: null }),
     },
     backupProviderService: null,
     buildExpandedPassportPayload: () => ({}),

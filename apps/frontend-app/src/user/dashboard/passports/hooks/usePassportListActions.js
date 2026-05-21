@@ -142,7 +142,7 @@ export function usePassportListActions({
         const passportPath = buildPublicPassportPath({
           companyName: user?.company_name,
           modelName: passport.model_name,
-          productId: passport.product_id,
+          internalAliasId: passport.internal_alias_id,
         });
         if (!passportPath) throw new Error("Passport link is unavailable for this QR code");
 

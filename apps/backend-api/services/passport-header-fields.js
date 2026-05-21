@@ -25,9 +25,9 @@ const DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS = [
     locked: true,
   },
   {
-    key: "localProductId",
-    label: "Local Product ID",
-    semanticId: "dpp:productId",
+    key: "internalAliasId",
+    label: "Internal Alias ID",
+    semanticId: "dpp:internalAliasId",
     valueSource: "system",
     ownership: "passport_author_editable",
     required: true,

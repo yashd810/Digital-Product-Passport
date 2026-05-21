@@ -27,10 +27,10 @@ module.exports = function registerDidRoutes(app, deps) {
   };
   const companyProductParamsSchema = {
     type: "object",
-    required: ["companyId", "productId"],
+    required: ["companyId", "internalAliasId"],
     properties: {
       companyId: { type: "string", minLength: 1 },
-      productId: { type: "string", minLength: 1 },
+      internalAliasId: { type: "string", minLength: 1 },
     },
   };
   const facilityParamsSchema = {
@@ -60,15 +60,15 @@ module.exports = function registerDidRoutes(app, deps) {
     }
   });
 
-  app.get("/did/battery/model/:companyId/:productId/did.json", createValidationMiddleware({
+  app.get("/did/battery/model/:companyId/:internalAliasId/did.json", createValidationMiddleware({
     params: companyProductParamsSchema,
   }), async (req, res) => {
     try {
       const companyId = parseInt(req.params.companyId, 10);
       if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
 
-      const productId = decodeURIComponent(req.params.productId);
-      const target = await resolveLegacyPassportDidTarget(companyId, productId, "model");
+      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
+      const target = await resolveLegacyPassportDidTarget(companyId, internalAliasId, "model");
       if (!target) return res.status(404).json({ error: "Passport not found or not released" });
       return res.redirect(301, `/did/battery/model/${encodeURIComponent(target.stableId)}/did.json`);
     } catch (e) {
@@ -77,15 +77,15 @@ module.exports = function registerDidRoutes(app, deps) {
     }
   });
 
-  app.get("/did/battery/item/:companyId/:productId/did.json", createValidationMiddleware({
+  app.get("/did/battery/item/:companyId/:internalAliasId/did.json", createValidationMiddleware({
     params: companyProductParamsSchema,
   }), async (req, res) => {
     try {
       const companyId = parseInt(req.params.companyId, 10);
       if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
 
-      const productId = decodeURIComponent(req.params.productId);
-      const target = await resolveLegacyPassportDidTarget(companyId, productId, "item");
+      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
+      const target = await resolveLegacyPassportDidTarget(companyId, internalAliasId, "item");
       if (!target) return res.status(404).json({ error: "Passport not found or not released" });
       return res.redirect(301, `/did/battery/item/${encodeURIComponent(target.stableId)}/did.json`);
     } catch (e) {
@@ -94,15 +94,15 @@ module.exports = function registerDidRoutes(app, deps) {
     }
   });
 
-  app.get("/did/battery/batch/:companyId/:productId/did.json", createValidationMiddleware({
+  app.get("/did/battery/batch/:companyId/:internalAliasId/did.json", createValidationMiddleware({
     params: companyProductParamsSchema,
   }), async (req, res) => {
     try {
       const companyId = parseInt(req.params.companyId, 10);
       if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
 
-      const productId = decodeURIComponent(req.params.productId);
-      const target = await resolveLegacyPassportDidTarget(companyId, productId, "batch");
+      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
+      const target = await resolveLegacyPassportDidTarget(companyId, internalAliasId, "batch");
       if (!target) return res.status(404).json({ error: "Passport not found or not released" });
       return res.redirect(301, `/did/battery/batch/${encodeURIComponent(target.stableId)}/did.json`);
     } catch (e) {
@@ -111,14 +111,14 @@ module.exports = function registerDidRoutes(app, deps) {
     }
   });
 
-  app.get("/did/dpp/:granularity/:companyId/:productId/did.json", createValidationMiddleware({
+  app.get("/did/dpp/:granularity/:companyId/:internalAliasId/did.json", createValidationMiddleware({
     params: {
       type: "object",
-      required: ["granularity", "companyId", "productId"],
+      required: ["granularity", "companyId", "internalAliasId"],
       properties: {
         granularity: { type: "string", minLength: 1 },
         companyId: { type: "string", minLength: 1 },
-        productId: { type: "string", minLength: 1 },
+        internalAliasId: { type: "string", minLength: 1 },
       },
     },
   }), async (req, res) => {
@@ -132,8 +132,8 @@ module.exports = function registerDidRoutes(app, deps) {
       const companyId = parseInt(req.params.companyId, 10);
       if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
 
-      const productId = decodeURIComponent(req.params.productId);
-      const target = await resolveLegacyPassportDidTarget(companyId, productId, granularity);
+      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
+      const target = await resolveLegacyPassportDidTarget(companyId, internalAliasId, granularity);
       if (!target) return res.status(404).json({ error: "Passport not found or not released" });
       const nextGranularity = didService.normalizeGranularity(target.granularity || granularity);
       return res.redirect(301, `/did/dpp/${encodeURIComponent(nextGranularity)}/${encodeURIComponent(target.stableId)}/did.json`);
@@ -211,7 +211,7 @@ module.exports = function registerDidRoutes(app, deps) {
       if (parsed.type === "battery") {
         if (wantsBrowser) {
           const companyId = parseInt(parsed.companyId, 10);
-          const result = await dbLookupByCompanyAndProduct(companyId, parsed.productId).catch(() => null);
+          const result = await dbLookupByCompanyAndProduct(companyId, parsed.internalAliasId).catch(() => null);
           if (result) {
             const publicUrl = dppIdentity.buildCanonicalPublicUrl(result.passport, result.companyName);
             return res.redirect(307, publicUrl);
@@ -225,7 +225,7 @@ module.exports = function registerDidRoutes(app, deps) {
       if (parsed.type === "dpp") {
         if (wantsBrowser) {
           const companyId = parseInt(parsed.companyId, 10);
-          const result = await dbLookupByCompanyAndProduct(companyId, parsed.productId).catch(() => null);
+          const result = await dbLookupByCompanyAndProduct(companyId, parsed.internalAliasId).catch(() => null);
           if (result) {
             const publicUrl = dppIdentity.buildCanonicalPublicUrl(result.passport, result.companyName);
             return res.redirect(307, publicUrl);
@@ -271,7 +271,7 @@ module.exports = function registerDidRoutes(app, deps) {
       const tableName = getTable(passport_type);
 
       const r = await pool.query(
-        `SELECT dpp_id, product_id, model_name, company_id FROM ${tableName}
+        `SELECT dpp_id, internal_alias_id, model_name, company_id FROM ${tableName}
          WHERE dpp_id = $1 AND deleted_at IS NULL
          LIMIT 1`,
         [dppId]
@@ -286,13 +286,13 @@ module.exports = function registerDidRoutes(app, deps) {
 
       const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       const productDid = passport.product_identifier_did || null;
-      const pDppDid = passport.product_id ?
-        dppIdentity.dppDid("model", company_id, passport.product_id) :
+      const pDppDid = passport.internal_alias_id ?
+        dppIdentity.dppDid("model", company_id, passport.internal_alias_id) :
         null;
 
       res.json({
         publicUrl,
-        productId: passport.product_id || null,
+        internalAliasId: passport.internal_alias_id || null,
         productIdentifierDid: passport.product_identifier_did || null,
         modelName: passport.model_name || null,
         companyName,

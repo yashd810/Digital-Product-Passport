@@ -247,7 +247,7 @@ describe("admin passport type validation", () => {
           fields: [
             { key: "digitalProductPassportId", label: "Readable DPP ID" },
             { key: "uniqueProductIdentifier", label: "Readable Product Identifier" },
-            { key: "localProductId", label: "Readable Local Product ID" },
+            { key: "internalAliasId", label: "Readable Internal Alias ID" },
             { key: "granularity", label: "Readable Granularity" },
             { key: "dppSchemaVersion", label: "Readable Schema Version" },
             { key: "dppStatus", label: "Readable Status" },

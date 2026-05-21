@@ -7,7 +7,7 @@ function createPassportQueryRepository({
   logger,
   getTable,
   normalizePassportRow,
-  normalizeProductIdValue,
+  normalizeInternalAliasIdValue,
   productIdentifierService,
   isPublicHistoryStatus,
 }) {
@@ -15,16 +15,16 @@ function createPassportQueryRepository({
     return error?.code === "42P01";
   }
 
-  async function findExistingPassportByProductId({
+  async function findExistingPassportByInternalAliasId({
     tableName,
     companyId,
-    productId,
+    internalAliasId,
     excludeDppId = null,
     excludeGuid = null,
     excludeLineageId = null,
   }) {
-    if (!productId) return null;
-    const params = [companyId, productId];
+    if (!internalAliasId) return null;
+    const params = [companyId, internalAliasId];
     let exclusionSql = "";
     const resolvedExcludeDppId = excludeDppId || excludeGuid || null;
     if (resolvedExcludeDppId) {
@@ -36,10 +36,10 @@ function createPassportQueryRepository({
       exclusionSql += ` AND lineage_id <> $${params.length}`;
     }
     const existing = await pool.query(
-      `SELECT id, dpp_id AS "dppId", lineage_id, product_id, release_status, version_number
+      `SELECT id, dpp_id AS "dppId", lineage_id, internal_alias_id, release_status, version_number
        FROM ${tableName}
        WHERE company_id = $1
-         AND product_id = $2
+         AND internal_alias_id = $2
          AND deleted_at IS NULL${exclusionSql}
        ORDER BY version_number DESC, updated_at DESC, id DESC
        LIMIT 1`,
@@ -57,7 +57,7 @@ function createPassportQueryRepository({
       liveCompanyFilter = ` AND company_id = $${liveParams.length}`;
     }
     const liveRes = await pool.query(
-      `SELECT dpp_id AS "dppId", lineage_id, product_id
+      `SELECT dpp_id AS "dppId", lineage_id, internal_alias_id
        FROM ${tableName}
        WHERE dpp_id = $1${liveCompanyFilter}
        ORDER BY version_number DESC
@@ -73,7 +73,7 @@ function createPassportQueryRepository({
       archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
     }
     const archiveRes = await pool.query(
-      `SELECT dpp_id AS "dppId", lineage_id, product_id
+      `SELECT dpp_id AS "dppId", lineage_id, internal_alias_id
        FROM passport_archives
        WHERE dpp_id = $1
          AND passport_type = $2${archiveCompanyFilter}
@@ -118,7 +118,7 @@ function createPassportQueryRepository({
       archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
     }
     const archiveRes = await pool.query(
-      `SELECT dpp_id AS "dppId", lineage_id, company_id, passport_type, version_number, model_name, product_id, product_identifier_did, release_status, archived_at, row_data
+      `SELECT dpp_id AS "dppId", lineage_id, company_id, passport_type, version_number, model_name, internal_alias_id, product_identifier_did, release_status, archived_at, row_data
        FROM passport_archives
        WHERE lineage_id = $1
          AND passport_type = $2${archiveCompanyFilter}
@@ -139,7 +139,7 @@ function createPassportQueryRepository({
           passport_type: row.passport_type || rowData?.passport_type,
           version_number: row.version_number ?? rowData?.version_number,
           model_name: row.model_name || rowData?.model_name,
-          product_id: row.product_id || rowData?.product_id,
+          internal_alias_id: row.internal_alias_id || rowData?.internal_alias_id,
           product_identifier_did: row.product_identifier_did || rowData?.product_identifier_did,
           release_status: row.release_status || rowData?.release_status,
           archived: true,
@@ -289,14 +289,14 @@ function createPassportQueryRepository({
     };
   }
 
-  async function resolveReleasedPassportByProductId(productId, {
+  async function resolveReleasedPassportByInternalAliasId(internalAliasId, {
     versionNumber = null,
     companyId = null,
     passportType = "battery",
     granularity = "item",
     strictProductId = false,
   } = {}) {
-    const normalizedProductId = normalizeProductIdValue(productId);
+    const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
     if (!normalizedProductId) return { passport: null, archived: false };
     const isDidIdentifier = productIdentifierService?.isDidIdentifier?.(normalizedProductId);
     const candidates = strictProductId
@@ -306,15 +306,15 @@ function createPassportQueryRepository({
         : productIdentifierService?.buildLookupCandidates?.({
             companyId,
             passportType,
-            productId: normalizedProductId,
+            internalAliasId: normalizedProductId,
             granularity,
           }) || [normalizedProductId];
     const liveMatchSql = strictProductId
-      ? "product_id = ANY($1::text[])"
-      : "(product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))";
+      ? "internal_alias_id = ANY($1::text[])"
+      : "(internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))";
     const archiveMatchSql = strictProductId
-      ? "pa.product_id = ANY($1::text[])"
-      : "(pa.product_id = ANY($1::text[]) OR pa.product_identifier_did = ANY($1::text[]))";
+      ? "pa.internal_alias_id = ANY($1::text[])"
+      : "(pa.internal_alias_id = ANY($1::text[]) OR pa.product_identifier_did = ANY($1::text[]))";
 
     const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
     const matches = [];
@@ -501,12 +501,12 @@ function createPassportQueryRepository({
     return resolveReleasedPassportByDppId(normalizedDppId);
   }
 
-  async function resolveCompanyPreviewPassportByProductId(companyId, productId) {
-    const normalizedProductId = normalizeProductIdValue(productId);
+  async function resolveCompanyPreviewPassportByInternalAliasId(companyId, internalAliasId) {
+    const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
     if (!companyId || !normalizedProductId) return { passport: null, archived: false };
     const candidates = productIdentifierService?.buildLookupCandidates?.({
       companyId,
-      productId: normalizedProductId,
+      internalAliasId: normalizedProductId,
     }) || [normalizedProductId];
 
     const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
@@ -520,7 +520,7 @@ function createPassportQueryRepository({
           `SELECT *
            FROM ${tableName}
            WHERE company_id = $1
-             AND (product_id = ANY($2::text[]) OR product_identifier_did = ANY($2::text[]))
+             AND (internal_alias_id = ANY($2::text[]) OR product_identifier_did = ANY($2::text[]))
              AND deleted_at IS NULL
            ORDER BY version_number DESC, updated_at DESC, id DESC
            LIMIT 1`,
@@ -555,7 +555,7 @@ function createPassportQueryRepository({
          FROM passport_archives
          WHERE company_id = $1
            AND passport_type = $2
-           AND (product_id = ANY($3::text[]) OR product_identifier_did = ANY($3::text[]))
+           AND (internal_alias_id = ANY($3::text[]) OR product_identifier_did = ANY($3::text[]))
          ORDER BY version_number DESC, archived_at DESC
          LIMIT 1`,
         [companyId, type_name, candidates]
@@ -580,24 +580,24 @@ function createPassportQueryRepository({
   }
 
   async function resolveCompanyPreviewPassport({ companyId, passportKey }) {
-    const normalizedPassportKey = normalizeProductIdValue(passportKey);
+    const normalizedPassportKey = normalizeInternalAliasIdValue(passportKey);
     if (normalizedPassportKey) {
-      const productMatch = await resolveCompanyPreviewPassportByProductId(companyId, normalizedPassportKey);
+      const productMatch = await resolveCompanyPreviewPassportByInternalAliasId(companyId, normalizedPassportKey);
       if (productMatch?.passport) return productMatch;
     }
     return fetchCompanyPassportRecord({ companyId, dppId: passportKey });
   }
 
   return {
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     getPassportLineageContext,
     getCompanyNameMap,
     getPassportVersionsByLineage,
     fetchCompanyPassportRecord,
     resolveReleasedPassportByDppId,
-    resolveReleasedPassportByProductId,
+    resolveReleasedPassportByInternalAliasId,
     resolvePublicPassportByDppId,
-    resolveCompanyPreviewPassportByProductId,
+    resolveCompanyPreviewPassportByInternalAliasId,
     resolveCompanyPreviewPassport,
   };
 }

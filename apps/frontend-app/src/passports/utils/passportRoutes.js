@@ -15,8 +15,8 @@ function getManufacturerSegment({ companyName = "", manufacturerName = "", manuf
   return slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
 }
 
-function getModelSegment({ modelName = "", productId = "", previewId = "" }) {
-  return slugifyRouteSegment(modelName || productId || previewId, "product");
+function getModelSegment({ modelName = "", internalAliasId = "", previewId = "" }) {
+  return slugifyRouteSegment(modelName || internalAliasId || previewId, "product");
 }
 
 export function buildPublicPassportPath({
@@ -24,10 +24,10 @@ export function buildPublicPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
 }) {
-  if (!productId) return null;
-  return `/dpp/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, productId })}/${encodeURIComponent(productId)}`;
+  if (!internalAliasId) return null;
+  return `/dpp/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId })}/${encodeURIComponent(internalAliasId)}`;
 }
 
 export function buildTechnicalPassportPath({
@@ -35,14 +35,14 @@ export function buildTechnicalPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
 }) {
   return buildPublicPassportPath({
     companyName,
     manufacturerName,
     manufacturedBy,
     modelName,
-    productId,
+    internalAliasId,
   });
 }
 
@@ -51,11 +51,11 @@ export function buildInactivePassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
   versionNumber = "",
 }) {
-  if (!productId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
-  return `/dpp/inactive/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, productId })}/${encodeURIComponent(productId)}/${encodeURIComponent(versionNumber)}`;
+  if (!internalAliasId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
+  return `/dpp/inactive/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId })}/${encodeURIComponent(internalAliasId)}/${encodeURIComponent(versionNumber)}`;
 }
 
 export function buildInactiveTechnicalPassportPath({
@@ -63,7 +63,7 @@ export function buildInactiveTechnicalPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
   versionNumber = "",
 }) {
   return buildInactivePassportPath({
@@ -71,7 +71,7 @@ export function buildInactiveTechnicalPassportPath({
     manufacturerName,
     manufacturedBy,
     modelName,
-    productId,
+    internalAliasId,
     versionNumber,
   });
 }
@@ -81,12 +81,12 @@ export function buildPreviewPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
   previewId = "",
 }) {
-  const routeKey = productId || previewId;
+  const routeKey = internalAliasId || previewId;
   if (!routeKey) return null;
-  return `/dpp/preview/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, productId: routeKey, previewId })}/${encodeURIComponent(routeKey)}`;
+  return `/dpp/preview/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId: routeKey, previewId })}/${encodeURIComponent(routeKey)}`;
 }
 
 export function buildPreviewTechnicalPassportPath({
@@ -94,7 +94,7 @@ export function buildPreviewTechnicalPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
-  productId = "",
+  internalAliasId = "",
   previewId = "",
 }) {
   return buildPreviewPassportPath({
@@ -102,7 +102,7 @@ export function buildPreviewTechnicalPassportPath({
     manufacturerName,
     manufacturedBy,
     modelName,
-    productId,
+    internalAliasId,
     previewId,
   });
 }

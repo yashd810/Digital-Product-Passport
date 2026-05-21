@@ -2,7 +2,7 @@
 
 const createDidService = require("../services/did-service");
 const createProductIdentifierService = require("../services/product-identifier-service");
-const { generateProductIdValue } = require("../src/shared/passports/passport-helpers");
+const { generateInternalAliasIdValue } = require("../src/shared/passports/passport-helpers");
 
 describe("product identifier service", () => {
   const didService = createDidService({
@@ -34,7 +34,7 @@ describe("product identifier service", () => {
     const candidates = service.buildLookupCandidates({
       companyId: 4,
       passportType: "battery",
-      productId: "BAT-7788",
+      internalAliasId: "BAT-7788",
       granularity: "item",
     });
 
@@ -53,7 +53,7 @@ describe("product identifier service", () => {
       granularity: "item",
     });
 
-    expect(normalized.productIdInput).toBe("LOCAL-7788");
+    expect(normalized.internalAliasIdInput).toBe("LOCAL-7788");
     expect(normalized.productIdentifierDid).toBe(existingDid);
   });
 
@@ -64,7 +64,7 @@ describe("product identifier service", () => {
       companyId: 4,
       selectedGlobalIdentifierScheme: "did_web_product_identifier",
       uniqueProductIdentifierField: "product_identifier_did",
-      localProductIdField: "product_id",
+      localProductIdField: "internal_alias_id",
       lineageIdentifierField: "lineage_id",
       rules: expect.objectContaining({
         identifiersNeverReused: true,
@@ -92,7 +92,7 @@ describe("product identifier service", () => {
   });
 
   test("uses the generated DPP ID as the fallback local product ID", () => {
-    expect(generateProductIdValue("dpp_c9808ead-1d18-4329-8347-428b526e957a"))
+    expect(generateInternalAliasIdValue("dpp_c9808ead-1d18-4329-8347-428b526e957a"))
       .toBe("dpp_c9808ead-1d18-4329-8347-428b526e957a");
   });
 
@@ -109,8 +109,8 @@ describe("product identifier service", () => {
               replacement_passport_dpp_id: "dpp_new",
               previous_identifier: "did:web:www.example.test:did:battery:model:old",
               replacement_identifier: "did:web:www.example.test:did:battery:item:new",
-              previous_local_product_id: "BAT-MODEL-01",
-              replacement_local_product_id: "BAT-ITEM-01",
+              previous_internal_alias_id: "BAT-MODEL-01",
+              replacement_internal_alias_id: "BAT-ITEM-01",
               previous_granularity: "model",
               replacement_granularity: "item",
               transition_reason: "granularity_change",
@@ -129,8 +129,8 @@ describe("product identifier service", () => {
               replacement_passport_dpp_id: "dpp_new",
               previous_identifier: "did:web:www.example.test:did:battery:model:old",
               replacement_identifier: "did:web:www.example.test:did:battery:item:new",
-              previous_local_product_id: "BAT-MODEL-01",
-              replacement_local_product_id: "BAT-ITEM-01",
+              previous_internal_alias_id: "BAT-MODEL-01",
+              replacement_internal_alias_id: "BAT-ITEM-01",
               previous_granularity: "model",
               replacement_granularity: "item",
               transition_reason: "granularity_change",

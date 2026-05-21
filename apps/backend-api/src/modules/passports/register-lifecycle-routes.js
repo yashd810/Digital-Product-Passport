@@ -12,10 +12,10 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     generateDppRecordId,
     normalizePassportRequestBody,
     getTable,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     normalizePassportRow,
     normalizeReleaseStatus,
-    findExistingPassportByProductId,
+    findExistingPassportByInternalAliasId,
     buildStoredProductIdentifiers,
     productIdentifierService,
     getPassportLineageContext,
@@ -149,7 +149,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
           versionNumber: currentPassport.version_number || null,
           releaseStatus: currentPassport.release_status || null,
           modelName: currentPassport.model_name || null,
-          productId: currentPassport.product_id || null,
+          internalAliasId: currentPassport.internal_alias_id || null,
         },
         verification: buildVerificationSummary(compliance),
         compliance,
@@ -369,21 +369,21 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       );
       if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
 
-      const requestedProductId = normalizeProductIdValue(
-        req.body?.localProductId ?? req.body?.productId ?? req.body?.product_id ?? src.product_id
+      const requestedProductId = normalizeInternalAliasIdValue(
+        req.body?.internalAliasId ?? req.body?.internalAliasId ?? req.body?.internal_alias_id ?? src.internal_alias_id
       );
-      if (!requestedProductId) return res.status(400).json({ error: "productId cannot be blank" });
+      if (!requestedProductId) return res.status(400).json({ error: "internalAliasId cannot be blank" });
 
-      const existingByProductId = await findExistingPassportByProductId({
+      const existingByProductId = await findExistingPassportByInternalAliasId({
         tableName,
         companyId,
-        productId: requestedProductId,
+        internalAliasId: requestedProductId,
         excludeGuid: dppId,
         excludeLineageId: src.lineage_id,
       });
       if (existingByProductId) {
         return res.status(409).json({
-          error: `A passport with Local Passport ID "${requestedProductId}" already exists.`,
+          error: `A passport with Internal Alias ID "${requestedProductId}" already exists.`,
           existing_dpp_id: existingByProductId.dppId,
           release_status: normalizeReleaseStatus(existingByProductId.release_status),
         });
@@ -392,7 +392,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const nextIdentifiers = buildStoredProductIdentifiers({
         companyId,
         passportType,
-        productId: requestedProductId,
+        internalAliasId: requestedProductId,
         granularity: requestedGranularity,
         passportLike: src,
       });
@@ -406,7 +406,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         if (key === "created_by") return userId;
         if (key === "deleted_at") return null;
         if (key === "granularity") return requestedGranularity;
-        if (key === "product_id") return nextIdentifiers.product_id;
+        if (key === "internal_alias_id") return nextIdentifiers.internal_alias_id;
         if (key === "product_identifier_did") return nextIdentifiers.product_identifier_did;
         return src[key];
       });
@@ -443,10 +443,10 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         lineageId: src.lineage_id,
         previousPassportDppId: src.dpp_id || src.dppId,
         replacementPassportDppId: newGuid,
-        previousIdentifier: src.product_identifier_did || src.product_id,
-        replacementIdentifier: nextIdentifiers.product_identifier_did || nextIdentifiers.product_id,
-        previousLocalProductId: src.product_id || null,
-        replacementLocalProductId: nextIdentifiers.product_id || null,
+        previousIdentifier: src.product_identifier_did || src.internal_alias_id,
+        replacementIdentifier: nextIdentifiers.product_identifier_did || nextIdentifiers.internal_alias_id,
+        previousLocalProductId: src.internal_alias_id || null,
+        replacementLocalProductId: nextIdentifiers.internal_alias_id || null,
         previousGranularity: currentGranularity,
         replacementGranularity: requestedGranularity,
         transitionReason: reason || "granularity_change",
@@ -463,10 +463,10 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       await logAudit(companyId, userId, "TRANSITION_GRANULARITY", tableName, newGuid, {
         previous_granularity: currentGranularity,
-        previous_identifier: src.product_identifier_did || src.product_id,
+        previous_identifier: src.product_identifier_did || src.internal_alias_id,
       }, {
         replacement_granularity: requestedGranularity,
-        replacement_identifier: nextIdentifiers.product_identifier_did || nextIdentifiers.product_id,
+        replacement_identifier: nextIdentifiers.product_identifier_did || nextIdentifiers.internal_alias_id,
         previous_dpp_id: src.dpp_id || src.dppId,
       });
 
@@ -479,7 +479,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         currentGranularity,
         requestedGranularity,
         uniqueProductIdentifier: nextIdentifiers.product_identifier_did || null,
-        localProductId: nextIdentifiers.product_id || null,
+        internalAliasId: nextIdentifiers.internal_alias_id || null,
         identifierLineageLink: lineageLink,
       });
     } catch (error) {

@@ -185,7 +185,7 @@ function createMockBatteryDictionaryService() {
 
 function buildCanonicalPassportPayload(passport, _typeDef, { company } = {}) {
   const dppIdentifier = passport?.dppId || passport?.dpp_id || passport?.guid || "dpp_mock";
-  const productIdentifier = passport?.product_id || passport?.passport_identifier || "product-mock";
+  const productIdentifier = passport?.internal_alias_id || passport?.passport_identifier || "product-mock";
   return {
     digitalProductPassportId: `https://example.test/dpp/${encodeURIComponent(dppIdentifier)}`,
     uniqueProductIdentifier: `https://example.test/product/${encodeURIComponent(productIdentifier)}`,

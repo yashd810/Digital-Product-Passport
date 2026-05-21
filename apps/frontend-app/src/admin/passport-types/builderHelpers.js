@@ -91,7 +91,7 @@ export const HEADER_OWNERSHIP_LABELS = {
 export const DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS = [
   { key: "digitalProductPassportId", label: "Digital Product Passport ID", semanticId: "dpp:digitalProductPassportId", valueSource: "system", ownership: "system_generated", required: true, locked: true },
   { key: "uniqueProductIdentifier", label: "Unique Product Identifier", semanticId: "dpp:uniqueProductIdentifier", valueSource: "system", ownership: "system_generated", required: true, locked: true },
-  { key: "localProductId", label: "Local Product ID", semanticId: "dpp:productId", valueSource: "system", ownership: "passport_author_editable", required: true, locked: true },
+  { key: "internalAliasId", label: "Internal Alias ID", semanticId: "dpp:internalAliasId", valueSource: "system", ownership: "passport_author_editable", required: true, locked: true },
   { key: "granularity", label: "Granularity", semanticId: "dpp:granularity", valueSource: "company_policy", ownership: "company_managed", required: true, locked: true },
   { key: "dppSchemaVersion", label: "DPP Schema Version", semanticId: "dpp:dppSchemaVersion", valueSource: "passport_type", ownership: "company_managed", required: true, locked: true },
   { key: "dppStatus", label: "DPP Status", semanticId: "dpp:dppStatus", valueSource: "system", ownership: "system_generated", required: true, locked: true },
@@ -309,7 +309,7 @@ export const downloadTemplate = () => {
     "Field Label,Section,Type,Access,Confidentiality,Update Authority",
     "Manufacturer,General,text,manufacturer|market_surveillance,regulated,economic_operator|market_surveillance",
     "Model Number,General,text,public,public,economic_operator",
-    "Local Passport ID,General,text,public,public,economic_operator",
+    "Internal Alias ID,General,text,public,public,economic_operator",
     "Weight (kg),Technical Specifications,text,public,public,economic_operator",
     "Dimensions,Technical Specifications,text,public,public,economic_operator",
     "Material Composition,Technical Specifications,textarea,public,public,economic_operator",

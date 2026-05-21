@@ -245,7 +245,7 @@ function buildViewerDidFallbacks(passport) {
     || "company";
   const companySlug = slugifyDidSegment(passport?.company_profile?.did_slug || companyName);
   const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
-  const stableId = stableDidSegment(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.product_id);
+  const stableId = stableDidSegment(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.internal_alias_id);
   return {
     companyDid: `did:web:${didDomain}:did:company:${companySlug}`,
     dppDid: `did:web:${didDomain}:did:dpp:${granularity}:${stableId}`,
@@ -271,7 +271,7 @@ function parseHeaderArray(value) {
 export function PassportHeaderPanel({ passport, typeDef }) {
   if (!passport) return null;
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
-  const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields.filter((field) => field?.key !== "localProductId") : [];
+  const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields.filter((field) => field?.key !== "internalAliasId") : [];
   const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport);
   const resolvedCompanyDid = passport.companyDid || passport.company_did || canonicalSubjects.companyDid || fallbackDids.companyDid;
@@ -281,7 +281,7 @@ export function PassportHeaderPanel({ passport, typeDef }) {
   const headerValues = {
     digitalProductPassportId: passport.digitalProductPassportId || passport.dppId || passport.dpp_id,
     uniqueProductIdentifier: passport.uniqueProductIdentifier || passport.product_identifier_did || null,
-    localProductId: passport.product_id,
+    internalAliasId: passport.internal_alias_id,
     granularity: passport.granularity || "item",
     dppSchemaVersion: passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
     dppStatus: formatPassportStatus(passport.release_status),

@@ -1,18 +1,20 @@
 "use strict";
 
+const { collectRequestedInternalAliasIds } = require("../../shared/passports/passport-helpers");
+
 function createResolutionHelpers({
   pool,
   getTable,
   normalizePassportRow,
   getCompanyNameMap,
-  normalizeProductIdValue,
+  normalizeInternalAliasIdValue,
   productIdentifierService,
   didService,
   dppIdentity,
   isDppRecordId,
   loadReleasedPassport,
   dbLookupByCompanyAndProduct,
-  dbLookupByProductIdOnly,
+  dbLookupByInternalAliasIdOnly,
   buildPassportResponse,
   getRepresentationFromValue,
   buildPassportJsonLdContext,
@@ -49,7 +51,7 @@ function createResolutionHelpers({
     return {
       ...buildDppIdentifierFields(passport),
       uniqueProductIdentifier: passport?.product_identifier_did || null,
-      localProductId: passport?.product_id || null,
+      internalAliasId: passport?.internal_alias_id || null,
       granularity: passport?.granularity || "item",
       lineageId: passport?.lineage_id || passport?.lineageId || null,
       identifierLineage,
@@ -200,7 +202,7 @@ function createResolutionHelpers({
     }
     return companyId ?
       loadReleasedPassport(companyId, productIdentifier, { versionNumber }) :
-      dbLookupByProductIdOnly(productIdentifier, { versionNumber });
+      dbLookupByInternalAliasIdOnly(productIdentifier, { versionNumber });
   }
 
   async function loadReleasedPassportAtDate(identifier, atDate, { strictProductId = false } = {}) {
@@ -210,7 +212,7 @@ function createResolutionHelpers({
       return resolvePassportByStableDppId(parsedDppId.stableId, { atDate });
     }
     const baseline = strictProductId ?
-      await dbLookupByProductIdOnly(identifier) :
+      await dbLookupByInternalAliasIdOnly(identifier) :
       await resolveReleasedPassportForIdentifier(identifier, null, null);
     if (!baseline?.passport) return null;
 
@@ -220,15 +222,15 @@ function createResolutionHelpers({
     const candidates = productIdentifierService?.buildLookupCandidates?.({
       companyId,
       passportType,
-      productId: baseline.passport.product_id,
+      internalAliasId: baseline.passport.internal_alias_id,
       granularity: baseline.passport.granularity || "item"
-    }) || [baseline.passport.product_id, baseline.passport.product_identifier_did].filter(Boolean);
+    }) || [baseline.passport.internal_alias_id, baseline.passport.product_identifier_did].filter(Boolean);
 
     const liveRes = await pool.query(
       `SELECT *
        FROM ${tableName}
        WHERE company_id = $2
-         AND (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
+         AND (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
          AND release_status IN ('released', 'obsolete')
          AND deleted_at IS NULL`,
       [candidates, companyId]
@@ -238,7 +240,7 @@ function createResolutionHelpers({
        FROM passport_archives
        WHERE company_id = $2
          AND passport_type = $3
-         AND (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
+         AND (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
          AND release_status IN ('released', 'obsolete')`,
       [candidates, companyId, passportType]
     );
@@ -291,9 +293,9 @@ function createResolutionHelpers({
     const candidates = productIdentifierService?.buildLookupCandidates?.({
       companyId,
       passportType: "battery",
-      productId: parsed.productId,
+      internalAliasId: parsed.internalAliasId,
       granularity: parsed.granularity || "item"
-    }) || [parsed.productId];
+    }) || [parsed.internalAliasId];
     const typeRows = await pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
 
     const matches = [];
@@ -303,7 +305,7 @@ function createResolutionHelpers({
         `SELECT *
          FROM ${tableName}
          WHERE company_id = $2
-           AND (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
+           AND (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
            AND release_status IN ('draft', 'in_revision')
            AND deleted_at IS NULL
          ORDER BY version_number DESC, updated_at DESC
@@ -342,7 +344,7 @@ function createResolutionHelpers({
       const candidates = productIdentifierService?.buildLookupCandidates?.({
         companyId,
         passportType: typeRow.type_name,
-        productId: productIdentifier,
+        internalAliasId: productIdentifier,
         granularity: "item"
       }) || [productIdentifier];
       const params = [candidates];
@@ -355,7 +357,7 @@ function createResolutionHelpers({
       const result = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))${companySql}
+         WHERE (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))${companySql}
            AND release_status IN ('draft', 'in_revision')
            AND deleted_at IS NULL
          ORDER BY version_number DESC, updated_at DESC
@@ -442,12 +444,7 @@ function createResolutionHelpers({
   }
 
   function normalizeRequestedProductIds(body = {}) {
-    const rawValues = Array.isArray(body?.productId) ?
-      body.productId :
-      [];
-    return rawValues
-      .map((value) => decodeURIComponent(String(value || "").trim()))
-      .filter(Boolean);
+    return collectRequestedInternalAliasIds(body);
   }
 
   function parseBatchLimit(rawLimit) {
@@ -468,8 +465,8 @@ function createResolutionHelpers({
 
   function buildPassportServiceEndpoints(subjectDid, passport, typeDef, companyName) {
     const appUrl = getAppUrl();
-    const { product_id } = passport;
-    const encodedPid = encodeURIComponent(String(product_id));
+    const { internal_alias_id } = passport;
+    const encodedPid = encodeURIComponent(String(internal_alias_id));
     const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
 
     return [
@@ -519,8 +516,8 @@ function createResolutionHelpers({
     return result.rows[0] || null;
   }
 
-  async function resolveLegacyPassportDidTarget(companyId, productId, fallbackGranularity = "model") {
-    const result = await dbLookupByCompanyAndProduct(companyId, productId);
+  async function resolveLegacyPassportDidTarget(companyId, internalAliasId, fallbackGranularity = "model") {
+    const result = await dbLookupByCompanyAndProduct(companyId, internalAliasId);
     if (!result?.passport) return null;
     const stableId = didService.normalizeStableId(result.passport.lineage_id || result.passport.dppId);
     const granularity = String(

@@ -75,7 +75,7 @@ module.exports = function registerWorkflowRoutes(app, {
       let info = {
         model_name: row.passport_dpp_id?.substring(0, 8) || "?",
         version_number: 1,
-        product_id: null,
+        internal_alias_id: null,
         release_status: null
       };
       try {
@@ -86,7 +86,7 @@ module.exports = function registerWorkflowRoutes(app, {
         const actualType = regRow.rows[0]?.passport_type || row.passport_type;
         const tableName = getTable(actualType);
         const r = await pool.query(
-          `SELECT model_name, version_number, product_id, release_status
+          `SELECT model_name, version_number, internal_alias_id, release_status
            FROM ${tableName}
            WHERE dpp_id = $1
            ORDER BY version_number DESC
@@ -226,7 +226,7 @@ module.exports = function registerWorkflowRoutes(app, {
       const tableName = getTable(resolvedPassportType);
       const currentPassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType });
       const pRes = await pool.query(
-        `SELECT p.model_name, p.product_id, p.version_number, c.company_name
+        `SELECT p.model_name, p.internal_alias_id, p.version_number, c.company_name
          FROM ${tableName} p
          LEFT JOIN companies c ON c.id = p.company_id
          WHERE p.dpp_id = $1
@@ -234,7 +234,7 @@ module.exports = function registerWorkflowRoutes(app, {
          LIMIT 1`,
         [dppId]
       );
-      const pInfo = pRes.rows[0] || { model_name: dppId.substring(0, 8), product_id: null, version_number: 1, company_name: "" };
+      const pInfo = pRes.rows[0] || { model_name: dppId.substring(0, 8), internal_alias_id: null, version_number: 1, company_name: "" };
 
       if (action === "reject") {
         const col = isReviewer ? "review_status" : "approval_status";
@@ -373,7 +373,7 @@ module.exports = function registerWorkflowRoutes(app, {
             const releasePath = buildCurrentPublicPassportPath({
               companyName: pInfo.company_name,
               modelName: pInfo.model_name,
-              productId: pInfo.product_id || dppId
+              internalAliasId: pInfo.internal_alias_id || dppId
             });
             await runBestEffort("Workflow review approved notification error", async () => createNotification(
               wf.submitted_by,
@@ -479,7 +479,7 @@ module.exports = function registerWorkflowRoutes(app, {
           const releasePath = buildCurrentPublicPassportPath({
             companyName: pInfo.company_name,
             modelName: pInfo.model_name,
-            productId: pInfo.product_id || dppId
+            internalAliasId: pInfo.internal_alias_id || dppId
           });
           await runBestEffort("Workflow approval approved notification error", async () => createNotification(
             wf.submitted_by,

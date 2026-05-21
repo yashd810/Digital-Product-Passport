@@ -26,14 +26,14 @@ function createCarrierSecurityHelpers({
       return buildCurrentPublicPassportPath({
         companyName,
         modelName: passport.model_name,
-        productId: passport.product_id,
+        internalAliasId: passport.internal_alias_id,
       });
     }
 
     return buildPreviewPassportPath({
       companyName,
       modelName: passport.model_name,
-      productId: passport.product_id,
+      internalAliasId: passport.internal_alias_id,
       fallbackDppId: passport.dppId || passport.dpp_id,
     });
   }
@@ -137,14 +137,14 @@ function createCarrierSecurityHelpers({
     const publicPath = buildPassportCarrierPublicPath(passport, companyName);
     const publicAccessUrl = buildPublicAccessUrl(publicPath);
     const dppId = passport?.dppId || passport?.dpp_id || null;
-    const productId = passport?.product_id || null;
+    const internalAliasId = passport?.internal_alias_id || null;
     const credential = await signPortableDataConstruct({
       type: "DataCarrierBindingCredential",
       id: `${publicAccessUrl || `urn:dpp:${dppId || "unknown"}`}#carrier-binding`,
       subjectId: `${publicAccessUrl || `urn:dpp:${dppId || "unknown"}`}#carrier`,
       payload: {
         digitalProductPassportId: dppId,
-        uniqueProductIdentifier: productId,
+        uniqueProductIdentifier: internalAliasId,
         publicAccessUrl,
         carrierSecurityStatus: metadata.carrierSecurityStatus || null,
         carrierAuthenticationMethod: metadata.carrierAuthenticationMethod || null,

@@ -101,7 +101,7 @@ const PASSPORT = {
   lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
   company_id: 7,
   passport_type: "battery",
-  product_id: "BAT-2026-001",
+  internal_alias_id: "BAT-2026-001",
   product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c7-bat-2026-001",
   version_number: 2,
   release_status: "released",

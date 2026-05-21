@@ -92,7 +92,7 @@ function createProductIdentifierService({ didService, pool = null }) {
     uniqueProductIdentifier = null,
     granularity = "item",
   }) {
-    const productIdInput = normalizeRawProductId(rawProductId);
+    const internalAliasIdInput = normalizeRawProductId(rawProductId);
     const explicitUniqueIdentifier = normalizeRawProductId(uniqueProductIdentifier);
     const canonicalSource = normalizeRawProductId(canonicalProductIdSource);
     const productIdentifierDid = explicitUniqueIdentifier
@@ -109,7 +109,7 @@ function createProductIdentifierService({ didService, pool = null }) {
           : null);
 
     return {
-      productIdInput,
+      internalAliasIdInput,
       productIdentifierDid,
     };
   }
@@ -117,10 +117,10 @@ function createProductIdentifierService({ didService, pool = null }) {
   function buildLookupCandidates({
     companyId = null,
     passportType = "battery",
-    productId,
+    internalAliasId,
     granularity = "item",
   }) {
-    const normalized = normalizeRawProductId(productId);
+    const normalized = normalizeRawProductId(internalAliasId);
     if (!normalized) return [];
     if (isDidIdentifier(normalized)) return [normalized];
 
@@ -142,7 +142,7 @@ function createProductIdentifierService({ didService, pool = null }) {
       companyId: companyId !== null && companyId !== undefined ? Number.parseInt(companyId, 10) || null : null,
       selectedGlobalIdentifierScheme: "did_web_product_identifier",
       uniqueProductIdentifierField: "product_identifier_did",
-      localProductIdField: "product_id",
+      localProductIdField: "internal_alias_id",
       dppRecordIdentifierField: "dpp_id",
       lineageIdentifierField: "lineage_id",
       didWebDomain: typeof didService?.getDidDomain === "function" ? didService.getDidDomain() : null,
@@ -191,10 +191,10 @@ function createProductIdentifierService({ didService, pool = null }) {
       previous_identifier: row.previous_identifier ?? null,
       replacementIdentifier: row.replacement_identifier ?? null,
       replacement_identifier: row.replacement_identifier ?? null,
-      previousLocalProductId: row.previous_local_product_id ?? null,
-      previous_local_product_id: row.previous_local_product_id ?? null,
-      replacementLocalProductId: row.replacement_local_product_id ?? null,
-      replacement_local_product_id: row.replacement_local_product_id ?? null,
+      previousInternalAliasId: row.previous_internal_alias_id ?? null,
+      previous_internal_alias_id: row.previous_internal_alias_id ?? null,
+      replacementInternalAliasId: row.replacement_internal_alias_id ?? null,
+      replacement_internal_alias_id: row.replacement_internal_alias_id ?? null,
       previousGranularity: row.previous_granularity ?? null,
       previous_granularity: row.previous_granularity ?? null,
       replacementGranularity: row.replacement_granularity ?? null,
@@ -215,8 +215,8 @@ function createProductIdentifierService({ didService, pool = null }) {
     replacementPassportDppId,
     previousIdentifier,
     replacementIdentifier,
-    previousLocalProductId = null,
-    replacementLocalProductId = null,
+    previousInternalAliasId = null,
+    replacementInternalAliasId = null,
     previousGranularity,
     replacementGranularity,
     transitionReason = null,
@@ -228,8 +228,8 @@ function createProductIdentifierService({ didService, pool = null }) {
     const result = await client.query(
       `INSERT INTO product_identifier_lineage
          (company_id, lineage_id, previous_passport_dpp_id, replacement_passport_dpp_id,
-          previous_identifier, replacement_identifier, previous_local_product_id,
-          replacement_local_product_id, previous_granularity, replacement_granularity,
+          previous_identifier, replacement_identifier, previous_internal_alias_id,
+          replacement_internal_alias_id, previous_granularity, replacement_granularity,
           transition_reason, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
@@ -240,8 +240,8 @@ function createProductIdentifierService({ didService, pool = null }) {
         replacementPassportDppId,
         previousIdentifier,
         replacementIdentifier,
-        previousLocalProductId,
-        replacementLocalProductId,
+        previousInternalAliasId,
+        replacementInternalAliasId,
         normalizeGranularity(previousGranularity),
         normalizeGranularity(replacementGranularity),
         transitionReason,

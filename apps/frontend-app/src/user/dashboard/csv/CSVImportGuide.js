@@ -50,7 +50,7 @@ function ResultSummary({ summary, details, onDone }) {
           {details.map((d, i) => (
             <div key={i} className={`upsert-detail-row upsert-detail-${d.status}`}>
               <span className="upsert-detail-status">{d.status}</span>
-              <span className="upsert-detail-id">{d.product_id || d.dppId || d.model_name || `#${i+1}`}</span>
+              <span className="upsert-detail-id">{d.internal_alias_id || d.dppId || d.model_name || `#${i+1}`}</span>
               {d.reason && <span className="upsert-detail-reason">— {d.reason}</span>}
               {d.error  && <span className="upsert-detail-reason">— {d.error}</span>}
             </div>
@@ -94,7 +94,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const sections = passportTypeData.fields_json?.sections || [];
       const csvRows = [];
       csvRows.push(["Field Name", "Passport 1", "Passport 2", "Passport 3"]);
-      csvRows.push(["product_id", "", "", ""]);
+      csvRows.push(["internal_alias_id", "", "", ""]);
       csvRows.push(["model_name", "", "", ""]);
       sections.forEach(section => {
         (section.fields || []).forEach(field => {
@@ -143,14 +143,14 @@ function CSVImportGuide({ user, companyId, activeTab }) {
             allFields.find(f => f.label?.trim().toLowerCase() === normalized) ||
             allFields.find(f => f.key?.toLowerCase() === normalized) ||
             (normalized === "model_name" ? { key: "model_name", type: "text" } : null) ||
-            (normalized === "product_id" ? { key: "product_id", type: "text" } : null);
+            (normalized === "internal_alias_id" ? { key: "internal_alias_id", type: "text" } : null);
           if (field) {
             passportData[field.key] = field.type === "boolean"
               ? (value.toLowerCase() === "true" || value === "1")
               : value;
           }
         });
-        if (hasData && passportData.product_id) createdPassports.push(passportData);
+        if (hasData && passportData.internal_alias_id) createdPassports.push(passportData);
       }
       if (createdPassports.length > 0) {
         let successCount = 0;
@@ -280,7 +280,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               <div className="subsection">
                 <h3>Required Fields</h3>
                 <ul>
-                  <li><strong>product_id</strong> — The unique local passport ID used internally by the platform (required)</li>
+                  <li><strong>internal_alias_id</strong> — The unique local passport ID used internally by the platform (required)</li>
                   <li><strong>model_name</strong> — Display name or model label for the product (optional)</li>
                 </ul>
               </div>
@@ -289,7 +289,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <table className="example-table">
                   <thead><tr><th>Field Name</th><th>Passport 1</th><th>Passport 2</th></tr></thead>
                   <tbody>
-                    <tr><td className="field-name">product_id</td><td>SKU-001</td><td>SKU-002</td></tr>
+                    <tr><td className="field-name">internal_alias_id</td><td>SKU-001</td><td>SKU-002</td></tr>
                     <tr><td className="field-name">model_name</td><td>Model A</td><td>Model B</td></tr>
                     <tr><td className="field-name">Category</td><td>Electronics</td><td>Textiles</td></tr>
                   </tbody>
@@ -313,7 +313,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
             <section className="guide-section tips-section">
               <h2>💡 Tips</h2>
               <ul>
-                <li><strong>Local Passport ID drives uniqueness</strong> — use a stable internal identifier; model names can repeat</li>
+                <li><strong>Internal Alias ID drives uniqueness</strong> — use a stable internal identifier; model names can repeat</li>
                 <li><strong>Boolean fields:</strong> use "true"/"false" or "1"/"0"</li>
                 <li><strong>Save as CSV</strong>, not .xlsx or .xls</li>
                 <li><strong>Partial fields supported</strong> — missing cells stay empty</li>
@@ -337,8 +337,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <strong>How it works:</strong>
                 <ul>
                   <li>Row has a <code>dppId</code> → the matching draft passport is <strong>updated</strong></li>
-                  <li>No <code>dppId</code> but matching <code>product_id</code> on an editable passport → that passport is <strong>updated</strong></li>
-                  <li>New <code>product_id</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
+                  <li>No <code>dppId</code> but matching <code>internal_alias_id</code> on an editable passport → that passport is <strong>updated</strong></li>
+                  <li>New <code>internal_alias_id</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
                   <li>If the matching passport is released or in review, the row is skipped so you can revise it first</li>
                 </ul>
               </div>
@@ -380,20 +380,20 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <pre className="upsert-code">{`[
   {
     "dppId": "existing-passport-dppId",
-    "product_id": "SKU-1001",
+    "internal_alias_id": "SKU-1001",
     "model_name": "Unit A",
     "serial_number": "SN-1001",
     "manufacture_date": "2024-01-15"
   },
   {
-    "product_id": "SKU-1002",
+    "internal_alias_id": "SKU-1002",
     "serial_number": "SN-1002"
   }
 ]`}</pre>
                 <ul>
                   <li>Object has a <code>dppId</code> → the matching draft is <strong>updated</strong></li>
-                  <li>No <code>dppId</code> but matching <code>product_id</code> on an editable passport → that passport is <strong>updated</strong></li>
-                  <li>New <code>product_id</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
+                  <li>No <code>dppId</code> but matching <code>internal_alias_id</code> on an editable passport → that passport is <strong>updated</strong></li>
+                  <li>New <code>internal_alias_id</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
                   <li>If the matching passport is released or in review, the object is skipped so you can revise it first</li>
                   <li>Only include fields you want to change — unspecified fields are left as-is</li>
                 </ul>

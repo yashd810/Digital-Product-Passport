@@ -122,7 +122,7 @@ function extractFieldValuesFromElements(elements, aliasToKey = new Map(), values
 
 function buildClonePrefill(record, sections) {
   if (!record || typeof record !== "object") {
-    return { modelName: "", productId: "", formData: {} };
+    return { modelName: "", internalAliasId: "", formData: {} };
   }
 
   const aliasToKey = buildSchemaAliasMap(sections);
@@ -167,7 +167,7 @@ function buildClonePrefill(record, sections) {
 
   return {
     modelName: aligned?.model_name || record?.model_name || "",
-    productId: "",
+    internalAliasId: "",
     formData,
   };
 }
@@ -210,9 +210,9 @@ const NON_EDITABLE_FORM_KEYS = new Set([
     "companyDid",
     "model_name",
     "modelName",
-    "product_id",
-    "productId",
-    "localProductId",
+    "internal_alias_id",
+    "internalAliasId",
+    "internalAliasId",
     "elements",
     "fields",
     "linked_data",
@@ -253,7 +253,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const [expanded,       setExpanded]       = useState({});
   const [modelName,      setModelName]      = useState("");
-  const [productId,      setProductId]      = useState(() => mode === "create" ? generateDraftLocalPassportId() : "");
+  const [internalAliasId,      setInternalAliasId]      = useState(() => mode === "create" ? generateDraftLocalPassportId() : "");
   const [formData,       setFormData]       = useState({});
   const [modelDataKeys,  setModelDataKeys]  = useState(new Set()); // fields locked from template
   const [templateName,   setTemplateName]   = useState("");
@@ -308,7 +308,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     if (!dirtyRef.current) return;
     const payload = {
       modelName,
-      productId,
+      internalAliasId,
       formData,
       savedAt: new Date().toISOString(),
     };
@@ -322,7 +322,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     try {
       const draft = JSON.parse(raw);
       setModelName(draft.modelName ?? fallbackData?.model_name ?? "");
-      setProductId(draft.productId ?? fallbackData?.product_id ?? "");
+      setInternalAliasId(draft.internalAliasId ?? fallbackData?.internal_alias_id ?? "");
       setFormData(draft.formData && typeof draft.formData === "object" ? draft.formData : (fallbackData || {}));
       dirtyRef.current = true;
       setAutoSaveState("pending");
@@ -345,7 +345,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
     if (!restored) {
       setModelName(alignedData?.model_name || "");
-      setProductId(alignedData?.product_id || "");
+      setInternalAliasId(alignedData?.internal_alias_id || "");
       setFormData(alignedData || {});
       dirtyRef.current = false;
       setAutoSaveState("idle");
@@ -505,11 +505,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
       if (!source) return;
 
-      const { modelName: nextModelName, productId: nextProductId, formData: nextFormData } =
+      const { modelName: nextModelName, internalAliasId: nextProductId, formData: nextFormData } =
         buildClonePrefill(source, SECTIONS);
 
       setModelName(nextModelName);
-      setProductId(nextProductId);
+      setInternalAliasId(nextProductId);
       setFormData(nextFormData);
       setModelDataKeys(new Set());
       setTemplateName("");
@@ -540,13 +540,13 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     if (isLoading || loadingType) return;
     if (!draftHydratedRef.current) return;
     persistLocalDraft();
-  }, [mode, isLoading, loadingType, modelName, productId, formData, draftStorageKey]);
+  }, [mode, isLoading, loadingType, modelName, internalAliasId, formData, draftStorageKey]);
 
   useEffect(() => {
     if (mode !== "create") return;
-    if (productId.trim()) return;
-    setProductId(generateDraftLocalPassportId());
-  }, [mode, productId]);
+    if (internalAliasId.trim()) return;
+    setInternalAliasId(generateDraftLocalPassportId());
+  }, [mode, internalAliasId]);
 
   useEffect(() => {
     if (mode !== "edit") return undefined;
@@ -622,7 +622,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       passportType: activePassportType,
       ...cleanData,
       model_name: modelName.trim() || null,
-      product_id: productId.trim() || null,
+      internal_alias_id: internalAliasId.trim() || null,
     };
   };
 
@@ -880,7 +880,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         setSuccess("Passport created successfully");
         setTimeout(() => setSuccess(""), 4000);
         setModelName("");
-        setProductId(generateDraftLocalPassportId());
+        setInternalAliasId(generateDraftLocalPassportId());
         setFormData({});
         clearLocalDraft();
       } else {
@@ -1169,7 +1169,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const values = {
       digitalProductPassportId: formData.dppId || formData.dpp_id || (mode === "create" ? "Generated when passport is saved" : ""),
       uniqueProductIdentifier: formData.product_identifier_did || formData.uniqueProductIdentifier || "Generated from serial number when available",
-      localProductId: productId || formData.product_id || "Generated local passport ID",
+      internalAliasId: internalAliasId || formData.internal_alias_id || "Generated local passport ID",
       granularity: formData.granularity || "Resolved from company DPP policy",
       dppSchemaVersion: formData.dpp_schema_version || formData.schema_version || "Resolved from passport type",
       dppStatus: releaseStatus,
@@ -1187,7 +1187,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const renderPassportHeaderSection = () => {
     const section = systemHeader?.section || {};
     const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields : [];
-    const visibleFields = fields.filter((field) => field?.key !== "localProductId");
+    const visibleFields = fields.filter((field) => field?.key !== "internalAliasId");
     if (!visibleFields.length) return null;
 
     return (

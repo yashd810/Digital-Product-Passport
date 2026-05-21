@@ -42,7 +42,7 @@ const DPP_CONTEXT = {
   semantic_model: "dpp:semanticModel",
   model_name: "dpp:modelName",
   modelName: "dpp:modelName",
-  product_id: "dpp:productId",
+  internal_alias_id: "dpp:internalAliasId",
   release_status: "dpp:releaseStatus",
   version_number: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
   versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },

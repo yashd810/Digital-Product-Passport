@@ -93,16 +93,16 @@ function createTestApp() {
     getTable: (typeName) => `${typeName}_passports`,
     getPassportTypeSchema: jest.fn(async () => ({
       typeName: "battery",
-      allowedKeys: new Set(["manufacturer", "model_name", "product_id"]),
+      allowedKeys: new Set(["manufacturer", "model_name", "internal_alias_id"]),
       schemaFields: [
         { key: "manufacturer", label: "Manufacturer", type: "text" },
       ],
     })),
     normalizePassportRequestBody: (body) => body,
-    normalizeProductIdValue: (value) => String(value || "").trim(),
+    normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
     normalizeReleaseStatus: (value) => value,
     isEditablePassportStatus: (value) => value === "draft" || value === "in_revision",
-    findExistingPassportByProductId: jest.fn(async () => null),
+    findExistingPassportByInternalAliasId: jest.fn(async () => null),
     updatePassportRowById: jest.fn(async () => []),
     getWritablePassportColumns: (data, excluded = new Set()) => Object.keys(data || {}).filter((key) => !excluded.has(key)),
     getStoredPassportValues: (keys, data) => keys.map((key) => data[key]),
@@ -112,7 +112,7 @@ function createTestApp() {
     buildBatteryPassJsonExport: jest.fn(() => ({})),
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId }) => ({
-        productIdInput: rawProductId,
+        internalAliasIdInput: rawProductId,
         productIdentifierDid: rawProductId,
       }),
     },
@@ -141,7 +141,7 @@ describe("company passport import governance rules", () => {
         passport_type: "battery",
         csv: [
           '"Field Name","Passport 1"',
-          '"product_id","SKU-1"',
+          '"internal_alias_id","SKU-1"',
           '"Confidentiality","trade_secret"',
         ].join("\n"),
       },
@@ -165,7 +165,7 @@ describe("company passport import governance rules", () => {
         passport_type: "battery",
         passports: [
           {
-            product_id: "SKU-1",
+            internal_alias_id: "SKU-1",
             manufacturer: "ACME",
             confidentiality: "trade_secret",
           },

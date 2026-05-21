@@ -73,12 +73,12 @@ test("returns correct product model DID", () => {
     "did:web:www.claros-dpp.online:did:battery:model:5:ACME-001"
   );
 });
-test("URL-encodes productId with special characters", () => {
+test("URL-encodes internalAliasId with special characters", () => {
   const did = dppIdentity.productModelDid(5, "ACME 001/v2");
-  assert.ok(did.includes("ACME%20001%2Fv2"), `Expected encoded productId in: ${did}`);
+  assert.ok(did.includes("ACME%20001%2Fv2"), `Expected encoded internalAliasId in: ${did}`);
 });
-test("throws for null productId", () => {
-  assert.throws(() => dppIdentity.productModelDid(5, null), /productId/);
+test("throws for null internalAliasId", () => {
+  assert.throws(() => dppIdentity.productModelDid(5, null), /internalAliasId/);
 });
 
 // ─── productItemDid ──────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ test("parses battery model DID", () => {
   assert.strictEqual(parsed.type, "battery");
   assert.strictEqual(parsed.level, "model");
   assert.strictEqual(parsed.companyId, "5");
-  assert.strictEqual(parsed.productId, "ACME-001");
+  assert.strictEqual(parsed.internalAliasId, "ACME-001");
 });
 test("parses battery item DID", () => {
   const parsed = dppIdentity.parseDid("did:web:www.claros-dpp.online:did:battery:item:5:ACME-001");
@@ -176,7 +176,7 @@ test("parses battery batch DID", () => {
   assert.strictEqual(parsed.type, "battery");
   assert.strictEqual(parsed.level, "batch");
   assert.strictEqual(parsed.companyId, "5");
-  assert.strictEqual(parsed.productId, "BATCH-001");
+  assert.strictEqual(parsed.internalAliasId, "BATCH-001");
 });
 test("parses DPP DID", () => {
   const parsed = dppIdentity.parseDid("did:web:www.claros-dpp.online:did:dpp:model:5:ACME-001");
@@ -184,7 +184,7 @@ test("parses DPP DID", () => {
   assert.strictEqual(parsed.type, "dpp");
   assert.strictEqual(parsed.granularity, "model");
   assert.strictEqual(parsed.companyId, "5");
-  assert.strictEqual(parsed.productId, "ACME-001");
+  assert.strictEqual(parsed.internalAliasId, "ACME-001");
 });
 test("parses facility DID", () => {
   const parsed = dppIdentity.parseDid("did:web:www.claros-dpp.online:did:facility:PLANT-A");
@@ -192,11 +192,11 @@ test("parses facility DID", () => {
   assert.strictEqual(parsed.type, "facility");
   assert.strictEqual(parsed.facilityId, "PLANT-A");
 });
-test("round-trips encoded productId through parseDid", () => {
+test("round-trips encoded internalAliasId through parseDid", () => {
   const original = "ACME 001/v2";
   const did = dppIdentity.productModelDid(5, original);
   const parsed = dppIdentity.parseDid(did);
-  assert.strictEqual(parsed.productId, original);
+  assert.strictEqual(parsed.internalAliasId, original);
 });
 
 // ─── didToDocumentUrl ────────────────────────────────────────────────────────
@@ -243,33 +243,33 @@ test("returns null for invalid DID", () => {
 
 // ─── buildCanonicalPublicUrl ─────────────────────────────────────────────────
 console.log("\nbuildCanonicalPublicUrl()");
-test("uses product_id (not guid) in the URL", () => {
+test("uses internal_alias_id (not guid) in the URL", () => {
   const passport = {
     guid:       "11111111-2222-3333-4444-555555555555",
-    product_id: "ACME-001",
+    internal_alias_id: "ACME-001",
     model_name: "Acme Battery Pro",
     company_id: 5,
   };
   const url = dppIdentity.buildCanonicalPublicUrl(passport, "Acme Corp");
   assert.ok(!url.includes("11111111"), `URL must not contain guid: ${url}`);
-  assert.ok(url.includes("ACME-001"),  `URL must contain product_id: ${url}`);
+  assert.ok(url.includes("ACME-001"),  `URL must contain internal_alias_id: ${url}`);
   assert.ok(url.startsWith("https://"), `URL must be HTTPS: ${url}`);
 });
 test("builds correct slug structure", () => {
   const passport = {
     guid:       "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-    product_id: "MODEL-X",
+    internal_alias_id: "MODEL-X",
     model_name: "Model X",
     company_id: 7,
   };
   const url = dppIdentity.buildCanonicalPublicUrl(passport, "Tesla Energy");
   assert.ok(url.includes("/dpp/tesla-energy/model-x/"), `Expected slug path in: ${url}`);
-  assert.ok(url.endsWith("MODEL-X"), `Expected encoded productId at end: ${url}`);
+  assert.ok(url.endsWith("MODEL-X"), `Expected encoded internalAliasId at end: ${url}`);
 });
-test("falls back to DPP ID in canonical /dpp route when no product_id", () => {
+test("falls back to DPP ID in canonical /dpp route when no internal_alias_id", () => {
   const passport = {
     guid:       "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-    product_id: null,
+    internal_alias_id: null,
     model_name: null,
     company_id: 5,
   };

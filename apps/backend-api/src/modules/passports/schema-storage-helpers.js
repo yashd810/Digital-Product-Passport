@@ -190,7 +190,7 @@ function createSchemaStorageHelpers({
         lineage_id     TEXT         NOT NULL,
         company_id     INTEGER      NOT NULL,
         model_name     VARCHAR(255),
-        product_id     VARCHAR(255) NOT NULL,
+        internal_alias_id     VARCHAR(255) NOT NULL,
         product_identifier_did TEXT,
         compliance_profile_key VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1',
         content_specification_ids TEXT,

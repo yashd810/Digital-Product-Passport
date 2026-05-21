@@ -106,7 +106,7 @@ export function BulkReviseModal({
   const availableFields = useMemo(() => {
     const baseFields = [
       { key: "model_name", label: "Model Name", type: "text" },
-      { key: "product_id", label: "Local Passport ID", type: "text" },
+      { key: "internal_alias_id", label: "Internal Alias ID", type: "text" },
     ];
     const schemaFields = (typeDef?.fields_json?.sections || [])
       .flatMap((section) => section.fields || [])

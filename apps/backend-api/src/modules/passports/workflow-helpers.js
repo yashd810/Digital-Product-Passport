@@ -114,7 +114,7 @@ function createWorkflowHelpers({
       await runBestEffort("Workflow reviewer notification error", async () => createNotification(
         resolvedReviewerId,
         "workflow_review",
-        `Review requested: ${passport.product_id}`,
+        `Review requested: ${passport.internal_alias_id}`,
         `v${passport.version_number} needs your review`,
         dppId,
         "/dashboard/workflow"
@@ -131,14 +131,14 @@ function createWorkflowHelpers({
           await createTransporter().sendMail({
             from: process.env.EMAIL_FROM || "noreply@example.com",
             to: reviewer.rows[0].email,
-            subject: `[DPP] Review requested — ${passport.product_id}`,
+            subject: `[DPP] Review requested — ${passport.internal_alias_id}`,
             html: brandedEmail({
               preheader: `${submitterName} submitted a passport for your review`,
               bodyHtml: `
                 <p>Hi <strong>${reviewerName}</strong>,</p>
                 <p><strong>${submitterName}</strong> has submitted a passport for your review.</p>
                 <div class="info-box">
-                  <div class="info-row"><span class="info-label">Local Passport ID</span><span class="info-value">${passport.product_id}</span></div>
+                  <div class="info-row"><span class="info-label">Internal Alias ID</span><span class="info-value">${passport.internal_alias_id}</span></div>
                   ${passport.model_name ? `<div class="info-row"><span class="info-label">Model</span><span class="info-value">${passport.model_name}</span></div>` : ""}
                   <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.version_number}</span></div>
                   <div class="info-row"><span class="info-label">Type</span><span class="info-value">${passportType}</span></div>
@@ -156,7 +156,7 @@ function createWorkflowHelpers({
       await runBestEffort("Workflow approver notification error", async () => createNotification(
         resolvedApproverId,
         "workflow_approval",
-        `Approval requested: ${passport.product_id}`,
+        `Approval requested: ${passport.internal_alias_id}`,
         `v${passport.version_number} needs your approval`,
         dppId,
         "/dashboard/workflow"

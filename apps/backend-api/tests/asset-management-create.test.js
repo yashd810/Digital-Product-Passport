@@ -56,14 +56,14 @@ function buildService(overrides = {}) {
     }),
     assertAssetManagementEnabled: async () => ({ id: 7 }),
     getLatestCompanyPassports: async () => [],
-    findExistingPassportByProductId: overrides.findExistingPassportByProductId || (async () => null),
+    findExistingPassportByInternalAliasId: overrides.findExistingPassportByInternalAliasId || (async () => null),
     updatePassportRowById: async () => [],
-    normalizeProductIdValue: (value) => typeof value === "string" ? value.trim() : "",
-    generateProductIdValue: (dppId) => `PID-${String(dppId).slice(-6)}`,
+    normalizeInternalAliasIdValue: (value) => typeof value === "string" ? value.trim() : "",
+    generateInternalAliasIdValue: (dppId) => `PID-${String(dppId).slice(-6)}`,
     generateDppRecordId: overrides.generateDppRecordId || (() => "dpp_new_001"),
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId }) => ({
-        productIdInput: String(rawProductId || "").trim(),
+        internalAliasIdInput: String(rawProductId || "").trim(),
         productIdentifierDid: `did:web:test:product:${String(rawProductId || "").trim().toLowerCase()}`,
       }),
     },
@@ -77,11 +77,11 @@ function buildService(overrides = {}) {
     toDynamicStoredValue: (value) => value,
     getAssetFieldMap: () => new Map([
       ["dppId", { key: "dppId", label: "Passport DPP ID", type: "text", system: true }],
-      ["product_id", { key: "product_id", label: "Serial Number", type: "text", system: true }],
+      ["internal_alias_id", { key: "internal_alias_id", label: "Serial Number", type: "text", system: true }],
       ["model_name", { key: "model_name", label: "Model Name", type: "text", system: true }],
     ]),
     EDITABLE_RELEASE_STATUSES_SQL: "('draft','in_revision')",
-    ASSET_MATCH_FIELDS: new Set(["dppId", "dpp_id", "match_dpp_id", "guid", "match_guid", "product_id", "match_product_id", "next_product_id"]),
+    ASSET_MATCH_FIELDS: new Set(["dppId", "dpp_id", "match_dpp_id", "guid", "match_guid", "internal_alias_id", "match_product_id", "next_product_id"]),
     ASSET_IGNORED_SYSTEM_COLUMNS: new Set(["id", "company_id"]),
     ASSET_SCHEDULER_INTERVAL_MS: 60000,
     ASSET_SOURCE_ALLOWED_HOSTS: new Set(),
@@ -95,14 +95,14 @@ test("prepareAssetPayload generates a new dppId for unmatched product rows", asy
   const payload = await service.prepareAssetPayload({
     companyId: 7,
     passportType: "battery-passport",
-    records: [{ product_id: "BAT-001", model_name: "Model A" }],
+    records: [{ internal_alias_id: "BAT-001", model_name: "Model A" }],
   });
 
   assert.strictEqual(payload.summary.ready, 1);
   assert.strictEqual(payload.summary.ready_for_passport_create, 1);
   assert.strictEqual(payload.generated_payload.records[0].action, "create");
   assert.strictEqual(payload.generated_payload.records[0].generated_dpp_id, "dpp_new_001");
-  assert.strictEqual(payload.generated_payload.records[0].product_id, "BAT-001");
+  assert.strictEqual(payload.generated_payload.records[0].internal_alias_id, "BAT-001");
 });
 
 test("prepareAssetPayload ignores blank unknown columns on create rows", async () => {
@@ -110,7 +110,7 @@ test("prepareAssetPayload ignores blank unknown columns on create rows", async (
   const payload = await service.prepareAssetPayload({
     companyId: 7,
     passportType: "battery-passport",
-    records: [{ product_id: "BAT-001", model_name: "Model A", serial_number: "" }],
+    records: [{ internal_alias_id: "BAT-001", model_name: "Model A", serial_number: "" }],
   });
 
   assert.strictEqual(payload.summary.failed, 0);
@@ -153,7 +153,7 @@ test("executeAssetPush persists created passports and reports passports_created"
                   lineage_id: params[1],
                   company_id: params[2],
                   model_name: params[3],
-                  product_id: params[4],
+                  internal_alias_id: params[4],
                   product_identifier_did: params[5],
                   granularity: params[6],
                   release_status: "draft",
@@ -185,10 +185,10 @@ test("executeAssetPush persists created passports and reports passports_created"
         generated_dpp_id: "dpp_new_002",
         generated_lineage_id: "dpp_new_002",
         generated_granularity: "item",
-        product_id: "BAT-002",
+        internal_alias_id: "BAT-002",
         product_identifier_did: "did:web:test:product:bat-002",
         passport_create: {
-          product_id: "BAT-002",
+          internal_alias_id: "BAT-002",
           model_name: "Model B",
         },
       }],

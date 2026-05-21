@@ -11,7 +11,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
     normalizePassportRow,
     getPassportFieldValue,
     normalizeReleaseStatus,
-    normalizeProductIdValue,
+    normalizeInternalAliasIdValue,
     getPassportTypeSchema,
     fetchCompanyPassportRecord,
     buildBatteryPassJsonExport,
@@ -50,7 +50,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         }
       }
       if (search) {
-        query += ` AND (p.model_name ILIKE $${index} OR p.product_id ILIKE $${index} OR p.product_identifier_did ILIKE $${index})`;
+        query += ` AND (p.model_name ILIKE $${index} OR p.internal_alias_id ILIKE $${index} OR p.product_identifier_did ILIKE $${index})`;
         params.push(`%${search}%`);
         index += 1;
       }
@@ -87,9 +87,9 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const results = [];
 
       for (const item of identifiers) {
-        const raw = typeof item === "string" ? { product_id: item } : item || {};
+        const raw = typeof item === "string" ? { internal_alias_id: item } : item || {};
         const dppId = raw.dppId;
-        const productId = normalizeProductIdValue(raw.product_id || raw.productId);
+        const internalAliasId = normalizeInternalAliasIdValue(raw.internal_alias_id || raw.internalAliasId);
         try {
           let row = null;
           if (dppId) {
@@ -101,17 +101,17 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
             );
             row = result.rows[0];
           }
-          if (!row && productId) {
+          if (!row && internalAliasId) {
             const productIdCandidates = productIdentifierService.buildLookupCandidates({
               companyId,
               passportType: typeSchema.typeName,
-              productId,
+              internalAliasId,
             });
             const result = await pool.query(
               `WITH latest AS (
                  SELECT DISTINCT ON (lineage_id) *
                  FROM ${tableName}
-                 WHERE (product_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
+                 WHERE (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
                    AND company_id = $2
                    AND deleted_at IS NULL
                  ORDER BY lineage_id, version_number DESC, updated_at DESC
@@ -127,10 +127,10 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
           if (row) {
             results.push({ ...normalizePassportRow(row), passport_type: typeSchema.typeName, _status: "found" });
           } else {
-            results.push({ dppId: dppId || undefined, product_id: productId || undefined, _status: "not_found" });
+            results.push({ dppId: dppId || undefined, internal_alias_id: internalAliasId || undefined, _status: "not_found" });
           }
         } catch (error) {
-          results.push({ dppId: dppId || undefined, product_id: productId || undefined, _status: "error", error: error.message });
+          results.push({ dppId: dppId || undefined, internal_alias_id: internalAliasId || undefined, _status: "error", error: error.message });
         }
       }
 
@@ -217,7 +217,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const fieldRows = [
         ["dppId", ...rows.map((row) => row.dpp_id)],
         ["model_name", ...rows.map((row) => row.model_name || "")],
-        ["product_id", ...rows.map((row) => row.product_id || "")],
+        ["internal_alias_id", ...rows.map((row) => row.internal_alias_id || "")],
         ["release_status", ...rows.map((row) => row.release_status || "")],
         ...schemaFields.map((field) => [field.label || field.key, ...rows.map((row) => getPassportFieldValue(row, field.key) ?? "")]),
       ];
@@ -252,7 +252,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         params.push(passportType);
       }
       if (search) {
-        query += ` AND (pa.model_name ILIKE $${index} OR pa.product_id ILIKE $${index} OR pa.product_identifier_did ILIKE $${index} OR pa.dpp_id::text ILIKE $${index})`;
+        query += ` AND (pa.model_name ILIKE $${index} OR pa.internal_alias_id ILIKE $${index} OR pa.product_identifier_did ILIKE $${index} OR pa.dpp_id::text ILIKE $${index})`;
         params.push(`%${search}%`);
         index += 1;
       }

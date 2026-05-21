@@ -7,8 +7,8 @@ function createDppUseCase(deps) {
     getPassportTypeSchema,
     getTable,
     normalizePassportRow,
-    normalizeProductIdValue,
-    findExistingPassportByProductId,
+    normalizeInternalAliasIdValue,
+    findExistingPassportByInternalAliasId,
     productIdentifierService,
     complianceService,
     SYSTEM_PASSPORT_FIELDS,
@@ -40,10 +40,10 @@ function createDppUseCase(deps) {
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
 
-    const productIdInput = normalizeProductIdValue(
-      normalizedBody.product_id || normalizedBody.localProductId || normalizedBody.productId || normalizedBody.productIdentifier
+    const internalAliasIdInput = normalizeInternalAliasIdValue(
+      normalizedBody.internal_alias_id || normalizedBody.internalAliasId || normalizedBody.internalAliasId || normalizedBody.productIdentifier
     );
-    if (!productIdInput) throw Object.assign(new Error("productId is required"), { statusCode: 400 });
+    if (!internalAliasIdInput) throw Object.assign(new Error("internalAliasId is required"), { statusCode: 400 });
 
     const explicitUniqueProductIdentifier = normalizedBody.product_identifier_did
       || normalizedBody.uniqueProductIdentifier
@@ -65,18 +65,18 @@ function createDppUseCase(deps) {
     const storedProductIdentifiers = productIdentifierService.normalizeProductIdentifiers({
       companyId,
       passportType: resolvedPassportType,
-      rawProductId: productIdInput,
+      rawProductId: internalAliasIdInput,
       canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.(normalizedBody) || null,
       uniqueProductIdentifier: explicitUniqueProductIdentifier,
       granularity: requestedGranularity,
     });
-    const existingByProductId = await findExistingPassportByProductId({
+    const existingByProductId = await findExistingPassportByInternalAliasId({
       tableName,
       companyId,
-      productId: storedProductIdentifiers.productIdInput,
+      internalAliasId: storedProductIdentifiers.internalAliasIdInput,
     });
     if (existingByProductId) {
-      const conflict = new Error(`A passport with Local Passport ID "${storedProductIdentifiers.productIdInput}" already exists.`);
+      const conflict = new Error(`A passport with Internal Alias ID "${storedProductIdentifiers.internalAliasIdInput}" already exists.`);
       conflict.statusCode = 409;
       conflict.payload = {
         existingDppId: existingByProductId.dppId,
@@ -91,9 +91,9 @@ function createDppUseCase(deps) {
       representation: requestedRepresentation,
       companyId: ignoredCompanyId,
       company_id,
-      product_id,
+      internal_alias_id,
       product_identifier_did,
-      productId,
+      internalAliasId,
       productIdentifier,
       model_name,
       modelName,
@@ -110,9 +110,9 @@ function createDppUseCase(deps) {
     void passportType;
     void ignoredCompanyId;
     void company_id;
-    void product_id;
+    void internal_alias_id;
     void product_identifier_did;
-    void productId;
+    void internalAliasId;
     void productIdentifier;
     void granularity;
 
@@ -151,7 +151,7 @@ function createDppUseCase(deps) {
       "lineage_id",
       "company_id",
       "model_name",
-      "product_id",
+      "internal_alias_id",
       "product_identifier_did",
       "compliance_profile_key",
       "content_specification_ids",
@@ -168,7 +168,7 @@ function createDppUseCase(deps) {
       lineageId,
       companyId,
       model_name || modelName || null,
-      storedProductIdentifiers.productIdInput,
+      storedProductIdentifiers.internalAliasIdInput,
       storedProductIdentifiers.productIdentifierDid,
       complianceManagedFields.compliance_profile_key,
       complianceManagedFields.content_specification_ids,
@@ -210,7 +210,7 @@ function createDppUseCase(deps) {
 
     await logAudit(companyId, req.user.userId, "CREATE_DPP", tableName, dppId, null, {
       passport_type: resolvedPassportType,
-      product_id: storedProductIdentifiers.productIdInput,
+      internal_alias_id: storedProductIdentifiers.internalAliasIdInput,
       product_identifier_did: storedProductIdentifiers.productIdentifierDid,
       granularity: requestedGranularity,
     });

@@ -18,7 +18,7 @@ import "../styles/PassportViewer.css";
 const API = import.meta.env.VITE_API_URL || "";
 
 function PassportViewer({ previewMode = false, previewCompanyId = null }) {
-  const { productId, versionNumber, previewId } = useParams();
+  const { internalAliasId, versionNumber, previewId } = useParams();
   const navigate   = useNavigate();
   const location   = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -51,7 +51,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [passportAccessKey, setPassportAccessKey] = useState(null);   // one-time reveal after rotation
   const [accessKeyBusy,     setAccessKeyBusy]     = useState(false);
   const [keyCopied,         setKeyCopied]         = useState(false);
-  const encodedProductId = encodeURIComponent(productId || "");
+  const encodedProductId = encodeURIComponent(internalAliasId || "");
   const encodedPreviewId = encodeURIComponent(previewId || "");
   const isPreviewMode = !!previewMode && !!previewId;
   const isInactiveView = !!versionNumber;
@@ -59,7 +59,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   // Primary data loading
   useEffect(() => {
     if (isPreviewMode && (!previewId || !previewCompanyId)) return;
-    if (!isPreviewMode && !productId) return;
+    if (!isPreviewMode && !internalAliasId) return;
     (async () => {
       setLoading(true);
       setError("");
@@ -100,7 +100,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         setLoading(false);
       }
     })();
-  }, [encodedPreviewId, encodedProductId, isPreviewMode, previewCompanyId, previewId, productId, versionNumber]);
+  }, [encodedPreviewId, encodedProductId, isPreviewMode, previewCompanyId, previewId, internalAliasId, versionNumber]);
 
   useEffect(() => {
     if (!isPreviewMode || !previewCompanyId) return;
@@ -122,12 +122,12 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   // Secondary data loading
   useEffect(() => {
-    if (!passport?.dppId || !passport?.product_id) return;
+    if (!passport?.dppId || !passport?.internal_alias_id) return;
     (async () => {
       setQrLoading(true);
       try {
         const generatedBundle = await generateQRCodeBundle({
-          productId: passport.product_id,
+          internalAliasId: passport.internal_alias_id,
           companyName: companyData?.company_name,
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
@@ -153,7 +153,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         setQrLoading(false);
       }
     })();
-  }, [companyData?.company_name, passport?.dppId, passport?.manufactured_by, passport?.manufacturer, passport?.model_name, passport?.passport_type, passport?.product_id]);
+  }, [companyData?.company_name, passport?.dppId, passport?.manufactured_by, passport?.manufacturer, passport?.model_name, passport?.passport_type, passport?.internal_alias_id]);
 
   // Fetch + poll dynamic field values every 30 s
   useEffect(() => {
@@ -252,21 +252,21 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
     modelName: passport?.model_name,
-    productId: passport?.product_id,
+    internalAliasId: passport?.internal_alias_id,
   });
   const canonicalTechnicalPath = buildTechnicalPassportPath({
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
     modelName: passport?.model_name,
-    productId: passport?.product_id,
+    internalAliasId: passport?.internal_alias_id,
   });
   const canonicalInactivePath = buildInactivePassportPath({
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
     modelName: passport?.model_name,
-    productId: passport?.product_id,
+    internalAliasId: passport?.internal_alias_id,
     versionNumber,
   });
   const canonicalInactiveTechnicalPath = buildInactiveTechnicalPassportPath({
@@ -274,7 +274,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
     modelName: passport?.model_name,
-    productId: passport?.product_id,
+    internalAliasId: passport?.internal_alias_id,
     versionNumber,
   });
   const canonicalPreviewPath = buildPreviewPassportPath({
@@ -282,7 +282,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
     modelName: passport?.model_name,
-    productId: passport?.product_id,
+    internalAliasId: passport?.internal_alias_id,
     previewId: passport?.dppId,
   });
   const canonicalPreviewTechnicalPath = buildPreviewTechnicalPassportPath({
@@ -290,7 +290,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
     modelName: passport?.model_name,
-    productId: passport?.product_id,
+    internalAliasId: passport?.internal_alias_id,
     previewId: passport?.dppId,
   });
 

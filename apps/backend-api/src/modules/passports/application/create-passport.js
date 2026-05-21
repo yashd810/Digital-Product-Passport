@@ -6,9 +6,9 @@ function createDraftPassportUseCase(deps) {
   const {
     pool,
     generateDppRecordId,
-    normalizeProductIdValue,
-    generateProductIdValue,
-    findExistingPassportByProductId,
+    normalizeInternalAliasIdValue,
+    generateInternalAliasIdValue,
+    findExistingPassportByInternalAliasId,
     resolveGranularityForCreate,
     buildStoredProductIdentifiers,
     buildComplianceManagedFields,
@@ -41,7 +41,7 @@ function createDraftPassportUseCase(deps) {
   }) {
     const {
       model_name,
-      product_id,
+      internal_alias_id,
       product_image,
       granularity: requestedGranularity,
       compliance_profile_key,
@@ -57,14 +57,14 @@ function createDraftPassportUseCase(deps) {
 
     const dppId = generateDppRecordId();
     const lineageId = dppId;
-    const normalizedProductId = normalizeProductIdValue(product_id) || generateProductIdValue(dppId);
+    const normalizedProductId = normalizeInternalAliasIdValue(internal_alias_id) || generateInternalAliasIdValue(dppId);
 
-    const existingByProductId = await findExistingPassportByProductId({ tableName, companyId, productId: normalizedProductId });
+    const existingByProductId = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId });
     if (existingByProductId) {
       const error = new Error(
         isBulk
-          ? `A passport with Local Passport ID "${normalizedProductId}" already exists — skipped`
-          : `A passport with Local Passport ID "${normalizedProductId}" already exists.`
+          ? `A passport with Internal Alias ID "${normalizedProductId}" already exists — skipped`
+          : `A passport with Internal Alias ID "${normalizedProductId}" already exists.`
       );
       error.statusCode = 409;
       error.payload = isBulk ? null : {
@@ -97,9 +97,9 @@ function createDraftPassportUseCase(deps) {
       companyId,
       companyName,
       passportType: resolvedPassportType,
-      productId: normalizedProductId,
+      internalAliasId: normalizedProductId,
       granularity: effectiveGranularity,
-      passportLike: { ...fields, product_id: normalizedProductId },
+      passportLike: { ...fields, internal_alias_id: normalizedProductId },
     });
     const complianceManagedFields = await buildComplianceManagedFields({
       companyId,
@@ -129,7 +129,7 @@ function createDraftPassportUseCase(deps) {
         release_status: "draft",
         company_id: companyId,
         model_name: model_name || null,
-        product_id: storedProductIdentifiers.product_id,
+        internal_alias_id: storedProductIdentifiers.internal_alias_id,
       },
       companyName,
       metadata: applyCarrierAuthenticityMutation(null, carrierAuthenticityMutation),
@@ -141,7 +141,7 @@ function createDraftPassportUseCase(deps) {
       "lineage_id",
       "company_id",
       "model_name",
-      "product_id",
+      "internal_alias_id",
       "product_identifier_did",
       "compliance_profile_key",
       "content_specification_ids",
@@ -160,7 +160,7 @@ function createDraftPassportUseCase(deps) {
       lineageId,
       companyId,
       model_name || null,
-      storedProductIdentifiers.product_id,
+      storedProductIdentifiers.internal_alias_id,
       storedProductIdentifiers.product_identifier_did,
       complianceManagedFields.compliance_profile_key,
       complianceManagedFields.content_specification_ids,
@@ -191,7 +191,7 @@ function createDraftPassportUseCase(deps) {
     });
 
     await logAudit(companyId, userId, "CREATE", tableName, dppId, null, {
-      product_id: storedProductIdentifiers.product_id,
+      internal_alias_id: storedProductIdentifiers.internal_alias_id,
       product_identifier_did: storedProductIdentifiers.product_identifier_did,
       passport_type: resolvedPassportType,
       model_name,

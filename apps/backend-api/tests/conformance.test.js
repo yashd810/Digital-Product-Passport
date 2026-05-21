@@ -26,7 +26,7 @@ function createConformanceFixture() {
     lineage_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
     company_id: 5,
     passport_type: "battery",
-    product_id: "BAT-2026-001",
+    internal_alias_id: "BAT-2026-001",
     product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
     release_status: "released",
     version_number: 2,
@@ -67,7 +67,7 @@ function createConformanceFixture() {
     expectedHeader: {
       digitalProductPassportId: didService.generateDppDid("item", passport.lineage_id),
       uniqueProductIdentifier: passport.product_identifier_did,
-      localProductId: passport.product_id,
+      internalAliasId: passport.internal_alias_id,
       dppSchemaVersion: "prEN 18223:2025",
       dppStatus: "Active",
       lastUpdate: passport.updated_at,
@@ -104,7 +104,7 @@ describe("battery DPP conformance", () => {
       expect.objectContaining({
         digitalProductPassportId: expectedHeader.digitalProductPassportId,
         uniqueProductIdentifier: expectedHeader.uniqueProductIdentifier,
-        localProductId: expectedHeader.localProductId,
+        internalAliasId: expectedHeader.internalAliasId,
         granularity: "item",
         dppSchemaVersion: expectedHeader.dppSchemaVersion,
         dppStatus: expectedHeader.dppStatus,
@@ -145,7 +145,7 @@ describe("battery DPP conformance", () => {
       expect.objectContaining({
         digitalProductPassportId: expectedHeader.digitalProductPassportId,
         uniqueProductIdentifier: expectedHeader.uniqueProductIdentifier,
-        localProductId: expectedHeader.localProductId,
+        internalAliasId: expectedHeader.internalAliasId,
         granularity: "Item",
         dppSchemaVersion: expectedHeader.dppSchemaVersion,
         dppStatus: expectedHeader.dppStatus,

@@ -1,14 +1,15 @@
 "use strict";
 
 const { randomUUID } = require("crypto");
+const { addLegacyInternalAliasAliases } = require("../../shared/passports/passport-helpers");
 
 function createRequestResponseHelpers({
   pool,
   getTable,
-  normalizeProductIdValue,
+  normalizeInternalAliasIdValue,
   stripRestrictedFieldsForPublicView,
   getCompanyNameMap,
-  resolveReleasedPassportByProductId,
+  resolveReleasedPassportByInternalAliasId,
   buildOperationalDppPayload,
   buildCanonicalPassportPayload,
   buildExpandedPassportPayload,
@@ -128,12 +129,12 @@ function createRequestResponseHelpers({
   }
 
   async function loadReleasedPassport(companyId, rawProductId, options = {}) {
-    const productId = normalizeProductIdValue ?
-      normalizeProductIdValue(rawProductId) :
+    const internalAliasId = normalizeInternalAliasIdValue ?
+      normalizeInternalAliasIdValue(rawProductId) :
       rawProductId;
-    if (!productId) return null;
+    if (!internalAliasId) return null;
 
-    const result = await resolveReleasedPassportByProductId(productId, {
+    const result = await resolveReleasedPassportByInternalAliasId(internalAliasId, {
       companyId,
       versionNumber: options.versionNumber ?? null,
       granularity: options.granularity || "item"
@@ -169,29 +170,29 @@ function createRequestResponseHelpers({
 
   function buildMutationPassportPayload(passport, typeDef, companyName, representationValue) {
     if (getRepresentationFromValue(representationValue) === "full") {
-      return buildExpandedPassportPayload(passport, typeDef, { companyName });
+      return addLegacyInternalAliasAliases(buildExpandedPassportPayload(passport, typeDef, { companyName }));
     }
-    return buildCanonicalPassportPayload(passport, typeDef, { companyName });
+    return addLegacyInternalAliasAliases(buildCanonicalPassportPayload(passport, typeDef, { companyName }));
   }
 
   async function buildPassportResponse(req, passport, typeDef, companyName) {
     const sanitized = await stripRestrictedFieldsForPublicView(passport, passport.passport_type);
     if (getRepresentation(req) === "full") {
-      return buildExpandedPassportPayload(sanitized, typeDef, { companyName });
+      return addLegacyInternalAliasAliases(buildExpandedPassportPayload(sanitized, typeDef, { companyName }));
     }
-    return buildOperationalDppPayload(sanitized, typeDef, {
+    return addLegacyInternalAliasAliases(buildOperationalDppPayload(sanitized, typeDef, {
       companyName,
       granularity: sanitized.granularity || "model",
       dppIdentity
-    });
+    }));
   }
 
-  async function dbLookupByCompanyAndProduct(companyId, productId) {
-    return loadReleasedPassport(companyId, productId);
+  async function dbLookupByCompanyAndProduct(companyId, internalAliasId) {
+    return loadReleasedPassport(companyId, internalAliasId);
   }
 
-  async function dbLookupByProductIdOnly(productId, { versionNumber = null } = {}) {
-    const result = await resolveReleasedPassportByProductId(productId, {
+  async function dbLookupByInternalAliasIdOnly(internalAliasId, { versionNumber = null } = {}) {
+    const result = await resolveReleasedPassportByInternalAliasId(internalAliasId, {
       versionNumber,
       strictProductId: true
     });
@@ -217,7 +218,7 @@ function createRequestResponseHelpers({
     buildMutationPassportPayload,
     buildPassportResponse,
     dbLookupByCompanyAndProduct,
-    dbLookupByProductIdOnly,
+    dbLookupByInternalAliasIdOnly,
   };
 }
 
