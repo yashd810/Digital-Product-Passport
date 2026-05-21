@@ -48,6 +48,7 @@ function updateEditablePassportUseCase(deps) {
     const requestedPassportType = passport_type || passportType;
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
+    const BUILT_IN_EDITABLE_FIELDS = new Set(["product_image"]);
     if (createPassportTable) {
       await createPassportTable(typeSchema.typeName, {
         createdBy: userId,
@@ -62,6 +63,13 @@ function updateEditablePassportUseCase(deps) {
       [dppId]
     );
     if (!current.rows.length) throw Object.assign(new Error("Passport not found or not editable."), { statusCode: 404 });
+
+    for (const key of Object.keys(fields)) {
+      if (!typeSchema.allowedKeys.has(key) && !BUILT_IN_EDITABLE_FIELDS.has(key)) {
+        delete fields[key];
+      }
+    }
+
     const rowId = current.rows[0].id;
     const currentGranularity = String(current.rows[0].granularity || "item").trim().toLowerCase();
     let cachedCompanyName;

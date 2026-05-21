@@ -487,6 +487,29 @@ describe("passport patch governance", () => {
     });
   });
 
+  test("PATCH /api/companies/:companyId/passports/:dppId ignores unsupported payload keys while updating supported fields", async () => {
+    const { app, updatePassportRowById } = createTestApp();
+
+    const response = await invokeRoute(app, {
+      method: "patch",
+      path: "/api/companies/:companyId/passports/:dppId",
+      params: { companyId: "5", dppId: "dpp_test_1" },
+      body: {
+        passportType: "battery",
+        model_name: "Updated model",
+        unsupported_runtime_key: "should be ignored",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(updatePassportRowById).toHaveBeenCalled();
+    expect(updatePassportRowById.mock.calls[0][0].data).toMatchObject({
+      model_name: "Updated model",
+    });
+    expect(updatePassportRowById.mock.calls[0][0].data.unsupported_runtime_key).toBeUndefined();
+  });
+
   test("PATCH /api/companies/:companyId/passports/:dppId preserves stored inactive facility when request does not change facility", async () => {
     const { app, pool, updatePassportRowById } = createTestApp();
 
