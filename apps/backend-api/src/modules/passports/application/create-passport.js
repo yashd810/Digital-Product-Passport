@@ -55,6 +55,16 @@ function createDraftPassportUseCase(deps) {
     } = item;
     if (product_image !== undefined) fields.product_image = product_image;
 
+    if (
+      fields.serial_number !== undefined
+      && !typeSchema.allowedKeys.has("serial_number")
+      && typeSchema.allowedKeys.has("battery_serial_number")
+      && fields.battery_serial_number === undefined
+    ) {
+      fields.battery_serial_number = fields.serial_number;
+      delete fields.serial_number;
+    }
+
     const dppId = generateDppRecordId();
     const lineageId = dppId;
     const normalizedProductId = normalizeInternalAliasIdValue(internal_alias_id) || generateInternalAliasIdValue(dppId);

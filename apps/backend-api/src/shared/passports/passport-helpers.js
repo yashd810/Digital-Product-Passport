@@ -139,6 +139,9 @@ const normalizePassportRequestBody = (body = {}) => {
     else if (normalized.batterySerialNumber !== undefined) normalized.serial_number = normalized.batterySerialNumber;
     else if (normalized.productSerialNumber !== undefined) normalized.serial_number = normalized.productSerialNumber;
   }
+  if (normalized.battery_serial_number === undefined && normalized.serial_number !== undefined) {
+    normalized.battery_serial_number = normalized.serial_number;
+  }
   if (normalized.economic_operator_id === undefined && normalized.economicOperatorId !== undefined) {
     normalized.economic_operator_id = normalized.economicOperatorId;
   }

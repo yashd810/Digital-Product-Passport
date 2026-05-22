@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { LANGUAGES, translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
@@ -849,18 +849,28 @@ export function FileCell({ url, label, onRefreshUrl = null }) {
 export function RefreshableImage({ src, alt, className = "", onRefreshUrl = null }) {
   const [activeSrc, setActiveSrc] = useState(src);
   const [refreshing, setRefreshing] = useState(false);
+  const attemptedSourcesRef = useRef(new Set());
 
   useEffect(() => {
     setActiveSrc(src);
     setRefreshing(false);
+    attemptedSourcesRef.current = new Set();
   }, [src]);
 
   const handleError = async () => {
-    if (refreshing || typeof onRefreshUrl !== "function" || !src) return;
+    const failedSrc = activeSrc || src;
+    if (
+      refreshing
+      || typeof onRefreshUrl !== "function"
+      || !src
+      || !failedSrc
+      || attemptedSourcesRef.current.has(failedSrc)
+    ) return;
+    attemptedSourcesRef.current.add(failedSrc);
     setRefreshing(true);
     try {
       const nextSrc = await onRefreshUrl(src);
-      if (nextSrc && nextSrc !== activeSrc) setActiveSrc(nextSrc);
+      if (nextSrc && nextSrc !== failedSrc) setActiveSrc(nextSrc);
     } catch {
       // Leave the current src in place if refresh fails.
     } finally {

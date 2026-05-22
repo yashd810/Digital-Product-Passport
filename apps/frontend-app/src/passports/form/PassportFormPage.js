@@ -45,6 +45,16 @@ function normalizeSchemaAlias(value) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+const SERIAL_FIELD_ALIASES = [
+  "serial_number",
+  "serial",
+  "serialNumber",
+  "battery_serial_number",
+  "batterySerialNumber",
+  "product_serial_number",
+  "productSerialNumber",
+];
+
 function getSchemaFieldDescriptors(sections) {
   return Object.values(sections || {})
     .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
@@ -66,6 +76,11 @@ function buildSchemaAliasMap(sections) {
   for (const field of getSchemaFieldDescriptors(sections)) {
     for (const alias of field.aliases) {
       aliasToKey.set(normalizeSchemaAlias(alias), field.key);
+    }
+    if (SERIAL_FIELD_ALIASES.includes(field.key)) {
+      for (const alias of SERIAL_FIELD_ALIASES) {
+        aliasToKey.set(normalizeSchemaAlias(alias), field.key);
+      }
     }
   }
   return aliasToKey;
@@ -616,6 +631,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const buildPersistedBody = () => {
+    const alignedFormData = alignRecordToSchemaKeys(formData, SECTIONS);
     const schemaFieldKeys = new Set(
       Object.values(SECTIONS || {})
         .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
@@ -632,7 +648,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const hasSchemaKeys = schemaFieldKeys.size > 0;
     const allowedKeys = new Set([...schemaFieldKeys, ...managedEditableKeys]);
     const cleanData = Object.fromEntries(
-      Object.entries(formData)
+      Object.entries(alignedFormData)
         .filter(([key]) => {
           if (NON_EDITABLE_FORM_KEYS.has(key)) return false;
           if (NON_PERSISTED_PAYLOAD_KEYS.has(key)) return false;
