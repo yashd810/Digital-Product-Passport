@@ -101,6 +101,21 @@ function alignRecordToSchemaKeys(record, sections) {
   return aligned;
 }
 
+function canonicalizeRecordToSchemaKeys(record, sections) {
+  if (!record || typeof record !== "object") return {};
+  const aliasToKey = buildSchemaAliasMap(sections);
+  const canonical = {};
+
+  for (const [rawKey, value] of Object.entries(record)) {
+    const canonicalKey = aliasToKey.get(normalizeSchemaAlias(rawKey)) || rawKey;
+    if (canonical[canonicalKey] === undefined) {
+      canonical[canonicalKey] = value;
+    }
+  }
+
+  return canonical;
+}
+
 function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
   const rawFields = rawRecord?.fields && typeof rawRecord.fields === "object" ? rawRecord.fields : {};
   const fullFields = fullRecord?.fields && typeof fullRecord.fields === "object" ? fullRecord.fields : {};
@@ -631,7 +646,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const buildPersistedBody = () => {
-    const alignedFormData = alignRecordToSchemaKeys(formData, SECTIONS);
+    const canonicalFormData = canonicalizeRecordToSchemaKeys(formData, SECTIONS);
     const schemaFieldKeys = new Set(
       Object.values(SECTIONS || {})
         .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
@@ -648,7 +663,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const hasSchemaKeys = schemaFieldKeys.size > 0;
     const allowedKeys = new Set([...schemaFieldKeys, ...managedEditableKeys]);
     const cleanData = Object.fromEntries(
-      Object.entries(alignedFormData)
+      Object.entries(canonicalFormData)
         .filter(([key]) => {
           if (NON_EDITABLE_FORM_KEYS.has(key)) return false;
           if (NON_PERSISTED_PAYLOAD_KEYS.has(key)) return false;

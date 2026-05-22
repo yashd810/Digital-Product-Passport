@@ -123,11 +123,31 @@ module.exports = function createPassportService({
     if (!typeRes.rows.length) return null;
     const sections = typeRes.rows[0]?.fields_json?.sections || [];
     const schemaFields = sections.flatMap(section => section.fields || []);
+    const normalizeAlias = (value) =>
+      String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+    const aliasToKey = new Map();
+    for (const field of schemaFields) {
+      if (!field?.key) continue;
+      const aliases = [
+        field.key,
+        field.elementId,
+        field.element_id,
+        field.semanticId,
+        field.semantic_id,
+      ].filter(Boolean);
+      for (const alias of aliases) {
+        aliasToKey.set(normalizeAlias(alias), field.key);
+      }
+    }
     return {
       typeName: typeRes.rows[0].type_name,
       displayName: typeRes.rows[0].display_name,
       schemaFields,
       allowedKeys: new Set(schemaFields.map(field => field.key).filter(Boolean)),
+      aliasToKey,
     };
   }
 

@@ -68,6 +68,17 @@ function updateEditablePassportUseCase(deps) {
     );
     if (!current.rows.length) throw Object.assign(new Error("Passport not found or not editable."), { statusCode: 404 });
 
+    if (typeSchema?.aliasToKey instanceof Map) {
+      for (const [rawKey, value] of Object.entries({ ...fields })) {
+        const canonicalKey = typeSchema.aliasToKey.get(String(rawKey).trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+        if (!canonicalKey || canonicalKey === rawKey) continue;
+        if (fields[canonicalKey] === undefined) {
+          fields[canonicalKey] = value;
+        }
+        delete fields[rawKey];
+      }
+    }
+
     for (const key of Object.keys(fields)) {
       if (!typeSchema.allowedKeys.has(key) && !BUILT_IN_EDITABLE_FIELDS.has(key)) {
         delete fields[key];

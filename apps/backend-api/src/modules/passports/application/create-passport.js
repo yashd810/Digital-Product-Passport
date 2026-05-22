@@ -55,14 +55,15 @@ function createDraftPassportUseCase(deps) {
     } = item;
     if (product_image !== undefined) fields.product_image = product_image;
 
-    if (
-      fields.serial_number !== undefined
-      && !typeSchema.allowedKeys.has("serial_number")
-      && typeSchema.allowedKeys.has("battery_serial_number")
-      && fields.battery_serial_number === undefined
-    ) {
-      fields.battery_serial_number = fields.serial_number;
-      delete fields.serial_number;
+    if (typeSchema?.aliasToKey instanceof Map) {
+      for (const [rawKey, value] of Object.entries({ ...fields })) {
+        const canonicalKey = typeSchema.aliasToKey.get(String(rawKey).trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+        if (!canonicalKey || canonicalKey === rawKey) continue;
+        if (fields[canonicalKey] === undefined) {
+          fields[canonicalKey] = value;
+        }
+        delete fields[rawKey];
+      }
     }
 
     const dppId = generateDppRecordId();
