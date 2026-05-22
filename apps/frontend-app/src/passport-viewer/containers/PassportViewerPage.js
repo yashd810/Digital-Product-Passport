@@ -81,7 +81,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   }, [isPreviewMode, passportEndpoint, previewCompanyId]);
 
   const refreshFieldUrl = useCallback(async (fieldKey, fallbackUrl) => {
-    const refreshed = await fetchPassportRecord();
+    const refreshed = await fetchPassportRecord({ applyState: true });
     const nextValue = refreshed?.[fieldKey];
     return typeof nextValue === "string" && nextValue.trim() ? nextValue : fallbackUrl;
   }, [fetchPassportRecord]);

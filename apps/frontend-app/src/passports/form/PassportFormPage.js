@@ -116,6 +116,18 @@ function canonicalizeRecordToSchemaKeys(record, sections) {
   return canonical;
 }
 
+function normalizePersistedComparisonValue(value) {
+  if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  if (typeof value === "string") return value.trim();
+  return value ?? null;
+}
+
 function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
   const rawFields = rawRecord?.fields && typeof rawRecord.fields === "object" ? rawRecord.fields : {};
   const fullFields = fullRecord?.fields && typeof fullRecord.fields === "object" ? fullRecord.fields : {};
@@ -258,6 +270,24 @@ const NON_EDITABLE_FORM_KEYS = new Set([
   "last_name",
 ]);
 
+const RESERVED_SYSTEM_FIELD_KEYS = new Set([
+  "carrier_authenticity",
+  "carrier_security_status",
+  "carrier_authentication_method",
+  "carrier_verification_instructions",
+  "signed_carrier_payload",
+  "issuer_certificate_id",
+  "carrier_compatibility_profiles",
+  "physical_carrier_security_features",
+  "trusted_viewer_origin",
+  "trusted_viewer_host",
+  "counterfeit_risk_level",
+  "anti_counterfeit_instructions",
+  "safety_warnings",
+  "qr_print_specification",
+  "sign_carrier_payload",
+]);
+
 const NON_PERSISTED_PAYLOAD_KEYS = new Set([
   "digitalProductPassportId",
   "uniqueProductIdentifier",
@@ -331,6 +361,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const lastInteractionRef = useRef(Date.now());
   const dirtyRef           = useRef(false);
+  const dirtyFieldsRef     = useRef(new Set());
+  const baselinePayloadRef = useRef({});
   const saveInFlightRef    = useRef(false);
   const sessionActiveRef   = useRef(false);
   const mountedRef         = useRef(true);
@@ -347,6 +379,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const markDirty = () => {
     dirtyRef.current = true;
     setAutoSaveState("pending");
+  };
+
+  const markFieldDirty = (key) => {
+    if (!key) return;
+    dirtyFieldsRef.current.add(key);
+    markDirty();
   };
 
   useEffect(() => {
@@ -382,6 +420,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       setInternalAliasId(draft.internalAliasId ?? fallbackData?.internal_alias_id ?? "");
       setFormData(draft.formData && typeof draft.formData === "object" ? draft.formData : (fallbackData || {}));
       dirtyRef.current = true;
+      dirtyFieldsRef.current = new Set([
+        "model_name",
+        "internal_alias_id",
+        ...Object.keys(draft.formData && typeof draft.formData === "object" ? draft.formData : {}),
+      ]);
       setAutoSaveState("pending");
       setSuccess("Unsaved changes from this browser were restored.");
       return true;
@@ -405,8 +448,19 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       setInternalAliasId(alignedData?.internal_alias_id || "");
       setFormData(alignedData || {});
       dirtyRef.current = false;
+      dirtyFieldsRef.current = new Set();
       setAutoSaveState("idle");
     }
+    baselinePayloadRef.current = {
+      model_name: normalizePersistedComparisonValue(alignedData?.model_name || ""),
+      internal_alias_id: normalizePersistedComparisonValue(alignedData?.internal_alias_id || ""),
+      ...Object.fromEntries(
+        Object.entries(canonicalizeRecordToSchemaKeys(alignedData || {}, SECTIONS)).map(([key, value]) => [
+          key,
+          normalizePersistedComparisonValue(value),
+        ])
+      ),
+    };
     setLastSavedAt(alignedData?.updated_at || null);
     draftHydratedRef.current = true;
   };
@@ -618,8 +672,13 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const toggle      = (k)        => setExpanded(p => ({ ...p, [k]: !p[k] }));
   const handleField = (key, val) => {
-    markDirty();
+    markFieldDirty(key);
     setFormData(p => ({ ...p, [key]: val }));
+  };
+
+  const handleModelNameChange = (value) => {
+    markFieldDirty("model_name");
+    setModelName(value);
   };
 
   const handleFile = (key, file) => {
@@ -645,13 +704,13 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     return url;
   };
 
-  const buildPersistedBody = () => {
+  const buildPersistedBody = ({ onlyDirty = false } = {}) => {
     const canonicalFormData = canonicalizeRecordToSchemaKeys(formData, SECTIONS);
     const schemaFieldKeys = new Set(
       Object.values(SECTIONS || {})
         .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
         .map((field) => field?.key)
-        .filter(Boolean)
+        .filter((key) => key && !RESERVED_SYSTEM_FIELD_KEYS.has(key))
     );
     const managedEditableKeys = new Set([
       "economic_operator_id",
@@ -667,6 +726,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         .filter(([key]) => {
           if (NON_EDITABLE_FORM_KEYS.has(key)) return false;
           if (NON_PERSISTED_PAYLOAD_KEYS.has(key)) return false;
+          if (RESERVED_SYSTEM_FIELD_KEYS.has(key)) return false;
           if (hasSchemaKeys) return allowedKeys.has(key);
           return true;
         })
@@ -682,12 +742,29 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           ];
         })
     );
-    return {
+    const fullBody = {
       passportType: activePassportType,
       ...cleanData,
       model_name: modelName.trim() || null,
       internal_alias_id: internalAliasId.trim() || null,
     };
+    if (!onlyDirty) return fullBody;
+
+    const dirtyKeys = dirtyFieldsRef.current;
+    const deltaBody = { passportType: activePassportType };
+
+    for (const [key, value] of Object.entries(fullBody)) {
+      if (key === "passportType") continue;
+      if (!dirtyKeys.has(key)) continue;
+      const nextComparable = normalizePersistedComparisonValue(value);
+      const previousComparable = Object.prototype.hasOwnProperty.call(baselinePayloadRef.current, key)
+        ? baselinePayloadRef.current[key]
+        : null;
+      if (nextComparable === previousComparable) continue;
+      deltaBody[key] = value;
+    }
+
+    return deltaBody;
   };
 
   const renderProductImagePicker = () => {
@@ -805,12 +882,19 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const saveEditChanges = async ({ showSuccessMessage = false } = {}) => {
     if (mode !== "edit" || !dppId || !activePassportType || saveInFlightRef.current) return false;
+    if (!dirtyRef.current) return true;
 
     saveInFlightRef.current = true;
       if (mountedRef.current) setAutoSaveState("saving");
 
     try {
-      const body = buildPersistedBody();
+      const body = buildPersistedBody({ onlyDirty: true });
+      if (Object.keys(body).length === 1) {
+        dirtyRef.current = false;
+        dirtyFieldsRef.current = new Set();
+        if (mountedRef.current) setAutoSaveState("saved");
+        return true;
+      }
       const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports/${dppId}`, {
         method:"PATCH",
         headers: authHeaders({ "Content-Type":"application/json" }),
@@ -840,6 +924,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       }
 
       dirtyRef.current = false;
+      dirtyFieldsRef.current = new Set();
       clearLocalDraft();
       const responsePayload = await r.json().catch(() => ({}));
       const refreshed = uploadedKeys.length
@@ -922,6 +1007,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       let passportDppId = dppId;
 
       if (mode === "create") {
+        if (loadingType) {
+          throw new Error("Passport type is still loading. Please wait a moment and save again.");
+        }
         const body = buildPersistedBody();
         const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
@@ -952,6 +1040,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         setModelName("");
         setInternalAliasId(generateDraftLocalPassportId());
         setFormData({});
+        dirtyRef.current = false;
+        dirtyFieldsRef.current = new Set();
+        baselinePayloadRef.current = {};
         clearLocalDraft();
       } else {
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1421,7 +1512,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
               <input id="modelName" type="text" value={modelName}
                 className="passport-model-input"
                 placeholder="Enter model name (optional)"
-                onChange={e => { markDirty(); setModelName(e.target.value); }} />
+                onChange={e => handleModelNameChange(e.target.value)} />
             </div>
             <div className="passport-field-group">
               <label>Passport Type</label>
@@ -1476,7 +1567,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                         </p>
                       )}
                       <div className="form-grid">
-                        {section.fields.map(f => {
+                        {section.fields.filter((field) => field?.key && !RESERVED_SYSTEM_FIELD_KEYS.has(field.key)).map(f => {
                           const isLocked = mode === "create" && modelDataKeys.has(f.key);
                           return (
                             <div key={f.key}
@@ -1503,7 +1594,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                 onClick={() => navigate(`/dashboard/passports/${activePassportType}`)} disabled={isSaving}>
                 Cancel
               </button>
-              <button type="submit" className="submit-btn" disabled={isSaving}>
+              <button type="submit" className="submit-btn" disabled={isSaving || loadingType}>
                 {isSaving ? "Saving…" : mode==="create" ? "Create Passport" : "Save Changes"}
               </button>
             </div>
