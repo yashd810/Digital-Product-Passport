@@ -228,6 +228,26 @@ const NON_EDITABLE_FORM_KEYS = new Set([
   "last_name",
 ]);
 
+const NON_PERSISTED_PAYLOAD_KEYS = new Set([
+  "digitalProductPassportId",
+  "uniqueProductIdentifier",
+  "internalAliasId",
+  "dppSchemaVersion",
+  "dppStatus",
+  "lastUpdate",
+  "economicOperatorId",
+  "facilityId",
+  "contentSpecificationIds",
+  "subjectDid",
+  "dppDid",
+  "companyDid",
+  "dpp_schema_version",
+  "schema_version",
+  "subject_did",
+  "dpp_did",
+  "company_did",
+]);
+
 function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -615,6 +635,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       Object.entries(formData)
         .filter(([key]) => {
           if (NON_EDITABLE_FORM_KEYS.has(key)) return false;
+          if (NON_PERSISTED_PAYLOAD_KEYS.has(key)) return false;
           if (hasSchemaKeys) return allowedKeys.has(key);
           return true;
         })
@@ -875,7 +896,13 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
           body: JSON.stringify(body),
         });
-        if (!r.ok) { const d = await r.json(); throw new Error(d.detail || d.error || "Failed to create"); }
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          const invalidFields = Array.isArray(d?.fields) && d.fields.length
+            ? ` (${d.fields.join(", ")})`
+            : "";
+          throw new Error(d.detail || `${d.error || "Failed to create"}${invalidFields}`);
+        }
         const { passport } = await r.json();
         passportDppId = passport.dppId;
       } else {

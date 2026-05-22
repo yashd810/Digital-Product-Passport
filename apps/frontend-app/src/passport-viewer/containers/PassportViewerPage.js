@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { generateQRCodeBundle, saveQRCodeToDatabase } from "../utils/QRcode";
 import { getViewerBrandTheme } from "../../app/providers/ThemeContext";
@@ -56,7 +56,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const isPreviewMode = !!previewMode && !!previewId;
   const isInactiveView = !!versionNumber;
 
-  const buildPassportEndpoint = () => (
+  const passportEndpoint = (
     isPreviewMode
       ? `${API}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
       : versionNumber
@@ -64,26 +64,27 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         : `${API}/api/passports/by-product/${encodedProductId}`
   );
 
-  const refreshPassportLinks = async () => {
-    const endpoint = buildPassportEndpoint();
-    const response = await fetchWithAuth(endpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
+  const fetchPassportRecord = useCallback(async ({ applyState = false } = {}) => {
+    const response = await fetchWithAuth(passportEndpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
     if (!response.ok) throw new Error("Could not refresh passport resources");
     const data = await response.json();
-    const resolvedCompanyId = data?.company_id || data?.companyId || previewCompanyId || null;
-    setPassport(data);
-    if (data?.company_profile) setCompanyData(data.company_profile);
-    if (isPreviewMode && resolvedCompanyId) {
-      const profileRes = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`);
-      if (profileRes?.ok) setCompanyData(await profileRes.json());
+    if (applyState) {
+      const resolvedCompanyId = data?.company_id || data?.companyId || previewCompanyId || null;
+      setPassport(data);
+      if (data?.company_profile) setCompanyData(data.company_profile);
+      if (isPreviewMode && resolvedCompanyId) {
+        const profileRes = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`);
+        if (profileRes?.ok) setCompanyData(await profileRes.json());
+      }
     }
     return data;
-  };
+  }, [isPreviewMode, passportEndpoint, previewCompanyId]);
 
-  const refreshFieldUrl = async (fieldKey, fallbackUrl) => {
-    const refreshed = await refreshPassportLinks();
+  const refreshFieldUrl = useCallback(async (fieldKey, fallbackUrl) => {
+    const refreshed = await fetchPassportRecord();
     const nextValue = refreshed?.[fieldKey];
     return typeof nextValue === "string" && nextValue.trim() ? nextValue : fallbackUrl;
-  };
+  }, [fetchPassportRecord]);
 
   // Primary data loading
   useEffect(() => {
@@ -102,15 +103,8 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       setError("");
       try {
         // 1. Fetch the passport record
-        const endpoint = buildPassportEndpoint();
-        const r = await fetchWithAuth(endpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
-        if (!r.ok) throw new Error("Passport not found");
-        const data = await r.json();
+        const data = await fetchPassportRecord({ applyState: true });
         const resolvedCompanyId = data?.company_id || data?.companyId || previewCompanyId || null;
-        setPassport(data);
-        if (!isPreviewMode && data?.company_profile) {
-          setCompanyData(data.company_profile);
-        }
 
         // 2. Fetch company branding in parallel with type definition
         const [profileRes, typeRes] = await Promise.all([
@@ -133,7 +127,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         setLoading(false);
       }
     })();
-  }, [encodedPreviewId, encodedProductId, isPreviewMode, previewCompanyId, previewId, internalAliasId, versionNumber]);
+  }, [encodedPreviewId, encodedProductId, fetchPassportRecord, isPreviewMode, previewCompanyId, previewId, internalAliasId, versionNumber]);
 
   useEffect(() => {
     if (!isPreviewMode || !previewCompanyId) return;
