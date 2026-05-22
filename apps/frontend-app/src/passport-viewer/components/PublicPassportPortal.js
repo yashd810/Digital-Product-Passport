@@ -6,7 +6,7 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
 import { FileCell, LiveBadge, LockedFieldCell, RefreshableImage, ViewerDomainIndicator } from "./ViewerBlocks";
-import { formatFieldLabelWithUnit, renderTextBlock } from "../utils/viewerHelpers";
+import { formatFieldLabelWithUnit, formatIsoDate, renderTextBlock } from "../utils/viewerHelpers";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -229,7 +229,7 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues)
       text: serviceContextText,
     },
     {
-      date: updatedAt ? new Date(updatedAt).toISOString().slice(0, 10) : "",
+      date: formatIsoDate(updatedAt, { dateOnly: true }),
       title: "DPP updated",
       text: updatedAt ? "Latest data, QR binding, and signature checked." : "",
     },
@@ -251,9 +251,7 @@ function buildHeaderRows(passport, typeDef, companyData) {
     granularity: passport?.granularity || "item",
     dppSchemaVersion: passport?.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
     dppStatus: formatPassportStatus(passport?.release_status),
-    lastUpdate: passport?.updated_at || passport?.created_at
-      ? new Date(passport.updated_at || passport.created_at).toISOString()
-      : null,
+    lastUpdate: formatIsoDate(passport?.updated_at || passport?.created_at) || null,
     economicOperatorId: resolvedCompanyDid || passport?.economicOperatorId || passport?.economic_operator_id,
     facilityId: resolvedFacilityDid || passport?.facilityId || passport?.facility_id,
     contentSpecificationIds: Array.isArray(passport?.content_specification_ids)
@@ -279,7 +277,7 @@ function buildTrustRows(passport, carrierAuthenticity, sigVerification) {
 
   return [
     ["Signature status", sigVerification?.status || ""],
-    ["Signature timestamp", sigVerification?.signedAt ? new Date(sigVerification.signedAt).toISOString() : ""],
+    ["Signature timestamp", formatIsoDate(sigVerification?.signedAt)],
     ["Signing key", sigVerification?.keyId || ""],
     ["Trusted viewer host", carrierAuthenticity?.trustedViewerHost || ""],
     ["Trusted viewer origin", carrierAuthenticity?.trustedViewerOrigin || ""],
@@ -289,7 +287,7 @@ function buildTrustRows(passport, carrierAuthenticity, sigVerification) {
     ["Issuer certificate", carrierAuthenticity?.issuerCertificateId || ""],
     ["Signed carrier payload", carrierAuthenticity?.signedCarrierPayload ? "Available" : "Not stored"],
     ["QR print specification", carrierAuthenticity?.qrPrintSpecification ? `${carrierAuthenticity.qrPrintSpecification.symbology} · ECC ${carrierAuthenticity.qrPrintSpecification.errorCorrectionLevel}` : ""],
-    ["Latest verification", latestVerification?.verifiedAt ? `${latestVerification.printGrade || "recorded"} · ${new Date(latestVerification.verifiedAt).toISOString()}` : ""],
+    ["Latest verification", formatIsoDate(latestVerification?.verifiedAt) ? `${latestVerification.printGrade || "recorded"} · ${formatIsoDate(latestVerification?.verifiedAt)}` : ""],
     ["Current viewer host", typeof window !== "undefined" ? window.location.host : ""],
     ["Public passport URL", passport?.linked_data?.public_url || ""],
   ].filter(([, value]) => isFilled(value));
@@ -623,7 +621,7 @@ export default function PublicPassportPortal({
     ["Manufacturer", companyData?.company_name || passport?.manufacturer || passport?.manufactured_by || ""],
     ["Serial number", passport?.serial_number || passport?.product_serial_number || passport?.serial || passport?.batterySerialNumber || passport?.battery_serial_number || passport?.productSerialNumber || ""],
     ["Status", currentStatus || ""],
-    ["Last update", passport?.updated_at ? new Date(passport.updated_at).toISOString().slice(0, 10) : ""],
+    ["Last update", formatIsoDate(passport?.updated_at, { dateOnly: true })],
   ];
 
   return (

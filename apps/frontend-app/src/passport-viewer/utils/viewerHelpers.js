@@ -121,6 +121,14 @@ export function formatFieldLabelWithUnit(label, field) {
   return unitLabel ? `${baseLabel} (${unitLabel})` : baseLabel;
 }
 
+export function formatIsoDate(value, { dateOnly = false } = {}) {
+  if (value === null || value === undefined || value === "") return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const iso = parsed.toISOString();
+  return dateOnly ? iso.slice(0, 10) : iso;
+}
+
 export function getFieldPresentation(field, raw, isLocked, pieItems) {
   if (isLocked) return { tone: "restricted", eyebrow: "Protected data" };
   if (field.type === "file") return { tone: "document", eyebrow: "Evidence file" };

@@ -16,6 +16,13 @@ server {
     proxy_set_header X-Forwarded-Host $host;
   }
 
+  location /assets/ {
+    try_files $uri =404;
+    access_log off;
+    expires 1h;
+    add_header Cache-Control "public, max-age=3600";
+  }
+
   location / {
     try_files $uri $uri/ /index.html;
   }

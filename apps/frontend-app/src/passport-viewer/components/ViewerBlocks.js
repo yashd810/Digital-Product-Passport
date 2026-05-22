@@ -5,7 +5,7 @@ import { PieChart, parseCompositionFromTable, parseCompositionFromText } from ".
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
-import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel, formatFieldLabelWithUnit } from "../utils/viewerHelpers";
+import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
 import { getMarketingContactUrl } from "../utils/QRcode";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -285,9 +285,7 @@ export function PassportHeaderPanel({ passport, typeDef }) {
     granularity: passport.granularity || "item",
     dppSchemaVersion: passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
     dppStatus: formatPassportStatus(passport.release_status),
-    lastUpdate: passport.updated_at || passport.created_at
-      ? new Date(passport.updated_at || passport.created_at).toISOString()
-      : null,
+    lastUpdate: formatIsoDate(passport.updated_at || passport.created_at) || null,
     economicOperatorId: resolvedCompanyDid || passport.economicOperatorId || passport.economic_operator_id,
     facilityId: resolvedFacilityDid || passport.facilityId || passport.facility_id,
     contentSpecificationIds: parseHeaderArray(passport.content_specification_ids || passport.compliance_profile_key || typeDef?.semantic_model_key),
