@@ -106,6 +106,21 @@ export function formatLinkLabel(value) {
   }
 }
 
+export function getFieldUnitLabel(field) {
+  const unitDisplay = String(field?.unitDisplay || "").trim();
+  const unit = String(field?.unit || "").trim();
+  if (unitDisplay && unitDisplay.toLowerCase() !== "n.a.") return unitDisplay;
+  if (unit && unit.toLowerCase() !== "none") return unit;
+  return "";
+}
+
+export function formatFieldLabelWithUnit(label, field) {
+  const baseLabel = String(label || field?.label || field?.key || "").trim();
+  const unitLabel = getFieldUnitLabel(field);
+  if (!baseLabel) return unitLabel;
+  return unitLabel ? `${baseLabel} (${unitLabel})` : baseLabel;
+}
+
 export function getFieldPresentation(field, raw, isLocked, pieItems) {
   if (isLocked) return { tone: "restricted", eyebrow: "Protected data" };
   if (field.type === "file") return { tone: "document", eyebrow: "Evidence file" };

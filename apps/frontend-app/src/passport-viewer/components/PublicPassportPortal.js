@@ -5,8 +5,8 @@ import { formatPassportStatus } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
-import { FileCell, LiveBadge, LockedFieldCell, ViewerDomainIndicator } from "./ViewerBlocks";
-import { renderTextBlock } from "../utils/viewerHelpers";
+import { FileCell, LiveBadge, LockedFieldCell, RefreshableImage, ViewerDomainIndicator } from "./ViewerBlocks";
+import { formatFieldLabelWithUnit, renderTextBlock } from "../utils/viewerHelpers";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -318,17 +318,17 @@ function buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, l
 
       return {
         field,
-        fieldLabel: translateSchemaLabel(lang, field),
+        fieldLabel: formatFieldLabelWithUnit(translateSchemaLabel(lang, field), field),
         ...resolved,
       };
     })
     .filter(Boolean);
 }
 
-function DataArtifactPreview({ field, raw, label, onPreviewImage }) {
+function DataArtifactPreview({ field, raw, label, onPreviewImage, onRefreshFieldUrl = null }) {
   if (!isFilled(raw)) return null;
   if (field.type === "file" || isPdfLikeUrl(raw)) {
-    return <FileCell url={raw} label={label} />;
+    return <FileCell url={raw} label={label} onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, raw) : null} />;
   }
   if (field.type === "symbol" || isImageLikeUrl(raw)) {
     return (
@@ -336,18 +336,32 @@ function DataArtifactPreview({ field, raw, label, onPreviewImage }) {
         <button
           type="button"
           className="artifact-image-button"
-          onClick={() => onPreviewImage?.(raw, label)}
+          onClick={async () => {
+            const nextRaw = onRefreshFieldUrl ? await onRefreshFieldUrl(field.key, raw) : raw;
+            onPreviewImage?.(nextRaw || raw, label);
+          }}
           aria-label={`Open larger preview for ${label}`}
         >
-          <img src={raw} alt={label} className="artifact-image" />
+          <RefreshableImage
+            src={raw}
+            alt={label}
+            className="artifact-image"
+            onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, raw) : null}
+          />
         </button>
       </div>
     );
   }
   const href = toHref(raw);
   if (field.type === "url" && href) {
+    const handleOpen = async (e) => {
+      if (typeof onRefreshFieldUrl !== "function") return;
+      e.preventDefault();
+      const nextUrl = await onRefreshFieldUrl(field.key, raw);
+      window.open(toHref(nextUrl || raw), "_blank", "noopener,noreferrer");
+    };
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="artifact-link">
+      <a href={href} target="_blank" rel="noopener noreferrer" className="artifact-link" onClick={handleOpen}>
         {raw}
       </a>
     );
@@ -355,7 +369,7 @@ function DataArtifactPreview({ field, raw, label, onPreviewImage }) {
   return null;
 }
 
-function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, onPreviewImage }) {
+function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, onPreviewImage, onRefreshFieldUrl = null }) {
   const [expandedHistory, setExpandedHistory] = useState(false);
   const [chartType, setChartType] = useState("line");
   const [historyState, setHistoryState] = useState({ loading: false, loaded: false, data: [] });
@@ -428,7 +442,7 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
       <span className="field-value-empty">—</span>
     );
   } else if (field.type === "symbol" || field.type === "file" || field.type === "url" || isImageLikeUrl(raw) || isPdfLikeUrl(raw) || isUrlLike(raw)) {
-    content = <DataArtifactPreview field={field} raw={raw} label={translateSchemaLabel(lang, field)} onPreviewImage={onPreviewImage} />;
+    content = <DataArtifactPreview field={field} raw={raw} label={formatFieldLabelWithUnit(translateSchemaLabel(lang, field), field)} onPreviewImage={onPreviewImage} onRefreshFieldUrl={onRefreshFieldUrl} />;
   } else if (typeof raw === "string" && raw.includes("\n")) {
     content = renderTextBlock(raw, "field-value-text");
   } else if (isFilled(raw)) {
@@ -486,10 +500,16 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
   );
 }
 
-function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang }) {
+function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, onRefreshFieldUrl = null }) {
   const { field, fieldLabel, isLocked } = item;
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
   const documentValue = !isLocked && isFilled(resolved.raw) ? resolved.raw : null;
+  const handleOpenDocument = async (e) => {
+    if (typeof onRefreshFieldUrl !== "function") return;
+    e.preventDefault();
+    const nextUrl = await onRefreshFieldUrl(field.key, documentValue);
+    window.open(toHref(nextUrl || documentValue), "_blank", "noopener,noreferrer");
+  };
 
   return (
     <article className="doc-card">
@@ -502,10 +522,15 @@ function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynam
         {documentValue && (field.type === "symbol" || isImageLikeUrl(documentValue)) ? (
           <div className="doc-asset-shell">
             <div className="doc-asset-visual">
-              <img src={documentValue} alt={fieldLabel} className="artifact-image" />
+              <RefreshableImage
+                src={documentValue}
+                alt={fieldLabel}
+                className="artifact-image"
+                onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(field.key, documentValue) : null}
+              />
             </div>
             <div className="doc-asset-actions">
-              <a href={documentValue} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
+              <a href={documentValue} target="_blank" rel="noopener noreferrer" className="pdf-open-link" onClick={handleOpenDocument}>
                 Open
               </a>
             </div>
@@ -518,6 +543,7 @@ function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynam
             onRequestUnlock={onRequestUnlock}
             dynamicValues={dynamicValues}
             lang={lang}
+            onRefreshFieldUrl={onRefreshFieldUrl}
           />
         )}
       </div>
@@ -538,6 +564,7 @@ export default function PublicPassportPortal({
   sigVerification,
   verificationBundle,
   carrierAuthenticity,
+  onRefreshFieldUrl = null,
   isPreviewMode = false,
   isInactiveView = false,
   isObsolete = false,
@@ -683,7 +710,14 @@ export default function PublicPassportPortal({
             <article className="card">
               <h2>Product overview</h2>
               <div className={`energy-art${productImageEntry ? " has-img" : ""}`}>
-                {productImageEntry && <img src={productImageEntry.raw} alt={passport?.model_name || "Product"} className="overview-product-image" />}
+                {productImageEntry && (
+                  <RefreshableImage
+                    src={productImageEntry.raw}
+                    alt={passport?.model_name || "Product"}
+                    className="overview-product-image"
+                    onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(productImageEntry.field.key, productImageEntry.raw) : null}
+                  />
+                )}
               </div>
               <div className="overview-meta">
                 {[
@@ -708,15 +742,23 @@ export default function PublicPassportPortal({
                     {overviewSymbols.map((entry) => (
                       <div key={entry.field.key} className="symbol-item">
                         <div>
-                          <span>{translateSchemaLabel(lang, entry.field)}</span>
+                      <span>{formatFieldLabelWithUnit(translateSchemaLabel(lang, entry.field), entry.field)}</span>
                           {entry.field.type === "symbol" || isImageLikeUrl(entry.raw) ? (
                             <button
                               type="button"
                               className="overview-symbol-button"
-                              onClick={() => setPreviewImage({ src: entry.raw, label: translateSchemaLabel(lang, entry.field) })}
-                              aria-label={`Open larger preview for ${translateSchemaLabel(lang, entry.field)}`}
+                              onClick={async () => {
+                                const nextSrc = onRefreshFieldUrl ? await onRefreshFieldUrl(entry.field.key, entry.raw) : entry.raw;
+                                setPreviewImage({ src: nextSrc || entry.raw, label: formatFieldLabelWithUnit(translateSchemaLabel(lang, entry.field), entry.field) });
+                              }}
+                              aria-label={`Open larger preview for ${formatFieldLabelWithUnit(translateSchemaLabel(lang, entry.field), entry.field)}`}
                             >
-                              <img src={entry.raw} alt={translateSchemaLabel(lang, entry.field)} className="overview-symbol-image" />
+                              <RefreshableImage
+                                src={entry.raw}
+                                alt={formatFieldLabelWithUnit(translateSchemaLabel(lang, entry.field), entry.field)}
+                                className="overview-symbol-image"
+                                onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(entry.field.key, entry.raw) : null}
+                              />
                             </button>
                           ) : (
                             <strong>{formatValue(entry.raw)}</strong>
@@ -827,7 +869,7 @@ export default function PublicPassportPortal({
                 <ul className="field-list">
                   {(section.fields || []).map((field) => (
                     <li key={field.key} className="field-row">
-                      <span className="field-key">{translateSchemaLabel(lang, field)}</span>
+                      <span className="field-key">{formatFieldLabelWithUnit(translateSchemaLabel(lang, field), field)}</span>
                       <div className="field-value">
                         <DataFieldValue
                           field={field}
@@ -837,6 +879,7 @@ export default function PublicPassportPortal({
                           dynamicValues={dynamicValues}
                           lang={lang}
                           onPreviewImage={(src, label) => setPreviewImage({ src, label })}
+                          onRefreshFieldUrl={onRefreshFieldUrl}
                         />
                       </div>
                     </li>
@@ -891,6 +934,7 @@ export default function PublicPassportPortal({
                 onRequestUnlock={onRequestUnlock}
                 dynamicValues={dynamicValues}
                 lang={lang}
+                onRefreshFieldUrl={onRefreshFieldUrl}
               />
             ))}
           </div>

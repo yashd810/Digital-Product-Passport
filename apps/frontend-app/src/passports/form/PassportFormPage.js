@@ -6,6 +6,7 @@ import {
   HEADER_OWNERSHIP_LABELS,
   normalizeSystemPassportHeader,
 } from "../../admin/passport-types/builderHelpers";
+import { formatFieldLabelWithUnit, getFieldUnitLabel } from "../../passport-viewer/utils/viewerHelpers";
 import RepositoryPicker from "./components/RepositoryPicker";
 import SymbolRepositoryPicker from "./components/SymbolRepositoryPicker";
 import "../../assets/styles/CreatePass.css";
@@ -20,6 +21,12 @@ const HEADER_SOURCE_LABELS = {
   company_identity: "From company identity",
   company_or_passport: "From company or passport",
 };
+
+function getFieldInputPrompt(field) {
+  const baseLabel = String(field?.label || field?.key || "value").toLowerCase();
+  const unitLabel = getFieldUnitLabel(field);
+  return unitLabel ? `Enter ${baseLabel} in ${unitLabel}` : `Enter ${baseLabel}`;
+}
 
 function buildDraftStorageKey({ mode, companyId, passportType, dppId }) {
   return [
@@ -902,13 +909,14 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const val      = formData[field.key] ?? "";
     const isLocked = mode === "create" && modelDataKeys.has(field.key);
     const disabled = isSaving || (mode==="edit" && isLoading) || isLocked;
+    const fieldLabel = formatFieldLabelWithUnit(field.label, field);
 
     if (field.type === "boolean") {
       return (
         <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
           <input type="checkbox" checked={!!val}
             onChange={e => handleField(field.key, e.target.checked)} disabled={disabled} />
-          <span style={{ fontSize:14, color:"var(--text-primary)", fontFamily:"var(--font)" }}>{field.label}</span>
+          <span style={{ fontSize:14, color:"var(--text-primary)", fontFamily:"var(--font)" }}>{fieldLabel}</span>
         </label>
       );
     }
@@ -1137,7 +1145,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
     if (field.type === "textarea") {
       return <textarea value={val} disabled={disabled}
-        placeholder={`Enter ${field.label.toLowerCase()}`}
+        placeholder={getFieldInputPrompt(field)}
         onChange={e => handleField(field.key,e.target.value)} />;
     }
 
@@ -1165,7 +1173,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     }
 
     return <input type="text" value={val} disabled={disabled}
-      placeholder={`Enter ${field.label.toLowerCase()}`}
+      placeholder={getFieldInputPrompt(field)}
       onChange={e => handleField(field.key,e.target.value)} />;
   };
 
@@ -1417,7 +1425,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                               className={`form-group${f.type==="textarea"||f.type==="file"?" full-width":""}${isLocked?" form-group-locked":""}`}>
                               {f.type !== "boolean" && (
                                 <label htmlFor={f.type==="file" ? `f-${f.key}` : f.key}>
-                                  {f.label}
+                                  {formatFieldLabelWithUnit(f.label, f)}
                                   {isLocked && <span className="pf-model-badge">📌 Model data</span>}
                                 </label>
                               )}

@@ -29,6 +29,7 @@ function registerAppRoutes(app, deps) {
     pool: deps.pool,
     fs: deps.fs,
     path: deps.path,
+    publicReadRateLimit: deps.publicReadRateLimit,
     authenticateToken: deps.authenticateToken,
     checkCompanyAccess: deps.checkCompanyAccess,
     requireEditor: deps.requireEditor,

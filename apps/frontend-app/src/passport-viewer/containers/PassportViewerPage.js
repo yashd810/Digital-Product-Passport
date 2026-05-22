@@ -56,20 +56,53 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const isPreviewMode = !!previewMode && !!previewId;
   const isInactiveView = !!versionNumber;
 
+  const buildPassportEndpoint = () => (
+    isPreviewMode
+      ? `${API}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
+      : versionNumber
+        ? `${API}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
+        : `${API}/api/passports/by-product/${encodedProductId}`
+  );
+
+  const refreshPassportLinks = async () => {
+    const endpoint = buildPassportEndpoint();
+    const response = await fetchWithAuth(endpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
+    if (!response.ok) throw new Error("Could not refresh passport resources");
+    const data = await response.json();
+    const resolvedCompanyId = data?.company_id || data?.companyId || previewCompanyId || null;
+    setPassport(data);
+    if (data?.company_profile) setCompanyData(data.company_profile);
+    if (isPreviewMode && resolvedCompanyId) {
+      const profileRes = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`);
+      if (profileRes?.ok) setCompanyData(await profileRes.json());
+    }
+    return data;
+  };
+
+  const refreshFieldUrl = async (fieldKey, fallbackUrl) => {
+    const refreshed = await refreshPassportLinks();
+    const nextValue = refreshed?.[fieldKey];
+    return typeof nextValue === "string" && nextValue.trim() ? nextValue : fallbackUrl;
+  };
+
   // Primary data loading
   useEffect(() => {
-    if (isPreviewMode && (!previewId || !previewCompanyId)) return;
-    if (!isPreviewMode && !internalAliasId) return;
+    if (isPreviewMode && (!previewId || !previewCompanyId)) {
+      setLoading(false);
+      setError("Passport preview not found");
+      return;
+    }
+    if (!isPreviewMode && !internalAliasId) {
+      setLoading(false);
+      setError("Passport not found");
+      return;
+    }
     (async () => {
       setLoading(true);
       setError("");
       try {
         // 1. Fetch the passport record
-        const endpoint = isPreviewMode
-          ? `${API}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
-          : versionNumber
-            ? `${API}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
-            : `${API}/api/passports/by-product/${encodedProductId}`;
+        const endpoint = buildPassportEndpoint();
         const r = await fetchWithAuth(endpoint, isPreviewMode ? { headers: authHeaders() } : undefined);
         if (!r.ok) throw new Error("Passport not found");
         const data = await r.json();
@@ -369,6 +402,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           sigVerification={sigVerification}
           verificationBundle={verificationBundle}
           carrierAuthenticity={passport?.carrier_authenticity || carrierAuthenticity}
+          onRefreshFieldUrl={refreshFieldUrl}
           isPreviewMode={isPreviewMode}
           isInactiveView={isInactiveView}
           isObsolete={isObsoletePassportStatus(passport.release_status)}

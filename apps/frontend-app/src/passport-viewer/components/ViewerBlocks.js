@@ -5,7 +5,7 @@ import { PieChart, parseCompositionFromTable, parseCompositionFromText } from ".
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
-import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel } from "../utils/viewerHelpers";
+import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel, formatFieldLabelWithUnit } from "../utils/viewerHelpers";
 import { getMarketingContactUrl } from "../utils/QRcode";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -528,7 +528,7 @@ export function LiveBadge({ updatedAt }) {
   );
 }
 
-export function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, sectionId = "" }) {
+export function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, sectionId = "", onRefreshFieldUrl = null }) {
   const [expandedKey, setExpandedKey] = useState(null);   // which dynamic field is open
   const [chartTypes,  setChartTypes]  = useState({});     // { [fieldKey]: "line"|"histogram" }
   const [history,     setHistory]     = useState({});     // { [fieldKey]: { data, loading } }
@@ -558,7 +558,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
   const fieldEntries = visibleFields.map(f => {
     const access = f.access || ["public"];
     const isPublic = access.includes("public");
-    const fieldLabel = translateSchemaLabel(lang, f);
+    const fieldLabel = formatFieldLabelWithUnit(translateSchemaLabel(lang, f), f);
     const isDynamic = !!f.dynamic;
     const dynEntry = isDynamic ? dynamicValues?.[f.key] : null;
     const src = unlockedPassport || passport;
@@ -578,7 +578,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     } else if (f.type === "boolean") {
       display = <div className="pv-field-value-strong">{translateFieldValue(lang, !!raw, "boolean")}</div>;
     } else if (f.type === "file" && isFileUrl(raw)) {
-      display = <FileCell url={raw} label={`${passport.model_name}_${f.key}`} />;
+      display = <FileCell url={raw} label={`${passport.model_name}_${f.key}`} onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(f.key, raw) : null} />;
     } else if (f.type === "table") {
       const { columns: storedColumns, rows: tableData } = parseStoredTableValue(raw);
       if (Array.isArray(tableData) && tableData.length > 0) {
@@ -607,7 +607,12 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     } else if (f.type === "symbol" && raw) {
       display = (
         <div className="pv-field-symbol-wrap">
-          <img src={raw} alt={f.label} className="field-symbol-img pv-field-symbol" />
+          <RefreshableImage
+            src={raw}
+            alt={f.label}
+            className="field-symbol-img pv-field-symbol"
+            onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(f.key, raw) : null}
+          />
         </div>
       );
     } else if (f.type === "url" && raw) {
@@ -755,12 +760,18 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
 // ─── File cell with inline PDF preview ───────────────────────
 // Fetches the PDF as a blob to create a same-origin URL,
 // which bypasses X-Frame-Options restrictions on the backend.
-export function FileCell({ url, label }) {
+export function FileCell({ url, label, onRefreshUrl = null }) {
   const [open,    setOpen]    = useState(false);
   const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err,     setErr]     = useState(null);
   const previewId = useId();
+
+  const tryResolveUrl = async () => {
+    if (typeof onRefreshUrl !== "function") return url;
+    const nextUrl = await onRefreshUrl(url);
+    return nextUrl || url;
+  };
 
   const handleToggle = async () => {
     if (open) { setOpen(false); return; }
@@ -768,7 +779,12 @@ export function FileCell({ url, label }) {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetchWithAuth(url);
+      let activeUrl = url;
+      let res = await fetchWithAuth(activeUrl);
+      if (!res.ok && (res.status === 401 || res.status === 403 || res.status === 404 || res.status === 410)) {
+        activeUrl = await tryResolveUrl();
+        res = await fetchWithAuth(activeUrl);
+      }
       if (!res.ok) throw new Error(`Could not load PDF (${res.status})`);
       const blob = await res.blob();
       setBlobUrl(URL.createObjectURL(blob));
@@ -780,6 +796,17 @@ export function FileCell({ url, label }) {
     }
   };
 
+  const handleOpen = async (e) => {
+    e.preventDefault();
+    setErr(null);
+    try {
+      const activeUrl = await tryResolveUrl();
+      window.open(activeUrl, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      setErr(e.message || "Could not open file");
+    }
+  };
+
   return (
     <div className="pdf-cell">
       {err && <div className="pdf-err" role="alert">{err}</div>}
@@ -787,7 +814,7 @@ export function FileCell({ url, label }) {
         <iframe id={previewId} src={blobUrl} title={label} className="pdf-iframe" />
       )}
       <div className="pdf-cell-actions">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="pdf-open-link">
+        <a href={url} target="_blank" rel="noopener noreferrer" className="pdf-open-link" onClick={handleOpen}>
           Open
         </a>
         <button
@@ -803,6 +830,31 @@ export function FileCell({ url, label }) {
       </div>
     </div>
   );
+}
+
+export function RefreshableImage({ src, alt, className = "", onRefreshUrl = null }) {
+  const [activeSrc, setActiveSrc] = useState(src);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    setActiveSrc(src);
+    setRefreshing(false);
+  }, [src]);
+
+  const handleError = async () => {
+    if (refreshing || typeof onRefreshUrl !== "function" || !src) return;
+    setRefreshing(true);
+    try {
+      const nextSrc = await onRefreshUrl(src);
+      if (nextSrc && nextSrc !== activeSrc) setActiveSrc(nextSrc);
+    } catch {
+      // Leave the current src in place if refresh fails.
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return <img src={activeSrc} alt={alt} className={className} onError={handleError} />;
 }
 
 // ─── Passport section tabs ────────────────────────────────────
@@ -964,7 +1016,7 @@ export function PrintView({ passport, companyData, sections }) {
                 } else {
                   display = raw || "—";
                 }
-                return (<tr key={f.key}><th>{f.label}</th><td>{display}</td></tr>);
+                return (<tr key={f.key}><th>{formatFieldLabelWithUnit(f.label, f)}</th><td>{display}</td></tr>);
               })}
             </tbody>
           </table>

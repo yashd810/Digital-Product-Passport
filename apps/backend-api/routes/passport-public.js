@@ -4,6 +4,7 @@ const logger = require("../src/infrastructure/logging/logger");
 const { buildCanonicalIdentityBundle } = require("../src/shared/identifiers/canonical-identity-bundle");
 const { isPublicVersionVisible } = require("../src/modules/public-passports/visibility");
 const { addLegacyInternalAliasAliases } = require("../src/shared/passports/passport-helpers");
+const { rewriteRepositoryLinksForSignedAccessDeep } = require("../src/shared/repository/repository-file-links");
 
 module.exports = function registerPassportPublicRoutes(app, {
   pool,
@@ -37,6 +38,12 @@ module.exports = function registerPassportPublicRoutes(app, {
   const PLATFORM_DID = didService.getPlatformDid();
   const CANONICAL_DPP_CONTEXT_URL = `https://${DID_DOMAIN}/contexts/dpp/v1`;
   const CANONICAL_BATTERY_CONTEXT_URL = `https://${DID_DOMAIN}/dictionary/battery/v1/context.jsonld`;
+
+  function securePublicRepositoryLinks(value) {
+    return rewriteRepositoryLinksForSignedAccessDeep(value, {
+      appBaseUrl: API_ORIGIN,
+    });
+  }
 
   const DPP_CONTEXT_RESPONSE = {
     "@context": {
@@ -423,9 +430,9 @@ module.exports = function registerPassportPublicRoutes(app, {
     const loaded = await loadPublicPassportByGuid(dppId, { versionNumber });
     if (!loaded?.passport) return null;
 
-    const sanitizedPassport = loaded.passport.backup_public_handover ?
+    const sanitizedPassport = securePublicRepositoryLinks(loaded.passport.backup_public_handover ?
     loaded.passport :
-    await stripRestrictedFieldsForPublicView(loaded.passport, loaded.passport.passport_type);
+    await stripRestrictedFieldsForPublicView(loaded.passport, loaded.passport.passport_type));
     const passportDppId = loaded.passport.dppId || loaded.passport.dpp_id || loaded.passport.guid || dppId;
     const resolvedVersion = versionNumber || sanitizedPassport.version_number || loaded.passport.version_number || 1;
     const verifyResult = await verifyPassportSignature(passportDppId, resolvedVersion);
@@ -700,11 +707,12 @@ module.exports = function registerPassportPublicRoutes(app, {
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const passport = resolved.passport;
-      const [sanitizedPassport, typeDef, company] = await Promise.all([
+      const [sanitizedPassportRaw, typeDef, company] = await Promise.all([
       passport.backup_public_handover ? passport : stripRestrictedFieldsForPublicView(passport, passport.passport_type),
       resolved.typeDef || loadTypeDef(passport.passport_type),
       resolved.company || hydrateCompany(passport.company_id)]
       );
+      const sanitizedPassport = securePublicRepositoryLinks(sanitizedPassportRaw);
       const companyName = company?.company_name || "";
       const publicPath = buildCurrentPublicPassportPath({
         companyName,
@@ -737,7 +745,7 @@ module.exports = function registerPassportPublicRoutes(app, {
         dppDid: canonicalPayloadRaw?.dppDid || canonicalIdentity.dppDid || linkedSubjects?.dppDid || null,
         companyDid: canonicalPayloadRaw?.companyDid || canonicalIdentity.companyDid || linkedSubjects?.companyDid || null,
       };
-      const requestedPayload = buildRequestedPassportPayload(req, sanitizedPassport, typeDef, company);
+      const requestedPayload = securePublicRepositoryLinks(buildRequestedPassportPayload(req, sanitizedPassport, typeDef, company));
 
       const basePayload = addLegacyInternalAliasAliases({
         ...sanitizedPassport,
@@ -848,9 +856,9 @@ module.exports = function registerPassportPublicRoutes(app, {
       const loaded = await loadPublicPassportByGuid(req.params.dppId);
       if (!loaded?.passport) return res.status(404).json({ error: "Passport not found" });
 
-      const sanitizedPassport = loaded.passport.backup_public_handover ?
-      loaded.passport :
-      await stripRestrictedFieldsForPublicView(loaded.passport, loaded.passport.passport_type);
+    const sanitizedPassport = securePublicRepositoryLinks(loaded.passport.backup_public_handover ?
+    loaded.passport :
+    await stripRestrictedFieldsForPublicView(loaded.passport, loaded.passport.passport_type));
       const canonicalPayload = buildRequestedPassportPayload(req, sanitizedPassport, loaded.typeDef, loaded.company);
 
       if (wantsSemanticResponse(req)) {

@@ -20,13 +20,13 @@ export default function PublicViewerApp() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/p/:productId" element={<PublicPassportRedirectPage />} />
-        <Route path="/p/inactive/:productId/:versionNumber" element={<PublicPassportRedirectPage />} />
+        <Route path="/p/:internalAliasId" element={<PublicPassportRedirectPage />} />
+        <Route path="/p/inactive/:internalAliasId/:versionNumber" element={<PublicPassportRedirectPage />} />
 
-        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber/technical/*" element={<PassportViewer />} />
-        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:productId/:versionNumber" element={<PassportViewer />} />
-        <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId/technical/*" element={<PassportViewer />} />
-        <Route path="/dpp/:manufacturerSlug/:modelSlug/:productId" element={<PassportViewer />} />
+        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:internalAliasId/:versionNumber/technical/*" element={<PassportViewer />} />
+        <Route path="/dpp/inactive/:manufacturerSlug/:modelSlug/:internalAliasId/:versionNumber" element={<PassportViewer />} />
+        <Route path="/dpp/:manufacturerSlug/:modelSlug/:internalAliasId/technical/*" element={<PassportViewer />} />
+        <Route path="/dpp/:manufacturerSlug/:modelSlug/:internalAliasId" element={<PassportViewer />} />
 
         <Route path="/" element={<Navigate to="/p/not-found" replace />} />
         <Route path="/p/not-found" element={<NotFound />} />

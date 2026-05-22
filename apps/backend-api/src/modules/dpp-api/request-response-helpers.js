@@ -2,6 +2,7 @@
 
 const { randomUUID } = require("crypto");
 const { addLegacyInternalAliasAliases } = require("../../shared/passports/passport-helpers");
+const { rewriteRepositoryLinksForSignedAccessDeep } = require("../../shared/repository/repository-file-links");
 
 function createRequestResponseHelpers({
   pool,
@@ -176,7 +177,10 @@ function createRequestResponseHelpers({
   }
 
   async function buildPassportResponse(req, passport, typeDef, companyName) {
-    const sanitized = await stripRestrictedFieldsForPublicView(passport, passport.passport_type);
+    const sanitized = rewriteRepositoryLinksForSignedAccessDeep(
+      await stripRestrictedFieldsForPublicView(passport, passport.passport_type),
+      { appBaseUrl: getAppUrl() }
+    );
     if (getRepresentation(req) === "full") {
       return addLegacyInternalAliasAliases(buildExpandedPassportPayload(sanitized, typeDef, { companyName }));
     }

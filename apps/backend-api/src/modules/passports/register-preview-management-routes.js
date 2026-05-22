@@ -1,6 +1,7 @@
 "use strict";
 
 const { buildCanonicalIdentityBundle } = require("../../shared/identifiers/canonical-identity-bundle");
+const { rewriteRepositoryLinksForSignedAccessDeep } = require("../../shared/repository/repository-file-links");
 
 module.exports = function registerPreviewManagementRoutes(app, deps) {
   const {
@@ -23,6 +24,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     productIdentifierService,
     logAudit,
   } = deps;
+  const previewAppBaseUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001";
 
   app.get("/api/companies/:companyId/passports/:passportKey/preview", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
@@ -32,7 +34,10 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
       const sourcePassport = resolved.passport;
       const resolvedCompanyId = sourcePassport.company_id ?? sourcePassport.companyId ?? companyId ?? null;
-      const passport = await stripRestrictedFieldsForPublicView(sourcePassport, sourcePassport.passport_type);
+      const passport = rewriteRepositoryLinksForSignedAccessDeep(
+        await stripRestrictedFieldsForPublicView(sourcePassport, sourcePassport.passport_type),
+        { appBaseUrl: previewAppBaseUrl }
+      );
       const company = resolvedCompanyId
         ? (await pool.query(
             `SELECT id, company_name, company_logo, did_slug

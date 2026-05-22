@@ -1,9 +1,15 @@
 const logger = require("../src/infrastructure/logging/logger");
+const {
+  decodeRepositoryFileAccessToken,
+  buildRepositoryFilePublicUrl,
+  decodeRepositoryFileToken,
+} = require("../src/shared/repository/repository-file-links");
 
 module.exports = function registerRepositoryRoutes(app, {
   pool,
   fs,
   path,
+  publicReadRateLimit,
   authenticateToken,
   checkCompanyAccess,
   requireEditor,
@@ -13,9 +19,14 @@ module.exports = function registerRepositoryRoutes(app, {
   isPathInsideBase,
   storageService,
 }) {
+  const appBaseUrlFromRequest = (req) => `${req.protocol}://${req.get("host")}`;
   const repositoryFileUrl = (req, row) => {
     if (row?.id && (row.storage_key || row.file_path)) {
-      return `${req.protocol}://${req.get("host")}/api/companies/${row.company_id}/repository/${row.id}/file`;
+      return buildRepositoryFilePublicUrl({
+        appBaseUrl: appBaseUrlFromRequest(req),
+        companyId: row.company_id,
+        itemId: row.id,
+      });
     }
     return row?.file_url || null;
   };
@@ -300,6 +311,100 @@ module.exports = function registerRepositoryRoutes(app, {
       } catch (e) {
       logger.error("Company symbol upload error:", e.message);
         res.status(500).json({ error: e.message || "Upload failed" });
+      }
+    }
+  );
+
+  app.get(
+    "/repository-files/access/:token",
+    publicReadRateLimit,
+    async (req, res) => {
+      try {
+        const resolved = decodeRepositoryFileAccessToken(req.params.token);
+        if (!resolved) return res.status(404).json({ error: "File not found" });
+
+        const item = await pool.query(
+          `SELECT *
+           FROM company_repository
+           WHERE id = $1
+             AND company_id = $2
+             AND type = 'file'
+           LIMIT 1`,
+          [resolved.itemId, resolved.companyId]
+        );
+        if (!item.rows.length) return res.status(404).json({ error: "File not found" });
+        const row = item.rows[0];
+
+        setRepositoryFileHeaders(res, row);
+
+        if (row.storage_key && storageService.fetchObject) {
+          const objectResponse = await storageService.fetchObject(row.storage_key);
+          const contentLength = objectResponse.headers?.get("content-length");
+          const etag = objectResponse.headers?.get("etag");
+          if (contentLength) res.setHeader("Content-Length", contentLength);
+          if (etag) res.setHeader("ETag", etag);
+          return res.send(Buffer.from(await objectResponse.arrayBuffer()));
+        }
+
+        if (row.file_path) {
+          const safeFilePath = path.resolve(row.file_path);
+          if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR) || !fs.existsSync(safeFilePath)) {
+            return res.status(404).json({ error: "File not found" });
+          }
+          return res.sendFile(safeFilePath);
+        }
+
+        return res.status(404).json({ error: "File not available" });
+      } catch (e) {
+        logger.error({ err: e }, "[repository-signed-file] Failed to serve repository file");
+        return res.status(500).json({ error: "Failed to serve file" });
+      }
+    }
+  );
+
+  app.get(
+    "/repository-files/:token",
+    publicReadRateLimit,
+    async (req, res) => {
+      try {
+        const resolved = decodeRepositoryFileToken(req.params.token);
+        if (!resolved) return res.status(404).json({ error: "File not found" });
+
+        const item = await pool.query(
+          `SELECT *
+           FROM company_repository
+           WHERE id = $1
+             AND company_id = $2
+             AND type = 'file'
+           LIMIT 1`,
+          [resolved.itemId, resolved.companyId]
+        );
+        if (!item.rows.length) return res.status(404).json({ error: "File not found" });
+        const row = item.rows[0];
+
+        setRepositoryFileHeaders(res, row);
+
+        if (row.storage_key && storageService.fetchObject) {
+          const objectResponse = await storageService.fetchObject(row.storage_key);
+          const contentLength = objectResponse.headers?.get("content-length");
+          const etag = objectResponse.headers?.get("etag");
+          if (contentLength) res.setHeader("Content-Length", contentLength);
+          if (etag) res.setHeader("ETag", etag);
+          return res.send(Buffer.from(await objectResponse.arrayBuffer()));
+        }
+
+        if (row.file_path) {
+          const safeFilePath = path.resolve(row.file_path);
+          if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR) || !fs.existsSync(safeFilePath)) {
+            return res.status(404).json({ error: "File not found" });
+          }
+          return res.sendFile(safeFilePath);
+        }
+
+        return res.status(404).json({ error: "File not available" });
+      } catch (e) {
+        logger.error({ err: e }, "[repository-public-file] Failed to serve repository file");
+        return res.status(500).json({ error: "Failed to serve file" });
       }
     }
   );

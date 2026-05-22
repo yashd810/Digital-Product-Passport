@@ -1,5 +1,7 @@
 "use strict";
 
+const { rewriteLegacyRepositoryLinksDeep } = require("../repository/repository-file-links");
+
 const IN_REVISION_STATUS = "in_revision";
 
 const SYSTEM_PASSPORT_FIELDS = new Set([
@@ -59,14 +61,16 @@ const normalizePassportRow = (row) => {
   if (!row) return row;
   const dppId = row.dppId ?? row.dpp_id ?? null;
   const companyId = row.companyId ?? row.company_id ?? null;
-  const normalized = {
+  const normalized = rewriteLegacyRepositoryLinksDeep({
     ...row,
     dpp_id: row.dpp_id ?? dppId,
     dppId,
     company_id: row.company_id ?? companyId,
     companyId,
     release_status: normalizeReleaseStatus(row.release_status),
-  };
+  }, {
+    appBaseUrl: process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001",
+  });
   return normalized;
 };
 
