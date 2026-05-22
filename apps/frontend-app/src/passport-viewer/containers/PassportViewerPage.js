@@ -326,6 +326,12 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     internalAliasId: passport?.internal_alias_id,
     previewId: passport?.dppId,
   });
+  const releasedAtTimestamp =
+    verificationBundle?.releasedAt
+    || sigVerification?.releasedAt
+    || passport?.releasedAt
+    || passport?.released_at
+    || null;
 
   // Route normalization
   useEffect(() => {
@@ -407,6 +413,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           isInactiveView={isInactiveView}
           isObsolete={isObsoletePassportStatus(passport.release_status)}
           canonicalPublicPath={canonicalPublicPath}
+          lastUpdateAt={releasedAtTimestamp}
         />
       </div>
 

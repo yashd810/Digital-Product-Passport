@@ -235,6 +235,20 @@ function stableDidSegment(value, fallback = "passport") {
   return segment || fallback;
 }
 
+function isViewerHiddenField(field) {
+  const normalizedKey = String(field?.key || "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const normalizedLabel = String(field?.label || "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalizedKey === "internal alias id" || normalizedLabel === "internal alias id";
+}
+
 function buildViewerDidFallbacks(passport) {
   const didDomain = "www.claros-dpp.online";
   const companyName = passport?.company_profile?.company_name
@@ -271,7 +285,9 @@ function parseHeaderArray(value) {
 export function PassportHeaderPanel({ passport, typeDef }) {
   if (!passport) return null;
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
-  const fields = Array.isArray(systemHeader?.fields) ? systemHeader.fields.filter((field) => field?.key !== "internalAliasId") : [];
+  const fields = Array.isArray(systemHeader?.fields)
+    ? systemHeader.fields.filter((field) => field?.key !== "internalAliasId" && !isViewerHiddenField(field))
+    : [];
   const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport);
   const resolvedCompanyDid = passport.companyDid || passport.company_did || canonicalSubjects.companyDid || fallbackDids.companyDid;

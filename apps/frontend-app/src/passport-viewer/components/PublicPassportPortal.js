@@ -34,6 +34,15 @@ function normalizeText(value) {
     .trim();
 }
 
+function isViewerHiddenField(field) {
+  const normalizedKey = normalizeText(field?.key);
+  const normalizedLabel = normalizeText(field?.label);
+  return normalizedKey === "internal alias id"
+    || normalizedLabel === "internal alias id"
+    || normalizedKey === "internalaliasid"
+    || normalizedKey === "internal aliasid";
+}
+
 function isUrlLike(value) {
   return typeof value === "string" && /^(https?:)?\/\//i.test(value);
 }
@@ -98,7 +107,9 @@ function buildViewerDidFallbacks(passport, companyData) {
 
 function flattenSections(sections) {
   return sections.flatMap((section) =>
-    (section.fields || []).map((field) => ({ ...field, _section: section }))
+    (section.fields || [])
+      .filter((field) => !isViewerHiddenField(field))
+      .map((field) => ({ ...field, _section: section }))
   );
 }
 
@@ -175,7 +186,7 @@ function parseStoredTableValue(raw) {
   return { columns: [], rows: [] };
 }
 
-function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues) {
+function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues, lastUpdateAt) {
   const manufactured = findFieldEntry(
     fields,
     ["manufactured date", "manufacture date", "manufacturing date", "date of manufacture", "production date"],
@@ -204,7 +215,7 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues)
     unlockedPassport,
     dynamicValues
   );
-  const updatedAt = passport?.updated_at || passport?.created_at || "";
+  const updatedAt = lastUpdateAt || passport?.updated_at || passport?.created_at || "";
   const serviceContextText = serviceContext
     ? (() => {
         const contextLabel = normalizeText(serviceContext.field?.label || serviceContext.field?.key || "");
@@ -229,14 +240,14 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues)
       text: serviceContextText,
     },
     {
-      date: formatIsoDate(updatedAt, { dateOnly: true }),
+      date: formatIsoDate(updatedAt),
       title: "DPP updated",
       text: updatedAt ? "Latest data, QR binding, and signature checked." : "",
     },
   ];
 }
 
-function buildHeaderRows(passport, typeDef, companyData) {
+function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
   const canonicalSubjects = passport?.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport, companyData);
@@ -251,7 +262,7 @@ function buildHeaderRows(passport, typeDef, companyData) {
     granularity: passport?.granularity || "item",
     dppSchemaVersion: passport?.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
     dppStatus: formatPassportStatus(passport?.release_status),
-    lastUpdate: formatIsoDate(passport?.updated_at || passport?.created_at) || null,
+    lastUpdate: formatIsoDate(lastUpdateAt || passport?.updated_at || passport?.created_at) || null,
     economicOperatorId: resolvedCompanyDid || passport?.economicOperatorId || passport?.economic_operator_id,
     facilityId: resolvedFacilityDid || passport?.facilityId || passport?.facility_id,
     contentSpecificationIds: Array.isArray(passport?.content_specification_ids)
@@ -262,7 +273,7 @@ function buildHeaderRows(passport, typeDef, companyData) {
     companyDid: resolvedCompanyDid,
   };
 
-  return systemHeader.fields.map((field) => ({
+  return (systemHeader.fields || []).filter((field) => !isViewerHiddenField(field)).map((field) => ({
     key: field.key,
     label: field.label || field.key,
     value: formatValue(values[field.key]),
@@ -567,10 +578,14 @@ export default function PublicPassportPortal({
   isInactiveView = false,
   isObsolete = false,
   canonicalPublicPath = "",
+  lastUpdateAt = null,
 }) {
   const [activePage, setActivePage] = useState("overview");
   const [previewImage, setPreviewImage] = useState(null);
-  const sections = typeDef?.fields_json?.sections || typeDef?.sections || [];
+  const sections = (typeDef?.fields_json?.sections || typeDef?.sections || []).map((section) => ({
+    ...section,
+    fields: (section.fields || []).filter((field) => !isViewerHiddenField(field)),
+  }));
   const fields = useMemo(() => flattenSections(sections), [sections]);
 
   useEffect(() => {
@@ -602,8 +617,8 @@ export default function PublicPassportPortal({
     })
     .slice(0, 3);
 
-  const lifecycleEvents = buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues);
-  const headerRows = buildHeaderRows(passport, typeDef, companyData);
+  const lifecycleEvents = buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues, lastUpdateAt);
+  const headerRows = buildHeaderRows(passport, typeDef, companyData, lastUpdateAt);
   const trustRows = buildTrustRows(passport, carrierAuthenticity, sigVerification);
   const verificationRows = buildVerificationRows(verificationBundle);
   const documentItems = buildDocumentItems(fields, passport, unlockedPassport, dynamicValues, lang);
@@ -621,7 +636,7 @@ export default function PublicPassportPortal({
     ["Manufacturer", companyData?.company_name || passport?.manufacturer || passport?.manufactured_by || ""],
     ["Serial number", passport?.serial_number || passport?.product_serial_number || passport?.serial || passport?.batterySerialNumber || passport?.battery_serial_number || passport?.productSerialNumber || ""],
     ["Status", currentStatus || ""],
-    ["Last update", formatIsoDate(passport?.updated_at, { dateOnly: true })],
+    ["Last update", formatIsoDate(lastUpdateAt || passport?.updated_at || passport?.created_at)],
   ];
 
   return (
