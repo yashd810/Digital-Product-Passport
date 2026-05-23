@@ -344,13 +344,13 @@ networks:
 
 ```bash
 # Start all services
-docker-compose up -d
+./scripts/restart-local-stack.sh
 
 # Start specific service
 docker-compose up -d postgres
 
 # View running containers
-docker-compose ps
+docker compose -f docker/docker-compose.yml ps
 
 # View logs
 docker-compose logs
@@ -359,19 +359,20 @@ docker-compose logs
 docker-compose logs -f backend-api
 
 # Stop services
-docker-compose stop
+docker compose -f docker/docker-compose.yml stop
 
 # Stop and remove containers
-docker-compose down
+docker compose -f docker/docker-compose.yml down
 
-# Remove everything including volumes
-docker-compose down -v
+# Remove Docker-managed volumes
+# Local DB data remains in ./.docker-data/postgres
+docker compose -f docker/docker-compose.yml down -v
 
 # Rebuild images
 docker-compose build
 
 # Restart services
-docker-compose restart backend-api
+docker compose -f docker/docker-compose.yml restart backend-api
 ```
 
 ### Service Management

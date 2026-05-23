@@ -85,16 +85,6 @@ function updateEditablePassportUseCase(deps) {
       }
     }
 
-    for (const [key, value] of Object.entries(fields)) {
-      if (value !== "[object Object]") continue;
-      const existingValue = current.rows[0][key];
-      if (existingValue === undefined) {
-        delete fields[key];
-        continue;
-      }
-      fields[key] = existingValue;
-    }
-
     const rowId = current.rows[0].id;
     const currentGranularity = String(current.rows[0].granularity || "item").trim().toLowerCase();
     let cachedCompanyName;
@@ -255,7 +245,7 @@ function updateEditablePassportUseCase(deps) {
     return {
       success: true,
       passport: updateResult.updatedRow
-        ? { ...normalizePassportRow(updateResult.updatedRow), passport_type: typeSchema.typeName }
+        ? { ...normalizePassportRow(updateResult.updatedRow, typeSchema), passport_type: typeSchema.typeName }
         : null,
     };
   };

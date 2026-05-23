@@ -31,6 +31,8 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const { companyId } = req.params;
       const { passportType, search, status } = req.query;
       if (!passportType) return res.status(400).json({ error: "passportType query param is required" });
+      const typeSchema = await getPassportTypeSchema(passportType);
+      if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
 
       const tableName = getTable(passportType);
       let query = `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
@@ -57,7 +59,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       query += " ORDER BY p.lineage_id, p.version_number DESC";
 
       const result = await pool.query(query, params);
-      res.json(result.rows.map((row) => ({ ...normalizePassportRow(row), passport_type: passportType })));
+      res.json(result.rows.map((row) => ({ ...normalizePassportRow(row, typeSchema), passport_type: passportType })));
     } catch {
       res.status(500).json({ error: "Failed to fetch passports" });
     }
@@ -125,7 +127,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
           }
 
           if (row) {
-            results.push({ ...normalizePassportRow(row), passport_type: typeSchema.typeName, _status: "found" });
+            results.push({ ...normalizePassportRow(row, typeSchema), passport_type: typeSchema.typeName, _status: "found" });
           } else {
             results.push({ dppId: dppId || undefined, internal_alias_id: internalAliasId || undefined, _status: "not_found" });
           }
@@ -304,29 +306,35 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const resolved = await fetchCompanyPassportRecord({ companyId, dppId, passportType, versionNumber });
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
+      // Get passport type schema for normalization
+      const typeDef = await pool.query(
+        `SELECT type_name, product_category, semantic_model_key, fields_json
+         FROM passport_types
+         WHERE type_name = $1
+         LIMIT 1`,
+        [resolved.passport.passport_type || passportType]
+      );
+      if (!typeDef.rows.length) {
+        return res.status(404).json({ error: "Passport type not found" });
+      }
+
+      // Normalize the passport (deserialize JSONB fields)
+      const normalizedPassport = normalizePassportRow(
+        resolved.passport,
+        typeDef.rows[0]
+      );
+
       if (isFullRepresentationRequest(req.query.representation)) {
-        const [typeDef, company] = await Promise.all([
-          pool.query(
-            `SELECT type_name, product_category, semantic_model_key, fields_json
-             FROM passport_types
-             WHERE type_name = $1
-             LIMIT 1`,
-            [resolved.passport.passport_type || passportType]
-          ),
-          loadCompanySerializationContext(companyId),
-        ]);
-        if (!typeDef.rows.length) {
-          return res.status(404).json({ error: "Passport type not found" });
-        }
+        const company = await loadCompanySerializationContext(companyId);
         return res.json(
-          buildExpandedPassportPayload(resolved.passport, typeDef.rows[0], {
+          buildExpandedPassportPayload(normalizedPassport, typeDef.rows[0], {
             company,
-            granularity: company?.default_granularity || resolved.passport.granularity || "model",
+            granularity: company?.default_granularity || normalizedPassport.granularity || "model",
           })
         );
       }
 
-      res.json(resolved.passport);
+      res.json(normalizedPassport);
     } catch {
       res.status(500).json({ error: "Failed to fetch passport" });
     }

@@ -71,7 +71,7 @@ function registerPublicApiV1Routes(app, deps) {
         access_mode: req.apiKey.accessMode || "read",
         max_confidentiality: req.apiKey.maxConfidentiality || "regulated",
         passports: r.rows.map((row) => {
-          const normalized = { ...normalizePassportRow(row), passport_type: typeSchema.typeName };
+          const normalized = { ...normalizePassportRow(row, typeSchema), passport_type: typeSchema.typeName };
           return sanitizePassportForApiKey(normalized, typeSchema, req.apiKey);
         }),
       });
@@ -101,7 +101,7 @@ function registerPublicApiV1Routes(app, deps) {
         [dppId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-      const normalized = { ...normalizePassportRow(r.rows[0]), passport_type: passportType };
+      const normalized = { ...normalizePassportRow(r.rows[0], typeSchema), passport_type: passportType };
       res.json(sanitizePassportForApiKey(normalized, typeSchema, req.apiKey));
     } catch (e) {
       logger.error("API v1 get error:", e.message);
@@ -220,7 +220,7 @@ function registerPublicApiV1Routes(app, deps) {
       );
 
       const responsePassport = sanitizePassportForApiKey(
-        { ...normalizePassportRow(updateResult.updatedRow || { ...current.rows[0], ...fields }), passport_type: resolvedPassportType },
+        { ...normalizePassportRow(updateResult.updatedRow || { ...current.rows[0], ...fields }, typeSchema), passport_type: resolvedPassportType },
         typeSchema,
         req.apiKey
       );

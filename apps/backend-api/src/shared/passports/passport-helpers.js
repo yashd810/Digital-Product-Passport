@@ -57,17 +57,93 @@ const isPublicHistoryStatus = (status) => {
 const isEditablePassportStatus = (status) =>
   EDITABLE_PASSPORT_STATUSES.has(normalizeReleaseStatus(status));
 
-const normalizePassportRow = (row) => {
+const extractSchemaFields = (schema) => {
+  if (!schema || typeof schema !== "object") return [];
+  if (Array.isArray(schema.schemaFields)) return schema.schemaFields.filter((field) => field?.key);
+  if (Array.isArray(schema.sections)) {
+    return schema.sections
+      .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
+      .filter((field) => field?.key);
+  }
+  if (schema.fields_json && typeof schema.fields_json === "object") {
+    return extractSchemaFields(schema.fields_json);
+  }
+  return [];
+};
+
+const normalizePassportRow = (row, schema) => {
   if (!row) return row;
   const dppId = row.dppId ?? row.dpp_id ?? null;
   const companyId = row.companyId ?? row.company_id ?? null;
+  const schemaFields = extractSchemaFields(schema);
+  
+  // Deserialize JSONB fields
+  let rowData = { ...row };
+  
+  // Build lowercase-to-camelCase key mapping from schema
+  const lowercaseToSchemaKey = {};
+  if (schemaFields.length > 0) {
+    schemaFields.forEach((field) => {
+      if (field && field.key) {
+        const lowerKey = String(field.key).toLowerCase();
+        lowercaseToSchemaKey[lowerKey] = field.key;
+      }
+    });
+  }
+  
+  if (Object.keys(lowercaseToSchemaKey).length > 0) {
+    const normalized = {};
+    for (const [key, value] of Object.entries(rowData)) {
+      const lowerKey = String(key).toLowerCase();
+      const schemaKey = lowercaseToSchemaKey[lowerKey];
+      if (schemaKey && schemaKey !== key) {
+        normalized[schemaKey] = value;
+      } else {
+        normalized[key] = value;
+      }
+    }
+    rowData = normalized;
+  }
+  
+  if (schemaFields.length > 0) {
+    const jsonbFields = new Set();
+    schemaFields.forEach((field) => {
+      if (field && field.key) {
+        const storageType = String(field.storageType || field.storage_type || field.valueType || "").trim().toLowerCase();
+        if (field.type === "table" || field.repeated === true || field.structured === true || ["json", "jsonb", "object", "array"].includes(storageType)) {
+          jsonbFields.add(field.key);
+        }
+      }
+    });
+
+    for (const key of jsonbFields) {
+      if (typeof rowData[key] === "string" && rowData[key]) {
+        try {
+          rowData[key] = JSON.parse(rowData[key]);
+        } catch {}
+      }
+    }
+  } else {
+    for (const [key, value] of Object.entries(rowData)) {
+      if (typeof value === "string" && value && value.trim().startsWith("{")) {
+        try {
+          rowData[key] = JSON.parse(value);
+        } catch {}
+      } else if (typeof value === "string" && value && value.trim().startsWith("[")) {
+        try {
+          rowData[key] = JSON.parse(value);
+        } catch {}
+      }
+    }
+  }
+  
   const normalized = rewriteLegacyRepositoryLinksDeep({
-    ...row,
-    dpp_id: row.dpp_id ?? dppId,
+    ...rowData,
+    dpp_id: rowData.dpp_id ?? dppId,
     dppId,
-    company_id: row.company_id ?? companyId,
+    company_id: rowData.company_id ?? companyId,
     companyId,
-    release_status: normalizeReleaseStatus(row.release_status),
+    release_status: normalizeReleaseStatus(rowData.release_status),
   }, {
     appBaseUrl: process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001",
   });
@@ -692,6 +768,7 @@ module.exports = {
   formatHistoryFieldValue,
   comparableHistoryFieldValue,
   isPlainObject,
+  extractSchemaFields,
   getPassportFieldLookupKeys,
   getPassportFieldValue,
   getAssetFieldMap,

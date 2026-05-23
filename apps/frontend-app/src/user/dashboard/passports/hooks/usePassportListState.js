@@ -8,6 +8,8 @@ import { buildPublicViewerUrl } from "../../../../passports/utils/publicViewerUr
 import {
   calcCompleteness,
   formatPassportTypeLabel,
+  getPassportDateTimestamp,
+  getPassportDateValue,
   getPassportGroupKey,
   getPassportSerialNumberForType,
   sortPassportsByVersionDesc,
@@ -192,7 +194,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         const types = typeResponse.ok ? await typeResponse.json() : [];
         const all = (await fetchForTypes(Array.isArray(types) ? types : []))
           .filter((passport) => passport.created_by === user?.id)
-          .sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
+          .sort((left, right) => getPassportDateTimestamp(right) - getPassportDateTimestamp(left));
         setPassports(all);
         return;
       }
@@ -205,7 +207,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         const all = await fetchForTypes(
           (Array.isArray(types) ? types : []).filter((type) => type.product_category === activeProductCategory)
         );
-        all.sort((left, right) => new Date(right.created_at) - new Date(left.created_at));
+        all.sort((left, right) => getPassportDateTimestamp(right) - getPassportDateTimestamp(left));
         setPassports(all);
         return;
       }
@@ -296,7 +298,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       { key: "version_number", type: "number", getValue: (group) => group.latest?.version_number },
       { key: "serial_number", type: "string", getValue: (group) => getPassportSerialNumberForType(group.latest, allPassportTypes) },
       { key: "model_name", type: "string", getValue: (group) => group.latest?.model_name || "" },
-      { key: "created_at", type: "date", getValue: (group) => group.latest?.created_at },
+      { key: "created_at", type: "date", getValue: (group) => getPassportDateValue(group.latest) },
       { key: "release_status", type: "string", getValue: (group) => group.latest?.release_status || "" },
       { key: "completeness", type: "number", getValue: (group) => calcCompleteness(group.latest, allPassportTypes) ?? -1 },
     ];

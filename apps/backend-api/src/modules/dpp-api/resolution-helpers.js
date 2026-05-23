@@ -110,7 +110,7 @@ function createResolutionHelpers({
       );
       for (const row of liveRes.rows) {
         matches.push({
-          passport: { ...normalizePassportRow(row), passport_type: typeRow.type_name },
+          passport: { ...normalizePassportRow(row, typeRow), passport_type: typeRow.type_name },
           typeDef: typeRow,
           tableName
         });
@@ -137,7 +137,7 @@ function createResolutionHelpers({
         const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
         matches.push({
           passport: {
-            ...normalizePassportRow(rowData),
+            ...normalizePassportRow(rowData, typeRow),
             product_identifier_did: row.product_identifier_did || rowData?.product_identifier_did,
             archived_at: row.archived_at || rowData?.archived_at,
             passport_type: typeRow.type_name,
@@ -246,11 +246,11 @@ function createResolutionHelpers({
     );
 
     const combined = [
-      ...liveRes.rows.map((row) => ({ ...normalizePassportRow(row), passport_type: passportType })),
+      ...liveRes.rows.map((row) => ({ ...normalizePassportRow(row, baseline.typeDef), passport_type: passportType })),
       ...archiveRes.rows.map((row) => {
         const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
         return {
-          ...normalizePassportRow(rowData),
+          ...normalizePassportRow(rowData, baseline.typeDef),
           product_identifier_did: row.product_identifier_did || rowData?.product_identifier_did,
           archived_at: row.archived_at || rowData?.archived_at,
           passport_type: passportType,

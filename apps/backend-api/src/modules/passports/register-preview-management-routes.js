@@ -12,6 +12,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     createAccessKeyMaterial,
     EDIT_SESSION_TIMEOUT_HOURS,
     stripRestrictedFieldsForPublicView,
+    normalizePassportRow,
     getCompanyNameMap,
     resolveCompanyPreviewPassport,
     clearExpiredEditSessions,
@@ -34,8 +35,17 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
       const sourcePassport = resolved.passport;
       const resolvedCompanyId = sourcePassport.company_id ?? sourcePassport.companyId ?? companyId ?? null;
+      const typeDefResult = await pool.query(
+        `SELECT id, type_name, display_name, product_category, product_icon, fields_json
+         FROM passport_types
+         WHERE type_name = $1
+         LIMIT 1`,
+        [sourcePassport.passport_type]
+      );
+      const typeDef = typeDefResult.rows[0] || null;
+      const normalizedPassport = normalizePassportRow(sourcePassport, typeDef);
       const passport = rewriteRepositoryLinksForSignedAccessDeep(
-        await stripRestrictedFieldsForPublicView(sourcePassport, sourcePassport.passport_type),
+        normalizedPassport,
         { appBaseUrl: previewAppBaseUrl }
       );
       const company = resolvedCompanyId
@@ -49,14 +59,6 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         : null;
       const companyNameMap = resolvedCompanyId ? await getCompanyNameMap([resolvedCompanyId]) : new Map();
       const companyName = company?.company_name || (resolvedCompanyId ? companyNameMap.get(String(resolvedCompanyId)) : "") || "";
-      const typeDefResult = await pool.query(
-        `SELECT id, type_name, display_name, product_category, product_icon, fields_json
-         FROM passport_types
-         WHERE type_name = $1
-         LIMIT 1`,
-        [sourcePassport.passport_type]
-      );
-      const typeDef = typeDefResult.rows[0] || null;
       const canonicalPayload = typeof buildCanonicalPassportPayload === "function"
         ? buildCanonicalPassportPayload(sourcePassport, typeDef || resolved.typeDef || null, {
             company: company || (companyName ? { company_name: companyName } : null),

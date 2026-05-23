@@ -96,13 +96,11 @@ function createArchiveHistoryHelpers({
 
     const vals = getStoredPassportValues(updateCols, data);
     const sets = updateCols.map((col, i) => `${col} = $${i + 1}`).join(", ");
-    const result = await pool.query(
-      `UPDATE ${tableName}
+    const sql = `UPDATE ${tableName}
        SET ${sets}, updated_by = $${vals.length + 1}, updated_at = NOW()
        WHERE id = $${vals.length + 2}
-       ${includeUpdatedRow ? "RETURNING *" : ""}`,
-      [...vals, userId, rowId]
-    );
+       ${includeUpdatedRow ? "RETURNING *" : ""}`;
+    const result = await pool.query(sql, [...vals, userId, rowId]);
     if (includeUpdatedRow) {
       return {
         updateCols,

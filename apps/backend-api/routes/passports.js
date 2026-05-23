@@ -285,6 +285,7 @@ module.exports = function registerPassportRoutes(app, {
     EDIT_SESSION_TIMEOUT_HOURS,
     stripRestrictedFieldsForPublicView,
     getCompanyNameMap,
+    normalizePassportRow,
     resolveCompanyPreviewPassport,
     clearExpiredEditSessions,
     listActiveEditSessions,

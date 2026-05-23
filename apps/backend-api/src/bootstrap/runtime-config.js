@@ -60,11 +60,46 @@ function isPassportStorageKey(value, passportStoragePrefix = "passport-files/") 
 }
 
 function isPlainRecord(value) {
+  const proto = value && typeof value === "object" ? Object.getPrototypeOf(value) : null;
   return value !== null
     && typeof value === "object"
     && !Array.isArray(value)
     && !(value instanceof Date)
+    && (proto === Object.prototype || proto === null)
     && !Buffer.isBuffer(value);
+}
+
+function normalizeJsonFriendlyValue(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeJsonFriendlyValue(entry));
+  }
+  if (!value || typeof value !== "object") return value;
+
+  if (!isPlainRecord(value)) {
+    if (typeof value.toJSON === "function") {
+      const jsonValue = value.toJSON();
+      if (jsonValue !== value) return normalizeJsonFriendlyValue(jsonValue);
+    }
+    if (typeof value.toISO === "function") {
+      const isoValue = value.toISO();
+      if (typeof isoValue === "string") return isoValue;
+    }
+    if (typeof value.toISOString === "function") {
+      try {
+        return value.toISOString();
+      } catch {
+        return value;
+      }
+    }
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, normalizeJsonFriendlyValue(entry)])
+  );
 }
 
 function normalizeIncomingDppIdentifiers(value) {
@@ -89,13 +124,14 @@ function normalizeIncomingDppIdentifiers(value) {
 }
 
 function normalizeOutgoingDppIdentifiers(value) {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeOutgoingDppIdentifiers(entry));
+  const normalizedValue = normalizeJsonFriendlyValue(value);
+  if (Array.isArray(normalizedValue)) {
+    return normalizedValue.map((entry) => normalizeOutgoingDppIdentifiers(entry));
   }
-  if (!isPlainRecord(value)) return value;
+  if (!isPlainRecord(normalizedValue)) return normalizedValue;
 
   const normalized = {};
-  for (const [key, rawEntry] of Object.entries(value)) {
+  for (const [key, rawEntry] of Object.entries(normalizedValue)) {
     const entry = normalizeOutgoingDppIdentifiers(rawEntry);
     if (key === "dpp_id") normalized.dppId = entry;
     else if (key === "dppIds") normalized.dppIds = entry;

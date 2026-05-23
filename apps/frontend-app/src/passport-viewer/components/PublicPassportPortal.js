@@ -593,6 +593,7 @@ export default function PublicPassportPortal({
   }, [activePage]);
 
   const modelEntry = findFieldEntry(fields, ["model name", "product name"], passport, unlockedPassport, dynamicValues);
+  const displayModelName = passport?.model_name || (modelEntry ? formatValue(modelEntry.raw) : "");
   const capacityEntry = findFieldEntry(fields, ["rated capacity", "capacity", "usable battery energy", "certified usable battery energy"], passport, unlockedPassport, dynamicValues);
   const categoryEntry = findFieldEntry(fields, ["battery category", "product category", "category"], passport, unlockedPassport, dynamicValues);
   const productImageEntry = findFieldEntry(
@@ -672,7 +673,7 @@ export default function PublicPassportPortal({
         <div className="hero-main">
           <div>
             <div className="kicker">{typeDef?.display_name || passport?.passport_type || "Battery product passport"}</div>
-            <h1>{modelEntry ? formatValue(modelEntry.raw) : (passport?.model_name || "")}</h1>
+            <h1>{displayModelName}</h1>
             {(isPreviewMode || isInactiveView || isObsolete || unlockedPassport) && (
               <div className="hero-badge-row">
                 {isPreviewMode && <span className="badge">Preview mode</span>}
@@ -726,7 +727,7 @@ export default function PublicPassportPortal({
                 {productImageEntry && (
                   <RefreshableImage
                     src={productImageEntry.raw}
-                    alt={passport?.model_name || "Product"}
+                    alt={displayModelName || "Product"}
                     className="overview-product-image"
                     onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(productImageEntry.field.key, productImageEntry.raw) : null}
                   />
@@ -734,7 +735,7 @@ export default function PublicPassportPortal({
               </div>
               <div className="overview-meta">
                 {[
-                  ["Model", modelEntry ? formatValue(modelEntry.raw) : passport?.model_name || ""],
+                  ["Model", displayModelName],
                   ["Capacity", capacityEntry ? formatValue(capacityEntry.raw) : ""],
                   ["Category", categoryEntry ? formatValue(categoryEntry.raw) : ""],
                 ].map(([label, value]) => (

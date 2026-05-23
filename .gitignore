@@ -22,6 +22,7 @@ node_modules/.cache/
 
 # User-uploaded files (runtime data, not source code)
 storage/local-storage/
+.docker-data/
 
 # macOS
 .DS_Store

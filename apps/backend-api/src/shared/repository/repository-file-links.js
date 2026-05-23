@@ -160,6 +160,8 @@ function rewriteLegacyRepositoryLinksDeep(value, options = {}) {
   if (typeof value === "string") return rewriteLegacyRepositoryFileLink(value, options);
   if (Array.isArray(value)) return value.map((entry) => rewriteLegacyRepositoryLinksDeep(entry, options));
   if (!value || typeof value !== "object") return value;
+  if (value instanceof Date) return value;
+  if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return value;
 
   const next = {};
   for (const [key, entry] of Object.entries(value)) {
@@ -179,6 +181,8 @@ function rewriteRepositoryLinksForSignedAccessDeep(value, options = {}) {
   if (typeof value === "string") return rewriteRepositoryFileLinkForSignedAccess(value, options);
   if (Array.isArray(value)) return value.map((entry) => rewriteRepositoryLinksForSignedAccessDeep(entry, options));
   if (!value || typeof value !== "object") return value;
+  if (value instanceof Date) return value;
+  if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return value;
 
   const next = {};
   for (const [key, entry] of Object.entries(value)) {

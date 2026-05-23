@@ -84,14 +84,14 @@ JWT_SECRET=dev-secret-key-change-in-production
 ### 3. Start Services
 
 ```bash
-# Start all services in background
-docker-compose up -d
+# Start or restart all services in background
+./scripts/restart-local-stack.sh
 
 # Wait for services to be ready
 sleep 30
 
 # Check status
-docker-compose ps
+docker compose -f docker/docker-compose.yml ps
 ```
 
 ### 4. Access Applications
@@ -239,39 +239,46 @@ docker-compose exec postgres psql -U postgres -d dpp_system < apps/backend-api/d
 
 ```bash
 # Start all services in background
-docker-compose up -d
+./scripts/restart-local-stack.sh
 
 # View running services
-docker-compose ps
+docker compose -f docker/docker-compose.yml ps
 
 # View logs
-docker-compose logs -f
+docker compose -f docker/docker-compose.yml logs -f
 
 # View logs for specific service
-docker-compose logs -f backend-api
-docker-compose logs -f frontend-app
-docker-compose logs -f postgres
+docker compose -f docker/docker-compose.yml logs -f backend-api
+docker compose -f docker/docker-compose.yml logs -f frontend-app
+docker compose -f docker/docker-compose.yml logs -f postgres
 
 # Stop all services
-docker-compose stop
+docker compose -f docker/docker-compose.yml stop
 
 # Restart services
-docker-compose restart
-docker-compose restart backend-api
+docker compose -f docker/docker-compose.yml restart
+docker compose -f docker/docker-compose.yml restart backend-api
 
 # Stop and remove containers
-docker-compose down
+docker compose -f docker/docker-compose.yml down
 
-# Remove volumes too (WARNING: deletes database)
-docker-compose down -v
+# Remove Docker-managed volumes only (DB now lives in ./.docker-data/postgres)
+docker compose -f docker/docker-compose.yml down -v
 
 # Rebuild images
-docker-compose build
-docker-compose build --no-cache backend-api
+docker compose -f docker/docker-compose.yml build
+docker compose -f docker/docker-compose.yml build --no-cache backend-api
 
 # Rebuild and restart
-docker-compose up -d --build
+./scripts/restart-local-stack.sh
 ```
+
+Local persistence now lives under `./.docker-data/`:
+
+- PostgreSQL data: `./.docker-data/postgres`
+- Uploaded/runtime files: `./.docker-data/local-storage`
+
+That means ordinary restarts and even `docker compose down -v` will not wipe your development database anymore. To intentionally reset local data, delete the relevant folder under `./.docker-data/`.
 
 ### Execute Commands in Containers
 

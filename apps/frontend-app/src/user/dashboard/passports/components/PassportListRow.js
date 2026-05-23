@@ -5,7 +5,7 @@ import {
 } from "../../../../passports/utils/passportStatus";
 import { CompletenessBar } from "./PassportListComponents";
 import { PassportListRowMenu } from "./PassportListRowMenu";
-import { getPassportSerialNumberForType } from "../utils/passportListHelpers";
+import { formatPassportDate, getPassportSerialNumberForType } from "../utils/passportListHelpers";
 
 export function PassportListRow({
   passport,
@@ -117,7 +117,7 @@ export function PassportListRow({
       {filterByUser && (
         <td><span className="type-badge passport-type-badge">{pType}</span></td>
       )}
-      <td>{new Date(passport.created_at).toLocaleDateString()}</td>
+      <td>{formatPassportDate(passport)}</td>
       <td>
         <div className="passport-status-cell">
           <span className={`status-badge ${normalizedStatus}`}>

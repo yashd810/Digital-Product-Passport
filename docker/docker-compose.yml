@@ -59,7 +59,7 @@ services:
       - ../apps/backend-api:/app
       - ../apps/frontend-app/src/assets/styles/email-styles.css:/tmp/email-styles.css:ro
       - backend_node_modules:/app/node_modules
-      - local_storage_data:/data
+      - ../.docker-data/local-storage:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,7 +98,7 @@ services:
       retries: 20
       start_period: 5s
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ../.docker-data/postgres:/var/lib/postgresql/data
 
 volumes:
   frontend_node_modules:
@@ -107,7 +107,3 @@ volumes:
     name: "${BACKEND_NODE_MODULES_VOLUME_NAME:-docker_backend_node_modules}"
   public_viewer_node_modules:
     name: "${PUBLIC_VIEWER_NODE_MODULES_VOLUME_NAME:-docker_public_viewer_node_modules}"
-  local_storage_data:
-    name: "${LOCAL_STORAGE_VOLUME_NAME:-docker_local_storage_data}"
-  postgres_data:
-    name: "${POSTGRES_VOLUME_NAME:-docker_postgres_data}"

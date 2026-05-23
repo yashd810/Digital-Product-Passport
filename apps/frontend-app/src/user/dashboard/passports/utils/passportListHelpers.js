@@ -40,7 +40,31 @@ export function formatPassportTypeLabel(passportType) {
 export function sortPassportsByVersionDesc(a, b) {
   const versionDiff = Number(b?.version_number || 0) - Number(a?.version_number || 0);
   if (versionDiff !== 0) return versionDiff;
-  return new Date(b?.updated_at || b?.created_at || 0).getTime() - new Date(a?.updated_at || a?.created_at || 0).getTime();
+  return getPassportDateTimestamp(b) - getPassportDateTimestamp(a);
+}
+
+export function getPassportDateValue(passport) {
+  if (!passport || typeof passport !== "object") return null;
+  return passport.created_at
+    || passport.createdAt
+    || passport.updated_at
+    || passport.updatedAt
+    || null;
+}
+
+export function getPassportDateTimestamp(passport) {
+  const dateValue = getPassportDateValue(passport);
+  if (!dateValue) return 0;
+  const timestamp = new Date(dateValue).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+export function formatPassportDate(passport, locale) {
+  const dateValue = getPassportDateValue(passport);
+  if (!dateValue) return "—";
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString(locale);
 }
 
 export function getPassportGroupKey(passport) {
