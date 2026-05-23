@@ -671,8 +671,8 @@ Authorization: Bearer <JWT>
 {
   "passports": [
     {
-      "dpp_id": "dpp-uuid-1",
-      "passport_type": "battery",
+      "dppId": "dpp-uuid-1",
+      "passportType": "battery",
       "product_id": "BAT-2026-001",
       "company_id": 7,
       "is_published": true,
@@ -698,8 +698,8 @@ Authorization: Bearer <JWT>
 **Response** (200 OK)
 ```json
 {
-  "dpp_id": "dpp-uuid-1",
-  "passport_type": "battery",
+  "dppId": "dpp-uuid-1",
+  "passportType": "battery",
   "product_id": "BAT-2026-001",
   "company_id": 7,
   "is_published": true,
@@ -757,7 +757,7 @@ Authorization: Bearer <JWT>
 Content-Type: application/json
 
 {
-  "passport_type": "battery",
+  "passportType": "battery",
   "product_id": "BAT-2026-001",
   "data": {
     "capacity": "50 kWh",
@@ -776,8 +776,8 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "dpp_id": "dpp-uuid-new",
-  "passport_type": "battery",
+  "dppId": "dpp-uuid-new",
+  "passportType": "battery",
   "product_id": "BAT-2026-001",
   "created_at": "2026-05-04T12:00:00Z"
 }
@@ -809,7 +809,7 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "dpp_id": "dpp-uuid-1",
+  "dppId": "dpp-uuid-1",
   "data": {
     "capacity": "60 kWh",
     "chemistry": "LFP"
@@ -922,8 +922,8 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "dpp_id": "dpp-uuid-1",
-  "version_number": 2,
+  "dppId": "dpp-uuid-1",
+  "versionNumber": 2,
   "data": {...}
 }
 ```
@@ -951,8 +951,8 @@ Authorization: Bearer <JWT>
 **Response** (200 OK)
 ```json
 {
-  "dpp_id": "dpp-uuid-1",
-  "version_number": 1,
+  "dppId": "dpp-uuid-1",
+  "versionNumber": 1,
   "data_hash": "sha256:abc123def456...",
   "signature": "base64-encoded-signature",
   "algorithm": "ES256",
@@ -1097,7 +1097,7 @@ Authorization: Bearer <JWT>
   "grants": [
     {
       "id": "grant-uuid",
-      "dpp_id": "dpp-uuid-1",
+      "dppId": "dpp-uuid-1",
       "grantee_user_id": 50,
       "audience": "delegated_operator",
       "element_id_path": "$.fields.battery_profile.chemistry",
@@ -1119,7 +1119,7 @@ Authorization: Bearer <JWT>
 Content-Type: application/json
 
 {
-  "dpp_id": "dpp-uuid-1",
+  "dppId": "dpp-uuid-1",
   "grantee_user_id": 50,
   "audience": "delegated_operator",
   "element_id_path": "$.fields.battery_profile.chemistry",
@@ -1133,7 +1133,7 @@ Content-Type: application/json
 {
   "success": true,
   "grant_id": "grant-uuid-new",
-  "dpp_id": "dpp-uuid-1",
+  "dppId": "dpp-uuid-1",
   "grantee_user_id": 50
 }
 ```

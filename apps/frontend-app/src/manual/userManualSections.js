@@ -593,8 +593,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Know which identifier is which",
           items: [
             "`dppId` is the internal passport record identifier used by dashboard rows and most company APIs.",
-            "`internal_alias_id` is the local passport ID used internally for routing, uniqueness, and draft creation.",
-            "`product_identifier_did` is the global product identifier DID, and it should be derived from the real serial/business identifier when one exists.",
+            "`internalAliasId` is the local passport ID used internally for routing, uniqueness, and draft creation.",
+            "`uniqueProductIdentifier` is the global product identifier DID, and it should be derived from the real serial/business identifier when one exists.",
             "`granularity` says whether the DPP represents a model, batch, or item. Released granularity changes use a linked successor flow instead of silent in-place mutation.",
           ],
         },
@@ -636,9 +636,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       title: "Use Asset Management for safe bulk updates on existing passports",
       summary: "Asset Management is a separate operational layer for editing many already existing passports at once. It is best when you need to stage updates from CSV, JSON, or an ERP/API source, check the result before writing anything, and then push or schedule the changes in a controlled way.",
       facts: [
-        { label: "Best use case", value: "Bulk updates on existing passports, especially when rows already have dppId or internal_alias_id" },
+        { label: "Best use case", value: "Bulk updates on existing passports, especially when rows already have dppId or internalAliasId" },
         { label: "Launch path", value: "Open from the company dashboard. The tool authenticates automatically from the dashboard launch." },
-        { label: "Matching rule", value: "dppId is safest. internal_alias_id works as the fallback local passport ID match key for ERP and spreadsheet updates." },
+        { label: "Matching rule", value: "dppId is safest. internalAliasId works as the fallback local passport ID match key for ERP and spreadsheet updates." },
         { label: "Safety rule", value: "Unknown columns are rejected. Nothing changes until Push to Backend is used." },
       ],
       journeys: [
@@ -664,8 +664,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "The grid behaves like a simple spreadsheet. Row and Passport DPP ID stay visible while you scroll.",
             "Use Create Passport Row when you want to stage a new row manually before previewing it.",
-            "Use Export CSV to create a safe base file. Filtered columns export still keeps `dppId` and `internal_alias_id` so the file can be matched on import.",
-            "Keep `dppId` whenever possible. If your incoming data does not have `dppId`, make sure `internal_alias_id` is present and stable.",
+            "Use Export CSV to create a safe base file. Filtered columns export still keeps `dppId` and `internalAliasId` so the file can be matched on import.",
+            "Keep `dppId` whenever possible. If your incoming data does not have `dppId`, make sure `internalAliasId` is present and stable.",
           ],
         },
         {
@@ -680,12 +680,12 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
       table: ASSET_MANAGEMENT_TERMS_TABLE,
       tips: [
-        "If your ERP does not store dppId, map a stable ERP field to `internal_alias_id` so the tool can find the right passport.",
+        "If your ERP does not store dppId, map a stable ERP field to `internalAliasId` so the tool can find the right passport.",
         "Export a template first when non-technical users need to edit a spreadsheet safely.",
       ],
       warnings: [
         "Asset Management writes into the same backend passport records used by the main dashboard. Treat it as a production update tool.",
-        "Rows without dppId and without internal_alias_id cannot be matched to an existing passport.",
+        "Rows without dppId and without internalAliasId cannot be matched to an existing passport.",
       ],
     },
     {
@@ -727,9 +727,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Simple create or update pattern",
           items: [
-            "For one new record, send `passport_type` plus the normal field keys to `POST /api/companies/:companyId/passports`.",
-            "For one existing editable record, send the same fields to `PATCH /api/companies/:companyId/passports/:dppId` and include `passportType` or `passport_type` in the body.",
-            "For many existing editable records, use `PATCH /api/companies/:companyId/passports` and give each row a `dppId` or `internal_alias_id` so the backend can match it safely.",
+            "For one new record, send `passportType` plus the normal field keys to `POST /api/companies/:companyId/passports`.",
+            "For one existing editable record, send the same fields to `PATCH /api/companies/:companyId/passports/:dppId` and include `passportType` or `passportType` in the body.",
+            "For many existing editable records, use `PATCH /api/companies/:companyId/passports` and give each row a `dppId` or `internalAliasId` so the backend can match it safely.",
           ],
         },
         {
@@ -737,14 +737,14 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Use `POST /api/companies/:companyId/passports/upsert-json` when you already have a JSON array.",
             "Use `POST /api/companies/:companyId/passports/upsert-csv` when the source is a spreadsheet and you want the backend to create or update row by row.",
-            "In both cases, rows with a matching editable passport are updated. Rows without a match can create a new passport when `internal_alias_id` is present.",
+            "In both cases, rows with a matching editable passport are updated. Rows without a match can create a new passport when `internalAliasId` is present.",
           ],
         },
       ],
       table: COMPANY_WRITE_API_TABLE,
       warnings: [
         "Released passports are not normal editable rows. Use revise first if you need a new editable version.",
-        "internal_alias_id must stay unique. The backend blocks duplicates.",
+        "internalAliasId must stay unique. The backend blocks duplicates.",
       ],
     },
     {
@@ -758,7 +758,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Read auth", value: "Session cookie or bearer token with company access" },
         { label: "Best use case", value: "Internal tools, controlled exports, compare/history pages, and support diagnostics" },
         { label: "Export formats", value: "CSV and JSON-LD from the draft export endpoint" },
-        { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by dppId or internal_alias_id in one request" },
+        { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by dppId or internalAliasId in one request" },
       ],
       table: READ_EXPORT_API_TABLE,
       tips: [

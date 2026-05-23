@@ -58,7 +58,7 @@ function ArchivedPassports({ user, companyId }) {
 
   // Archived public-path helpers
   const getArchivedPathCacheKey = useCallback((passport) => (
-    `${passport?.dppId || ""}:${passport?.versionNumber || ""}:${passport?.public_version_number || ""}`
+    `${passport?.dppId || ""}:${passport?.versionNumber || ""}:${passport?.publicVersionNumber || ""}`
   ), []);
   const getArchivedPublicVersionNumber = useCallback((passport) => {
     if (
@@ -68,7 +68,7 @@ function ArchivedPassports({ user, companyId }) {
       const currentVersion = Number.parseInt(passport?.versionNumber, 10);
       if (Number.isFinite(currentVersion) && currentVersion > 0) return currentVersion;
     }
-    const parsed = Number.parseInt(passport?.public_version_number, 10);
+    const parsed = Number.parseInt(passport?.publicVersionNumber, 10);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
     return null;
   }, []);
@@ -94,7 +94,7 @@ function ArchivedPassports({ user, companyId }) {
 
     const payload = await response.json().catch(() => null);
     const history = Array.isArray(payload?.history) ? payload.history : [];
-    const matchingEntry = history.find((entry) => Number(entry.versionNumber ?? entry.version_number) === Number(publicVersionNumber));
+    const matchingEntry = history.find((entry) => Number(entry.versionNumber ?? entry.versionNumber) === Number(publicVersionNumber));
     const resolvedPath = matchingEntry?.is_current
       ? matchingEntry?.public_path
       : matchingEntry?.inactive_path;

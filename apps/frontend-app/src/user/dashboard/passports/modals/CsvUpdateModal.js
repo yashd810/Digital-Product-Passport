@@ -108,8 +108,8 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
         allFields.find((item) => item.key?.toLowerCase() === normalized) ||
         (normalized === "modelname" ? { key: "modelName", type: "text" } : null) ||
         (normalized === "internalaliasid" ? { key: "internalAliasId", type: "text" } : null) ||
-        (normalized === "model_name" ? { key: "modelName", type: "text" } : null) ||
-        (normalized === "internal_alias_id" ? { key: "internalAliasId", type: "text" } : null) ||
+        (normalized === "modelName" ? { key: "modelName", type: "text" } : null) ||
+        (normalized === "internalAliasId" ? { key: "internalAliasId", type: "text" } : null) ||
         (normalized === "modelname" ? { key: "modelName", type: "text" } : null) ||
         (normalized === "internalaliasid" ? { key: "internalAliasId", type: "text" } : null);
 

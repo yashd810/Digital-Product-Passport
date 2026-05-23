@@ -149,8 +149,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
           const field =
             allFields.find(f => f.label?.trim().toLowerCase() === normalized) ||
             allFields.find(f => f.key?.toLowerCase() === normalized) ||
-            (normalized === "model_name" ? { key: "modelName", type: "text" } : null) ||
-            (normalized === "internal_alias_id" ? { key: "internalAliasId", type: "text" } : null) ||
+            (normalized === "modelName" ? { key: "modelName", type: "text" } : null) ||
+            (normalized === "internalAliasId" ? { key: "internalAliasId", type: "text" } : null) ||
             (normalized === "modelname" ? { key: "modelName", type: "text" } : null) ||
             (normalized === "internalaliasid" ? { key: "internalAliasId", type: "text" } : null);
           if (field) {

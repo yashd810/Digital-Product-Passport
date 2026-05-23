@@ -27,8 +27,8 @@ function createComplianceHelpers({
       granularity,
     });
     return {
-      internal_alias_id: normalized.internalAliasIdInput || null,
-      product_identifier_did: normalized.productIdentifierDid || null,
+      internalAliasId: normalized.internalAliasIdInput || null,
+      uniqueProductIdentifier: normalized.productIdentifierDid || null,
     };
   }
 
@@ -37,14 +37,14 @@ function createComplianceHelpers({
     let excludeSql = "";
     if (excludeDppId) {
       params.push(excludeDppId);
-      excludeSql = ` AND dpp_id <> $${params.length}`;
+      excludeSql = ` AND "dppId" <> $${params.length}`;
     }
     const result = await pool.query(
       `SELECT 1
        FROM ${tableName}
-       WHERE lineage_id = $1
-         AND release_status IN ('released', 'obsolete')
-         AND deleted_at IS NULL${excludeSql}
+       WHERE "lineageId" = $1
+         AND "releaseStatus" IN ('released', 'obsolete')
+         AND "deletedAt" IS NULL${excludeSql}
        LIMIT 1`,
       params
     );
@@ -107,15 +107,10 @@ function createComplianceHelpers({
 
   function hasExplicitFacilityOverride(source = {}) {
     return (
-      hasOwnValue(source, "facility_id")
-      || hasOwnValue(source, "facilityId")
-      || hasOwnValue(source, "facility_identifier")
+      hasOwnValue(source, "facilityId")
       || hasOwnValue(source, "facilityIdentifier")
-      || hasOwnValue(source, "manufacturing_facility_id")
       || hasOwnValue(source, "manufacturingFacilityId")
-      || hasOwnValue(source, "manufacturing_facility_identifier")
       || hasOwnValue(source, "manufacturingFacilityIdentifier")
-      || hasOwnValue(source, "manufacturing_facility")
       || hasOwnValue(source, "manufacturingFacility")
     );
   }
@@ -145,17 +140,17 @@ function createComplianceHelpers({
       }
     }
     return {
-      compliance_profile_key: profile.key,
-      content_specification_ids: serializeProfileDefaultValue(
-        requestedFields.content_specification_ids || profile.contentSpecificationIds
+      complianceProfileKey: profile.key,
+      contentSpecificationIds: serializeProfileDefaultValue(
+        requestedFields.contentSpecificationIds || profile.contentSpecificationIds
       ),
-      carrier_policy_key: requestedFields.carrier_policy_key || profile.defaultCarrierPolicyKey || null,
-      economic_operator_id: requestedFields.economic_operator_id || companyIdentity?.economic_operator_identifier || null,
-      economic_operator_identifier_scheme:
-        requestedFields.economic_operator_identifier_scheme
+      carrierPolicyKey: requestedFields.carrierPolicyKey || profile.defaultCarrierPolicyKey || null,
+      economicOperatorId: requestedFields.economicOperatorId || companyIdentity?.economic_operator_identifier || null,
+      economicOperatorIdentifierScheme:
+        requestedFields.economicOperatorIdentifierScheme
         || companyIdentity?.economic_operator_identifier_scheme
         || null,
-      facility_id: resolvedFacilityId,
+      facilityId: resolvedFacilityId,
     };
   }
 
@@ -222,11 +217,11 @@ function createComplianceHelpers({
     const result = await pool.query(
       `SELECT *
        FROM ${tableName}
-       WHERE dpp_id = $1
-         AND company_id = $2
-         ${releaseStatusSql ? `AND release_status IN ${releaseStatusSql}` : ""}
-         AND deleted_at IS NULL
-       ORDER BY version_number DESC
+       WHERE "dppId" = $1
+         AND "companyId" = $2
+         ${releaseStatusSql ? `AND "releaseStatus" IN ${releaseStatusSql}` : ""}
+         AND "deletedAt" IS NULL
+       ORDER BY "versionNumber" DESC
        LIMIT 1`,
       [dppId, companyId]
     );
@@ -235,7 +230,7 @@ function createComplianceHelpers({
 
   async function evaluateCompliance(passport, passportType) {
     return complianceService.evaluatePassport(
-      { ...normalizePassportRow(passport), passport_type: passportType },
+      { ...normalizePassportRow(passport), passportType },
       passportType
     );
   }
@@ -248,7 +243,7 @@ function createComplianceHelpers({
 
     const nextFields = {};
     const effectiveGranularity = passport.granularity || "item";
-    const normalizedProductId = normalizeInternalAliasIdValue(passport.internal_alias_id);
+    const normalizedProductId = normalizeInternalAliasIdValue(passport.internalAliasId);
 
     if (normalizedProductId) {
       const storedProductIdentifiers = buildStoredProductIdentifiers({
@@ -258,11 +253,11 @@ function createComplianceHelpers({
         granularity: effectiveGranularity,
         passportLike: passport,
       });
-      if (storedProductIdentifiers.internal_alias_id && storedProductIdentifiers.internal_alias_id !== passport.internal_alias_id) {
-        nextFields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
+      if (storedProductIdentifiers.internalAliasId && storedProductIdentifiers.internalAliasId !== passport.internalAliasId) {
+        nextFields.internalAliasId = storedProductIdentifiers.internalAliasId;
       }
-      if (storedProductIdentifiers.product_identifier_did !== passport.product_identifier_did) {
-        nextFields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+      if (storedProductIdentifiers.uniqueProductIdentifier !== passport.uniqueProductIdentifier) {
+        nextFields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
       }
     }
 
@@ -274,23 +269,23 @@ function createComplianceHelpers({
       existingFields: passport,
     });
 
-    if (complianceManagedFields.compliance_profile_key !== passport.compliance_profile_key) {
-      nextFields.compliance_profile_key = complianceManagedFields.compliance_profile_key;
+    if (complianceManagedFields.complianceProfileKey !== passport.complianceProfileKey) {
+      nextFields.complianceProfileKey = complianceManagedFields.complianceProfileKey;
     }
-    if (complianceManagedFields.content_specification_ids !== passport.content_specification_ids) {
-      nextFields.content_specification_ids = complianceManagedFields.content_specification_ids;
+    if (complianceManagedFields.contentSpecificationIds !== passport.contentSpecificationIds) {
+      nextFields.contentSpecificationIds = complianceManagedFields.contentSpecificationIds;
     }
-    if (complianceManagedFields.carrier_policy_key !== passport.carrier_policy_key) {
-      nextFields.carrier_policy_key = complianceManagedFields.carrier_policy_key;
+    if (complianceManagedFields.carrierPolicyKey !== passport.carrierPolicyKey) {
+      nextFields.carrierPolicyKey = complianceManagedFields.carrierPolicyKey;
     }
-    if (complianceManagedFields.economic_operator_id !== passport.economic_operator_id) {
-      nextFields.economic_operator_id = complianceManagedFields.economic_operator_id;
+    if (complianceManagedFields.economicOperatorId !== passport.economicOperatorId) {
+      nextFields.economicOperatorId = complianceManagedFields.economicOperatorId;
     }
-    if (complianceManagedFields.economic_operator_identifier_scheme !== passport.economic_operator_identifier_scheme) {
-      nextFields.economic_operator_identifier_scheme = complianceManagedFields.economic_operator_identifier_scheme;
+    if (complianceManagedFields.economicOperatorIdentifierScheme !== passport.economicOperatorIdentifierScheme) {
+      nextFields.economicOperatorIdentifierScheme = complianceManagedFields.economicOperatorIdentifierScheme;
     }
-    if (complianceManagedFields.facility_id !== passport.facility_id) {
-      nextFields.facility_id = complianceManagedFields.facility_id;
+    if (complianceManagedFields.facilityId !== passport.facilityId) {
+      nextFields.facilityId = complianceManagedFields.facilityId;
     }
 
     const updateKeys = Object.keys(nextFields);

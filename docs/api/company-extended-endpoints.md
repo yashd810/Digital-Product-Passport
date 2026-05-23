@@ -40,7 +40,7 @@ Authorization: Bearer <token>
     "company_name": "Acme Corporation",
     "did_slug": "acme-corp",
     "economic_operator_identifier": "GLN:5412345000013",
-    "economic_operator_identifier_scheme": "GLN"
+    "economicOperatorIdentifierScheme": "GLN"
   },
   "facilities": [
     {
@@ -88,7 +88,7 @@ Content-Type: application/json
 
 {
   "economic_operator_identifier": "GLN:5412345000013",
-  "economic_operator_identifier_scheme": "GLN"
+  "economicOperatorIdentifierScheme": "GLN"
 }
 ```
 
@@ -97,7 +97,7 @@ Content-Type: application/json
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `economic_operator_identifier` | string | Optional | Unique identifier for economic operator (e.g., GLN number, VAT ID) |
-| `economic_operator_identifier_scheme` | string | Optional | Identifier scheme type (e.g., "GLN", "VAT", "DUNS", "LEI") |
+| `economicOperatorIdentifierScheme` | string | Optional | Identifier scheme type (e.g., "GLN", "VAT", "DUNS", "LEI") |
 
 **Response** (200 OK)
 
@@ -232,7 +232,7 @@ Content-Disposition: attachment; filename="battery_drafts.csv"
 
 Field Name,Passport 1,Passport 2,Passport 3
 dppId,dpp-guid-001,dpp-guid-002,dpp-guid-003
-model_name,AA Battery Model X,AA Battery Model X,AA Battery Model Y
+modelName,AA Battery Model X,AA Battery Model X,AA Battery Model Y
 product_id,PROD-12345,PROD-12346,PROD-12350
 Voltage (V),1.5,1.5,9.0
 Capacity (mAh),2800,2800,580
@@ -253,7 +253,7 @@ Content-Disposition: attachment; filename="battery_drafts.jsonld"
     "passports": [
       {
         "dppId": "dpp-guid-001",
-        "model_name": "AA Battery Model X",
+        "modelName": "AA Battery Model X",
         "product_id": "PROD-12345",
         "characteristics": {
           "voltage": 1.5,
@@ -303,7 +303,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "passport_type": "battery",
+  "passportType": "battery",
   "csv": "Field Name,Passport 1,Passport 2\ndppId,existing-dpp-guid,\nmodel_name,AA Alkaline Cell,AA Alkaline Rechargeable\nproduct_id,SKU-001,SKU-002\nVoltage (V),1.5,1.2\nCapacity (mAh),2800,2500"
 }
 ```
@@ -312,14 +312,14 @@ Content-Type: application/json
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `passport_type` | string | Required | Type of passport (e.g., "battery", "packaging") |
+| `passportType` | string | Required | Type of passport (e.g., "battery", "packaging") |
 | `csv` | string | Required | CSV-formatted data with field labels in first column and passport data in columns |
 
 **CSV Format**:
 - First row: Field names in first column, "Passport 1", "Passport 2", etc. in subsequent columns
 - First column: Field labels/keys
 - Remaining columns: Data for each passport
-- Support for `dppId`, `model_name`, `product_id`, and all schema-defined fields
+- Support for `dppId`, `modelName`, `product_id`, and all schema-defined fields
 - Empty cells represent no value
 - Quoted cells support commas and newlines: `"Field with, comma"`
 
@@ -342,7 +342,7 @@ Content-Type: application/json
     {
       "dppId": "new-dpp-guid-001",
       "product_id": "SKU-002",
-      "model_name": "AA Alkaline Rechargeable",
+      "modelName": "AA Alkaline Rechargeable",
       "status": "created"
     }
   ]
@@ -372,7 +372,7 @@ Content-Type: application/json
 
 | Code | Error | Description |
 |------|-------|-------------|
-| 400 | Bad Request | Missing passport_type, invalid csv format, or governance fields detected |
+| 400 | Bad Request | Missing passportType, invalid csv format, or governance fields detected |
 | 401 | Unauthorized | Missing or invalid authentication token |
 | 403 | Forbidden | Insufficient permissions or no company access |
 | 404 | Not Found | Passport type not found |
@@ -402,18 +402,18 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "passport_type": "battery",
+  "passportType": "battery",
   "passports": [
     {
       "dppId": "existing-dpp-guid",
-      "model_name": "AA Alkaline Cell Updated",
+      "modelName": "AA Alkaline Cell Updated",
       "product_id": "SKU-001",
       "voltage": 1.5,
       "capacity": 2900
     },
     {
       "product_id": "SKU-002",
-      "model_name": "AA Alkaline Rechargeable",
+      "modelName": "AA Alkaline Rechargeable",
       "voltage": 1.2,
       "capacity": 2500
     }
@@ -430,9 +430,9 @@ Content-Type: application/json
 
 [
   {
-    "passport_type": "battery",
+    "passportType": "battery",
     "product_id": "SKU-001",
-    "model_name": "AA Battery"
+    "modelName": "AA Battery"
   }
 ]
 ```
@@ -441,11 +441,11 @@ Content-Type: application/json
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `passport_type` | string | Required* | Type of passport (*optional if array format used) |
+| `passportType` | string | Required* | Type of passport (*optional if array format used) |
 | `passports` | array | Required | Array of passport objects to create/update |
 | `passports[].dppId` | string | Optional | Existing passport ID for updates |
 | `passports[].product_id` | string | Conditional | Required for creates, optional for updates |
-| `passports[].model_name` | string | Optional | Passport model/product name |
+| `passports[].modelName` | string | Optional | Passport model/product name |
 | `passports[].*` | various | Optional | Schema-defined fields (voltage, capacity, etc.) |
 
 **Response** (200 OK)
@@ -467,7 +467,7 @@ Content-Type: application/json
     {
       "dppId": "new-dpp-guid-001",
       "product_id": "SKU-002",
-      "model_name": "AA Alkaline Rechargeable",
+      "modelName": "AA Alkaline Rechargeable",
       "status": "created"
     }
   ]
@@ -485,7 +485,7 @@ Content-Type: application/json
 
 | Code | Error | Description |
 |------|-------|-------------|
-| 400 | Bad Request | Missing passport_type, invalid JSON format, or max 500 exceeded |
+| 400 | Bad Request | Missing passportType, invalid JSON format, or max 500 exceeded |
 | 401 | Unauthorized | Missing or invalid authentication token |
 | 403 | Forbidden | Insufficient permissions or no company access |
 | 404 | Not Found | Passport type not found |
@@ -596,7 +596,7 @@ Facility identifiers support multi-site manufacturing tracking:
 Spreadsheet Column | Passport Field | Example
 ─────────────────────────────────────────────
 SKU               | product_id     | PROD-12345
-Model             | model_name     | AA Battery
+Model             | modelName     | AA Battery
 ```
 
 ### Error Handling

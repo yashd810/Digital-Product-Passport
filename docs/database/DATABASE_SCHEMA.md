@@ -109,22 +109,22 @@ Dynamic passport tables store the actual passport rows for each passport type. T
 
 ```text
 id
-dpp_id
-lineage_id
+dppId
+lineageId
 company_id
-passport_type
+passportType
 product_id
-product_identifier_did
+uniqueProductIdentifier
 granularity
-model_name
-version_number
-release_status
-compliance_profile_key
-content_specification_ids
-carrier_policy_key
-carrier_authenticity
-economic_operator_id
-facility_id
+modelName
+versionNumber
+releaseStatus
+complianceProfileKey
+contentSpecificationIds
+carrierPolicyKey
+carrierAuthenticity
+economicOperatorId
+facilityId
 created_by
 updated_by
 released_at
@@ -139,21 +139,21 @@ Each dynamic table also includes the fields defined in `passport_types.fields_js
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `passport_registry` | Stable registry for every DPP identifier. | `dpp_id`, `lineage_id`, `company_id`, `passport_type`, hashed access/device keys, key prefixes, rotation timestamps |
-| `dpp_subject_registry` | Issued DID records for company/product/DPP subjects. | `company_id`, `passport_dpp_id`, `product_id`, `product_identifier_did`, `granularity`, `product_did`, `dpp_did`, `company_did` |
-| `dpp_registry_registrations` | External/local registry registration records. | `passport_dpp_id`, `company_id`, `product_identifier`, `dpp_id`, `registry_name`, `status`, `registration_payload` |
-| `product_identifier_lineage` | Linked successor records when identifier granularity changes. | `lineage_id`, previous/replacement passport IDs, identifiers, granularities, `transition_reason` |
+| `passport_registry` | Stable registry for every DPP identifier. | `dppId`, `lineageId`, `company_id`, `passportType`, hashed access/device keys, key prefixes, rotation timestamps |
+| `dpp_subject_registry` | Issued DID records for company/product/DPP subjects. | `company_id`, `passport_dpp_id`, `product_id`, `uniqueProductIdentifier`, `granularity`, `product_did`, `dpp_did`, `company_did` |
+| `dpp_registry_registrations` | External/local registry registration records. | `passport_dpp_id`, `company_id`, `product_identifier`, `dppId`, `registry_name`, `status`, `registration_payload` |
+| `product_identifier_lineage` | Linked successor records when identifier granularity changes. | `lineageId`, previous/replacement passport IDs, identifiers, granularities, `transition_reason` |
 
-`passport_registry.dpp_id` is the parent identifier used by most shared passport tables. Registry IDs are text, not UUID-only values.
+`passport_registry.dppId` is the parent identifier used by most shared passport tables. Registry IDs are text, not UUID-only values.
 
 ## Passport Lifecycle And History
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `passport_archives` | Immutable snapshots for archived/revision/history states. | `dpp_id`, `lineage_id`, `company_id`, `passport_type`, `version_number`, `row_data`, `snapshot_reason` |
-| `passport_history_visibility` | Public/private visibility of version history rows. | `passport_dpp_id`, `version_number`, `is_public`, `updated_by` |
-| `passport_edit_sessions` | Active edit locks/sessions. | `passport_dpp_id`, `company_id`, `passport_type`, `user_id`, `last_activity_at` |
-| `passport_revision_batches` | Bulk revision batch headers. | `company_id`, `passport_type`, `scope_type`, `changes_json`, counts, workflow targets |
+| `passport_archives` | Immutable snapshots for archived/revision/history states. | `dppId`, `lineageId`, `company_id`, `passportType`, `versionNumber`, `row_data`, `snapshot_reason` |
+| `passport_history_visibility` | Public/private visibility of version history rows. | `passport_dpp_id`, `versionNumber`, `is_public`, `updated_by` |
+| `passport_edit_sessions` | Active edit locks/sessions. | `passport_dpp_id`, `company_id`, `passportType`, `user_id`, `last_activity_at` |
+| `passport_revision_batches` | Bulk revision batch headers. | `company_id`, `passportType`, `scope_type`, `changes_json`, counts, workflow targets |
 | `passport_revision_batch_items` | Per-passport results for a bulk revision. | `batch_id`, `passport_dpp_id`, `status`, version numbers, `message` |
 
 Release status is stored on the dynamic passport row. History and archive records preserve exact row snapshots.
@@ -165,7 +165,7 @@ Release status is stored on the dynamic passport row. History and archive record
 | `api_keys` | Company-scoped API keys for `/api/v1`. | `company_id`, `name`, `key_hash`, `key_prefix`, `key_salt`, `hash_algorithm`, `scopes`, `expires_at`, `is_active` |
 | `user_access_audiences` | User-level audience grants. | `user_id`, `company_id`, `audience`, `granted_by`, `expires_at`, `is_active` |
 | `passport_access_grants` | Element/passport audience grants. | `passport_dpp_id`, `company_id`, `audience`, `element_id_path`, `grantee_user_id`, `expires_at`, `is_active` |
-| `passport_signatures` | Released passport signatures. | `passport_dpp_id`, `version_number`, `data_hash`, `signature`, `algorithm`, `signing_key_id`, `vc_json` |
+| `passport_signatures` | Released passport signatures. | `passport_dpp_id`, `versionNumber`, `data_hash`, `signature`, `algorithm`, `signing_key_id`, `vc_json` |
 | `passport_signing_keys` | Public signing keys by key ID. | `key_id`, `public_key`, `algorithm`, `algorithm_version` |
 | `passport_scan_events` | Public scan analytics. | `passport_dpp_id`, `viewer_user_id`, `user_agent`, `referrer`, `scanned_at` |
 | `passport_security_events` | Passport security and carrier-verification events. | `passport_dpp_id`, `company_id`, `event_type`, `severity`, `source`, `details` |
@@ -199,8 +199,8 @@ Storage should prefer provider keys (`storage_key`, `storage_provider`). Public 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
 | `backup_service_providers` | Company/global backup providers. | `company_id`, `provider_key`, `provider_type`, `display_name`, `object_prefix`, `public_base_url`, `config_json`, `is_active` |
-| `passport_backup_replications` | Per-passport backup snapshots. | `backup_provider_key`, `passport_dpp_id`, `lineage_id`, `company_id`, `version_number`, `replication_status`, `storage_key`, `public_url`, hash/verification fields |
-| `backup_public_handovers` | Active public fallback handover records. | `company_id`, `passport_dpp_id`, `lineage_id`, `product_id`, `backup_provider_key`, `public_url`, `public_row_data`, `handover_status`, verification fields |
+| `passport_backup_replications` | Per-passport backup snapshots. | `backup_provider_key`, `passport_dpp_id`, `lineageId`, `company_id`, `versionNumber`, `replication_status`, `storage_key`, `public_url`, hash/verification fields |
+| `backup_public_handovers` | Active public fallback handover records. | `company_id`, `passport_dpp_id`, `lineageId`, `product_id`, `backup_provider_key`, `public_url`, `public_row_data`, `handover_status`, verification fields |
 
 Backup public handover is current behavior. It is not an old file-serving fallback.
 
@@ -208,9 +208,9 @@ Backup public handover is current behavior. It is not an old file-serving fallba
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `asset_management_jobs` | Scheduled/manual import jobs. | `company_id`, `passport_type`, `source_kind`, `source_config`, `records_json`, schedule fields, `last_status` |
-| `asset_management_runs` | Execution history for asset jobs. | `job_id`, `company_id`, `passport_type`, `trigger_type`, `status`, request/generated JSON |
-| `passport_templates` | Company passport templates. | `company_id`, `passport_type`, `name`, `description`, `created_by` |
+| `asset_management_jobs` | Scheduled/manual import jobs. | `company_id`, `passportType`, `source_kind`, `source_config`, `records_json`, schedule fields, `last_status` |
+| `asset_management_runs` | Execution history for asset jobs. | `job_id`, `company_id`, `passportType`, `trigger_type`, `status`, request/generated JSON |
+| `passport_templates` | Company passport templates. | `company_id`, `passportType`, `name`, `description`, `created_by` |
 | `passport_template_fields` | Field values for templates. | `template_id`, `field_key`, `field_value`, `is_model_data` |
 | `conversations` | Company conversation threads. | `company_id`, `created_at` |
 | `conversation_members` | Conversation membership/read state. | `conversation_id`, `user_id`, `last_read_at` |
@@ -242,7 +242,7 @@ Find the stable registry row for a passport:
 ```sql
 SELECT *
 FROM passport_registry
-WHERE dpp_id = $1;
+WHERE dppId = $1;
 ```
 
 Find all passport history snapshots:
@@ -250,8 +250,8 @@ Find all passport history snapshots:
 ```sql
 SELECT *
 FROM passport_archives
-WHERE dpp_id = $1
-ORDER BY version_number DESC, archived_at DESC;
+WHERE dppId = $1
+ORDER BY versionNumber DESC, archived_at DESC;
 ```
 
 Find active access grants for a passport:

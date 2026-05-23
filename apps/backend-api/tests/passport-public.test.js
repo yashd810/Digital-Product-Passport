@@ -117,18 +117,18 @@ function createTestApp(options = {}) {
 
   const passport = {
     guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
-    lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
+    lineageId: "72b99c83-952c-4179-96f6-54a513d39dbc",
     company_id: 5,
-    passport_type: "battery",
-    internal_alias_id: "BAT-2026-001",
+    passportType: "battery",
+    internalAliasId: "BAT-2026-001",
     serial_number: "SN-2026-001",
-    product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
-    release_status: "released",
-    version_number: 2,
+    uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
+    releaseStatus: "released",
+    versionNumber: 2,
     updated_at: "2026-04-27T10:00:00.000Z",
     granularity: "item",
     battery_mass: "450",
-    carrier_authenticity: {
+    carrierAuthenticity: {
       carrierSecurityStatus: "signed_payload",
       carrierAuthenticationMethod: "signed_qr_payload",
       carrierVerificationInstructions: "Scan the public carrier and verify the signed binding payload.",
@@ -284,7 +284,7 @@ describe("passport public routes", () => {
     const response = await invokeRoute(app, {
       method: "get",
       path: "/api/passports/by-product/:internalAliasId",
-      params: { internalAliasId: passport.internal_alias_id },
+      params: { internalAliasId: passport.internalAliasId },
     });
 
     expect(response.statusCode).toBe(200);
@@ -297,9 +297,9 @@ describe("passport public routes", () => {
     );
     expect(response.body.companyDid).toBe("did:web:www.claros-dpp.online:did:company:acme-energy");
     expect(response.body.dppDid).toBe("did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc");
-    expect(response.body.internalAliasId).toBe(passport.internal_alias_id);
-    expect(response.body.localProductId).toBe(passport.internal_alias_id);
-    expect(response.body.productId).toBe(passport.internal_alias_id);
+    expect(response.body.internalAliasId).toBe(passport.internalAliasId);
+    expect(response.body.localProductId).toBe(passport.internalAliasId);
+    expect(response.body.productId).toBe(passport.internalAliasId);
     expect(response.body.linked_data?.canonical_subjects).toEqual(
       expect.objectContaining({
         companyDid: "did:web:www.claros-dpp.online:did:company:acme-energy",
@@ -339,7 +339,7 @@ describe("passport public routes", () => {
       buildCanonicalPassportPayload: () => ({
         digitalProductPassportId: null,
         uniqueProductIdentifier: null,
-        internalAliasId: passport.internal_alias_id,
+        internalAliasId: passport.internalAliasId,
         economicOperatorId: null,
         facilityId: null,
         subjectDid: null,
@@ -358,7 +358,7 @@ describe("passport public routes", () => {
     const response = await invokeRoute(app, {
       method: "get",
       path: "/api/passports/by-product/:internalAliasId",
-      params: { internalAliasId: passport.internal_alias_id },
+      params: { internalAliasId: passport.internalAliasId },
     });
 
     expect(response.statusCode).toBe(200);
@@ -508,12 +508,12 @@ describe("passport public routes", () => {
     const handoverPassport = {
       dppId: "dpp_handover_001",
       guid: "dpp_handover_001",
-      lineage_id: "dpp_handover_001",
+      lineageId: "dpp_handover_001",
       company_id: 5,
-      passport_type: "battery",
-      internal_alias_id: "BAT-2026-001",
-      release_status: "released",
-      version_number: 2,
+      passportType: "battery",
+      internalAliasId: "BAT-2026-001",
+      releaseStatus: "released",
+      versionNumber: 2,
       granularity: "item",
       battery_mass: "455",
       manufacturer: "Backup Copy Manufacturer",
@@ -527,10 +527,10 @@ describe("passport public routes", () => {
           return {
             company_id: 5,
             passport_dpp_id: "dpp_handover_001",
-            lineage_id: "dpp_handover_001",
-            passport_type: "battery",
-            internal_alias_id: "BAT-2026-001",
-            version_number: 2,
+            lineageId: "dpp_handover_001",
+            passportType: "battery",
+            internalAliasId: "BAT-2026-001",
+            versionNumber: 2,
             public_url: "https://backup.example/passports/dpp_handover_001",
             backup_provider_key: "oci-primary",
             source_replication_id: 73,
@@ -561,12 +561,12 @@ describe("passport public routes", () => {
     const handoverPassport = {
       dppId: "dpp_handover_auto_001",
       guid: "dpp_handover_auto_001",
-      lineage_id: "dpp_handover_auto_001",
+      lineageId: "dpp_handover_auto_001",
       company_id: 5,
-      passport_type: "battery",
-      internal_alias_id: "BAT-2026-002",
-      release_status: "released",
-      version_number: 3,
+      passportType: "battery",
+      internalAliasId: "BAT-2026-002",
+      releaseStatus: "released",
+      versionNumber: 3,
       granularity: "item",
       battery_mass: "462",
     };
@@ -574,10 +574,10 @@ describe("passport public routes", () => {
     const ensureAutomaticPublicHandover = jest.fn(async () => ({
       company_id: 5,
       passport_dpp_id: "dpp_handover_auto_001",
-      lineage_id: "dpp_handover_auto_001",
-      passport_type: "battery",
-      internal_alias_id: "BAT-2026-002",
-      version_number: 3,
+      lineageId: "dpp_handover_auto_001",
+      passportType: "battery",
+      internalAliasId: "BAT-2026-002",
+      versionNumber: 3,
       public_url: "https://backup.example/passports/dpp_handover_auto_001",
       backup_provider_key: "oci-primary",
       source_replication_id: 88,

@@ -83,7 +83,7 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       for (const internalAliasId of pageProductIds) {
         try {
           const result = await dbLookupByInternalAliasIdOnly(internalAliasId);
-          const resolvedDppId = result?.passport?.dppId || result?.passport?.dpp_id || null;
+          const resolvedDppId = result?.passport?.dppId || null;
           if (resolvedDppId) {
             identifiers.push(resolvedDppId);
           }
@@ -240,9 +240,9 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       }
 
       const identifierLineage = await productIdentifierService?.listIdentifierLineage?.({
-        companyId: released.passport.company_id,
-        lineageId: released.passport.lineage_id,
-        dppId: released.passport.dppId || released.passport.dpp_id,
+        companyId: released.passport.companyId,
+        lineageId: released.passport.lineageId,
+        dppId: released.passport.dppId,
       }) || [];
 
       return res.json(buildIdentifierLineageEnvelope(released.passport, identifierLineage));

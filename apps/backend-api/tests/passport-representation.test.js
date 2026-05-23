@@ -11,13 +11,13 @@ describe("passport representation service", () => {
       {
         guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
         company_id: 5,
-        passport_type: "battery",
-        internal_alias_id: "BAT-2026-001",
-        product_identifier_did: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
-        release_status: "released",
-        version_number: 2,
+        passportType: "battery",
+        internalAliasId: "BAT-2026-001",
+        uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+        releaseStatus: "released",
+        versionNumber: 2,
         updated_at: "2026-04-27T10:00:00.000Z",
-        facility_id: "FAC-01",
+        facilityId: "FAC-01",
       },
       {
         semantic_model_key: "claros_battery_dictionary_v1",
@@ -25,7 +25,7 @@ describe("passport representation service", () => {
           sections: [
             {
               fields: [
-                { key: "facility_id", type: "text" },
+                { key: "facilityId", type: "text" },
               ],
             },
           ],
@@ -77,11 +77,11 @@ describe("passport representation service", () => {
       {
         guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
         company_id: 5,
-        passport_type: "battery",
-        internal_alias_id: "BAT-2026-001",
-        product_identifier_did: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
-        release_status: "released",
-        version_number: 2,
+        passportType: "battery",
+        internalAliasId: "BAT-2026-001",
+        uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+        releaseStatus: "released",
+        versionNumber: 2,
         battery_mass: "250.5",
       },
       {

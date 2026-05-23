@@ -107,14 +107,14 @@ function createTestApp() {
 
   const state = {
     passport: {
-      dpp_id: "dpp_test_qr_1",
       dppId: "dpp_test_qr_1",
-      internal_alias_id: "BAT-2026-001",
-      model_name: "Battery Pack",
+      dppId: "dpp_test_qr_1",
+      internalAliasId: "BAT-2026-001",
+      modelName: "Battery Pack",
       company_id: 5,
-      release_status: "draft",
+      releaseStatus: "draft",
       qr_code: null,
-      carrier_authenticity: null,
+      carrierAuthenticity: null,
     },
     securityEvents: [],
   };
@@ -122,23 +122,23 @@ function createTestApp() {
   const pool = {
     query: jest.fn(async (sql, params = []) => {
       const text = String(sql);
-      if (text.includes("SELECT company_id, passport_type FROM passport_registry")) {
-        return { rows: [{ company_id: 5, passport_type: "battery" }] };
+      if (text.includes("SELECT company_id, passportType FROM passport_registry")) {
+        return { rows: [{ company_id: 5, passportType: "battery" }] };
       }
       if (text.includes("SELECT company_id FROM passport_registry")) {
         return { rows: [{ company_id: 5 }] };
       }
-      if (text.includes("SELECT passport_type FROM passport_registry")) {
-        return { rows: [{ passport_type: "battery" }] };
+      if (text.includes("SELECT passportType FROM passport_registry")) {
+        return { rows: [{ passportType: "battery" }] };
       }
-      if (text.includes("SELECT dpp_id, internal_alias_id, model_name, release_status, company_id, carrier_authenticity")) {
+      if (text.includes("SELECT dppId, internalAliasId, modelName, releaseStatus, company_id, carrierAuthenticity")) {
         return { rows: [{ ...state.passport }] };
       }
-      if (text.includes("SELECT qr_code, carrier_authenticity")) {
-        return { rows: [{ qr_code: state.passport.qr_code, carrier_authenticity: state.passport.carrier_authenticity }] };
+      if (text.includes("SELECT qr_code, carrierAuthenticity")) {
+        return { rows: [{ qr_code: state.passport.qr_code, carrierAuthenticity: state.passport.carrierAuthenticity }] };
       }
-      if (text.includes("SELECT carrier_authenticity")) {
-        return { rows: [{ carrier_authenticity: state.passport.carrier_authenticity }] };
+      if (text.includes("SELECT carrierAuthenticity")) {
+        return { rows: [{ carrierAuthenticity: state.passport.carrierAuthenticity }] };
       }
       if (text.includes("INSERT INTO passport_security_events")) {
         state.securityEvents.push({
@@ -160,9 +160,9 @@ function createTestApp() {
       if (text.includes("UPDATE battery_passports")) {
         if (text.includes("SET qr_code")) {
           state.passport.qr_code = params[0];
-          state.passport.carrier_authenticity = params[1] ? JSON.parse(params[1]) : null;
+          state.passport.carrierAuthenticity = params[1] ? JSON.parse(params[1]) : null;
         } else {
-          state.passport.carrier_authenticity = params[0] ? JSON.parse(params[0]) : null;
+          state.passport.carrierAuthenticity = params[0] ? JSON.parse(params[0]) : null;
         }
         return { rows: [] };
       }
@@ -199,7 +199,7 @@ function createTestApp() {
     IN_REVISION_STATUS: "in_revision",
     SYSTEM_PASSPORT_FIELDS: new Set(),
     getTable: (typeName) => `${typeName}_passports`,
-    normalizePassportRow: (row) => ({ ...row, dppId: row.dppId || row.dpp_id, dpp_id: row.dpp_id || row.dppId }),
+    normalizePassportRow: (row) => ({ ...row, dppId: row.dppId || row.dppId, dppId: row.dppId || row.dppId }),
     normalizeReleaseStatus: (value) => value,
     isEditablePassportStatus: () => true,
     normalizeInternalAliasIdValue: (value) => String(value || "").trim(),

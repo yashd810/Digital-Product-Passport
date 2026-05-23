@@ -171,7 +171,7 @@ function createTestApp() {
     EDIT_SESSION_TIMEOUT_HOURS: 12,
     EDIT_SESSION_TIMEOUT_SQL: "12 hours",
     IN_REVISION_STATUS: "in_revision",
-    SYSTEM_PASSPORT_FIELDS: new Set(["dpp_id", "company_id"]),
+    SYSTEM_PASSPORT_FIELDS: new Set(["dppId", "company_id"]),
     getTable: (typeName) => `${typeName}_passports`,
     normalizePassportRow: (row) => row,
     normalizeReleaseStatus: (value) => value,

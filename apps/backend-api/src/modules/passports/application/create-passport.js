@@ -69,8 +69,8 @@ function createDraftPassportUseCase(deps) {
       );
       error.statusCode = 409;
       error.payload = isBulk ? null : {
-        existing_dpp_id: existingByProductId.dppId,
-        release_status: normalizeReleaseStatus(existingByProductId.release_status),
+        existingDppId: existingByProductId.dppId,
+        releaseStatus: normalizeReleaseStatus(existingByProductId.releaseStatus),
       };
       error.normalizedProductId = normalizedProductId;
       throw error;
@@ -100,7 +100,7 @@ function createDraftPassportUseCase(deps) {
       passportType: resolvedPassportType,
       internalAliasId: normalizedProductId,
       granularity: effectiveGranularity,
-      passportLike: { ...fields, internalAliasId: normalizedProductId, internal_alias_id: normalizedProductId },
+      passportLike: { ...fields, internalAliasId: normalizedProductId },
     });
     const complianceManagedFields = await buildComplianceManagedFields({
       companyId,
@@ -126,11 +126,10 @@ function createDraftPassportUseCase(deps) {
     const signedCarrierAuthenticity = await maybeSignCarrierPayload({
       passport: {
         dppId,
-        dpp_id: dppId,
-        release_status: "draft",
-        company_id: companyId,
-        model_name: modelName || null,
-        internal_alias_id: storedProductIdentifiers.internal_alias_id,
+        releaseStatus: "draft",
+        companyId,
+        modelName: modelName || null,
+        internalAliasId: storedProductIdentifiers.internalAliasId,
       },
       companyName,
       metadata: applyCarrierAuthenticityMutation(null, carrierAuthenticityMutation),
@@ -138,21 +137,21 @@ function createDraftPassportUseCase(deps) {
     });
 
     const allCols = [
-      "dpp_id",
-      "lineage_id",
-      "company_id",
-      "model_name",
-      "internal_alias_id",
-      "product_identifier_did",
-      "compliance_profile_key",
-      "content_specification_ids",
-      "carrier_policy_key",
-      "carrier_authenticity",
-      "economic_operator_id",
-      "economic_operator_identifier_scheme",
-      "facility_id",
+      "dppId",
+      "lineageId",
+      "companyId",
+      "modelName",
+      "internalAliasId",
+      "uniqueProductIdentifier",
+      "complianceProfileKey",
+      "contentSpecificationIds",
+      "carrierPolicyKey",
+      "carrierAuthenticity",
+      "economicOperatorId",
+      "economicOperatorIdentifierScheme",
+      "facilityId",
       "granularity",
-      "created_by",
+      "createdBy",
       ...dataFields,
     ];
 
@@ -161,15 +160,15 @@ function createDraftPassportUseCase(deps) {
       lineageId,
       companyId,
       modelName || null,
-      storedProductIdentifiers.internal_alias_id,
-      storedProductIdentifiers.product_identifier_did,
-      complianceManagedFields.compliance_profile_key,
-      complianceManagedFields.content_specification_ids,
-      complianceManagedFields.carrier_policy_key,
+      storedProductIdentifiers.internalAliasId,
+      storedProductIdentifiers.uniqueProductIdentifier,
+      complianceManagedFields.complianceProfileKey,
+      complianceManagedFields.contentSpecificationIds,
+      complianceManagedFields.carrierPolicyKey,
       buildCarrierAuthenticityStorageValue(signedCarrierAuthenticity),
-      complianceManagedFields.economic_operator_id,
-      complianceManagedFields.economic_operator_identifier_scheme,
-      complianceManagedFields.facility_id,
+      complianceManagedFields.economicOperatorId,
+      complianceManagedFields.economicOperatorIdentifierScheme,
+      complianceManagedFields.facilityId,
       effectiveGranularity,
       userId,
       ...dataFields.map((key) => processedFields[key]),
@@ -192,12 +191,12 @@ function createDraftPassportUseCase(deps) {
     });
 
     await logAudit(companyId, userId, "CREATE", tableName, dppId, null, {
-      internal_alias_id: storedProductIdentifiers.internal_alias_id,
-      product_identifier_did: storedProductIdentifiers.product_identifier_did,
-      passport_type: resolvedPassportType,
-      model_name: modelName,
+      internalAliasId: storedProductIdentifiers.internalAliasId,
+      uniqueProductIdentifier: storedProductIdentifiers.uniqueProductIdentifier,
+      passportType: resolvedPassportType,
+      modelName,
       granularity: effectiveGranularity,
-      compliance_profile_key: complianceManagedFields.compliance_profile_key,
+      complianceProfileKey: complianceManagedFields.complianceProfileKey,
       ...(isBulk ? { bulk: true } : {}),
     });
     await archivePassportSnapshot({

@@ -343,7 +343,7 @@ properties:
     type: integer
   product_identifier:
     type: string
-  dpp_id:
+  dppId:
     type: string
   registry_name:
     type: string

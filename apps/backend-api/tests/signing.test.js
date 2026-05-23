@@ -85,7 +85,7 @@ const TYPE_DEF = {
     sections: [
       {
         fields: [
-          { key: "facility_id" },
+          { key: "facilityId" },
           { key: "capacity_wh", dataType: "integer" },
           { key: "dynamic_metrics", dataType: "json" },
           { key: "battery_materials", dataType: "json" },
@@ -98,16 +98,16 @@ const TYPE_DEF = {
 const PASSPORT = {
   guid: "72b99c83-952c-4179-96f6-54a513d39dbc",
   dppId: "72b99c83-952c-4179-96f6-54a513d39dbc",
-  lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
+  lineageId: "72b99c83-952c-4179-96f6-54a513d39dbc",
   company_id: 7,
-  passport_type: "battery",
-  internal_alias_id: "BAT-2026-001",
-  product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c7-bat-2026-001",
-  version_number: 2,
-  release_status: "released",
+  passportType: "battery",
+  internalAliasId: "BAT-2026-001",
+  uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:c7-bat-2026-001",
+  versionNumber: 2,
+  releaseStatus: "released",
   updated_at: "2026-04-24T12:00:00.000Z",
-  model_name: "Battery Pack 5000",
-  facility_id: "plant-42",
+  modelName: "Battery Pack 5000",
+  facilityId: "plant-42",
   capacity_wh: "5000",
   granularity: "item",
 };
@@ -161,9 +161,9 @@ describe("signing service", () => {
 
     expect(signed.signatureAlgorithm).toBe("ES256");
 
-    pool.state.signatures.set(`${PASSPORT.guid}:${PASSPORT.version_number}`, {
+    pool.state.signatures.set(`${PASSPORT.guid}:${PASSPORT.versionNumber}`, {
       passport_dpp_id: PASSPORT.guid,
-      version_number: PASSPORT.version_number,
+      versionNumber: PASSPORT.versionNumber,
       data_hash: signed.dataHash,
       signature: signed.signature,
       algorithm: signed.signatureAlgorithm,
@@ -173,7 +173,7 @@ describe("signing service", () => {
       vc_json: signed.vcJson,
     });
 
-    const verification = await signingService.verifyPassportSignature(PASSPORT.guid, PASSPORT.version_number);
+    const verification = await signingService.verifyPassportSignature(PASSPORT.guid, PASSPORT.versionNumber);
     expect(verification.status).toBe("valid");
     expect(verification.algorithm).toBe("ES256");
     expect(verification.proofType).toBe("JsonWebSignature2020");
@@ -287,7 +287,7 @@ describe("signing service", () => {
       subjectId: "https://www.claros-dpp.online/dpp/acme-energy/battery-pack/BAT-2026-001#carrier",
       payload: {
         digitalProductPassportId: PASSPORT.dppId,
-        uniqueProductIdentifier: PASSPORT.product_identifier_did,
+        uniqueProductIdentifier: PASSPORT.uniqueProductIdentifier,
         publicAccessUrl: "https://www.claros-dpp.online/dpp/acme-energy/battery-pack/BAT-2026-001",
       },
     });
@@ -301,7 +301,7 @@ describe("signing service", () => {
           type: ["VerifiableCredential", "DataCarrierBindingCredential"],
           credentialSubject: expect.objectContaining({
             digitalProductPassportId: PASSPORT.dppId,
-            uniqueProductIdentifier: PASSPORT.product_identifier_did,
+            uniqueProductIdentifier: PASSPORT.uniqueProductIdentifier,
           }),
           proof: expect.objectContaining({
             issuerCertificateId: "qsealc-cert-001",

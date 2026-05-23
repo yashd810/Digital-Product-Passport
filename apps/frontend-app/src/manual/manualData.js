@@ -37,7 +37,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "companies",
         purpose: "Tenant master record, Asset Management switch, DID slug, and economic-operator identity.",
-        columns: ["id", "company_name", "is_active", "asset_management_enabled", "asset_management_revoked_at", "did_slug", "economic_operator_identifier", "economic_operator_identifier_scheme", "created_at", "updated_at"],
+        columns: ["id", "company_name", "is_active", "asset_management_enabled", "asset_management_revoked_at", "did_slug", "economic_operator_identifier", "economicOperatorIdentifierScheme", "created_at", "updated_at"],
       },
       {
         name: "company_dpp_policies",
@@ -83,17 +83,17 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_registry",
         purpose: "Maps every passport DPP ID to its company, type, public access key, and device API key.",
-        columns: ["dpp_id", "lineage_id", "company_id", "passport_type", "access_key", "access_key_hash", "access_key_prefix", "access_key_last_rotated_at", "device_api_key", "device_api_key_hash", "device_api_key_prefix", "device_key_last_rotated_at", "created_at"],
+        columns: ["dppId", "lineageId", "company_id", "passportType", "access_key", "access_key_hash", "access_key_prefix", "access_key_last_rotated_at", "device_api_key", "device_api_key_hash", "device_api_key_prefix", "device_key_last_rotated_at", "created_at"],
       },
       {
         name: "dpp_subject_registry",
         purpose: "Subject DID registry connecting local product IDs to product DIDs, DPP DIDs, company DIDs, and granularity.",
-        columns: ["id", "company_id", "passport_dpp_id", "internal_alias_id", "product_identifier_did", "granularity", "product_did", "dpp_did", "company_did", "created_at", "updated_at"],
+        columns: ["id", "company_id", "passport_dpp_id", "internalAliasId", "uniqueProductIdentifier", "granularity", "product_did", "dpp_did", "company_did", "created_at", "updated_at"],
       },
       {
         name: "dpp_registry_registrations",
         purpose: "Records standards-style DPP registry submissions from `/api/v1/registerDPP`.",
-        columns: ["id", "passport_dpp_id", "company_id", "product_identifier", "dpp_id", "registry_name", "status", "registration_payload", "registered_by", "registered_at", "updated_at"],
+        columns: ["id", "passport_dpp_id", "company_id", "product_identifier", "dppId", "registry_name", "status", "registration_payload", "registered_by", "registered_at", "updated_at"],
       },
       {
         name: "product_identifier_lineage",
@@ -103,7 +103,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_edit_sessions",
         purpose: "Tracks who is currently editing a passport and when that session was last active.",
-        columns: ["id", "passport_dpp_id", "company_id", "passport_type", "user_id", "last_activity_at", "created_at", "updated_at"],
+        columns: ["id", "passport_dpp_id", "company_id", "passportType", "user_id", "last_activity_at", "created_at", "updated_at"],
       },
       {
         name: "passport_dynamic_values",
@@ -113,7 +113,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_archives",
         purpose: "Stores full passport row data when a passport is archived. Each version is stored as a separate row with the complete row_data JSONB. Unarchiving restores the soft-deleted rows in the passport table and removes the archive entries.",
-        columns: ["id", "dpp_id", "lineage_id", "company_id", "passport_type", "version_number", "model_name", "internal_alias_id", "product_identifier_did", "release_status", "row_data", "actor_identifier", "snapshot_reason", "archived_by", "archived_at"],
+        columns: ["id", "dppId", "lineageId", "company_id", "passportType", "versionNumber", "modelName", "internalAliasId", "uniqueProductIdentifier", "releaseStatus", "row_data", "actor_identifier", "snapshot_reason", "archived_by", "archived_at"],
       },
     ],
   },
@@ -129,7 +129,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_signatures",
         purpose: "Signature record created when a passport version is released.",
-        columns: ["id", "passport_dpp_id", "version_number", "data_hash", "signature", "algorithm", "signing_key_id", "released_at", "signed_at", "vc_json"],
+        columns: ["id", "passport_dpp_id", "versionNumber", "data_hash", "signature", "algorithm", "signing_key_id", "released_at", "signed_at", "vc_json"],
       },
       {
         name: "passport_scan_events",
@@ -155,7 +155,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_workflow",
         purpose: "Reviewer and approver assignments plus the full workflow status timeline.",
-        columns: ["id", "passport_dpp_id", "passport_type", "company_id", "submitted_by", "reviewer_id", "approver_id", "review_status", "approval_status", "overall_status", "previous_release_status", "reviewer_comment", "approver_comment", "reviewed_at", "approved_at", "rejected_at", "created_at", "updated_at"],
+        columns: ["id", "passport_dpp_id", "passportType", "company_id", "submitted_by", "reviewer_id", "approver_id", "review_status", "approval_status", "overall_status", "previous_release_status", "reviewer_comment", "approver_comment", "reviewed_at", "approved_at", "rejected_at", "created_at", "updated_at"],
       },
       {
         name: "notifications",
@@ -165,17 +165,17 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_revision_batches",
         purpose: "Bulk-revision request metadata, including selected scope, changes, workflow submission intent, and result counts.",
-        columns: ["id", "company_id", "passport_type", "requested_by", "scope_type", "scope_meta", "revision_note", "changes_json", "submit_to_workflow", "reviewer_id", "approver_id", "total_targeted", "revised_count", "skipped_count", "failed_count", "created_at", "updated_at"],
+        columns: ["id", "company_id", "passportType", "requested_by", "scope_type", "scope_meta", "revision_note", "changes_json", "submit_to_workflow", "reviewer_id", "approver_id", "total_targeted", "revised_count", "skipped_count", "failed_count", "created_at", "updated_at"],
       },
       {
         name: "passport_revision_batch_items",
         purpose: "Per-passport result rows for a bulk-revision batch.",
-        columns: ["id", "batch_id", "passport_dpp_id", "passport_type", "source_version_number", "new_version_number", "status", "message", "created_at"],
+        columns: ["id", "batch_id", "passport_dpp_id", "passportType", "source_version_number", "new_version_number", "status", "message", "created_at"],
       },
       {
         name: "passport_history_visibility",
         purpose: "Controls whether individual released versions appear in public history.",
-        columns: ["passport_dpp_id", "version_number", "is_public", "updated_by", "created_at", "updated_at"],
+        columns: ["passport_dpp_id", "versionNumber", "is_public", "updated_by", "created_at", "updated_at"],
       },
       {
         name: "audit_logs",
@@ -221,7 +221,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_templates",
         purpose: "Reusable template headers for a company and passport type.",
-        columns: ["id", "company_id", "passport_type", "name", "description", "created_by", "created_at", "updated_at"],
+        columns: ["id", "company_id", "passportType", "name", "description", "created_by", "created_at", "updated_at"],
       },
       {
         name: "passport_template_fields",
@@ -252,12 +252,12 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_backup_replications",
         purpose: "Backup snapshots and verification status for released passports or access-control evidence.",
-        columns: ["id", "backup_provider_id", "backup_provider_key", "passport_dpp_id", "lineage_id", "company_id", "passport_type", "version_number", "dpp_id", "snapshot_scope", "replication_status", "storage_provider", "storage_key", "public_url", "payload_hash", "payload_json", "verification_status", "last_verified_at", "created_at", "updated_at"],
+        columns: ["id", "backup_provider_id", "backup_provider_key", "passport_dpp_id", "lineageId", "company_id", "passportType", "versionNumber", "dppId", "snapshot_scope", "replication_status", "storage_provider", "storage_key", "public_url", "payload_hash", "payload_json", "verification_status", "last_verified_at", "created_at", "updated_at"],
       },
       {
         name: "backup_public_handovers",
         purpose: "Public continuity copy activated when an economic operator is inactive.",
-        columns: ["id", "company_id", "passport_dpp_id", "lineage_id", "passport_type", "internal_alias_id", "version_number", "backup_provider_id", "backup_provider_key", "source_replication_id", "storage_key", "public_url", "public_company_name", "public_row_data", "handover_status", "verification_status", "notes", "activated_by", "deactivated_by", "activated_at", "deactivated_at", "created_at", "updated_at"],
+        columns: ["id", "company_id", "passport_dpp_id", "lineageId", "passportType", "internalAliasId", "versionNumber", "backup_provider_id", "backup_provider_key", "source_replication_id", "storage_key", "public_url", "public_company_name", "public_row_data", "handover_status", "verification_status", "notes", "activated_by", "deactivated_by", "activated_at", "deactivated_at", "created_at", "updated_at"],
       },
     ],
   },
@@ -268,12 +268,12 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "asset_management_jobs",
         purpose: "Saved Asset Management schedules and source configurations.",
-        columns: ["id", "company_id", "passport_type", "name", "source_kind", "source_config", "records_json", "options_json", "is_active", "start_at", "interval_minutes", "next_run_at", "last_run_at", "last_status", "last_summary", "created_at", "updated_at"],
+        columns: ["id", "company_id", "passportType", "name", "source_kind", "source_config", "records_json", "options_json", "is_active", "start_at", "interval_minutes", "next_run_at", "last_run_at", "last_status", "last_summary", "created_at", "updated_at"],
       },
       {
         name: "asset_management_runs",
         purpose: "Run log for manual pushes and scheduled Asset Management jobs.",
-        columns: ["id", "job_id", "company_id", "passport_type", "trigger_type", "source_kind", "status", "summary_json", "request_json", "generated_json", "created_at"],
+        columns: ["id", "job_id", "company_id", "passportType", "trigger_type", "source_kind", "status", "summary_json", "request_json", "generated_json", "created_at"],
       },
       {
         name: "request_rate_limits",
@@ -442,7 +442,7 @@ export const BACKEND_OPERATION_FLOWS = [
     steps: [
       "The company record stores a DID slug plus economic-operator identifier and scheme.",
       "The company DPP policy chooses default granularity: model, batch, or item.",
-      "Passport creation stores product_identifier_did, granularity, economic_operator_id, and facility_id. The product DID should follow the real serial/business identifier rather than the internal local passport ID.",
+      "Passport creation stores uniqueProductIdentifier, granularity, economicOperatorId, and facilityId. The product DID should follow the real serial/business identifier rather than the internal local passport ID.",
       "Public DID URLs expose platform, company, product model/batch/item, DPP, and facility DID documents.",
       "The `/resolve?did=...` endpoint redirects browsers to the public passport where possible and API clients to the DID document URL.",
     ],
@@ -493,7 +493,7 @@ export const BACKEND_OPERATION_FLOWS = [
       "A company editor launches Asset Management from the dashboard, which issues a short-lived asset platform token and optional extra asset key.",
       "The tool loads the company's allowed passport types and current passports for the selected type.",
       "Users stage changes by CSV, JSON, blank rows, or ERP/API fetch, then preview the package before anything is written.",
-      "Preview checks matching by dppId or internal_alias_id, rejects unknown columns, and shows row-by-row validation results.",
+      "Preview checks matching by dppId or internalAliasId, rejects unknown columns, and shows row-by-row validation results.",
       "Push writes the prepared changes into the normal passport backend, while Schedule saves a server-side job that can fetch from an external source later.",
     ],
   },
@@ -568,8 +568,8 @@ export const ASSET_MANAGEMENT_TERMS_TABLE = {
   rows: [
     ["Workspace", "Auto-connects to the company and loads the selected passport type.", "You do not need to type the company or token manually after a normal dashboard launch."],
     ["Ingest", "Accepts JSON paste, CSV import, or ERP/API fetch.", "The tool is for updating existing passports, not for bypassing the main passport schema."],
-    ["Asset Grid", "Shows staged rows in a spreadsheet-like table.", "Keep dppId when possible. If dppId is missing, internal_alias_id is the main fallback match key."],
-    ["Export CSV", "Downloads current rows, blank templates, filtered rows, filtered columns, or editable-only rows.", "Filtered columns still keep dppId and internal_alias_id so the file can be re-imported safely."],
+    ["Asset Grid", "Shows staged rows in a spreadsheet-like table.", "Keep dppId when possible. If dppId is missing, internalAliasId is the main fallback match key."],
+    ["Export CSV", "Downloads current rows, blank templates, filtered rows, filtered columns, or editable-only rows.", "Filtered columns still keep dppId and internalAliasId so the file can be re-imported safely."],
     ["Preview & Build JSON", "Runs a dry check and creates the exact JSON package that would be pushed.", "No passport is changed at preview time."],
     ["Validation Details", "Explains row by row whether each line is ready, skipped, or failed.", "Use this list before pushing so you understand exactly which rows will change."],
     ["Push to Backend", "Writes the prepared changes into your real passport records.", "This is the moment when the update becomes real."],
@@ -620,13 +620,13 @@ export const COMPANY_WRITE_API_TABLE = {
   title: "Company write APIs for create, update, release, revise, and bulk work",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What happens"],
   rows: [
-    ["Create one passport", "POST /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passport_type, model_name, internal_alias_id, granularity, product_identifier_did, economic_operator_id, facility_id, ...fieldKeys }", "Creates one new draft passport. internal_alias_id must be unique."],
-    ["Bulk create many passports", "POST /api/companies/:companyId/passports/bulk", "Session cookie or bearer token, company access, editor or company admin", "{ passport_type, passports: [ {...}, {...} ] } up to 500 rows", "Creates many passports and returns a per-row summary instead of failing the whole batch."],
-    ["Update one editable passport", "PATCH /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token, company access, editor or company admin", "{ passportType or passport_type, granularity, product_identifier_did, economic_operator_id, facility_id, ...fieldsToChange }", "Updates one draft or in-revision passport. Released granularity cannot be changed in place."],
-    ["Bulk update matched passports", "PATCH /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passport_type, passports: [ { dppId or internal_alias_id, ...fields }, ... ] } up to 500 rows", "Updates many existing editable passports. It does not create new ones."],
-    ["Bulk update many records with the same value", "PATCH /api/companies/:companyId/passports/bulk-update-all", "Session cookie or bearer token, company access, editor or company admin", "{ passport_type, filter, update }", "Applies one update object to every matching editable passport. internal_alias_id cannot be bulk-set."],
-    ["Upsert from CSV text", "POST /api/companies/:companyId/passports/upsert-csv", "Session cookie or bearer token, company access, editor or company admin", "{ passport_type, csv: \"...csv text...\" }", "Creates new passports when no dppId is present, or updates matching editable passports when dppId or internal_alias_id matches."],
-    ["Upsert from JSON", "POST /api/companies/:companyId/passports/upsert-json", "Session cookie or bearer token, company access, editor or company admin", "{ passport_type, passports: [ {...}, {...} ] } or a raw array", "Creates new passports without dppId, or updates editable ones when dppId or internal_alias_id matches."],
+    ["Create one passport", "POST /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, modelName, internalAliasId, granularity, uniqueProductIdentifier, economicOperatorId, facilityId, ...fieldKeys }", "Creates one new draft passport. internalAliasId must be unique."],
+    ["Bulk create many passports", "POST /api/companies/:companyId/passports/bulk", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, passports: [ {...}, {...} ] } up to 500 rows", "Creates many passports and returns a per-row summary instead of failing the whole batch."],
+    ["Update one editable passport", "PATCH /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token, company access, editor or company admin", "{ passportType or passportType, granularity, uniqueProductIdentifier, economicOperatorId, facilityId, ...fieldsToChange }", "Updates one draft or in-revision passport. Released granularity cannot be changed in place."],
+    ["Bulk update matched passports", "PATCH /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, passports: [ { dppId or internalAliasId, ...fields }, ... ] } up to 500 rows", "Updates many existing editable passports. It does not create new ones."],
+    ["Bulk update many records with the same value", "PATCH /api/companies/:companyId/passports/bulk-update-all", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, filter, update }", "Applies one update object to every matching editable passport. internalAliasId cannot be bulk-set."],
+    ["Upsert from CSV text", "POST /api/companies/:companyId/passports/upsert-csv", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, csv: \"...csv text...\" }", "Creates new passports when no dppId is present, or updates matching editable passports when dppId or internalAliasId matches."],
+    ["Upsert from JSON", "POST /api/companies/:companyId/passports/upsert-json", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, passports: [ {...}, {...} ] } or a raw array", "Creates new passports without dppId, or updates editable ones when dppId or internalAliasId matches."],
     ["Release one passport", "PATCH /api/companies/:companyId/passports/:dppId/release", "Session cookie or bearer token, company access, editor or company admin", "{ passportType }", "Moves an editable passport to released and stores signature/VC metadata."],
     ["Revise one released passport", "POST /api/companies/:companyId/passports/:dppId/revise", "Session cookie or bearer token, company access, editor or company admin", "{ passportType }", "Creates the next editable version from the latest released version."],
     ["Change granularity with a linked successor", "POST /api/companies/:companyId/passports/:dppId/granularity-transition", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, targetGranularity, reason }", "Creates a linked successor identifier when released DPP granularity must move between model, batch, and item levels."],
@@ -639,7 +639,7 @@ export const COMPANY_WRITE_API_TABLE = {
     ["Unarchive one passport", "POST /api/companies/:companyId/passports/:dppId/unarchive", "Session cookie or bearer token, company access, editor or company admin", "No body", "Restores all soft-deleted versions and removes the archive entries. The passport reappears in the active list."],
     ["Bulk unarchive passports", "POST /api/companies/:companyId/passports/bulk-unarchive", "Session cookie or bearer token, company access, editor or company admin", "{ dppIds: [ \"uuid\", ... ] } up to 500", "Restores many archived passports and reports how many were restored or skipped."],
     ["Delete one editable passport", "DELETE /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token, company access, editor or company admin", "{ passportType }", "Soft-deletes one draft or in-revision passport. Released passports cannot be deleted."],
-    ["Bulk delete editable passports", "DELETE /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passport_type, identifiers: [ { dppId }, { internal_alias_id } ] }", "Soft-deletes many editable passports and reports deleted, skipped, and failed rows."],
+    ["Bulk delete editable passports", "DELETE /api/companies/:companyId/passports", "Session cookie or bearer token, company access, editor or company admin", "{ passportType, identifiers: [ { dppId }, { internalAliasId } ] }", "Soft-deletes many editable passports and reports deleted, skipped, and failed rows."],
   ],
 };
 
@@ -649,7 +649,7 @@ export const READ_EXPORT_API_TABLE = {
   rows: [
     ["List company passports", "GET /api/companies/:companyId/passports", "Session cookie or bearer token and company access", "Query params: passportType required, search optional, status optional", "Current active company passports for that type. Archived passports are excluded."],
     ["List archived passports", "GET /api/companies/:companyId/passports/archived", "Session cookie or bearer token and company access", "Query params: passportType optional, search optional", "Returns the latest version per DPP ID from the passport_archives table, with archived-by user details."],
-    ["Fetch many by dppId or internal_alias_id", "POST /api/companies/:companyId/passports/bulk-fetch", "Session cookie or bearer token and company access", "{ passport_type, identifiers: [ { dppId }, { internal_alias_id } ] }", "A found or not_found result for each requested identifier."],
+    ["Fetch many by dppId or internalAliasId", "POST /api/companies/:companyId/passports/bulk-fetch", "Session cookie or bearer token and company access", "{ passportType, identifiers: [ { dppId }, { internalAliasId } ] }", "A found or not_found result for each requested identifier."],
     ["Export drafts or released rows", "GET /api/companies/:companyId/passports/export-drafts", "Session cookie or bearer token and company access", "Query params: passportType required, format csv or json, status draft released in_revision or all", "A downloadable CSV or JSON export."],
     ["Fetch one company passport", "GET /api/companies/:companyId/passports/:dppId", "Session cookie or bearer token and company access", "No body", "The latest company-visible version of that passport."],
     ["Preview a company passport", "GET /api/companies/:companyId/passports/:passportKey/preview", "Session cookie or bearer token and company access", "No body", "Preview payload for a passport before public release."],
@@ -696,7 +696,7 @@ export const PUBLIC_AND_LIVE_API_TABLE = {
     ["Record scan", "POST /api/passports/:dppId/scan", "No auth", "Optional scan metadata", "Stores public scan event telemetry."],
     ["Read scan stats", "GET /api/passports/:dppId/scan-stats", "No auth", "No body", "Returns aggregate scan information."],
     ["Report security concern", "POST /api/passports/:dppId/security-report", "No auth", "{ eventType, details }", "Stores anti-counterfeiting, phishing, or suspicious scan reports."],
-    ["Generate or read QR code", "POST/GET /api/passports/:dppId/qrcode", "POST requires session/bearer editor; GET is public", "POST options, QR payload, and optional carrier_authenticity metadata", "Creates or returns QR code data plus carrier authenticity fields for passport public access."],
+    ["Generate or read QR code", "POST/GET /api/passports/:dppId/qrcode", "POST requires session/bearer editor; GET is public", "POST options, QR payload, and optional carrierAuthenticity metadata", "Creates or returns QR code data plus carrier authenticity fields for passport public access."],
     ["Read latest live values", "GET /api/passports/:dppId/dynamic-values", "No auth", "No body", "The most recent live value per dynamic field."],
     ["Read one live field history", "GET /api/passports/:dppId/dynamic-values/:fieldKey/history", "No auth", "Optional query param: limit", "Time-series history for one dynamic field."],
     ["Push live device values", "POST /api/passports/:dppId/dynamic-values", "x-device-key header", "{ fieldKey: value, anotherField: value }", "Stores a new live reading per field."],
@@ -711,7 +711,7 @@ export const GOVERNANCE_SECURITY_API_TABLE = {
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it controls"],
   rows: [
     ["Read company compliance identity", "GET /api/companies/:companyId/compliance-identity", "Session cookie or bearer token and company access", "No body", "Returns economic-operator identifier details and related identity metadata."],
-    ["Update company compliance identity", "POST /api/companies/:companyId/compliance-identity", "Session cookie or bearer token, company access, editor/company admin", "{ economic_operator_identifier, economic_operator_identifier_scheme }", "Stores the economic-operator identity used by DID, VC, JSON-LD, standards APIs, and audit actor identity."],
+    ["Update company compliance identity", "POST /api/companies/:companyId/compliance-identity", "Session cookie or bearer token, company access, editor/company admin", "{ economic_operator_identifier, economicOperatorIdentifierScheme }", "Stores the economic-operator identity used by DID, VC, JSON-LD, standards APIs, and audit actor identity."],
     ["Add a managed facility", "POST /api/companies/:companyId/facilities", "Session cookie or bearer token, company access, editor/company admin", "{ facility_identifier, identifier_scheme, display_name, metadata_json }", "Creates an active facility identifier that standards APIs can reference and facility DID documents can expose."],
     ["Read passport access grants", "GET /api/passports/:dppId/access-grants or GET /api/companies/:companyId/passports/:dppId/access-grants", "Session cookie or bearer token", "No body", "Lists delegated access grants for a passport."],
     ["Create passport access grant", "POST /api/access-grants or POST /api/companies/:companyId/passports/:dppId/access-grants", "Session cookie or bearer token; company route requires company admin", "{ dppId, audience, granteeUserId, elementIdPath, reason, expiresAt }", "Grants controlled audience access to a user for a passport or specific element path."],
@@ -726,7 +726,7 @@ export const GOVERNANCE_SECURITY_API_TABLE = {
     ["Read backup setup", "GET /api/admin/companies/:companyId/backup-policy, /backup-continuity-evidence, /identifier-persistence-policy", "Session cookie or bearer token, super_admin", "No body", "Reads backup, continuity, and identifier persistence status."],
     ["Manage backup providers", "POST /api/companies/:companyId/backup-providers, DELETE /api/companies/:companyId/backup-providers/:providerKey", "Session cookie or bearer token, super_admin", "Provider config or provider key", "Adds or removes backup providers."],
     ["Manage passport backup/handover", "GET/POST /api/companies/:companyId/passports/:dppId/backup-*", "Session cookie or bearer token; activation/deactivation requires company admin", "Replication, verify, handover activate/deactivate payloads", "Reads, creates, verifies, activates, or deactivates backup replications and public handover state."],
-    ["Record data-carrier verification", "POST /api/companies/:companyId/passports/:dppId/data-carrier-verifications", "Session cookie or bearer token, company access, editor/company admin", "Print grade, scanner tests, durability checks, placement checks, and evidence URIs", "Adds verification evidence to carrier_authenticity and records a security event."],
+    ["Record data-carrier verification", "POST /api/companies/:companyId/passports/:dppId/data-carrier-verifications", "Session cookie or bearer token, company access, editor/company admin", "Print grade, scanner tests, durability checks, placement checks, and evidence URIs", "Adds verification evidence to carrierAuthenticity and records a security event."],
     ["Security events", "GET /api/companies/:companyId/passports/:dppId/security-events", "Session cookie or bearer token and company access", "No body", "Reads public security reports tied to a passport."],
     ["API key emergency revoke", "POST /api/companies/:companyId/api-keys/:keyId/emergency-revoke", "Session cookie or bearer token, company admin", "{ reason } optional", "Immediately disables an external read API key and records emergency revocation evidence."],
   ],
@@ -753,10 +753,10 @@ export const ASSET_MANAGEMENT_API_TABLE = {
     ["Load bootstrap data", "GET /api/asset-management/bootstrap", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Returns company info, allowed passport types, ERP presets, and security hints."],
     ["Load current passports", "GET /api/asset-management/passports", "x-asset-platform-token and, if enabled, x-asset-key", "Query param: passportType", "Returns the current passports and editable summary for the selected type."],
     ["Fetch ERP or API rows", "POST /api/asset-management/source/fetch", "x-asset-platform-token and, if enabled, x-asset-key", "{ sourceConfig } with url, method, headers, body, recordPath, fieldMap", "Fetches external rows and maps them into asset rows."],
-    ["Preview staged changes", "POST /api/asset-management/preview", "x-asset-platform-token and, if enabled, x-asset-key", "{ passport_type, records }", "Validates matching and field rules, then builds the JSON package without changing any passports."],
-    ["Push staged changes", "POST /api/asset-management/push", "x-asset-platform-token and, if enabled, x-asset-key", "{ generated_payload } or { passport_type, records }", "Writes the prepared changes into the normal backend passport records."],
+    ["Preview staged changes", "POST /api/asset-management/preview", "x-asset-platform-token and, if enabled, x-asset-key", "{ passportType, records }", "Validates matching and field rules, then builds the JSON package without changing any passports."],
+    ["Push staged changes", "POST /api/asset-management/push", "x-asset-platform-token and, if enabled, x-asset-key", "{ generated_payload } or { passportType, records }", "Writes the prepared changes into the normal backend passport records."],
     ["List saved jobs", "GET /api/asset-management/jobs", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Returns saved schedules for the current company."],
-    ["Create a job", "POST /api/asset-management/jobs", "x-asset-platform-token and, if enabled, x-asset-key", "{ passport_type, name, records, sourceKind, sourceConfig, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server."],
+    ["Create a job", "POST /api/asset-management/jobs", "x-asset-platform-token and, if enabled, x-asset-key", "{ passportType, name, records, sourceKind, sourceConfig, startAt, intervalMinutes, isActive }", "Saves a recurring job that can run later on the server."],
     ["Update a job", "PATCH /api/asset-management/jobs/:jobId", "x-asset-platform-token and, if enabled, x-asset-key", "Name, schedule, source, records, and active state fields", "Edits an existing saved job."],
     ["Run one job immediately", "POST /api/asset-management/jobs/:jobId/run", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Executes the saved job immediately instead of waiting for its next schedule."],
     ["See recent runs", "GET /api/asset-management/runs", "x-asset-platform-token and, if enabled, x-asset-key", "No body", "Shows recent manual pushes and scheduled job runs."],

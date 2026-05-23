@@ -78,27 +78,27 @@ function createApp(options = {}) {
 
   const currentReleased = {
     id: 11,
-    dpp_id: "dpp_release_1",
     dppId: "dpp_release_1",
-    lineage_id: "lineage_1",
+    dppId: "dpp_release_1",
+    lineageId: "lineage_1",
     company_id: 5,
-    passport_type: "battery",
-    version_number: 2,
-    release_status: "released",
-    internal_alias_id: "SKU-REL-1",
-    product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:5:sku-rel-1",
+    passportType: "battery",
+    versionNumber: 2,
+    releaseStatus: "released",
+    internalAliasId: "SKU-REL-1",
+    uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:5:sku-rel-1",
     granularity: "item",
-    compliance_profile_key: "battery_dpp_v1",
-    content_specification_ids: "[\"spec-battery\"]",
-    carrier_policy_key: "battery_qr_public_entry_v1",
-    economic_operator_id: "EO-5",
-    economic_operator_identifier_scheme: "uri",
-    facility_id: "FAC-DEFAULT-1",
+    complianceProfileKey: "battery_dpp_v1",
+    contentSpecificationIds: "[\"spec-battery\"]",
+    carrierPolicyKey: "battery_qr_public_entry_v1",
+    economicOperatorId: "EO-5",
+    economicOperatorIdentifierScheme: "uri",
+    facilityId: "FAC-DEFAULT-1",
   };
 
   let latestLivePassport = {
     ...currentReleased,
-    release_status: "draft",
+    releaseStatus: "draft",
   };
 
   const archivePassportSnapshot = jest.fn(async () => {});
@@ -116,17 +116,17 @@ function createApp(options = {}) {
   const pool = {
     query: jest.fn(async (sql, params = []) => {
       const text = String(sql);
-      if (text.includes("UPDATE battery_passports SET release_status = 'released'")) {
-        latestLivePassport = { ...latestLivePassport, release_status: "released" };
+      if (text.includes("UPDATE battery_passports SET releaseStatus = 'released'")) {
+        latestLivePassport = { ...latestLivePassport, releaseStatus: "released" };
         return { rows: [latestLivePassport] };
       }
       if (text.includes("UPDATE passport_attachments SET is_public = true")) {
         return { rows: [] };
       }
-      if (text.includes("SELECT * FROM battery_passports WHERE dpp_id = $1 AND release_status = 'released'")) {
+      if (text.includes("SELECT * FROM battery_passports WHERE dppId = $1 AND releaseStatus = 'released'")) {
         return { rows: [currentReleased] };
       }
-      if (text.includes("SELECT id FROM battery_passports WHERE lineage_id = $1")) {
+      if (text.includes("SELECT id FROM battery_passports WHERE lineageId = $1")) {
         return { rows: [] };
       }
       if (text.includes("SELECT access_key_hash")) {
@@ -137,11 +137,11 @@ function createApp(options = {}) {
           rows: [{
             ...currentReleased,
             id: 22,
-            dpp_id: params[0],
             dppId: params[0],
-            lineage_id: params[1],
-            version_number: 3,
-            release_status: "in_revision",
+            dppId: params[0],
+            lineageId: params[1],
+            versionNumber: 3,
+            releaseStatus: "in_revision",
             created_by: 9,
           }],
         };
@@ -164,8 +164,8 @@ function createApp(options = {}) {
     normalizeReleaseStatus: (value) => value,
     findExistingPassportByInternalAliasId: jest.fn(async () => null),
     buildStoredProductIdentifiers: jest.fn(({ internalAliasId }) => ({
-      internal_alias_id: internalAliasId,
-      product_identifier_did: `did:web:www.claros-dpp.online:did:battery:item:5:${String(internalAliasId).toLowerCase()}`,
+      internalAliasId: internalAliasId,
+      uniqueProductIdentifier: `did:web:www.claros-dpp.online:did:battery:item:5:${String(internalAliasId).toLowerCase()}`,
     })),
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId, granularity }) => ({
@@ -182,13 +182,13 @@ function createApp(options = {}) {
     loadLatestLivePassport: jest.fn(async () => ({ ...latestLivePassport })),
     reconcileManagedReleaseFields: jest.fn(async ({ passport }) => ({
       ...passport,
-      product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc",
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: "[\"spec-battery\"]",
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      economic_operator_id: "EO-5",
-      economic_operator_identifier_scheme: "uri",
-      facility_id: "FAC-DEFAULT-1",
+      uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: "[\"spec-battery\"]",
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      economicOperatorId: "EO-5",
+      economicOperatorIdentifierScheme: "uri",
+      facilityId: "FAC-DEFAULT-1",
     })),
     evaluateCompliance: jest.fn(async () => ({
       directReleaseAllowed: true,
@@ -244,13 +244,13 @@ describe("passport lifecycle routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toMatchObject({
       success: true,
-      passport: expect.objectContaining({ release_status: "released" }),
+      passport: expect.objectContaining({ releaseStatus: "released" }),
     });
     expect(archivePassportSnapshot).toHaveBeenCalledTimes(2);
     expect(signPassport).toHaveBeenCalled();
     expect(recordSignedDppRelease).toHaveBeenCalled();
     expect(markOlderVersionsObsolete).toHaveBeenCalledWith("battery_passports", "dpp_release_1", 2, "battery");
-    expect(logAudit).toHaveBeenCalledWith(5, 9, "RELEASE", "battery_passports", "dpp_release_1", { release_status: "draft_or_in_revision" }, { release_status: "released" });
+    expect(logAudit).toHaveBeenCalledWith(5, 9, "RELEASE", "battery_passports", "dpp_release_1", { releaseStatus: "draft_or_in_revision" }, { releaseStatus: "released" });
   });
 
   test("PATCH /api/companies/:companyId/passports/:dppId/release no longer blocks when verification finds issues", async () => {
@@ -341,7 +341,7 @@ describe("passport lifecycle routes", () => {
       success: true,
       dppId: "dpp_revision_2",
       newVersion: 3,
-      release_status: "in_revision",
+      releaseStatus: "in_revision",
     });
     expect(insertPassportRegistry).toHaveBeenCalledWith(expect.objectContaining({
       dppId: "dpp_revision_2",
@@ -351,6 +351,6 @@ describe("passport lifecycle routes", () => {
       deviceApiKeyHash: "dhash",
     }));
     expect(archivePassportSnapshot).toHaveBeenCalled();
-    expect(logAudit).toHaveBeenCalledWith("5", 9, "REVISE", "battery_passports", "dpp_revision_2", { version_number: 2 }, { version_number: 3 });
+    expect(logAudit).toHaveBeenCalledWith("5", 9, "REVISE", "battery_passports", "dpp_revision_2", { versionNumber: 2 }, { versionNumber: 3 });
   });
 });

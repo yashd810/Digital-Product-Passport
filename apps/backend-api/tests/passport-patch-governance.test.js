@@ -89,19 +89,19 @@ function createTestApp() {
 
   const currentPassport = {
     id: 12,
-    dpp_id: "dpp_test_1",
-    lineage_id: "dpp_test_1",
+    dppId: "dpp_test_1",
+    lineageId: "dpp_test_1",
     company_id: 5,
     granularity: "item",
-    release_status: "draft",
-    internal_alias_id: "SKU-1",
-    model_name: "Original model",
-    facility_id: "FAC-INACTIVE",
-    content_specification_ids: "[\"spec-a\"]",
-    carrier_policy_key: "battery_qr_public_entry_v1",
-    compliance_profile_key: "battery_dpp_v1",
-    economic_operator_id: "EO-1",
-    economic_operator_identifier_scheme: "uri",
+    releaseStatus: "draft",
+    internalAliasId: "SKU-1",
+    modelName: "Original model",
+    facilityId: "FAC-INACTIVE",
+    contentSpecificationIds: "[\"spec-a\"]",
+    carrierPolicyKey: "battery_qr_public_entry_v1",
+    complianceProfileKey: "battery_dpp_v1",
+    economicOperatorId: "EO-1",
+    economicOperatorIdentifierScheme: "uri",
     traceability_table: "{\"columns\":[\"Step\",\"Place\"],\"rows\":[[\"Assembled\",\"Factory A\"]]}",
   };
 
@@ -109,18 +109,18 @@ function createTestApp() {
     query: jest.fn(async (sql, params = []) => {
       const text = String(sql);
 
-      if (text.includes("SELECT economic_operator_identifier, economic_operator_identifier_scheme")
+      if (text.includes("SELECT economic_operator_identifier, economicOperatorIdentifierScheme")
         && text.includes("FROM companies")) {
         return {
           rows: [{
             economic_operator_identifier: "EO-1",
-            economic_operator_identifier_scheme: "uri",
+            economicOperatorIdentifierScheme: "uri",
           }],
         };
       }
 
       if (text.includes("FROM battery_passports")
-        && text.includes("WHERE dpp_id = $1")
+        && text.includes("WHERE dppId = $1")
         && text.includes("deleted_at IS NULL LIMIT 1")) {
         return { rows: [{ ...currentPassport }] };
       }
@@ -170,7 +170,7 @@ function createTestApp() {
     EDIT_SESSION_TIMEOUT_HOURS: 12,
     EDIT_SESSION_TIMEOUT_SQL: "12 hours",
     IN_REVISION_STATUS: "in_revision",
-    SYSTEM_PASSPORT_FIELDS: new Set(["id", "dpp_id", "company_id"]),
+    SYSTEM_PASSPORT_FIELDS: new Set(["id", "dppId", "company_id"]),
     getTable: (typeName) => `${typeName}_passports`,
     normalizePassportRow: (row) => row,
     normalizeReleaseStatus: (value) => value,
@@ -179,7 +179,7 @@ function createTestApp() {
     generateInternalAliasIdValue: (value) => `PID-${value}`,
     normalizePassportRequestBody: (body) => body,
     extractExplicitFacilityId: (source) => {
-      const value = source?.facility_id;
+      const value = source?.facilityId;
       return value ? String(value).trim() : null;
     },
     getWritablePassportColumns: (data, excluded = new Set()) =>
@@ -250,20 +250,20 @@ function createReleaseTestApp() {
 
   const currentPassport = {
     id: 21,
-    dpp_id: "dpp_release_1",
+    dppId: "dpp_release_1",
     company_id: 5,
-    version_number: 3,
+    versionNumber: 3,
     granularity: "item",
-    release_status: "draft",
-    internal_alias_id: "SKU-REL-1",
-    product_identifier_did: "SKU-REL-1",
-    compliance_profile_key: "generic_dpp_v1",
-    content_specification_ids: null,
-    carrier_policy_key: null,
-    economic_operator_id: null,
-    economic_operator_identifier_scheme: null,
-    facility_id: null,
-    model_name: "Release test passport",
+    releaseStatus: "draft",
+    internalAliasId: "SKU-REL-1",
+    uniqueProductIdentifier: "SKU-REL-1",
+    complianceProfileKey: "generic_dpp_v1",
+    contentSpecificationIds: null,
+    carrierPolicyKey: null,
+    economicOperatorId: null,
+    economicOperatorIdentifierScheme: null,
+    facilityId: null,
+    modelName: "Release test passport",
   };
 
   const pool = {
@@ -272,17 +272,17 @@ function createReleaseTestApp() {
 
       if (text.includes("SELECT *")
         && text.includes("FROM battery_passports")
-        && text.includes("WHERE dpp_id = $1")
+        && text.includes("WHERE dppId = $1")
         && text.includes("company_id = $2")) {
         return { rows: [{ ...currentPassport }] };
       }
 
-      if (text.includes("SELECT economic_operator_identifier, economic_operator_identifier_scheme")
+      if (text.includes("SELECT economic_operator_identifier, economicOperatorIdentifierScheme")
         && text.includes("FROM companies")) {
         return {
           rows: [{
             economic_operator_identifier: "EO-5",
-            economic_operator_identifier_scheme: "uri",
+            economicOperatorIdentifierScheme: "uri",
           }],
         };
       }
@@ -292,18 +292,18 @@ function createReleaseTestApp() {
         return { rows: [{ facility_identifier: "FAC-DEFAULT-1" }] };
       }
 
-      if (text.includes("UPDATE battery_passports SET release_status = 'released'")) {
+      if (text.includes("UPDATE battery_passports SET releaseStatus = 'released'")) {
         return {
           rows: [{
             ...currentPassport,
-            release_status: "released",
-            compliance_profile_key: "battery_dpp_v1",
-            product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc",
-            content_specification_ids: "[\"spec-battery\"]",
-            carrier_policy_key: "battery_qr_public_entry_v1",
-            economic_operator_id: "EO-5",
-            economic_operator_identifier_scheme: "uri",
-            facility_id: "FAC-DEFAULT-1",
+            releaseStatus: "released",
+            complianceProfileKey: "battery_dpp_v1",
+            uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc",
+            contentSpecificationIds: "[\"spec-battery\"]",
+            carrierPolicyKey: "battery_qr_public_entry_v1",
+            economicOperatorId: "EO-5",
+            economicOperatorIdentifierScheme: "uri",
+            facilityId: "FAC-DEFAULT-1",
           }],
         };
       }
@@ -359,7 +359,7 @@ function createReleaseTestApp() {
     EDIT_SESSION_TIMEOUT_HOURS: 12,
     EDIT_SESSION_TIMEOUT_SQL: "12 hours",
     IN_REVISION_STATUS: "in_revision",
-    SYSTEM_PASSPORT_FIELDS: new Set(["id", "dpp_id", "company_id"]),
+    SYSTEM_PASSPORT_FIELDS: new Set(["id", "dppId", "company_id"]),
     getTable: (typeName) => `${typeName}_passports`,
     normalizePassportRow: (row) => row,
     normalizeReleaseStatus: (value) => value,
@@ -368,7 +368,7 @@ function createReleaseTestApp() {
     generateInternalAliasIdValue: (value) => `PID-${value}`,
     normalizePassportRequestBody: (body) => body,
     extractExplicitFacilityId: (source) => {
-      const value = source?.facility_id;
+      const value = source?.facilityId;
       return value ? String(value).trim() : null;
     },
     getWritablePassportColumns: (data, excluded = new Set()) =>
@@ -383,7 +383,7 @@ function createReleaseTestApp() {
     logAudit: jest.fn(async () => {}),
     getPassportTypeSchema: jest.fn(async () => ({
       typeName: "battery",
-      allowedKeys: new Set(["manufacturer", "model_name", "internal_alias_id"]),
+      allowedKeys: new Set(["manufacturer", "modelName", "internalAliasId"]),
     })),
     findExistingPassportByInternalAliasId: jest.fn(async () => null),
     getPassportLineageContext: jest.fn(async () => null),
@@ -445,13 +445,13 @@ describe("passport patch governance", () => {
       params: { companyId: "5", dppId: "dpp_test_1" },
       body: {
         passportType: "battery",
-        facility_id: "PASSPORT-FAC-001",
+        facilityId: "PASSPORT-FAC-001",
       },
     });
 
     expect(response.statusCode).toBe(200);
     expect(updatePassportRowById).toHaveBeenCalled();
-    expect(updatePassportRowById.mock.calls[0][0].data.facility_id).toBe("PASSPORT-FAC-001");
+    expect(updatePassportRowById.mock.calls[0][0].data.facilityId).toBe("PASSPORT-FAC-001");
 
     const facilityValidationCalls = pool.query.mock.calls.filter(([sql]) =>
       String(sql).includes("FROM company_facilities")
@@ -469,7 +469,7 @@ describe("passport patch governance", () => {
       params: { companyId: "5", dppId: "dpp_test_1" },
       body: {
         passportType: "battery",
-        model_name: "Updated model",
+        modelName: "Updated model",
         manufacturer: "Updated manufacturer",
       },
     });
@@ -477,13 +477,13 @@ describe("passport patch governance", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.passport).toMatchObject({
-      dpp_id: "dpp_test_1",
-      passport_type: "battery",
-      model_name: "Updated model",
+      dppId: "dpp_test_1",
+      passportType: "battery",
+      modelName: "Updated model",
       manufacturer: "Updated manufacturer",
     });
     expect(updatePassportRowById.mock.calls[0][0].data).toMatchObject({
-      model_name: "Updated model",
+      modelName: "Updated model",
       manufacturer: "Updated manufacturer",
     });
   });
@@ -497,7 +497,7 @@ describe("passport patch governance", () => {
       params: { companyId: "5", dppId: "dpp_test_1" },
       body: {
         passportType: "battery",
-        model_name: "Updated model",
+        modelName: "Updated model",
         unsupported_runtime_key: "should be ignored",
       },
     });
@@ -506,7 +506,7 @@ describe("passport patch governance", () => {
     expect(response.body.success).toBe(true);
     expect(updatePassportRowById).toHaveBeenCalled();
     expect(updatePassportRowById.mock.calls[0][0].data).toMatchObject({
-      model_name: "Updated model",
+      modelName: "Updated model",
     });
     expect(updatePassportRowById.mock.calls[0][0].data.unsupported_runtime_key).toBeUndefined();
   });
@@ -550,13 +550,13 @@ describe("passport patch governance", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body.success).toBe(true);
     expect(response.body.passport).toMatchObject({
-      dpp_id: "dpp_test_1",
-      passport_type: "battery",
+      dppId: "dpp_test_1",
+      passportType: "battery",
       manufacturer: "Updated manufacturer",
-      facility_id: "FAC-INACTIVE",
+      facilityId: "FAC-INACTIVE",
     });
     expect(updatePassportRowById).toHaveBeenCalled();
-    expect(updatePassportRowById.mock.calls[0][0].data.facility_id).toBe("FAC-INACTIVE");
+    expect(updatePassportRowById.mock.calls[0][0].data.facilityId).toBe("FAC-INACTIVE");
 
     const facilityValidationCalls = pool.query.mock.calls.filter(([sql]) =>
       String(sql).includes("FROM company_facilities")
@@ -580,20 +580,20 @@ describe("passport patch governance", () => {
     expect(response.statusCode).toBe(200);
     expect(updatePassportRowById).toHaveBeenCalled();
     expect(updatePassportRowById.mock.calls[0][0].data).toMatchObject({
-      product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc",
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: "[\"spec-battery\"]",
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      economic_operator_id: "EO-5",
-      economic_operator_identifier_scheme: "uri",
-      facility_id: "FAC-DEFAULT-1",
+      uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: "[\"spec-battery\"]",
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      economicOperatorId: "EO-5",
+      economicOperatorIdentifierScheme: "uri",
+      facilityId: "FAC-DEFAULT-1",
     });
     expect(complianceEvaluate).toHaveBeenCalledWith(
       expect.objectContaining({
-        passport_type: "battery",
-        product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc",
-        compliance_profile_key: "battery_dpp_v1",
-        facility_id: "FAC-DEFAULT-1",
+        passportType: "battery",
+        uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:5:c5-sku-rel-1-123456789abc",
+        complianceProfileKey: "battery_dpp_v1",
+        facilityId: "FAC-DEFAULT-1",
       }),
       "battery"
     );

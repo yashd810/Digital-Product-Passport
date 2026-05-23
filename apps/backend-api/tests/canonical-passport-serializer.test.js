@@ -38,12 +38,12 @@ const typeDef = {
         { key: "uniqueProductIdentifier", semanticId: "dpp:uniqueProductIdentifier", valueSource: "system", required: true, locked: true },
         { key: "internalAliasId", semanticId: "dpp:internalAliasId", valueSource: "system", required: true, locked: true },
         { key: "granularity", semanticId: "dpp:granularity", valueSource: "company_policy", required: true, locked: true },
-        { key: "dppSchemaVersion", semanticId: "dpp:dppSchemaVersion", valueSource: "passport_type", required: true, locked: true },
+        { key: "dppSchemaVersion", semanticId: "dpp:dppSchemaVersion", valueSource: "passportType", required: true, locked: true },
         { key: "dppStatus", semanticId: "dpp:dppStatus", valueSource: "system", required: true, locked: true },
         { key: "lastUpdate", semanticId: "dpp:lastUpdate", valueSource: "system", required: true, locked: true },
         { key: "economicOperatorId", semanticId: "dpp:economicOperatorId", valueSource: "company_identity", required: true, locked: true },
         { key: "facilityId", semanticId: "dpp:facilityId", valueSource: "company_or_passport", required: false, locked: true },
-        { key: "contentSpecificationIds", semanticId: "dpp:contentSpecificationIds", valueSource: "passport_type", required: true, locked: true },
+        { key: "contentSpecificationIds", semanticId: "dpp:contentSpecificationIds", valueSource: "passportType", required: true, locked: true },
         { key: "subjectDid", semanticId: "dpp:subjectDid", valueSource: "system", required: true, locked: true },
         { key: "dppDid", semanticId: "dpp:dppDid", valueSource: "system", required: true, locked: true },
         { key: "companyDid", semanticId: "dpp:companyDid", valueSource: "system", required: true, locked: true },
@@ -62,18 +62,18 @@ const typeDef = {
 
 const passport = {
   guid: "dpp_fff9372d-6405-4207-9ed2-808426a3151c",
-  lineage_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-  passport_type: "generic_passport",
-  internal_alias_id: "PID-72b99c83",
-  product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:pid-72b99c83",
-  release_status: "released",
-  version_number: "3",
+  lineageId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+  passportType: "generic_passport",
+  internalAliasId: "PID-72b99c83",
+  uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:pid-72b99c83",
+  releaseStatus: "released",
+  versionNumber: "3",
   updated_at: "2026-04-24T10:00:00.000Z",
   company_id: 2,
   batteryMass: "250.5",
   isReplaceable: "true",
-  content_specification_ids: "prEN1234_xyz,prEN5678_abc",
-  facility_id: "plant-1",
+  contentSpecificationIds: "prEN1234_xyz,prEN5678_abc",
+  facilityId: "plant-1",
   dpp_status: "draft",
 };
 
@@ -103,8 +103,8 @@ test("preserves typed field values and required headers", () => {
   assert.strictEqual(typeof payload.fields.isReplaceable, "boolean");
   assert.strictEqual(payload.fields.isReplaceable, true);
   assert.deepStrictEqual(payload.contentSpecificationIds, ["prEN1234_xyz", "prEN5678_abc"]);
-  assert.ok(!("facility_id" in payload.fields));
-  assert.ok(!("content_specification_ids" in payload.fields));
+  assert.ok(!("facilityId" in payload.fields));
+  assert.ok(!("contentSpecificationIds" in payload.fields));
   assert.ok(!("dpp_status" in payload.fields));
 });
 

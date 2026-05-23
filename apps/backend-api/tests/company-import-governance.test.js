@@ -93,7 +93,7 @@ function createTestApp() {
     getTable: (typeName) => `${typeName}_passports`,
     getPassportTypeSchema: jest.fn(async () => ({
       typeName: "battery",
-      allowedKeys: new Set(["manufacturer", "model_name", "internal_alias_id"]),
+      allowedKeys: new Set(["manufacturer", "modelName", "internalAliasId"]),
       schemaFields: [
         { key: "manufacturer", label: "Manufacturer", type: "text" },
       ],
@@ -138,10 +138,10 @@ describe("company passport import governance rules", () => {
       path: "/api/companies/:companyId/passports/upsert-csv",
       params: { companyId: "5" },
       body: {
-        passport_type: "battery",
+        passportType: "battery",
         csv: [
           '"Field Name","Passport 1"',
-          '"internal_alias_id","SKU-1"',
+          '"internalAliasId","SKU-1"',
           '"Confidentiality","trade_secret"',
         ].join("\n"),
       },
@@ -162,10 +162,10 @@ describe("company passport import governance rules", () => {
       path: "/api/companies/:companyId/passports/upsert-json",
       params: { companyId: "5" },
       body: {
-        passport_type: "battery",
+        passportType: "battery",
         passports: [
           {
-            internal_alias_id: "SKU-1",
+            internalAliasId: "SKU-1",
             manufacturer: "ACME",
             confidentiality: "trade_secret",
           },

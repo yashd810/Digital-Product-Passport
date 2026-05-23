@@ -40,76 +40,6 @@ function createSchemaStorageHelpers({
     return Array.from(new Set(candidates.filter(Boolean).filter((candidate) => candidate !== exactKey)));
   }
 
-  function buildLegacyCompatibilityDefinition(definition) {
-    return String(definition || "")
-      .replace(/\s+NOT\s+NULL\b/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function buildLegacySystemColumnSyncFunctionSql() {
-    const insertGuards = SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap(({ storageKey, legacyKey }) => {
-      if (!legacyKey || legacyKey === storageKey) return [];
-      return [
-        `IF NEW.${quoteSqlIdentifier(storageKey)} IS NULL AND NEW.${quoteSqlIdentifier(legacyKey)} IS NOT NULL THEN NEW.${quoteSqlIdentifier(storageKey)} = NEW.${quoteSqlIdentifier(legacyKey)}; END IF;`,
-        `IF NEW.${quoteSqlIdentifier(legacyKey)} IS NULL AND NEW.${quoteSqlIdentifier(storageKey)} IS NOT NULL THEN NEW.${quoteSqlIdentifier(legacyKey)} = NEW.${quoteSqlIdentifier(storageKey)}; END IF;`,
-      ];
-    }).join("\n  ");
-
-    const updateGuards = SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap(({ storageKey, legacyKey }) => {
-      if (!legacyKey || legacyKey === storageKey) return [];
-      return [
-        `IF NEW.${quoteSqlIdentifier(storageKey)} IS DISTINCT FROM OLD.${quoteSqlIdentifier(storageKey)} THEN NEW.${quoteSqlIdentifier(legacyKey)} = NEW.${quoteSqlIdentifier(storageKey)}; ELSIF NEW.${quoteSqlIdentifier(legacyKey)} IS DISTINCT FROM OLD.${quoteSqlIdentifier(legacyKey)} THEN NEW.${quoteSqlIdentifier(storageKey)} = NEW.${quoteSqlIdentifier(legacyKey)}; END IF;`,
-      ];
-    }).join("\n  ");
-
-    return `
-CREATE OR REPLACE FUNCTION sync_legacy_passport_system_columns()
-RETURNS trigger AS $$
-BEGIN
-  IF TG_OP = 'INSERT' THEN
-  ${insertGuards}
-    RETURN NEW;
-  END IF;
-
-  ${updateGuards}
-  ${insertGuards}
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-`;
-  }
-
-  async function ensureLegacySystemColumnCompatibility(tableName) {
-    await pool.query(buildLegacySystemColumnSyncFunctionSql());
-    for (const { storageKey, legacyKey, definition } of SYSTEM_PASSPORT_COLUMN_MAPPINGS) {
-      if (!legacyKey || legacyKey === storageKey) continue;
-      await pool.query(
-        `ALTER TABLE ${tableName}
-         ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(legacyKey)} ${buildLegacyCompatibilityDefinition(definition)}`
-      );
-      await pool.query(
-        `UPDATE ${tableName}
-         SET ${quoteSqlIdentifier(legacyKey)} = ${quoteSqlIdentifier(storageKey)}
-         WHERE ${quoteSqlIdentifier(legacyKey)} IS NULL
-           AND ${quoteSqlIdentifier(storageKey)} IS NOT NULL`
-      );
-      await pool.query(
-        `UPDATE ${tableName}
-         SET ${quoteSqlIdentifier(storageKey)} = ${quoteSqlIdentifier(legacyKey)}
-         WHERE ${quoteSqlIdentifier(storageKey)} IS NULL
-           AND ${quoteSqlIdentifier(legacyKey)} IS NOT NULL`
-      );
-    }
-    await pool.query(`DROP TRIGGER IF EXISTS sync_legacy_passport_system_columns_trigger ON ${tableName}`);
-    await pool.query(
-      `CREATE TRIGGER sync_legacy_passport_system_columns_trigger
-       BEFORE INSERT OR UPDATE ON ${tableName}
-       FOR EACH ROW
-       EXECUTE FUNCTION sync_legacy_passport_system_columns()`
-    );
-  }
-
   async function getLiveTableColumnMap(tableName) {
     const columns = await pool.query(
       `SELECT column_name, data_type
@@ -329,8 +259,8 @@ $$ LANGUAGE plpgsql;
     for (const [columnName, columnDefinition] of LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS) {
       await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(columnName)} ${columnDefinition}`);
     }
-
-    await ensureLegacySystemColumnCompatibility(tableName);
+    await pool.query(`DROP TRIGGER IF EXISTS sync_legacy_passport_system_columns_trigger ON ${tableName}`).catch(() => {});
+    await pool.query("DROP FUNCTION IF EXISTS sync_legacy_passport_system_columns()").catch(() => {});
 
     const addedColumns = [];
     const indexedColumns = [];

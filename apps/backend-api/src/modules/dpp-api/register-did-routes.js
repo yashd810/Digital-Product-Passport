@@ -271,8 +271,8 @@ module.exports = function registerDidRoutes(app, deps) {
       const tableName = getTable(passport_type);
 
       const r = await pool.query(
-        `SELECT dpp_id, internal_alias_id, model_name, company_id FROM ${tableName}
-         WHERE dpp_id = $1 AND deleted_at IS NULL
+        `SELECT "dppId", "internalAliasId", "modelName", "companyId" FROM ${tableName}
+         WHERE "dppId" = $1 AND "deletedAt" IS NULL
          LIMIT 1`,
         [dppId]
       );
@@ -286,7 +286,7 @@ module.exports = function registerDidRoutes(app, deps) {
 
       const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
-      const productDid = businessIdentifier ? (passport.productIdentifierDid || passport.product_identifier_did || null) : null;
+      const productDid = businessIdentifier ? (passport.productIdentifierDid || passport.uniqueProductIdentifier || null) : null;
       const pDppDid = passport.internalAliasId ?
         dppIdentity.dppDid("model", company_id, passport.internalAliasId) :
         null;
@@ -294,7 +294,7 @@ module.exports = function registerDidRoutes(app, deps) {
       res.json({
         publicUrl,
         internalAliasId: passport.internalAliasId || null,
-        productIdentifierDid: businessIdentifier ? (passport.productIdentifierDid || passport.product_identifier_did || null) : null,
+        productIdentifierDid: businessIdentifier ? (passport.productIdentifierDid || passport.uniqueProductIdentifier || null) : null,
         modelName: passport.modelName || null,
         companyName,
         dppDid: pDppDid,

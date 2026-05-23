@@ -85,7 +85,7 @@ Get all passports of a specific type for the company. Returns only editable fiel
 ```json
 {
   "company_id": "uuid",
-  "passport_type": "battery-passport",
+  "passportType": "battery-passport",
   "display_name": "Battery Digital Product Passport",
   "fields": [
     "modelNumber",
@@ -101,8 +101,8 @@ Get all passports of a specific type for the company. Returns only editable fiel
       "productName": "High Capacity Battery",
       "manufacturingDate": "2024-01-15",
       "is_editable": true,
-      "release_status": "draft",
-      "version_number": 1
+      "releaseStatus": "draft",
+      "versionNumber": 1
     }
   ],
   "summary": {
@@ -176,7 +176,7 @@ Generate passport JSON preview without pushing to database. Used to validate and
 **Request Body:**
 ```json
 {
-  "passport_type": "battery-passport",
+  "passportType": "battery-passport",
   "records": [
     {
       "product_id": "BAT-2024-001",
@@ -196,7 +196,7 @@ Generate passport JSON preview without pushing to database. Used to validate and
 ```json
 {
   "generated_payload": {
-    "passport_type": "battery-passport",
+    "passportType": "battery-passport",
     "records": [
       {
         "product_id": "BAT-2024-001",
@@ -232,7 +232,7 @@ Create or update passports with asset data. This is the main endpoint for bulk p
 **Request Body:**
 ```json
 {
-  "passport_type": "battery-passport",
+  "passportType": "battery-passport",
   "records": [
     {
       "product_id": "BAT-2024-001",
@@ -251,7 +251,7 @@ Create or update passports with asset data. This is the main endpoint for bulk p
 ```
 
 **Parameters:**
-- `passport_type` (string, required) - Type of passport
+- `passportType` (string, required) - Type of passport
 - `records` (array, required) - Passport records to push
 - `options` (object, optional):
   - `auto_publish` (boolean) - Automatically publish after push
@@ -267,7 +267,7 @@ Create or update passports with asset data. This is the main endpoint for bulk p
   "run": {
     "id": "uuid",
     "company_id": "uuid",
-    "passport_type": "battery-passport",
+    "passportType": "battery-passport",
     "trigger_type": "manual",
     "source_kind": "manual",
     "status": "success",
@@ -322,7 +322,7 @@ List all recurring or scheduled asset management jobs for the company.
     {
       "id": 1,
       "company_id": "uuid",
-      "passport_type": "battery-passport",
+      "passportType": "battery-passport",
       "name": "Daily Battery Sync",
       "source_kind": "api",
       "source_config": {
@@ -351,7 +351,7 @@ Create a new recurring or one-time asset management job.
 **Request Body:**
 ```json
 {
-  "passport_type": "battery-passport",
+  "passportType": "battery-passport",
   "name": "Daily Battery Sync",
   "sourceKind": "api",
   "sourceConfig": {
@@ -371,7 +371,7 @@ Create a new recurring or one-time asset management job.
 ```
 
 **Parameters:**
-- `passport_type` (string, required) - Type of passport
+- `passportType` (string, required) - Type of passport
 - `name` (string, required) - Job name
 - `sourceKind` (string, required) - "api" or "manual"
 - `sourceConfig` (object) - Configuration for API source
@@ -387,7 +387,7 @@ Create a new recurring or one-time asset management job.
   "job": {
     "id": 1,
     "company_id": "uuid",
-    "passport_type": "battery-passport",
+    "passportType": "battery-passport",
     "name": "Daily Battery Sync",
     "source_kind": "api",
     "source_config": {...},
@@ -484,7 +484,7 @@ Get execution history of all asset management jobs and pushes.
       "id": "uuid",
       "job_id": 1,
       "company_id": "uuid",
-      "passport_type": "battery-passport",
+      "passportType": "battery-passport",
       "trigger_type": "scheduled",
       "source_kind": "api",
       "status": "success",

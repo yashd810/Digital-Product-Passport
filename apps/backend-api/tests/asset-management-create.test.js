@@ -52,7 +52,7 @@ function buildService(overrides = {}) {
     assertCompanyAssetPassportTypeAccess: async () => ({
       typeName: "battery_passport",
       displayName: "Battery Passport",
-      schemaFields: [{ key: "model_name", label: "Model Name", type: "text" }],
+      schemaFields: [{ key: "modelName", label: "Model Name", type: "text" }],
     }),
     assertAssetManagementEnabled: async () => ({ id: 7 }),
     getLatestCompanyPassports: async () => [],
@@ -77,11 +77,11 @@ function buildService(overrides = {}) {
     toDynamicStoredValue: (value) => value,
     getAssetFieldMap: () => new Map([
       ["dppId", { key: "dppId", label: "Passport DPP ID", type: "text", system: true }],
-      ["internal_alias_id", { key: "internal_alias_id", label: "Serial Number", type: "text", system: true }],
-      ["model_name", { key: "model_name", label: "Model Name", type: "text", system: true }],
+      ["internalAliasId", { key: "internalAliasId", label: "Serial Number", type: "text", system: true }],
+      ["modelName", { key: "modelName", label: "Model Name", type: "text", system: true }],
     ]),
     EDITABLE_RELEASE_STATUSES_SQL: "('draft','in_revision')",
-    ASSET_MATCH_FIELDS: new Set(["dppId", "dpp_id", "match_dpp_id", "guid", "match_guid", "internal_alias_id", "match_product_id", "next_product_id"]),
+    ASSET_MATCH_FIELDS: new Set(["dppId", "dppId", "match_dpp_id", "guid", "match_guid", "internalAliasId", "match_product_id", "next_product_id"]),
     ASSET_IGNORED_SYSTEM_COLUMNS: new Set(["id", "company_id"]),
     ASSET_SCHEDULER_INTERVAL_MS: 60000,
     ASSET_SOURCE_ALLOWED_HOSTS: new Set(),
@@ -95,14 +95,14 @@ test("prepareAssetPayload generates a new dppId for unmatched product rows", asy
   const payload = await service.prepareAssetPayload({
     companyId: 7,
     passportType: "battery-passport",
-    records: [{ internal_alias_id: "BAT-001", model_name: "Model A" }],
+    records: [{ internalAliasId: "BAT-001", modelName: "Model A" }],
   });
 
   assert.strictEqual(payload.summary.ready, 1);
   assert.strictEqual(payload.summary.ready_for_passport_create, 1);
   assert.strictEqual(payload.generated_payload.records[0].action, "create");
   assert.strictEqual(payload.generated_payload.records[0].generated_dpp_id, "dpp_new_001");
-  assert.strictEqual(payload.generated_payload.records[0].internal_alias_id, "BAT-001");
+  assert.strictEqual(payload.generated_payload.records[0].internalAliasId, "BAT-001");
 });
 
 test("prepareAssetPayload ignores blank unknown columns on create rows", async () => {
@@ -110,7 +110,7 @@ test("prepareAssetPayload ignores blank unknown columns on create rows", async (
   const payload = await service.prepareAssetPayload({
     companyId: 7,
     passportType: "battery-passport",
-    records: [{ internal_alias_id: "BAT-001", model_name: "Model A", serial_number: "" }],
+    records: [{ internalAliasId: "BAT-001", modelName: "Model A", serial_number: "" }],
   });
 
   assert.strictEqual(payload.summary.failed, 0);
@@ -149,15 +149,15 @@ test("executeAssetPush persists created passports and reports passports_created"
               insertedRows.push({ sql: text, params });
               return {
                 rows: [{
-                  dpp_id: params[0],
-                  lineage_id: params[1],
+                  dppId: params[0],
+                  lineageId: params[1],
                   company_id: params[2],
-                  model_name: params[3],
-                  internal_alias_id: params[4],
-                  product_identifier_did: params[5],
+                  modelName: params[3],
+                  internalAliasId: params[4],
+                  uniqueProductIdentifier: params[5],
                   granularity: params[6],
-                  release_status: "draft",
-                  version_number: 1,
+                  releaseStatus: "draft",
+                  versionNumber: 1,
                 }],
               };
             }
@@ -178,18 +178,18 @@ test("executeAssetPush persists created passports and reports passports_created"
   const result = await service.executeAssetPush({
     companyId: 7,
     generatedPayload: {
-      passport_type: "battery_passport",
+      passportType: "battery_passport",
       records: [{
         row_index: 1,
         action: "create",
         generated_dpp_id: "dpp_new_002",
         generated_lineage_id: "dpp_new_002",
         generated_granularity: "item",
-        internal_alias_id: "BAT-002",
-        product_identifier_did: "did:web:test:product:bat-002",
+        internalAliasId: "BAT-002",
+        uniqueProductIdentifier: "did:web:test:product:bat-002",
         passport_create: {
-          internal_alias_id: "BAT-002",
-          model_name: "Model B",
+          internalAliasId: "BAT-002",
+          modelName: "Model B",
         },
       }],
     },

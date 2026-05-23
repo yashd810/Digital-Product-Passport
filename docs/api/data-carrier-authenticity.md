@@ -23,7 +23,7 @@ Supported fields:
 - `dataCarrierPlacementRules`
 - `dataCarrierVerificationEvidence`
 
-These fields are stored per passport in `carrier_authenticity` and are exposed in:
+These fields are stored per passport in `carrierAuthenticity` and are exposed in:
 
 - operational DPP JSON responses
 - full/canonical DPP JSON responses

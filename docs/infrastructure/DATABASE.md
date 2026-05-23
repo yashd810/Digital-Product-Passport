@@ -104,7 +104,7 @@ SELECT count(*) FROM audit_logs;
 For a specific passport type, inspect the generated table name from the backend and then query it directly:
 
 ```sql
-SELECT id, dpp_id, product_id, release_status, updated_at
+SELECT id, dppId, product_id, releaseStatus, updated_at
 FROM battery_passports
 ORDER BY updated_at DESC
 LIMIT 20;

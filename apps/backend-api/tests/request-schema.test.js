@@ -13,13 +13,13 @@ describe("request schema validation", () => {
   test("validateSchema reports missing aliased required values", () => {
     const issues = validateSchema({}, {
       type: "object",
-      anyOf: [["passport_type", "passportType"]],
+      anyOf: [["passportType", "passportType"]],
     }, "body");
 
     expect(issues).toEqual([
       expect.objectContaining({
         path: "body",
-        message: "At least one of passport_type, passportType is required",
+        message: "At least one of passportType, passportType is required",
       }),
     ]);
   });

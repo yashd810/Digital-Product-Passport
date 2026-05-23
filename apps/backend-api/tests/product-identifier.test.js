@@ -64,9 +64,9 @@ describe("product identifier service", () => {
     expect(policy).toMatchObject({
       companyId: 4,
       selectedGlobalIdentifierScheme: "did_web_product_identifier",
-      uniqueProductIdentifierField: "product_identifier_did",
-      localProductIdField: "internal_alias_id",
-      lineageIdentifierField: "lineage_id",
+      uniqueProductIdentifierField: "uniqueProductIdentifier",
+      localProductIdField: "internalAliasId",
+      lineageIdentifierField: "lineageId",
       rules: expect.objectContaining({
         identifiersNeverReused: true,
         oldIdentifiersRemainResolvable: true,
@@ -75,7 +75,7 @@ describe("product identifier service", () => {
       }),
       granularityChangePolicy: expect.objectContaining({
         mode: "linked_new_identifier_required",
-        linkageField: "lineage_id",
+        linkageField: "lineageId",
       }),
     });
   });
@@ -105,7 +105,7 @@ describe("product identifier service", () => {
             rows: [{
               id: 11,
               company_id: 4,
-              lineage_id: "dpp_lineage_001",
+              lineageId: "dpp_lineage_001",
               previous_passport_dpp_id: "dpp_old",
               replacement_passport_dpp_id: "dpp_new",
               previous_identifier: "did:web:www.example.test:did:battery:model:old",
@@ -125,7 +125,7 @@ describe("product identifier service", () => {
             rows: [{
               id: 11,
               company_id: 4,
-              lineage_id: "dpp_lineage_001",
+              lineageId: "dpp_lineage_001",
               previous_passport_dpp_id: "dpp_old",
               replacement_passport_dpp_id: "dpp_new",
               previous_identifier: "did:web:www.example.test:did:battery:model:old",

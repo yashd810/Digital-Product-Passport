@@ -158,9 +158,9 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Understand operator identity",
           items: [
-            "The company stores economic_operator_identifier and economic_operator_identifier_scheme.",
+            "The company stores economic_operator_identifier and economicOperatorIdentifierScheme.",
             "Authenticated user responses include actor/operator identity fields when the company identity exists.",
-            "Standards APIs can also accept economicOperatorId/economic_operator_id and facilityId/facility_id in create or patch payloads.",
+            "Standards APIs can also accept economicOperatorId/economicOperatorId and facilityId/facilityId in create or patch payloads.",
             "Audit logs can record actor_identifier and audience, so operator-driven actions remain traceable.",
           ],
         },
@@ -561,7 +561,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       table: ASSET_MANAGEMENT_API_TABLE,
       warnings: [
         "Asset Management should only be enabled for companies that actually need high-volume operational updates.",
-        "Because this layer can update many passports in one run, support teams should ask companies to preview first and use stable match keys such as dppId or internal_alias_id.",
+        "Because this layer can update many passports in one run, support teams should ask companies to preview first and use stable match keys such as dppId or internalAliasId.",
       ],
     },
     {

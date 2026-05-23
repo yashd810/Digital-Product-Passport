@@ -271,7 +271,7 @@ function normalizeOverviewAnalyticsPayload(payload) {
   const analyticsRows = Array.isArray(payload?.analytics)
     ? payload.analytics.map((item) => ({
         ...item,
-        passportType: item.passportType || item.passport_type || "",
+        passportType: item.passportType || item.passportType || "",
         draftCount: item.draftCount ?? item.draft_count ?? 0,
         inReviewCount: item.inReviewCount ?? item.in_review_count ?? 0,
         releasedCount: item.releasedCount ?? item.released_count ?? 0,

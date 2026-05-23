@@ -16,10 +16,10 @@ describe("buildCanonicalIdentityBundle", () => {
     const bundle = buildCanonicalIdentityBundle({
       passport: {
         dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-        lineage_id: "72b99c83-952c-4179-96f6-54a513d39dbc",
+        lineageId: "72b99c83-952c-4179-96f6-54a513d39dbc",
         company_id: 5,
-        passport_type: "trial_1_dbp",
-        internal_alias_id: "123456789",
+        passportType: "trial_1_dbp",
+        internalAliasId: "123456789",
         granularity: "item",
       },
       company: {

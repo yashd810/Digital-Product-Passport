@@ -206,7 +206,7 @@ Get all workflows for current user in a company.
     {
       "id": "uuid",
       "passport_dpp_id": "uuid",
-      "passport_type": "battery-passport",
+      "passportType": "battery-passport",
       "company_id": "uuid",
       "submitted_by": "user-id",
       "submitted_at": "2025-05-05T10:30:00Z",
@@ -217,10 +217,10 @@ Get all workflows for current user in a company.
       "approver_name": "Jane Approver",
       "approval_status": "pending",
       "overall_status": "in_progress",
-      "model_name": "BAT-01",
+      "modelName": "BAT-01",
       "product_id": "BAT-2024-001",
-      "version_number": 2,
-      "release_status": "in_review"
+      "versionNumber": 2,
+      "releaseStatus": "in_review"
     }
   ],
   "history": [
@@ -231,9 +231,9 @@ Get all workflows for current user in a company.
       "submitted_by": "user-id",
       "reviewed_at": "2025-05-05T11:00:00Z",
       "approved_at": "2025-05-05T11:15:00Z",
-      "model_name": "BAT-01",
-      "version_number": 2,
-      "release_status": "released"
+      "modelName": "BAT-01",
+      "versionNumber": 2,
+      "releaseStatus": "released"
     }
   ]
 }
@@ -260,7 +260,7 @@ Get all passports awaiting current user's review or approval across all companie
     {
       "id": "uuid",
       "passport_dpp_id": "uuid",
-      "passport_type": "battery-passport",
+      "passportType": "battery-passport",
       "company_id": "uuid",
       "submitted_by": "user-id",
       "submitted_at": "2025-05-05T10:30:00Z",
@@ -269,9 +269,9 @@ Get all passports awaiting current user's review or approval across all companie
       "approver_id": "user-id-2",
       "approval_status": "pending",
       "overall_status": "in_progress",
-      "model_name": "BAT-01",
+      "modelName": "BAT-01",
       "product_id": "BAT-2024-001",
-      "version_number": 2,
+      "versionNumber": 2,
       "created_at": "2025-05-05T10:30:00Z"
     }
   ]
@@ -325,10 +325,10 @@ Workflow generates notifications at key stages:
 
 | Event | Recipient | Message |
 |-------|-----------|---------|
-| Submitted to review | Reviewer | "Review needed: {model_name}" |
-| Review approved (approver exists) | Approver | "Approval needed: {model_name}" |
-| Approved & released | Passport creator | "✅ {model_name} reviewed and released!" |
-| Rejected | Passport creator | "❌ {model_name} was rejected" + reason |
+| Submitted to review | Reviewer | "Review needed: {modelName}" |
+| Review approved (approver exists) | Approver | "Approval needed: {modelName}" |
+| Approved & released | Passport creator | "✅ {modelName} reviewed and released!" |
+| Rejected | Passport creator | "❌ {modelName} was rejected" + reason |
 
 ---
 

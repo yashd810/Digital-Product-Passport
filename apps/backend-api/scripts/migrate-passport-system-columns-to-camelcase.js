@@ -44,79 +44,6 @@ function quoteIdentifier(value) {
   return `"${String(value).replace(/"/g, "\"\"")}"`;
 }
 
-function buildLegacyCompatibilityDefinition(definition) {
-  return String(definition || "")
-    .replace(/\s+NOT\s+NULL\b/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function buildLegacySyncFunctionSql() {
-  const insertGuards = SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap(({ storageKey, legacyKey }) => {
-    if (!legacyKey || legacyKey === storageKey) return [];
-    return [
-      `IF NEW.${quoteIdentifier(storageKey)} IS NULL AND NEW.${quoteIdentifier(legacyKey)} IS NOT NULL THEN NEW.${quoteIdentifier(storageKey)} = NEW.${quoteIdentifier(legacyKey)}; END IF;`,
-      `IF NEW.${quoteIdentifier(legacyKey)} IS NULL AND NEW.${quoteIdentifier(storageKey)} IS NOT NULL THEN NEW.${quoteIdentifier(legacyKey)} = NEW.${quoteIdentifier(storageKey)}; END IF;`,
-    ];
-  }).join("\n  ");
-
-  const updateGuards = SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap(({ storageKey, legacyKey }) => {
-    if (!legacyKey || legacyKey === storageKey) return [];
-    return [
-      `IF NEW.${quoteIdentifier(storageKey)} IS DISTINCT FROM OLD.${quoteIdentifier(storageKey)} THEN NEW.${quoteIdentifier(legacyKey)} = NEW.${quoteIdentifier(storageKey)}; ELSIF NEW.${quoteIdentifier(legacyKey)} IS DISTINCT FROM OLD.${quoteIdentifier(legacyKey)} THEN NEW.${quoteIdentifier(storageKey)} = NEW.${quoteIdentifier(legacyKey)}; END IF;`,
-    ];
-  }).join("\n  ");
-
-  return `
-CREATE OR REPLACE FUNCTION sync_legacy_passport_system_columns()
-RETURNS trigger AS $$
-BEGIN
-  IF TG_OP = 'INSERT' THEN
-  ${insertGuards}
-    RETURN NEW;
-  END IF;
-
-  ${updateGuards}
-  ${insertGuards}
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-`;
-}
-
-async function ensureLegacyCompatibilityColumns(tableName) {
-  const initialColumns = await getColumnNames(tableName);
-  const compatibilityColumns = SYSTEM_PASSPORT_COLUMN_MAPPINGS
-    .filter(({ storageKey, legacyKey }) => legacyKey && initialColumns.has(storageKey) && !initialColumns.has(legacyKey))
-    .map(({ storageKey, legacyKey, definition }) => ({ storageKey, legacyKey, definition }));
-
-  for (const column of compatibilityColumns) {
-    await pool.query(
-      `ALTER TABLE ${quoteIdentifier(tableName)}
-       ADD COLUMN IF NOT EXISTS ${quoteIdentifier(column.legacyKey)} ${buildLegacyCompatibilityDefinition(column.definition)}`
-    );
-    await pool.query(
-      `UPDATE ${quoteIdentifier(tableName)}
-       SET ${quoteIdentifier(column.legacyKey)} = ${quoteIdentifier(column.storageKey)}
-       WHERE ${quoteIdentifier(column.legacyKey)} IS NULL
-         AND ${quoteIdentifier(column.storageKey)} IS NOT NULL`
-    );
-  }
-
-  const syncedColumns = await getColumnNames(tableName);
-  for (const { storageKey, legacyKey } of SYSTEM_PASSPORT_COLUMN_MAPPINGS) {
-    if (!legacyKey || !syncedColumns.has(storageKey) || !syncedColumns.has(legacyKey)) continue;
-    await pool.query(
-      `UPDATE ${quoteIdentifier(tableName)}
-       SET ${quoteIdentifier(storageKey)} = ${quoteIdentifier(legacyKey)}
-       WHERE ${quoteIdentifier(storageKey)} IS NULL
-         AND ${quoteIdentifier(legacyKey)} IS NOT NULL`
-    );
-  }
-
-  return compatibilityColumns;
-}
-
 async function main() {
   const apply = process.argv.includes("--apply");
   const tables = await getPassportTables();
@@ -127,13 +54,11 @@ async function main() {
     const plannedRenames = SYSTEM_PASSPORT_COLUMN_MAPPINGS
       .filter(({ storageKey, legacyKey }) => legacyKey && columns.has(legacyKey) && !columns.has(storageKey))
       .map(({ storageKey, legacyKey }) => ({ from: legacyKey, to: storageKey }));
-    const plannedCompatibilityColumns = SYSTEM_PASSPORT_COLUMN_MAPPINGS
-      .filter(({ storageKey, legacyKey }) => legacyKey && columns.has(storageKey) && !columns.has(legacyKey))
-      .map(({ storageKey, legacyKey, definition }) => ({ storageKey, legacyKey, definition }));
-    let appliedCompatibilityColumns = plannedCompatibilityColumns;
+    const plannedLegacyDrops = SYSTEM_PASSPORT_COLUMN_MAPPINGS
+      .filter(({ storageKey, legacyKey }) => legacyKey && columns.has(storageKey) && columns.has(legacyKey))
+      .map(({ storageKey, legacyKey }) => ({ storageKey, legacyKey }));
 
     if (apply) {
-      await pool.query(buildLegacySyncFunctionSql());
       for (const rename of plannedRenames) {
         await pool.query(
           `ALTER TABLE ${quoteIdentifier(tableName)}
@@ -141,22 +66,25 @@ async function main() {
            TO ${quoteIdentifier(rename.to)}`
         );
       }
-      appliedCompatibilityColumns = await ensureLegacyCompatibilityColumns(tableName);
       await pool.query(`DROP TRIGGER IF EXISTS sync_legacy_passport_system_columns_trigger ON ${quoteIdentifier(tableName)}`);
-      await pool.query(
-        `CREATE TRIGGER sync_legacy_passport_system_columns_trigger
-         BEFORE INSERT OR UPDATE ON ${quoteIdentifier(tableName)}
-         FOR EACH ROW
-         EXECUTE FUNCTION sync_legacy_passport_system_columns()`
-      );
+      for (const column of plannedLegacyDrops) {
+        await pool.query(
+          `ALTER TABLE ${quoteIdentifier(tableName)}
+           DROP COLUMN IF EXISTS ${quoteIdentifier(column.legacyKey)}`
+        );
+      }
     }
 
     results.push({
       tableName,
-      status: plannedRenames.length || plannedCompatibilityColumns.length ? (apply ? "applied" : "pending") : "ok",
+      status: plannedRenames.length || plannedLegacyDrops.length ? (apply ? "applied" : "pending") : "ok",
       renames: plannedRenames,
-      compatibilityColumns: apply ? appliedCompatibilityColumns : plannedCompatibilityColumns,
+      droppedLegacyColumns: plannedLegacyDrops,
     });
+  }
+
+  if (apply) {
+    await pool.query("DROP FUNCTION IF EXISTS sync_legacy_passport_system_columns()");
   }
 
   console.log(JSON.stringify({ apply, results }, null, 2));

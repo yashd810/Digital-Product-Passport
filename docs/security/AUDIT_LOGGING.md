@@ -126,7 +126,7 @@ ORDER BY created_at DESC;
 
 - Keep audit tables append-only.
 - Use company IDs for tenant scoping.
-- Use `passport_dpp_id`/`dpp_id` for passport references.
+- Use `passport_dpp_id`/`dppId` for passport references.
 - Do not document or build new audit behavior around workspace IDs.
 - Anchor regularly in production if external evidence of log integrity is required.
 

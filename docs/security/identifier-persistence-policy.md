@@ -16,13 +16,13 @@ This document defines the identifier-persistence policy used for DPP records and
 
 The platform distinguishes between:
 
-- `dpp_id`
+- `dppId`
   The DPP record identifier for a specific passport record/version lineage entry point.
-- `lineage_id`
+- `lineageId`
   The stable lifecycle linkage identifier joining related versions and successor identifiers.
 - `product_id`
   The local/company-scoped business product identifier.
-- `product_identifier_did`
+- `uniqueProductIdentifier`
   The globally unique public product identifier used as `uniqueProductIdentifier`.
 
 ## Policy rules
@@ -30,7 +30,7 @@ The platform distinguishes between:
 - Identifiers are never reused for different objects.
 - DPP record identifiers are never reassigned to another passport.
 - The local `product_id` is not treated as globally unique outside its company/business scope.
-- The public `uniqueProductIdentifier` is the DID-based `product_identifier_did`.
+- The public `uniqueProductIdentifier` is the DID-based `uniqueProductIdentifier`.
 - Old identifiers remain resolvable through live, archived, or backup-handover resolution paths.
 - Archived DPP identifiers remain resolvable through `passport_archives`.
 - When an economic operator becomes inactive, verified backup public handover can continue public resolution.
@@ -43,7 +43,7 @@ Granularity is treated as identity-significant.
 That means:
 
 - a model/item granularity shift must mint a new public identifier
-- the old and new identifiers stay linked by `lineage_id`
+- the old and new identifiers stay linked by `lineageId`
 - in-place reassignment of a public identifier to a new granularity is not allowed
 
 In practice, the current routes already avoid in-place granularity reassignment during patch/update flows.

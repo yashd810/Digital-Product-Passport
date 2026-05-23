@@ -34,7 +34,7 @@ describe("auth middleware", () => {
             session_version: 3,
             two_factor_enabled: true,
             economic_operator_identifier: "did:web:www.example.test:did:company:5",
-            economic_operator_identifier_scheme: "did",
+            economicOperatorIdentifierScheme: "did",
           }],
           };
         }
@@ -103,7 +103,7 @@ describe("auth middleware", () => {
               session_version: 3,
               two_factor_enabled: false,
               economic_operator_identifier: null,
-              economic_operator_identifier_scheme: null,
+              economicOperatorIdentifierScheme: null,
             }],
           };
         }
@@ -199,7 +199,7 @@ describe("auth middleware", () => {
               key_salt: keySalt,
               hash_algorithm: "hmac_sha256",
               economic_operator_identifier: "did:web:www.example.test:did:company:5",
-              economic_operator_identifier_scheme: "did",
+              economicOperatorIdentifierScheme: "did",
             }],
           };
         }

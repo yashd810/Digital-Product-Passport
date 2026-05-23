@@ -48,11 +48,8 @@ function updateEditablePassportUseCase(deps) {
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
     const BUILT_IN_EDITABLE_FIELDS = new Set([
-      "model_name",
-      "internal_alias_id",
       "modelName",
       "internalAliasId",
-      "product_image",
       "productImage",
     ]);
     if (createPassportTable) {
@@ -65,7 +62,7 @@ function updateEditablePassportUseCase(deps) {
 
     const current = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL LIMIT 1`,
+       WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL LIMIT 1`,
       [dppId]
     );
     if (!current.rows.length) throw Object.assign(new Error("Passport not found or not editable."), { statusCode: 404 });
@@ -93,8 +90,8 @@ function updateEditablePassportUseCase(deps) {
       if (requestedGranularity !== currentGranularity) {
         const lineageAlreadyReleased = await hasReleasedLineageVersion({
           tableName,
-          lineageId: current.rows[0].lineage_id,
-          excludeDppId: current.rows[0].dpp_id,
+          lineageId: current.rows[0].lineageId,
+          excludeDppId: current.rows[0].dppId,
         });
         if (lineageAlreadyReleased) {
           const error = new Error("Released DPP granularity cannot be changed in place. Use the granularity transition workflow to mint a linked successor identifier.");
@@ -103,9 +100,9 @@ function updateEditablePassportUseCase(deps) {
           throw error;
         }
         fields.granularity = requestedGranularity;
-        const nextProductIdForGranularity = normalizeInternalAliasIdValue(fields.internalAliasId || fields.internal_alias_id || current.rows[0].internal_alias_id);
+        const nextProductIdForGranularity = normalizeInternalAliasIdValue(fields.internalAliasId || current.rows[0].internalAliasId);
         if (!nextProductIdForGranularity) {
-          throw Object.assign(new Error("internal_alias_id cannot be blank when changing granularity"), { statusCode: 400 });
+          throw Object.assign(new Error("internalAliasId cannot be blank when changing granularity"), { statusCode: 400 });
         }
         const storedProductIdentifiers = buildStoredProductIdentifiers({
           companyId,
@@ -113,31 +110,31 @@ function updateEditablePassportUseCase(deps) {
           passportType: typeSchema.typeName,
           internalAliasId: nextProductIdForGranularity,
           granularity: requestedGranularity,
-          passportLike: { ...current.rows[0], ...fields, internalAliasId: nextProductIdForGranularity, internal_alias_id: nextProductIdForGranularity },
+          passportLike: { ...current.rows[0], ...fields, internalAliasId: nextProductIdForGranularity },
         });
-        fields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
-        fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+        fields.internalAliasId = storedProductIdentifiers.internalAliasId;
+        fields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
       }
     }
 
     const hasBusinessIdentifierUpdate = ["serial_number", "serial", "serialNumber", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"].some((key) => fields[key] !== undefined);
 
-    if (fields.internalAliasId !== undefined || fields.internal_alias_id !== undefined) {
-      const normalizedProductId = normalizeInternalAliasIdValue(fields.internalAliasId ?? fields.internal_alias_id);
-      if (!normalizedProductId) throw Object.assign(new Error("internal_alias_id cannot be blank"), { statusCode: 400 });
+    if (fields.internalAliasId !== undefined) {
+      const normalizedProductId = normalizeInternalAliasIdValue(fields.internalAliasId);
+      if (!normalizedProductId) throw Object.assign(new Error("internalAliasId cannot be blank"), { statusCode: 400 });
       const existingByProductId = await findExistingPassportByInternalAliasId({
         tableName,
         companyId,
         internalAliasId: normalizedProductId,
         excludeGuid: dppId,
-        excludeLineageId: current.rows[0].lineage_id,
+        excludeLineageId: current.rows[0].lineageId,
       });
       if (existingByProductId) {
         const error = new Error(`A passport with Internal Alias ID "${normalizedProductId}" already exists.`);
         error.statusCode = 409;
         error.payload = {
-          existing_dpp_id: existingByProductId.dppId,
-          release_status: normalizeReleaseStatus(existingByProductId.release_status),
+          existingDppId: existingByProductId.dppId,
+          releaseStatus: normalizeReleaseStatus(existingByProductId.releaseStatus),
         };
         throw error;
       }
@@ -147,25 +144,25 @@ function updateEditablePassportUseCase(deps) {
         passportType: typeSchema.typeName,
         internalAliasId: normalizedProductId,
         granularity: fields.granularity || current.rows[0].granularity || "item",
-        passportLike: { ...current.rows[0], ...fields, internalAliasId: normalizedProductId, internal_alias_id: normalizedProductId },
+        passportLike: { ...current.rows[0], ...fields, internalAliasId: normalizedProductId },
       });
-      fields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
-      fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
-    } else if ((hasBusinessIdentifierUpdate || !current.rows[0].product_identifier_did) && current.rows[0].internal_alias_id) {
+      fields.internalAliasId = storedProductIdentifiers.internalAliasId;
+      fields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
+    } else if ((hasBusinessIdentifierUpdate || !current.rows[0].uniqueProductIdentifier) && current.rows[0].internalAliasId) {
       const storedProductIdentifiers = buildStoredProductIdentifiers({
         companyId,
         companyName: await getResolvedCompanyName(),
         passportType: typeSchema.typeName,
-        internalAliasId: current.rows[0].internal_alias_id,
+        internalAliasId: current.rows[0].internalAliasId,
         granularity: fields.granularity || current.rows[0].granularity || "item",
         passportLike: { ...current.rows[0], ...fields },
       });
-      fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+      fields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
     }
 
     const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
       ...normalizedBody,
-      carrier_authenticity,
+      carrierAuthenticity,
     });
     if (carrierAuthenticityMutation.provided) {
       const companyName = await getResolvedCompanyName();
@@ -173,16 +170,15 @@ function updateEditablePassportUseCase(deps) {
         passport: {
           ...current.rows[0],
           dppId,
-          dpp_id: dppId,
-          company_id: companyId,
-          internal_alias_id: fields.internal_alias_id || current.rows[0].internal_alias_id,
-          model_name: fields.model_name || current.rows[0].model_name,
+          companyId,
+          internalAliasId: fields.internalAliasId || current.rows[0].internalAliasId,
+          modelName: fields.modelName || current.rows[0].modelName,
         },
         companyName,
-        metadata: applyCarrierAuthenticityMutation(current.rows[0].carrier_authenticity, carrierAuthenticityMutation),
+        metadata: applyCarrierAuthenticityMutation(current.rows[0].carrierAuthenticity, carrierAuthenticityMutation),
         forceSign: carrierAuthenticityMutation.signCarrierPayload,
       });
-      fields.carrier_authenticity = buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity);
+      fields.carrierAuthenticity = buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity);
     }
 
     const effectiveGranularity = fields.granularity || current.rows[0].granularity || "item";
@@ -203,12 +199,12 @@ function updateEditablePassportUseCase(deps) {
       facilitySource: normalizedBody,
       existingFields: current.rows[0],
     });
-    fields.compliance_profile_key = complianceManagedFields.compliance_profile_key;
-    fields.content_specification_ids = complianceManagedFields.content_specification_ids;
-    fields.carrier_policy_key = complianceManagedFields.carrier_policy_key;
-    fields.economic_operator_id = complianceManagedFields.economic_operator_id;
-    fields.economic_operator_identifier_scheme = complianceManagedFields.economic_operator_identifier_scheme;
-    fields.facility_id = complianceManagedFields.facility_id;
+    fields.complianceProfileKey = complianceManagedFields.complianceProfileKey;
+    fields.contentSpecificationIds = complianceManagedFields.contentSpecificationIds;
+    fields.carrierPolicyKey = complianceManagedFields.carrierPolicyKey;
+    fields.economicOperatorId = complianceManagedFields.economicOperatorId;
+    fields.economicOperatorIdentifierScheme = complianceManagedFields.economicOperatorIdentifierScheme;
+    fields.facilityId = complianceManagedFields.facilityId;
 
     await archivePassportSnapshot({
       passport: current.rows[0],
@@ -232,7 +228,7 @@ function updateEditablePassportUseCase(deps) {
       });
     }
 
-    await logAudit(companyId, userId, "UPDATE", tableName, dppId, null, { fields_updated: updateFields });
+    await logAudit(companyId, userId, "UPDATE", tableName, dppId, null, { fieldsUpdated: updateFields });
     return {
       success: true,
       passport: updateResult.updatedRow

@@ -276,7 +276,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
   const token = typeof window !== "undefined"
     ? (window.localStorage.getItem("token") || "")
     : "";
-  const [passportType,  setPassportType]  = useState(editingTemplate?.passport_type || cloneTemplate?.passport_type || "");
+  const [passportType,  setPassportType]  = useState(editingTemplate?.passportType || cloneTemplate?.passportType || "");
   const [name,          setName]          = useState(editingTemplate?.name || (cloneTemplate?.name ? `Copy of ${cloneTemplate.name}` : ""));
   const [description,   setDescription]  = useState(editingTemplate?.description || cloneTemplate?.description || "");
   const [sections,      setSections]      = useState(null);
@@ -325,7 +325,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
     const sourceTemplate = editingTemplate || cloneTemplate;
     if (!sourceTemplate) return;
     if (editingTemplate) {
-      setPassportType(editingTemplate.passport_type || "");
+      setPassportType(editingTemplate.passportType || "");
       setName(editingTemplate.name || "");
       setDescription(editingTemplate.description || "");
     }
@@ -336,7 +336,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       if (f.is_model_data) model.add(f.field_key);
     }
     if (!editingTemplate && cloneTemplate) {
-      setPassportType(cloneTemplate.passport_type || "");
+      setPassportType(cloneTemplate.passportType || "");
       setName(cloneTemplate.name ? `Copy of ${cloneTemplate.name}` : "");
       setDescription(cloneTemplate.description || "");
     }
@@ -404,7 +404,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
           <div className="tmpl-meta-group">
             <label className="tmpl-label">Passport Type *</label>
             {isEdit ? (
-              <div className="tmpl-type-badge">{editingTemplate.passport_type}</div>
+              <div className="tmpl-type-badge">{editingTemplate.passportType}</div>
             ) : (
               <select className="tmpl-select" value={passportType}
                 onChange={e => setPassportType(e.target.value)}>
@@ -531,7 +531,7 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
-          passportType: template.passport_type,
+          passportType: template.passportType,
           passports: Array.from({ length: n }, () => ({ ...prefill })),
         }),
       });
@@ -719,19 +719,19 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
   };
 
   // Group templates by passport type
-  const allTypes = [...new Set(templates.map(t => t.passport_type))];
+  const allTypes = [...new Set(templates.map(t => t.passportType))];
 
   const filtered = templates.filter(t => {
     const matchesSearch = search
-      ? `${t.name} ${t.description || ""} ${t.passport_type}`.toLowerCase().includes(search.toLowerCase())
+      ? `${t.name} ${t.description || ""} ${t.passportType}`.toLowerCase().includes(search.toLowerCase())
       : true;
-    const matchesType = filterType === "all" || t.passport_type === filterType;
+    const matchesType = filterType === "all" || t.passportType === filterType;
     return matchesSearch && matchesType;
   });
 
   const grouped = filtered.reduce((acc, t) => {
-    if (!acc[t.passport_type]) acc[t.passport_type] = [];
-    acc[t.passport_type].push(t);
+    if (!acc[t.passportType]) acc[t.passportType] = [];
+    acc[t.passportType].push(t);
     return acc;
   }, {});
 

@@ -24,7 +24,7 @@ function normalizeAdminAnalyticsPayload(payload) {
   const analyticsRows = Array.isArray(payload?.analytics)
     ? payload.analytics.map((item) => ({
         ...item,
-        passportType: item.passportType || item.passport_type || "",
+        passportType: item.passportType || item.passportType || "",
         displayName: item.displayName || item.display_name || "",
         draftCount: item.draftCount ?? item.draft_count ?? 0,
         inReviewCount: item.inReviewCount ?? item.in_review_count ?? 0,

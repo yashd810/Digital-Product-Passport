@@ -161,14 +161,14 @@ function createTestApp(options = {}) {
   let releasedPassport = {
     id: 14,
     dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-    dpp_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-    lineage_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+    dppId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+    lineageId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
     company_id: 5,
-    passport_type: "battery",
-    internal_alias_id: "BAT-2026-001",
-    product_identifier_did: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
-    release_status: options.releasedStatus || "released",
-    version_number: 2,
+    passportType: "battery",
+    internalAliasId: "BAT-2026-001",
+    uniqueProductIdentifier: "did:web:www.example.test:did:battery:item:c5-bat-2026-001-abcdef123456",
+    releaseStatus: options.releasedStatus || "released",
+    versionNumber: 2,
     updated_at: "2026-04-27T10:00:00.000Z",
     granularity: "item",
     manufacturer: "Acme Energy",
@@ -187,18 +187,18 @@ function createTestApp(options = {}) {
     : {
         ...releasedPassport,
         id: 21,
-        release_status: options.editableStatus || "draft",
-        version_number: 3,
+        releaseStatus: options.editableStatus || "draft",
+        versionNumber: 3,
         manufacturer: "Draft Manufacturer",
       };
   const identifierLineage = [{
     id: 1,
     companyId: 5,
-    lineageId: releasedPassport.lineage_id,
+    lineageId: releasedPassport.lineageId,
     previousDppId: "dpp_model_previous",
     replacementDppId: releasedPassport.dppId,
     previousIdentifier: "did:web:www.example.test:did:battery:model:c5-bat-2026-001-abcdef123456",
-    replacementIdentifier: releasedPassport.product_identifier_did,
+    replacementIdentifier: releasedPassport.uniqueProductIdentifier,
     previousLocalProductId: "BAT-2026-001",
     replacementLocalProductId: "BAT-2026-001",
     previousGranularity: "model",
@@ -224,7 +224,7 @@ function createTestApp(options = {}) {
         return {
           rows: [{
             economic_operator_identifier: "did:web:www.example.test:did:company:5",
-            economic_operator_identifier_scheme: "did",
+            economicOperatorIdentifierScheme: "did",
           }],
         };
       }
@@ -270,8 +270,8 @@ function createTestApp(options = {}) {
             id: 1,
             passport_dpp_id: releasedPassport.dppId,
             company_id: releasedPassport.company_id,
-            product_identifier: releasedPassport.product_identifier_did,
-            dpp_id: "did:web:www.example.test:did:dpp:item:fixture",
+            product_identifier: releasedPassport.uniqueProductIdentifier,
+            dppId: "did:web:www.example.test:did:dpp:item:fixture",
             registry_name: "local",
             status: "registered",
             registered_at: "2026-04-27T11:00:00.000Z",
@@ -283,17 +283,17 @@ function createTestApp(options = {}) {
         editablePassport = {
           ...editablePassport,
           dppId: params[0],
-          dpp_id: params[0],
-          lineage_id: params[1],
+          dppId: params[0],
+          lineageId: params[1],
           company_id: params[2],
-          model_name: params[3],
-          internal_alias_id: params[4],
-          product_identifier_did: params[5],
-          compliance_profile_key: params[6],
-          content_specification_ids: params[7],
-          carrier_policy_key: params[8],
-          economic_operator_id: params[9],
-          facility_id: params[10],
+          modelName: params[3],
+          internalAliasId: params[4],
+          uniqueProductIdentifier: params[5],
+          complianceProfileKey: params[6],
+          contentSpecificationIds: params[7],
+          carrierPolicyKey: params[8],
+          economicOperatorId: params[9],
+          facilityId: params[10],
           granularity: params[11],
           created_by: params[12],
           public_summary: params[13] || editablePassport.public_summary,
@@ -315,11 +315,11 @@ function createTestApp(options = {}) {
       }
       if (
         normalizedSql.includes("DELETE FROM battery_passports")
-        && normalizedSql.includes("release_status = 'draft'")
+        && normalizedSql.includes("releaseStatus = 'draft'")
       ) {
-        return { rows: editablePassport ? [{ dpp_id: editablePassport.dppId }] : [] };
+        return { rows: editablePassport ? [{ dppId: editablePassport.dppId }] : [] };
       }
-      if (normalizedSql.includes("SELECT *") && normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("WHERE lineage_id = $1") && normalizedSql.includes("company_id = $2") && normalizedSql.includes("deleted_at IS NULL")) {
+      if (normalizedSql.includes("SELECT *") && normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("WHERE lineageId = $1") && normalizedSql.includes("company_id = $2") && normalizedSql.includes("deleted_at IS NULL")) {
         return {
           rows: [releasedPassport, editablePassport].filter(Boolean),
         };
@@ -327,13 +327,13 @@ function createTestApp(options = {}) {
       if (
         normalizedSql.includes("SET deleted_at = NOW()")
         && normalizedSql.includes("WHERE guid = $1")
-        && normalizedSql.includes("release_status IN ('draft', 'in_revision')")
+        && normalizedSql.includes("releaseStatus IN ('draft', 'in_revision')")
       ) {
-        return { rows: editablePassport ? [{ dpp_id: editablePassport.dppId }] : [] };
+        return { rows: editablePassport ? [{ dppId: editablePassport.dppId }] : [] };
       }
-      if (normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("release_status IN ('draft', 'in_revision')")) {
+      if (normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("releaseStatus IN ('draft', 'in_revision')")) {
         return {
-          rows: editablePassport && ["draft", "in_revision"].includes(editablePassport.release_status)
+          rows: editablePassport && ["draft", "in_revision"].includes(editablePassport.releaseStatus)
             ? [editablePassport]
             : [],
         };
@@ -342,7 +342,7 @@ function createTestApp(options = {}) {
         return { rows: [] };
       }
       if (normalizedSql.includes("UPDATE battery_passports")) {
-        if (normalizedSql.includes("WHERE lineage_id = $1")) {
+        if (normalizedSql.includes("WHERE lineageId = $1")) {
           releasedPassport = { ...releasedPassport, deleted_at: "2026-04-29T12:00:00.000Z" };
           if (editablePassport) {
             editablePassport = { ...editablePassport, deleted_at: "2026-04-29T12:00:00.000Z" };
@@ -356,20 +356,20 @@ function createTestApp(options = {}) {
         }
         return { rows: [] };
       }
-      if (normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("release_status IN ('released', 'obsolete')")) {
+      if (normalizedSql.includes("FROM battery_passports") && normalizedSql.includes("releaseStatus IN ('released', 'obsolete')")) {
         return {
           rows: releasedPassport && !releasedPassport.deleted_at ? [releasedPassport] : [],
         };
       }
       if (
         String(sql).includes("FROM battery_passports")
-        && String(sql).includes("WHERE (lineage_id = $1 OR dpp_id::text = $1)")
-        && String(sql).includes("release_status = 'released'")
+        && String(sql).includes("WHERE (lineageId = $1 OR dppId::text = $1)")
+        && String(sql).includes("releaseStatus = 'released'")
       ) {
         const requestedId = params[0];
         return {
           rows: releasedPassport && !releasedPassport.deleted_at && (
-            requestedId === releasedPassport.dppId || requestedId === releasedPassport.lineage_id
+            requestedId === releasedPassport.dppId || requestedId === releasedPassport.lineageId
           ) ? [releasedPassport] : [],
         };
       }
@@ -399,22 +399,22 @@ function createTestApp(options = {}) {
     stripRestrictedFieldsForPublicView: async (passport) => passport,
     getCompanyNameMap: async () => new Map([["5", "Acme Energy"]]),
     resolveReleasedPassportByInternalAliasId: async (internalAliasId, { companyId = null, strictProductId = false } = {}) => {
-      if (strictProductId && internalAliasId === releasedPassport.product_identifier_did) return null;
-      if (internalAliasId !== "BAT-2026-001" && internalAliasId !== releasedPassport.product_identifier_did) return null;
+      if (strictProductId && internalAliasId === releasedPassport.uniqueProductIdentifier) return null;
+      if (internalAliasId !== "BAT-2026-001" && internalAliasId !== releasedPassport.uniqueProductIdentifier) return null;
       if (companyId !== null && Number(companyId) !== 5) return null;
       return { passport: { ...releasedPassport } };
     },
     signingService: {},
     buildOperationalDppPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_identifier_did || null,
-      internalAliasId: passport.internal_alias_id,
-      internal_alias_id: passport.internal_alias_id,
+      uniqueProductIdentifier: passport.uniqueProductIdentifier || null,
+      internalAliasId: passport.internalAliasId,
+      internalAliasId: passport.internalAliasId,
     }),
     buildCanonicalPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_identifier_did || null,
-      internalAliasId: passport.internal_alias_id,
+      uniqueProductIdentifier: passport.uniqueProductIdentifier || null,
+      internalAliasId: passport.internalAliasId,
       subjectDid: "did:web:www.example.test:did:battery:item:fixture",
       dppDid: "did:web:www.example.test:did:dpp:item:fixture",
       companyDid: "did:web:www.example.test:did:company:5",
@@ -423,7 +423,7 @@ function createTestApp(options = {}) {
       extensions: {
         claros: {
           passportType: "battery",
-          versionNumber: passport.version_number || 2,
+          versionNumber: passport.versionNumber || 2,
           internalId: passport.dppId,
         },
       },
@@ -443,8 +443,8 @@ function createTestApp(options = {}) {
     }),
     buildExpandedPassportPayload: (passport) => ({
       digitalProductPassportId: passport.dppId,
-      uniqueProductIdentifier: passport.product_identifier_did || null,
-      internalAliasId: passport.internal_alias_id,
+      uniqueProductIdentifier: passport.uniqueProductIdentifier || null,
+      internalAliasId: passport.internalAliasId,
       subjectDid: "did:web:www.example.test:did:battery:item:fixture",
       dppDid: "did:web:www.example.test:did:dpp:item:fixture",
       companyDid: "did:web:www.example.test:did:company:5",
@@ -453,7 +453,7 @@ function createTestApp(options = {}) {
       extensions: {
         claros: {
           passportType: "battery",
-          versionNumber: passport.version_number || 2,
+          versionNumber: passport.versionNumber || 2,
           internalId: passport.dppId,
         },
       },
@@ -535,7 +535,7 @@ function createTestApp(options = {}) {
         internalAliasIdInput: rawProductId,
         productIdentifierDid: uniqueProductIdentifier || `did:web:www.example.test:did:battery:item:c5-${String(rawProductId).toLowerCase()}`,
       }),
-      buildLookupCandidates: ({ internalAliasId }) => [internalAliasId, releasedPassport.product_identifier_did],
+      buildLookupCandidates: ({ internalAliasId }) => [internalAliasId, releasedPassport.uniqueProductIdentifier],
       listIdentifierLineage: jest.fn(async () => identifierLineage),
     },
     archivePassportSnapshot: jest.fn(async () => {}),
@@ -578,11 +578,11 @@ function createTestApp(options = {}) {
     SYSTEM_PASSPORT_FIELDS: new Set([
       "company_id",
       "created_by",
-      "dpp_id",
       "dppId",
-      "lineage_id",
-      "release_status",
-      "version_number",
+      "dppId",
+      "lineageId",
+      "releaseStatus",
+      "versionNumber",
     ]),
     getWritablePassportColumns: (data) => Object.keys(data || {}),
     toStoredPassportValue: (value) => value,

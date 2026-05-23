@@ -243,34 +243,34 @@ test("returns null for invalid DID", () => {
 
 // ─── buildCanonicalPublicUrl ─────────────────────────────────────────────────
 console.log("\nbuildCanonicalPublicUrl()");
-test("uses internal_alias_id (not guid) in the URL", () => {
+test("uses internalAliasId (not guid) in the URL", () => {
   const passport = {
     guid:       "11111111-2222-3333-4444-555555555555",
-    internal_alias_id: "ACME-001",
-    model_name: "Acme Battery Pro",
+    internalAliasId: "ACME-001",
+    modelName: "Acme Battery Pro",
     company_id: 5,
   };
   const url = dppIdentity.buildCanonicalPublicUrl(passport, "Acme Corp");
   assert.ok(!url.includes("11111111"), `URL must not contain guid: ${url}`);
-  assert.ok(url.includes("ACME-001"),  `URL must contain internal_alias_id: ${url}`);
+  assert.ok(url.includes("ACME-001"),  `URL must contain internalAliasId: ${url}`);
   assert.ok(url.startsWith("https://"), `URL must be HTTPS: ${url}`);
 });
 test("builds correct slug structure", () => {
   const passport = {
     guid:       "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-    internal_alias_id: "MODEL-X",
-    model_name: "Model X",
+    internalAliasId: "MODEL-X",
+    modelName: "Model X",
     company_id: 7,
   };
   const url = dppIdentity.buildCanonicalPublicUrl(passport, "Tesla Energy");
   assert.ok(url.includes("/dpp/tesla-energy/model-x/"), `Expected slug path in: ${url}`);
   assert.ok(url.endsWith("MODEL-X"), `Expected encoded internalAliasId at end: ${url}`);
 });
-test("falls back to DPP ID in canonical /dpp route when no internal_alias_id", () => {
+test("falls back to DPP ID in canonical /dpp route when no internalAliasId", () => {
   const passport = {
     guid:       "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-    internal_alias_id: null,
-    model_name: null,
+    internalAliasId: null,
+    modelName: null,
     company_id: 5,
   };
   const url = dppIdentity.buildCanonicalPublicUrl(passport, "Acme Corp");

@@ -29,7 +29,7 @@ const SYSTEM_PASSPORT_COLUMN_MAPPINGS = [
 const LIVE_PASSPORT_SYSTEM_COLUMNS = new Set(
   [
     "id",
-    ...SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap((item) => [item.storageKey, item.legacyKey].filter(Boolean)),
+    ...SYSTEM_PASSPORT_COLUMN_MAPPINGS.map((item) => item.storageKey),
   ]
 );
 
@@ -41,7 +41,6 @@ const LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS = SYSTEM_PASSPORT_COLUMN_MAPPINGS.
 const SYSTEM_PASSPORT_STORAGE_TO_APP_KEY = new Map(
   SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap((item) => [
     [item.storageKey, item.appKey],
-    ...(item.legacyKey ? [[item.legacyKey, item.appKey]] : []),
   ])
 );
 

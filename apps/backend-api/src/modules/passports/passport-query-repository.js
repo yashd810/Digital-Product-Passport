@@ -133,15 +133,15 @@ function createPassportQueryRepository({
         const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
         return {
           ...rowData,
-          dppId: row.dppId || rowData?.dppId || rowData?.dpp_id,
-          lineageId: row.lineage_id || rowData?.lineageId || rowData?.lineage_id,
-          companyId: row.company_id || rowData?.companyId || rowData?.company_id,
-          passportType: row.passport_type || rowData?.passportType || rowData?.passport_type,
-          versionNumber: row.version_number ?? rowData?.versionNumber ?? rowData?.version_number,
-          modelName: row.model_name || rowData?.modelName || rowData?.model_name,
-          internalAliasId: row.internal_alias_id || rowData?.internalAliasId || rowData?.internal_alias_id,
-          uniqueProductIdentifier: row.product_identifier_did || rowData?.uniqueProductIdentifier || rowData?.product_identifier_did,
-          releaseStatus: row.release_status || rowData?.releaseStatus || rowData?.release_status,
+          dppId: row.dppId || rowData?.dppId,
+          lineageId: row.lineage_id || rowData?.lineageId,
+          companyId: row.company_id || rowData?.companyId,
+          passportType: row.passport_type || rowData?.passportType,
+          versionNumber: row.version_number ?? rowData?.versionNumber,
+          modelName: row.model_name || rowData?.modelName,
+          internalAliasId: row.internal_alias_id || rowData?.internalAliasId,
+          uniqueProductIdentifier: row.product_identifier_did || rowData?.uniqueProductIdentifier,
+          releaseStatus: row.release_status || rowData?.releaseStatus,
           archived: true,
           archivedAt: row.archived_at,
         };
@@ -280,7 +280,7 @@ function createPassportQueryRepository({
     const rowData = typeof archiveRes.rows[0].row_data === "string"
       ? JSON.parse(archiveRes.rows[0].row_data)
       : archiveRes.rows[0].row_data;
-    if (!isPublicVersionVisible(rowData?.releaseStatus || rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+    if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
       return { passport: null, archived: false };
     }
     return {
@@ -401,7 +401,7 @@ function createPassportQueryRepository({
         matches.push({
           passport: {
             ...normalizePassportRow(rowData),
-            uniqueProductIdentifier: archiveRes.rows[0].product_identifier_did || rowData?.uniqueProductIdentifier || rowData?.product_identifier_did,
+            uniqueProductIdentifier: archiveRes.rows[0].product_identifier_did || rowData?.uniqueProductIdentifier,
             passportType: type_name,
             archived: true,
           },
@@ -434,21 +434,21 @@ function createPassportQueryRepository({
 
     if (versionNumber !== null && versionNumber !== undefined) {
       const lineageContext = await getPassportLineageContext({ dppId: normalizedDppId, passportType });
-      if (!lineageContext?.lineage_id) return { passport: null, archived: false };
+      if (!lineageContext?.lineageId) return { passport: null, archived: false };
 
       const liveRes = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE lineage_id = $1
-           AND version_number = $2
-           AND release_status IN ('released', 'obsolete')
-           AND deleted_at IS NULL
-         ORDER BY updated_at DESC
+         WHERE "lineageId" = $1
+           AND "versionNumber" = $2
+           AND "releaseStatus" IN ('released', 'obsolete')
+           AND "deletedAt" IS NULL
+         ORDER BY "updatedAt" DESC
          LIMIT 1`,
-        [lineageContext.lineage_id, versionNumber]
+        [lineageContext.lineageId, versionNumber]
       );
       if (liveRes.rows.length) {
-        const passport = { ...normalizePassportRow(liveRes.rows[0]), passport_type: passportType };
+        const passport = { ...normalizePassportRow(liveRes.rows[0]), passportType };
         const visibilityRes = await pool.query(
           `SELECT is_public
            FROM passport_history_visibility
@@ -458,7 +458,7 @@ function createPassportQueryRepository({
         );
         const isVisible = visibilityRes.rows.length
           ? !!visibilityRes.rows[0].is_public
-          : isPublicHistoryStatus(passport.release_status);
+          : isPublicHistoryStatus(passport.releaseStatus);
         return isVisible ? { passport, archived: false } : { passport: null, archived: false };
       }
 
@@ -474,17 +474,17 @@ function createPassportQueryRepository({
            AND pa.version_number = $3
          ORDER BY pa.archived_at DESC
          LIMIT 1`,
-        [lineageContext.lineage_id, passportType, versionNumber]
+        [lineageContext.lineageId, passportType, versionNumber]
       );
       if (!archiveRes.rows.length) return { passport: null, archived: false };
 
       const rowData = typeof archiveRes.rows[0].row_data === "string"
         ? JSON.parse(archiveRes.rows[0].row_data)
         : archiveRes.rows[0].row_data;
-      if (!isPublicVersionVisible(rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+      if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
         return { passport: null, archived: false };
       }
-      const passport = { ...normalizePassportRow(rowData), passport_type: passportType, archived: true };
+      const passport = { ...normalizePassportRow(rowData), passportType, archived: true };
       const visibilityRes = await pool.query(
         `SELECT is_public
          FROM passport_history_visibility
@@ -494,7 +494,7 @@ function createPassportQueryRepository({
       );
       const isVisible = visibilityRes.rows.length
         ? !!visibilityRes.rows[0].is_public
-        : isPublicHistoryStatus(passport.release_status);
+        : isPublicHistoryStatus(passport.releaseStatus);
       return isVisible ? { passport, archived: true } : { passport: null, archived: false };
     }
 

@@ -23,13 +23,13 @@ function createConformanceFixture() {
 
   const passport = {
     guid: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-    lineage_id: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
+    lineageId: "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
     company_id: 5,
-    passport_type: "battery",
-    internal_alias_id: "BAT-2026-001",
-    product_identifier_did: "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
-    release_status: "released",
-    version_number: 2,
+    passportType: "battery",
+    internalAliasId: "BAT-2026-001",
+    uniqueProductIdentifier: "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
+    releaseStatus: "released",
+    versionNumber: 2,
     updated_at: "2026-04-27T10:00:00.000Z",
     granularity: "item",
     battery_mass: "450",
@@ -65,16 +65,16 @@ function createConformanceFixture() {
       default_granularity: "item",
     },
     expectedHeader: {
-      digitalProductPassportId: didService.generateDppDid("item", passport.lineage_id),
-      uniqueProductIdentifier: passport.product_identifier_did,
-      internalAliasId: passport.internal_alias_id,
+      digitalProductPassportId: didService.generateDppDid("item", passport.lineageId),
+      uniqueProductIdentifier: passport.uniqueProductIdentifier,
+      internalAliasId: passport.internalAliasId,
       dppSchemaVersion: "prEN 18223:2025",
       dppStatus: "Active",
       lastUpdate: passport.updated_at,
       economicOperatorId: didService.generateCompanyDid("acme-energy"),
       contentSpecificationIds: ["claros_battery_dictionary_v1"],
-      subjectDid: didService.generateItemDid("battery", passport.lineage_id),
-      dppDid: didService.generateDppDid("item", passport.lineage_id),
+      subjectDid: didService.generateItemDid("battery", passport.lineageId),
+      dppDid: didService.generateDppDid("item", passport.lineageId),
       companyDid: didService.generateCompanyDid("acme-energy"),
     },
   };
@@ -94,7 +94,7 @@ describe("battery DPP conformance", () => {
       granularity: "item",
       dppIdentity: {
         companyDid: () => expectedHeader.economicOperatorId,
-        productModelDid: () => passport.product_identifier_did,
+        productModelDid: () => passport.uniqueProductIdentifier,
         dppDid: () => expectedHeader.dppDid,
         buildCanonicalPublicUrl: () => "https://app.example.test/dpp/acme-energy/battery/BAT-2026-001",
       },
@@ -231,7 +231,7 @@ describe("battery DPP conformance", () => {
     });
 
     const exported = buildPassportJsonLdExport(
-      [{ guid: "guid-1", passport_type: "ev_battery_passport_custom", battery_mass: "450.5" }],
+      [{ guid: "guid-1", passportType: "ev_battery_passport_custom", battery_mass: "450.5" }],
       "ev_battery_passport_custom",
       {
         semanticModelKey: "generic_dpp_v1",

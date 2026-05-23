@@ -15,7 +15,7 @@ function createMockPool(typeDef) {
             company_name: "Acme Energy",
             did_slug: "acme-energy",
             economic_operator_identifier: "EORI-ACME-001",
-            economic_operator_identifier_scheme: "EORI",
+            economicOperatorIdentifierScheme: "EORI",
           }],
         };
       }
@@ -184,17 +184,17 @@ function createMockBatteryDictionaryService() {
 }
 
 function buildCanonicalPassportPayload(passport, _typeDef, { company } = {}) {
-  const dppIdentifier = passport?.dppId || passport?.dpp_id || passport?.guid || "dpp_mock";
-  const productIdentifier = passport?.internal_alias_id || passport?.passport_identifier || "product-mock";
+  const dppIdentifier = passport?.dppId || passport?.dppId || passport?.guid || "dpp_mock";
+  const productIdentifier = passport?.internalAliasId || passport?.passport_identifier || "product-mock";
   return {
     digitalProductPassportId: `https://example.test/dpp/${encodeURIComponent(dppIdentifier)}`,
     uniqueProductIdentifier: `https://example.test/product/${encodeURIComponent(productIdentifier)}`,
     dppSchemaVersion: passport?.dpp_schema_version || "prEN 18223:2025",
-    dppStatus: passport?.release_status || "Draft",
+    dppStatus: passport?.releaseStatus || "Draft",
     granularity: passport?.granularity || "item",
     lastUpdate: passport?.updated_at || passport?.created_at || "2026-04-27T10:00:00.000Z",
-    economicOperatorId: passport?.economic_operator_id || company?.economic_operator_identifier || "EORI-ACME-001",
-    facilityId: passport?.facility_id || passport?.facility_identifier || null,
+    economicOperatorId: passport?.economicOperatorId || company?.economic_operator_identifier || "EORI-ACME-001",
+    facilityId: passport?.facilityId || passport?.facility_identifier || null,
   };
 }
 
@@ -228,12 +228,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",
@@ -261,12 +261,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",
@@ -288,12 +288,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "not-a-number",
@@ -334,12 +334,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",
@@ -379,12 +379,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",
@@ -431,12 +431,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
     }, TYPE_DEF.type_name);
@@ -456,12 +456,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "Industrial",
       battery_mass: "450.5",
@@ -483,7 +483,7 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
@@ -525,12 +525,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",
@@ -560,12 +560,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "battery_dpp_v1",
-      content_specification_ids: JSON.stringify(["claros_battery_dictionary_v1"]),
-      carrier_policy_key: "battery_qr_public_entry_v1",
-      facility_id: "PLANT-01",
+      complianceProfileKey: "battery_dpp_v1",
+      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      carrierPolicyKey: "battery_qr_public_entry_v1",
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",
@@ -588,12 +588,12 @@ describe("compliance service", () => {
     });
 
     const result = await service.evaluatePassport({
-      passport_type: TYPE_DEF.type_name,
+      passportType: TYPE_DEF.type_name,
       company_id: 5,
-      compliance_profile_key: "generic_dpp_v1",
-      content_specification_ids: null,
-      carrier_policy_key: null,
-      facility_id: "PLANT-01",
+      complianceProfileKey: "generic_dpp_v1",
+      contentSpecificationIds: null,
+      carrierPolicyKey: null,
+      facilityId: "PLANT-01",
       passport_identifier: "BAT-2026-001",
       battery_category: "EV",
       battery_mass: "450.5",

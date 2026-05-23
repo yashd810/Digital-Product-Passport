@@ -83,21 +83,21 @@ The helper replaces unsafe characters with underscores before appending `_passpo
 Each live passport table has shared system columns, including:
 
 - `id`
-- `dpp_id`
-- `lineage_id`
+- `dppId`
+- `lineageId`
 - `company_id`
-- `model_name`
+- `modelName`
 - `product_id`
-- `product_identifier_did`
-- `compliance_profile_key`
-- `content_specification_ids`
-- `carrier_policy_key`
-- `carrier_authenticity JSONB`
-- `economic_operator_id`
-- `facility_id`
+- `uniqueProductIdentifier`
+- `complianceProfileKey`
+- `contentSpecificationIds`
+- `carrierPolicyKey`
+- `carrierAuthenticity JSONB`
+- `economicOperatorId`
+- `facilityId`
 - `granularity`
-- `release_status`
-- `version_number`
+- `releaseStatus`
+- `versionNumber`
 - `qr_code`
 - `created_by`
 - `updated_by`
@@ -120,14 +120,14 @@ If a custom field declares `queryable: true` or `indexed: true`, table creation/
 
 ## Registry Lookup
 
-`passport_registry` maps each `dpp_id` to its passport type and company.
+`passport_registry` maps each `dppId` to its passport type and company.
 
 The typical lookup path is:
 
-1. read `passport_registry` by `dpp_id`
-2. get `passport_type`
-3. derive the live table name with `getTable(passport_type)`
-4. read the row from `<passport_type>_passports`
+1. read `passport_registry` by `dppId`
+2. get `passportType`
+3. derive the live table name with `getTable(passportType)`
+4. read the row from `<passportType>_passports`
 
 This avoids scanning every dynamic passport table when resolving a DPP ID.
 
@@ -158,15 +158,15 @@ Archived passport records are copied into `passport_archives`.
 
 Important columns:
 
-- `dpp_id`
-- `lineage_id`
+- `dppId`
+- `lineageId`
 - `company_id`
-- `passport_type`
-- `version_number`
-- `model_name`
+- `passportType`
+- `versionNumber`
+- `modelName`
 - `product_id`
-- `product_identifier_did`
-- `release_status`
+- `uniqueProductIdentifier`
+- `releaseStatus`
 - `row_data JSONB`
 - `archived_by`
 - `archived_at`
@@ -178,7 +178,7 @@ Important columns:
 The system uses JSONB in several places:
 
 - `passport_types.fields_json`: type schema/configuration
-- dynamic live passport tables: `carrier_authenticity`
+- dynamic live passport tables: `carrierAuthenticity`
 - `passport_archives.row_data`: archived row snapshot
 - `passport_backup_replications.payload_json`: backup envelope snapshot
 - `backup_public_handovers.public_row_data`: public handover snapshot

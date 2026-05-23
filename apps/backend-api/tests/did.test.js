@@ -114,11 +114,11 @@ describe("DID routes", () => {
 
     const bundle = buildCanonicalIdentityBundle({
       passport: {
-        dpp_id: "dpp_9f863d0d-bc74-4c34-9925-2470f18c3f00",
-        lineage_id: "dpp_9f863d0d-bc74-4c34-9925-2470f18c3f00",
+        dppId: "dpp_9f863d0d-bc74-4c34-9925-2470f18c3f00",
+        lineageId: "dpp_9f863d0d-bc74-4c34-9925-2470f18c3f00",
         company_id: 1,
-        passport_type: "trial_1_dbp",
-        internal_alias_id: "123456789",
+        passportType: "trial_1_dbp",
+        internalAliasId: "123456789",
         granularity: "item",
       },
       company: {

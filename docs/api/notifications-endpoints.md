@@ -183,26 +183,26 @@ Mark a specific notification as read.
 ### When Notifications Are Created
 
 **Workflow Submission:**
-- Reviewer receives: "Review needed: {model_name}"
+- Reviewer receives: "Review needed: {modelName}"
 
 **Workflow Approval (with subsequent approver):**
-- Approver receives: "Approval needed: {model_name}"
+- Approver receives: "Approval needed: {modelName}"
 
 **Workflow Approval/Release (no subsequent approver):**
-- Passport creator receives: "✅ {model_name} reviewed and released!"
+- Passport creator receives: "✅ {modelName} reviewed and released!"
 
 **Workflow Rejection:**
-- Passport creator receives: "❌ {model_name} was rejected"
+- Passport creator receives: "❌ {modelName} was rejected"
 - Message includes rejection reason if provided
 
 **Passport Published:**
-- Passport creator receives: "{model_name} is now public"
+- Passport creator receives: "{modelName} is now public"
 
 **Access Grant:**
-- User receives: "You have access to {model_name}"
+- User receives: "You have access to {modelName}"
 
 **Access Revocation:**
-- User receives: "Your access to {model_name} has been revoked"
+- User receives: "Your access to {modelName} has been revoked"
 
 ---
 

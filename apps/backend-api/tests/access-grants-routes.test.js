@@ -102,9 +102,9 @@ function createTestApp() {
 
   const registryRow = {
     dppId: "dpp_test_1",
-    lineage_id: "dpp_test_1",
+    lineageId: "dpp_test_1",
     company_id: 5,
-    passport_type: "battery",
+    passportType: "battery",
   };
   let grants = [
     {
@@ -120,8 +120,8 @@ function createTestApp() {
       is_active: true,
       created_at: "2026-04-29T10:00:00.000Z",
       updated_at: "2026-04-29T10:00:00.000Z",
-      passport_type: "battery",
-      lineage_id: "dpp_test_1",
+      passportType: "battery",
+      lineageId: "dpp_test_1",
       grantee_email: "delegate@example.test",
       grantee_first_name: "Del",
       grantee_last_name: "Egated",
@@ -159,7 +159,7 @@ function createTestApp() {
     query: jest.fn(async (sql, params = []) => {
       const text = String(sql);
 
-      if (text.includes("FROM passport_registry") && text.includes("WHERE dpp_id = $1")) {
+      if (text.includes("FROM passport_registry") && text.includes("WHERE dppId = $1")) {
         return {
           rows: params[0] === registryRow.dppId ? [registryRow] : [],
         };
@@ -209,7 +209,7 @@ function createTestApp() {
       if (text.includes("FROM passport_access_grants pag") && text.includes("WHERE pag.id = $1")) {
         const grant = grants.find((row) => row.id === Number(params[0]));
         return {
-          rows: grant ? [{ ...grant, passport_type: registryRow.passport_type, lineage_id: registryRow.lineage_id }] : [],
+          rows: grant ? [{ ...grant, passportType: registryRow.passportType, lineageId: registryRow.lineageId }] : [],
         };
       }
 
@@ -309,7 +309,7 @@ function createTestApp() {
     EDIT_SESSION_TIMEOUT_HOURS: 12,
     EDIT_SESSION_TIMEOUT_SQL: "12 hours",
     IN_REVISION_STATUS: "in_revision",
-    SYSTEM_PASSPORT_FIELDS: new Set(["dpp_id", "company_id"]),
+    SYSTEM_PASSPORT_FIELDS: new Set(["dppId", "company_id"]),
     getTable: (typeName) => `${typeName}_passports`,
     normalizePassportRow: (row) => row,
     normalizeReleaseStatus: (value) => value,

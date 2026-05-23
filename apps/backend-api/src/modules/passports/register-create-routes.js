@@ -34,21 +34,18 @@ module.exports = function registerCreateRoutes(app, deps) {
   };
   const createPassportSchema = {
     type: "object",
-    anyOf: [["passport_type", "passportType"]],
+    required: ["passportType"],
     properties: {
-      passport_type: { type: "string", minLength: 1 },
       passportType: { type: "string", minLength: 1 },
     },
   };
   const bulkCreateSchema = {
     type: "object",
-    anyOf: [["passport_type", "passportType"]],
+    required: ["passportType", "passports"],
     properties: {
-      passport_type: { type: "string", minLength: 1 },
       passportType: { type: "string", minLength: 1 },
       passports: { type: "array", minItems: 1, maxItems: 500 },
     },
-    required: ["passports"],
   };
 
   app.post("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, requireDraftEditor, createValidationMiddleware({
@@ -58,12 +55,12 @@ module.exports = function registerCreateRoutes(app, deps) {
     try {
       const { companyId } = req.params;
       const normalizedBody = normalizePassportRequestBody(req.body);
-      const { passport_type } = normalizedBody;
+      const { passportType } = normalizedBody;
       const userId = req.user.userId;
 
-      if (!passport_type) return res.status(400).json({ error: "passport_type is required" });
+      if (!passportType) return res.status(400).json({ error: "passportType is required" });
 
-      const typeSchema = await getPassportTypeSchema(passport_type);
+      const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       if (createPassportTable) {
         await createPassportTable(typeSchema.typeName, {
@@ -104,10 +101,10 @@ module.exports = function registerCreateRoutes(app, deps) {
     try {
       const { companyId } = req.params;
       const normalizedBody = normalizePassportRequestBody(req.body);
-      const { passport_type, passports } = normalizedBody;
+      const { passportType, passports } = normalizedBody;
       const userId = req.user.userId;
 
-      const typeSchema = await getPassportTypeSchema(passport_type);
+      const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
 
       const resolvedPassportType = typeSchema.typeName;
@@ -137,18 +134,18 @@ module.exports = function registerCreateRoutes(app, deps) {
             index,
             success: true,
             dppId: createdPassport.dppId,
-            internal_alias_id: createdPassport.storedProductIdentifiers.internal_alias_id,
-            product_identifier_did: createdPassport.storedProductIdentifiers.product_identifier_did,
-            model_name: createdPassport.model_name,
+            internalAliasId: createdPassport.storedProductIdentifiers.internalAliasId,
+            uniqueProductIdentifier: createdPassport.storedProductIdentifiers.uniqueProductIdentifier,
+            modelName: createdPassport.modelName,
             granularity: createdPassport.effectiveGranularity,
-            compliance_profile_key: createdPassport.complianceManagedFields.compliance_profile_key,
+            complianceProfileKey: createdPassport.complianceManagedFields.complianceProfileKey,
           });
           created += 1;
         } catch (error) {
           const isDuplicate = error.statusCode === 409;
           results.push({
             index,
-            internal_alias_id: error.normalizedProductId || undefined,
+            internalAliasId: error.normalizedProductId || undefined,
             success: false,
             ...(error.invalidFieldKeys && !isDuplicate ? { fields: error.invalidFieldKeys } : {}),
             error: error.message,

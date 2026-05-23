@@ -30,13 +30,13 @@ describe("battery-pass-export", () => {
     );
 
     const exported = buildPassportJsonLdExport([
-      { guid: "guid-1", passport_type: "ev_battery_passport_custom", battery_mass: "450.5" },
+      { guid: "guid-1", passportType: "ev_battery_passport_custom", battery_mass: "450.5" },
     ], "ev_battery_passport_custom", {
       semanticModelKey: "generic_dpp_v1",
       productCategory: "Battery Digital Passport",
     });
 
-    expect(exported.passport_type).toBe("ev_battery_passport_custom");
+    expect(exported.passportType).toBe("ev_battery_passport_custom");
     expect(exported.semantic_model?.semanticModelKey).toBe("claros_battery_dictionary_v1");
     expect(exported["@context"]).toEqual(
       expect.arrayContaining([
