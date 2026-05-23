@@ -19,15 +19,15 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
       if (!passportType) return res.status(400).json({ error: "passportType required" });
 
       const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId: req.params.companyId });
-      if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
+      if (!lineageContext?.lineageId) return res.status(404).json({ error: "Passport not found" });
 
       const versions = await getPassportVersionsByLineage({
-        lineageId: lineageContext.lineage_id,
+        lineageId: lineageContext.lineageId,
         passportType,
         companyId: req.params.companyId,
       });
       res.json({
-        versions: [...versions].sort((a, b) => Number(a.version_number || 0) - Number(b.version_number || 0)),
+        versions: [...versions].sort((a, b) => Number(a.versionNumber || 0) - Number(b.versionNumber || 0)),
         passportType,
       });
     } catch {

@@ -33,18 +33,18 @@ function registerPassportSupportRoutes(app, deps) {
 
       const passportType = reg.rows[0].passport_type;
       const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
-      if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
+      if (!lineageContext?.lineageId) return res.status(404).json({ error: "Passport not found" });
 
       const tableName = getTable(passportType);
       const versionRes = await pool.query(
-        `SELECT dpp_id, version_number, release_status FROM ${tableName}
-         WHERE lineage_id = $1 AND company_id = $2 AND version_number = $3 AND deleted_at IS NULL LIMIT 1`,
-        [lineageContext.lineage_id, companyId, parsedVersion]
+        `SELECT "dppId", "versionNumber", "releaseStatus" FROM ${tableName}
+         WHERE "lineageId" = $1 AND "companyId" = $2 AND "versionNumber" = $3 AND "deletedAt" IS NULL LIMIT 1`,
+        [lineageContext.lineageId, companyId, parsedVersion]
       );
       if (!versionRes.rows.length) return res.status(404).json({ error: "Passport version not found" });
 
       const versionRow = normalizePassportRow(versionRes.rows[0]);
-      if (!isPublicHistoryStatus(versionRow.release_status) && isPublic) {
+      if (!isPublicHistoryStatus(versionRow.releaseStatus) && isPublic) {
         return res.status(400).json({ error: "Only released or obsolete versions can be shown publicly." });
       }
 
@@ -54,7 +54,7 @@ function registerPassportSupportRoutes(app, deps) {
       );
       const previousVisibility = existingVisibilityRes.rows.length
         ? !!existingVisibilityRes.rows[0].is_public
-        : isPublicHistoryStatus(versionRow.release_status);
+        : isPublicHistoryStatus(versionRow.releaseStatus);
 
       await pool.query(
         `INSERT INTO passport_history_visibility (passport_dpp_id, version_number, is_public, updated_by, created_at, updated_at)
@@ -69,11 +69,11 @@ function registerPassportSupportRoutes(app, deps) {
         "UPDATE_HISTORY_VISIBILITY",
         tableName,
         dppId,
-        { version_number: parsedVersion, is_public: previousVisibility },
-        { version_number: parsedVersion, is_public: isPublic }
+        { versionNumber: parsedVersion, isPublic: previousVisibility },
+        { versionNumber: parsedVersion, isPublic }
       );
 
-      res.json({ success: true, version_number: parsedVersion, is_public: isPublic });
+      res.json({ success: true, versionNumber: parsedVersion, isPublic });
     } catch {
       res.status(500).json({ error: "Failed to update history visibility" });
     }
@@ -109,8 +109,8 @@ function registerPassportSupportRoutes(app, deps) {
 
         const row = await pool.query(
           `SELECT id FROM ${tableName}
-           WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
-           ORDER BY version_number DESC LIMIT 1`,
+           WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+           ORDER BY "versionNumber" DESC LIMIT 1`,
           [dppId]
         );
         if (!row.rows.length) {
@@ -140,7 +140,7 @@ function registerPassportSupportRoutes(app, deps) {
         ).catch(() => {});
 
         await pool.query(
-          `UPDATE ${tableName} SET ${fieldKey} = $1, updated_at = NOW() WHERE id = $2`,
+          `UPDATE ${tableName} SET ${fieldKey} = $1, "updatedAt" = NOW() WHERE id = $2`,
           [publicFileUrl, row.rows[0].id]
         );
         await logAudit(companyId, req.user.userId, "UPLOAD", tableName, dppId, null, { fieldKey, publicFileUrl });

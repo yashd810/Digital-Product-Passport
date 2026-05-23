@@ -3,10 +3,17 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { PASSPORT_SECTIONS_MAP } from "../config/PassportFields";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import {
+  alignRecordToSchemaKeys,
+  buildSchemaFieldAliasMap,
+  canonicalizeRecordToSchemaKeys,
+  extractFieldValuesFromElements,
+} from "../../shared/passports/schemaKeyUtils";
+import {
   HEADER_OWNERSHIP_LABELS,
   normalizeSystemPassportHeader,
 } from "../../admin/passport-types/builderHelpers";
 import { formatFieldLabelWithUnit, getFieldUnitLabel } from "../../passport-viewer/utils/viewerHelpers";
+import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
 import RepositoryPicker from "./components/RepositoryPicker";
 import SymbolRepositoryPicker from "./components/SymbolRepositoryPicker";
 import "../../assets/styles/CreatePass.css";
@@ -38,84 +45,6 @@ function buildDraftStorageKey({ mode, companyId, passportType, dppId }) {
   ].join(":");
 }
 
-function normalizeSchemaAlias(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-
-const SERIAL_FIELD_ALIASES = [
-  "serial_number",
-  "serial",
-  "serialNumber",
-  "battery_serial_number",
-  "batterySerialNumber",
-  "product_serial_number",
-  "productSerialNumber",
-];
-
-function getSchemaFieldDescriptors(sections) {
-  return Object.values(sections || {})
-    .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
-    .filter((field) => field?.key)
-    .map((field) => ({
-      key: field.key,
-      aliases: [
-        field.key,
-        field.elementId,
-        field.element_id,
-        field.semanticId,
-        field.semantic_id,
-      ].filter(Boolean),
-    }));
-}
-
-function buildSchemaAliasMap(sections) {
-  const aliasToKey = new Map();
-  for (const field of getSchemaFieldDescriptors(sections)) {
-    for (const alias of field.aliases) {
-      aliasToKey.set(normalizeSchemaAlias(alias), field.key);
-    }
-    if (SERIAL_FIELD_ALIASES.includes(field.key)) {
-      for (const alias of SERIAL_FIELD_ALIASES) {
-        aliasToKey.set(normalizeSchemaAlias(alias), field.key);
-      }
-    }
-  }
-  return aliasToKey;
-}
-
-function alignRecordToSchemaKeys(record, sections) {
-  if (!record || typeof record !== "object") return record || {};
-  const aligned = { ...record };
-  const aliasToKey = buildSchemaAliasMap(sections);
-
-  for (const [rawKey, value] of Object.entries(record)) {
-    const canonicalKey = aliasToKey.get(normalizeSchemaAlias(rawKey));
-    if (canonicalKey && aligned[canonicalKey] === undefined) {
-      aligned[canonicalKey] = value;
-    }
-  }
-
-  return aligned;
-}
-
-function canonicalizeRecordToSchemaKeys(record, sections) {
-  if (!record || typeof record !== "object") return {};
-  const aliasToKey = buildSchemaAliasMap(sections);
-  const canonical = {};
-
-  for (const [rawKey, value] of Object.entries(record)) {
-    const canonicalKey = aliasToKey.get(normalizeSchemaAlias(rawKey)) || rawKey;
-    if (canonical[canonicalKey] === undefined) {
-      canonical[canonicalKey] = value;
-    }
-  }
-
-  return canonical;
-}
-
 function normalizePersistedComparisonValue(value) {
   if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
     try {
@@ -142,39 +71,12 @@ function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
   };
 }
 
-function extractFieldValuesFromElements(elements, aliasToKey = new Map(), values = {}) {
-  if (!Array.isArray(elements)) return values;
-  for (const element of elements) {
-    if (!element || typeof element !== "object") continue;
-    const candidateAliases = [
-      element.elementId,
-      element.element_id,
-      element.dictionaryReference,
-    ].filter((entry) => typeof entry === "string" && entry.trim());
-    const canonicalKey = candidateAliases
-      .map((alias) => aliasToKey.get(normalizeSchemaAlias(alias)))
-      .find(Boolean);
-    const rawElementId = typeof element.elementId === "string" ? element.elementId.trim() : "";
-    const targetKey = canonicalKey || rawElementId;
-
-    if (Array.isArray(element.elements) && element.elements.length) {
-      extractFieldValuesFromElements(element.elements, aliasToKey, values);
-    }
-
-    if (!targetKey) continue;
-    if (element.value !== undefined) {
-      values[targetKey] = element.value;
-    }
-  }
-  return values;
-}
-
 function buildClonePrefill(record, sections) {
   if (!record || typeof record !== "object") {
     return { modelName: "", internalAliasId: "", formData: {} };
   }
 
-  const aliasToKey = buildSchemaAliasMap(sections);
+  const aliasToKey = buildSchemaFieldAliasMap(sections);
   const mergedRecord = {
     ...record,
     ...(record.fields && typeof record.fields === "object" ? record.fields : {}),
@@ -184,17 +86,17 @@ function buildClonePrefill(record, sections) {
   const excludedKeys = new Set([
     "id",
     "dppId",
-    "dpp_id",
+    "dppId",
     "companyId",
-    "company_id",
-    "lineage_id",
-    "created_at",
-    "updated_at",
-    "release_status",
-    "version_number",
+    "companyId",
+    "lineageId",
+    "createdAt",
+    "updatedAt",
+    "releaseStatus",
+    "versionNumber",
     "archived_at",
     "released_at",
-    "deleted_at",
+    "deletedAt",
     "elements",
     "fields",
     "linked_data",
@@ -215,7 +117,7 @@ function buildClonePrefill(record, sections) {
   );
 
   return {
-    modelName: aligned?.model_name || record?.model_name || "",
+    modelName: aligned?.modelName || record?.modelName || "",
     internalAliasId: "",
     formData,
   };
@@ -233,33 +135,33 @@ function generateDraftLocalPassportId() {
 const NON_EDITABLE_FORM_KEYS = new Set([
   "id",
   "dppId",
-  "dpp_id",
+  "dppId",
   "companyId",
-  "company_id",
-  "lineage_id",
-  "created_by",
+  "companyId",
+  "lineageId",
+  "createdBy",
   "created_by_email",
-  "created_at",
-  "updated_by",
-  "updated_at",
-  "release_status",
-  "version_number",
+  "createdAt",
+  "updatedBy",
+  "updatedAt",
+  "releaseStatus",
+  "versionNumber",
   "archived",
   "archived_at",
   "released_at",
-  "deleted_at",
+  "deletedAt",
   "passport_type",
   "passportType",
-  "qr_code",
-  "product_identifier_did",
+  "qrCode",
+  "uniqueProductIdentifier",
   "digitalProductPassportId",
   "uniqueProductIdentifier",
   "subjectDid",
   "dppDid",
     "companyDid",
-    "model_name",
     "modelName",
-    "internal_alias_id",
+    "modelName",
+    "internalAliasId",
     "internalAliasId",
     "internalAliasId",
     "elements",
@@ -271,7 +173,7 @@ const NON_EDITABLE_FORM_KEYS = new Set([
 ]);
 
 const RESERVED_SYSTEM_FIELD_KEYS = new Set([
-  "carrier_authenticity",
+  "carrierAuthenticity",
   "carrier_security_status",
   "carrier_authentication_method",
   "carrier_verification_instructions",
@@ -301,11 +203,11 @@ const NON_PERSISTED_PAYLOAD_KEYS = new Set([
   "subjectDid",
   "dppDid",
   "companyDid",
-  "dpp_schema_version",
-  "schema_version",
-  "subject_did",
-  "dpp_did",
-  "company_did",
+  "dppSchemaVersion",
+  "schemaVersion",
+  "subjectDid",
+  "dppDid",
+  "companyDid",
 ]);
 
 function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
@@ -320,7 +222,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const effectiveCompanyId = String(
     companyId ||
     user?.companyId ||
-    user?.company_id ||
+    user?.companyId ||
     localStorage.getItem("companyId") ||
     ""
   );
@@ -383,9 +285,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const markFieldDirty = (key) => {
-    const normalizedKey = normalizeSchemaAlias(key);
-    if (!normalizedKey) return;
-    dirtyFieldsRef.current.add(normalizedKey);
+    const fieldKey = String(key || "").trim();
+    if (!fieldKey) return;
+    dirtyFieldsRef.current.add(fieldKey);
     markDirty();
   };
 
@@ -418,19 +320,19 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     if (!raw) return false;
     try {
       const draft = JSON.parse(raw);
-      setModelName(draft.modelName ?? fallbackData?.model_name ?? "");
-      setInternalAliasId(draft.internalAliasId ?? fallbackData?.internal_alias_id ?? "");
+      setModelName(draft.modelName ?? fallbackData?.modelName ?? "");
+      setInternalAliasId(draft.internalAliasId ?? fallbackData?.internalAliasId ?? "");
       const draftFormData = draft.formData && typeof draft.formData === "object" ? draft.formData : (fallbackData || {});
       formDataRef.current = draftFormData; // ← Update ref
       setFormData(draftFormData);
       dirtyRef.current = true;
       dirtyFieldsRef.current = new Set(
         [
-          "model_name",
-          "internal_alias_id",
+          "modelName",
+          "internalAliasId",
           ...Object.keys(draft.formData && typeof draft.formData === "object" ? draft.formData : {}),
         ]
-          .map((key) => normalizeSchemaAlias(key))
+          .map((key) => String(key || "").trim())
           .filter(Boolean)
       );
       setAutoSaveState("pending");
@@ -443,7 +345,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const hydrateFromPassportRecord = (data, { allowDraftRestore = false } = {}) => {
-    const aliasToKey = buildSchemaAliasMap(SECTIONS);
+    const aliasToKey = buildSchemaFieldAliasMap(SECTIONS);
     const flattenedData = {
       ...(data || {}),
       ...(data?.fields && typeof data.fields === "object" ? data.fields : {}),
@@ -452,8 +354,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const alignedData = alignRecordToSchemaKeys(flattenedData, SECTIONS);
     const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
     if (!restored) {
-      setModelName(alignedData?.model_name || "");
-      setInternalAliasId(alignedData?.internal_alias_id || "");
+      setModelName(alignedData?.modelName || "");
+      setInternalAliasId(alignedData?.internalAliasId || "");
       formDataRef.current = alignedData || {}; // ← Update ref
       setFormData(alignedData || {});
       dirtyRef.current = false;
@@ -461,8 +363,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       setAutoSaveState("idle");
     }
     baselinePayloadRef.current = {
-      model_name: normalizePersistedComparisonValue(alignedData?.model_name || ""),
-      internal_alias_id: normalizePersistedComparisonValue(alignedData?.internal_alias_id || ""),
+      modelName: normalizePersistedComparisonValue(alignedData?.modelName || ""),
+      internalAliasId: normalizePersistedComparisonValue(alignedData?.internalAliasId || ""),
       ...Object.fromEntries(
         Object.entries(canonicalizeRecordToSchemaKeys(alignedData || {}, SECTIONS)).map(([key, value]) => [
           key,
@@ -470,7 +372,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         ])
       ),
     };
-    setLastSavedAt(alignedData?.updated_at || null);
+    setLastSavedAt(alignedData?.updatedAt || null);
     draftHydratedRef.current = true;
   };
 
@@ -516,14 +418,14 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         });
         setFormData((prev) => {
           const next = { ...prev };
-          if (!next.economic_operator_id && data.company?.economic_operator_identifier) {
-            next.economic_operator_id = data.company.economic_operator_identifier;
+          if (!next.economicOperatorId && data.company?.economic_operator_identifier) {
+            next.economicOperatorId = data.company.economic_operator_identifier;
           }
-          if (!next.economic_operator_identifier_scheme && data.company?.economic_operator_identifier_scheme) {
-            next.economic_operator_identifier_scheme = data.company.economic_operator_identifier_scheme;
+          if (!next.economicOperatorIdentifierScheme && data.company?.economicOperatorIdentifierScheme) {
+            next.economicOperatorIdentifierScheme = data.company.economicOperatorIdentifierScheme;
           }
-          if (!next.facility_id && activeFacilities.length === 1) {
-            next.facility_id = activeFacilities[0].facility_identifier;
+          if (!next.facilityId && activeFacilities.length === 1) {
+            next.facilityId = activeFacilities[0].facility_identifier;
           }
           // CRITICAL: Keep formDataRef in sync with state updates
           formDataRef.current = { ...formDataRef.current, ...next };
@@ -691,7 +593,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const handleModelNameChange = (value) => {
-    markFieldDirty("model_name");
+    markFieldDirty("modelName");
     setModelName(value);
   };
 
@@ -727,9 +629,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         .filter((key) => key && !RESERVED_SYSTEM_FIELD_KEYS.has(key))
     );
     const managedEditableKeys = new Set([
-      "economic_operator_id",
-      "economic_operator_identifier_scheme",
-      "facility_id",
+      "economicOperatorId",
+      "economicOperatorIdentifierScheme",
+      "facilityId",
       "granularity",
       "product_image",
     ]);
@@ -761,8 +663,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const fullBody = {
       passportType: activePassportType,
       ...cleanData,
-      model_name: modelName.trim() || null,
-      internal_alias_id: internalAliasId.trim() || null,
+      modelName: modelName.trim() || null,
+      internalAliasId: internalAliasId.trim() || null,
     };
     if (!onlyDirty) return fullBody;
 
@@ -771,8 +673,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
     for (const [key, value] of Object.entries(fullBody)) {
       if (key === "passportType") continue;
-      const normalizedKey = normalizeSchemaAlias(key);
-      if (!dirtyKeys.has(normalizedKey)) continue;
+      if (!dirtyKeys.has(key)) continue;
       const nextComparable = normalizePersistedComparisonValue(value);
       const previousComparable = Object.prototype.hasOwnProperty.call(baselinePayloadRef.current, key)
         ? baselinePayloadRef.current[key]
@@ -948,7 +849,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
         : responsePayload?.passport
         ? hydrateFromPassportRecord(responsePayload.passport, { allowDraftRestore: false }) || responsePayload.passport
         : await fetchPassportRecord({ allowDraftRestore: false });
-      const nowIso = refreshed?.updated_at || new Date().toISOString();
+      const nowIso = refreshed?.updatedAt || new Date().toISOString();
       if (mountedRef.current) {
         setLastSavedAt(nowIso);
         setAutoSaveState("saved");
@@ -1344,21 +1245,21 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const getHeaderDisplayValue = (field) => {
-    const releaseStatus = formData.release_status || (mode === "create" ? "draft" : "");
+    const releaseStatus = formData.releaseStatus || (mode === "create" ? "draft" : "");
     const values = {
-      digitalProductPassportId: formData.dppId || formData.dpp_id || (mode === "create" ? "Generated when passport is saved" : ""),
-      uniqueProductIdentifier: formData.product_identifier_did || formData.uniqueProductIdentifier || "Generated from serial number when available",
-      internalAliasId: internalAliasId || formData.internal_alias_id || "Generated local passport ID",
+      digitalProductPassportId: formData.dppId || formData.dppId || (mode === "create" ? "Generated when passport is saved" : ""),
+      uniqueProductIdentifier: formData.uniqueProductIdentifier || formData.uniqueProductIdentifier || "Generated from serial number when available",
+      internalAliasId: internalAliasId || formData.internalAliasId || "Generated local passport ID",
       granularity: formData.granularity || "Resolved from company DPP policy",
-      dppSchemaVersion: formData.dpp_schema_version || formData.schema_version || "Resolved from passport type",
+      dppSchemaVersion: formData.dppSchemaVersion || formData.schemaVersion || "Resolved from passport type",
       dppStatus: releaseStatus,
-      lastUpdate: formData.updated_at || (mode === "create" ? "Generated when passport is saved" : ""),
-      economicOperatorId: formData.economic_operator_id || user?.economicOperatorId || user?.economic_operator_identifier || "Resolved from company identity",
-      facilityId: formData.facility_id || "Optional; resolved from company or passport data",
-      contentSpecificationIds: formData.content_specification_ids || "Resolved from passport type compliance profile",
-      subjectDid: formData.subject_did || "Generated from product identity",
-      dppDid: formData.dpp_did || "Generated from passport identity",
-      companyDid: formData.company_did || "Generated from company identity",
+      lastUpdate: formData.updatedAt || (mode === "create" ? "Generated when passport is saved" : ""),
+      economicOperatorId: formData.economicOperatorId || user?.economicOperatorId || user?.economic_operator_identifier || "Resolved from company identity",
+      facilityId: formData.facilityId || "Optional; resolved from company or passport data",
+      contentSpecificationIds: formData.contentSpecificationIds || "Resolved from passport type compliance profile",
+      subjectDid: formData.subjectDid || "Generated from product identity",
+      dppDid: formData.dppDid || "Generated from passport identity",
+      companyDid: formData.companyDid || "Generated from company identity",
     };
     return values[field.key] || "Managed by system";
   };
@@ -1431,9 +1332,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                 id="economic-operator-id"
                 type="text"
                 className="passport-model-input"
-                value={formData.economic_operator_id || ""}
+                value={formData.economicOperatorId || ""}
                 placeholder="Enter the operator identifier for this passport"
-                onChange={(e) => handleField("economic_operator_id", e.target.value)}
+                onChange={(e) => handleField("economicOperatorId", e.target.value)}
                 disabled={isSaving || (mode === "edit" && isLoading)}
               />
               <div className="pf-managed-hint">Can differ per passport if a subsidiary or delegated operator should be identified here.</div>
@@ -1444,9 +1345,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                 id="economic-operator-scheme"
                 type="text"
                 className="passport-model-input"
-                value={formData.economic_operator_identifier_scheme || ""}
+                value={formData.economicOperatorIdentifierScheme || ""}
                 placeholder="Enter the identifier scheme used for this passport"
-                onChange={(e) => handleField("economic_operator_identifier_scheme", e.target.value)}
+                onChange={(e) => handleField("economicOperatorIdentifierScheme", e.target.value)}
                 disabled={isSaving || (mode === "edit" && isLoading)}
               />
               <div className="pf-managed-hint">Examples: `VAT`, `EORI`, or the scheme required by your target regulation.</div>
@@ -1457,8 +1358,8 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                 id="facility-id"
                 type="text"
                 className="passport-model-input"
-                value={formData.facility_id || ""}
-                onChange={(e) => handleField("facility_id", e.target.value)}
+                value={formData.facilityId || ""}
+                onChange={(e) => handleField("facilityId", e.target.value)}
                 placeholder="Enter the facility identifier for this passport"
                 disabled={isSaving || (mode === "edit" && isLoading)}
                 list={activeFacilities.length ? "passport-facility-suggestions" : undefined}
@@ -1493,11 +1394,16 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const typeLabel = displayName || (activePassportType
     ? activePassportType.charAt(0).toUpperCase() + activePassportType.slice(1)
     : "");
+  const passportListPath = buildDashboardPath({
+    companyName: user?.company_name,
+    companyId: effectiveCompanyId,
+    subpath: `passports/${activePassportType}`,
+  });
 
   return (
     <div className="createpass-page">
       <header className="createpass-header">
-        <button className="back-btn" onClick={() => navigate(`/dashboard/passports/${activePassportType}`)}>
+        <button className="back-btn" onClick={() => navigate(passportListPath)}>
           ← Back
         </button>
         <h1>{mode==="create" ? "Create New" : "Edit"} {typeLabel} Passport</h1>
@@ -1608,7 +1514,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
             <div className="form-actions">
               <button type="button" className="cancel-btn"
-                onClick={() => navigate(`/dashboard/passports/${activePassportType}`)} disabled={isSaving}>
+                onClick={() => navigate(passportListPath)} disabled={isSaving}>
                 Cancel
               </button>
               <button type="submit" className="submit-btn" disabled={isSaving || loadingType}>

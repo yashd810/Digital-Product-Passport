@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useParams } from "react-router-dom";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
+import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "./CompanyRepository.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -671,6 +672,10 @@ function FilesTab({ token, companyId }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 function CompanyRepository({ token, companyId, activeTab = "files" }) {
+  const { companySlug } = useParams();
+  const filesPath = buildDashboardPath({ companySlug, companyId, subpath: "repository/files" });
+  const symbolsPath = buildDashboardPath({ companySlug, companyId, subpath: "repository/symbols" });
+
   return (
     <div className="repo-page">
       <div className="repo-header">
@@ -683,11 +688,11 @@ function CompanyRepository({ token, companyId, activeTab = "files" }) {
       </div>
 
       <div className="repo-tabs">
-        <NavLink to="/dashboard/repository/files"
+        <NavLink to={filesPath}
           className={({ isActive }) => `repo-tab${isActive ? " active" : ""}`}>
           📄 Files
         </NavLink>
-        <NavLink to="/dashboard/repository/symbols"
+        <NavLink to={symbolsPath}
           className={({ isActive }) => `repo-tab${isActive ? " active" : ""}`}>
           🔣 Symbols
         </NavLink>

@@ -22,19 +22,19 @@ function createCarrierSecurityHelpers({
   function buildPassportCarrierPublicPath(passport, companyName = "") {
     if (!passport) return null;
 
-    if (normalizeReleaseStatus(passport.release_status) === "released") {
+    if (normalizeReleaseStatus(passport.releaseStatus) === "released") {
       return buildCurrentPublicPassportPath({
         companyName,
-        modelName: passport.model_name,
-        internalAliasId: passport.internal_alias_id,
+        modelName: passport.modelName,
+        internalAliasId: passport.internalAliasId,
       });
     }
 
     return buildPreviewPassportPath({
       companyName,
-      modelName: passport.model_name,
-      internalAliasId: passport.internal_alias_id,
-      fallbackDppId: passport.dppId || passport.dpp_id,
+      modelName: passport.modelName,
+      internalAliasId: passport.internalAliasId,
+      fallbackDppId: passport.dppId,
     });
   }
 
@@ -136,8 +136,8 @@ function createCarrierSecurityHelpers({
 
     const publicPath = buildPassportCarrierPublicPath(passport, companyName);
     const publicAccessUrl = buildPublicAccessUrl(publicPath);
-    const dppId = passport?.dppId || passport?.dpp_id || null;
-    const internalAliasId = passport?.internal_alias_id || null;
+    const dppId = passport?.dppId || null;
+    const internalAliasId = passport?.internalAliasId || null;
     const credential = await signPortableDataConstruct({
       type: "DataCarrierBindingCredential",
       id: `${publicAccessUrl || `urn:dpp:${dppId || "unknown"}`}#carrier-binding`,

@@ -29,8 +29,8 @@ function registerCarrierSecurityRoutes(app, deps) {
   app.post("/api/passports/:dppId/qrcode", authenticateToken, requireEditor, async (req, res) => {
     try {
       const normalizedBody = normalizePassportRequestBody(req.body);
-      const { qrCode, passportType, passport_type, carrier_authenticity } = normalizedBody;
-      const resolvedPassportType = passportType || passport_type;
+      const { qrCode, passportType, carrierAuthenticity } = normalizedBody;
+      const resolvedPassportType = passportType;
       if (!qrCode || !resolvedPassportType) return res.status(400).json({ error: "qrCode and passportType required" });
 
       if (
@@ -51,9 +51,9 @@ function registerCarrierSecurityRoutes(app, deps) {
 
       const tableName = getTable(resolvedPassportType);
       const currentPassportResult = await pool.query(
-        `SELECT dpp_id, internal_alias_id, model_name, release_status, company_id, carrier_authenticity
+        `SELECT "dppId", "internalAliasId", "modelName", "releaseStatus", "companyId", "carrierAuthenticity"
          FROM ${tableName}
-         WHERE dpp_id = $1 AND deleted_at IS NULL
+         WHERE "dppId" = $1 AND "deletedAt" IS NULL
          LIMIT 1`,
         [req.params.dppId]
       );
@@ -64,7 +64,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       const currentPassport = normalizePassportRow(currentPassportResult.rows[0]);
       const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
         ...normalizedBody,
-        carrier_authenticity,
+        carrierAuthenticity,
       });
       const requestedPrintSpec = carrierAuthenticityMutation.updates?.qrPrintSpecification;
       const printSpecValidation = validateQrPrintSpecification(requestedPrintSpec);
@@ -78,16 +78,16 @@ function registerCarrierSecurityRoutes(app, deps) {
       const nextCarrierAuthenticity = await maybeSignCarrierPayload({
         passport: currentPassport,
         companyName,
-        metadata: applyCarrierAuthenticityMutation(currentPassport.carrier_authenticity, carrierAuthenticityMutation),
+        metadata: applyCarrierAuthenticityMutation(currentPassport.carrierAuthenticity, carrierAuthenticityMutation),
         forceSign: carrierAuthenticityMutation.signCarrierPayload,
       });
 
       await pool.query(
         `UPDATE ${tableName}
-         SET qr_code = $1,
-             carrier_authenticity = $2,
-             updated_at = NOW()
-         WHERE dpp_id = $3`,
+         SET "qrCode" = $1,
+             "carrierAuthenticity" = $2,
+             "updatedAt" = NOW()
+         WHERE "dppId" = $3`,
         [qrCode, buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), req.params.dppId]
       );
       await logAudit(
@@ -123,16 +123,16 @@ function registerCarrierSecurityRoutes(app, deps) {
       const { passport_type } = reg.rows[0];
       const tableName = getTable(passport_type);
       const r = await pool.query(
-        `SELECT qr_code, carrier_authenticity
+        `SELECT "qrCode", "carrierAuthenticity"
          FROM ${tableName}
-         WHERE dpp_id = $1 AND deleted_at IS NULL LIMIT 1`,
+         WHERE "dppId" = $1 AND "deletedAt" IS NULL LIMIT 1`,
         [dppId]
       );
-      if (!r.rows.length || !r.rows[0].qr_code) return res.status(404).json({ error: "QR code not found" });
+      if (!r.rows.length || !r.rows[0].qrCode) return res.status(404).json({ error: "QR code not found" });
 
       res.json({
-        qrCode: r.rows[0].qr_code,
-        ...buildCarrierAuthenticityResponseFields(r.rows[0].carrier_authenticity),
+        qrCode: r.rows[0].qrCode,
+        ...buildCarrierAuthenticityResponseFields(r.rows[0].carrierAuthenticity),
       });
     } catch {
       res.status(500).json({ error: "Failed to fetch QR code" });
@@ -151,16 +151,16 @@ function registerCarrierSecurityRoutes(app, deps) {
 
       const tableName = getTable(reg.rows[0].passport_type);
       const current = await pool.query(
-        `SELECT carrier_authenticity
+        `SELECT "carrierAuthenticity"
          FROM ${tableName}
-         WHERE dpp_id = $1 AND deleted_at IS NULL
+         WHERE "dppId" = $1 AND "deletedAt" IS NULL
          LIMIT 1`,
         [dppId]
       );
       if (!current.rows.length) return res.status(404).json({ error: "Passport not found" });
 
       const record = buildDataCarrierVerificationRecord(req.body || {}, req.user || {});
-      const existing = normalizeCarrierAuthenticityMetadata(current.rows[0].carrier_authenticity) || {};
+      const existing = normalizeCarrierAuthenticityMetadata(current.rows[0].carrierAuthenticity) || {};
       const evidence = Array.isArray(existing.dataCarrierVerificationEvidence)
         ? existing.dataCarrierVerificationEvidence
         : [];
@@ -171,9 +171,9 @@ function registerCarrierSecurityRoutes(app, deps) {
 
       await pool.query(
         `UPDATE ${tableName}
-         SET carrier_authenticity = $1,
-             updated_at = NOW()
-         WHERE dpp_id = $2`,
+         SET "carrierAuthenticity" = $1,
+             "updatedAt" = NOW()
+         WHERE "dppId" = $2`,
         [buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity), dppId]
       );
 
@@ -224,7 +224,7 @@ function registerCarrierSecurityRoutes(app, deps) {
 
       const tbl = getTable(reg.rows[0].passport_type);
       const check = await pool.query(
-        `SELECT company_id FROM ${tbl} WHERE dpp_id = $1 AND release_status = 'released' AND deleted_at IS NULL`,
+        `SELECT "companyId" FROM ${tbl} WHERE "dppId" = $1 AND "releaseStatus" = 'released' AND "deletedAt" IS NULL`,
         [dppId]
       );
       if (!check.rows.length) return res.json({ success: true });
@@ -237,7 +237,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       if (observedReferrerHost && trustedHost && observedReferrerHost !== trustedHost) {
         await recordPassportSecurityEvent({
           dppId,
-          companyId: check.rows[0]?.company_id || null,
+          companyId: check.rows[0]?.companyId || null,
           eventType: "unexpected_scan_referrer",
           severity: "warning",
           source: "scan_monitor",

@@ -1,5 +1,7 @@
 "use strict";
 
+const { joinQuotedSqlIdentifiers } = require("../../shared/passports/passport-helpers");
+
 module.exports = function registerBulkLifecycleRoutes(app, deps) {
   const {
     pool,
@@ -63,12 +65,12 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
       const registryByGuid = new Map(registryRes.rows.map((row) => [row.dpp_id, row.passport_type]));
       const resolvedItems = uniqueGuids
-        .map((dppId) => ({ dppId, passport_type: registryByGuid.get(dppId) || null }))
-        .filter((item) => item.passport_type);
+        .map((dppId) => ({ dppId, passportType: registryByGuid.get(dppId) || null }))
+        .filter((item) => item.passportType);
 
       if (!resolvedItems.length) return res.status(404).json({ error: "No matching passports were found for this company." });
 
-      const passportTypes = [...new Set(resolvedItems.map((item) => item.passport_type))];
+      const passportTypes = [...new Set(resolvedItems.map((item) => item.passportType))];
       const batchPassportType = passportTypes.length === 1 ? passportTypes[0] : null;
 
       const batchRes = await pool.query(
@@ -87,8 +89,8 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       let failed = 0;
 
       const groupedItems = resolvedItems.reduce((acc, item) => {
-        if (!acc[item.passport_type]) acc[item.passport_type] = [];
-        acc[item.passport_type].push(item.dppId);
+        if (!acc[item.passportType]) acc[item.passportType] = [];
+        acc[item.passportType].push(item.dppId);
         return acc;
       }, {});
 
@@ -97,17 +99,17 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
         const typeRes = await pool.query("SELECT fields_json, display_name FROM passport_types WHERE type_name = $1", [passportType]);
         const sections = typeRes.rows[0]?.fields_json?.sections || [];
         const fieldMap = new Map(sections.flatMap((section) => section.fields || []).map((field) => [field.key, field]));
-        fieldMap.set("model_name", { key: "model_name", label: "Model Name", type: "text" });
-        fieldMap.set("internal_alias_id", { key: "internal_alias_id", label: "Internal Alias ID", type: "text" });
+        fieldMap.set("modelName", { key: "modelName", label: "Model Name", type: "text" });
+        fieldMap.set("internalAliasId", { key: "internalAliasId", label: "Internal Alias ID", type: "text" });
 
-        const applicableChanges = Object.entries(changes).filter(([key]) => fieldMap.has(key) && /^[a-z][a-z0-9_]*$/.test(key));
+        const applicableChanges = Object.entries(changes).filter(([key]) => fieldMap.has(key) && /^[a-z][A-Za-z0-9_]*$/.test(key));
 
         const releasedRes = await pool.query(
           `SELECT * FROM ${tableName}
-           WHERE company_id = $1 AND dpp_id = ANY($2::text[]) AND release_status = 'released' AND deleted_at IS NULL`,
+           WHERE "companyId" = $1 AND "dppId" = ANY($2::text[]) AND "releaseStatus" = 'released' AND "deletedAt" IS NULL`,
           [companyId, dppIds]
         );
-        const releasedByGuid = new Map(releasedRes.rows.map((row) => [row.dpp_id, row]));
+        const releasedByGuid = new Map(releasedRes.rows.map((row) => [row.dppId, row]));
 
         for (const dppId of dppIds) {
           const insertBatchItem = async (status, message, sourceVersion = null, newVersion = null) => {
@@ -122,61 +124,61 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           const source = releasedByGuid.get(dppId);
           if (!source) {
             const message = "No released passport version was found for this GUID.";
-            details.push({ dppId, passport_type: passportType, status: "skipped", message });
+            details.push({ dppId, passportType, status: "skipped", message });
             skipped += 1;
             await insertBatchItem("skipped", message);
             continue;
           }
 
           const blockerRes = await pool.query(
-            `SELECT dpp_id, version_number, release_status FROM ${tableName}
-             WHERE company_id = $1 AND lineage_id = $2 AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL} AND deleted_at IS NULL
-             ORDER BY version_number DESC LIMIT 1`,
-            [companyId, source.lineage_id]
+            `SELECT "dppId", "versionNumber", "releaseStatus" FROM ${tableName}
+             WHERE "companyId" = $1 AND "lineageId" = $2 AND "releaseStatus" IN ${REVISION_BLOCKING_STATUSES_SQL} AND "deletedAt" IS NULL
+             ORDER BY "versionNumber" DESC LIMIT 1`,
+            [companyId, source.lineageId]
           );
           const blocker = blockerRes.rows[0];
           if (blocker) {
-            const blockerStatus = normalizeReleaseStatus(blocker.release_status);
+            const blockerStatus = normalizeReleaseStatus(blocker.releaseStatus);
             const message = blockerStatus === "in_review"
               ? "A revision is already in workflow for this passport."
               : "An editable revision already exists for this passport.";
-            details.push({ dppId, passport_type: passportType, status: "skipped", source_version_number: source.version_number, message });
+            details.push({ dppId, passportType, status: "skipped", sourceVersionNumber: source.versionNumber, message });
             skipped += 1;
-            await insertBatchItem("skipped", message, source.version_number, blocker.version_number || null);
+            await insertBatchItem("skipped", message, source.versionNumber, blocker.versionNumber || null);
             continue;
           }
 
           if (!applicableChanges.length) {
             const message = "None of the requested change fields apply to this passport type.";
-            details.push({ dppId, passport_type: passportType, status: "skipped", source_version_number: source.version_number, message });
+            details.push({ dppId, passportType, status: "skipped", sourceVersionNumber: source.versionNumber, message });
             skipped += 1;
-            await insertBatchItem("skipped", message, source.version_number, null);
+            await insertBatchItem("skipped", message, source.versionNumber, null);
             continue;
           }
 
           try {
-            const sourceVersion = parseInt(source.version_number, 10) || 1;
+            const sourceVersion = parseInt(source.versionNumber, 10) || 1;
             const newVersion = sourceVersion + 1;
             const newGuid = generateDppRecordId();
-            const excluded = new Set(["id", "dppId", "dpp_id", "created_at", "updated_at", "updated_by", "qr_code", "lineage_id"]);
+            const excluded = new Set(["id", "dppId", "createdAt", "updatedAt", "updatedBy", "qrCode", "lineageId"]);
             const columns = Object.keys(source).filter((key) => !excluded.has(key));
             const mappedChanges = Object.fromEntries(
               applicableChanges.map(([key, value]) => [key, coerceBulkFieldValue(fieldMap.get(key), value)])
             );
 
             const values = columns.map((key) => {
-              if (key === "version_number") return newVersion;
-              if (key === "release_status") return IN_REVISION_STATUS;
-              if (key === "created_by") return userId;
-              if (key === "deleted_at") return null;
+              if (key === "versionNumber") return newVersion;
+              if (key === "releaseStatus") return IN_REVISION_STATUS;
+              if (key === "createdBy") return userId;
+              if (key === "deletedAt") return null;
               if (Object.prototype.hasOwnProperty.call(mappedChanges, key)) return toStoredPassportValue(mappedChanges[key]);
               return source[key];
             });
 
-            const allColumns = ["dpp_id", "lineage_id", ...columns];
-            const allValues = [newGuid, source.lineage_id, ...values];
+            const allColumns = ["dppId", "lineageId", ...columns];
+            const allValues = [newGuid, source.lineageId, ...values];
             const placeholders = allColumns.map((_, index) => `$${index + 1}`).join(", ");
-            const insertedRevision = await pool.query(`INSERT INTO ${tableName} (${allColumns.join(", ")}) VALUES (${placeholders}) RETURNING *`, allValues);
+            const insertedRevision = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allColumns)}) VALUES (${placeholders}) RETURNING *`, allValues);
 
             const sourceRegistry = await pool.query(
               `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
@@ -189,7 +191,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             const sourceKeys = sourceRegistry.rows[0] || {};
             await insertPassportRegistry({
               dppId: newGuid,
-              lineageId: source.lineage_id,
+              lineageId: source.lineageId,
               companyId,
               passportType,
               accessKeyHash: sourceKeys.access_key_hash || null,
@@ -224,18 +226,18 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             }
 
             await logAudit(companyId, userId, "BULK_REVISE", tableName, newGuid,
-              { version_number: sourceVersion, release_status: source.release_status },
-              { version_number: newVersion, release_status: submitToWorkflow ? "in_review" : IN_REVISION_STATUS, batch_id: batch.id, revision_note: revisionNote || null, fields_updated: Object.keys(mappedChanges) }
+              { versionNumber: sourceVersion, releaseStatus: source.releaseStatus },
+              { versionNumber: newVersion, releaseStatus: submitToWorkflow ? "in_review" : IN_REVISION_STATUS, batchId: batch.id, revisionNote: revisionNote || null, fieldsUpdated: Object.keys(mappedChanges) }
             );
 
-            details.push({ dppId: newGuid, passport_type: passportType, status: detailStatus, source_version_number: sourceVersion, new_version_number: newVersion, message: detailMessage });
+            details.push({ dppId: newGuid, passportType, status: detailStatus, sourceVersionNumber: sourceVersion, newVersionNumber: newVersion, message: detailMessage });
             revised += 1;
             await insertBatchItem(detailStatus, detailMessage, sourceVersion, newVersion);
           } catch (error) {
             const message = error.message || "Bulk revise failed for this passport.";
-            details.push({ dppId, passport_type: passportType, status: "failed", source_version_number: source.version_number || null, message });
+            details.push({ dppId, passportType, status: "failed", sourceVersionNumber: source.versionNumber || null, message });
             failed += 1;
-            await insertBatchItem("failed", message, source.version_number || null, null);
+            await insertBatchItem("failed", message, source.versionNumber || null, null);
           }
         }
       }
@@ -247,7 +249,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
       res.json({
         success: true,
-        batch: { id: batch.id, created_at: batch.created_at, passport_type: batchPassportType, scope_type: scopeType },
+        batch: { id: batch.id, createdAt: batch.created_at, passportType: batchPassportType, scopeType },
         summary: { targeted: resolvedItems.length, revised, skipped, failed },
         details,
       });
@@ -266,7 +268,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items must be a non-empty array of { dppId, passportType }" });
       if (items.length > 500) return res.status(400).json({ error: "Maximum 500 passports per bulk release request" });
 
-      const invalid = items.filter((item) => !item?.dppId || (!item?.passportType && !item?.passport_type));
+      const invalid = items.filter((item) => !item?.dppId || !item?.passportType);
       if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing dppId or passportType` });
 
       let released = 0;
@@ -276,7 +278,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
       for (const item of items) {
         const dppId = item?.dppId;
-        const passportType = item?.passportType || item?.passport_type;
+        const passportType = item?.passportType;
         if (!dppId || !passportType) {
           details.push({ dppId, status: "failed", message: "Missing dppId or passportType" });
           failed += 1;
@@ -287,7 +289,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           const currentRes = await pool.query(
             `SELECT *
              FROM ${tableName}
-             WHERE dpp_id = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+             WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
              LIMIT 1`,
             [dppId, companyId]
           );
@@ -307,8 +309,8 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             snapshotReason: "before_bulk_release",
           });
           const result = await pool.query(
-            `UPDATE ${tableName} SET release_status = 'released', updated_at = NOW()
-             WHERE dpp_id = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+            `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
+             WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
              RETURNING *`,
             [dppId, companyId]
           );
@@ -327,19 +329,19 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           });
 
           const typeRes = await pool.query("SELECT * FROM passport_types WHERE type_name = $1", [passportType]);
-          const sigData = await signPassport({ ...releasedRow, passport_type: passportType }, typeRes.rows[0] || null);
+          const sigData = await signPassport({ ...releasedRow, passportType }, typeRes.rows[0] || null);
           if (sigData) {
             await recordSignedDppRelease(pool, {
               passportDppId: dppId,
               companyId,
               releasedByUserId: userId,
               releasedByEmail: req.user.email,
-              versionNumber: releasedRow.version_number,
+              versionNumber: releasedRow.versionNumber,
               sigData,
               releaseNote: item?.releaseNote || null,
             });
             await logAudit(companyId, userId, "SIGN_PASSPORT", "passport_signatures", dppId, null, {
-              version_number: releasedRow.version_number,
+              versionNumber: releasedRow.versionNumber,
               signing_key_id: sigData.keyId,
               signature_algorithm: sigData.signatureAlgorithm,
               source: "bulk_release",
@@ -349,12 +351,12 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             });
           }
 
-          await markOlderVersionsObsolete(tableName, dppId, releasedRow.version_number, passportType);
-          await logAudit(companyId, userId, "RELEASE", tableName, dppId, { release_status: "draft_or_in_revision" }, { release_status: "released" });
+          await markOlderVersionsObsolete(tableName, dppId, releasedRow.versionNumber, passportType);
+          await logAudit(companyId, userId, "RELEASE", tableName, dppId, { releaseStatus: "draft_or_in_revision" }, { releaseStatus: "released" });
           details.push({
             dppId,
             status: "released",
-            version: releasedRow.version_number,
+            version: releasedRow.versionNumber,
             compliance,
             verificationStatus: compliance?.blockingIssues?.length
               ? "released_with_issues"
@@ -384,14 +386,14 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "items required" });
       if (items.length > 500) return res.status(400).json({ error: "Max 500 per request" });
 
-      const invalid = items.filter((item) => !item?.dppId || (!item?.passportType && !item?.passport_type));
+      const invalid = items.filter((item) => !item?.dppId || !item?.passportType);
       if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing dppId or passportType` });
 
       let archived = 0;
       let skipped = 0;
       for (const item of items) {
         const dppId = item?.dppId;
-        const passportType = item?.passportType || item?.passport_type;
+        const passportType = item?.passportType;
         if (!dppId || !passportType) {
           skipped += 1;
           continue;
@@ -399,13 +401,13 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
         try {
           const tableName = getTable(passportType);
           const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
-          if (!lineageContext?.lineage_id) {
+          if (!lineageContext?.lineageId) {
             skipped += 1;
             continue;
           }
           const rows = await pool.query(
-            `SELECT * FROM ${tableName} WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-            [lineageContext.lineage_id, companyId]
+            `SELECT * FROM ${tableName} WHERE "lineageId" = $1 AND "companyId" = $2 AND "deletedAt" IS NULL`,
+            [lineageContext.lineageId, companyId]
           );
           if (!rows.rows.length) {
             skipped += 1;
@@ -419,12 +421,12 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             snapshotReason: "before_bulk_archive_delete",
           });
           await pool.query(
-            `UPDATE ${tableName} SET deleted_at = NOW() WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-            [lineageContext.lineage_id, companyId]
+            `UPDATE ${tableName} SET "deletedAt" = NOW() WHERE "lineageId" = $1 AND "companyId" = $2 AND "deletedAt" IS NULL`,
+            [lineageContext.lineageId, companyId]
           );
           for (const row of rows.rows) {
             await replicatePassportToBackup({
-              passport: { ...row, passport_type: passportType },
+              passport: { ...row, passportType },
               passportType,
               reason: "bulk_archive",
               snapshotScope: "archived_history",

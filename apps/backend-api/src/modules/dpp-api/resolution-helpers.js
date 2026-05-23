@@ -40,7 +40,7 @@ function createResolutionHelpers({
   }
 
   function buildDppIdentifierFields(passport) {
-    const digitalProductPassportId = passport?.dppId || passport?.dpp_id || null;
+    const digitalProductPassportId = passport?.dppId || null;
     return {
       dppId: digitalProductPassportId,
       digitalProductPassportId
@@ -50,10 +50,10 @@ function createResolutionHelpers({
   function buildIdentifierLineageEnvelope(passport, identifierLineage = []) {
     return {
       ...buildDppIdentifierFields(passport),
-      uniqueProductIdentifier: productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) ? (passport?.product_identifier_did || null) : null,
-      internalAliasId: passport?.internal_alias_id || null,
+      uniqueProductIdentifier: productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) ? (passport?.uniqueProductIdentifier || passport?.product_identifier_did || null) : null,
+      internalAliasId: passport?.internalAliasId || null,
       granularity: passport?.granularity || "item",
-      lineageId: passport?.lineage_id || passport?.lineageId || null,
+      lineageId: passport?.lineageId || null,
       identifierLineage,
     };
   }
@@ -110,7 +110,7 @@ function createResolutionHelpers({
       );
       for (const row of liveRes.rows) {
         matches.push({
-          passport: { ...normalizePassportRow(row, typeRow), passport_type: typeRow.type_name },
+          passport: { ...normalizePassportRow(row, typeRow), passportType: typeRow.type_name },
           typeDef: typeRow,
           tableName
         });
@@ -138,9 +138,9 @@ function createResolutionHelpers({
         matches.push({
           passport: {
             ...normalizePassportRow(rowData, typeRow),
-            product_identifier_did: row.product_identifier_did || rowData?.product_identifier_did,
-            archived_at: row.archived_at || rowData?.archived_at,
-            passport_type: typeRow.type_name,
+            uniqueProductIdentifier: row.product_identifier_did || rowData?.uniqueProductIdentifier || rowData?.product_identifier_did,
+            archivedAt: row.archived_at || rowData?.archivedAt || rowData?.archived_at,
+            passportType: typeRow.type_name,
             archived: true
           },
           typeDef: typeRow,
@@ -151,17 +151,17 @@ function createResolutionHelpers({
 
     const filteredMatches = atDate ?
       matches.filter(({ passport }) => {
-        const candidateDate = new Date(passport.updated_at || passport.created_at || passport.archived_at || 0);
+        const candidateDate = new Date(passport.updatedAt || passport.createdAt || passport.archivedAt || 0);
         return !Number.isNaN(candidateDate.getTime()) && candidateDate.getTime() <= atDate.getTime();
       }) :
       matches;
 
     if (!filteredMatches.length) return null;
     filteredMatches.sort((left, right) => {
-      const leftTime = new Date(left.passport.updated_at || left.passport.created_at || left.passport.archived_at || 0).getTime();
-      const rightTime = new Date(right.passport.updated_at || right.passport.created_at || right.passport.archived_at || 0).getTime();
+      const leftTime = new Date(left.passport.updatedAt || left.passport.createdAt || left.passport.archivedAt || 0).getTime();
+      const rightTime = new Date(right.passport.updatedAt || right.passport.createdAt || right.passport.archivedAt || 0).getTime();
       if (rightTime !== leftTime) return rightTime - leftTime;
-      return Number(right.passport.version_number || 0) - Number(left.passport.version_number || 0);
+      return Number(right.passport.versionNumber || 0) - Number(left.passport.versionNumber || 0);
     });
     if (filteredMatches.length > 1 && filteredMatches[0].passport.dppId !== filteredMatches[1].passport.dppId) {
       const error = new Error(`Multiple passports match DPP identifier "${stableId}".`);
@@ -170,12 +170,12 @@ function createResolutionHelpers({
     }
 
     const selected = filteredMatches[0];
-    const companyNameMap = await getCompanyNameMap([selected.passport.company_id]);
+    const companyNameMap = await getCompanyNameMap([selected.passport.companyId]);
     return {
       passport: selected.passport,
       typeDef: selected.typeDef,
       tableName: selected.tableName,
-      companyName: companyNameMap.get(String(selected.passport.company_id)) || ""
+      companyName: companyNameMap.get(String(selected.passport.companyId)) || ""
     };
   }
 
@@ -188,7 +188,7 @@ function createResolutionHelpers({
   async function resolveActiveReleasedPassportByDppId(dppId) {
     const result = await resolveReleasedPassportByDppId(dppId, { versionNumber: null });
     if (!result?.passport || result.passport.archived) return null;
-    if (!["released", "obsolete"].includes(String(result.passport.release_status || "").trim().toLowerCase())) {
+    if (!["released", "obsolete"].includes(String(result.passport.releaseStatus || "").trim().toLowerCase())) {
       return null;
     }
     return result;
@@ -216,15 +216,15 @@ function createResolutionHelpers({
       await resolveReleasedPassportForIdentifier(identifier, null, null);
     if (!baseline?.passport) return null;
 
-    const companyId = baseline.passport.company_id;
-    const passportType = baseline.passport.passport_type;
+    const companyId = baseline.passport.companyId;
+    const passportType = baseline.passport.passportType;
     const tableName = getTable(passportType);
     const candidates = productIdentifierService?.buildLookupCandidates?.({
       companyId,
       passportType,
-      internalAliasId: baseline.passport.internal_alias_id,
+      internalAliasId: baseline.passport.internalAliasId,
       granularity: baseline.passport.granularity || "item"
-    }) || [baseline.passport.internal_alias_id, baseline.passport.product_identifier_did].filter(Boolean);
+    }) || [baseline.passport.internalAliasId, baseline.passport.uniqueProductIdentifier || baseline.passport.product_identifier_did].filter(Boolean);
 
     const liveRes = await pool.query(
       `SELECT *
@@ -246,28 +246,28 @@ function createResolutionHelpers({
     );
 
     const combined = [
-      ...liveRes.rows.map((row) => ({ ...normalizePassportRow(row, baseline.typeDef), passport_type: passportType })),
+      ...liveRes.rows.map((row) => ({ ...normalizePassportRow(row, baseline.typeDef), passportType })),
       ...archiveRes.rows.map((row) => {
         const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
         return {
           ...normalizePassportRow(rowData, baseline.typeDef),
-          product_identifier_did: row.product_identifier_did || rowData?.product_identifier_did,
-          archived_at: row.archived_at || rowData?.archived_at,
-          passport_type: passportType,
+          uniqueProductIdentifier: row.product_identifier_did || rowData?.uniqueProductIdentifier || rowData?.product_identifier_did,
+          archivedAt: row.archived_at || rowData?.archivedAt || rowData?.archived_at,
+          passportType,
           archived: true
         };
       })
     ].filter((row) => {
-      const candidateDate = new Date(row.updated_at || row.created_at || row.archived_at || 0);
+      const candidateDate = new Date(row.updatedAt || row.createdAt || row.archivedAt || 0);
       return !Number.isNaN(candidateDate.getTime()) && candidateDate.getTime() <= atDate.getTime();
     });
 
     if (!combined.length) return null;
     combined.sort((left, right) => {
-      const leftTime = new Date(left.updated_at || left.created_at || left.archived_at || 0).getTime();
-      const rightTime = new Date(right.updated_at || right.created_at || right.archived_at || 0).getTime();
+      const leftTime = new Date(left.updatedAt || left.createdAt || left.archivedAt || 0).getTime();
+      const rightTime = new Date(right.updatedAt || right.createdAt || right.archivedAt || 0).getTime();
       if (rightTime !== leftTime) return rightTime - leftTime;
-      return Number(right.version_number || 0) - Number(left.version_number || 0);
+      return Number(right.versionNumber || 0) - Number(left.versionNumber || 0);
     });
 
     const [companyNameMap, typeRes] = await Promise.all([
@@ -314,7 +314,7 @@ function createResolutionHelpers({
       );
       if (result.rows.length) {
         matches.push({
-          passport: { ...normalizePassportRow(result.rows[0]), passport_type: typeRow.type_name },
+          passport: { ...normalizePassportRow(result.rows[0]), passportType: typeRow.type_name },
           typeDef: typeRow,
           tableName
         });
@@ -366,7 +366,7 @@ function createResolutionHelpers({
       );
       if (result.rows.length) {
         matches.push({
-          passport: { ...normalizePassportRow(result.rows[0]), passport_type: typeRow.type_name },
+          passport: { ...normalizePassportRow(result.rows[0]), passportType: typeRow.type_name },
           typeDef: typeRow,
           tableName
         });
@@ -375,16 +375,16 @@ function createResolutionHelpers({
 
     if (!matches.length) return null;
     matches.sort((left, right) => {
-      const leftTime = new Date(left.passport.updated_at || left.passport.created_at || 0).getTime();
-      const rightTime = new Date(right.passport.updated_at || right.passport.created_at || 0).getTime();
+      const leftTime = new Date(left.passport.updatedAt || left.passport.createdAt || 0).getTime();
+      const rightTime = new Date(right.passport.updatedAt || right.passport.createdAt || 0).getTime();
       if (rightTime !== leftTime) return rightTime - leftTime;
-      return Number(right.passport.version_number || 0) - Number(left.passport.version_number || 0);
+      return Number(right.passport.versionNumber || 0) - Number(left.passport.versionNumber || 0);
     });
 
     if (matches.length > 1 && matches[0].passport.dppId !== matches[1].passport.dppId) {
       const error = new Error(`Multiple editable passports match identifier "${productIdentifier}".`);
       error.code = "AMBIGUOUS_PRODUCT_ID";
-      error.companyIds = [...new Set(matches.map(({ passport }) => Number(passport.company_id)).filter(Number.isFinite))];
+      error.companyIds = [...new Set(matches.map(({ passport }) => Number(passport.companyId)).filter(Number.isFinite))];
       throw error;
     }
 
@@ -465,8 +465,8 @@ function createResolutionHelpers({
 
   function buildPassportServiceEndpoints(subjectDid, passport, typeDef, companyName) {
     const appUrl = getAppUrl();
-    const { internal_alias_id } = passport;
-    const encodedPid = encodeURIComponent(String(internal_alias_id));
+    const { internalAliasId } = passport;
+    const encodedPid = encodeURIComponent(String(internalAliasId));
     const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
 
     return [
@@ -495,7 +495,7 @@ function createResolutionHelpers({
       {
         id: `${subjectDid}#passport-schema`,
         type: "DPPSchema",
-        serviceEndpoint: `${appUrl}/api/passport-types/${passport.passport_type}`
+        serviceEndpoint: `${appUrl}/api/passport-types/${passport.passportType}`
       }
     ];
   }

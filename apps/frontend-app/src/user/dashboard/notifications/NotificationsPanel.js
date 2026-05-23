@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -29,6 +30,10 @@ function timeAgo(dateStr) {
 
 function NotificationsPanel({ user }) {
   const navigate   = useNavigate();
+  const notificationsPath = buildDashboardPath({
+    companyName: user?.company_name,
+    subpath: "notifications",
+  });
   const [open,     setOpen]     = useState(false);
   const [notifs,   setNotifs]   = useState([]);
   const [unread,   setUnread]   = useState(0);
@@ -130,7 +135,7 @@ function NotificationsPanel({ user }) {
           </div>
 
           <div className="notif-panel-view-all">
-            <button className="notif-view-all-btn" onClick={() => { setOpen(false); navigate("/dashboard/notifications"); }}>
+            <button className="notif-view-all-btn" onClick={() => { setOpen(false); navigate(notificationsPath); }}>
               View all &amp; workflow history →
             </button>
           </div>

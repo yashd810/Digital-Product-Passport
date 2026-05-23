@@ -40,7 +40,7 @@ function createBackupEventHelpers({
 
     const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
     const resolvedCompanyName = companyName
-      || (await getCompanyNameMap([passport.company_id])).get(String(passport.company_id))
+      || (await getCompanyNameMap([passport.companyId])).get(String(passport.companyId))
       || "";
 
     return assertBackupReplicationResult(await backupProviderService.replicatePassportSnapshot({

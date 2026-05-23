@@ -44,13 +44,13 @@ export function PassportListRow({
   calcCompleteness,
   togglePin,
 }) {
-  const pType = passport.passport_type || activeType;
-  const menuId = `${passport.dppId}-${passport.version_number}`;
+  const pType = passport.passportType || activeType;
+  const menuId = `${passport.dppId}-${passport.versionNumber}`;
   const isOpen = openMenuId === menuId;
   const pct = calcCompleteness(passport, allPassportTypes);
   const isPinned = pinnedGuids.has(passport.dppId);
   const isExpanded = expandedPassportGroups.has(parentGuid);
-  const normalizedStatus = normalizePassportStatus(passport.release_status);
+  const normalizedStatus = normalizePassportStatus(passport.releaseStatus);
   const showOlderVersionsToggle = hasOlderVersions && !isHistorical;
   const serialNumber = getPassportSerialNumberForType(passport, allPassportTypes);
 
@@ -68,7 +68,7 @@ export function PassportListRow({
           return;
         }
         if (selectionMode) {
-          toggleSelectPassport(passport.dppId, passport.version_number);
+          toggleSelectPassport(passport.dppId, passport.versionNumber);
         } else {
           openPassportViewer(passport);
         }
@@ -79,7 +79,7 @@ export function PassportListRow({
           <input
             type="checkbox"
             checked={selectedPassports.has(menuId)}
-            onChange={() => toggleSelectPassport(passport.dppId, passport.version_number)}
+            onChange={() => toggleSelectPassport(passport.dppId, passport.versionNumber)}
             onClick={e => e.stopPropagation()}
           />
         </td>
@@ -105,13 +105,13 @@ export function PassportListRow({
               </button>
             )}
           </span>
-          <span className="version-badge">v{passport.version_number}</span>
+          <span className="version-badge">v{passport.versionNumber}</span>
         </div>
       </td>
       <td>{serialNumber ? <span className="product-id-badge">{serialNumber}</span> : <span className="no-product-id">—</span>}</td>
       <td>
         <button className="model-link-btn" onClick={e => { e.stopPropagation(); openPassportViewer(passport); }}>
-          {passport.model_name}
+          {passport.modelName}
         </button>
       </td>
       {filterByUser && (
@@ -121,7 +121,7 @@ export function PassportListRow({
       <td>
         <div className="passport-status-cell">
           <span className={`status-badge ${normalizedStatus}`}>
-            {formatPassportStatus(passport.release_status)}
+            {formatPassportStatus(passport.releaseStatus)}
           </span>
         </div>
       </td>
@@ -145,6 +145,7 @@ export function PassportListRow({
             passport={passport}
             pType={pType}
             isPinned={isPinned}
+            companyName={user?.company_name}
             companyId={companyId}
             navigate={navigate}
             openPassportViewer={openPassportViewer}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -31,7 +32,7 @@ function BulkModal({ passportType, typeLabel, companyId, templateId, templateNam
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
-          passport_type: passportType,
+          passportType,
           passports: Array.from({ length: n }, () => ({ ...prefill })),
         }),
       });
@@ -154,6 +155,11 @@ export default function CreateHub({ user, companyId }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedType = searchParams.get("type");
+  const dashboardPath = (subpath = "") => buildDashboardPath({
+    companyName: user?.company_name,
+    companyId,
+    subpath,
+  });
 
   const [passportTypes,    setPassportTypes]    = useState([]);
   const [selectedType,     setSelectedType]     = useState(null);
@@ -377,7 +383,7 @@ export default function CreateHub({ user, companyId }) {
           onClose={() => setBulkModal(null)}
           onDone={() => {
             setBulkModal(null);
-            navigate(`/dashboard/passports/${selectedType.type_name}`);
+            navigate(dashboardPath(`passports/${selectedType.type_name}`));
           }}
         />
       )}

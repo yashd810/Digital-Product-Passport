@@ -141,8 +141,8 @@ export function usePassportListActions({
         const qrCanvas = document.createElement("canvas");
         const passportPath = buildPublicPassportPath({
           companyName: user?.company_name,
-          modelName: passport.model_name,
-          internalAliasId: passport.internal_alias_id,
+          modelName: passport.modelName,
+          internalAliasId: passport.internalAliasId,
         });
         if (!passportPath) throw new Error("Passport link is unavailable for this QR code");
 
@@ -162,19 +162,19 @@ export function usePassportListActions({
         context.textAlign = "center";
         context.fillStyle = isBlackAndWhite ? "#000000" : (format === "jpeg" ? "#0b1826" : "#f0f6fa");
         context.font = `700 ${categoryFontSize}px ${getComputedStyle(document.documentElement).getPropertyValue("--font").trim() || "sans-serif"}`;
-        context.fillText((passport.passport_type || activeType || "Passport").replace(/_/g, " "), widthPx / 2, topPadding + categoryFontSize);
+        context.fillText((passport.passportType || activeType || "Passport").replace(/_/g, " "), widthPx / 2, topPadding + categoryFontSize);
 
         context.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
 
         context.font = `600 ${guidFontSize}px monospace`;
         context.fillStyle = isBlackAndWhite ? "#000000" : (format === "jpeg" ? "#35586a" : "#b8ccd9");
-        context.fillText(passport.dppId || passport.dpp_id || "", widthPx / 2, heightPx - bottomPadding);
+        context.fillText(passport.dppId || "", widthPx / 2, heightPx - bottomPadding);
 
         const dataUrl = canvas.toDataURL(mimeType, format === "jpeg" ? 0.95 : undefined);
         const link = document.createElement("a");
-        const safeType = (passport.passport_type || activeType || "passport").replace(/[^a-z0-9-_]+/gi, "_").toLowerCase();
+        const safeType = (passport.passportType || activeType || "passport").replace(/[^a-z0-9-_]+/gi, "_").toLowerCase();
         link.href = dataUrl;
-        link.download = `${safeType}_${passport.dppId || passport.dpp_id || "passport"}.${format}`;
+        link.download = `${safeType}_${passport.dppId || "passport"}.${format}`;
         link.click();
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
@@ -191,7 +191,7 @@ export function usePassportListActions({
   const bulkRelease = useCallback(async () => {
     if (!selectedPassportList.length) return;
 
-    const editable = selectedPassportList.filter((passport) => isEditablePassportStatus(passport.release_status));
+    const editable = selectedPassportList.filter((passport) => isEditablePassportStatus(passport.releaseStatus));
     if (!editable.length) {
       showError("No draft or in-revision passports selected.");
       return;
@@ -200,7 +200,7 @@ export function usePassportListActions({
 
     setBulkActionLoading(true);
     try {
-      const items = editable.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || activeType }));
+      const items = editable.map((passport) => ({ dppId: passport.dppId, passportType: passport.passportType || activeType }));
       const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-release`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
@@ -232,7 +232,7 @@ export function usePassportListActions({
   const bulkDelete = useCallback(async () => {
     if (!selectedPassportList.length) return;
 
-    const editable = selectedPassportList.filter((passport) => isEditablePassportStatus(passport.release_status));
+    const editable = selectedPassportList.filter((passport) => isEditablePassportStatus(passport.releaseStatus));
     if (!editable.length) {
       showError("No deletable passports selected. Released passports cannot be deleted.");
       return;
@@ -245,7 +245,7 @@ export function usePassportListActions({
 
     try {
       for (const passport of editable) {
-        const passportType = passport.passport_type || activeType;
+        const passportType = passport.passportType || activeType;
         const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}`, {
           method: "DELETE",
           headers: authHeaders({ "Content-Type": "application/json" }),
@@ -273,7 +273,7 @@ export function usePassportListActions({
     setBulkActionLoading(true);
     try {
       const grouped = selectedPassportList.reduce((acc, passport) => {
-        const passportType = passport.passport_type || activeType;
+        const passportType = passport.passportType || activeType;
         if (!acc[passportType]) acc[passportType] = [];
         acc[passportType].push(passport);
         return acc;
@@ -294,8 +294,8 @@ export function usePassportListActions({
             passportType,
             representation: "full",
           });
-          if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
-            query.set("versionNumber", String(passport.version_number));
+          if (passport.versionNumber !== null && passport.versionNumber !== undefined && passport.versionNumber !== "") {
+            query.set("versionNumber", String(passport.versionNumber));
           }
           const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}?${query.toString()}`, {
             headers: authHeaders(),
@@ -364,7 +364,7 @@ export function usePassportListActions({
 
     try {
       setBulkActionLoading(true);
-      const items = selectedPassportList.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || activeType }));
+      const items = selectedPassportList.map((passport) => ({ dppId: passport.dppId, passportType: passport.passportType || activeType }));
       const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-archive`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),

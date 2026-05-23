@@ -16,7 +16,13 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
     fetchWithAuth(`${API}/api/companies/${companyId}/users`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((data) => {
-        setTeamUsers(data.filter((member) => (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id));
+        setTeamUsers(data
+          .filter((member) => (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id)
+          .map((member) => ({
+            ...member,
+            firstName: member.firstName || member.first_name || "",
+            lastName: member.lastName || member.last_name || "",
+          })));
       })
       .catch(() => {});
 
@@ -37,7 +43,7 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
     setSubmitting(true);
     setError("");
     try {
-      const items = selectedList.map((passport) => ({ dppId: passport.dppId, passportType: passport.passport_type || passport.passportType }));
+      const items = selectedList.map((passport) => ({ dppId: passport.dppId, passportType: passport.passportType }));
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-workflow`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
@@ -56,7 +62,7 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
     }
   };
 
-  const editableCount = selectedList.filter((passport) => isEditablePassportStatus(passport.release_status)).length;
+  const editableCount = selectedList.filter((passport) => isEditablePassportStatus(passport.releaseStatus)).length;
 
   return createPortal(
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -74,14 +80,14 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
             <label>Reviewer <span className="wf-opt">(optional if approver selected)</span></label>
             <select value={reviewerId} onChange={(e) => setReviewerId(e.target.value)} disabled={submitting}>
               <option value="">— Skip review —</option>
-              {teamUsers.map((member) => <option key={member.id} value={member.id}>{member.first_name} {member.last_name} — {member.role}</option>)}
+              {teamUsers.map((member) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName} — {member.role}</option>)}
             </select>
           </div>
           <div className="wf-select-group">
             <label>Approver <span className="wf-opt">(optional if reviewer selected)</span></label>
             <select value={approverId} onChange={(e) => setApproverId(e.target.value)} disabled={submitting}>
               <option value="">— Skip approval —</option>
-              {teamUsers.map((member) => <option key={member.id} value={member.id}>{member.first_name} {member.last_name} — {member.role}</option>)}
+              {teamUsers.map((member) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName} — {member.role}</option>)}
             </select>
           </div>
         </div>

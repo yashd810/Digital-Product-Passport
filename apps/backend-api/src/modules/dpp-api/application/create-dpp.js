@@ -13,6 +13,7 @@ function createDppUseCase(deps) {
     complianceService,
     SYSTEM_PASSPORT_FIELDS,
     getWritablePassportColumns,
+    joinQuotedSqlIdentifiers,
     toStoredPassportValue,
     extractCarrierAuthenticityMutation,
     applyCarrierAuthenticityMutation,
@@ -30,25 +31,22 @@ function createDppUseCase(deps) {
 
   return async function createDpp({ req }) {
     const normalizedBody = normalizePassportRequestBody ? normalizePassportRequestBody(req.body) : req.body || {};
-    const submittedCompanyId = normalizedBody.companyId ?? normalizedBody.company_id;
+    const submittedCompanyId = normalizedBody.companyId;
     const companyId = req.user.role === "super_admin"
       ? Number.parseInt(submittedCompanyId, 10)
       : Number.parseInt(req.user.companyId, 10);
     if (!Number.isFinite(companyId)) throw Object.assign(new Error("A valid companyId is required"), { statusCode: 400 });
 
-    const requestedPassportType = normalizedBody.passport_type || normalizedBody.passportType;
+    const requestedPassportType = normalizedBody.passportType;
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
 
     const internalAliasIdInput = normalizeInternalAliasIdValue(
-      normalizedBody.internal_alias_id || normalizedBody.internalAliasId || normalizedBody.internalAliasId || normalizedBody.productIdentifier
+      normalizedBody.internalAliasId || normalizedBody.productIdentifier
     );
     if (!internalAliasIdInput) throw Object.assign(new Error("internalAliasId is required"), { statusCode: 400 });
 
-    const explicitUniqueProductIdentifier = normalizedBody.product_identifier_did
-      || normalizedBody.uniqueProductIdentifier
-      || normalizedBody.unique_product_identifier
-      || null;
+    const explicitUniqueProductIdentifier = normalizedBody.uniqueProductIdentifier || null;
     if (explicitUniqueProductIdentifier && !usesConfiguredGlobalProductIdentifierScheme(explicitUniqueProductIdentifier)) {
       throw Object.assign(new Error("uniqueProductIdentifier must use the configured global DID-based identifier scheme"), { statusCode: 400 });
     }
@@ -86,34 +84,19 @@ function createDppUseCase(deps) {
     }
 
     const {
-      passport_type,
-      passportType,
       representation: requestedRepresentation,
       companyId: ignoredCompanyId,
-      company_id,
-      internal_alias_id,
-      product_identifier_did,
-      internalAliasId,
-      productIdentifier,
-      model_name,
       modelName,
       granularity,
-      compliance_profile_key,
-      content_specification_ids,
-      carrier_policy_key,
-      carrier_authenticity,
-      economic_operator_id,
-      facility_id,
+      complianceProfileKey,
+      contentSpecificationIds,
+      carrierPolicyKey,
+      carrierAuthenticity,
+      economicOperatorId,
+      facilityId,
       ...fields
     } = normalizedBody;
-    void passport_type;
-    void passportType;
     void ignoredCompanyId;
-    void company_id;
-    void internal_alias_id;
-    void product_identifier_did;
-    void internalAliasId;
-    void productIdentifier;
     void granularity;
 
     const invalidFieldKeys = Object.keys(fields).filter((key) =>
@@ -132,20 +115,20 @@ function createDppUseCase(deps) {
       granularity: requestedGranularity,
       requestedFields: {
         ...fields,
-        compliance_profile_key,
-        content_specification_ids,
-        carrier_policy_key,
-        economic_operator_id,
-        facility_id,
+        complianceProfileKey,
+        contentSpecificationIds,
+        carrierPolicyKey,
+        economicOperatorId,
+        facilityId,
       },
     });
     const dataFields = getWritablePassportColumns(fields).filter((key) => typeSchema.allowedKeys.has(key));
     const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
     const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
       ...normalizedBody,
-      carrier_authenticity,
+      carrierAuthenticity,
     });
-    const carrierAuthenticity = applyCarrierAuthenticityMutation(null, carrierAuthenticityMutation);
+    const nextCarrierAuthenticity = applyCarrierAuthenticityMutation(null, carrierAuthenticityMutation);
     const allColumns = [
       "dppId",
       "lineage_id",
@@ -167,13 +150,13 @@ function createDppUseCase(deps) {
       dppId,
       lineageId,
       companyId,
-      model_name || modelName || null,
+      modelName || null,
       storedProductIdentifiers.internalAliasIdInput,
       storedProductIdentifiers.productIdentifierDid,
       complianceManagedFields.compliance_profile_key,
       complianceManagedFields.content_specification_ids,
       complianceManagedFields.carrier_policy_key,
-      carrierAuthenticity ? JSON.stringify(carrierAuthenticity) : null,
+      nextCarrierAuthenticity ? JSON.stringify(nextCarrierAuthenticity) : null,
       complianceManagedFields.economic_operator_id,
       complianceManagedFields.facility_id,
       requestedGranularity,
@@ -183,7 +166,7 @@ function createDppUseCase(deps) {
     const placeholders = allColumns.map((_, index) => `$${index + 1}`).join(", ");
 
     const insertResult = await pool.query(
-      `INSERT INTO ${tableName} (${allColumns.join(", ")})
+      `INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allColumns)})
        VALUES (${placeholders})
        RETURNING *`,
       allValues
@@ -197,7 +180,7 @@ function createDppUseCase(deps) {
 
     const createdPassport = {
       ...normalizePassportRow(insertResult.rows[0]),
-      passport_type: resolvedPassportType,
+      passportType: resolvedPassportType,
     };
     const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
     const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";

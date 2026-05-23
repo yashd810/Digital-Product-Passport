@@ -1,84 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
+import {
+  alignRecordToSchemaKeys,
+  buildSchemaFieldAliasMap,
+  extractFieldValuesFromElements,
+} from "../../../../shared/passports/schemaKeyUtils";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
 
 const API = import.meta.env.VITE_API_URL || "";
-
-function normalizeSchemaAlias(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-
-function getSchemaFieldDescriptors(sections) {
-  return (sections || [])
-    .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
-    .filter((field) => field?.key)
-    .map((field) => ({
-      key: field.key,
-      aliases: [
-        field.key,
-        field.elementId,
-        field.element_id,
-        field.semanticId,
-        field.semantic_id,
-      ].filter(Boolean),
-    }));
-}
-
-function buildSchemaAliasMap(sections) {
-  const aliasToKey = new Map();
-  for (const field of getSchemaFieldDescriptors(sections)) {
-    for (const alias of field.aliases) {
-      aliasToKey.set(normalizeSchemaAlias(alias), field.key);
-    }
-  }
-  return aliasToKey;
-}
-
-function alignRecordToSchemaKeys(record, sections) {
-  if (!record || typeof record !== "object") return record || {};
-  const aligned = { ...record };
-  const aliasToKey = buildSchemaAliasMap(sections);
-
-  for (const [rawKey, value] of Object.entries(record)) {
-    const canonicalKey = aliasToKey.get(normalizeSchemaAlias(rawKey));
-    if (canonicalKey && aligned[canonicalKey] === undefined) {
-      aligned[canonicalKey] = value;
-    }
-  }
-
-  return aligned;
-}
-
-function extractFieldValuesFromElements(elements, aliasToKey = new Map(), values = {}) {
-  if (!Array.isArray(elements)) return values;
-  for (const element of elements) {
-    if (!element || typeof element !== "object") continue;
-    const candidateAliases = [
-      element.elementId,
-      element.element_id,
-      element.dictionaryReference,
-    ].filter((entry) => typeof entry === "string" && entry.trim());
-    const canonicalKey = candidateAliases
-      .map((alias) => aliasToKey.get(normalizeSchemaAlias(alias)))
-      .find(Boolean);
-    const rawElementId = typeof element.elementId === "string" ? element.elementId.trim() : "";
-    const targetKey = canonicalKey || rawElementId;
-
-    if (Array.isArray(element.elements) && element.elements.length) {
-      extractFieldValuesFromElements(element.elements, aliasToKey, values);
-    }
-
-    if (!targetKey) continue;
-    if (element.value !== undefined) {
-      values[targetKey] = element.value;
-    }
-  }
-  return values;
-}
 
 function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
   const rawFields = rawRecord?.fields && typeof rawRecord.fields === "object" ? rawRecord.fields : {};
@@ -108,7 +38,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   const [error, setError] = useState("");
   const formatLabel = format === "jsonld" ? "JSON-LD" : format.toUpperCase();
 
-  const selectedList = passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${passport.version_number}`));
+  const selectedList = passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${passport.versionNumber}`));
 
   const scopePassports = {
     selected: selectedList,
@@ -137,7 +67,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   };
 
   const loadFullPassportPayload = async (type, passport) => {
-    const targetCompanyId = passport.company_id || companyId;
+    const targetCompanyId = passport.companyId || companyId;
     if (!targetCompanyId) {
       throw new Error("A company identifier is required for export.");
     }
@@ -146,8 +76,8 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
       passportType: type,
       representation: "full",
     });
-    if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
-      query.set("versionNumber", String(passport.version_number));
+    if (passport.versionNumber !== null && passport.versionNumber !== undefined && passport.versionNumber !== "") {
+      query.set("versionNumber", String(passport.versionNumber));
     }
     const [rawResponse, fullResponse] = await Promise.all([
       fetchWithAuth(baseUrl, { headers: authHeaders() }),
@@ -166,7 +96,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     const data = await loadTypeSchema(type);
     const sections = data.fields_json?.sections || [];
     const allFields = sections.flatMap((section) => section.fields || []);
-    const aliasToKey = buildSchemaAliasMap(sections);
+    const aliasToKey = buildSchemaFieldAliasMap(sections);
     const normalizedRecords = await Promise.all(list.map(async (passport) => {
       const payload = await loadFullPassportPayload(type, passport);
       const flattened = {
@@ -177,10 +107,10 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
       return alignRecordToSchemaKeys(flattened, sections);
     }));
     const rows = [
-      ["Field Name", ...normalizedRecords.map((passport) => passport.model_name || passport.internal_alias_id || passport.dppId || "")],
-      ["dppId", ...normalizedRecords.map((passport) => passport.dppId || passport.dpp_id || "")],
-      ["model_name", ...normalizedRecords.map((passport) => passport.model_name || "")],
-      ["internal_alias_id", ...normalizedRecords.map((passport) => passport.internal_alias_id || "")],
+      ["Field Name", ...normalizedRecords.map((passport) => passport.modelName || passport.internalAliasId || passport.dppId || "")],
+      ["dppId", ...normalizedRecords.map((passport) => passport.dppId || "")],
+      ["modelName", ...normalizedRecords.map((passport) => passport.modelName || "")],
+      ["internalAliasId", ...normalizedRecords.map((passport) => passport.internalAliasId || "")],
       ...allFields
         .filter((field) => field.type !== "table")
         .map((field) => [
@@ -227,7 +157,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     setError("");
     try {
       const grouped = exportList.reduce((acc, passport) => {
-        const type = passport.passport_type || activeType;
+        const type = passport.passportType || activeType;
         if (!acc[type]) acc[type] = [];
         acc[type].push(passport);
         return acc;

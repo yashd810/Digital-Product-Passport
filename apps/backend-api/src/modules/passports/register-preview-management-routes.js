@@ -34,13 +34,13 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
 
       const sourcePassport = resolved.passport;
-      const resolvedCompanyId = sourcePassport.company_id ?? sourcePassport.companyId ?? companyId ?? null;
+      const resolvedCompanyId = sourcePassport.companyId ?? companyId ?? null;
       const typeDefResult = await pool.query(
         `SELECT id, type_name, display_name, product_category, product_icon, fields_json
          FROM passport_types
          WHERE type_name = $1
          LIMIT 1`,
-        [sourcePassport.passport_type]
+        [sourcePassport.passportType]
       );
       const typeDef = typeDefResult.rows[0] || null;
       const normalizedPassport = normalizePassportRow(sourcePassport, typeDef);
@@ -71,14 +71,14 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         company: company || (companyName ? { company_name: companyName } : null),
         companyName,
         granularity: sourcePassport.granularity || "item",
-        passportType: sourcePassport.passport_type,
+        passportType: sourcePassport.passportType,
         didService,
         productIdentifierService,
       });
 
       res.json({
         ...passport,
-        digitalProductPassportId: canonicalPayload?.digitalProductPassportId || passport.dppId || passport.dpp_id || null,
+        digitalProductPassportId: canonicalPayload?.digitalProductPassportId || passport.dppId || null,
         uniqueProductIdentifier: canonicalPayload?.uniqueProductIdentifier || canonicalIdentity.uniqueProductIdentifier || null,
         subjectDid: canonicalPayload?.subjectDid || canonicalIdentity.subjectDid || null,
         dppDid: canonicalPayload?.dppDid || canonicalIdentity.dppDid || null,
@@ -95,29 +95,29 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
             companyDid: canonicalPayload?.companyDid || canonicalIdentity.companyDid || null,
           },
         } : undefined,
-        preview_mode: true,
-        preview_path: buildPreviewPassportPath({
+        previewMode: true,
+        previewPath: buildPreviewPassportPath({
           companyName,
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
-          modelName: passport.model_name,
-          internalAliasId: passport.internal_alias_id,
-          fallbackGuid: passport.dppId,
+          modelName: passport.modelName,
+          internalAliasId: passport.internalAliasId,
+          fallbackDppId: passport.dppId,
         }),
-        public_path: buildCurrentPublicPassportPath({
+        publicPath: buildCurrentPublicPassportPath({
           companyName,
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
-          modelName: passport.model_name,
-          internalAliasId: passport.internal_alias_id,
+          modelName: passport.modelName,
+          internalAliasId: passport.internalAliasId,
         }),
-        inactive_path: buildInactivePublicPassportPath({
+        inactivePath: buildInactivePublicPassportPath({
           companyName,
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
-          modelName: passport.model_name,
-          internalAliasId: passport.internal_alias_id,
-          versionNumber: passport.version_number,
+          modelName: passport.modelName,
+          internalAliasId: passport.internalAliasId,
+          versionNumber: passport.versionNumber,
         }),
       });
     } catch (error) {

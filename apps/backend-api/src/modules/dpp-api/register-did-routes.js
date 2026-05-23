@@ -279,23 +279,23 @@ module.exports = function registerDidRoutes(app, deps) {
       if (!r.rows.length) return res.status(404).json({ error: "Passport record not found" });
 
       const passport = normalizePassportRow(r.rows[0]);
-      passport.passport_type = passport_type;
+      passport.passportType = passport_type;
 
       const companyNameMap = await getCompanyNameMap([company_id]);
       const companyName = companyNameMap.get(String(company_id)) || "";
 
       const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
-      const productDid = businessIdentifier ? (passport.product_identifier_did || null) : null;
-      const pDppDid = passport.internal_alias_id ?
-        dppIdentity.dppDid("model", company_id, passport.internal_alias_id) :
+      const productDid = businessIdentifier ? (passport.productIdentifierDid || passport.product_identifier_did || null) : null;
+      const pDppDid = passport.internalAliasId ?
+        dppIdentity.dppDid("model", company_id, passport.internalAliasId) :
         null;
 
       res.json({
         publicUrl,
-        internalAliasId: passport.internal_alias_id || null,
-        productIdentifierDid: businessIdentifier ? (passport.product_identifier_did || null) : null,
-        modelName: passport.model_name || null,
+        internalAliasId: passport.internalAliasId || null,
+        productIdentifierDid: businessIdentifier ? (passport.productIdentifierDid || passport.product_identifier_did || null) : null,
+        modelName: passport.modelName || null,
         companyName,
         dppDid: pDppDid,
         productDid

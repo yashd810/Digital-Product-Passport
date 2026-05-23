@@ -1,5 +1,7 @@
 "use strict";
 
+const { joinQuotedSqlIdentifiers } = require("../../shared/passports/passport-helpers");
+
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
 
 module.exports = function registerLifecycleRoutes(app, deps) {
@@ -296,7 +298,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const allCols = ["dpp_id", "lineage_id", ...cols];
       const allVals = [newGuid, src.lineage_id, ...vals];
       const places = allCols.map((_, index) => `$${index + 1}`).join(", ");
-      const insertRes = await pool.query(`INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places}) RETURNING *`, allVals);
+      const insertRes = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`, allVals);
 
       const sourceRegistry = await pool.query(
         `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
@@ -414,7 +416,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const allCols = ["dpp_id", "lineage_id", ...cols];
       const allVals = [newGuid, src.lineage_id, ...vals];
       const places = allCols.map((_, index) => `$${index + 1}`).join(", ");
-      const insertRes = await pool.query(`INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places}) RETURNING *`, allVals);
+      const insertRes = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`, allVals);
 
       const sourceRegistry = await pool.query(
         `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,

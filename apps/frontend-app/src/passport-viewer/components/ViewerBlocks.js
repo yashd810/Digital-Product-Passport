@@ -128,7 +128,7 @@ export function TrustedEntryPanel({
         <div className="trusted-entry-card">
           <span className="trusted-entry-label">Counterfeit risk</span>
           <strong>{carrierAuthenticity?.counterfeitRiskLevel || "medium"}</strong>
-          <p className="trusted-entry-copy">Digital Passport ID: {passport?.dppId || passport?.dpp_id || "—"}</p>
+          <p className="trusted-entry-copy">Digital Passport ID: {passport?.dppId || "—"}</p>
         </div>
         <div className="trusted-entry-card">
           <span className="trusted-entry-label">Protected verification</span>
@@ -254,12 +254,11 @@ function buildViewerDidFallbacks(passport) {
   const companyName = passport?.company_profile?.company_name
     || passport?.companyName
     || passport?.company_name
-    || passport?.company_id
     || passport?.companyId
     || "company";
   const companySlug = slugifyDidSegment(passport?.company_profile?.did_slug || companyName);
   const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
-  const stableId = stableDidSegment(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.internal_alias_id);
+  const stableId = stableDidSegment(passport?.lineageId || passport?.dppId || passport?.internalAliasId);
   return {
     companyDid: `did:web:${didDomain}:did:company:${companySlug}`,
     dppDid: `did:web:${didDomain}:did:dpp:${granularity}:${stableId}`,
@@ -290,21 +289,21 @@ export function PassportHeaderPanel({ passport, typeDef }) {
     : [];
   const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport);
-  const resolvedCompanyDid = passport.companyDid || passport.company_did || canonicalSubjects.companyDid || fallbackDids.companyDid;
-  const resolvedFacilityDid = passport.facilityDid || passport.facility_did || canonicalSubjects.facilityDid || null;
-  const resolvedSubjectDid = passport.subjectDid || passport.subject_did || canonicalSubjects.subjectDid || passport.product_identifier_did || null;
-  const resolvedDppDid = passport.dppDid || passport.dpp_did || canonicalSubjects.dppDid || fallbackDids.dppDid;
+  const resolvedCompanyDid = passport.companyDid || canonicalSubjects.companyDid || fallbackDids.companyDid;
+  const resolvedFacilityDid = passport.facilityDid || canonicalSubjects.facilityDid || null;
+  const resolvedSubjectDid = passport.subjectDid || canonicalSubjects.subjectDid || passport.uniqueProductIdentifier || null;
+  const resolvedDppDid = passport.dppDid || canonicalSubjects.dppDid || fallbackDids.dppDid;
   const headerValues = {
-    digitalProductPassportId: passport.digitalProductPassportId || passport.dppId || passport.dpp_id,
-    uniqueProductIdentifier: passport.uniqueProductIdentifier || passport.product_identifier_did || null,
-    internalAliasId: passport.internal_alias_id,
+    digitalProductPassportId: passport.digitalProductPassportId || passport.dppId,
+    uniqueProductIdentifier: passport.uniqueProductIdentifier || null,
+    internalAliasId: passport.internalAliasId,
     granularity: passport.granularity || "item",
-    dppSchemaVersion: passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
-    dppStatus: formatPassportStatus(passport.release_status),
-    lastUpdate: formatIsoDate(passport.updated_at || passport.created_at) || null,
-    economicOperatorId: resolvedCompanyDid || passport.economicOperatorId || passport.economic_operator_id,
-    facilityId: resolvedFacilityDid || passport.facilityId || passport.facility_id,
-    contentSpecificationIds: parseHeaderArray(passport.content_specification_ids || passport.compliance_profile_key || typeDef?.semantic_model_key),
+    dppSchemaVersion: passport.dppSchemaVersion || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
+    dppStatus: formatPassportStatus(passport.releaseStatus),
+    lastUpdate: formatIsoDate(passport.updatedAt || passport.createdAt) || null,
+    economicOperatorId: resolvedCompanyDid || passport.economicOperatorId,
+    facilityId: resolvedFacilityDid || passport.facilityId,
+    contentSpecificationIds: parseHeaderArray(passport.contentSpecificationIds || passport.complianceProfileKey || typeDef?.semantic_model_key),
     subjectDid: resolvedSubjectDid,
     dppDid: resolvedDppDid,
     companyDid: resolvedCompanyDid,
@@ -361,7 +360,6 @@ export function PassportIntro({
     "—";
   const uniqueBatteryIdentifier =
     passport.uniqueProductIdentifier ||
-    passport.product_identifier_did ||
     passport.unique_battery_identifier ||
     passport.battery_identifier ||
     "—";
@@ -371,12 +369,9 @@ export function PassportIntro({
     passport.weight ||
     "—";
   const serialNumber =
-    passport.serial_number ||
-    passport.product_serial_number ||
-    passport.serial ||
     passport.batterySerialNumber ||
-    passport.battery_serial_number ||
     passport.productSerialNumber ||
+    passport.serialNumber ||
     "—";
   const manufacturerInfo =
     companyData?.company_name ||
@@ -395,7 +390,7 @@ export function PassportIntro({
     passport.chemistry ||
     "—";
   const summaryStats = [
-    { label: "Digital Passport ID", value: passport.dppId || passport.dpp_id || "—" },
+    { label: "Digital Passport ID", value: passport.dppId || "—" },
     { label: "Manufacturing Date", value: manufacturingDate },
     { label: "Unique Battery Identifier", value: uniqueBatteryIdentifier },
     { label: "Serial Number", value: serialNumber },
@@ -410,8 +405,8 @@ export function PassportIntro({
       <div className="pv-hero-main">
         <div className="pv-hero-brandline">
           <div>
-            <p className="pv-hero-kicker">{displayName || passport.passport_type}</p>
-            <h1>{passport.model_name}</h1>
+            <p className="pv-hero-kicker">{displayName || passport.passportType}</p>
+            <h1>{passport.modelName}</h1>
           </div>
         </div>
 
@@ -592,7 +587,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     } else if (f.type === "boolean") {
       display = <div className="pv-field-value-strong">{translateFieldValue(lang, !!raw, "boolean")}</div>;
     } else if (f.type === "file" && isFileUrl(raw)) {
-      display = <FileCell url={raw} label={`${passport.model_name}_${f.key}`} onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(f.key, raw) : null} />;
+      display = <FileCell url={raw} label={`${passport.modelName}_${f.key}`} onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(f.key, raw) : null} />;
     } else if (f.type === "table") {
       const { columns: storedColumns, rows: tableData } = parseStoredTableValue(raw);
       if (Array.isArray(tableData) && tableData.length > 0) {
@@ -974,19 +969,19 @@ export function EmptySectionsState() {
 // ─── Print view ───────────────────────────────────────────────
 export function PrintView({ passport, companyData, sections }) {
   const isFileUrl = v => typeof v === "string" && v.startsWith("http");
-  const statusLabel = formatPassportStatus(passport.release_status);
+  const statusLabel = formatPassportStatus(passport.releaseStatus);
   return (
     <div className="print-view">
       <div className="print-header">
         <div className="print-header-left">
         </div>
         <div className="print-header-right">
-          <h1 className="print-model-name">{passport.model_name}</h1>
+          <h1 className="print-model-name">{passport.modelName}</h1>
           <div className="print-meta">
-            <span><strong>Type:</strong> {passport.passport_type}</span>
-            <span><strong>Version:</strong> v{passport.version_number}</span>
+            <span><strong>Type:</strong> {passport.passportType}</span>
+            <span><strong>Version:</strong> v{passport.versionNumber}</span>
             <span><strong>Status:</strong> {statusLabel}</span>
-            {(passport.dppId || passport.dpp_id) && <span><strong>Digital Passport ID:</strong> {passport.dppId || passport.dpp_id}</span>}
+            {passport.dppId && <span><strong>Digital Passport ID:</strong> {passport.dppId}</span>}
           </div>
         </div>
       </div>

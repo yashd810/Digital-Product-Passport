@@ -93,12 +93,11 @@ function buildViewerDidFallbacks(passport, companyData) {
     || passport?.company_profile?.company_name
     || passport?.companyName
     || passport?.company_name
-    || passport?.company_id
     || passport?.companyId
     || "company";
   const companySlug = slugifyDidSegment(companyData?.did_slug || passport?.company_profile?.did_slug || companyName);
   const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
-  const stableId = stableDidSegment(passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.internal_alias_id);
+  const stableId = stableDidSegment(passport?.lineageId || passport?.dppId || passport?.internalAliasId);
   return {
     companyDid: `did:web:${didDomain}:did:company:${companySlug}`,
     dppDid: `did:web:${didDomain}:did:dpp:${granularity}:${stableId}`,
@@ -215,7 +214,7 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues,
     unlockedPassport,
     dynamicValues
   );
-  const updatedAt = lastUpdateAt || passport?.updated_at || passport?.created_at || "";
+  const updatedAt = lastUpdateAt || passport?.updatedAt || passport?.createdAt || "";
   const serviceContextText = serviceContext
     ? (() => {
         const contextLabel = normalizeText(serviceContext.field?.label || serviceContext.field?.key || "");
@@ -251,23 +250,23 @@ function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
   const canonicalSubjects = passport?.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport, companyData);
-  const resolvedCompanyDid = passport?.companyDid || passport?.company_did || canonicalSubjects.companyDid || fallbackDids.companyDid;
-  const resolvedFacilityDid = passport?.facilityDid || passport?.facility_did || canonicalSubjects.facilityDid || null;
-  const resolvedSubjectDid = passport?.subjectDid || passport?.subject_did || canonicalSubjects.subjectDid || passport?.product_identifier_did || null;
-  const resolvedDppDid = passport?.dppDid || passport?.dpp_did || canonicalSubjects.dppDid || fallbackDids.dppDid;
+  const resolvedCompanyDid = passport?.companyDid || canonicalSubjects.companyDid || fallbackDids.companyDid;
+  const resolvedFacilityDid = passport?.facilityDid || canonicalSubjects.facilityDid || null;
+  const resolvedSubjectDid = passport?.subjectDid || canonicalSubjects.subjectDid || passport?.uniqueProductIdentifier || null;
+  const resolvedDppDid = passport?.dppDid || canonicalSubjects.dppDid || fallbackDids.dppDid;
   const values = {
-    digitalProductPassportId: passport?.digitalProductPassportId || passport?.dppId || passport?.dpp_id,
-    uniqueProductIdentifier: passport?.uniqueProductIdentifier || passport?.product_identifier_did || null,
-    internalAliasId: passport?.internal_alias_id,
+    digitalProductPassportId: passport?.digitalProductPassportId || passport?.dppId,
+    uniqueProductIdentifier: passport?.uniqueProductIdentifier || null,
+    internalAliasId: passport?.internalAliasId,
     granularity: passport?.granularity || "item",
-    dppSchemaVersion: passport?.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
-    dppStatus: formatPassportStatus(passport?.release_status),
-    lastUpdate: formatIsoDate(lastUpdateAt || passport?.updated_at || passport?.created_at) || null,
-    economicOperatorId: resolvedCompanyDid || passport?.economicOperatorId || passport?.economic_operator_id,
-    facilityId: resolvedFacilityDid || passport?.facilityId || passport?.facility_id,
-    contentSpecificationIds: Array.isArray(passport?.content_specification_ids)
-      ? passport.content_specification_ids.join(", ")
-      : passport?.content_specification_ids || passport?.compliance_profile_key || typeDef?.semantic_model_key,
+    dppSchemaVersion: passport?.dppSchemaVersion || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
+    dppStatus: formatPassportStatus(passport?.releaseStatus),
+    lastUpdate: formatIsoDate(lastUpdateAt || passport?.updatedAt || passport?.createdAt) || null,
+    economicOperatorId: resolvedCompanyDid || passport?.economicOperatorId,
+    facilityId: resolvedFacilityDid || passport?.facilityId,
+    contentSpecificationIds: Array.isArray(passport?.contentSpecificationIds)
+      ? passport.contentSpecificationIds.join(", ")
+      : passport?.contentSpecificationIds || passport?.complianceProfileKey || typeDef?.semantic_model_key,
     subjectDid: resolvedSubjectDid,
     dppDid: resolvedDppDid,
     companyDid: resolvedCompanyDid,
@@ -593,7 +592,7 @@ export default function PublicPassportPortal({
   }, [activePage]);
 
   const modelEntry = findFieldEntry(fields, ["model name", "product name"], passport, unlockedPassport, dynamicValues);
-  const displayModelName = passport?.model_name || (modelEntry ? formatValue(modelEntry.raw) : "");
+  const displayModelName = passport?.modelName || (modelEntry ? formatValue(modelEntry.raw) : "");
   const capacityEntry = findFieldEntry(fields, ["rated capacity", "capacity", "usable battery energy", "certified usable battery energy"], passport, unlockedPassport, dynamicValues);
   const categoryEntry = findFieldEntry(fields, ["battery category", "product category", "category"], passport, unlockedPassport, dynamicValues);
   const productImageEntry = findFieldEntry(
@@ -603,10 +602,10 @@ export default function PublicPassportPortal({
     unlockedPassport,
     dynamicValues,
     (raw) => isImageLikeUrl(raw) || isUrlLike(raw)
-  ) || (passport?.product_image
+  ) || (passport?.productImage
     ? {
-        raw: passport.product_image,
-        field: { key: "product_image", label: "Product image", type: "image" },
+        raw: passport.productImage,
+        field: { key: "productImage", label: "Product image", type: "image" },
       }
     : null);
   const overviewSymbols = fields
@@ -632,12 +631,12 @@ export default function PublicPassportPortal({
     { key: "documents", label: "Documents" },
   ];
 
-  const currentStatus = formatPassportStatus(passport?.release_status || "");
+  const currentStatus = formatPassportStatus(passport?.releaseStatus || "");
   const heroMetrics = [
     ["Manufacturer", companyData?.company_name || passport?.manufacturer || passport?.manufactured_by || ""],
-    ["Serial number", passport?.serial_number || passport?.product_serial_number || passport?.serial || passport?.batterySerialNumber || passport?.battery_serial_number || passport?.productSerialNumber || ""],
+    ["Serial number", passport?.batterySerialNumber || passport?.serialNumber || passport?.productSerialNumber || ""],
     ["Status", currentStatus || ""],
-    ["Last update", formatIsoDate(lastUpdateAt || passport?.updated_at || passport?.created_at)],
+    ["Last update", formatIsoDate(lastUpdateAt || passport?.updatedAt || passport?.createdAt)],
   ];
 
   return (
@@ -672,7 +671,7 @@ export default function PublicPassportPortal({
       <header className="hero" id="portal-top">
         <div className="hero-main">
           <div>
-            <div className="kicker">{typeDef?.display_name || passport?.passport_type || "Battery product passport"}</div>
+            <div className="kicker">{typeDef?.display_name || passport?.passportType || "Battery product passport"}</div>
             <h1>{displayModelName}</h1>
             {(isPreviewMode || isInactiveView || isObsolete || unlockedPassport) && (
               <div className="hero-badge-row">

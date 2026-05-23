@@ -40,30 +40,30 @@ function registerPublicApiV1Routes(app, deps) {
 
       let q = `
         WITH latest AS (
-          SELECT DISTINCT ON (lineage_id) *
+          SELECT DISTINCT ON ("lineageId") *
           FROM ${tableName}
-          WHERE deleted_at IS NULL AND company_id = $1
-          ORDER BY lineage_id, version_number DESC, updated_at DESC
+          WHERE "deletedAt" IS NULL AND "companyId" = $1
+          ORDER BY "lineageId", "versionNumber" DESC, "updatedAt" DESC
         )
         SELECT * FROM latest WHERE 1=1
       `;
       const params = [companyId];
       let i = 2;
       if (status) {
-        q += ` AND release_status = $${i++}`;
+        q += ` AND "releaseStatus" = $${i++}`;
         params.push(status);
       }
       if (search) {
-        q += ` AND (model_name ILIKE $${i} OR internal_alias_id ILIKE $${i} OR product_identifier_did ILIKE $${i})`;
+        q += ` AND ("modelName" ILIKE $${i} OR "internalAliasId" ILIKE $${i} OR "uniqueProductIdentifier" ILIKE $${i})`;
         params.push(`%${search}%`);
         i++;
       }
-      q += ` ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i++}`;
+      q += ` ORDER BY "createdAt" DESC LIMIT $${i++} OFFSET $${i++}`;
       params.push(cap, off);
 
       const r = await pool.query(q, params);
       res.json({
-        passport_type: type,
+        passportType: type,
         count: r.rows.length,
         limit: cap,
         offset: off,
@@ -71,7 +71,7 @@ function registerPublicApiV1Routes(app, deps) {
         access_mode: req.apiKey.accessMode || "read",
         max_confidentiality: req.apiKey.maxConfidentiality || "regulated",
         passports: r.rows.map((row) => {
-          const normalized = { ...normalizePassportRow(row, typeSchema), passport_type: typeSchema.typeName };
+          const normalized = { ...normalizePassportRow(row, typeSchema), passportType: typeSchema.typeName };
           return sanitizePassportForApiKey(normalized, typeSchema, req.apiKey);
         }),
       });
@@ -97,11 +97,11 @@ function registerPublicApiV1Routes(app, deps) {
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(passportType);
       const r = await pool.query(
-        `SELECT * FROM ${tableName} WHERE dpp_id = $1 AND deleted_at IS NULL LIMIT 1`,
+        `SELECT * FROM ${tableName} WHERE "dppId" = $1 AND "deletedAt" IS NULL LIMIT 1`,
         [dppId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-      const normalized = { ...normalizePassportRow(r.rows[0], typeSchema), passport_type: passportType };
+      const normalized = { ...normalizePassportRow(r.rows[0], typeSchema), passportType };
       res.json(sanitizePassportForApiKey(normalized, typeSchema, req.apiKey));
     } catch (e) {
       logger.error("API v1 get error:", e.message);
@@ -115,10 +115,9 @@ function registerPublicApiV1Routes(app, deps) {
       if (!dppId) return res.status(400).json({ error: "dppId is required" });
 
       const normalizedBody = normalizePassportRequestBody(req.body);
-      const { passport_type, passportType, carrier_authenticity, granularity, ...fields } = normalizedBody;
-      void passport_type;
+      const { passportType, carrierAuthenticity, granularity, ...fields } = normalizedBody;
       void passportType;
-      void carrier_authenticity;
+      void carrierAuthenticity;
       void granularity;
 
       const companyId = req.apiKey.companyId;
@@ -134,7 +133,7 @@ function registerPublicApiV1Routes(app, deps) {
       const tableName = getTable(resolvedPassportType);
       const current = await pool.query(
         `SELECT * FROM ${tableName}
-         WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+         WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
          LIMIT 1`,
         [dppId]
       );
@@ -220,13 +219,13 @@ function registerPublicApiV1Routes(app, deps) {
       );
 
       const responsePassport = sanitizePassportForApiKey(
-        { ...normalizePassportRow(updateResult.updatedRow || { ...current.rows[0], ...fields }, typeSchema), passport_type: resolvedPassportType },
+        { ...normalizePassportRow(updateResult.updatedRow || { ...current.rows[0], ...fields }, typeSchema), passportType: resolvedPassportType },
         typeSchema,
         req.apiKey
       );
       res.json({
         success: true,
-        updated_fields: updateFields,
+        updatedFields: updateFields,
         passport: responsePassport,
       });
     } catch (e) {

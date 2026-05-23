@@ -25,7 +25,7 @@ export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
-          passport_type: passportType,
+          passportType,
           passports: Array.from({ length: parsedCount }, () => ({})),
         }),
       });

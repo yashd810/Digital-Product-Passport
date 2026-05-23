@@ -1,13 +1,16 @@
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
 import "./BatteryDictionaryBrowserPage.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-function buildDictionaryBasePath(pathname) {
+function buildDictionaryBasePath(pathname, companySlug = "") {
   if (pathname.startsWith("/admin/")) return "/admin/dictionary/battery/v1";
-  if (pathname.startsWith("/dashboard/")) return "/dashboard/dictionary/battery/v1";
+  if (pathname.startsWith("/dashboard/")) {
+    return buildDashboardPath({ companySlug, subpath: "dictionary/battery/v1" });
+  }
   return "/dictionary/battery/v1";
 }
 
@@ -235,9 +238,12 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath }) 
 }
 
 export default function BatteryDictionaryBrowserPage() {
-  const { slug } = useParams();
+  const { companySlug, slug } = useParams();
   const location = useLocation();
-  const basePath = useMemo(() => buildDictionaryBasePath(location.pathname), [location.pathname]);
+  const basePath = useMemo(
+    () => buildDictionaryBasePath(location.pathname, companySlug),
+    [companySlug, location.pathname]
+  );
   const isDetailView = Boolean(slug);
 
   const [terms, setTerms] = useState([]);

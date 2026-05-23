@@ -28,6 +28,8 @@ export function BulkReviseModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const getPassportType = (passport) => passport?.passportType || activeType || "";
+  const getVersionNumber = (passport) => passport?.versionNumber;
 
   useEffect(() => {
     fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
@@ -38,7 +40,11 @@ export function BulkReviseModal({
         const eligible = (Array.isArray(data) ? data : []).filter((member) =>
           (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id
         );
-        setTeamUsers(eligible);
+        setTeamUsers(eligible.map((member) => ({
+          ...member,
+          firstName: member.firstName || member.first_name || "",
+          lastName: member.lastName || member.last_name || "",
+        })));
       })
       .catch(() => {});
 
@@ -52,7 +58,7 @@ export function BulkReviseModal({
   }, [companyId, user?.id]);
 
   const selectedSourcePassports = useMemo(
-    () => passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${passport.version_number}`)),
+    () => passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${getVersionNumber(passport)}`)),
     [passports, selectedPassports]
   );
 
@@ -76,7 +82,7 @@ export function BulkReviseModal({
 
   const scopedPassports = scopePassports[scope] || [];
   const availableTypes = useMemo(
-    () => [...new Set(scopedPassports.map((passport) => passport.passport_type || activeType).filter(Boolean))],
+    () => [...new Set(scopedPassports.map((passport) => getPassportType(passport)).filter(Boolean))],
     [activeType, scopedPassports]
   );
 
@@ -98,15 +104,15 @@ export function BulkReviseModal({
   }, [activeType, availableTypes, selectedType]);
 
   const targetedPassports = useMemo(
-    () => scopedPassports.filter((passport) => !selectedType || (passport.passport_type || activeType) === selectedType),
+    () => scopedPassports.filter((passport) => !selectedType || getPassportType(passport) === selectedType),
     [activeType, scopedPassports, selectedType]
   );
 
   const typeDef = allPassportTypes.find((type) => type.type_name === selectedType);
   const availableFields = useMemo(() => {
     const baseFields = [
-      { key: "model_name", label: "Model Name", type: "text" },
-      { key: "internal_alias_id", label: "Internal Alias ID", type: "text" },
+      { key: "modelName", label: "Model Name", type: "text" },
+      { key: "internalAliasId", label: "Internal Alias ID", type: "text" },
     ];
     const schemaFields = (typeDef?.fields_json?.sections || [])
       .flatMap((section) => section.fields || [])
@@ -138,10 +144,10 @@ export function BulkReviseModal({
       ["DPP ID", "Passport Type", "Status", "Source Version", "New Version", "Message"],
       ...result.details.map((item) => [
         item.dppId || "",
-        item.passport_type || "",
+        item.passportType || "",
         item.status || "",
-        item.source_version_number ?? "",
-        item.new_version_number ?? "",
+        item.sourceVersionNumber ?? "",
+        item.newVersionNumber ?? "",
         item.message || "",
       ]),
     ];
@@ -220,7 +226,7 @@ export function BulkReviseModal({
         body: JSON.stringify({
           items: targetedPassports.map((passport) => ({
             dppId: passport.dppId,
-            passport_type: passport.passport_type || activeType,
+            passportType: getPassportType(passport),
           })),
           changes: parsedChanges,
           revisionNote: revisionNote.trim(),
@@ -229,10 +235,10 @@ export function BulkReviseModal({
           approverId: approverId || null,
           scopeType: scope,
           scopeMeta: {
-            selected_count: scopePassports.selected.length,
-            filtered_count: scopePassports.filtered.length,
-            all_count: scopePassports.all.length,
-            targeted_type: selectedType || null,
+            selectedCount: scopePassports.selected.length,
+            filteredCount: scopePassports.filtered.length,
+            allCount: scopePassports.all.length,
+            targetedType: selectedType || null,
           },
         }),
       });
@@ -326,14 +332,14 @@ export function BulkReviseModal({
           <div key={`${item.dppId}-${index}`} className={`bulk-revise-result-item ${item.status || "default"}`}>
             <div className="bulk-revise-result-topline">
               <strong>{item.dppId?.slice(0, 8)}…</strong>
-              <span>{item.passport_type}</span>
+              <span>{item.passportType}</span>
               <span className={`bulk-revise-result-status ${item.status || "default"}`}>
                 {item.status}
               </span>
             </div>
             <div className="bulk-revise-result-copy">
-              {item.source_version_number ? `v${item.source_version_number}` : "—"}
-              {item.new_version_number ? ` -> v${item.new_version_number}` : ""}
+              {item.sourceVersionNumber ? `v${item.sourceVersionNumber}` : "—"}
+              {item.newVersionNumber ? ` -> v${item.newVersionNumber}` : ""}
               {item.message ? ` · ${item.message}` : ""}
             </div>
           </div>
@@ -380,7 +386,7 @@ export function BulkReviseModal({
                 const typeMeta = allPassportTypes.find((type) => type.type_name === typeName);
                 return (
                   <option key={typeName} value={typeName}>
-                    {typeMeta?.display_name || typeName}
+                    {typeMeta?.displayName || typeMeta?.display_name || typeName}
                   </option>
                 );
               })}
@@ -461,7 +467,7 @@ export function BulkReviseModal({
                 <option value="">— Skip review —</option>
                 {teamUsers.map((member) => (
                   <option key={member.id} value={member.id}>
-                    {member.first_name} {member.last_name} — {member.role}
+                    {member.firstName} {member.lastName} — {member.role}
                   </option>
                 ))}
               </select>
@@ -474,7 +480,7 @@ export function BulkReviseModal({
                   .filter((member) => !reviewerId || String(member.id) !== reviewerId)
                   .map((member) => (
                     <option key={member.id} value={member.id}>
-                      {member.first_name} {member.last_name} — {member.role}
+                      {member.firstName} {member.lastName} — {member.role}
                     </option>
                   ))}
               </select>

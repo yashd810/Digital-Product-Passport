@@ -31,27 +31,29 @@ function updateEditablePassportUseCase(deps) {
     const { companyId, dppId } = req.params;
     const normalizedBody = normalizePassportRequestBody(req.body);
     const {
-      passport_type,
       passportType,
-      carrier_authenticity,
+      carrierAuthenticity,
       granularity,
-      compliance_profile_key,
-      content_specification_ids,
-      carrier_policy_key,
-      economic_operator_id,
-      economic_operator_identifier_scheme,
-      facility_id,
+      complianceProfileKey,
+      contentSpecificationIds,
+      carrierPolicyKey,
+      economicOperatorId,
+      economicOperatorIdentifierScheme,
+      facilityId,
       ...fields
     } = normalizedBody;
     const userId = req.user.userId;
 
-    const requestedPassportType = passport_type || passportType;
+    const requestedPassportType = passportType;
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
     const BUILT_IN_EDITABLE_FIELDS = new Set([
       "model_name",
       "internal_alias_id",
+      "modelName",
+      "internalAliasId",
       "product_image",
+      "productImage",
     ]);
     if (createPassportTable) {
       await createPassportTable(typeSchema.typeName, {
@@ -67,17 +69,6 @@ function updateEditablePassportUseCase(deps) {
       [dppId]
     );
     if (!current.rows.length) throw Object.assign(new Error("Passport not found or not editable."), { statusCode: 404 });
-
-    if (typeSchema?.aliasToKey instanceof Map) {
-      for (const [rawKey, value] of Object.entries({ ...fields })) {
-        const canonicalKey = typeSchema.aliasToKey.get(String(rawKey).trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
-        if (!canonicalKey || canonicalKey === rawKey) continue;
-        if (fields[canonicalKey] === undefined) {
-          fields[canonicalKey] = value;
-        }
-        delete fields[rawKey];
-      }
-    }
 
     for (const key of Object.keys(fields)) {
       if (!typeSchema.allowedKeys.has(key) && !BUILT_IN_EDITABLE_FIELDS.has(key)) {
@@ -112,7 +103,7 @@ function updateEditablePassportUseCase(deps) {
           throw error;
         }
         fields.granularity = requestedGranularity;
-        const nextProductIdForGranularity = normalizeInternalAliasIdValue(fields.internal_alias_id || current.rows[0].internal_alias_id);
+        const nextProductIdForGranularity = normalizeInternalAliasIdValue(fields.internalAliasId || fields.internal_alias_id || current.rows[0].internal_alias_id);
         if (!nextProductIdForGranularity) {
           throw Object.assign(new Error("internal_alias_id cannot be blank when changing granularity"), { statusCode: 400 });
         }
@@ -122,7 +113,7 @@ function updateEditablePassportUseCase(deps) {
           passportType: typeSchema.typeName,
           internalAliasId: nextProductIdForGranularity,
           granularity: requestedGranularity,
-          passportLike: { ...current.rows[0], ...fields, internal_alias_id: nextProductIdForGranularity },
+          passportLike: { ...current.rows[0], ...fields, internalAliasId: nextProductIdForGranularity, internal_alias_id: nextProductIdForGranularity },
         });
         fields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
         fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
@@ -131,8 +122,8 @@ function updateEditablePassportUseCase(deps) {
 
     const hasBusinessIdentifierUpdate = ["serial_number", "serial", "serialNumber", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"].some((key) => fields[key] !== undefined);
 
-    if (fields.internal_alias_id !== undefined) {
-      const normalizedProductId = normalizeInternalAliasIdValue(fields.internal_alias_id);
+    if (fields.internalAliasId !== undefined || fields.internal_alias_id !== undefined) {
+      const normalizedProductId = normalizeInternalAliasIdValue(fields.internalAliasId ?? fields.internal_alias_id);
       if (!normalizedProductId) throw Object.assign(new Error("internal_alias_id cannot be blank"), { statusCode: 400 });
       const existingByProductId = await findExistingPassportByInternalAliasId({
         tableName,
@@ -156,7 +147,7 @@ function updateEditablePassportUseCase(deps) {
         passportType: typeSchema.typeName,
         internalAliasId: normalizedProductId,
         granularity: fields.granularity || current.rows[0].granularity || "item",
-        passportLike: { ...current.rows[0], ...fields, internal_alias_id: normalizedProductId },
+        passportLike: { ...current.rows[0], ...fields, internalAliasId: normalizedProductId, internal_alias_id: normalizedProductId },
       });
       fields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
       fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
@@ -202,12 +193,12 @@ function updateEditablePassportUseCase(deps) {
       requestedFields: {
         ...current.rows[0],
         ...fields,
-        compliance_profile_key,
-        content_specification_ids,
-        carrier_policy_key,
-        economic_operator_id,
-        economic_operator_identifier_scheme,
-        facility_id,
+        complianceProfileKey,
+        contentSpecificationIds,
+        carrierPolicyKey,
+        economicOperatorId,
+        economicOperatorIdentifierScheme,
+        facilityId,
       },
       facilitySource: normalizedBody,
       existingFields: current.rows[0],
@@ -245,7 +236,7 @@ function updateEditablePassportUseCase(deps) {
     return {
       success: true,
       passport: updateResult.updatedRow
-        ? { ...normalizePassportRow(updateResult.updatedRow, typeSchema), passport_type: typeSchema.typeName }
+        ? { ...normalizePassportRow(updateResult.updatedRow, typeSchema), passportType: typeSchema.typeName }
         : null,
     };
   };

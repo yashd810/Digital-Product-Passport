@@ -20,6 +20,36 @@ const ROLES = [
   { key: "viewer", label: "Viewer" },
 ];
 
+function normalizeAdminAnalyticsPayload(payload) {
+  const analyticsRows = Array.isArray(payload?.analytics)
+    ? payload.analytics.map((item) => ({
+        ...item,
+        passportType: item.passportType || item.passport_type || "",
+        displayName: item.displayName || item.display_name || "",
+        draftCount: item.draftCount ?? item.draft_count ?? 0,
+        inReviewCount: item.inReviewCount ?? item.in_review_count ?? 0,
+        releasedCount: item.releasedCount ?? item.released_count ?? 0,
+        revisedCount: item.revisedCount ?? item.revised_count ?? 0,
+        obsoleteCount: item.obsoleteCount ?? item.obsolete_count ?? 0,
+      }))
+    : [];
+
+  const users = Array.isArray(payload?.users)
+    ? payload.users.map((user) => ({
+        ...user,
+        firstName: user.firstName || user.first_name || "",
+        lastName: user.lastName || user.last_name || "",
+        lastLoginAt: user.lastLoginAt || user.last_login_at || "",
+      }))
+    : [];
+
+  return {
+    ...(payload || {}),
+    analytics: analyticsRows,
+    users,
+  };
+}
+
 function RolePill({ role }) {
   const match = ROLES.find((item) => item.key === role) || { label: role };
   return (
@@ -274,7 +304,7 @@ function AdminCompanyAnalytics() {
         headers: authHeaders(),
       });
       if (!response.ok) throw new Error("Failed to load");
-      setData(await response.json());
+      setData(normalizeAdminAnalyticsPayload(await response.json()));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -318,11 +348,11 @@ function AdminCompanyAnalytics() {
       const now = new Date();
       const companyName = data.company?.company_name || `Company ${companyId}`;
       const sumField = (field) => data.analytics?.reduce((sum, item) => sum + parseInt(item[field] || 0, 10), 0) || 0;
-      const totalDraft = sumField("draft_count");
-      const totalReleased = sumField("released_count");
-      const totalInRevision = sumField("revised_count");
-      const totalInReview = sumField("in_review_count");
-      const totalObsoletePdf = sumField("obsolete_count");
+      const totalDraft = sumField("draftCount");
+      const totalReleased = sumField("releasedCount");
+      const totalInRevision = sumField("revisedCount");
+      const totalInReview = sumField("inReviewCount");
+      const totalObsoletePdf = sumField("obsoleteCount");
       const summaryStats = [
         { label: "Total Passports", value: data.totalPassports || 0, tone: "default" },
         { label: "Draft", value: totalDraft, tone: "draft" },
@@ -340,7 +370,7 @@ function AdminCompanyAnalytics() {
         { label: "In Revision", value: totalInRevision,  color: STATUS_COLORS.revised },
       ].filter((item) => item.value > 0);
       const typeChartData = (data.analytics || []).map((item, index) => ({
-        label: item.display_name || item.passport_type,
+        label: item.displayName || item.passportType,
         value: parseInt(item.total || 0, 10),
         color: OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length],
       }));
@@ -384,11 +414,11 @@ function AdminCompanyAnalytics() {
             title: "Breakdown by Passport Type",
             headers: ["Passport Type", "Draft", "In Review", "Released", "In Revision"],
             rows: (data.analytics || []).map((stat) => [
-              stat.display_name || stat.passport_type,
-              stat.draft_count || 0,
-              stat.in_review_count || 0,
-              stat.released_count || 0,
-              stat.revised_count || 0,
+              stat.displayName || stat.passportType,
+              stat.draftCount || 0,
+              stat.inReviewCount || 0,
+              stat.releasedCount || 0,
+              stat.revisedCount || 0,
             ]),
             emptyText: "No passport data yet.",
           },
@@ -408,24 +438,24 @@ function AdminCompanyAnalytics() {
   const filteredUsers = userRows.filter((user) => (
     !search
       || user.email.toLowerCase().includes(search.toLowerCase())
-      || `${user.first_name} ${user.last_name}`.toLowerCase().includes(search.toLowerCase())
+      || `${user.firstName} ${user.lastName}`.toLowerCase().includes(search.toLowerCase())
   ));
 
   const analyticsColumns = useMemo(() => ([
-    { key: "passport_type", type: "string", getValue: (item) => item.passport_type || "" },
+    { key: "passportType", type: "string", getValue: (item) => item.passportType || "" },
     { key: "total", type: "number", getValue: (item) => parseInt(item.total || 0, 10) },
-    { key: "draft_count", type: "number", getValue: (item) => parseInt(item.draft_count || 0, 10) },
-    { key: "in_review_count", type: "number", getValue: (item) => parseInt(item.in_review_count || 0, 10) },
-    { key: "released_count", type: "number", getValue: (item) => parseInt(item.released_count || 0, 10) },
-    { key: "revised_count", type: "number", getValue: (item) => parseInt(item.revised_count || 0, 10) },
+    { key: "draftCount", type: "number", getValue: (item) => parseInt(item.draftCount || 0, 10) },
+    { key: "inReviewCount", type: "number", getValue: (item) => parseInt(item.inReviewCount || 0, 10) },
+    { key: "releasedCount", type: "number", getValue: (item) => parseInt(item.releasedCount || 0, 10) },
+    { key: "revisedCount", type: "number", getValue: (item) => parseInt(item.revisedCount || 0, 10) },
   ]), []);
 
   const userColumns = useMemo(() => ([
-    { key: "name", type: "string", getValue: (user) => `${user.first_name || ""} ${user.last_name || ""}`.trim() },
+    { key: "name", type: "string", getValue: (user) => `${user.firstName || ""} ${user.lastName || ""}`.trim() },
     { key: "email", type: "string", getValue: (user) => user.email || "" },
     { key: "id", type: "number", getValue: (user) => user.id },
     { key: "role", type: "string", getValue: (user) => user.role || "" },
-    { key: "last_login_at", type: "date", getValue: (user) => user.last_login_at || "" },
+    { key: "lastLoginAt", type: "date", getValue: (user) => user.lastLoginAt || "" },
   ]), []);
 
   const controlledAnalytics = useMemo(
@@ -451,11 +481,11 @@ function AdminCompanyAnalytics() {
   if (!data) return null;
 
   const sumField = (field) => data.analytics?.reduce((sum, item) => sum + parseInt(item[field] || 0, 10), 0) || 0;
-  const totalDraft       = sumField("draft_count");
-  const totalReleased    = sumField("released_count");
-  const totalInRevision  = sumField("revised_count");
-  const totalInReview    = sumField("in_review_count");
-  const totalObsolete    = sumField("obsolete_count");
+  const totalDraft       = sumField("draftCount");
+  const totalReleased    = sumField("releasedCount");
+  const totalInRevision  = sumField("revisedCount");
+  const totalInReview    = sumField("inReviewCount");
+  const totalObsolete    = sumField("obsoleteCount");
   const totalScans       = data.scanStats || 0;
   const archivedCount    = data.archivedCount || 0;
   const statusChartItems = [
@@ -465,7 +495,7 @@ function AdminCompanyAnalytics() {
     { label: "In Revision", value: totalInRevision,  color: STATUS_COLORS.revised },
   ].filter((item) => item.value > 0);
   const typeChartData = (data.analytics || []).map((item, index) => ({
-    label: item.display_name || item.passport_type,
+    label: item.displayName || item.passportType,
     value: parseInt(item.total || 0, 10),
     color: OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length],
   }));
@@ -544,13 +574,13 @@ function AdminCompanyAnalytics() {
                 </div>
                 <div className="analytics-cards">
                   {data.analytics.map((stat) => (
-                    <div key={stat.passport_type} className="type-stat-card">
-                      <h4>{stat.display_name || stat.passport_type}</h4>
+                    <div key={stat.passportType} className="type-stat-card">
+                      <h4>{stat.displayName || stat.passportType}</h4>
                       <div className="type-stat-grid">
-                        <div className="type-stat-item"><div className="type-stat-label">Draft</div><div className="type-stat-draft">{stat.draft_count || 0}</div></div>
-                        <div className="type-stat-item"><div className="type-stat-label">In Review</div><div className="type-stat-review">{stat.in_review_count || 0}</div></div>
-                        <div className="type-stat-item"><div className="type-stat-label">Released</div><div className="type-stat-released">{stat.released_count || 0}</div></div>
-                        <div className="type-stat-item"><div className="type-stat-label">In Revision</div><div className="type-stat-revised">{stat.revised_count || 0}</div></div>
+                        <div className="type-stat-item"><div className="type-stat-label">Draft</div><div className="type-stat-draft">{stat.draftCount || 0}</div></div>
+                        <div className="type-stat-item"><div className="type-stat-label">In Review</div><div className="type-stat-review">{stat.inReviewCount || 0}</div></div>
+                        <div className="type-stat-item"><div className="type-stat-label">Released</div><div className="type-stat-released">{stat.releasedCount || 0}</div></div>
+                        <div className="type-stat-item"><div className="type-stat-label">In Revision</div><div className="type-stat-revised">{stat.revisedCount || 0}</div></div>
                       </div>
                     </div>
                   ))}
@@ -580,33 +610,33 @@ function AdminCompanyAnalytics() {
           <table className="aca-table">
             <thead>
               <tr>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("passport_type")}>Type{sortIndicator(analyticsSort, "passport_type") && ` ${sortIndicator(analyticsSort, "passport_type")}`}</button></th>
+                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("passportType")}>Type{sortIndicator(analyticsSort, "passportType") && ` ${sortIndicator(analyticsSort, "passportType")}`}</button></th>
                 <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("total")}>Total{sortIndicator(analyticsSort, "total") && ` ${sortIndicator(analyticsSort, "total")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("draft_count")}>Draft{sortIndicator(analyticsSort, "draft_count") && ` ${sortIndicator(analyticsSort, "draft_count")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("in_review_count")}>In Review{sortIndicator(analyticsSort, "in_review_count") && ` ${sortIndicator(analyticsSort, "in_review_count")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("released_count")}>Released{sortIndicator(analyticsSort, "released_count") && ` ${sortIndicator(analyticsSort, "released_count")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("revised_count")}>In Revision{sortIndicator(analyticsSort, "revised_count") && ` ${sortIndicator(analyticsSort, "revised_count")}`}</button></th>
+                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("draftCount")}>Draft{sortIndicator(analyticsSort, "draftCount") && ` ${sortIndicator(analyticsSort, "draftCount")}`}</button></th>
+                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("inReviewCount")}>In Review{sortIndicator(analyticsSort, "inReviewCount") && ` ${sortIndicator(analyticsSort, "inReviewCount")}`}</button></th>
+                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("releasedCount")}>Released{sortIndicator(analyticsSort, "releasedCount") && ` ${sortIndicator(analyticsSort, "releasedCount")}`}</button></th>
+                <th><button type="button" className="table-sort-btn" onClick={() => toggleAnalyticsSort("revisedCount")}>In Revision{sortIndicator(analyticsSort, "revisedCount") && ` ${sortIndicator(analyticsSort, "revisedCount")}`}</button></th>
               </tr>
               {showAnalyticsFilters && (
                 <tr className="table-filter-row">
-                  <th><input className="table-filter-input" value={analyticsFilters.passport_type || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, passport_type: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={analyticsFilters.passportType || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, passportType: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={analyticsFilters.total || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, total: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={analyticsFilters.draft_count || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, draft_count: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={analyticsFilters.in_review_count || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, in_review_count: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={analyticsFilters.released_count || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, released_count: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={analyticsFilters.revised_count || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, revised_count: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={analyticsFilters.draftCount || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, draftCount: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={analyticsFilters.inReviewCount || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, inReviewCount: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={analyticsFilters.releasedCount || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, releasedCount: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={analyticsFilters.revisedCount || ""} onChange={(e) => setAnalyticsFilters((prev) => ({ ...prev, revisedCount: e.target.value }))} placeholder="Filter" /></th>
                 </tr>
               )}
             </thead>
             <tbody>
               {controlledAnalytics.map((item) => (
-                <tr key={item.passport_type}>
-                  <td><strong className="admin-text-capitalize">{item.display_name || item.passport_type}</strong></td>
+                <tr key={item.passportType}>
+                  <td><strong className="admin-text-capitalize">{item.displayName || item.passportType}</strong></td>
                   <td>{item.total || 0}</td>
-                  <td><span className="mini-badge draft">{item.draft_count || 0}</span></td>
-                  <td><span className="mini-badge review">{item.in_review_count || 0}</span></td>
-                  <td><span className="mini-badge released">{item.released_count || 0}</span></td>
-                  <td><span className="mini-badge revised">{item.revised_count || 0}</span></td>
+                  <td><span className="mini-badge draft">{item.draftCount || 0}</span></td>
+                  <td><span className="mini-badge review">{item.inReviewCount || 0}</span></td>
+                  <td><span className="mini-badge released">{item.releasedCount || 0}</span></td>
+                  <td><span className="mini-badge revised">{item.revisedCount || 0}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -645,7 +675,7 @@ function AdminCompanyAnalytics() {
                 <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("email")}>Email{sortIndicator(usersSort, "email") && ` ${sortIndicator(usersSort, "email")}`}</button></th>
                 <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("id")}>User ID{sortIndicator(usersSort, "id") && ` ${sortIndicator(usersSort, "id")}`}</button></th>
                 <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("role")}>Role{sortIndicator(usersSort, "role") && ` ${sortIndicator(usersSort, "role")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("last_login_at")}>Last Login{sortIndicator(usersSort, "last_login_at") && ` ${sortIndicator(usersSort, "last_login_at")}`}</button></th>
+                <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("lastLoginAt")}>Last Login{sortIndicator(usersSort, "lastLoginAt") && ` ${sortIndicator(usersSort, "lastLoginAt")}`}</button></th>
                 <th>Actions</th>
               </tr>
               {showUsersFilters && (
@@ -654,7 +684,7 @@ function AdminCompanyAnalytics() {
                   <th><input className="table-filter-input" value={usersFilters.email || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, email: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={usersFilters.id || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, id: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={usersFilters.role || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, role: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={usersFilters.last_login_at || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, last_login_at: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={usersFilters.lastLoginAt || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, lastLoginAt: e.target.value }))} placeholder="Filter" /></th>
                   <th></th>
                 </tr>
               )}
@@ -662,7 +692,7 @@ function AdminCompanyAnalytics() {
             <tbody>
               {controlledUsers.map((user) => (
                 <tr key={user.id}>
-                  <td><div className="aca-user-name">{user.first_name} {user.last_name}</div></td>
+                  <td><div className="aca-user-name">{user.firstName} {user.lastName}</div></td>
                   <td className="aca-user-email">{user.email}</td>
                   <td className="aca-user-id">#{user.id}</td>
                   <td>
@@ -685,7 +715,7 @@ function AdminCompanyAnalytics() {
                     )}
                   </td>
                   <td className="aca-last-login">
-                    {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString() : "Never"}
+                    {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : "Never"}
                   </td>
                   <td>
                     {editUserId !== user.id && (

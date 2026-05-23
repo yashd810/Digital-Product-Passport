@@ -29,19 +29,19 @@ function createPassportQueryRepository({
     const resolvedExcludeDppId = excludeDppId || excludeGuid || null;
     if (resolvedExcludeDppId) {
       params.push(resolvedExcludeDppId);
-      exclusionSql += ` AND dpp_id <> $${params.length}`;
+      exclusionSql += ` AND "dppId" <> $${params.length}`;
     }
     if (excludeLineageId) {
       params.push(excludeLineageId);
-      exclusionSql += ` AND lineage_id <> $${params.length}`;
+      exclusionSql += ` AND "lineageId" <> $${params.length}`;
     }
     const existing = await pool.query(
-      `SELECT id, dpp_id AS "dppId", lineage_id, internal_alias_id, release_status, version_number
+      `SELECT id, "dppId", "lineageId", "internalAliasId", "releaseStatus", "versionNumber"
        FROM ${tableName}
-       WHERE company_id = $1
-         AND internal_alias_id = $2
-         AND deleted_at IS NULL${exclusionSql}
-       ORDER BY version_number DESC, updated_at DESC, id DESC
+       WHERE "companyId" = $1
+         AND "internalAliasId" = $2
+         AND "deletedAt" IS NULL${exclusionSql}
+       ORDER BY "versionNumber" DESC, "updatedAt" DESC, id DESC
        LIMIT 1`,
       params
     );
@@ -54,13 +54,13 @@ function createPassportQueryRepository({
     let liveCompanyFilter = "";
     if (companyId !== null && companyId !== undefined) {
       liveParams.push(companyId);
-      liveCompanyFilter = ` AND company_id = $${liveParams.length}`;
+      liveCompanyFilter = ` AND "companyId" = $${liveParams.length}`;
     }
     const liveRes = await pool.query(
-      `SELECT dpp_id AS "dppId", lineage_id, internal_alias_id
+      `SELECT "dppId", "lineageId", "internalAliasId"
        FROM ${tableName}
-       WHERE dpp_id = $1${liveCompanyFilter}
-       ORDER BY version_number DESC
+       WHERE "dppId" = $1${liveCompanyFilter}
+       ORDER BY "versionNumber" DESC
        LIMIT 1`,
       liveParams
     );
@@ -100,14 +100,14 @@ function createPassportQueryRepository({
     let liveCompanyFilter = "";
     if (companyId !== null && companyId !== undefined) {
       liveParams.push(companyId);
-      liveCompanyFilter = ` AND company_id = $${liveParams.length}`;
+      liveCompanyFilter = ` AND "companyId" = $${liveParams.length}`;
     }
     const liveRes = await pool.query(
       `SELECT *
        FROM ${tableName}
-       WHERE lineage_id = $1
-         AND deleted_at IS NULL${liveCompanyFilter}
-       ORDER BY version_number DESC, updated_at DESC`,
+       WHERE "lineageId" = $1
+         AND "deletedAt" IS NULL${liveCompanyFilter}
+       ORDER BY "versionNumber" DESC, "updatedAt" DESC`,
       liveParams
     );
 
@@ -133,24 +133,24 @@ function createPassportQueryRepository({
         const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
         return {
           ...rowData,
-          dpp_id: row.dppId || rowData?.dpp_id || rowData?.dppId,
-          lineage_id: row.lineage_id || rowData?.lineage_id,
-          company_id: row.company_id || rowData?.company_id,
-          passport_type: row.passport_type || rowData?.passport_type,
-          version_number: row.version_number ?? rowData?.version_number,
-          model_name: row.model_name || rowData?.model_name,
-          internal_alias_id: row.internal_alias_id || rowData?.internal_alias_id,
-          product_identifier_did: row.product_identifier_did || rowData?.product_identifier_did,
-          release_status: row.release_status || rowData?.release_status,
+          dppId: row.dppId || rowData?.dppId || rowData?.dpp_id,
+          lineageId: row.lineage_id || rowData?.lineageId || rowData?.lineage_id,
+          companyId: row.company_id || rowData?.companyId || rowData?.company_id,
+          passportType: row.passport_type || rowData?.passportType || rowData?.passport_type,
+          versionNumber: row.version_number ?? rowData?.versionNumber ?? rowData?.version_number,
+          modelName: row.model_name || rowData?.modelName || rowData?.model_name,
+          internalAliasId: row.internal_alias_id || rowData?.internalAliasId || rowData?.internal_alias_id,
+          uniqueProductIdentifier: row.product_identifier_did || rowData?.uniqueProductIdentifier || rowData?.product_identifier_did,
+          releaseStatus: row.release_status || rowData?.releaseStatus || rowData?.release_status,
           archived: true,
-          archived_at: row.archived_at,
+          archivedAt: row.archived_at,
         };
       })
       .map(normalizePassportRow)
       .filter((row) => row?.dppId && !seenDppIds.has(row.dppId));
 
     return [...liveVersions, ...archiveVersions]
-      .sort((a, b) => Number(b.version_number || 0) - Number(a.version_number || 0));
+      .sort((a, b) => Number(b.versionNumber || 0) - Number(a.versionNumber || 0));
   }
 
   async function fetchCompanyPassportRecord({ companyId, dppId = null, passportType = null, versionNumber = null }) {
@@ -188,20 +188,20 @@ function createPassportQueryRepository({
     let liveVersionSql = "";
     if (parsedVersionNumber !== null) {
       liveParams.push(parsedVersionNumber);
-      liveVersionSql = ` AND p.version_number = $${liveParams.length}`;
+      liveVersionSql = ` AND p."versionNumber" = $${liveParams.length}`;
     }
     const liveRes = await pool.query(
       `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
        FROM ${tableName} p
-       LEFT JOIN users u ON u.id = p.created_by
-       WHERE p.dpp_id = $1 AND p.company_id = $2 AND p.deleted_at IS NULL${liveVersionSql}
-       ORDER BY p.version_number DESC, p.updated_at DESC
+       LEFT JOIN users u ON u.id = p."createdBy"
+       WHERE p."dppId" = $1 AND p."companyId" = $2 AND p."deletedAt" IS NULL${liveVersionSql}
+       ORDER BY p."versionNumber" DESC, p."updatedAt" DESC
        LIMIT 1`,
       liveParams
     );
     if (liveRes.rows.length) {
       return {
-        passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: resolvedPassportType },
+        passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: resolvedPassportType },
         archived: false,
       };
     }
@@ -227,7 +227,7 @@ function createPassportQueryRepository({
       : archiveRes.rows[0].row_data;
 
     return {
-      passport: { ...normalizePassportRow(rowData), passport_type: resolvedPassportType, archived: true },
+      passport: { ...normalizePassportRow(rowData), passportType: resolvedPassportType, archived: true },
       archived: true,
     };
   }
@@ -247,16 +247,16 @@ function createPassportQueryRepository({
 
     const liveRes = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE dpp_id = $1
-         AND release_status = 'released'
-         AND deleted_at IS NULL
-       ORDER BY version_number DESC
+       WHERE "dppId" = $1
+         AND "releaseStatus" = 'released'
+         AND "deletedAt" IS NULL
+       ORDER BY "versionNumber" DESC
        LIMIT 1`,
       [normalizedDppId]
     );
     if (liveRes.rows.length) {
       return {
-        passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: passportType },
+        passport: { ...normalizePassportRow(liveRes.rows[0]), passportType },
         archived: false,
       };
     }
@@ -280,11 +280,11 @@ function createPassportQueryRepository({
     const rowData = typeof archiveRes.rows[0].row_data === "string"
       ? JSON.parse(archiveRes.rows[0].row_data)
       : archiveRes.rows[0].row_data;
-    if (!isPublicVersionVisible(rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+    if (!isPublicVersionVisible(rowData?.releaseStatus || rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
       return { passport: null, archived: false };
     }
     return {
-      passport: { ...normalizePassportRow(rowData), passport_type: passportType, archived: true },
+      passport: { ...normalizePassportRow(rowData), passportType, archived: true },
       archived: true,
     };
   }
@@ -310,8 +310,8 @@ function createPassportQueryRepository({
             granularity,
           }) || [normalizedProductId];
     const liveMatchSql = strictProductId
-      ? "internal_alias_id = ANY($1::text[])"
-      : "(internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))";
+      ? `"internalAliasId" = ANY($1::text[])`
+      : `("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))`;
     const archiveMatchSql = strictProductId
       ? "pa.internal_alias_id = ANY($1::text[])"
       : "(pa.internal_alias_id = ANY($1::text[]) OR pa.product_identifier_did = ANY($1::text[]))";
@@ -341,11 +341,11 @@ function createPassportQueryRepository({
            WHERE ${liveMatchSql}
              AND ${
                versionNumber !== null && versionNumber !== undefined
-                 ? "release_status IN ('released', 'obsolete')"
-                 : "release_status = 'released'"
+                 ? `"releaseStatus" IN ('released', 'obsolete')`
+                 : `"releaseStatus" = 'released'`
              }${companySql}
-             AND deleted_at IS NULL${versionSql}
-           ORDER BY version_number DESC, updated_at DESC
+             AND "deletedAt" IS NULL${versionSql}
+           ORDER BY "versionNumber" DESC, "updatedAt" DESC
            LIMIT 1`,
           liveParams
         );
@@ -358,7 +358,7 @@ function createPassportQueryRepository({
       }
       if (liveRes.rows.length) {
         matches.push({
-          passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: type_name },
+          passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: type_name },
           archived: false,
         });
         continue;
@@ -395,14 +395,14 @@ function createPassportQueryRepository({
         const rowData = typeof archiveRes.rows[0].row_data === "string"
           ? JSON.parse(archiveRes.rows[0].row_data)
           : archiveRes.rows[0].row_data;
-        if (!isPublicVersionVisible(rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+        if (!isPublicVersionVisible(rowData?.releaseStatus || rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
           continue;
         }
         matches.push({
           passport: {
             ...normalizePassportRow(rowData),
-            product_identifier_did: archiveRes.rows[0].product_identifier_did || rowData?.product_identifier_did,
-            passport_type: type_name,
+            uniqueProductIdentifier: archiveRes.rows[0].product_identifier_did || rowData?.uniqueProductIdentifier || rowData?.product_identifier_did,
+            passportType: type_name,
             archived: true,
           },
           archived: true,
@@ -519,10 +519,10 @@ function createPassportQueryRepository({
         liveRes = await pool.query(
           `SELECT *
            FROM ${tableName}
-           WHERE company_id = $1
-             AND (internal_alias_id = ANY($2::text[]) OR product_identifier_did = ANY($2::text[]))
-             AND deleted_at IS NULL
-           ORDER BY version_number DESC, updated_at DESC, id DESC
+           WHERE "companyId" = $1
+             AND ("internalAliasId" = ANY($2::text[]) OR "uniqueProductIdentifier" = ANY($2::text[]))
+             AND "deletedAt" IS NULL
+           ORDER BY "versionNumber" DESC, "updatedAt" DESC, id DESC
            LIMIT 1`,
           [companyId, candidates]
         );
@@ -535,7 +535,7 @@ function createPassportQueryRepository({
       }
       if (liveRes.rows.length) {
         liveMatches.push({
-          passport: { ...normalizePassportRow(liveRes.rows[0]), passport_type: type_name },
+          passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: type_name },
           archived: false,
         });
       }
@@ -565,7 +565,7 @@ function createPassportQueryRepository({
           ? JSON.parse(archiveRes.rows[0].row_data)
           : archiveRes.rows[0].row_data;
         archiveMatches.push({
-          passport: { ...normalizePassportRow(rowData), passport_type: type_name, archived: true },
+          passport: { ...normalizePassportRow(rowData), passportType: type_name, archived: true },
           archived: true,
         });
       }

@@ -6,11 +6,7 @@ require("dotenv").config({
 });
 
 const { Pool } = require("pg");
-const { initDb } = require("../db/init");
-const createDidService = require("../services/did-service");
 const createPassportService = require("../services/passport-service");
-const createProductIdentifierService = require("../services/product-identifier-service");
-const logger = require("../services/logger");
 const {
   IN_REVISION_STATUS,
   SYSTEM_PASSPORT_FIELDS,
@@ -33,6 +29,7 @@ const {
   formatHistoryFieldValue,
   comparableHistoryFieldValue,
 } = require("../src/shared/passports/passport-helpers");
+const logger = require("../services/logger");
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -43,12 +40,7 @@ const pool = new Pool({
 });
 
 async function main() {
-  const didService = createDidService({
-    didDomain: process.env.DID_WEB_DOMAIN,
-    publicOrigin: process.env.PUBLIC_ORIGIN || process.env.APP_URL,
-    apiOrigin: process.env.SERVER_URL,
-  });
-  const productIdentifierService = createProductIdentifierService({ didService, pool });
+  const apply = process.argv.includes("--apply");
   const passportService = createPassportService({
     pool,
     getTable,
@@ -71,22 +63,23 @@ async function main() {
     getHistoryFieldDefs,
     buildCurrentPublicPassportPath,
     buildInactivePublicPassportPath,
-    productIdentifierService,
+    productIdentifierService: null,
   });
 
-  await pool.query("SELECT NOW()");
-  await initDb(pool, {
-    getTable,
-    createPassportTable: passportService.createPassportTable,
-    IN_REVISION_STATUS,
-    productIdentifierService,
+  const result = await passportService.migratePassportStorageToSchemaKeys({
+    apply,
+    includeArchives: true,
   });
-  logger.info("[DB] Migrations completed successfully");
+
+  console.log(JSON.stringify(result, null, 2));
+  if (!apply && result.results.some((row) => row.status === "pending")) {
+    process.exitCode = 2;
+  }
 }
 
 main()
   .catch((error) => {
-    logger.error({ err: error }, "[DB] Migration failed");
+    logger.error({ err: error }, "[CamelCase passport field migration] failed");
     process.exitCode = 1;
   })
   .finally(async () => {

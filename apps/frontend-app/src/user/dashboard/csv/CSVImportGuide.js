@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { useNavigate, useParams, NavLink } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -50,7 +51,7 @@ function ResultSummary({ summary, details, onDone }) {
           {details.map((d, i) => (
             <div key={i} className={`upsert-detail-row upsert-detail-${d.status}`}>
               <span className="upsert-detail-status">{d.status}</span>
-              <span className="upsert-detail-id">{d.internal_alias_id || d.dppId || d.model_name || `#${i+1}`}</span>
+              <span className="upsert-detail-id">{d.internalAliasId || d.dppId || d.modelName || `#${i+1}`}</span>
               {d.reason && <span className="upsert-detail-reason">— {d.reason}</span>}
               {d.error  && <span className="upsert-detail-reason">— {d.error}</span>}
             </div>
@@ -66,7 +67,13 @@ function ResultSummary({ summary, details, onDone }) {
 
 function CSVImportGuide({ user, companyId, activeTab }) {
   const navigate = useNavigate();
-  const { passportType } = useParams();
+  const { companySlug, passportType } = useParams();
+  const passportListPath = buildDashboardPath({
+    companySlug,
+    companyName: user?.company_name,
+    companyId,
+    subpath: `passports/${passportType}`,
+  });
 
   const tab = activeTab || "create";
 
@@ -94,8 +101,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const sections = passportTypeData.fields_json?.sections || [];
       const csvRows = [];
       csvRows.push(["Field Name", "Passport 1", "Passport 2", "Passport 3"]);
-      csvRows.push(["internal_alias_id", "", "", ""]);
-      csvRows.push(["model_name", "", "", ""]);
+      csvRows.push(["internalAliasId", "", "", ""]);
+      csvRows.push(["modelName", "", "", ""]);
       sections.forEach(section => {
         (section.fields || []).forEach(field => {
           if (field.type !== "file" && field.type !== "table") {
@@ -142,15 +149,17 @@ function CSVImportGuide({ user, companyId, activeTab }) {
           const field =
             allFields.find(f => f.label?.trim().toLowerCase() === normalized) ||
             allFields.find(f => f.key?.toLowerCase() === normalized) ||
-            (normalized === "model_name" ? { key: "model_name", type: "text" } : null) ||
-            (normalized === "internal_alias_id" ? { key: "internal_alias_id", type: "text" } : null);
+            (normalized === "model_name" ? { key: "modelName", type: "text" } : null) ||
+            (normalized === "internal_alias_id" ? { key: "internalAliasId", type: "text" } : null) ||
+            (normalized === "modelname" ? { key: "modelName", type: "text" } : null) ||
+            (normalized === "internalaliasid" ? { key: "internalAliasId", type: "text" } : null);
           if (field) {
             passportData[field.key] = field.type === "boolean"
               ? (value.toLowerCase() === "true" || value === "1")
               : value;
           }
         });
-        if (hasData && passportData.internal_alias_id) createdPassports.push(passportData);
+        if (hasData && passportData.internalAliasId) createdPassports.push(passportData);
       }
       if (createdPassports.length > 0) {
         let successCount = 0;
@@ -159,13 +168,13 @@ function CSVImportGuide({ user, companyId, activeTab }) {
             const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports`, {
               method: "POST",
               headers: authHeaders({ "Content-Type": "application/json" }),
-              body: JSON.stringify({ passport_type: passportType, ...passportData }),
+              body: JSON.stringify({ passportType, ...passportData }),
             });
             if (response.ok) successCount++;
           } catch {}
         }
         setCreateSuccess(`Successfully created ${successCount} passport(s)!`);
-        setTimeout(() => navigate(`/dashboard/passports/${passportType}`), 2000);
+        setTimeout(() => navigate(passportListPath), 2000);
       } else {
         setCreateError("No valid passports found in CSV. Please check your CSV format.");
       }
@@ -191,7 +200,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/upsert-csv`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ passport_type: passportType, csv }),
+        body: JSON.stringify({ passportType, csv }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || "Import failed");
@@ -221,7 +230,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/upsert-json`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ passport_type: passportType, passports }),
+        body: JSON.stringify({ passportType, passports }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || "Import failed");
@@ -236,7 +245,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
 
   return (
     <div className="csv-import-guide">
-      <button className="csv-back-btn" onClick={() => navigate(`/dashboard/passports/${passportType}`)}>
+      <button className="csv-back-btn" onClick={() => navigate(passportListPath)}>
         ← Back
       </button>
 
@@ -280,8 +289,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               <div className="subsection">
                 <h3>Required Fields</h3>
                 <ul>
-                  <li><strong>internal_alias_id</strong> — The unique local passport ID used internally by the platform (required)</li>
-                  <li><strong>model_name</strong> — Display name or model label for the product (optional)</li>
+                  <li><strong>internalAliasId</strong> — The unique local passport ID used internally by the platform (required)</li>
+                  <li><strong>modelName</strong> — Display name or model label for the product (optional)</li>
                 </ul>
               </div>
               <div className="subsection">
@@ -289,8 +298,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <table className="example-table">
                   <thead><tr><th>Field Name</th><th>Passport 1</th><th>Passport 2</th></tr></thead>
                   <tbody>
-                    <tr><td className="field-name">internal_alias_id</td><td>SKU-001</td><td>SKU-002</td></tr>
-                    <tr><td className="field-name">model_name</td><td>Model A</td><td>Model B</td></tr>
+                    <tr><td className="field-name">internalAliasId</td><td>SKU-001</td><td>SKU-002</td></tr>
+                    <tr><td className="field-name">modelName</td><td>Model A</td><td>Model B</td></tr>
                     <tr><td className="field-name">Category</td><td>Electronics</td><td>Textiles</td></tr>
                   </tbody>
                 </table>
@@ -337,8 +346,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <strong>How it works:</strong>
                 <ul>
                   <li>Row has a <code>dppId</code> → the matching draft passport is <strong>updated</strong></li>
-                  <li>No <code>dppId</code> but matching <code>internal_alias_id</code> on an editable passport → that passport is <strong>updated</strong></li>
-                  <li>New <code>internal_alias_id</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
+                  <li>No <code>dppId</code> but matching <code>internalAliasId</code> on an editable passport → that passport is <strong>updated</strong></li>
+                  <li>New <code>internalAliasId</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
                   <li>If the matching passport is released or in review, the row is skipped so you can revise it first</li>
                 </ul>
               </div>
@@ -348,7 +357,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               <ResultSummary
                 summary={updateResult.summary}
                 details={updateResult.details}
-                onDone={() => { setUpdateResult(null); navigate(`/dashboard/passports/${passportType}`); }}
+                onDone={() => { setUpdateResult(null); navigate(passportListPath); }}
               />
             ) : (
               <section className="guide-section">
@@ -380,20 +389,20 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <pre className="upsert-code">{`[
   {
     "dppId": "existing-passport-dppId",
-    "internal_alias_id": "SKU-1001",
-    "model_name": "Unit A",
+    "internalAliasId": "SKU-1001",
+    "modelName": "Unit A",
     "serial_number": "SN-1001",
     "manufacture_date": "2024-01-15"
   },
   {
-    "internal_alias_id": "SKU-1002",
+    "internalAliasId": "SKU-1002",
     "serial_number": "SN-1002"
   }
 ]`}</pre>
                 <ul>
                   <li>Object has a <code>dppId</code> → the matching draft is <strong>updated</strong></li>
-                  <li>No <code>dppId</code> but matching <code>internal_alias_id</code> on an editable passport → that passport is <strong>updated</strong></li>
-                  <li>New <code>internal_alias_id</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
+                  <li>No <code>dppId</code> but matching <code>internalAliasId</code> on an editable passport → that passport is <strong>updated</strong></li>
+                  <li>New <code>internalAliasId</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
                   <li>If the matching passport is released or in review, the object is skipped so you can revise it first</li>
                   <li>Only include fields you want to change — unspecified fields are left as-is</li>
                 </ul>
@@ -404,7 +413,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               <ResultSummary
                 summary={updateResult.summary}
                 details={updateResult.details}
-                onDone={() => { setUpdateResult(null); navigate(`/dashboard/passports/${passportType}`); }}
+                onDone={() => { setUpdateResult(null); navigate(passportListPath); }}
               />
             ) : (
               <section className="guide-section">
@@ -423,7 +432,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
         )}
 
         <div className="action-buttons">
-          <button className="cancel-btn" onClick={() => navigate(`/dashboard/passports/${passportType}`)}>
+          <button className="cancel-btn" onClick={() => navigate(passportListPath)}>
             ✕ Cancel
           </button>
           {tab === "create" && (

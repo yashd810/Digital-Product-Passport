@@ -38,9 +38,10 @@ describe("product identifier service", () => {
       granularity: "item",
     });
 
-    expect(candidates).toHaveLength(2);
+    expect(candidates).toHaveLength(3);
     expect(candidates[0]).toBe("BAT-7788");
-    expect(candidates[1]).toContain("did:web:www.example.test:did:battery:item:");
+    expect(candidates[1]).toBe("did:web:www.example.test:did:battery:item:BAT-7788");
+    expect(candidates[2]).toContain("did:web:www.example.test:did:battery:item:c4-bat-7788-");
   });
 
   test("existing did input stays untouched", () => {

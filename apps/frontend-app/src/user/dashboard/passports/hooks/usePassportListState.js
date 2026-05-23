@@ -45,7 +45,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const [selectedPassports, setSelectedPassports] = useState(new Set());
   const [expandedPassportGroups, setExpandedPassportGroups] = useState(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
-  const [sortConfig, setSortConfig] = useState({ key: "created_at", direction: "desc" });
+  const [sortConfig, setSortConfig] = useState({ key: "createdAt", direction: "desc" });
   const [columnFilters, setColumnFilters] = useState({});
   const [showFilters, setShowFilters] = useState(false);
   const [allPassportTypes, setAllPassportTypes] = useState([]);
@@ -76,28 +76,28 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const getViewerPath = useCallback((passport, { forcePreview = false } = {}) => {
     if (!passport?.dppId) return null;
 
-    const normalizedStatus = normalizePassportStatus(passport.release_status);
-    if (!forcePreview && normalizedStatus === "released" && passport.internal_alias_id) {
+    const normalizedStatus = normalizePassportStatus(passport.releaseStatus);
+    if (!forcePreview && normalizedStatus === "released" && passport.internalAliasId) {
       return buildPublicPassportPath({
         companyName: user?.company_name,
-        modelName: passport.model_name,
-        internalAliasId: passport.internal_alias_id,
+        modelName: passport.modelName,
+        internalAliasId: passport.internalAliasId,
       });
     }
 
-    if (!forcePreview && isObsoletePassportStatus(normalizedStatus) && passport.internal_alias_id && passport.version_number != null) {
+    if (!forcePreview && isObsoletePassportStatus(normalizedStatus) && passport.internalAliasId && passport.versionNumber != null) {
       return buildInactivePassportPath({
         companyName: user?.company_name,
-        modelName: passport.model_name,
-        internalAliasId: passport.internal_alias_id,
-        versionNumber: passport.version_number,
+        modelName: passport.modelName,
+        internalAliasId: passport.internalAliasId,
+        versionNumber: passport.versionNumber,
       });
     }
 
     return buildPreviewPassportPath({
       companyName: user?.company_name,
-      modelName: passport.model_name,
-      internalAliasId: passport.internal_alias_id,
+      modelName: passport.modelName,
+      internalAliasId: passport.internalAliasId,
       previewId: passport.dppId,
     });
   }, [user?.company_name]);
@@ -105,7 +105,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const openPassportViewer = useCallback((passport, options = {}) => {
     const path = getViewerPath(passport, options);
     if (!path) return;
-    const normalizedStatus = normalizePassportStatus(passport?.release_status);
+    const normalizedStatus = normalizePassportStatus(passport?.releaseStatus);
     const isPublicRoute = !options.forcePreview && (normalizedStatus === "released" || isObsoletePassportStatus(normalizedStatus));
     const url = isPublicRoute ? buildPublicViewerUrl(path) : `${window.location.origin}${path}`;
     if (!url) return;
@@ -147,7 +147,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     setSelectedPassports(new Set());
     setExpandedPassportGroups(new Set());
     setShowFilters(false);
-    setSortConfig({ key: "created_at", direction: "desc" });
+    setSortConfig({ key: "createdAt", direction: "desc" });
     setColumnFilters({});
   }, [filterByUser, passportType, productKey, productCategoryKey]);
 
@@ -193,7 +193,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         });
         const types = typeResponse.ok ? await typeResponse.json() : [];
         const all = (await fetchForTypes(Array.isArray(types) ? types : []))
-          .filter((passport) => passport.created_by === user?.id)
+          .filter((passport) => passport.createdBy === user?.id)
           .sort((left, right) => getPassportDateTimestamp(right) - getPassportDateTimestamp(left));
         setPassports(all);
         return;
@@ -224,7 +224,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       const data = await response.json();
       data.sort((left, right) => {
         if (left.dppId !== right.dppId) return left.dppId.localeCompare(right.dppId);
-        return right.version_number - left.version_number;
+        return right.versionNumber - left.versionNumber;
       });
       setPassports(data);
     } catch {
@@ -295,23 +295,23 @@ export function usePassportListState({ user, companyId, filterByUser }) {
 
   const tableColumns = useMemo(() => {
     const columns = [
-      { key: "version_number", type: "number", getValue: (group) => group.latest?.version_number },
-      { key: "serial_number", type: "string", getValue: (group) => getPassportSerialNumberForType(group.latest, allPassportTypes) },
-      { key: "model_name", type: "string", getValue: (group) => group.latest?.model_name || "" },
-      { key: "created_at", type: "date", getValue: (group) => getPassportDateValue(group.latest) },
-      { key: "release_status", type: "string", getValue: (group) => group.latest?.release_status || "" },
+      { key: "versionNumber", type: "number", getValue: (group) => group.latest?.versionNumber },
+      { key: "serialNumber", type: "string", getValue: (group) => getPassportSerialNumberForType(group.latest, allPassportTypes) },
+      { key: "modelName", type: "string", getValue: (group) => group.latest?.modelName || "" },
+      { key: "createdAt", type: "date", getValue: (group) => getPassportDateValue(group.latest) },
+      { key: "releaseStatus", type: "string", getValue: (group) => group.latest?.releaseStatus || "" },
       { key: "completeness", type: "number", getValue: (group) => calcCompleteness(group.latest, allPassportTypes) ?? -1 },
     ];
 
     if (filterByUser) {
       columns.splice(3, 0, {
-        key: "passport_type",
+        key: "passportType",
         type: "string",
-        getValue: (group) => group.latest?.passport_type || activeType || "",
+        getValue: (group) => group.latest?.passportType || activeType || "",
       });
     } else {
       columns.push({
-        key: "created_by",
+        key: "createdBy",
         type: "string",
         getValue: (group) => (
           group.latest?.first_name && group.latest?.last_name
@@ -360,7 +360,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   }, [sortConfig]);
 
   const isFiltering = !!(searchText || filterStatus || Object.values(columnFilters).some(Boolean));
-  const selectedPassportList = passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${passport.version_number}`));
+  const selectedPassportList = passports.filter((passport) => selectedPassports.has(`${passport.dppId}-${passport.versionNumber}`));
 
   const togglePassportGroup = useCallback((groupKey) => {
     setExpandedPassportGroups((prev) => {
@@ -375,10 +375,10 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     const keys = [];
     groups.forEach((group) => {
       if (!group?.latest) return;
-      keys.push(`${group.latest.dppId}-${group.latest.version_number}`);
+      keys.push(`${group.latest.dppId}-${group.latest.versionNumber}`);
       if (expandedPassportGroups.has(group.key)) {
         group.olderVersions.forEach((version) => {
-          keys.push(`${version.dppId}-${version.version_number}`);
+          keys.push(`${version.dppId}-${version.versionNumber}`);
         });
       }
     });

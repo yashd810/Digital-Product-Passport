@@ -59,12 +59,12 @@ function PassportHistoryModal({
   }, [companyId, dppId, isCompanyMode, internalAliasId]);
 
   const toggleVisibility = async (entry) => {
-    if (!isCompanyMode || !isPublicHistoryStatus(entry.release_status)) return;
-    setSavingVersion(entry.version_number);
+    if (!isCompanyMode || !isPublicHistoryStatus(entry.releaseStatus)) return;
+    setSavingVersion(entry.versionNumber);
     setError("");
     try {
       const response = await fetchWithAuth(
-        `${API}/api/companies/${companyId}/passports/${dppId}/history/${entry.version_number}`,
+        `${API}/api/companies/${companyId}/passports/${dppId}/history/${entry.versionNumber}`,
         {
           method: "PATCH",
           headers: authHeaders({ "Content-Type": "application/json" }),
@@ -76,8 +76,8 @@ function PassportHistoryModal({
       setPayload((current) => ({
         ...current,
         history: (current?.history || []).map((item) =>
-          item.version_number === entry.version_number
-            ? { ...item, is_public: data.is_public }
+          item.versionNumber === entry.versionNumber
+            ? { ...item, isPublic: data.isPublic }
             : item
         ),
       }));
@@ -121,24 +121,24 @@ function PassportHistoryModal({
               const visibleChanges = entry.changed_fields?.slice(0, 6) || [];
               const hiddenChanges = Math.max((entry.changed_fields?.length || 0) - visibleChanges.length, 0);
               return (
-                <article key={entry.version_number} className="pv-history-card">
+                <article key={entry.versionNumber} className="pv-history-card">
                   <div className="pv-history-card-top">
                     <div className="pv-history-version-group">
-                      <span className="pv-history-version-pill">v{entry.version_number}</span>
-                      <span className={`pv-history-status ${entry.release_status}`}>{formatPassportStatus(entry.release_status)}</span>
-                      {entry.is_current && <span className="pv-history-current">Current</span>}
+                      <span className="pv-history-version-pill">v{entry.versionNumber}</span>
+                      <span className={`pv-history-status ${entry.releaseStatus}`}>{formatPassportStatus(entry.releaseStatus)}</span>
+                      {entry.isCurrent && <span className="pv-history-current">Current</span>}
                     </div>
                     {isCompanyMode && (
                       <button
                         type="button"
-                        className={`pv-history-visibility-btn${entry.is_public ? " public" : ""}`}
+                        className={`pv-history-visibility-btn${entry.isPublic ? " public" : ""}`}
                         onClick={() => toggleVisibility(entry)}
-                        disabled={savingVersion === entry.version_number || !isPublicHistoryStatus(entry.release_status)}
-                        title={!isPublicHistoryStatus(entry.release_status) ? "Only released or obsolete versions can be public." : ""}
+                        disabled={savingVersion === entry.versionNumber || !isPublicHistoryStatus(entry.releaseStatus)}
+                        title={!isPublicHistoryStatus(entry.releaseStatus) ? "Only released or obsolete versions can be public." : ""}
                       >
-                        {savingVersion === entry.version_number
+                        {savingVersion === entry.versionNumber
                           ? "Saving…"
-                          : entry.is_public
+                          : entry.isPublic
                             ? "Public"
                             : "Hidden"}
                       </button>
@@ -146,8 +146,8 @@ function PassportHistoryModal({
                   </div>
 
                   <div className="pv-history-meta">
-                    <span>{formatHistoryDate(entry.updated_at || entry.created_at)}</span>
-                    {entry.created_by_name && <span>{entry.created_by_name}</span>}
+                    <span>{formatHistoryDate(entry.updatedAt || entry.createdAt)}</span>
+                    {entry.createdByName && <span>{entry.createdByName}</span>}
                   </div>
 
                   <p className="pv-history-summary">{entry.summary}</p>
@@ -155,12 +155,12 @@ function PassportHistoryModal({
                   {(entry.public_path || entry.inactive_path) && (
                     <div className="pv-history-meta">
                       <a
-                        href={entry.is_current ? entry.public_path : entry.inactive_path}
+                        href={entry.isCurrent ? entry.publicPath : entry.inactivePath}
                         className="pv-history-open-link"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {entry.is_current ? "Open current passport" : `Open v${entry.version_number} snapshot`}
+                        {entry.isCurrent ? "Open current passport" : `Open v${entry.versionNumber} snapshot`}
                       </a>
                     </div>
                   )}
@@ -168,7 +168,7 @@ function PassportHistoryModal({
                   {visibleChanges.length > 0 && (
                     <div className="pv-history-changes">
                       {visibleChanges.map((change) => (
-                        <div key={`${entry.version_number}-${change.key}`} className="pv-history-change-row">
+                        <div key={`${entry.versionNumber}-${change.key}`} className="pv-history-change-row">
                           <span className="pv-history-change-label">{change.label}</span>
                           <div className="pv-history-change-values">
                             <span>{change.before}</span>

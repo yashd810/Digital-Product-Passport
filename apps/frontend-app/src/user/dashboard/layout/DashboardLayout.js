@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation, useParams } from "react-router-dom";
 import NotificationsPanel from "../notifications/NotificationsPanel";
 import { applyTheme, getStoredTheme } from "../../../app/providers/ThemeContext";
 import { useI18n } from "../../../app/providers/i18n";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { buildDashboardPath, resolveDashboardCompanySlug } from "../utils/dashboardRoutes";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -18,6 +19,7 @@ function formatPassportTypeLabel(passportType) {
 function DashboardLayout({ user, companyId, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { companySlug: routeCompanySlug } = useParams();
   const { t, lang, setLang } = useI18n();
   const [passportTypes, setPassportTypes] = useState([]);
   const [currentTheme,  setCurrentTheme]  = useState(() => getStoredTheme(user?.id));
@@ -69,6 +71,13 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
   const isEditor = user?.role === "editor" || user?.role === "company_admin" || user?.role === "super_admin";
   const isAdmin  = user?.role === "company_admin" || user?.role === "super_admin";
+  const companySlug = resolveDashboardCompanySlug({
+    companySlug: routeCompanySlug,
+    companyName: user?.company_name,
+    companyId,
+  });
+  const dashboardPath = (subpath = "") => buildDashboardPath({ companySlug, subpath });
+  const isDashboardSectionActive = (section) => location.pathname.startsWith(dashboardPath(section));
   const displayName = user?.first_name ? `${user.first_name} ${user?.last_name || ""}`.trim() : user?.email;
   const initials = `${(user?.first_name || "").trim().charAt(0)}${(user?.last_name || "").trim().charAt(0)}`.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "?";
   const languageOptions = [
@@ -166,7 +175,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
             <nav className="sidebar-nav">
               {isEditor && (
-                <NavLink to="/dashboard/create" className={({isActive})=>`sidebar-link sidebar-create-btn${isActive?" active":""}`}>
+                <NavLink to={dashboardPath("create")} className={({isActive})=>`sidebar-link sidebar-create-btn${isActive?" active":""}`}>
                   + Create Passport
                 </NavLink>
               )}
@@ -182,10 +191,10 @@ function DashboardLayout({ user, companyId, onLogout }) {
               )}
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Start Here</p>
-              <NavLink to="/dashboard/overview" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("overview")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
               </NavLink>
-              <NavLink to="/dashboard/my-passports" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("my-passports")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 ✓ {t("myPassports")}
               </NavLink>
 
@@ -196,7 +205,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                   {Object.entries(groupedTypes).map(([productCategory, types]) => (
                     <React.Fragment key={productCategory}>
                       <NavLink
-                        to={`/dashboard/passports/product/${encodeURIComponent(productCategory)}`}
+                        to={dashboardPath(`passports/product/${encodeURIComponent(productCategory)}`)}
                         className={({ isActive }) => `sidebar-link sidebar-link-productCategory${isActive ? " active" : ""}`}
                       >
                         <span className="sidebar-productCategory-icon">{types[0]?.product_icon || "📋"}</span>
@@ -205,7 +214,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                       {types.map(pt => (
                         <NavLink
                           key={pt.id}
-                          to={`/dashboard/passports/${pt.type_name}`}
+                          to={dashboardPath(`passports/${pt.type_name}`)}
                           className={({isActive})=>`sidebar-link${isActive?" active":""}`}
                         >
                           {pt.display_name || formatPassportTypeLabel(pt.type_name)}
@@ -217,24 +226,24 @@ function DashboardLayout({ user, companyId, onLogout }) {
               )}
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Reusable Content</p>
-              <NavLink to="/dashboard/repository/files" end={false}
-                className={() => `sidebar-link${location.pathname.startsWith("/dashboard/repository") ? " active" : ""}`}>
+              <NavLink to={dashboardPath("repository/files")} end={false}
+                className={() => `sidebar-link${isDashboardSectionActive("repository") ? " active" : ""}`}>
                 🗂️ Repository
               </NavLink>
-              <NavLink to="/dashboard/templates" end={false}
-                className={() => `sidebar-link${location.pathname.startsWith("/dashboard/templates") ? " active" : ""}`}>
+              <NavLink to={dashboardPath("templates")} end={false}
+                className={() => `sidebar-link${isDashboardSectionActive("templates") ? " active" : ""}`}>
                 📋 Templates
               </NavLink>
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Approvals & Updates</p>
-              <NavLink to="/dashboard/workflow/inprogress" end={false}
-                className={() => `sidebar-link${location.pathname.startsWith("/dashboard/workflow") ? " active" : ""}`}>
+              <NavLink to={dashboardPath("workflow/inprogress")} end={false}
+                className={() => `sidebar-link${isDashboardSectionActive("workflow") ? " active" : ""}`}>
                 ⚙️ {t("workflow")}
               </NavLink>
-              <NavLink to="/dashboard/notifications" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("notifications")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 🔔 Notifications
               </NavLink>
-              <NavLink to="/dashboard/messages" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("messages")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   💬 Messages
                   {msgUnread > 0 && (
@@ -246,35 +255,35 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 </span>
               </NavLink>
 
-              <NavLink to="/dashboard/archived" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("archived")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📦 Archived
               </NavLink>
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Workspace Settings</p>
-              <NavLink to="/dashboard/company-profile" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("company-profile")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 🏢 Company Profile
               </NavLink>
               {(isAdmin || isEditor) && (
-                <NavLink to="/dashboard/team" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+                <NavLink to={dashboardPath("team")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                   👥 {t("manageTeam")}
                 </NavLink>
               )}
-              <NavLink to="/dashboard/security" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("security")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 🔐 Security
               </NavLink>
-              <NavLink to="/dashboard/profile" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("profile")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 👤 {t("myProfile")}
               </NavLink>
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Logs & Support</p>
-              <NavLink to="/dashboard/audit-logs" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("audit-logs")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📋 {t("auditLogs")}
               </NavLink>
-              <NavLink to="/dashboard/manual" className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
+              <NavLink to={dashboardPath("manual")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📘 Manual
               </NavLink>
-              <NavLink to="/dashboard/dictionary/battery/v1"
-                className={() => `sidebar-link${location.pathname.startsWith("/dashboard/dictionary") ? " active" : ""}`}>
+              <NavLink to={dashboardPath("dictionary/battery/v1")}
+                className={() => `sidebar-link${isDashboardSectionActive("dictionary") ? " active" : ""}`}>
                 🔖 Battery Dictionary
               </NavLink>
             </nav>

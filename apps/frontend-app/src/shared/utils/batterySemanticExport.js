@@ -30,15 +30,13 @@ const DPP_CONTEXT = {
   versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
   internalId: "dpp:internalId",
   dppId: "dpp:dppId",
-  passport_type: "dpp:passportType",
-  semantic_model: "dpp:semanticModel",
-  model_name: "dpp:modelName",
-  internal_alias_id: "dpp:internalAliasId",
-  release_status: "dpp:releaseStatus",
-  version_number: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
-  archived_at: { "@id": "dpp:archivedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
-  created_at: { "@id": "dpp:createdAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
-  updated_at: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+  semanticModel: "dpp:semanticModel",
+  modelName: "dpp:modelName",
+  internalAliasId: "dpp:internalAliasId",
+  releaseStatus: "dpp:releaseStatus",
+  archivedAt: { "@id": "dpp:archivedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+  createdAt: { "@id": "dpp:createdAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+  updatedAt: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
 };
 
 function normalizeSemanticModelKey(modelKey) {
@@ -72,7 +70,7 @@ function shouldUseBatteryDictionary(passportType, options = {}) {
 
 function sanitizePassport(passport, passportType) {
   const clean = { "@type": "DigitalProductPassport" };
-  const resolvedPassportType = passport.passport_type || passportType || null;
+  const resolvedPassportType = passport.passportType || passportType || null;
 
   Object.entries(passport || {}).forEach(([key, value]) => {
     if (value === undefined) return;
@@ -80,8 +78,8 @@ function sanitizePassport(passport, passportType) {
     clean[key] = value;
   });
 
-  if (resolvedPassportType && !clean.passport_type) {
-    clean.passport_type = resolvedPassportType;
+  if (resolvedPassportType && !clean.passportType) {
+    clean.passportType = resolvedPassportType;
   }
 
   return clean;
@@ -91,7 +89,7 @@ export function buildPassportJsonLdExport(passports, passportType) {
   if (!Array.isArray(passports)) return passports;
   const options = arguments[2] || {};
 
-  const resolvedType = String(passportType || passports[0]?.passport_type || "").trim().toLowerCase();
+  const resolvedType = String(passportType || passports[0]?.passportType || "").trim().toLowerCase();
   const graph = passports.map((passport) => sanitizePassport(passport, resolvedType));
   const contexts = [DPP_CONTEXT];
 
@@ -104,8 +102,8 @@ export function buildPassportJsonLdExport(passports, passportType) {
     "@graph": graph,
     ...(shouldUseBatteryDictionary(resolvedType, options)
       ? {
-          passport_type: resolvedType || graph[0]?.passport_type || null,
-          semantic_model: {
+          passportType: resolvedType || graph[0]?.passportType || null,
+          semanticModel: {
             semanticModelKey: BATTERY_PASS_MODEL_KEY,
             contextUrl: BATTERY_CONTEXT_URL,
           },

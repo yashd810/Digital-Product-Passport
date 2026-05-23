@@ -13,6 +13,7 @@ function createDraftPassportUseCase(deps) {
     buildStoredProductIdentifiers,
     buildComplianceManagedFields,
     getWritablePassportColumns,
+    joinQuotedSqlIdentifiers,
     toStoredPassportValue,
     extractCarrierAuthenticityMutation,
     applyCarrierAuthenticityMutation,
@@ -40,35 +41,24 @@ function createDraftPassportUseCase(deps) {
     isBulk = false,
   }) {
     const {
-      model_name,
-      internal_alias_id,
-      product_image,
+      modelName,
+      internalAliasId,
+      productImage,
       granularity: requestedGranularity,
-      compliance_profile_key,
-      content_specification_ids,
-      carrier_policy_key,
-      carrier_authenticity,
-      economic_operator_id,
-      economic_operator_identifier_scheme,
-      facility_id,
+      complianceProfileKey,
+      contentSpecificationIds,
+      carrierPolicyKey,
+      carrierAuthenticity,
+      economicOperatorId,
+      economicOperatorIdentifierScheme,
+      facilityId,
       ...fields
     } = item;
-    if (product_image !== undefined) fields.product_image = product_image;
-
-    if (typeSchema?.aliasToKey instanceof Map) {
-      for (const [rawKey, value] of Object.entries({ ...fields })) {
-        const canonicalKey = typeSchema.aliasToKey.get(String(rawKey).trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
-        if (!canonicalKey || canonicalKey === rawKey) continue;
-        if (fields[canonicalKey] === undefined) {
-          fields[canonicalKey] = value;
-        }
-        delete fields[rawKey];
-      }
-    }
+    if (productImage !== undefined) fields.productImage = productImage;
 
     const dppId = generateDppRecordId();
     const lineageId = dppId;
-    const normalizedProductId = normalizeInternalAliasIdValue(internal_alias_id) || generateInternalAliasIdValue(dppId);
+    const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId) || generateInternalAliasIdValue(dppId);
 
     const existingByProductId = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId });
     if (existingByProductId) {
@@ -110,7 +100,7 @@ function createDraftPassportUseCase(deps) {
       passportType: resolvedPassportType,
       internalAliasId: normalizedProductId,
       granularity: effectiveGranularity,
-      passportLike: { ...fields, internal_alias_id: normalizedProductId },
+      passportLike: { ...fields, internalAliasId: normalizedProductId, internal_alias_id: normalizedProductId },
     });
     const complianceManagedFields = await buildComplianceManagedFields({
       companyId,
@@ -118,12 +108,12 @@ function createDraftPassportUseCase(deps) {
       granularity: effectiveGranularity,
       requestedFields: {
         ...fields,
-        compliance_profile_key,
-        content_specification_ids,
-        carrier_policy_key,
-        economic_operator_id,
-        economic_operator_identifier_scheme,
-        facility_id,
+        complianceProfileKey,
+        contentSpecificationIds,
+        carrierPolicyKey,
+        economicOperatorId,
+        economicOperatorIdentifierScheme,
+        facilityId,
       },
     });
 
@@ -131,15 +121,15 @@ function createDraftPassportUseCase(deps) {
     const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
     const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
       ...item,
-      carrier_authenticity,
+      carrierAuthenticity,
     });
-    const carrierAuthenticity = await maybeSignCarrierPayload({
+    const signedCarrierAuthenticity = await maybeSignCarrierPayload({
       passport: {
         dppId,
         dpp_id: dppId,
         release_status: "draft",
         company_id: companyId,
-        model_name: model_name || null,
+        model_name: modelName || null,
         internal_alias_id: storedProductIdentifiers.internal_alias_id,
       },
       companyName,
@@ -170,13 +160,13 @@ function createDraftPassportUseCase(deps) {
       dppId,
       lineageId,
       companyId,
-      model_name || null,
+      modelName || null,
       storedProductIdentifiers.internal_alias_id,
       storedProductIdentifiers.product_identifier_did,
       complianceManagedFields.compliance_profile_key,
       complianceManagedFields.content_specification_ids,
       complianceManagedFields.carrier_policy_key,
-      buildCarrierAuthenticityStorageValue(carrierAuthenticity),
+      buildCarrierAuthenticityStorageValue(signedCarrierAuthenticity),
       complianceManagedFields.economic_operator_id,
       complianceManagedFields.economic_operator_identifier_scheme,
       complianceManagedFields.facility_id,
@@ -188,7 +178,7 @@ function createDraftPassportUseCase(deps) {
 
     const inserted = await withTransaction(pool, async (client) => {
       const insertResult = await client.query(
-        `INSERT INTO ${tableName} (${allCols.join(", ")}) VALUES (${places}) RETURNING *`,
+        `INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`,
         allVals
       );
       await insertPassportRegistry({
@@ -205,7 +195,7 @@ function createDraftPassportUseCase(deps) {
       internal_alias_id: storedProductIdentifiers.internal_alias_id,
       product_identifier_did: storedProductIdentifiers.product_identifier_did,
       passport_type: resolvedPassportType,
-      model_name,
+      model_name: modelName,
       granularity: effectiveGranularity,
       compliance_profile_key: complianceManagedFields.compliance_profile_key,
       ...(isBulk ? { bulk: true } : {}),
@@ -221,7 +211,7 @@ function createDraftPassportUseCase(deps) {
     return {
       passport: inserted,
       dppId,
-      model_name: model_name || null,
+      modelName: modelName || null,
       normalizedProductId,
       storedProductIdentifiers,
       effectiveGranularity,

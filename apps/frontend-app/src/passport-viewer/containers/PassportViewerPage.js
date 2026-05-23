@@ -69,7 +69,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     if (!response.ok) throw new Error("Could not refresh passport resources");
     const data = await response.json();
     if (applyState) {
-      const resolvedCompanyId = data?.company_id || data?.companyId || previewCompanyId || null;
+      const resolvedCompanyId = data?.companyId || previewCompanyId || null;
       setPassport(data);
       if (data?.company_profile) setCompanyData(data.company_profile);
       if (isPreviewMode && resolvedCompanyId) {
@@ -104,14 +104,14 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       try {
         // 1. Fetch the passport record
         const data = await fetchPassportRecord({ applyState: true });
-        const resolvedCompanyId = data?.company_id || data?.companyId || previewCompanyId || null;
+        const resolvedCompanyId = data?.companyId || previewCompanyId || null;
 
         // 2. Fetch company branding in parallel with type definition
         const [profileRes, typeRes] = await Promise.all([
           isPreviewMode && resolvedCompanyId
             ? fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`)
             : Promise.resolve(null),
-          fetchWithAuth(`${API}/api/passport-types/${data.passport_type}`),
+          fetchWithAuth(`${API}/api/passport-types/${data.passportType}`),
         ]);
 
         if (profileRes?.ok) setCompanyData(await profileRes.json());
@@ -149,16 +149,16 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   // Secondary data loading
   useEffect(() => {
-    if (!passport?.dppId || !passport?.internal_alias_id) return;
+    if (!passport?.dppId || !passport?.internalAliasId) return;
     (async () => {
       setQrLoading(true);
       try {
         const generatedBundle = await generateQRCodeBundle({
-          internalAliasId: passport.internal_alias_id,
+          internalAliasId: passport.internalAliasId,
           companyName: companyData?.company_name,
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufactured_by,
-          modelName: passport.model_name,
+          modelName: passport.modelName,
           granularity: passport.granularity || "item",
         });
         if (generatedBundle?.qrCodeDataUrl) {
@@ -168,7 +168,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
             await saveQRCodeToDatabase(
               passport.dppId,
               generatedBundle.publicUrl,
-              passport.passport_type,
+              passport.passportType,
               generatedBundle.carrierAuthenticity
             );
           } catch {}
@@ -180,7 +180,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         setQrLoading(false);
       }
     })();
-  }, [companyData?.company_name, passport?.dppId, passport?.manufactured_by, passport?.manufacturer, passport?.model_name, passport?.passport_type, passport?.internal_alias_id]);
+  }, [companyData?.company_name, passport?.dppId, passport?.manufactured_by, passport?.manufacturer, passport?.modelName, passport?.passportType, passport?.internalAliasId]);
 
   // Fetch + poll dynamic field values every 30 s
   useEffect(() => {
@@ -197,39 +197,39 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   // Fetch signature verification for released passports
   useEffect(() => {
-    if (!passport?.dppId || !isReleasedPassportStatus(passport?.release_status)) return;
+    if (!passport?.dppId || !isReleasedPassportStatus(passport?.releaseStatus)) return;
     fetchWithAuth(`${API}/api/passports/${passport.dppId}/signature`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setSigVerification(d); })
       .catch(() => {});
-  }, [passport?.dppId, passport?.release_status]);
+  }, [passport?.dppId, passport?.releaseStatus]);
 
   useEffect(() => {
     if (!passport?.dppId) return;
-    if (!isReleasedPassportStatus(passport?.release_status) && !isObsoletePassportStatus(passport?.release_status)) return;
+    if (!isReleasedPassportStatus(passport?.releaseStatus) && !isObsoletePassportStatus(passport?.releaseStatus)) return;
     fetchWithAuth(`${API}/api/public/dpp/${passport.dppId}/verification-bundle.json`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d) setVerificationBundle(d); })
       .catch(() => {});
-  }, [passport?.dppId, passport?.release_status]);
+  }, [passport?.dppId, passport?.releaseStatus]);
 
   // Fetch access-key metadata for logged-in company users.
   useEffect(() => {
-    if (!isLoggedIn || !passport?.dppId || !passport?.company_id) return;
-    fetchWithAuth(`${API}/api/companies/${passport.company_id}/passports/${passport.dppId}/access-key`, {
+    if (!isLoggedIn || !passport?.dppId || !passport?.companyId) return;
+    fetchWithAuth(`${API}/api/companies/${passport.companyId}/passports/${passport.dppId}/access-key`, {
       headers: authHeaders(),
     })
       .then(r => r.ok ? r.json() : null)
       .then((d) => { if (d) setPassportAccessKeyMeta(d); })
       .catch(() => {});
-  }, [passport?.dppId, passport?.company_id, isLoggedIn]);
+  }, [passport?.dppId, passport?.companyId, isLoggedIn]);
 
   const handleRegenerateAccessKey = async () => {
-    if (!passport?.dppId || !passport?.company_id) return;
+    if (!passport?.dppId || !passport?.companyId) return;
     if (!window.confirm("Issue a new passport access key? The previous key will stop working immediately.")) return;
     setAccessKeyBusy(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${passport.company_id}/passports/${passport.dppId}/access-key/regenerate`, {
+      const r = await fetchWithAuth(`${API}/api/companies/${passport.companyId}/passports/${passport.dppId}/access-key/regenerate`, {
         method: "POST",
         headers: authHeaders(),
       });
@@ -278,53 +278,53 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
-    modelName: passport?.model_name,
-    internalAliasId: passport?.internal_alias_id,
+    modelName: passport?.modelName,
+    internalAliasId: passport?.internalAliasId,
   });
   const canonicalTechnicalPath = buildTechnicalPassportPath({
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
-    modelName: passport?.model_name,
-    internalAliasId: passport?.internal_alias_id,
+    modelName: passport?.modelName,
+    internalAliasId: passport?.internalAliasId,
   });
   const canonicalInactivePath = buildInactivePassportPath({
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
-    modelName: passport?.model_name,
-    internalAliasId: passport?.internal_alias_id,
+    modelName: passport?.modelName,
+    internalAliasId: passport?.internalAliasId,
     versionNumber,
   });
   const canonicalInactiveTechnicalPath = buildInactiveTechnicalPassportPath({
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
-    modelName: passport?.model_name,
-    internalAliasId: passport?.internal_alias_id,
+    modelName: passport?.modelName,
+    internalAliasId: passport?.internalAliasId,
     versionNumber,
   });
   const canonicalPreviewPath = buildPreviewPassportPath({
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
-    modelName: passport?.model_name,
-    internalAliasId: passport?.internal_alias_id,
+    modelName: passport?.modelName,
+    internalAliasId: passport?.internalAliasId,
     previewId: passport?.dppId,
   });
   const canonicalPreviewTechnicalPath = buildPreviewTechnicalPassportPath({
     companyName: companyData?.company_name,
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufactured_by,
-    modelName: passport?.model_name,
-    internalAliasId: passport?.internal_alias_id,
+    modelName: passport?.modelName,
+    internalAliasId: passport?.internalAliasId,
     previewId: passport?.dppId,
   });
   const releasedAtTimestamp =
     verificationBundle?.releasedAt
     || sigVerification?.releasedAt
     || passport?.releasedAt
-    || passport?.released_at
+    || passport?.releasedAt
     || null;
 
   // Route normalization
@@ -401,11 +401,11 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           lang={lang}
           sigVerification={sigVerification}
           verificationBundle={verificationBundle}
-          carrierAuthenticity={passport?.carrier_authenticity || carrierAuthenticity}
+          carrierAuthenticity={passport?.carrierAuthenticity || carrierAuthenticity}
           onRefreshFieldUrl={refreshFieldUrl}
           isPreviewMode={isPreviewMode}
           isInactiveView={isInactiveView}
-          isObsolete={isObsoletePassportStatus(passport.release_status)}
+          isObsolete={isObsoletePassportStatus(passport.releaseStatus)}
           canonicalPublicPath={canonicalPublicPath}
           lastUpdateAt={releasedAtTimestamp}
         />

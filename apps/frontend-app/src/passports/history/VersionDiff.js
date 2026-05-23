@@ -7,8 +7,8 @@ import "../../assets/styles/Dashboard.css";
 const API = import.meta.env.VITE_API_URL || "";
 
 const SKIP = new Set([
-  "id","company_id","created_at","updated_at","qr_code","deleted_at",
-  "dppId","created_by","updated_by","release_status","version_number",
+  "id","companyId","createdAt","updatedAt","qrCode","deletedAt",
+  "dppId","createdBy","updatedBy","releaseStatus","versionNumber",
 ]);
 
 function VersionDiff({ companyId }) {
@@ -85,7 +85,7 @@ function VersionDiff({ companyId }) {
         <button className="diff-back-btn" onClick={() => navigate(-1)}>← Back</button>
         <div>
           <h2 className="diff-title">🔀 Version Comparison</h2>
-          <p className="diff-subtitle">{vA?.model_name || dppId} · {pType}</p>
+          <p className="diff-subtitle">{vA?.modelName || dppId} · {pType}</p>
         </div>
       </div>
 
@@ -93,15 +93,15 @@ function VersionDiff({ companyId }) {
         <div className="diff-selectors">
           <div className="diff-sel-group">
             <label>Compare from</label>
-            <select value={vA?.version_number || ""} onChange={e => setVA(versions.find(v => v.version_number === parseInt(e.target.value)))}>
-              {versions.map(v => <option key={v.id} value={v.version_number}>v{v.version_number} — {formatStatus(v.release_status)}</option>)}
+            <select value={vA?.versionNumber || ""} onChange={e => setVA(versions.find(v => v.versionNumber === parseInt(e.target.value, 10)))}>
+              {versions.map(v => <option key={v.id} value={v.versionNumber}>v{v.versionNumber} — {formatStatus(v.releaseStatus)}</option>)}
             </select>
           </div>
           <span className="diff-sel-arrow">↔</span>
           <div className="diff-sel-group">
             <label>Compare to</label>
-            <select value={vB?.version_number || ""} onChange={e => setVB(versions.find(v => v.version_number === parseInt(e.target.value)))}>
-              {versions.map(v => <option key={v.id} value={v.version_number}>v{v.version_number} — {formatStatus(v.release_status)}</option>)}
+            <select value={vB?.versionNumber || ""} onChange={e => setVB(versions.find(v => v.versionNumber === parseInt(e.target.value, 10)))}>
+              {versions.map(v => <option key={v.id} value={v.versionNumber}>v{v.versionNumber} — {formatStatus(v.releaseStatus)}</option>)}
             </select>
           </div>
         </div>
@@ -114,13 +114,13 @@ function VersionDiff({ companyId }) {
 
       <div className="diff-version-headers">
         <div className="diff-vh left">
-          <span>v{vA?.version_number}</span>
-          <span className={`diff-status ${vA?.release_status}`}>{formatStatus(vA?.release_status)}</span>
+          <span>v{vA?.versionNumber}</span>
+          <span className={`diff-status ${vA?.releaseStatus}`}>{formatStatus(vA?.releaseStatus)}</span>
         </div>
         <div className="diff-field-name-header">Field</div>
         <div className="diff-vh right">
-          <span className={`diff-status ${vB?.release_status}`}>{formatStatus(vB?.release_status)}</span>
-          <span>v{vB?.version_number}</span>
+          <span className={`diff-status ${vB?.releaseStatus}`}>{formatStatus(vB?.releaseStatus)}</span>
+          <span>v{vB?.versionNumber}</span>
         </div>
       </div>
 

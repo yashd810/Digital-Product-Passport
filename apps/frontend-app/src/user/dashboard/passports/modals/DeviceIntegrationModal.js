@@ -116,7 +116,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
         aria-describedby={dialogDescriptionId}
       >
         <div className="modal-header">
-          <span id={dialogTitleId} className="modal-title">Device Integration — {passport.model_name}</span>
+          <span id={dialogTitleId} className="modal-title">Device Integration — {passport.modelName}</span>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close device integration modal">✕</button>
         </div>
 

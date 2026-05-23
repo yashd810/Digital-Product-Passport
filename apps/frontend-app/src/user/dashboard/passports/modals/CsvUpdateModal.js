@@ -40,8 +40,8 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
 
   const downloadCurrent = () => {
     const rows = [["Field Name", "Value"]];
-    rows.push(["model_name", passport.model_name || ""]);
-    rows.push(["internal_alias_id", passport.internal_alias_id || ""]);
+    rows.push(["modelName", passport.modelName || ""]);
+    rows.push(["internalAliasId", passport.internalAliasId || ""]);
     allFields.forEach((field) => {
       const value = passport[field.key];
       rows.push([field.label, value === null || value === undefined ? "" : String(value)]);
@@ -50,7 +50,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `${(passport.model_name || passport.dppId).replace(/\s+/g, "_")}_update.csv`;
+    link.download = `${(passport.modelName || passport.dppId).replace(/\s+/g, "_")}_update.csv`;
     link.click();
   };
 
@@ -65,7 +65,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "Update failed");
       const count = Object.keys(data).length;
-      onDone(`"${passport.model_name}" updated — ${count} field${count !== 1 ? "s" : ""} set from CSV`);
+      onDone(`"${passport.modelName}" updated — ${count} field${count !== 1 ? "s" : ""} set from CSV`);
     } catch (ex) {
       setErr(ex.message);
       setPhase(conflicts.length ? "confirming" : "upload");
@@ -106,8 +106,12 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
       const field =
         allFields.find((item) => item.label?.trim().toLowerCase() === normalized) ||
         allFields.find((item) => item.key?.toLowerCase() === normalized) ||
-        (normalized === "model_name" ? { key: "model_name", type: "text" } : null) ||
-        (normalized === "internal_alias_id" ? { key: "internal_alias_id", type: "text" } : null);
+        (normalized === "modelname" ? { key: "modelName", type: "text" } : null) ||
+        (normalized === "internalaliasid" ? { key: "internalAliasId", type: "text" } : null) ||
+        (normalized === "model_name" ? { key: "modelName", type: "text" } : null) ||
+        (normalized === "internal_alias_id" ? { key: "internalAliasId", type: "text" } : null) ||
+        (normalized === "modelname" ? { key: "modelName", type: "text" } : null) ||
+        (normalized === "internalaliasid" ? { key: "internalAliasId", type: "text" } : null);
 
       if (!field) return;
       parsedData[field.key] = field.type === "boolean"
@@ -192,7 +196,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
         {(phase === "upload" || (phase === "loading" && err)) && phase !== "loading" && (
           <>
             <h3 className="dashboard-modal-title">Update data via CSV</h3>
-            <p className="dashboard-modal-subtitle">Passport: <strong>{passport.model_name}</strong></p>
+            <p className="dashboard-modal-subtitle">Passport: <strong>{passport.modelName}</strong></p>
 
             {err && <div className="dashboard-inline-error" role="alert">{err}</div>}
 

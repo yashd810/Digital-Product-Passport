@@ -47,28 +47,28 @@ export function PassportListTable({
               </th>
             )}
             <th className="passport-table-pin-col"></th>
-            <th className="passport-version-col"><SortableHeader columnKey="version_number" label="Ver." sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            <th><SortableHeader columnKey="serial_number" label="Serial Number" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            <th><SortableHeader columnKey="model_name" label="Model" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            {filterByUser && <th><SortableHeader columnKey="passport_type" label="Type" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
-            <th><SortableHeader columnKey="created_at" label="Date" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            <th><SortableHeader columnKey="release_status" label="Status" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th className="passport-version-col"><SortableHeader columnKey="versionNumber" label="Ver." sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th><SortableHeader columnKey="serialNumber" label="Serial Number" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th><SortableHeader columnKey="modelName" label="Model" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            {filterByUser && <th><SortableHeader columnKey="passportType" label="Type" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
+            <th><SortableHeader columnKey="createdAt" label="Date" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
+            <th><SortableHeader columnKey="releaseStatus" label="Status" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
             <th><SortableHeader columnKey="completeness" label="Complete" sortConfig={sortConfig} toggleSort={toggleSort} /></th>
-            {!filterByUser && <th><SortableHeader columnKey="created_by" label="Created By" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
+            {!filterByUser && <th><SortableHeader columnKey="createdBy" label="Created By" sortConfig={sortConfig} toggleSort={toggleSort} /></th>}
             <th>Options</th>
           </tr>
           {showFilters && (
             <tr className="table-filter-row">
               {user?.role !== "viewer" && selectionMode && <th></th>}
               <th></th>
-              <th><input className="table-filter-input" value={columnFilters.version_number || ""} onChange={(e) => updateColumnFilter("version_number", e.target.value)} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.serial_number || ""} onChange={(e) => updateColumnFilter("serial_number", e.target.value)} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.model_name || ""} onChange={(e) => updateColumnFilter("model_name", e.target.value)} placeholder="Filter" /></th>
-              {filterByUser && <th><input className="table-filter-input" value={columnFilters.passport_type || ""} onChange={(e) => updateColumnFilter("passport_type", e.target.value)} placeholder="Filter" /></th>}
-              <th><input className="table-filter-input" value={columnFilters.created_at || ""} onChange={(e) => updateColumnFilter("created_at", e.target.value)} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.release_status || ""} onChange={(e) => updateColumnFilter("release_status", e.target.value)} placeholder="Filter" /></th>
+              <th><input className="table-filter-input" value={columnFilters.versionNumber || ""} onChange={(e) => updateColumnFilter("versionNumber", e.target.value)} placeholder="Filter" /></th>
+              <th><input className="table-filter-input" value={columnFilters.serialNumber || ""} onChange={(e) => updateColumnFilter("serialNumber", e.target.value)} placeholder="Filter" /></th>
+              <th><input className="table-filter-input" value={columnFilters.modelName || ""} onChange={(e) => updateColumnFilter("modelName", e.target.value)} placeholder="Filter" /></th>
+              {filterByUser && <th><input className="table-filter-input" value={columnFilters.passportType || ""} onChange={(e) => updateColumnFilter("passportType", e.target.value)} placeholder="Filter" /></th>}
+              <th><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={(e) => updateColumnFilter("createdAt", e.target.value)} placeholder="Filter" /></th>
+              <th><input className="table-filter-input" value={columnFilters.releaseStatus || ""} onChange={(e) => updateColumnFilter("releaseStatus", e.target.value)} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.completeness || ""} onChange={(e) => updateColumnFilter("completeness", e.target.value)} placeholder="Filter" /></th>
-              {!filterByUser && <th><input className="table-filter-input" value={columnFilters.created_by || ""} onChange={(e) => updateColumnFilter("created_by", e.target.value)} placeholder="Filter" /></th>}
+              {!filterByUser && <th><input className="table-filter-input" value={columnFilters.createdBy || ""} onChange={(e) => updateColumnFilter("createdBy", e.target.value)} placeholder="Filter" /></th>}
               <th></th>
             </tr>
           )}
@@ -79,13 +79,13 @@ export function PassportListTable({
               {renderPassportRow(group.latest, {
                 parentGuid: group.key,
                 hasOlderVersions: group.olderVersions.length > 0,
-                latestVersionNumber: group.latest.version_number,
+                latestVersionNumber: group.latest.versionNumber,
               })}
               {expandedPassportGroups.has(group.key) && group.olderVersions.map((version) =>
                 renderPassportRow(version, {
                   parentGuid: group.key,
                   isHistorical: true,
-                  latestVersionNumber: group.latest.version_number,
+                  latestVersionNumber: group.latest.versionNumber,
                 })
               )}
             </React.Fragment>

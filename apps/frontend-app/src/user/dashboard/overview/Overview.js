@@ -267,6 +267,38 @@ function timeAgo(d) {
   if(s<86400)return`${Math.floor(s/3600)}h ago`; return new Date(d).toLocaleDateString();
 }
 
+function normalizeOverviewAnalyticsPayload(payload) {
+  const analyticsRows = Array.isArray(payload?.analytics)
+    ? payload.analytics.map((item) => ({
+        ...item,
+        passportType: item.passportType || item.passport_type || "",
+        draftCount: item.draftCount ?? item.draft_count ?? 0,
+        inReviewCount: item.inReviewCount ?? item.in_review_count ?? 0,
+        releasedCount: item.releasedCount ?? item.released_count ?? 0,
+        revisedCount: item.revisedCount ?? item.revised_count ?? 0,
+        obsoleteCount: item.obsoleteCount ?? item.obsolete_count ?? 0,
+      }))
+    : [];
+
+  return {
+    ...(payload || {}),
+    analytics: analyticsRows,
+  };
+}
+
+function normalizeActivityRows(rows) {
+  return Array.isArray(rows)
+    ? rows.map((item) => ({
+        ...item,
+        userFirstName: item.userFirstName || item.user_first_name || "",
+        userLastName: item.userLastName || item.user_last_name || "",
+        userEmail: item.userEmail || item.user_email || "",
+        recordId: item.recordId || item.record_id || "",
+        createdAt: item.createdAt || item.created_at || "",
+      }))
+    : [];
+}
+
 function Overview({ companyId }) {
   const resolvedCompanyId = companyId;
   const now = new Date();
@@ -285,7 +317,7 @@ function Overview({ companyId }) {
   const fetchAnalytics = async () => {
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/analytics`,{ headers:{ ...authHeaders() } });
-      if(r.ok) setAnalytics(await r.json());
+      if(r.ok) setAnalytics(normalizeOverviewAnalyticsPayload(await r.json()));
     } catch {}
   };
   const fetchActivity = async () => {
@@ -293,7 +325,7 @@ function Overview({ companyId }) {
       const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/activity?limit=5`,{ headers:{ ...authHeaders() } });
       if(r.ok) {
         const data = await r.json();
-        setActivity(Array.isArray(data) ? data.slice(0, 5) : []);
+        setActivity(normalizeActivityRows(Array.isArray(data) ? data.slice(0, 5) : []));
       }
     } catch {}
   };
@@ -307,11 +339,11 @@ function Overview({ companyId }) {
       const now = new Date();
       const sumField = (field) =>
         analytics?.analytics?.reduce((s, x) => s + parseInt(x[field] || 0), 0) || 0;
-      const totalDraft = sumField("draft_count");
-      const totalReleased = sumField("released_count");
-      const totalInRevision = sumField("revised_count");
-      const totalInReview = sumField("in_review_count");
-      const totalObsolete = sumField("obsolete_count");
+      const totalDraft = sumField("draftCount");
+      const totalReleased = sumField("releasedCount");
+      const totalInRevision = sumField("revisedCount");
+      const totalInReview = sumField("inReviewCount");
+      const totalObsolete = sumField("obsoleteCount");
       const summaryStats = [
         { label: "Total Passports", value: analytics?.totalPassports || 0, tone: "default" },
         { label: "Draft", value: totalDraft, tone: "draft" },
@@ -329,8 +361,8 @@ function Overview({ companyId }) {
         { label: "In Revision", value: totalInRevision,  color: STATUS_COLORS.revised },
       ].filter((item) => item.value > 0);
       const typeChartData = (analytics?.analytics || []).map((stat, index) => ({
-        label: stat.passport_type.charAt(0).toUpperCase() + stat.passport_type.slice(1),
-        value: parseInt(stat.draft_count || 0, 10) + parseInt(stat.released_count || 0, 10) + parseInt(stat.revised_count || 0, 10) + parseInt(stat.in_review_count || 0, 10),
+        label: stat.passportType.charAt(0).toUpperCase() + stat.passportType.slice(1),
+        value: parseInt(stat.draftCount || 0, 10) + parseInt(stat.releasedCount || 0, 10) + parseInt(stat.revisedCount || 0, 10) + parseInt(stat.inReviewCount || 0, 10),
         color: OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length],
       }));
       const trendSeries = (normalizedTrend.series || []).map((series, index) => ({
@@ -372,11 +404,11 @@ function Overview({ companyId }) {
             title: "Breakdown by Passport Type",
             headers: ["Passport Type", "Draft", "In Review", "Released", "In Revision"],
             rows: (analytics?.analytics || []).map((stat) => [
-              stat.passport_type.charAt(0).toUpperCase() + stat.passport_type.slice(1),
-              stat.draft_count || 0,
-              stat.in_review_count || 0,
-              stat.released_count || 0,
-              stat.revised_count || 0,
+              stat.passportType.charAt(0).toUpperCase() + stat.passportType.slice(1),
+              stat.draftCount || 0,
+              stat.inReviewCount || 0,
+              stat.releasedCount || 0,
+              stat.revisedCount || 0,
             ]),
             emptyText: "No passport data yet.",
           },
@@ -395,11 +427,11 @@ function Overview({ companyId }) {
   if(!analytics) return <div className="loading dashboard-loading-panel">Loading overview...</div>;
 
   const sumField=(field)=>analytics?.analytics?.reduce((s,x)=>s+parseInt(x[field]||0),0)||0;
-  const totalDraft    = sumField("draft_count");
-  const totalReleased = sumField("released_count");
-  const totalInRevision  = sumField("revised_count");
-  const totalInReview = sumField("in_review_count");
-  const totalObsolete = sumField("obsolete_count");
+  const totalDraft    = sumField("draftCount");
+  const totalReleased = sumField("releasedCount");
+  const totalInRevision  = sumField("revisedCount");
+  const totalInReview = sumField("inReviewCount");
+  const totalObsolete = sumField("obsoleteCount");
   const scanStats     = analytics?.scanStats||0;
   const archivedCount = analytics?.archivedCount||0;
 
@@ -411,10 +443,10 @@ function Overview({ companyId }) {
   ].filter(s=>s.value>0);
 
   const typeChartData=analytics?.analytics?.map(s=>({
-    label:s.passport_type.charAt(0).toUpperCase()+s.passport_type.slice(1),
-    value:parseInt(s.draft_count||0)+parseInt(s.released_count||0)+parseInt(s.revised_count||0)+parseInt(s.in_review_count||0),
+    label:s.passportType.charAt(0).toUpperCase()+s.passportType.slice(1),
+    value:parseInt(s.draftCount||0)+parseInt(s.releasedCount||0)+parseInt(s.revisedCount||0)+parseInt(s.inReviewCount||0),
     color:OVERVIEW_BAR_COLORS[
-      analytics.analytics.findIndex(item => item.passport_type === s.passport_type) % OVERVIEW_BAR_COLORS.length
+      analytics.analytics.findIndex(item => item.passportType === s.passportType) % OVERVIEW_BAR_COLORS.length
     ],
   }))||[];
   const trendChartData = (normalizedTrend.series || []).map((series, index) => ({
@@ -492,13 +524,13 @@ function Overview({ companyId }) {
               )}
               <div className="analytics-cards">
                 {analytics.analytics.map(stat=>(
-                  <div key={stat.passport_type} className="type-stat-card">
-                    <h4>{stat.passport_type.charAt(0).toUpperCase()+stat.passport_type.slice(1)}</h4>
+                  <div key={stat.passportType} className="type-stat-card">
+                    <h4>{stat.passportType.charAt(0).toUpperCase()+stat.passportType.slice(1)}</h4>
                     <div className="type-stat-grid">
-                      <div className="type-stat-item"><div className="type-stat-label">Draft</div><div className="type-stat-draft">{stat.draft_count||0}</div></div>
-                      <div className="type-stat-item"><div className="type-stat-label">In Review</div><div className="type-stat-review">{stat.in_review_count||0}</div></div>
-                      <div className="type-stat-item"><div className="type-stat-label">Released</div><div className="type-stat-released">{stat.released_count||0}</div></div>
-                      <div className="type-stat-item"><div className="type-stat-label">In Revision</div><div className="type-stat-revised">{stat.revised_count||0}</div></div>
+                      <div className="type-stat-item"><div className="type-stat-label">Draft</div><div className="type-stat-draft">{stat.draftCount||0}</div></div>
+                      <div className="type-stat-item"><div className="type-stat-label">In Review</div><div className="type-stat-review">{stat.inReviewCount||0}</div></div>
+                      <div className="type-stat-item"><div className="type-stat-label">Released</div><div className="type-stat-released">{stat.releasedCount||0}</div></div>
+                      <div className="type-stat-item"><div className="type-stat-label">In Revision</div><div className="type-stat-revised">{stat.revisedCount||0}</div></div>
                     </div>
                   </div>
                 ))}
@@ -525,15 +557,15 @@ function Overview({ companyId }) {
                   </span>
                   <div className="activity-body">
                     <div className="activity-row-top">
-                      <span className="activity-user">{a.user_first_name ? `${a.user_first_name} ${a.user_last_name || ""}`.trim() : (a.user_email?.split("@")[0]||"System")}</span>
+                      <span className="activity-user">{a.userFirstName ? `${a.userFirstName} ${a.userLastName || ""}`.trim() : (a.userEmail?.split("@")[0]||"System")}</span>
                       <span className={`activity-badge ${(a.action||"").toLowerCase()}`}>{(a.action||"").replaceAll("_", " ")}</span>
                     </div>
                     <div className="activity-row-bottom">
                       <span className="activity-copy">passport activity recorded</span>
-                      {a.record_id&&<span className="activity-pass">{a.record_id.substring(0,8)}…</span>}
+                      {a.recordId&&<span className="activity-pass">{a.recordId.substring(0,8)}…</span>}
                     </div>
                   </div>
-                  <span className="activity-time">{timeAgo(a.created_at)}</span>
+                  <span className="activity-time">{timeAgo(a.createdAt)}</span>
                 </div>
               ))}
             </div>

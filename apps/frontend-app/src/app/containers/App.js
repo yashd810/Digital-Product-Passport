@@ -1,11 +1,12 @@
 import React, { Suspense, lazy, useState, useEffect } from "react";
-import { Routes, Route, Navigate, useParams } from "react-router-dom";
+import { Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import "../styles/App.css";
 import { I18nProvider } from "../providers/i18n";
 import { useSessionAuth } from "../hooks/useSessionAuth";
 import { AdminRoute, ProtectedRoute } from "../routes/RouteGuards";
 import { applyTheme, getStoredTheme } from "../providers/ThemeContext";
 import AppSkipLink from "../components/AppSkipLink";
+import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
 
 // Auth
 const Login = lazy(() => import("../../auth/containers/Login"));
@@ -77,6 +78,22 @@ function CSVImportTabRoute({ user, companyId }) {
   return <CSVImportGuide user={user} companyId={companyId} activeTab={tab || "create"} />;
 }
 
+function DashboardLegacyRedirect({ user, companyId }) {
+  const location = useLocation();
+  const legacySuffix = location.pathname.replace(/^\/dashboard\/?/, "");
+  const subpath = legacySuffix || "overview";
+  return (
+    <Navigate
+      to={`${buildDashboardPath({
+        companyName: user?.company_name,
+        companyId,
+        subpath,
+      })}${location.search || ""}`}
+      replace
+    />
+  );
+}
+
 function App() {
   const {
     authReady,
@@ -144,7 +161,12 @@ function App() {
         } />
 
         {/* Dashboard */}
-        <Route path="/dashboard" element={
+        <Route path="/dashboard/*" element={
+          <ProtectedRoute token={token} authReady={authReady}>
+            <DashboardLegacyRedirect user={user} companyId={companyId} />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/:companySlug" element={
           <ProtectedRoute token={token} authReady={authReady}>
             <DashboardLayout user={user} companyId={companyId} onLogout={handleLogout} />
           </ProtectedRoute>

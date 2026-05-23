@@ -6,6 +6,7 @@ function createArchiveHistoryHelpers({
   SYSTEM_PASSPORT_FIELDS,
   getWritablePassportColumns,
   getStoredPassportValues,
+  quoteSqlIdentifier,
   normalizePassportRow,
   normalizeReleaseStatus,
   isPublicHistoryStatus,
@@ -36,8 +37,8 @@ function createArchiveHistoryHelpers({
     const rowData = buildArchiveSnapshotRow(passport);
     if (!rowData || !passportType) return null;
 
-    const dppId = rowData.dpp_id || rowData.dppId || null;
-    const lineageId = rowData.lineage_id || dppId || null;
+    const dppId = rowData.dppId || null;
+    const lineageId = rowData.lineageId || dppId || null;
     if (!dppId || !lineageId) return null;
 
     await client.query(
@@ -49,13 +50,13 @@ function createArchiveHistoryHelpers({
       [
         dppId,
         lineageId,
-        rowData.company_id || null,
+        rowData.companyId || null,
         passportType,
-        Number.isFinite(Number(rowData.version_number)) ? Number(rowData.version_number) : 1,
-        rowData.model_name || null,
-        rowData.internal_alias_id || null,
-        rowData.product_identifier_did || null,
-        rowData.release_status || null,
+        Number.isFinite(Number(rowData.versionNumber)) ? Number(rowData.versionNumber) : 1,
+        rowData.modelName || null,
+        rowData.internalAliasId || null,
+        rowData.uniqueProductIdentifier || null,
+        rowData.releaseStatus || null,
         JSON.stringify(rowData),
         archivedBy || null,
         actorIdentifier || null,
@@ -95,9 +96,9 @@ function createArchiveHistoryHelpers({
     if (!updateCols.length) return [];
 
     const vals = getStoredPassportValues(updateCols, data);
-    const sets = updateCols.map((col, i) => `${col} = $${i + 1}`).join(", ");
+    const sets = updateCols.map((col, i) => `${quoteSqlIdentifier(col)} = $${i + 1}`).join(", ");
     const sql = `UPDATE ${tableName}
-       SET ${sets}, updated_by = $${vals.length + 1}, updated_at = NOW()
+       SET ${sets}, "updatedBy" = $${vals.length + 1}, "updatedAt" = NOW()
        WHERE id = $${vals.length + 2}
        ${includeUpdatedRow ? "RETURNING *" : ""}`;
     const result = await pool.query(sql, [...vals, userId, rowId]);
@@ -133,14 +134,14 @@ function createArchiveHistoryHelpers({
     }
 
     const versions = await getPassportVersionsByLineage({
-      lineageId: lineageContext.lineage_id,
+      lineageId: lineageContext.lineageId,
       passportType,
       companyId,
     });
 
-    const creatorIds = [...new Set(versions.map((row) => row.created_by).filter(Boolean))];
+    const creatorIds = [...new Set(versions.map((row) => row.createdBy).filter(Boolean))];
     const creatorMap = new Map();
-    const companyNameMap = await getCompanyNameMap(versions.map((row) => row.company_id).filter(Boolean));
+    const companyNameMap = await getCompanyNameMap(versions.map((row) => row.companyId).filter(Boolean));
     if (creatorIds.length) {
       const userRes = await pool.query(
         "SELECT id, first_name, last_name, email FROM users WHERE id = ANY($1::int[])",
@@ -164,25 +165,25 @@ function createArchiveHistoryHelpers({
         )
       : { rows: [] };
     const visibilityMap = new Map(
-      visibilityRes.rows.map((row) => [`${row.passport_dpp_id}:${Number(row.version_number)}`, !!row.is_public])
+      visibilityRes.rows.map((row) => [`${row.passport_dpp_id}:${Number(row.versionNumber)}`, !!row.is_public])
     );
 
     const ascending = [...versions].sort((a, b) => Number(a.version_number) - Number(b.version_number));
     const previousByVersion = new Map();
     ascending.forEach((version, index) => {
-      previousByVersion.set(Number(version.version_number), index > 0 ? ascending[index - 1] : null);
+      previousByVersion.set(Number(version.versionNumber), index > 0 ? ascending[index - 1] : null);
     });
 
     const latestVersionNumber = versions[0]?.version_number ?? null;
     const latestReleasedVersionNumber = versions
-      .filter((row) => isPublicHistoryStatus(row.release_status))
-      .reduce((max, row) => Math.max(max, Number(row.version_number || 0)), 0);
+      .filter((row) => isPublicHistoryStatus(row.releaseStatus))
+      .reduce((max, row) => Math.max(max, Number(row.versionNumber || 0)), 0);
 
     const history = versions
       .map((version) => {
-        const versionNumber = Number(version.version_number);
+        const versionNumber = Number(version.versionNumber);
         const previous = previousByVersion.get(versionNumber) || null;
-        const normalizedStatus = normalizeReleaseStatus(version.release_status);
+        const normalizedStatus = normalizeReleaseStatus(version.releaseStatus);
         const defaultPublic = isPublicHistoryStatus(normalizedStatus);
         const visibilityKey = `${version.dppId}:${versionNumber}`;
         const isPublic = visibilityMap.has(visibilityKey)
@@ -208,24 +209,24 @@ function createArchiveHistoryHelpers({
         return {
           version_number: versionNumber,
           release_status: normalizedStatus,
-          created_at: version.created_at,
-          updated_at: version.updated_at,
-          created_by_name: creatorMap.get(version.created_by) || null,
+          createdAt: version.createdAt,
+          updatedAt: version.updatedAt,
+          createdByName: creatorMap.get(version.createdBy) || null,
           is_public: isPublic,
           dppId: version.dppId,
           public_path: buildCurrentPublicPassportPath({
-            companyName: companyNameMap.get(String(version.company_id)) || "",
+            companyName: companyNameMap.get(String(version.companyId)) || "",
             manufacturerName: version.manufacturer,
             manufacturedBy: version.manufactured_by,
-            modelName: version.model_name,
-            internalAliasId: version.internal_alias_id,
+            modelName: version.modelName,
+            internalAliasId: version.internalAliasId,
           }),
           inactive_path: buildInactivePublicPassportPath({
-            companyName: companyNameMap.get(String(version.company_id)) || "",
+            companyName: companyNameMap.get(String(version.companyId)) || "",
             manufacturerName: version.manufacturer,
             manufacturedBy: version.manufactured_by,
-            modelName: version.model_name,
-            internalAliasId: version.internal_alias_id,
+            modelName: version.modelName,
+            internalAliasId: version.internalAliasId,
             versionNumber,
           }),
           changed_fields: changedFields,
@@ -280,28 +281,28 @@ function createArchiveHistoryHelpers({
       params
     );
     return res.rows.map((row) => ({
-      user_id: row.user_id,
+      userId: row.user_id,
       name: `${row.first_name || ""} ${row.last_name || ""}`.trim() || row.email,
       email: row.email,
-      last_activity_at: row.last_activity_at,
+      lastActivityAt: row.last_activity_at,
     }));
   }
 
   async function markOlderVersionsObsolete(tableName, dppId, newVersionNumber, passportType = null) {
     try {
       const lineageRes = await pool.query(
-        `SELECT lineage_id FROM ${tableName} WHERE dpp_id = $1 LIMIT 1`, [dppId]
+        `SELECT "lineageId" FROM ${tableName} WHERE "dppId" = $1 LIMIT 1`, [dppId]
       );
       if (!lineageRes.rows.length) return;
-      const lineageId = lineageRes.rows[0].lineage_id;
+      const lineageId = lineageRes.rows[0].lineageId;
       const resolvedPassportType = passportType || tableName.replace(/^passports_/, "");
       const affectedRes = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE lineage_id = $1
-           AND version_number < $2
-           AND release_status = 'released'
-           AND deleted_at IS NULL`,
+         WHERE "lineageId" = $1
+           AND "versionNumber" < $2
+           AND "releaseStatus" = 'released'
+           AND "deletedAt" IS NULL`,
         [lineageId, newVersionNumber]
       );
       if (affectedRes.rows.length) {
@@ -313,21 +314,21 @@ function createArchiveHistoryHelpers({
       }
       await pool.query(
         `UPDATE ${tableName}
-         SET release_status = 'obsolete', updated_at = NOW()
-         WHERE lineage_id = $1
-           AND version_number < $2
-           AND release_status = 'released'
-           AND deleted_at IS NULL
+         SET "releaseStatus" = 'obsolete', "updatedAt" = NOW()
+         WHERE "lineageId" = $1
+           AND "versionNumber" < $2
+           AND "releaseStatus" = 'released'
+           AND "deletedAt" IS NULL
          RETURNING *`,
         [lineageId, newVersionNumber]
       );
       const updatedRes = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE lineage_id = $1
-           AND version_number < $2
-           AND release_status = 'obsolete'
-           AND deleted_at IS NULL`,
+         WHERE "lineageId" = $1
+           AND "versionNumber" < $2
+           AND "releaseStatus" = 'obsolete'
+           AND "deletedAt" IS NULL`,
         [lineageId, newVersionNumber]
       );
       if (updatedRes.rows.length) {

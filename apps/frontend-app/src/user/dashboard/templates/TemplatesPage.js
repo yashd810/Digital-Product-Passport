@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import { buildDashboardPath } from "../utils/dashboardRoutes";
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
 import "../../../assets/styles/Dashboard.css";
@@ -377,7 +378,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       const r = await fetchWithAuth(url, {
         method,
         headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ passport_type: passportType, name, description, fields }),
+        body: JSON.stringify({ passportType, name, description, fields }),
       });
       if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || "Save failed"); }
       onSave();
@@ -530,7 +531,7 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
-          passport_type: template.passport_type,
+          passportType: template.passport_type,
           passports: Array.from({ length: n }, () => ({ ...prefill })),
         }),
       });
@@ -616,6 +617,25 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
 export default function TemplatesPage({ user, companyId, view = "list", editTemplateId = null }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { companySlug } = useParams();
+  const templatesPath = buildDashboardPath({
+    companySlug,
+    companyName: user?.company_name,
+    companyId,
+    subpath: "templates",
+  });
+  const newTemplatePath = buildDashboardPath({
+    companySlug,
+    companyName: user?.company_name,
+    companyId,
+    subpath: "templates/new",
+  });
+  const templateEditPath = (templateId) => buildDashboardPath({
+    companySlug,
+    companyName: user?.company_name,
+    companyId,
+    subpath: `templates/${templateId}/edit`,
+  });
   const [templates,     setTemplates]     = useState([]);
   const [passportTypes, setPassportTypes] = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -647,14 +667,14 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
     if (view === "edit" && editTemplateId && !editingTemplate) {
       fetchWithAuth(`${API}/api/companies/${companyId}/templates/${editTemplateId}`, { headers: authHeaders() })
         .then(r => r.ok ? r.json() : null)
-        .then(data => { if (data) setEditingTemplate(data); else navigate("/dashboard/templates"); })
-        .catch(() => navigate("/dashboard/templates"));
+        .then(data => { if (data) setEditingTemplate(data); else navigate(templatesPath); })
+        .catch(() => navigate(templatesPath));
     }
     if (view !== "edit") setEditingTemplate(null);
-  }, [view, editTemplateId, companyId]);
+  }, [view, editTemplateId, companyId, navigate, templatesPath]);
 
   const openEdit = (tmpl) => {
-    navigate(`/dashboard/templates/${tmpl.id}/edit`);
+    navigate(templateEditPath(tmpl.id));
   };
 
   const openClone = async (tmpl) => {
@@ -662,7 +682,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
       if (!r.ok) throw new Error("Failed to load template");
       const cloneTemplate = await r.json();
-      navigate("/dashboard/templates/new", { state: { cloneTemplate } });
+      navigate(newTemplatePath, { state: { cloneTemplate } });
     } catch {
       // Keep the list stable if the clone source cannot be fetched.
     }
@@ -690,12 +710,12 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
   const handleSaved = () => {
     setEditingTemplate(null);
     fetchTemplates();
-    navigate("/dashboard/templates");
+    navigate(templatesPath);
   };
 
   const handleCancel = () => {
     setEditingTemplate(null);
-    navigate("/dashboard/templates");
+    navigate(templatesPath);
   };
 
   // Group templates by passport type
@@ -743,7 +763,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
             Mark fields as <strong>model data</strong> to pre-fill and lock them on every new passport.
           </p>
         </div>
-        <button className="tmpl-new-btn" onClick={() => navigate("/dashboard/templates/new")}>
+        <button className="tmpl-new-btn" onClick={() => navigate(newTemplatePath)}>
           + New Template
         </button>
       </div>
@@ -777,7 +797,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
           <div style={{ fontSize: 44, marginBottom: 10 }}>📋</div>
           <h3>No templates yet</h3>
           <p>Create your first template to start pre-filling passport fields for a specific model.</p>
-          <button className="tmpl-new-btn" style={{ marginTop: 8 }} onClick={() => navigate("/dashboard/templates/new")}>
+          <button className="tmpl-new-btn" style={{ marginTop: 8 }} onClick={() => navigate(newTemplatePath)}>
             + Create your first template
           </button>
         </div>

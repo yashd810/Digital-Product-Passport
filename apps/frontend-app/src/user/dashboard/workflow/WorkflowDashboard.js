@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, NavLink } from "react-router-dom";
+import { useNavigate, NavLink, useParams } from "react-router-dom";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
@@ -7,6 +7,7 @@ import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPasspor
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { extractComplianceError, formatComplianceIssueSummary } from "../../../shared/utils/complianceErrors";
 import { getPassportSerialNumber } from "../passports/utils/passportListHelpers";
+import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../admin/styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -19,6 +20,12 @@ const STATUS_MAP = {
 };
 
 const getWorkflowPassportId = (wf) => wf?.passport_guid || wf?.passport_dpp_id || null;
+const getWorkflowPassportType = (wf) => wf?.passportType || "";
+const getWorkflowModelName = (wf) => wf?.modelName || "";
+const getWorkflowVersionNumber = (wf) => wf?.versionNumber;
+const getWorkflowInternalAliasId = (wf) => wf?.internalAliasId || "";
+const getWorkflowReleaseStatus = (wf) => wf?.releaseStatus || "";
+const getWorkflowCreatedAt = (wf) => wf?.createdAt || "";
 
 function WorkflowBadge({ status }) {
   const s = STATUS_MAP[status] || { label: status, icon:"📄" };
@@ -187,7 +194,11 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
       const eligible = data.filter(u =>
         (u.role === "editor" || u.role === "company_admin") && u.id !== user?.id
       );
-      setTeamUsers(eligible);
+      setTeamUsers(eligible.map((member) => ({
+        ...member,
+        firstName: member.firstName || member.first_name || "",
+        lastName: member.lastName || member.last_name || "",
+      })));
     })
     .catch(() => {});
 
@@ -205,7 +216,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     setVerificationLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ passportType: passport.passport_type });
+      const params = new URLSearchParams({ passportType: getWorkflowPassportType(passport) });
       const response = await fetchWithAuth(
         `${API}/api/companies/${companyId}/passports/${passport.dppId}/verification-check?${params.toString()}`,
         { headers: authHeaders() }
@@ -221,7 +232,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     } finally {
       setVerificationLoading(false);
     }
-  }, [companyId, passport.dppId, passport.passport_type]);
+  }, [companyId, passport.dppId, passport.passportType]);
 
   useEffect(() => {
     if (checkerOnly) {
@@ -241,7 +252,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
             method: "POST",
             headers: authHeaders({ "Content-Type":"application/json" }),
             body: JSON.stringify({
-              passportType: passport.passport_type,
+              passportType: getWorkflowPassportType(passport),
               reviewerId:   reviewerId ? parseInt(reviewerId) : null,
               approverId:   approverId ? parseInt(approverId) : null,
             }),
@@ -283,7 +294,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
           {
             method: "PATCH",
             headers: authHeaders({ "Content-Type":"application/json" }),
-            body: JSON.stringify({ passportType: passport.passport_type }),
+            body: JSON.stringify({ passportType: getWorkflowPassportType(passport) }),
           }
         );
         const d = await r.json();
@@ -316,8 +327,8 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
         </div>
         <div className="modal-body">
           <p className="modal-passport-name">
-            <strong>{passport.model_name}</strong>
-            <span className="modal-version"> v{passport.version_number}</span>
+            <strong>{getWorkflowModelName(passport)}</strong>
+            <span className="modal-version"> v{getWorkflowVersionNumber(passport)}</span>
           </p>
           <p className="modal-hint">
             {checkerOnly
@@ -347,7 +358,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
                   <option value="">— Skip review —</option>
                   {teamUsers.map(u => (
                     <option key={u.id} value={u.id}>
-                      {u.first_name} {u.last_name} — {u.role}
+                      {u.firstName} {u.lastName} — {u.role}
                     </option>
                   ))}
                 </select>
@@ -359,7 +370,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
                   <option value="">— Skip approval —</option>
                   {teamUsers.filter(u => !reviewerId || String(u.id) !== reviewerId).map(u => (
                     <option key={u.id} value={u.id}>
-                      {u.first_name} {u.last_name} — {u.role}
+                      {u.firstName} {u.lastName} — {u.role}
                     </option>
                   ))}
                 </select>
@@ -416,7 +427,7 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
       const r = await fetchWithAuth(`${API}/api/passports/${workflowPassportId}/workflow/${action}`, {
         method: "POST",
         headers: authHeaders({ "Content-Type":"application/json" }),
-        body: JSON.stringify({ comment, passportType: wf.passport_type }),
+        body: JSON.stringify({ comment, passportType: getWorkflowPassportType(wf) }),
       });
       const d = await r.json();
       if (!r.ok) {
@@ -440,7 +451,7 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <p><strong>{wf.model_name}</strong> v{wf.version_number}</p>
+          <p><strong>{getWorkflowModelName(wf)}</strong> v{getWorkflowVersionNumber(wf)}</p>
           <ComplianceFailureNotice error={error} />
           <div className="wf-select-group">
             <label>Comment <span className="wf-opt">(optional)</span></label>
@@ -464,13 +475,14 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
 // ── Main WorkflowDashboard ─────────────────────────────────────
 function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   const navigate  = useNavigate();
+  const { companySlug } = useParams();
   const tab = activeTab;
   const [data,    setData]    = useState({ inProgress:[], backlog:[], history:[] });
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState(null); // {wf, action}
   const [removeModal, setRemoveModal] = useState(null); // {wf}
   const [flash,   setFlash]   = useState("");
-  const [sortConfig, setSortConfig] = useState({ key: "created_at", direction: "desc" });
+  const [sortConfig, setSortConfig] = useState({ key: "createdAt", direction: "desc" });
   const [columnFilters, setColumnFilters] = useState({});
   const [showFilters, setShowFilters] = useState(false);
 
@@ -541,24 +553,24 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   const openPassportViewer = (wf) => {
     const workflowPassportId = getWorkflowPassportId(wf);
     if (!workflowPassportId) return;
-    const normalizedStatus = normalizePassportStatus(wf.release_status);
-    const path = normalizedStatus === "released" && wf.internal_alias_id
+    const normalizedStatus = normalizePassportStatus(getWorkflowReleaseStatus(wf));
+    const path = normalizedStatus === "released" && getWorkflowInternalAliasId(wf)
       ? buildPublicPassportPath({
           companyName: user?.company_name,
-          modelName: wf.model_name,
-          internalAliasId: wf.internal_alias_id,
+          modelName: getWorkflowModelName(wf),
+          internalAliasId: getWorkflowInternalAliasId(wf),
         })
-      : isObsoletePassportStatus(normalizedStatus) && wf.internal_alias_id && wf.version_number != null
+      : isObsoletePassportStatus(normalizedStatus) && getWorkflowInternalAliasId(wf) && getWorkflowVersionNumber(wf) != null
         ? buildInactivePassportPath({
             companyName: user?.company_name,
-            modelName: wf.model_name,
-            internalAliasId: wf.internal_alias_id,
-            versionNumber: wf.version_number,
+            modelName: getWorkflowModelName(wf),
+            internalAliasId: getWorkflowInternalAliasId(wf),
+            versionNumber: getWorkflowVersionNumber(wf),
           })
       : buildPreviewPassportPath({
           companyName: user?.company_name,
-          modelName: wf.model_name,
-          internalAliasId: wf.internal_alias_id,
+          modelName: getWorkflowModelName(wf),
+          internalAliasId: getWorkflowInternalAliasId(wf),
           previewId: workflowPassportId,
         });
     if (!path) return;
@@ -579,10 +591,10 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
         <td>
           <button className="model-link-btn"
             onClick={() => openPassportViewer(wf)}>
-            {serialNumber || wf.model_name || workflowPassportId}
+            {serialNumber || getWorkflowModelName(wf) || workflowPassportId}
           </button>
           <div className="workflow-meta-copy">
-            {wf.passport_type} · v{wf.version_number}
+            {getWorkflowPassportType(wf)} · v{getWorkflowVersionNumber(wf)}
           </div>
         </td>
         <td><WorkflowBadge status={
@@ -603,7 +615,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
             <span className={`step-status ${wf.approval_status}`}> ({wf.approval_status})</span>
           )}
         </td>
-        <td className="small-text">{new Date(wf.created_at).toLocaleDateString()}</td>
+        <td className="small-text">{new Date(getWorkflowCreatedAt(wf)).toLocaleDateString()}</td>
         <td>
           <div className="workflow-action-group">
             {(needsMyReview || needsMyApproval) && (
@@ -635,7 +647,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
 
   const workflowColumns = useMemo(() => ([
     { key: "serial_number", type: "string", getValue: (wf) => getPassportSerialNumber(wf) },
-    { key: "model_name", type: "string", getValue: (wf) => wf.model_name || "" },
+    { key: "modelName", type: "string", getValue: (wf) => getWorkflowModelName(wf) },
     { key: "status", type: "string", getValue: (wf) => (
       wf.overall_status === "rejected" ? "rejected" :
       wf.review_status === "pending" ? "submitted_for_review" :
@@ -644,7 +656,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     ) },
     { key: "reviewer_name", type: "string", getValue: (wf) => wf.reviewer_name || "" },
     { key: "approver_name", type: "string", getValue: (wf) => wf.approver_name || "" },
-    { key: "created_at", type: "date", getValue: (wf) => wf.created_at },
+    { key: "createdAt", type: "date", getValue: (wf) => getWorkflowCreatedAt(wf) },
   ]), []);
 
   const controlledData = useMemo(
@@ -669,7 +681,12 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
       <div className="wf-tabs">
         {tabs.map(t => (
           <NavLink key={t.id}
-            to={`/dashboard/workflow/${t.id}`}
+            to={buildDashboardPath({
+              companySlug,
+              companyName: user?.company_name,
+              companyId,
+              subpath: `workflow/${t.id}`,
+            })}
             className={({ isActive }) => `wf-tab${isActive ? " active" : ""}`}>
             {t.label}
             {t.count > 0 && <span className="wf-count">{t.count}</span>}
@@ -705,7 +722,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("status")}>Status{sortIndicator(sortConfig, "status") && ` ${sortIndicator(sortConfig, "status")}`}</button></th>
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("reviewer_name")}>Reviewer{sortIndicator(sortConfig, "reviewer_name") && ` ${sortIndicator(sortConfig, "reviewer_name")}`}</button></th>
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("approver_name")}>Approver{sortIndicator(sortConfig, "approver_name") && ` ${sortIndicator(sortConfig, "approver_name")}`}</button></th>
-                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("created_at")}>Submitted{sortIndicator(sortConfig, "created_at") && ` ${sortIndicator(sortConfig, "created_at")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("createdAt")}>Submitted{sortIndicator(sortConfig, "createdAt") && ` ${sortIndicator(sortConfig, "createdAt")}`}</button></th>
                   <th>Actions</th>
                 </tr>
                 {showFilters && <tr className="table-filter-row">
@@ -713,7 +730,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
                   <th><input className="table-filter-input" value={columnFilters.status || ""} onChange={e => setColumnFilters(prev => ({ ...prev, status: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={columnFilters.reviewer_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, reviewer_name: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={columnFilters.approver_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, approver_name: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={columnFilters.created_at || ""} onChange={e => setColumnFilters(prev => ({ ...prev, created_at: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={e => setColumnFilters(prev => ({ ...prev, createdAt: e.target.value }))} placeholder="Filter" /></th>
                   <th></th>
                 </tr>}
               </thead>
@@ -740,7 +757,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
           <div className="apt-modal" onClick={e => e.stopPropagation()}>
             <h3 className="apt-modal-title">Remove from Workflow?</h3>
             <div className="apt-modal-warning">
-              ⚠️ This will permanently remove <strong>{removeModal.model_name}</strong> from the workflow.
+              ⚠️ This will permanently remove <strong>{getWorkflowModelName(removeModal)}</strong> from the workflow.
               This action cannot be undone.
             </div>
             <div className="apt-modal-actions">

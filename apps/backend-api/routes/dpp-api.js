@@ -49,6 +49,7 @@ module.exports = function registerDppApiRoutes(app, {
   normalizePassportRequestBody,
   SYSTEM_PASSPORT_FIELDS,
   getWritablePassportColumns,
+  joinQuotedSqlIdentifiers,
   toStoredPassportValue,
   getPassportTypeSchema,
   findExistingPassportByInternalAliasId,
@@ -264,7 +265,7 @@ module.exports = function registerDppApiRoutes(app, {
       typeDef: editable.typeDef,
       elementIdPath: targetElementIdPath,
       user,
-      passportCompanyId: editable.passport.company_id
+      passportCompanyId: editable.passport.companyId
     });
     if (!writeDecision.allowed) {
       return {
@@ -315,7 +316,7 @@ module.exports = function registerDppApiRoutes(app, {
     }
 
     await logAudit(
-      editable.passport.company_id,
+      editable.passport.companyId,
       user.userId,
       "PATCH_DPP_ELEMENT",
       editable.tableName,
@@ -384,6 +385,7 @@ module.exports = function registerDppApiRoutes(app, {
     complianceService,
     SYSTEM_PASSPORT_FIELDS,
     getWritablePassportColumns,
+    joinQuotedSqlIdentifiers,
     toStoredPassportValue,
     extractCarrierAuthenticityMutation,
     applyCarrierAuthenticityMutation,

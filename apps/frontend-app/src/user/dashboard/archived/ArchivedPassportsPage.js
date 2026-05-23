@@ -14,15 +14,15 @@ const API = import.meta.env.VITE_API_URL || "";
 // Archived Passport Collection Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 function sortPassportsByVersionDesc(a, b) {
-  const versionDiff = Number(b?.version_number || 0) - Number(a?.version_number || 0);
+  const versionDiff = Number(b?.versionNumber || 0) - Number(a?.versionNumber || 0);
   if (versionDiff !== 0) return versionDiff;
-  return new Date(b?.archived_at || b?.updated_at || b?.created_at || 0).getTime()
-    - new Date(a?.archived_at || a?.updated_at || a?.created_at || 0).getTime();
+  return new Date(b?.archived_at || b?.updatedAt || b?.createdAt || 0).getTime()
+    - new Date(a?.archived_at || a?.updatedAt || a?.createdAt || 0).getTime();
 }
 
 function getPassportGroupKey(passport) {
-  if (passport?.lineage_id) return `lineage:${passport.lineage_id}`;
-  if (passport?.internal_alias_id) return `product:${passport.passport_type || "passport"}:${passport.internal_alias_id}`;
+  if (passport?.lineageId) return `lineage:${passport.lineageId}`;
+  if (passport?.internalAliasId) return `product:${passport.passportType || "passport"}:${passport.internalAliasId}`;
   return `dppId:${passport?.dppId || ""}`;
 }
 
@@ -58,14 +58,14 @@ function ArchivedPassports({ user, companyId }) {
 
   // Archived public-path helpers
   const getArchivedPathCacheKey = useCallback((passport) => (
-    `${passport?.dppId || ""}:${passport?.version_number || ""}:${passport?.public_version_number || ""}`
+    `${passport?.dppId || ""}:${passport?.versionNumber || ""}:${passport?.public_version_number || ""}`
   ), []);
   const getArchivedPublicVersionNumber = useCallback((passport) => {
     if (
-      isPublishedPassportStatus(passport?.release_status) &&
+      isPublishedPassportStatus(passport?.releaseStatus) &&
       passport?.is_public !== false
     ) {
-      const currentVersion = Number.parseInt(passport?.version_number, 10);
+      const currentVersion = Number.parseInt(passport?.versionNumber, 10);
       if (Number.isFinite(currentVersion) && currentVersion > 0) return currentVersion;
     }
     const parsed = Number.parseInt(passport?.public_version_number, 10);
@@ -73,7 +73,7 @@ function ArchivedPassports({ user, companyId }) {
     return null;
   }, []);
   const canOpenArchivedPublicVersion = useCallback((passport) => (
-    !!passport?.internal_alias_id && !!getArchivedPublicVersionNumber(passport)
+    !!passport?.internalAliasId && !!getArchivedPublicVersionNumber(passport)
   ), [getArchivedPublicVersionNumber]);
 
   // Data loading
@@ -94,7 +94,7 @@ function ArchivedPassports({ user, companyId }) {
 
     const payload = await response.json().catch(() => null);
     const history = Array.isArray(payload?.history) ? payload.history : [];
-    const matchingEntry = history.find((entry) => Number(entry.version_number) === Number(publicVersionNumber));
+    const matchingEntry = history.find((entry) => Number(entry.versionNumber ?? entry.version_number) === Number(publicVersionNumber));
     const resolvedPath = matchingEntry?.is_current
       ? matchingEntry?.public_path
       : matchingEntry?.inactive_path;
@@ -176,7 +176,7 @@ function ArchivedPassports({ user, companyId }) {
     try {
       const selectedVersions = selectedGroups.flatMap(group => group.versions);
       const groupedByType = selectedVersions.reduce((acc, passport) => {
-        const passportType = passport.passport_type;
+        const passportType = passport.passportType;
         if (!acc[passportType]) acc[passportType] = [];
         acc[passportType].push(passport);
         return acc;
@@ -197,8 +197,8 @@ function ArchivedPassports({ user, companyId }) {
             passportType,
             representation: "full",
           });
-          if (passport.version_number !== null && passport.version_number !== undefined && passport.version_number !== "") {
-            query.set("versionNumber", String(passport.version_number));
+          if (passport.versionNumber !== null && passport.versionNumber !== undefined && passport.versionNumber !== "") {
+            query.set("versionNumber", String(passport.versionNumber));
           }
           const response = await fetchWithAuth(
             `${API}/api/companies/${companyId}/passports/${passport.dppId}?${query.toString()}`,
@@ -254,7 +254,7 @@ function ArchivedPassports({ user, companyId }) {
         });
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
-        link.download = `archived_${p.dppId || p.dpp_id || "passport"}_v${getArchivedPublicVersionNumber(p)}.png`;
+        link.download = `archived_${p.dppId || "passport"}_v${getArchivedPublicVersionNumber(p)}.png`;
         link.click();
         await new Promise(r => setTimeout(r, 100));
       }
@@ -295,11 +295,11 @@ function ArchivedPassports({ user, companyId }) {
     .map(group => group.latest);
 
   const tableColumns = useMemo(() => [
-    { key: "version_number", type: "number", getValue: group => group.latest?.version_number },
-    { key: "serial_number", type: "string", getValue: group => getPassportSerialNumberForType(group.latest, passportTypes) },
-    { key: "model_name", type: "string", getValue: group => group.latest?.model_name || "" },
-    { key: "passport_type", type: "string", getValue: group => group.latest?.passport_type || "" },
-    { key: "release_status", type: "string", getValue: group => group.latest?.release_status || "" },
+    { key: "versionNumber", type: "number", getValue: group => group.latest?.versionNumber },
+    { key: "serialNumber", type: "string", getValue: group => getPassportSerialNumberForType(group.latest, passportTypes) },
+    { key: "modelName", type: "string", getValue: group => group.latest?.modelName || "" },
+    { key: "passportType", type: "string", getValue: group => group.latest?.passportType || "" },
+    { key: "releaseStatus", type: "string", getValue: group => group.latest?.releaseStatus || "" },
     { key: "archived_at", type: "date", getValue: group => group.latest?.archived_at },
     { key: "archived_by_name", type: "string", getValue: group => group.latest?.archived_by_first_name ? `${group.latest.archived_by_first_name} ${group.latest.archived_by_last_name}` : group.latest?.archived_by_email || "" },
   ], []);
@@ -379,7 +379,7 @@ function ArchivedPassports({ user, companyId }) {
     hasOlderVersions = false,
   }) => (
     <tr
-      key={`${passport.dppId}-${passport.version_number}${isHistorical ? "-history" : ""}`}
+      key={`${passport.dppId}-${passport.versionNumber}${isHistorical ? "-history" : ""}`}
       className={`passport-row-clickable${isHistorical ? " passport-row-history" : ""}`}
       onClick={() => {
         if (selectionMode) toggleSelect(groupKey);
@@ -416,16 +416,16 @@ function ArchivedPassports({ user, companyId }) {
               </button>
               )}
           </span>
-          <span className="version-badge">v{passport.version_number}</span>
+          <span className="version-badge">v{passport.versionNumber}</span>
         </div>
       </td>
       <td>{getPassportSerialNumberForType(passport, passportTypes) ? <span className="product-id-badge">{getPassportSerialNumberForType(passport, passportTypes)}</span> : <span className="no-product-id">—</span>}</td>
-      <td>{passport.model_name || "—"}</td>
-      <td><span className="type-badge passport-type-badge">{passport.passport_type}</span></td>
+      <td>{passport.modelName || "—"}</td>
+      <td><span className="type-badge passport-type-badge">{passport.passportType}</span></td>
       <td>
         <div className="passport-status-cell">
-          <span className={`status-badge ${normalizePassportStatus(passport.release_status)}`}>
-            {formatPassportStatus(passport.release_status)}
+          <span className={`status-badge ${normalizePassportStatus(passport.releaseStatus)}`}>
+            {formatPassportStatus(passport.releaseStatus)}
           </span>
         </div>
       </td>
@@ -540,22 +540,22 @@ function ArchivedPassports({ user, companyId }) {
                         checked={paginatedPassports.length > 0 && paginatedPassports.every(group => selectedPassports.has(group.key))}
                         onChange={toggleSelectAll} title="Select All" />
                     </th>}
-                    <th className="passport-version-col"><button type="button" className="table-sort-btn" onClick={() => toggleSort("version_number")}>Ver.{sortIndicator(sortConfig, "version_number") && ` ${sortIndicator(sortConfig, "version_number")}`}</button></th>
-                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("serial_number")}>Serial Number{sortIndicator(sortConfig, "serial_number") && ` ${sortIndicator(sortConfig, "serial_number")}`}</button></th>
-                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("model_name")}>Model{sortIndicator(sortConfig, "model_name") && ` ${sortIndicator(sortConfig, "model_name")}`}</button></th>
-                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("passport_type")}>Type{sortIndicator(sortConfig, "passport_type") && ` ${sortIndicator(sortConfig, "passport_type")}`}</button></th>
-                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("release_status")}>Last Status{sortIndicator(sortConfig, "release_status") && ` ${sortIndicator(sortConfig, "release_status")}`}</button></th>
+                    <th className="passport-version-col"><button type="button" className="table-sort-btn" onClick={() => toggleSort("versionNumber")}>Ver.{sortIndicator(sortConfig, "versionNumber") && ` ${sortIndicator(sortConfig, "versionNumber")}`}</button></th>
+                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("serialNumber")}>Serial Number{sortIndicator(sortConfig, "serialNumber") && ` ${sortIndicator(sortConfig, "serialNumber")}`}</button></th>
+                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("modelName")}>Model{sortIndicator(sortConfig, "modelName") && ` ${sortIndicator(sortConfig, "modelName")}`}</button></th>
+                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("passportType")}>Type{sortIndicator(sortConfig, "passportType") && ` ${sortIndicator(sortConfig, "passportType")}`}</button></th>
+                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("releaseStatus")}>Last Status{sortIndicator(sortConfig, "releaseStatus") && ` ${sortIndicator(sortConfig, "releaseStatus")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("archived_at")}>Archived{sortIndicator(sortConfig, "archived_at") && ` ${sortIndicator(sortConfig, "archived_at")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("archived_by_name")}>Archived By{sortIndicator(sortConfig, "archived_by_name") && ` ${sortIndicator(sortConfig, "archived_by_name")}`}</button></th>
                     {user?.role !== "viewer" && <th>Actions</th>}
                   </tr>
                   {showFilters && <tr className="table-filter-row">
                     {selectionMode && <th></th>}
-                    <th><input className="table-filter-input" value={columnFilters.version_number || ""} onChange={e => setColumnFilters(prev => ({ ...prev, version_number: e.target.value }))} placeholder="Filter" /></th>
-                    <th><input className="table-filter-input" value={columnFilters.serial_number || ""} onChange={e => setColumnFilters(prev => ({ ...prev, serial_number: e.target.value }))} placeholder="Filter" /></th>
-                    <th><input className="table-filter-input" value={columnFilters.model_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, model_name: e.target.value }))} placeholder="Filter" /></th>
-                    <th><input className="table-filter-input" value={columnFilters.passport_type || ""} onChange={e => setColumnFilters(prev => ({ ...prev, passport_type: e.target.value }))} placeholder="Filter" /></th>
-                    <th><input className="table-filter-input" value={columnFilters.release_status || ""} onChange={e => setColumnFilters(prev => ({ ...prev, release_status: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={columnFilters.versionNumber || ""} onChange={e => setColumnFilters(prev => ({ ...prev, versionNumber: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={columnFilters.serialNumber || ""} onChange={e => setColumnFilters(prev => ({ ...prev, serialNumber: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={columnFilters.modelName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, modelName: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={columnFilters.passportType || ""} onChange={e => setColumnFilters(prev => ({ ...prev, passportType: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={columnFilters.releaseStatus || ""} onChange={e => setColumnFilters(prev => ({ ...prev, releaseStatus: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.archived_at || ""} onChange={e => setColumnFilters(prev => ({ ...prev, archived_at: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.archived_by_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, archived_by_name: e.target.value }))} placeholder="Filter" /></th>
                     {user?.role !== "viewer" && <th></th>}

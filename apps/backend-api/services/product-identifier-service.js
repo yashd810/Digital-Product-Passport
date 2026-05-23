@@ -1,7 +1,5 @@
 "use strict";
 
-const crypto = require("crypto");
-
 function createProductIdentifierService({ didService, pool = null }) {
   function normalizeRawProductId(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -32,11 +30,18 @@ function createProductIdentifierService({ didService, pool = null }) {
     return "";
   }
 
-  function buildStableProductId({ companyId, rawProductId }) {
+  function buildStableProductId({ rawProductId }) {
+    const normalized = normalizeRawProductId(rawProductId);
+    if (!normalized) return "";
+    return didService.normalizeStableId(normalized);
+  }
+
+  function buildLegacyStableProductId({ companyId, rawProductId }) {
     const normalized = normalizeRawProductId(rawProductId);
     if (!normalized) return "";
 
     const slugBase = didService.slugify(normalized).slice(0, 48) || "product";
+    const crypto = require("crypto");
     const hash = crypto
       .createHash("sha256")
       .update(`${companyId || "global"}::${normalized}`)
@@ -65,7 +70,7 @@ function createProductIdentifierService({ didService, pool = null }) {
     if (!normalized) return "";
     if (isDidIdentifier(normalized)) return normalized;
 
-    const stableId = buildStableProductId({ companyId, rawProductId: normalized });
+    const stableId = buildStableProductId({ rawProductId: normalized });
     const namespaceSegment = companySlug
       ? didService.normalizePassportTypeSegment(companySlug)
       : companyName
@@ -133,6 +138,21 @@ function createProductIdentifierService({ didService, pool = null }) {
         granularity,
       });
       if (canonicalDid) candidates.push(canonicalDid);
+
+      const legacyStableId = buildLegacyStableProductId({
+        companyId,
+        rawProductId: normalized,
+      });
+      if (legacyStableId && legacyStableId !== normalized) {
+        const legacyNamespace = didService.normalizePassportTypeSegment(passportType || "battery");
+        const normalizedGranularity = normalizeGranularity(granularity);
+        const legacyDid = normalizedGranularity === "model"
+          ? didService.generateModelDid(legacyNamespace, legacyStableId)
+          : normalizedGranularity === "batch"
+            ? didService.generateBatchDid(legacyNamespace, legacyStableId)
+            : didService.generateItemDid(legacyNamespace, legacyStableId);
+        if (legacyDid) candidates.push(legacyDid);
+      }
     }
     return [...new Set(candidates)];
   }

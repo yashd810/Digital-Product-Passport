@@ -9,10 +9,117 @@ function createSchemaStorageHelpers({
   getTable,
   normalizePassportRow,
   isEditablePassportStatus,
+  quoteSqlIdentifier,
+  joinQuotedSqlIdentifiers,
+  SYSTEM_PASSPORT_COLUMN_MAPPINGS,
   LIVE_PASSPORT_SYSTEM_COLUMNS,
   LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS,
   IN_REVISION_STATUSES_SQL,
 }) {
+  function isSafeSqlIdentifier(value) {
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || "").trim());
+  }
+
+  function camelToSnakeCase(value) {
+    return String(value || "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+      .replace(/[^A-Za-z0-9_]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .toLowerCase();
+  }
+
+  function compactLowercase(value) {
+    return String(value || "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
+  }
+
+  function buildLegacyFieldColumnCandidates(fieldKey) {
+    const exactKey = String(fieldKey || "").trim();
+    if (!exactKey) return [];
+    const candidates = [exactKey.toLowerCase(), camelToSnakeCase(exactKey), compactLowercase(exactKey)];
+    return Array.from(new Set(candidates.filter(Boolean).filter((candidate) => candidate !== exactKey)));
+  }
+
+  function buildLegacyCompatibilityDefinition(definition) {
+    return String(definition || "")
+      .replace(/\s+NOT\s+NULL\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function buildLegacySystemColumnSyncFunctionSql() {
+    const insertGuards = SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap(({ storageKey, legacyKey }) => {
+      if (!legacyKey || legacyKey === storageKey) return [];
+      return [
+        `IF NEW.${quoteSqlIdentifier(storageKey)} IS NULL AND NEW.${quoteSqlIdentifier(legacyKey)} IS NOT NULL THEN NEW.${quoteSqlIdentifier(storageKey)} = NEW.${quoteSqlIdentifier(legacyKey)}; END IF;`,
+        `IF NEW.${quoteSqlIdentifier(legacyKey)} IS NULL AND NEW.${quoteSqlIdentifier(storageKey)} IS NOT NULL THEN NEW.${quoteSqlIdentifier(legacyKey)} = NEW.${quoteSqlIdentifier(storageKey)}; END IF;`,
+      ];
+    }).join("\n  ");
+
+    const updateGuards = SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap(({ storageKey, legacyKey }) => {
+      if (!legacyKey || legacyKey === storageKey) return [];
+      return [
+        `IF NEW.${quoteSqlIdentifier(storageKey)} IS DISTINCT FROM OLD.${quoteSqlIdentifier(storageKey)} THEN NEW.${quoteSqlIdentifier(legacyKey)} = NEW.${quoteSqlIdentifier(storageKey)}; ELSIF NEW.${quoteSqlIdentifier(legacyKey)} IS DISTINCT FROM OLD.${quoteSqlIdentifier(legacyKey)} THEN NEW.${quoteSqlIdentifier(storageKey)} = NEW.${quoteSqlIdentifier(legacyKey)}; END IF;`,
+      ];
+    }).join("\n  ");
+
+    return `
+CREATE OR REPLACE FUNCTION sync_legacy_passport_system_columns()
+RETURNS trigger AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+  ${insertGuards}
+    RETURN NEW;
+  END IF;
+
+  ${updateGuards}
+  ${insertGuards}
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+`;
+  }
+
+  async function ensureLegacySystemColumnCompatibility(tableName) {
+    await pool.query(buildLegacySystemColumnSyncFunctionSql());
+    for (const { storageKey, legacyKey, definition } of SYSTEM_PASSPORT_COLUMN_MAPPINGS) {
+      if (!legacyKey || legacyKey === storageKey) continue;
+      await pool.query(
+        `ALTER TABLE ${tableName}
+         ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(legacyKey)} ${buildLegacyCompatibilityDefinition(definition)}`
+      );
+      await pool.query(
+        `UPDATE ${tableName}
+         SET ${quoteSqlIdentifier(legacyKey)} = ${quoteSqlIdentifier(storageKey)}
+         WHERE ${quoteSqlIdentifier(legacyKey)} IS NULL
+           AND ${quoteSqlIdentifier(storageKey)} IS NOT NULL`
+      );
+      await pool.query(
+        `UPDATE ${tableName}
+         SET ${quoteSqlIdentifier(storageKey)} = ${quoteSqlIdentifier(legacyKey)}
+         WHERE ${quoteSqlIdentifier(storageKey)} IS NULL
+           AND ${quoteSqlIdentifier(legacyKey)} IS NOT NULL`
+      );
+    }
+    await pool.query(`DROP TRIGGER IF EXISTS sync_legacy_passport_system_columns_trigger ON ${tableName}`);
+    await pool.query(
+      `CREATE TRIGGER sync_legacy_passport_system_columns_trigger
+       BEFORE INSERT OR UPDATE ON ${tableName}
+       FOR EACH ROW
+       EXECUTE FUNCTION sync_legacy_passport_system_columns()`
+    );
+  }
+
+  async function getLiveTableColumnMap(tableName) {
+    const columns = await pool.query(
+      `SELECT column_name, data_type
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1`,
+      [tableName]
+    );
+    return new Map(columns.rows.map((row) => [row.column_name, row.data_type]));
+  }
+
   async function getLatestCompanyPassports({ companyId, passportType }) {
     const tableName = getTable(passportType);
     const result = await pool.query(
@@ -157,9 +264,9 @@ function createSchemaStorageHelpers({
     if (field?.queryable !== true && field?.indexed !== true) return null;
     const indexName = buildQueryableIndexName(tableName, field.key);
     if (getPassportFieldDataType(field) === "jsonb") {
-      await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} USING GIN (${field.key})`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} USING GIN (${quoteSqlIdentifier(field.key)})`);
     } else {
-      await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} (${field.key}) WHERE deleted_at IS NULL`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} (${quoteSqlIdentifier(field.key)}) WHERE deleted_at IS NULL`);
     }
     return indexName;
   }
@@ -178,7 +285,7 @@ function createSchemaStorageHelpers({
     for (const section of sections) {
       for (const field of (section.fields || [])) {
         const colType = getPassportFieldColumnType(field);
-        ddlCols.push(`    ${field.key} ${colType}`);
+        ddlCols.push(`    ${quoteSqlIdentifier(field.key)} ${colType}`);
       }
     }
     const customColsDDL = ddlCols.length ? ",\n" + ddlCols.join(",\n") : "";
@@ -186,47 +293,49 @@ function createSchemaStorageHelpers({
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ${tableName} (
         id             SERIAL       PRIMARY KEY,
-        dpp_id         TEXT         NOT NULL,
-        lineage_id     TEXT         NOT NULL,
-        company_id     INTEGER      NOT NULL,
-        model_name     VARCHAR(255),
-        internal_alias_id     VARCHAR(255) NOT NULL,
-        product_identifier_did TEXT,
-        compliance_profile_key VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1',
-        content_specification_ids TEXT,
-        carrier_policy_key VARCHAR(120),
-        carrier_authenticity JSONB,
-        economic_operator_id TEXT,
-        economic_operator_identifier_scheme VARCHAR(80),
-        facility_id TEXT,
+        "dppId"         TEXT         NOT NULL,
+        "lineageId"     TEXT         NOT NULL,
+        "companyId"     INTEGER      NOT NULL,
+        "modelName"     VARCHAR(255),
+        "internalAliasId"     VARCHAR(255) NOT NULL,
+        "uniqueProductIdentifier" TEXT,
+        "complianceProfileKey" VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1',
+        "contentSpecificationIds" TEXT,
+        "carrierPolicyKey" VARCHAR(120),
+        "carrierAuthenticity" JSONB,
+        "economicOperatorId" TEXT,
+        "economicOperatorIdentifierScheme" VARCHAR(80),
+        "facilityId" TEXT,
         granularity    VARCHAR(20)  NOT NULL DEFAULT 'model',
-        release_status VARCHAR(50)  NOT NULL DEFAULT 'draft',
-        version_number INTEGER      NOT NULL DEFAULT 1,
-        qr_code        TEXT,
-        created_by     INTEGER      REFERENCES users(id) ON DELETE SET NULL,
-        updated_by     INTEGER      REFERENCES users(id) ON DELETE SET NULL,
-        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        deleted_at     TIMESTAMPTZ${customColsDDL}
+        "releaseStatus" VARCHAR(50)  NOT NULL DEFAULT 'draft',
+        "versionNumber" INTEGER      NOT NULL DEFAULT 1,
+        "qrCode"        TEXT,
+        "createdBy"     INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+        "updatedBy"     INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+        "createdAt"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "updatedAt"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "deletedAt"     TIMESTAMPTZ${customColsDDL}
       )
     `);
 
     await pool.query(`ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${tableName}_guid_key`);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_dpp_id_version_unique ON ${tableName}(dpp_id, version_number) WHERE deleted_at IS NULL`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_company ON ${tableName}(company_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_dpp_id ON ${tableName}(dpp_id) WHERE deleted_at IS NULL`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_lineage ON ${tableName}(lineage_id) WHERE deleted_at IS NULL`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_status ON ${tableName}(release_status) WHERE deleted_at IS NULL`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did ON ${tableName}(company_id, product_identifier_did) WHERE deleted_at IS NULL`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_dpp_id_version_unique ON ${tableName}("dppId", "versionNumber") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_company ON ${tableName}("companyId")`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_dpp_id ON ${tableName}("dppId") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_lineage ON ${tableName}("lineageId") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_status ON ${tableName}("releaseStatus") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did ON ${tableName}("companyId", "uniqueProductIdentifier") WHERE "deletedAt" IS NULL`);
 
     for (const [columnName, columnDefinition] of LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS) {
-      await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${columnName} ${columnDefinition}`);
+      await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(columnName)} ${columnDefinition}`);
     }
+
+    await ensureLegacySystemColumnCompatibility(tableName);
 
     const addedColumns = [];
     const indexedColumns = [];
     for (const field of flattenTypeFields(typeRes.rows[0].fields_json)) {
-      await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${field.key} ${getPassportFieldColumnType(field)}`);
+      await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(field.key)} ${getPassportFieldColumnType(field)}`);
       addedColumns.push({
         key: field.key,
         dataType: getPassportFieldDataType(field),
@@ -243,6 +352,120 @@ function createSchemaStorageHelpers({
       changeSummary: { ensuredColumns: addedColumns, indexedColumns },
       createdBy,
     });
+  }
+
+  async function migratePassportStorageToSchemaKeys({ apply = false, includeArchives = true } = {}) {
+    const typeRows = await pool.query(
+      `SELECT type_name, fields_json
+       FROM passport_types
+       ORDER BY type_name`
+    );
+    const results = [];
+
+    for (const typeRow of typeRows.rows) {
+      const tableName = getTable(typeRow.type_name);
+      const tableExists = await pool.query(
+        `SELECT 1
+         FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = $1
+         LIMIT 1`,
+        [tableName]
+      ).then((result) => result.rows.length > 0);
+
+      if (!tableExists) {
+        results.push({
+          typeName: typeRow.type_name,
+          tableName,
+          status: "skipped_missing_table",
+          columnRenames: [],
+          archiveKeyUpdates: [],
+        });
+        continue;
+      }
+
+      const columnMap = await getLiveTableColumnMap(tableName);
+      const columnRenames = [];
+      const archiveKeyUpdates = [];
+
+      for (const field of flattenTypeFields(typeRow.fields_json)) {
+        const exactKey = String(field?.key || "").trim();
+        if (!exactKey || !isSafeSqlIdentifier(exactKey)) continue;
+        const legacyKeys = buildLegacyFieldColumnCandidates(exactKey).filter((candidate) =>
+          candidate && columnMap.has(candidate) && !LIVE_PASSPORT_SYSTEM_COLUMNS.has(candidate)
+        );
+        if (!legacyKeys.length) continue;
+
+        let exactColumnExists = columnMap.has(exactKey);
+        const dataType = getPassportFieldDataType(field);
+
+        for (const legacyKey of legacyKeys) {
+          let action = exactColumnExists ? "merge_drop" : "rename";
+          if (apply) {
+            if (!exactColumnExists) {
+              const legacyDataType = columnMap.get(legacyKey);
+              await pool.query(
+                `ALTER TABLE ${tableName}
+                 RENAME COLUMN ${quoteSqlIdentifier(legacyKey)} TO ${quoteSqlIdentifier(exactKey)}`
+              );
+              columnMap.delete(legacyKey);
+              columnMap.set(exactKey, legacyDataType || dataType);
+              exactColumnExists = true;
+            } else {
+              const mergeExpression = dataType === "text"
+                ? `CASE
+                     WHEN ${quoteSqlIdentifier(exactKey)} IS NULL OR ${quoteSqlIdentifier(exactKey)} = ''
+                       THEN ${quoteSqlIdentifier(legacyKey)}
+                     ELSE ${quoteSqlIdentifier(exactKey)}
+                   END`
+                : `COALESCE(${quoteSqlIdentifier(exactKey)}, ${quoteSqlIdentifier(legacyKey)})`;
+              await pool.query(
+                `UPDATE ${tableName}
+                 SET ${quoteSqlIdentifier(exactKey)} = ${mergeExpression}
+                 WHERE ${quoteSqlIdentifier(legacyKey)} IS NOT NULL`
+              );
+              await pool.query(`ALTER TABLE ${tableName} DROP COLUMN IF EXISTS ${quoteSqlIdentifier(legacyKey)}`);
+              columnMap.delete(legacyKey);
+            }
+          }
+          columnRenames.push({ from: legacyKey, to: exactKey, action });
+
+          if (includeArchives) {
+            let affectedRows = 0;
+            if (apply) {
+              const archiveResult = await pool.query(
+                `UPDATE passport_archives
+                 SET row_data = jsonb_set(
+                   row_data - $2,
+                   ARRAY[$3],
+                   COALESCE(row_data -> $3, row_data -> $2),
+                   true
+                 )
+                 WHERE passport_type = $1
+                   AND row_data ? $2`,
+                [typeRow.type_name, legacyKey, exactKey]
+              );
+              affectedRows = archiveResult.rowCount || 0;
+            }
+            archiveKeyUpdates.push({ from: legacyKey, to: exactKey, affectedRows });
+          }
+        }
+      }
+
+      results.push({
+        typeName: typeRow.type_name,
+        tableName,
+        status: columnRenames.length || archiveKeyUpdates.length ? (apply ? "migrated" : "pending") : "ok",
+        columnRenames,
+        archiveKeyUpdates,
+      });
+    }
+
+    return {
+      success: results.every((result) => !["failed"].includes(result.status)),
+      applied: apply,
+      checked: results.length,
+      results,
+    };
   }
 
   async function validatePassportTypeStorage({ repair = false } = {}) {
@@ -269,13 +492,7 @@ function createSchemaStorageHelpers({
         continue;
       }
 
-      const columns = await pool.query(
-        `SELECT column_name, data_type
-         FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = $1`,
-        [tableName]
-      );
-      const columnMap = new Map(columns.rows.map((row) => [row.column_name, row.data_type]));
+      const columnMap = await getLiveTableColumnMap(tableName);
       const issues = [];
       const expectedFieldKeys = new Set();
 
@@ -300,6 +517,7 @@ function createSchemaStorageHelpers({
 
       if (repair && issues.some((issue) => issue.type === "missing_column")) {
         await createPassportTable(typeRow.type_name);
+        await migratePassportStorageToSchemaKeys({ apply: true, includeArchives: true });
       }
 
       results.push({
@@ -357,6 +575,7 @@ function createSchemaStorageHelpers({
     createPassportTable,
     validatePassportTypeStorage,
     queryTableStats,
+    migratePassportStorageToSchemaKeys,
   };
 }
 

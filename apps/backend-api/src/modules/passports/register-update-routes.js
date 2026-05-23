@@ -2,6 +2,7 @@
 
 const { handleRouteError } = require("../../shared/http/error-response");
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
+const { quoteSqlIdentifier } = require("../../shared/passports/passport-helpers");
 const { updateEditablePassportUseCase } = require("./application/update-passport");
 
 module.exports = function registerUpdateRoutes(app, deps) {
@@ -93,16 +94,16 @@ module.exports = function registerUpdateRoutes(app, deps) {
     try {
       const { companyId } = req.params;
       const userId = req.user.userId;
-      const { passport_type, passportType, filter, update } = normalizePassportRequestBody(req.body);
+      const { passportType, filter, update } = normalizePassportRequestBody(req.body);
 
-      const requestedType = passport_type || passportType;
+      const requestedType = passportType;
       const typeSchema = await getPassportTypeSchema(requestedType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(typeSchema.typeName);
 
-      const invalidKeys = Object.keys(update).filter((key) => !typeSchema.allowedKeys.has(key) && key !== "model_name" && key !== "internal_alias_id");
+      const invalidKeys = Object.keys(update).filter((key) => !typeSchema.allowedKeys.has(key) && key !== "modelName" && key !== "internalAliasId");
       if (invalidKeys.length) return res.status(400).json({ error: `Unknown field(s): ${invalidKeys.join(", ")}` });
-      if (update.internal_alias_id !== undefined) return res.status(400).json({ error: "Cannot bulk-update internal_alias_id — it must be unique per passport." });
+      if (update.internalAliasId !== undefined) return res.status(400).json({ error: "Cannot bulk-update internalAliasId — it must be unique per passport." });
       if (update.granularity !== undefined) {
         return res.status(400).json({ error: "Cannot bulk-update granularity. Use the granularity transition workflow for linked successor identifiers." });
       }
@@ -113,34 +114,34 @@ module.exports = function registerUpdateRoutes(app, deps) {
       const statusFilter = String(filterObj.status || "editable").toLowerCase();
 
       if (statusFilter === "all_editable" || statusFilter === "editable" || statusFilter === "draft") {
-        filterSql += ` AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
+        filterSql += ` AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
       } else if (statusFilter === "draft_only") {
-        filterSql += " AND release_status = 'draft'";
+        filterSql += ` AND "releaseStatus" = 'draft'`;
       } else if (statusFilter === "in_revision") {
-        filterSql += ` AND release_status IN ${IN_REVISION_STATUSES_SQL}`;
+        filterSql += ` AND "releaseStatus" IN ${IN_REVISION_STATUSES_SQL}`;
       } else {
         return res.status(400).json({ error: `Invalid status filter "${statusFilter}". Use: editable, draft_only, in_revision` });
       }
 
       if (filterObj.product_id_like) {
         params.push(`%${filterObj.product_id_like}%`);
-        filterSql += ` AND (internal_alias_id ILIKE $${params.length} OR product_identifier_did ILIKE $${params.length})`;
+        filterSql += ` AND ("internalAliasId" ILIKE $${params.length} OR "uniqueProductIdentifier" ILIKE $${params.length})`;
       }
       if (filterObj.model_name_like) {
         params.push(`%${filterObj.model_name_like}%`);
-        filterSql += ` AND model_name ILIKE $${params.length}`;
+        filterSql += ` AND "modelName" ILIKE $${params.length}`;
       }
       if (filterObj.created_after) {
         params.push(filterObj.created_after);
-        filterSql += ` AND created_at >= $${params.length}`;
+        filterSql += ` AND "createdAt" >= $${params.length}`;
       }
       if (filterObj.created_before) {
         params.push(filterObj.created_before);
-        filterSql += ` AND created_at <= $${params.length}`;
+        filterSql += ` AND "createdAt" <= $${params.length}`;
       }
 
       const countRes = await pool.query(
-        `SELECT COUNT(*) AS cnt FROM ${tableName} WHERE company_id = $1${filterSql} AND deleted_at IS NULL`,
+        `SELECT COUNT(*) AS cnt FROM ${tableName} WHERE "companyId" = $1${filterSql} AND "deletedAt" IS NULL`,
         params
       );
       const matchCount = parseInt(countRes.rows[0].cnt, 10);
@@ -154,12 +155,12 @@ module.exports = function registerUpdateRoutes(app, deps) {
 
       const updateVals = getStoredPassportValues(updateKeys, update);
       const setOffset = params.length;
-      const sets = updateKeys.map((col, i) => `${col} = $${setOffset + i + 1}`).join(", ");
+      const sets = updateKeys.map((col, i) => `${quoteSqlIdentifier(col)} = $${setOffset + i + 1}`).join(", ");
       const allParams = [...params, ...updateVals, userId];
       const updatedByIdx = allParams.length;
 
       const matchedRowsRes = await pool.query(
-        `SELECT * FROM ${tableName} WHERE company_id = $1${filterSql} AND deleted_at IS NULL`,
+        `SELECT * FROM ${tableName} WHERE "companyId" = $1${filterSql} AND "deletedAt" IS NULL`,
         params
       );
       await archivePassportSnapshots({
@@ -172,12 +173,12 @@ module.exports = function registerUpdateRoutes(app, deps) {
 
       const updateRes = await pool.query(
         `UPDATE ${tableName}
-         SET ${sets}, updated_by = $${updatedByIdx}, updated_at = NOW()
-         WHERE company_id = $1${filterSql} AND deleted_at IS NULL
+         SET ${sets}, "updatedBy" = $${updatedByIdx}, "updatedAt" = NOW()
+         WHERE "companyId" = $1${filterSql} AND "deletedAt" IS NULL
          RETURNING *`,
         allParams
       );
-      const updatedGuids = updateRes.rows.map((row) => row.dppId || row.dpp_id);
+      const updatedGuids = updateRes.rows.map((row) => row.dppId);
       await archivePassportSnapshots({
         passports: updateRes.rows,
         passportType: typeSchema.typeName,
@@ -234,10 +235,10 @@ module.exports = function registerUpdateRoutes(app, deps) {
 
       if (Array.isArray(req.body)) {
         passports = req.body;
-        passport_type = passports[0]?.passport_type || passports[0]?.passportType;
+        passport_type = passports[0]?.passportType || passports[0]?.passport_type;
       } else {
         const normalizedBody = normalizePassportRequestBody(req.body);
-        passport_type = normalizedBody.passport_type;
+        passport_type = normalizedBody.passportType;
         passports = normalizedBody.passports;
       }
       const typeSchema = await getPassportTypeSchema(passport_type);
@@ -257,22 +258,22 @@ module.exports = function registerUpdateRoutes(app, deps) {
 
       for (const item of passports) {
         const normalizedItem = normalizePassportRequestBody(item || {});
-        const { dppId: incomingGuid, passport_type: _pt, passportType: _pt2, carrier_authenticity, ...fields } = normalizedItem;
-        const normalizedProductId = normalizeInternalAliasIdValue(fields.internal_alias_id);
+        const { dppId: incomingGuid, passportType: _pt, carrierAuthenticity, ...fields } = normalizedItem;
+        const normalizedProductId = normalizeInternalAliasIdValue(fields.internalAliasId);
 
         try {
           if (!incomingGuid && !normalizedProductId) {
-            details.push({ status: "failed", error: "Each item needs a dppId or internal_alias_id to match against" });
+            details.push({ status: "failed", error: "Each item needs a dppId or internalAliasId to match against" });
             failed += 1;
             continue;
           }
 
-          const builtInCols = new Set(["internal_alias_id", "model_name"]);
+          const builtInCols = new Set(["internalAliasId", "modelName"]);
           const invalidKeys = Object.keys(fields).filter((key) =>
             !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key) && !builtInCols.has(key)
           );
           if (invalidKeys.length) {
-            details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "failed", error: `Unknown field(s): ${invalidKeys.join(", ")}` });
+            details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "failed", error: `Unknown field(s): ${invalidKeys.join(", ")}` });
             failed += 1;
             continue;
           }
@@ -283,43 +284,43 @@ module.exports = function registerUpdateRoutes(app, deps) {
           let currentRow = null;
           if (incomingGuid) {
             const byGuid = await pool.query(
-              `SELECT * FROM ${tableName} WHERE dpp_id=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
+              `SELECT * FROM ${tableName} WHERE "dppId"=$1 AND "companyId"=$2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL`,
               [incomingGuid, companyId]
             );
             if (byGuid.rows.length) {
               currentRow = byGuid.rows[0];
               rowId = currentRow.id;
-              matchedGuid = currentRow.dppId || currentRow.dpp_id;
-              matchedLineageId = currentRow.lineage_id;
+              matchedGuid = currentRow.dppId;
+              matchedLineageId = currentRow.lineageId;
             }
           }
           if (!rowId && normalizedProductId) {
             const byProductId = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId });
-            if (byProductId && isEditablePassportStatus(normalizeReleaseStatus(byProductId.release_status))) {
+            if (byProductId && isEditablePassportStatus(normalizeReleaseStatus(byProductId.releaseStatus))) {
               currentRow = byProductId;
               rowId = byProductId.id;
               matchedGuid = byProductId.dppId;
-              matchedLineageId = byProductId.lineage_id;
+              matchedLineageId = byProductId.lineageId;
             }
           }
           if (!rowId) {
-            details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "skipped", reason: "No matching editable passport found" });
+            details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "skipped", reason: "No matching editable passport found" });
             skipped += 1;
             continue;
           }
-          if (!currentRow || !currentRow.company_id || !currentRow.release_status) {
+          if (!currentRow || !currentRow.companyId || !currentRow.releaseStatus) {
             const fullRowRes = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [rowId]);
             currentRow = fullRowRes.rows[0] || currentRow;
           }
-          if (fields.internal_alias_id !== undefined) {
+          if (fields.internalAliasId !== undefined) {
             if (!normalizedProductId) {
-              details.push({ dppId: matchedGuid, status: "failed", error: "internal_alias_id cannot be blank" });
+              details.push({ dppId: matchedGuid, status: "failed", error: "internalAliasId cannot be blank" });
               failed += 1;
               continue;
             }
             const dup = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: matchedGuid, excludeLineageId: matchedLineageId });
             if (dup) {
-              details.push({ dppId: matchedGuid, internal_alias_id: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
+              details.push({ dppId: matchedGuid, internalAliasId: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
               failed += 1;
               continue;
             }
@@ -329,15 +330,15 @@ module.exports = function registerUpdateRoutes(app, deps) {
               passportType: typeSchema.typeName,
               internalAliasId: normalizedProductId,
               granularity: matchedGranularityRes.rows[0]?.granularity || "item",
-              passportLike: { ...currentRow, ...fields, internal_alias_id: normalizedProductId },
+              passportLike: { ...currentRow, ...fields, internalAliasId: normalizedProductId },
             });
-            fields.internal_alias_id = storedProductIdentifiers.internal_alias_id;
-            fields.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+            fields.internalAliasId = storedProductIdentifiers.internalAliasId;
+            fields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
           }
 
           const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({
             ...normalizedItem,
-            carrier_authenticity,
+            carrierAuthenticity,
           });
           if (carrierAuthenticityMutation.provided) {
             const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
@@ -345,16 +346,15 @@ module.exports = function registerUpdateRoutes(app, deps) {
               passport: {
                 ...currentRow,
                 dppId: matchedGuid,
-                dpp_id: matchedGuid,
-                company_id: companyId,
-                internal_alias_id: fields.internal_alias_id || currentRow?.internal_alias_id,
-                model_name: fields.model_name || currentRow?.model_name,
+                companyId,
+                internalAliasId: fields.internalAliasId || currentRow?.internalAliasId,
+                modelName: fields.modelName || currentRow?.modelName,
               },
               companyName,
-              metadata: applyCarrierAuthenticityMutation(currentRow?.carrier_authenticity, carrierAuthenticityMutation),
+              metadata: applyCarrierAuthenticityMutation(currentRow?.carrierAuthenticity, carrierAuthenticityMutation),
               forceSign: carrierAuthenticityMutation.signCarrierPayload,
             });
-            fields.carrier_authenticity = buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity);
+            fields.carrierAuthenticity = buildCarrierAuthenticityStorageValue(nextCarrierAuthenticity);
           }
 
           await archivePassportSnapshot({
@@ -368,7 +368,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
           const updateResult = await updatePassportRowById({ tableName, rowId, userId, data: fields, includeUpdatedRow: true });
           const updateCols = updateResult.updateCols || [];
           if (!updateCols.length) {
-            details.push({ dppId: matchedGuid, internal_alias_id: normalizedProductId || undefined, status: "skipped", reason: "No changes detected" });
+            details.push({ dppId: matchedGuid, internalAliasId: normalizedProductId || undefined, status: "skipped", reason: "No changes detected" });
             skipped += 1;
             continue;
           }
@@ -383,11 +383,11 @@ module.exports = function registerUpdateRoutes(app, deps) {
           }
 
           await logAudit(companyId, userId, "UPDATE", tableName, matchedGuid, null, { source: "bulk_patch", fields_updated: updateCols });
-          details.push({ dppId: matchedGuid, internal_alias_id: normalizedProductId || undefined, status: "updated", fields_updated: updateCols });
+          details.push({ dppId: matchedGuid, internalAliasId: normalizedProductId || undefined, status: "updated", fieldsUpdated: updateCols });
           updated += 1;
         } catch (error) {
           logger.error("Bulk PATCH item error:", error.message);
-          details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "failed", error: error.message });
+          details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "failed", error: error.message });
           failed += 1;
         }
       }

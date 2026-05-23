@@ -1,42 +1,43 @@
 "use strict";
 
 const { rewriteLegacyRepositoryLinksDeep } = require("../repository/repository-file-links");
+const { SYSTEM_PASSPORT_COLUMN_MAPPINGS } = require("./system-passport-columns");
 
 const IN_REVISION_STATUS = "in_revision";
 
 const SYSTEM_PASSPORT_FIELDS = new Set([
   "id",
-  "dpp_id",
   "dppId",
-  "lineage_id",
-  "company_id",
-  "created_by",
-  "created_at",
+  "lineageId",
+  "companyId",
+  "createdBy",
+  "createdAt",
+  "passportType",
   "passport_type",
-  "version_number",
-  "release_status",
-  "deleted_at",
-  "qr_code",
-  "carrier_authenticity",
-  "carrier_security_status",
-  "carrier_authentication_method",
-  "carrier_verification_instructions",
-  "signed_carrier_payload",
-  "issuer_certificate_id",
-  "carrier_compatibility_profiles",
-  "physical_carrier_security_features",
-  "trusted_viewer_origin",
-  "trusted_viewer_host",
-  "counterfeit_risk_level",
-  "anti_counterfeit_instructions",
-  "safety_warnings",
-  "qr_print_specification",
-  "sign_carrier_payload",
+  "versionNumber",
+  "releaseStatus",
+  "deletedAt",
+  "qrCode",
+  "carrierAuthenticity",
+  "carrierSecurityStatus",
+  "carrierAuthenticationMethod",
+  "carrierVerificationInstructions",
+  "signedCarrierPayload",
+  "issuerCertificateId",
+  "carrierCompatibilityProfiles",
+  "physicalCarrierSecurityFeatures",
+  "trustedViewerOrigin",
+  "trustedViewerHost",
+  "counterfeitRiskLevel",
+  "antiCounterfeitInstructions",
+  "safetyWarnings",
+  "qrPrintSpecification",
+  "signCarrierPayload",
   "created_by_email",
   "first_name",
   "last_name",
-  "updated_by",
-  "updated_at",
+  "updatedBy",
+  "updatedAt",
 ]);
 
 const EDITABLE_PASSPORT_STATUSES = new Set(["draft", IN_REVISION_STATUS]);
@@ -71,6 +72,49 @@ const extractSchemaFields = (schema) => {
   return [];
 };
 
+const quoteSqlIdentifier = (value) => {
+  const identifier = String(value || "").trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+    throw new Error(`Invalid SQL identifier: ${identifier}`);
+  }
+  return `"${identifier.replace(/"/g, "\"\"")}"`;
+};
+
+const joinQuotedSqlIdentifiers = (identifiers = []) =>
+  identifiers.map((identifier) => quoteSqlIdentifier(identifier)).join(", ");
+
+const LEGACY_PASSPORT_KEY_ALIASES = new Map([
+  ["passport_type", "passportType"],
+  ["model_name", "modelName"],
+  ["internal_alias_id", "internalAliasId"],
+  ["product_identifier_did", "uniqueProductIdentifier"],
+  ["economic_operator_id", "economicOperatorId"],
+  ["economic_operator_identifier_scheme", "economicOperatorIdentifierScheme"],
+  ["facility_id", "facilityId"],
+  ["dpp_id", "dppId"],
+  ["carrier_authenticity", "carrierAuthenticity"],
+  ["carrier_security_status", "carrierSecurityStatus"],
+  ["carrier_authentication_method", "carrierAuthenticationMethod"],
+  ["carrier_verification_instructions", "carrierVerificationInstructions"],
+  ["signed_carrier_payload", "signedCarrierPayload"],
+  ["issuer_certificate_id", "issuerCertificateId"],
+  ["carrier_compatibility_profiles", "carrierCompatibilityProfiles"],
+  ["physical_carrier_security_features", "physicalCarrierSecurityFeatures"],
+  ["trusted_viewer_origin", "trustedViewerOrigin"],
+  ["trusted_viewer_host", "trustedViewerHost"],
+  ["counterfeit_risk_level", "counterfeitRiskLevel"],
+  ["anti_counterfeit_instructions", "antiCounterfeitInstructions"],
+  ["safety_warnings", "safetyWarnings"],
+  ["qr_print_specification", "qrPrintSpecification"],
+  ["sign_carrier_payload", "signCarrierPayload"],
+]);
+
+const LEGACY_PASSPORT_KEYS = new Set([
+  "passport_type",
+  ...SYSTEM_PASSPORT_COLUMN_MAPPINGS.map((item) => item.legacyKey).filter(Boolean),
+  ...LEGACY_PASSPORT_KEY_ALIASES.keys(),
+]);
+
 const normalizePassportRow = (row, schema) => {
   if (!row) return row;
   const dppId = row.dppId ?? row.dpp_id ?? null;
@@ -79,32 +123,7 @@ const normalizePassportRow = (row, schema) => {
   
   // Deserialize JSONB fields
   let rowData = { ...row };
-  
-  // Build lowercase-to-camelCase key mapping from schema
-  const lowercaseToSchemaKey = {};
-  if (schemaFields.length > 0) {
-    schemaFields.forEach((field) => {
-      if (field && field.key) {
-        const lowerKey = String(field.key).toLowerCase();
-        lowercaseToSchemaKey[lowerKey] = field.key;
-      }
-    });
-  }
-  
-  if (Object.keys(lowercaseToSchemaKey).length > 0) {
-    const normalized = {};
-    for (const [key, value] of Object.entries(rowData)) {
-      const lowerKey = String(key).toLowerCase();
-      const schemaKey = lowercaseToSchemaKey[lowerKey];
-      if (schemaKey && schemaKey !== key) {
-        normalized[schemaKey] = value;
-      } else {
-        normalized[key] = value;
-      }
-    }
-    rowData = normalized;
-  }
-  
+
   if (schemaFields.length > 0) {
     const jsonbFields = new Set();
     schemaFields.forEach((field) => {
@@ -137,41 +156,59 @@ const normalizePassportRow = (row, schema) => {
     }
   }
   
+  const normalizedSource = { ...rowData };
+  for (const legacyKey of LEGACY_PASSPORT_KEYS) {
+    delete normalizedSource[legacyKey];
+  }
+
   const normalized = rewriteLegacyRepositoryLinksDeep({
-    ...rowData,
-    dpp_id: rowData.dpp_id ?? dppId,
+    ...normalizedSource,
     dppId,
-    company_id: rowData.company_id ?? companyId,
     companyId,
-    release_status: normalizeReleaseStatus(rowData.release_status),
+    lineageId: rowData.lineageId ?? rowData.lineage_id ?? null,
+    passportType: rowData.passportType ?? rowData.passport_type ?? null,
+    modelName: rowData.modelName ?? rowData.model_name ?? null,
+    internalAliasId: rowData.internalAliasId ?? rowData.internal_alias_id ?? null,
+    uniqueProductIdentifier: rowData.uniqueProductIdentifier ?? rowData.product_identifier_did ?? null,
+    productImage: rowData.productImage ?? rowData.product_image ?? null,
+    complianceProfileKey: rowData.complianceProfileKey ?? rowData.compliance_profile_key ?? null,
+    contentSpecificationIds: rowData.contentSpecificationIds ?? rowData.content_specification_ids ?? null,
+    carrierPolicyKey: rowData.carrierPolicyKey ?? rowData.carrier_policy_key ?? null,
+    carrierAuthenticity: rowData.carrierAuthenticity ?? rowData.carrier_authenticity ?? null,
+    economicOperatorId: rowData.economicOperatorId ?? rowData.economic_operator_id ?? null,
+    economicOperatorIdentifierScheme: rowData.economicOperatorIdentifierScheme ?? rowData.economic_operator_identifier_scheme ?? null,
+    facilityId: rowData.facilityId ?? rowData.facility_id ?? null,
+    releaseStatus: normalizeReleaseStatus(rowData.releaseStatus ?? rowData.release_status),
+    versionNumber: rowData.versionNumber ?? rowData.version_number ?? null,
+    qrCode: rowData.qrCode ?? rowData.qr_code ?? null,
+    createdBy: rowData.createdBy ?? rowData.created_by ?? null,
+    updatedBy: rowData.updatedBy ?? rowData.updated_by ?? null,
+    createdAt: rowData.createdAt ?? rowData.created_at ?? null,
+    updatedAt: rowData.updatedAt ?? rowData.updated_at ?? null,
+    deletedAt: rowData.deletedAt ?? rowData.deleted_at ?? null,
+    carrierSecurityStatus: rowData.carrierSecurityStatus ?? rowData.carrier_security_status ?? null,
+    carrierAuthenticationMethod: rowData.carrierAuthenticationMethod ?? rowData.carrier_authentication_method ?? null,
+    carrierVerificationInstructions: rowData.carrierVerificationInstructions ?? rowData.carrier_verification_instructions ?? null,
+    signedCarrierPayload: rowData.signedCarrierPayload ?? rowData.signed_carrier_payload ?? null,
+    issuerCertificateId: rowData.issuerCertificateId ?? rowData.issuer_certificate_id ?? null,
+    carrierCompatibilityProfiles: rowData.carrierCompatibilityProfiles ?? rowData.carrier_compatibility_profiles ?? null,
+    physicalCarrierSecurityFeatures: rowData.physicalCarrierSecurityFeatures ?? rowData.physical_carrier_security_features ?? null,
+    trustedViewerOrigin: rowData.trustedViewerOrigin ?? rowData.trusted_viewer_origin ?? null,
+    trustedViewerHost: rowData.trustedViewerHost ?? rowData.trusted_viewer_host ?? null,
+    counterfeitRiskLevel: rowData.counterfeitRiskLevel ?? rowData.counterfeit_risk_level ?? null,
+    antiCounterfeitInstructions: rowData.antiCounterfeitInstructions ?? rowData.anti_counterfeit_instructions ?? null,
+    safetyWarnings: rowData.safetyWarnings ?? rowData.safety_warnings ?? null,
+    qrPrintSpecification: rowData.qrPrintSpecification ?? rowData.qr_print_specification ?? null,
+    signCarrierPayload: rowData.signCarrierPayload ?? rowData.sign_carrier_payload ?? null,
   }, {
     appBaseUrl: process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001",
   });
   return normalized;
 };
 
-const toSnakeCaseFieldKey = (value) =>
-  String(value || "")
-    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-    .replace(/[^a-zA-Z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .replace(/_+/g, "_")
-    .toLowerCase();
-
-const toCompactFieldKey = (value) =>
-  String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-
 const getPassportFieldLookupKeys = (fieldKey) => {
   const exactKey = String(fieldKey || "").trim();
-  if (!exactKey) return [];
-  return [...new Set([
-    exactKey,
-    exactKey.toLowerCase(),
-    toSnakeCaseFieldKey(exactKey),
-    toCompactFieldKey(exactKey),
-  ].filter(Boolean))];
+  return exactKey ? [exactKey] : [];
 };
 
 const getPassportFieldValue = (passport, fieldKey) => {
@@ -191,122 +228,154 @@ const toStoredPassportValue = (value) =>
 
 const normalizePassportRequestBody = (body = {}) => {
   const normalized = { ...body };
+  if (normalized.passportType === undefined && normalized.passport_type !== undefined) {
+    normalized.passportType = normalized.passport_type;
+  }
   if (normalized.passport_type === undefined && normalized.passportType !== undefined) {
     normalized.passport_type = normalized.passportType;
+  }
+  if (normalized.modelName === undefined && normalized.model_name !== undefined) {
+    normalized.modelName = normalized.model_name;
   }
   if (normalized.model_name === undefined && normalized.modelName !== undefined) {
     normalized.model_name = normalized.modelName;
   }
+  if (normalized.internalAliasId === undefined && normalized.internal_alias_id !== undefined) {
+    normalized.internalAliasId = normalized.internal_alias_id;
+  }
   if (normalized.internal_alias_id === undefined) {
     if (normalized.internalAliasId !== undefined) normalized.internal_alias_id = normalized.internalAliasId;
-    else if (normalized.product_id !== undefined) normalized.internal_alias_id = normalized.product_id;
-    else if (normalized.productId !== undefined) normalized.internal_alias_id = normalized.productId;
-    else if (normalized.localProductId !== undefined) normalized.internal_alias_id = normalized.localProductId;
+  }
+  if (normalized.uniqueProductIdentifier === undefined && normalized.product_identifier_did !== undefined) {
+    normalized.uniqueProductIdentifier = normalized.product_identifier_did;
   }
   if (normalized.product_identifier_did === undefined) {
     if (normalized.uniqueProductIdentifier !== undefined) normalized.product_identifier_did = normalized.uniqueProductIdentifier;
-    else if (normalized.unique_product_identifier !== undefined) normalized.product_identifier_did = normalized.unique_product_identifier;
   }
-  if (normalized.serial_number === undefined) {
-    if (normalized.product_serial_number !== undefined) normalized.serial_number = normalized.product_serial_number;
-    else if (normalized.battery_serial_number !== undefined) normalized.serial_number = normalized.battery_serial_number;
-    else if (normalized.serialNumber !== undefined) normalized.serial_number = normalized.serialNumber;
-    else if (normalized.serial !== undefined) normalized.serial_number = normalized.serial;
-    else if (normalized.batterySerialNumber !== undefined) normalized.serial_number = normalized.batterySerialNumber;
-    else if (normalized.productSerialNumber !== undefined) normalized.serial_number = normalized.productSerialNumber;
-  }
-  if (normalized.battery_serial_number === undefined && normalized.serial_number !== undefined) {
-    normalized.battery_serial_number = normalized.serial_number;
+  if (normalized.economicOperatorId === undefined && normalized.economic_operator_id !== undefined) {
+    normalized.economicOperatorId = normalized.economic_operator_id;
   }
   if (normalized.economic_operator_id === undefined && normalized.economicOperatorId !== undefined) {
     normalized.economic_operator_id = normalized.economicOperatorId;
   }
+  if (normalized.economicOperatorIdentifierScheme === undefined && normalized.economic_operator_identifier_scheme !== undefined) {
+    normalized.economicOperatorIdentifierScheme = normalized.economic_operator_identifier_scheme;
+  }
   if (normalized.economic_operator_identifier_scheme === undefined) {
     if (normalized.economicOperatorIdentifierScheme !== undefined) {
       normalized.economic_operator_identifier_scheme = normalized.economicOperatorIdentifierScheme;
-    } else if (normalized.operatorIdentifierScheme !== undefined) {
-      normalized.economic_operator_identifier_scheme = normalized.operatorIdentifierScheme;
     }
+  }
+  if (normalized.facilityId === undefined && normalized.facility_id !== undefined) {
+    normalized.facilityId = normalized.facility_id;
   }
   if (normalized.facility_id === undefined && normalized.facilityId !== undefined) {
     normalized.facility_id = normalized.facilityId;
   }
+  if (normalized.dppId === undefined && normalized.dpp_id !== undefined) {
+    normalized.dppId = normalized.dpp_id;
+  }
   if (normalized.dpp_id === undefined) {
     if (normalized.dppId !== undefined) normalized.dpp_id = normalized.dppId;
+  }
+  if (normalized.carrierAuthenticity === undefined && normalized.carrier_authenticity !== undefined) {
+    normalized.carrierAuthenticity = normalized.carrier_authenticity;
   }
   if (normalized.carrier_authenticity === undefined && normalized.carrierAuthenticity !== undefined) {
     normalized.carrier_authenticity = normalized.carrierAuthenticity;
   }
+  if (normalized.carrierSecurityStatus === undefined && normalized.carrier_security_status !== undefined) {
+    normalized.carrierSecurityStatus = normalized.carrier_security_status;
+  }
   if (normalized.carrier_security_status === undefined && normalized.carrierSecurityStatus !== undefined) {
     normalized.carrier_security_status = normalized.carrierSecurityStatus;
+  }
+  if (normalized.carrierAuthenticationMethod === undefined && normalized.carrier_authentication_method !== undefined) {
+    normalized.carrierAuthenticationMethod = normalized.carrier_authentication_method;
   }
   if (normalized.carrier_authentication_method === undefined && normalized.carrierAuthenticationMethod !== undefined) {
     normalized.carrier_authentication_method = normalized.carrierAuthenticationMethod;
   }
+  if (normalized.carrierVerificationInstructions === undefined && normalized.carrier_verification_instructions !== undefined) {
+    normalized.carrierVerificationInstructions = normalized.carrier_verification_instructions;
+  }
   if (normalized.carrier_verification_instructions === undefined && normalized.carrierVerificationInstructions !== undefined) {
     normalized.carrier_verification_instructions = normalized.carrierVerificationInstructions;
+  }
+  if (normalized.signedCarrierPayload === undefined && normalized.signed_carrier_payload !== undefined) {
+    normalized.signedCarrierPayload = normalized.signed_carrier_payload;
   }
   if (normalized.signed_carrier_payload === undefined && normalized.signedCarrierPayload !== undefined) {
     normalized.signed_carrier_payload = normalized.signedCarrierPayload;
   }
+  if (normalized.issuerCertificateId === undefined && normalized.issuer_certificate_id !== undefined) {
+    normalized.issuerCertificateId = normalized.issuer_certificate_id;
+  }
   if (normalized.issuer_certificate_id === undefined && normalized.issuerCertificateId !== undefined) {
     normalized.issuer_certificate_id = normalized.issuerCertificateId;
+  }
+  if (normalized.carrierCompatibilityProfiles === undefined && normalized.carrier_compatibility_profiles !== undefined) {
+    normalized.carrierCompatibilityProfiles = normalized.carrier_compatibility_profiles;
   }
   if (normalized.carrier_compatibility_profiles === undefined && normalized.carrierCompatibilityProfiles !== undefined) {
     normalized.carrier_compatibility_profiles = normalized.carrierCompatibilityProfiles;
   }
+  if (normalized.physicalCarrierSecurityFeatures === undefined && normalized.physical_carrier_security_features !== undefined) {
+    normalized.physicalCarrierSecurityFeatures = normalized.physical_carrier_security_features;
+  }
   if (normalized.physical_carrier_security_features === undefined && normalized.physicalCarrierSecurityFeatures !== undefined) {
     normalized.physical_carrier_security_features = normalized.physicalCarrierSecurityFeatures;
+  }
+  if (normalized.trustedViewerOrigin === undefined && normalized.trusted_viewer_origin !== undefined) {
+    normalized.trustedViewerOrigin = normalized.trusted_viewer_origin;
   }
   if (normalized.trusted_viewer_origin === undefined && normalized.trustedViewerOrigin !== undefined) {
     normalized.trusted_viewer_origin = normalized.trustedViewerOrigin;
   }
+  if (normalized.trustedViewerHost === undefined && normalized.trusted_viewer_host !== undefined) {
+    normalized.trustedViewerHost = normalized.trusted_viewer_host;
+  }
   if (normalized.trusted_viewer_host === undefined && normalized.trustedViewerHost !== undefined) {
     normalized.trusted_viewer_host = normalized.trustedViewerHost;
+  }
+  if (normalized.counterfeitRiskLevel === undefined && normalized.counterfeit_risk_level !== undefined) {
+    normalized.counterfeitRiskLevel = normalized.counterfeit_risk_level;
   }
   if (normalized.counterfeit_risk_level === undefined && normalized.counterfeitRiskLevel !== undefined) {
     normalized.counterfeit_risk_level = normalized.counterfeitRiskLevel;
   }
+  if (normalized.antiCounterfeitInstructions === undefined && normalized.anti_counterfeit_instructions !== undefined) {
+    normalized.antiCounterfeitInstructions = normalized.anti_counterfeit_instructions;
+  }
   if (normalized.anti_counterfeit_instructions === undefined && normalized.antiCounterfeitInstructions !== undefined) {
     normalized.anti_counterfeit_instructions = normalized.antiCounterfeitInstructions;
+  }
+  if (normalized.safetyWarnings === undefined && normalized.safety_warnings !== undefined) {
+    normalized.safetyWarnings = normalized.safety_warnings;
   }
   if (normalized.safety_warnings === undefined && normalized.safetyWarnings !== undefined) {
     normalized.safety_warnings = normalized.safetyWarnings;
   }
+  if (normalized.qrPrintSpecification === undefined && normalized.qr_print_specification !== undefined) {
+    normalized.qrPrintSpecification = normalized.qr_print_specification;
+  }
   if (normalized.qr_print_specification === undefined && normalized.qrPrintSpecification !== undefined) {
     normalized.qr_print_specification = normalized.qrPrintSpecification;
+  }
+  if (normalized.signCarrierPayload === undefined && normalized.sign_carrier_payload !== undefined) {
+    normalized.signCarrierPayload = normalized.sign_carrier_payload;
   }
   if (normalized.sign_carrier_payload === undefined && normalized.signCarrierPayload !== undefined) {
     normalized.sign_carrier_payload = normalized.signCarrierPayload;
   }
-  delete normalized.passportType;
-  delete normalized.modelName;
-  delete normalized.internalAliasId;
-  delete normalized.product_id;
-  delete normalized.productId;
-  delete normalized.localProductId;
-  delete normalized.uniqueProductIdentifier;
-  delete normalized.unique_product_identifier;
-  delete normalized.economicOperatorId;
-  delete normalized.economicOperatorIdentifierScheme;
-  delete normalized.operatorIdentifierScheme;
-  delete normalized.facilityId;
-  delete normalized.dppId;
-  delete normalized.carrierAuthenticity;
-  delete normalized.carrierSecurityStatus;
-  delete normalized.carrierAuthenticationMethod;
-  delete normalized.carrierVerificationInstructions;
-  delete normalized.signedCarrierPayload;
-  delete normalized.issuerCertificateId;
-  delete normalized.carrierCompatibilityProfiles;
-  delete normalized.physicalCarrierSecurityFeatures;
-  delete normalized.trustedViewerOrigin;
-  delete normalized.trustedViewerHost;
-  delete normalized.counterfeitRiskLevel;
-  delete normalized.antiCounterfeitInstructions;
-  delete normalized.safetyWarnings;
-  delete normalized.qrPrintSpecification;
-  delete normalized.signCarrierPayload;
+  for (const [legacyKey, appKey] of LEGACY_PASSPORT_KEY_ALIASES.entries()) {
+    if (normalized[appKey] === undefined && normalized[legacyKey] !== undefined) {
+      normalized[appKey] = normalized[legacyKey];
+    }
+  }
+  for (const legacyKey of LEGACY_PASSPORT_KEYS) {
+    delete normalized[legacyKey];
+  }
   return normalized;
 };
 
@@ -316,10 +385,6 @@ const normalizeInternalAliasIdValue = (value) =>
 const INTERNAL_ALIAS_REQUEST_ARRAY_KEYS = [
   "internalAliasId",
   "internalAliasIds",
-  "localProductId",
-  "localProductIds",
-  "productId",
-  "productIds",
   "productIdentifiers",
 ];
 
@@ -342,30 +407,15 @@ const collectRequestedInternalAliasIds = (body = {}) => {
 };
 
 const addLegacyInternalAliasAliases = (payload) => {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
-  const internalAliasId = payload.internalAliasId ?? payload.internal_alias_id ?? null;
-  if (!internalAliasId) return payload;
-  return {
-    ...payload,
-    ...(payload.localProductId === undefined ? { localProductId: internalAliasId } : {}),
-    ...(payload.productId === undefined ? { productId: internalAliasId } : {}),
-  };
+  return payload;
 };
 
 const generateInternalAliasIdValue = (dppId) =>
   String(dppId || "").trim();
 
 const FACILITY_FIELD_CANDIDATES = [
-  "facility_id",
   "facilityId",
-  "facility_identifier",
-  "facilityIdentifier",
-  "manufacturing_facility_id",
   "manufacturingFacilityId",
-  "manufacturing_facility_identifier",
-  "manufacturingFacilityIdentifier",
-  "manufacturing_facility",
-  "manufacturingFacility",
 ];
 
 const extractExplicitFacilityId = (source) => {
@@ -769,6 +819,8 @@ module.exports = {
   comparableHistoryFieldValue,
   isPlainObject,
   extractSchemaFields,
+  quoteSqlIdentifier,
+  joinQuotedSqlIdentifiers,
   getPassportFieldLookupKeys,
   getPassportFieldValue,
   getAssetFieldMap,

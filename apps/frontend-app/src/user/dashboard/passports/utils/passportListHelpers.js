@@ -2,33 +2,8 @@ import { PASSPORT_SECTIONS_MAP } from "../../../../passports/config/PassportFiel
 import { isReleasedPassportStatus } from "../../../../passports/utils/passportStatus";
 
 const BASE_COMPLETENESS_FIELDS = [
-  { key: "model_name", type: "text" },
+  { key: "modelName", type: "text" },
 ];
-
-const FIELD_KEY_ALIASES = {
-  digitalProductPassportId: ["dppId", "dpp_id"],
-  dppId: ["dpp_id", "digitalProductPassportId"],
-  dpp_id: ["dppId", "digitalProductPassportId"],
-  uniqueProductIdentifier: ["product_identifier_did"],
-  internalAliasId: ["internal_alias_id"],
-  modelName: ["model_name"],
-  model_name: ["modelName"],
-  internalAliasId: ["internal_alias_id", "internalAliasId"],
-  internal_alias_id: ["internalAliasId", "internalAliasId"],
-  serial_number: ["serialNumber", "serial", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"],
-  serialNumber: ["serial_number", "serial", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"],
-  batterySerialNumber: ["battery_serial_number", "serial_number", "serial", "serialNumber"],
-  battery_serial_number: ["batterySerialNumber", "serial_number", "serial", "serialNumber"],
-  dppStatus: ["release_status"],
-  release_status: ["dppStatus"],
-  lastUpdate: ["updated_at", "created_at"],
-  economicOperatorId: ["economic_operator_id"],
-  economic_operator_id: ["economicOperatorId"],
-  facilityId: ["facility_id"],
-  facility_id: ["facilityId"],
-  contentSpecificationIds: ["content_specification_ids"],
-  content_specification_ids: ["contentSpecificationIds"],
-};
 
 export function formatPassportTypeLabel(passportType) {
   if (!passportType) return "Passport";
@@ -38,16 +13,14 @@ export function formatPassportTypeLabel(passportType) {
 }
 
 export function sortPassportsByVersionDesc(a, b) {
-  const versionDiff = Number(b?.version_number || 0) - Number(a?.version_number || 0);
+  const versionDiff = Number(b?.versionNumber || 0) - Number(a?.versionNumber || 0);
   if (versionDiff !== 0) return versionDiff;
   return getPassportDateTimestamp(b) - getPassportDateTimestamp(a);
 }
 
 export function getPassportDateValue(passport) {
   if (!passport || typeof passport !== "object") return null;
-  return passport.created_at
-    || passport.createdAt
-    || passport.updated_at
+  return passport.createdAt
     || passport.updatedAt
     || null;
 }
@@ -68,8 +41,8 @@ export function formatPassportDate(passport, locale) {
 }
 
 export function getPassportGroupKey(passport) {
-  if (passport?.lineage_id) return `lineage:${passport.lineage_id}`;
-  if (passport?.internal_alias_id) return `product:${passport.passport_type || "passport"}:${passport.internal_alias_id}`;
+  if (passport?.lineageId) return `lineage:${passport.lineageId}`;
+  if (passport?.internalAliasId) return `product:${passport.passportType || "passport"}:${passport.internalAliasId}`;
   return `dppId:${passport?.dppId || ""}`;
 }
 
@@ -102,22 +75,14 @@ export function parseCsvText(text) {
   return text.split("\n").map((line) => line.trim()).filter(Boolean).map(parseCsvRow);
 }
 
-function getFieldCandidates(key) {
-  const foldedKey = typeof key === "string" ? key.toLowerCase() : key;
-  return [...new Set([key, foldedKey, ...(FIELD_KEY_ALIASES[key] || [])].filter(Boolean))];
-}
-
 function getPassportFieldValue(passport, key) {
-  for (const candidate of getFieldCandidates(key)) {
-    if (Object.prototype.hasOwnProperty.call(passport, candidate)) {
-      return passport[candidate];
-    }
-  }
-  return undefined;
+  return Object.prototype.hasOwnProperty.call(passport, key) ? passport[key] : undefined;
 }
 
 export function getPassportSerialNumber(passport) {
-  const value = getPassportFieldValue(passport || {}, "serial_number");
+  const value = getPassportFieldValue(passport || {}, "batterySerialNumber")
+    ?? getPassportFieldValue(passport || {}, "serialNumber")
+    ?? getPassportFieldValue(passport || {}, "productSerialNumber");
   return value == null ? "" : String(value).trim();
 }
 
@@ -145,7 +110,7 @@ export function getPassportSerialNumberForType(passport, typeDefinitions = []) {
   const explicitSerial = getPassportSerialNumber(passport);
   if (explicitSerial) return explicitSerial;
 
-  const passportType = passport?.passport_type || passport?.passportType;
+  const passportType = passport?.passportType;
   const typeFields = passportType ? getTypeFields(passportType, typeDefinitions) : [];
   const serialField = typeFields.find(isLikelySerialField);
   if (!serialField?.key) return "";
@@ -193,7 +158,7 @@ function getTypeFields(passportType, typeDefinitions = []) {
 export function calcCompleteness(passport, typeDefinitions = []) {
   if (!passport) return null;
 
-  const pType = passport.passport_type || passport.passportType;
+  const pType = passport.passportType;
   const typeFields = pType ? getTypeFields(pType, typeDefinitions) : [];
   const authorFields = typeFields.filter((field) => field.type !== "file" && !field.dynamic);
   const fieldsToMeasure = [
@@ -213,10 +178,10 @@ export function calcCompleteness(passport, typeDefinitions = []) {
 export function dedupeLatestReleasedPassports(passports = []) {
   const latestByLineage = new Map();
   passports.forEach((passport) => {
-    if (!passport?.dppId || !isReleasedPassportStatus(passport.release_status)) return;
-    const key = passport.lineage_id || passport.dppId;
+    if (!passport?.dppId || !isReleasedPassportStatus(passport.releaseStatus)) return;
+    const key = passport.lineageId || passport.dppId;
     const current = latestByLineage.get(key);
-    if (!current || Number(passport.version_number || 0) > Number(current.version_number || 0)) {
+    if (!current || Number(passport.versionNumber || 0) > Number(current.versionNumber || 0)) {
       latestByLineage.set(key, passport);
     }
   });
