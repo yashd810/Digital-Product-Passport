@@ -262,7 +262,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       query = `
         SELECT
           sub.*,
-          COALESCE(phv."isPublic", sub."releaseStatus" IN ('released', 'obsolete')) AS "isPublic",
+          COALESCE(phv.is_public, sub."releaseStatus" IN ('released', 'obsolete')) AS "isPublic",
           public_version."versionNumber" AS "publicVersionNumber"
         FROM (${query}) sub
         LEFT JOIN passport_history_visibility phv
@@ -278,7 +278,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
             AND pa_public."companyId" = sub."companyId"
             AND ${ARCHIVED_HISTORY_FILTER_SQL.replaceAll("snapshot_reason", "pa_public.snapshot_reason")}
             AND pa_public."releaseStatus" IN ('released', 'obsolete')
-            AND COALESCE(phv_public."isPublic", true) = true
+            AND COALESCE(phv_public.is_public, true) = true
           ORDER BY pa_public."versionNumber" DESC, pa_public."archivedAt" DESC
           LIMIT 1
         ) public_version ON true

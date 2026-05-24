@@ -49,7 +49,7 @@ function registerPassportSupportRoutes(app, deps) {
       }
 
       const existingVisibilityRes = await pool.query(
-        `SELECT "isPublic"
+        `SELECT is_public AS "isPublic"
          FROM passport_history_visibility
          WHERE "passportDppId" = $1 AND "versionNumber" = $2`,
         [versionRow.dppId, parsedVersion]
@@ -59,10 +59,10 @@ function registerPassportSupportRoutes(app, deps) {
         : isPublicHistoryStatus(versionRow.releaseStatus);
 
       await pool.query(
-        `INSERT INTO passport_history_visibility ("passportDppId", "versionNumber", "isPublic", "updatedBy", "createdAt", "updatedAt")
+        `INSERT INTO passport_history_visibility ("passportDppId", "versionNumber", is_public, "updatedBy", "createdAt", "updatedAt")
          VALUES ($1,$2,$3,$4,NOW(),NOW())
          ON CONFLICT ("passportDppId", "versionNumber")
-         DO UPDATE SET "isPublic" = EXCLUDED."isPublic", "updatedBy" = EXCLUDED."updatedBy", "updatedAt" = NOW()`,
+         DO UPDATE SET is_public = EXCLUDED.is_public, "updatedBy" = EXCLUDED."updatedBy", "updatedAt" = NOW()`,
         [versionRow.dppId, parsedVersion, isPublic, req.user.userId]
       );
 
