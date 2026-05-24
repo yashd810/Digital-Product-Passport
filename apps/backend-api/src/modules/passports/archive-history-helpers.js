@@ -43,9 +43,9 @@ function createArchiveHistoryHelpers({
 
     await client.query(
       `INSERT INTO passport_archives
-         (dpp_id, lineage_id, company_id, passport_type, version_number, model_name,
-          internal_alias_id, product_identifier_did, release_status, row_data, archived_by,
-          actor_identifier, snapshot_reason)
+         ("dppId", "lineageId", "companyId", "passportType", "versionNumber", "modelName",
+          "internalAliasId", "productIdentifierDid", "releaseStatus", "rowData", "archivedBy",
+          "actorIdentifier", "snapshotReason")
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         dppId,
@@ -125,7 +125,7 @@ function createArchiveHistoryHelpers({
     const fieldDefs = getHistoryFieldDefs(typeRow);
 
     const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
-    if (!lineageContext?.lineage_id) {
+    if (!lineageContext?.lineageId) {
       return {
         passportType,
         displayName: typeRow?.display_name || passportType,
@@ -158,23 +158,23 @@ function createArchiveHistoryHelpers({
     const versionDppIds = versions.map((row) => row.dppId).filter(Boolean);
     const visibilityRes = versionDppIds.length
       ? await pool.query(
-          `SELECT passport_dpp_id, version_number, is_public
+          `SELECT "passportDppId", "versionNumber", "isPublic"
            FROM passport_history_visibility
-           WHERE passport_dpp_id = ANY($1::text[])`,
+           WHERE "passportDppId" = ANY($1::text[])`,
           [versionDppIds]
         )
       : { rows: [] };
     const visibilityMap = new Map(
-      visibilityRes.rows.map((row) => [`${row.passport_dpp_id}:${Number(row.versionNumber)}`, !!row.is_public])
+      visibilityRes.rows.map((row) => [`${row.passportDppId}:${Number(row.versionNumber)}`, !!row.isPublic])
     );
 
-    const ascending = [...versions].sort((a, b) => Number(a.version_number) - Number(b.version_number));
+    const ascending = [...versions].sort((a, b) => Number(a.versionNumber) - Number(b.versionNumber));
     const previousByVersion = new Map();
     ascending.forEach((version, index) => {
       previousByVersion.set(Number(version.versionNumber), index > 0 ? ascending[index - 1] : null);
     });
 
-    const latestVersionNumber = versions[0]?.version_number ?? null;
+    const latestVersionNumber = versions[0]?.versionNumber ?? null;
     const latestReleasedVersionNumber = versions
       .filter((row) => isPublicHistoryStatus(row.releaseStatus))
       .reduce((max, row) => Math.max(max, Number(row.versionNumber || 0)), 0);
@@ -207,21 +207,21 @@ function createArchiveHistoryHelpers({
           : [];
 
         return {
-          version_number: versionNumber,
-          release_status: normalizedStatus,
+          versionNumber,
+          releaseStatus: normalizedStatus,
           createdAt: version.createdAt,
           updatedAt: version.updatedAt,
           createdByName: creatorMap.get(version.createdBy) || null,
-          is_public: isPublic,
+          isPublic,
           dppId: version.dppId,
-          public_path: buildCurrentPublicPassportPath({
+          publicPath: buildCurrentPublicPassportPath({
             companyName: companyNameMap.get(String(version.companyId)) || "",
             manufacturerName: version.manufacturer,
             manufacturedBy: version.manufactured_by,
             modelName: version.modelName,
             internalAliasId: version.internalAliasId,
           }),
-          inactive_path: buildInactivePublicPassportPath({
+          inactivePath: buildInactivePublicPassportPath({
             companyName: companyNameMap.get(String(version.companyId)) || "",
             manufacturerName: version.manufacturer,
             manufacturedBy: version.manufactured_by,
@@ -229,14 +229,14 @@ function createArchiveHistoryHelpers({
             internalAliasId: version.internalAliasId,
             versionNumber,
           }),
-          changed_fields: changedFields,
-          change_count: changedFields.length,
+          changedFields,
+          changeCount: changedFields.length,
           summary: previous
             ? (changedFields.length
-                ? `${changedFields.length} field${changedFields.length === 1 ? "" : "s"} changed from v${previous.version_number}.`
-                : `No field changes detected from v${previous.version_number}.`)
+                ? `${changedFields.length} field${changedFields.length === 1 ? "" : "s"} changed from v${previous.versionNumber}.`
+                : `No field changes detected from v${previous.versionNumber}.`)
             : "Initial version.",
-          is_current: publicOnly
+          isCurrent: publicOnly
             ? versionNumber === Number(latestReleasedVersionNumber || latestVersionNumber)
             : versionNumber === Number(latestVersionNumber),
         };
@@ -253,7 +253,7 @@ function createArchiveHistoryHelpers({
   async function clearExpiredEditSessions(editSessionTimeoutSql) {
     await pool.query(
       `DELETE FROM passport_edit_sessions
-       WHERE last_activity_at < NOW() - INTERVAL '${editSessionTimeoutSql}'`
+       WHERE "lastActivityAt" < NOW() - INTERVAL '${editSessionTimeoutSql}'`
     );
   }
 
@@ -263,28 +263,28 @@ function createArchiveHistoryHelpers({
     let currentUserFilter = "";
     if (currentUserId) {
       params.push(currentUserId);
-      currentUserFilter = ` AND pes.user_id <> $${params.length}`;
+      currentUserFilter = ` AND pes."userId" <> $${params.length}`;
     }
     const res = await pool.query(
       `SELECT
-         pes.user_id,
-         pes.last_activity_at,
+         pes."userId",
+         pes."lastActivityAt",
          u.first_name,
          u.last_name,
          u.email
        FROM passport_edit_sessions pes
-       JOIN users u ON u.id = pes.user_id
-       WHERE pes.passport_dpp_id = $1
-         AND pes.last_activity_at >= NOW() - INTERVAL '${editSessionTimeoutSql}'
+       JOIN users u ON u.id = pes."userId"
+       WHERE pes."passportDppId" = $1
+         AND pes."lastActivityAt" >= NOW() - INTERVAL '${editSessionTimeoutSql}'
          ${currentUserFilter}
-       ORDER BY pes.last_activity_at DESC`,
+       ORDER BY pes."lastActivityAt" DESC`,
       params
     );
     return res.rows.map((row) => ({
-      userId: row.user_id,
+      userId: row.userId,
       name: `${row.first_name || ""} ${row.last_name || ""}`.trim() || row.email,
       email: row.email,
-      lastActivityAt: row.last_activity_at,
+      lastActivityAt: row.lastActivityAt,
     }));
   }
 

@@ -161,10 +161,10 @@ function createProductIdentifierService({ didService, pool = null }) {
     return {
       companyId: companyId !== null && companyId !== undefined ? Number.parseInt(companyId, 10) || null : null,
       selectedGlobalIdentifierScheme: "did_web_product_identifier",
-      uniqueProductIdentifierField: "product_identifier_did",
-      localProductIdField: "internal_alias_id",
-      dppRecordIdentifierField: "dpp_id",
-      lineageIdentifierField: "lineage_id",
+      uniqueProductIdentifierField: "uniqueProductIdentifier",
+      localProductIdField: "internalAliasId",
+      dppRecordIdentifierField: "dppId",
+      lineageIdentifierField: "lineageId",
       didWebDomain: typeof didService?.getDidDomain === "function" ? didService.getDidDomain() : null,
       rules: {
         identifiersNeverReused: true,
@@ -178,8 +178,8 @@ function createProductIdentifierService({ didService, pool = null }) {
       },
       granularityChangePolicy: {
         mode: "linked_new_identifier_required",
-        linkageField: "lineage_id",
-        note: "Granularity changes must mint a new identifier linked through the shared lineage_id rather than reassigning an existing identifier in place.",
+        linkageField: "lineageId",
+        note: "Granularity changes must mint a new identifier linked through the shared lineageId rather than reassigning an existing identifier in place.",
       },
       resolutionContinuity: {
         activeSource: "live_passport_or_public_route",
@@ -199,32 +199,19 @@ function createProductIdentifierService({ didService, pool = null }) {
     if (!row) return null;
     return {
       id: row.id,
-      companyId: row.company_id ?? null,
-      company_id: row.company_id ?? null,
-      lineageId: row.lineage_id ?? null,
-      lineage_id: row.lineage_id ?? null,
-      previousDppId: row.previous_passport_dpp_id ?? null,
-      previous_passport_dpp_id: row.previous_passport_dpp_id ?? null,
-      replacementDppId: row.replacement_passport_dpp_id ?? null,
-      replacement_passport_dpp_id: row.replacement_passport_dpp_id ?? null,
-      previousIdentifier: row.previous_identifier ?? null,
-      previous_identifier: row.previous_identifier ?? null,
-      replacementIdentifier: row.replacement_identifier ?? null,
-      replacement_identifier: row.replacement_identifier ?? null,
-      previousInternalAliasId: row.previous_internal_alias_id ?? null,
-      previous_internal_alias_id: row.previous_internal_alias_id ?? null,
-      replacementInternalAliasId: row.replacement_internal_alias_id ?? null,
-      replacement_internal_alias_id: row.replacement_internal_alias_id ?? null,
-      previousGranularity: row.previous_granularity ?? null,
-      previous_granularity: row.previous_granularity ?? null,
-      replacementGranularity: row.replacement_granularity ?? null,
-      replacement_granularity: row.replacement_granularity ?? null,
-      transitionReason: row.transition_reason ?? null,
-      transition_reason: row.transition_reason ?? null,
-      createdBy: row.created_by ?? null,
-      created_by: row.created_by ?? null,
-      createdAt: row.created_at ?? null,
-      created_at: row.created_at ?? null,
+      companyId: row.companyId ?? null,
+      lineageId: row.lineageId ?? null,
+      previousDppId: row.previousPassportDppId ?? null,
+      replacementDppId: row.replacementPassportDppId ?? null,
+      previousIdentifier: row.previousIdentifier ?? null,
+      replacementIdentifier: row.replacementIdentifier ?? null,
+      previousInternalAliasId: row.previousInternalAliasId ?? null,
+      replacementInternalAliasId: row.replacementInternalAliasId ?? null,
+      previousGranularity: row.previousGranularity ?? null,
+      replacementGranularity: row.replacementGranularity ?? null,
+      transitionReason: row.transitionReason ?? null,
+      createdBy: row.createdBy ?? null,
+      createdAt: row.createdAt ?? null,
     };
   }
 
@@ -247,10 +234,10 @@ function createProductIdentifierService({ didService, pool = null }) {
 
     const result = await client.query(
       `INSERT INTO product_identifier_lineage
-         (company_id, lineage_id, previous_passport_dpp_id, replacement_passport_dpp_id,
-          previous_identifier, replacement_identifier, previous_internal_alias_id,
-          replacement_internal_alias_id, previous_granularity, replacement_granularity,
-          transition_reason, created_by)
+         ("companyId", "lineageId", "previousPassportDppId", "replacementPassportDppId",
+          "previousIdentifier", "replacementIdentifier", "previousInternalAliasId",
+          "replacementInternalAliasId", "previousGranularity", "replacementGranularity",
+          "transitionReason", "createdBy")
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
@@ -286,19 +273,19 @@ function createProductIdentifierService({ didService, pool = null }) {
 
     if (companyId !== null && companyId !== undefined) {
       params.push(Number.parseInt(companyId, 10) || companyId);
-      filters.push(`company_id = $${params.length}`);
+      filters.push(`"companyId" = $${params.length}`);
     }
     if (lineageId) {
       params.push(String(lineageId));
-      filters.push(`lineage_id = $${params.length}`);
+      filters.push(`"lineageId" = $${params.length}`);
     }
     if (dppId) {
       params.push(String(dppId));
-      filters.push(`(previous_passport_dpp_id = $${params.length} OR replacement_passport_dpp_id = $${params.length})`);
+      filters.push(`("previousPassportDppId" = $${params.length} OR "replacementPassportDppId" = $${params.length})`);
     }
     if (identifier) {
       params.push(String(identifier));
-      filters.push(`(previous_identifier = $${params.length} OR replacement_identifier = $${params.length})`);
+      filters.push(`("previousIdentifier" = $${params.length} OR "replacementIdentifier" = $${params.length})`);
     }
     if (!filters.length) return [];
 
@@ -306,7 +293,7 @@ function createProductIdentifierService({ didService, pool = null }) {
       `SELECT *
        FROM product_identifier_lineage
        WHERE ${filters.join(" AND ")}
-       ORDER BY created_at ASC, id ASC`,
+       ORDER BY "createdAt" ASC, id ASC`,
       params
     );
     return result.rows.map(normalizeIdentifierLineageRow);

@@ -1,10 +1,19 @@
 "use strict";
 
 const logger = require("../services/logger");
+const { SHARED_PASSPORT_TABLE_COLUMN_MAPPINGS } = require("../src/shared/passports/shared-passport-table-columns");
 const BATTERY_DICTIONARY_MODEL_KEY = "claros_battery_dictionary_v1";
 
 function isSafeSqlIdentifier(value) {
   return /^[a-z][a-z0-9_]*$/i.test(String(value || ""));
+}
+
+function quoteDbIdentifier(value) {
+  const identifier = String(value || "").trim();
+  if (!isSafeSqlIdentifier(identifier)) {
+    throw new Error(`Unsafe SQL identifier: ${identifier}`);
+  }
+  return `"${identifier.replace(/"/g, "\"\"")}"`;
 }
 
 function toDidSlug(value, fallback = "company") {
@@ -65,11 +74,13 @@ async function runMigration(pool, migrationId, handler) {
 
 async function addPassportRegistryForeignKey(pool, {
   tableName,
-  columnName = "passport_dpp_id",
+  columnName = "passportDppId",
   constraintName,
   nullable = false,
   onDelete = "CASCADE",
 }) {
+  const quotedTableName = quoteDbIdentifier(tableName);
+  const quotedColumnName = quoteDbIdentifier(columnName);
   await pool.query(`
     DO $$
     DECLARE orphan_count INTEGER;
@@ -78,27 +89,63 @@ async function addPassportRegistryForeignKey(pool, {
         SELECT 1 FROM pg_constraint WHERE conname = '${constraintName}'
       ) THEN
         SELECT COUNT(*) INTO orphan_count
-        FROM ${tableName} child
-        LEFT JOIN passport_registry parent ON parent.dpp_id = child.${columnName}
-        WHERE child.${columnName} IS NOT NULL
-          AND parent.dpp_id IS NULL;
+        FROM ${quotedTableName} child
+        LEFT JOIN passport_registry parent ON parent."dppId" = child.${quotedColumnName}
+        WHERE child.${quotedColumnName} IS NOT NULL
+          AND parent."dppId" IS NULL;
 
         IF orphan_count > 0 THEN
           RAISE EXCEPTION 'Cannot add ${constraintName}: % orphan row(s) in ${tableName}.${columnName}', orphan_count;
         END IF;
 
-        ALTER TABLE ${tableName}
+        ALTER TABLE ${quotedTableName}
           ADD CONSTRAINT ${constraintName}
-          FOREIGN KEY (${columnName}) REFERENCES passport_registry(dpp_id) ON DELETE ${onDelete};
+          FOREIGN KEY (${quotedColumnName}) REFERENCES passport_registry("dppId") ON DELETE ${onDelete};
       END IF;
     END $$;
   `);
 
   if (!nullable) {
     await pool.query(`
-      ALTER TABLE ${tableName}
-      ALTER COLUMN ${columnName} SET NOT NULL
+      ALTER TABLE ${quotedTableName}
+      ALTER COLUMN ${quotedColumnName} SET NOT NULL
     `).catch(() => {});
+  }
+}
+
+async function renameTableColumnsToCamelCase(pool, tableName, columnMappings = []) {
+  const columns = await pool.query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = $1`,
+    [tableName]
+  );
+  const existingColumns = new Set(columns.rows.map((row) => row.column_name));
+  if (!existingColumns.size) return false;
+
+  let changed = false;
+  for (const [legacyName, camelName] of columnMappings) {
+    if (!existingColumns.has(legacyName) || existingColumns.has(camelName)) continue;
+    await pool.query(
+      `ALTER TABLE ${quoteDbIdentifier(tableName)}
+       RENAME COLUMN ${quoteDbIdentifier(legacyName)}
+       TO ${quoteDbIdentifier(camelName)}`
+    );
+    existingColumns.delete(legacyName);
+    existingColumns.add(camelName);
+    changed = true;
+  }
+  return changed;
+}
+
+async function migrateSharedPassportTablesToCamelCase(pool) {
+  const tableNames = Object.keys(SHARED_PASSPORT_TABLE_COLUMN_MAPPINGS);
+  for (const tableName of tableNames) {
+    await renameTableColumnsToCamelCase(
+      pool,
+      tableName,
+      SHARED_PASSPORT_TABLE_COLUMN_MAPPINGS[tableName]
+    );
   }
 }
 
@@ -256,17 +303,17 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dpp_subject_registry (
       id              SERIAL PRIMARY KEY,
-      company_id      INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-      passport_dpp_id   TEXT NOT NULL,
-      internal_alias_id      TEXT NOT NULL,
-      product_identifier_did TEXT,
+      "companyId"      INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      "passportDppId"  TEXT NOT NULL,
+      "internalAliasId" TEXT NOT NULL,
+      "productIdentifierDid" TEXT,
       granularity     VARCHAR(20) NOT NULL DEFAULT 'model',
-      product_did     TEXT NOT NULL,
-      dpp_did         TEXT NOT NULL,
-      company_did     TEXT NOT NULL,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE(company_id, internal_alias_id)
+      "productDid"    TEXT NOT NULL,
+      "dppDid"        TEXT NOT NULL,
+      "companyDid"    TEXT NOT NULL,
+      "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE("companyId", "internalAliasId")
     )
   `);
   await pool.query(`
@@ -285,35 +332,35 @@ async function initDb(pool, {
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dpp_subject_registry_guid
-      ON dpp_subject_registry(passport_dpp_id)
+      ON dpp_subject_registry("passportDppId")
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dpp_subject_registry_product
-      ON dpp_subject_registry(company_id, internal_alias_id)
+      ON dpp_subject_registry("companyId", "internalAliasId")
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dpp_registry_registrations (
       id SERIAL PRIMARY KEY,
-      passport_dpp_id TEXT NOT NULL,
-      company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-      product_identifier TEXT NOT NULL,
-      dpp_id TEXT NOT NULL,
-      registry_name VARCHAR(120) NOT NULL DEFAULT 'local',
+      "passportDppId" TEXT NOT NULL,
+      "companyId" INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      "productIdentifier" TEXT NOT NULL,
+      "dppId" TEXT NOT NULL,
+      "registryName" VARCHAR(120) NOT NULL DEFAULT 'local',
       status VARCHAR(40) NOT NULL DEFAULT 'registered',
-      registration_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-      registered_by INTEGER,
-      registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (registry_name, dpp_id)
+      "registrationPayload" JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "registeredBy" INTEGER,
+      "registeredAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE ("registryName", "dppId")
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dpp_registry_registrations_guid
-      ON dpp_registry_registrations(passport_dpp_id)
+      ON dpp_registry_registrations("passportDppId")
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dpp_registry_registrations_company
-      ON dpp_registry_registrations(company_id, registry_name)
+      ON dpp_registry_registrations("companyId", "registryName")
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS backup_service_providers (
@@ -340,80 +387,80 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_backup_replications (
       id                  SERIAL PRIMARY KEY,
-      backup_provider_id  INTEGER REFERENCES backup_service_providers(id) ON DELETE SET NULL,
-      backup_provider_key VARCHAR(120) NOT NULL,
-      passport_dpp_id       TEXT NOT NULL,
-      lineage_id          TEXT,
-      company_id          INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-      passport_type       VARCHAR(100),
-      version_number      INTEGER NOT NULL DEFAULT 1,
-      dpp_id              TEXT,
-      snapshot_scope      VARCHAR(60) NOT NULL DEFAULT 'released_current',
-      replication_status  VARCHAR(40) NOT NULL DEFAULT 'pending',
-      storage_provider    VARCHAR(60),
-      storage_key         TEXT,
-      public_url          TEXT,
-      payload_hash        VARCHAR(64),
-      payload_json        JSONB NOT NULL DEFAULT '{}'::jsonb,
-      error_message       TEXT,
-      verification_status VARCHAR(40) NOT NULL DEFAULT 'pending',
-      verification_error_message TEXT,
-      verified_payload_hash VARCHAR(64),
-      last_verified_at    TIMESTAMPTZ,
-      replicated_at       TIMESTAMPTZ,
-      created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (backup_provider_key, passport_dpp_id, version_number, snapshot_scope)
+      "backupProviderId"  INTEGER REFERENCES backup_service_providers(id) ON DELETE SET NULL,
+      "backupProviderKey" VARCHAR(120) NOT NULL,
+      "passportDppId"     TEXT NOT NULL,
+      "lineageId"         TEXT,
+      "companyId"         INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      "passportType"      VARCHAR(100),
+      "versionNumber"     INTEGER NOT NULL DEFAULT 1,
+      "dppId"             TEXT,
+      "snapshotScope"     VARCHAR(60) NOT NULL DEFAULT 'released_current',
+      "replicationStatus" VARCHAR(40) NOT NULL DEFAULT 'pending',
+      "storageProvider"   VARCHAR(60),
+      "storageKey"        TEXT,
+      "publicUrl"         TEXT,
+      "payloadHash"       VARCHAR(64),
+      "payloadJson"       JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "errorMessage"      TEXT,
+      "verificationStatus" VARCHAR(40) NOT NULL DEFAULT 'pending',
+      "verificationErrorMessage" TEXT,
+      "verifiedPayloadHash" VARCHAR(64),
+      "lastVerifiedAt"    TIMESTAMPTZ,
+      "replicatedAt"      TIMESTAMPTZ,
+      "createdAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE ("backupProviderKey", "passportDppId", "versionNumber", "snapshotScope")
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_backup_replications_passport
-      ON passport_backup_replications(company_id, passport_dpp_id, version_number DESC)
+      ON passport_backup_replications("companyId", "passportDppId", "versionNumber" DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_backup_replications_status
-      ON passport_backup_replications(replication_status, updated_at DESC)
+      ON passport_backup_replications("replicationStatus", "updatedAt" DESC)
   `);
   await pool.query(`
     ALTER TABLE passport_backup_replications
-    ADD COLUMN IF NOT EXISTS verification_status VARCHAR(40) NOT NULL DEFAULT 'pending'
+    ADD COLUMN IF NOT EXISTS "verificationStatus" VARCHAR(40) NOT NULL DEFAULT 'pending'
   `);
   await pool.query(`
     ALTER TABLE passport_backup_replications
-    ADD COLUMN IF NOT EXISTS verification_error_message TEXT
+    ADD COLUMN IF NOT EXISTS "verificationErrorMessage" TEXT
   `);
   await pool.query(`
     ALTER TABLE passport_backup_replications
-    ADD COLUMN IF NOT EXISTS verified_payload_hash VARCHAR(64)
+    ADD COLUMN IF NOT EXISTS "verifiedPayloadHash" VARCHAR(64)
   `);
   await pool.query(`
     ALTER TABLE passport_backup_replications
-    ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS "lastVerifiedAt" TIMESTAMPTZ
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_registry (
-      dpp_id                     TEXT        PRIMARY KEY,
-      lineage_id                 TEXT        NOT NULL,
-      company_id                 INTEGER     NOT NULL,
-      passport_type              VARCHAR(50) NOT NULL,
-      access_key                 VARCHAR(255),
-      access_key_hash            VARCHAR(64),
-      access_key_prefix          VARCHAR(24),
-      access_key_last_rotated_at TIMESTAMPTZ,
-      device_api_key             VARCHAR(255),
-      device_api_key_hash        VARCHAR(64),
-      device_api_key_prefix      VARCHAR(24),
-      device_key_last_rotated_at TIMESTAMPTZ,
-      created_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "dppId"                     TEXT        PRIMARY KEY,
+      "lineageId"                 TEXT        NOT NULL,
+      "companyId"                 INTEGER     NOT NULL,
+      "passportType"              VARCHAR(50) NOT NULL,
+      "accessKey"                 VARCHAR(255),
+      "accessKeyHash"             VARCHAR(64),
+      "accessKeyPrefix"           VARCHAR(24),
+      "accessKeyLastRotatedAt"    TIMESTAMPTZ,
+      "deviceApiKey"              VARCHAR(255),
+      "deviceApiKeyHash"          VARCHAR(64),
+      "deviceApiKeyPrefix"        VARCHAR(24),
+      "deviceKeyLastRotatedAt"    TIMESTAMPTZ,
+      "createdAt"                 TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_registry_company
-      ON passport_registry(company_id)
+      ON passport_registry("companyId")
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_registry_lineage
-      ON passport_registry(lineage_id)
+      ON passport_registry("lineageId")
   `);
 
   await pool.query(`
@@ -450,28 +497,28 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS backup_public_handovers (
       id                    SERIAL PRIMARY KEY,
-      company_id            INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-      passport_dpp_id       TEXT NOT NULL REFERENCES passport_registry(dpp_id) ON DELETE CASCADE,
-      lineage_id            TEXT,
-      passport_type         VARCHAR(100) NOT NULL,
-      internal_alias_id            TEXT NOT NULL,
-      version_number        INTEGER NOT NULL DEFAULT 1,
-      backup_provider_id    INTEGER REFERENCES backup_service_providers(id) ON DELETE SET NULL,
-      backup_provider_key   VARCHAR(100) NOT NULL,
-      source_replication_id INTEGER REFERENCES passport_backup_replications(id) ON DELETE SET NULL,
-      storage_key           TEXT,
-      public_url            TEXT,
-      public_company_name   TEXT,
-      public_row_data       JSONB NOT NULL DEFAULT '{}'::jsonb,
-      handover_status       VARCHAR(32) NOT NULL DEFAULT 'active',
-      verification_status   VARCHAR(32) NOT NULL DEFAULT 'verified',
+      "companyId"            INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      "passportDppId"        TEXT NOT NULL REFERENCES passport_registry("dppId") ON DELETE CASCADE,
+      "lineageId"            TEXT,
+      "passportType"         VARCHAR(100) NOT NULL,
+      "internalAliasId"      TEXT NOT NULL,
+      "versionNumber"        INTEGER NOT NULL DEFAULT 1,
+      "backupProviderId"     INTEGER REFERENCES backup_service_providers(id) ON DELETE SET NULL,
+      "backupProviderKey"    VARCHAR(100) NOT NULL,
+      "sourceReplicationId"  INTEGER REFERENCES passport_backup_replications(id) ON DELETE SET NULL,
+      "storageKey"           TEXT,
+      "publicUrl"            TEXT,
+      "publicCompanyName"    TEXT,
+      "publicRowData"        JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "handoverStatus"       VARCHAR(32) NOT NULL DEFAULT 'active',
+      "verificationStatus"   VARCHAR(32) NOT NULL DEFAULT 'verified',
       notes                 TEXT,
-      activated_by          INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      deactivated_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      activated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      deactivated_at        TIMESTAMPTZ,
-      created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "activatedBy"         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "deactivatedBy"       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "activatedAt"         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "deactivatedAt"       TIMESTAMPTZ,
+      "createdAt"           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"           TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
@@ -490,16 +537,16 @@ async function initDb(pool, {
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_backup_public_handovers_company
-      ON backup_public_handovers(company_id, activated_at DESC, id DESC)
+      ON backup_public_handovers("companyId", "activatedAt" DESC, id DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_backup_public_handovers_product
-      ON backup_public_handovers(internal_alias_id, handover_status, activated_at DESC, id DESC)
+      ON backup_public_handovers("internalAliasId", "handoverStatus", "activatedAt" DESC, id DESC)
   `);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_backup_public_handovers_active_passport
-      ON backup_public_handovers(passport_dpp_id)
-      WHERE handover_status = 'active'
+      ON backup_public_handovers("passportDppId")
+      WHERE "handoverStatus" = 'active'
   `);
 
   await pool.query(`
@@ -828,38 +875,38 @@ async function initDb(pool, {
 
   await pool.query(`
     ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS lineage_id TEXT
+    ADD COLUMN IF NOT EXISTS "lineageId" TEXT
   `).catch(() => {});
   await pool.query(`
     UPDATE passport_registry
-    SET lineage_id = dpp_id
-    WHERE lineage_id IS NULL
+    SET "lineageId" = "dppId"
+    WHERE "lineageId" IS NULL
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_registry_company
-      ON passport_registry(company_id)
+      ON passport_registry("companyId")
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_registry_lineage
-      ON passport_registry(lineage_id)
+      ON passport_registry("lineageId")
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS product_identifier_lineage (
       id                           SERIAL PRIMARY KEY,
-      company_id                   INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-      lineage_id                   TEXT    NOT NULL,
-      previous_passport_dpp_id     TEXT    NOT NULL,
-      replacement_passport_dpp_id  TEXT    NOT NULL,
-      previous_identifier          TEXT    NOT NULL,
-      replacement_identifier       TEXT    NOT NULL,
-      previous_internal_alias_id    TEXT,
-      replacement_internal_alias_id TEXT,
-      previous_granularity         VARCHAR(20) NOT NULL CHECK (previous_granularity IN ('model', 'batch', 'item')),
-      replacement_granularity      VARCHAR(20) NOT NULL CHECK (replacement_granularity IN ('model', 'batch', 'item')),
-      transition_reason            TEXT,
-      created_by                   INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      created_at                   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (previous_passport_dpp_id, replacement_passport_dpp_id)
+      "companyId"                  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      "lineageId"                  TEXT    NOT NULL,
+      "previousPassportDppId"      TEXT    NOT NULL,
+      "replacementPassportDppId"   TEXT    NOT NULL,
+      "previousIdentifier"         TEXT    NOT NULL,
+      "replacementIdentifier"      TEXT    NOT NULL,
+      "previousInternalAliasId"    TEXT,
+      "replacementInternalAliasId" TEXT,
+      "previousGranularity"        VARCHAR(20) NOT NULL CHECK ("previousGranularity" IN ('model', 'batch', 'item')),
+      "replacementGranularity"     VARCHAR(20) NOT NULL CHECK ("replacementGranularity" IN ('model', 'batch', 'item')),
+      "transitionReason"           TEXT,
+      "createdBy"                  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "createdAt"                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE ("previousPassportDppId", "replacementPassportDppId")
     )
   `);
   await pool.query(`
@@ -888,43 +935,43 @@ async function initDb(pool, {
   await pool.query(`
 
     CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_company
-      ON product_identifier_lineage(company_id)
+      ON product_identifier_lineage("companyId")
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_lineage
-      ON product_identifier_lineage(lineage_id)
+      ON product_identifier_lineage("lineageId")
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_previous_identifier
-      ON product_identifier_lineage(previous_identifier)
+      ON product_identifier_lineage("previousIdentifier")
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_replacement_identifier
-      ON product_identifier_lineage(replacement_identifier)
+      ON product_identifier_lineage("replacementIdentifier")
   `);
   await pool.query(`
     ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS access_key_hash VARCHAR(64)
+    ADD COLUMN IF NOT EXISTS "accessKeyHash" VARCHAR(64)
   `).catch(() => {});
   await pool.query(`
     ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS access_key_prefix VARCHAR(24)
+    ADD COLUMN IF NOT EXISTS "accessKeyPrefix" VARCHAR(24)
   `).catch(() => {});
   await pool.query(`
     ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS access_key_last_rotated_at TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS "accessKeyLastRotatedAt" TIMESTAMPTZ
   `).catch(() => {});
   await pool.query(`
     ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS device_api_key_hash VARCHAR(64)
+    ADD COLUMN IF NOT EXISTS "deviceApiKeyHash" VARCHAR(64)
   `).catch(() => {});
   await pool.query(`
     ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS device_api_key_prefix VARCHAR(24)
+    ADD COLUMN IF NOT EXISTS "deviceApiKeyPrefix" VARCHAR(24)
   `).catch(() => {});
   await pool.query(`
     ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS device_key_last_rotated_at TIMESTAMPTZ
+    ADD COLUMN IF NOT EXISTS "deviceKeyLastRotatedAt" TIMESTAMPTZ
   `).catch(() => {});
   await pool.query(`
     ALTER TABLE passport_registry
@@ -1148,23 +1195,23 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_access_grants (
       id               SERIAL PRIMARY KEY,
-      passport_dpp_id    TEXT NOT NULL REFERENCES passport_registry(dpp_id) ON DELETE CASCADE,
-      company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      "passportDppId"  TEXT NOT NULL REFERENCES passport_registry("dppId") ON DELETE CASCADE,
+      "companyId"      INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
       audience         VARCHAR(80) NOT NULL,
-      element_id_path  TEXT,
-      grantee_user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      granted_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "elementIdPath"  TEXT,
+      "granteeUserId"  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "grantedBy"      INTEGER REFERENCES users(id) ON DELETE SET NULL,
       reason           TEXT,
-      expires_at       TIMESTAMPTZ,
-      is_active        BOOLEAN NOT NULL DEFAULT true,
-      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (passport_dpp_id, audience, grantee_user_id, element_id_path)
+      "expiresAt"      TIMESTAMPTZ,
+      "isActive"       BOOLEAN NOT NULL DEFAULT true,
+      "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE ("passportDppId", audience, "granteeUserId", "elementIdPath")
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_access_grants_passport
-      ON passport_access_grants(passport_dpp_id, audience, grantee_user_id)
+      ON passport_access_grants("passportDppId", audience, "granteeUserId")
   `);
 
   await pool.query(`
@@ -1186,51 +1233,51 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_scan_events (
       id             SERIAL PRIMARY KEY,
-      passport_dpp_id  TEXT NOT NULL REFERENCES passport_registry(dpp_id) ON DELETE CASCADE,
-      viewer_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      user_agent     TEXT,
+      "passportDppId" TEXT NOT NULL REFERENCES passport_registry("dppId") ON DELETE CASCADE,
+      "viewerUserId" INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "userAgent"    TEXT,
       referrer       TEXT,
-      scanned_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "scannedAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     ALTER TABLE passport_scan_events
-    ADD COLUMN IF NOT EXISTS viewer_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+    ADD COLUMN IF NOT EXISTS "viewerUserId" INTEGER REFERENCES users(id) ON DELETE SET NULL
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_scan_events_passport
-      ON passport_scan_events(passport_dpp_id, scanned_at DESC)
+      ON passport_scan_events("passportDppId", "scannedAt" DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_scan_events_viewer
-      ON passport_scan_events(viewer_user_id)
-      WHERE viewer_user_id IS NOT NULL
+      ON passport_scan_events("viewerUserId")
+      WHERE "viewerUserId" IS NOT NULL
   `);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_passport_scan_events_unique_viewer
-      ON passport_scan_events(passport_dpp_id, viewer_user_id)
-      WHERE viewer_user_id IS NOT NULL
+      ON passport_scan_events("passportDppId", "viewerUserId")
+      WHERE "viewerUserId" IS NOT NULL
   `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_security_events (
       id SERIAL PRIMARY KEY,
-      passport_dpp_id TEXT NOT NULL,
-      company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
-      event_type VARCHAR(80) NOT NULL,
+      "passportDppId" TEXT NOT NULL,
+      "companyId" INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+      "eventType" VARCHAR(80) NOT NULL,
       severity VARCHAR(32) NOT NULL DEFAULT 'info',
       source VARCHAR(32) NOT NULL DEFAULT 'system',
       details JSONB,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_security_events_passport
-      ON passport_security_events(passport_dpp_id, created_at DESC)
+      ON passport_security_events("passportDppId", "createdAt" DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_security_events_company
-      ON passport_security_events(company_id, created_at DESC)
+      ON passport_security_events("companyId", "createdAt" DESC)
   `);
 
   // Company-managed branding for public passport viewer and consumer pages
@@ -1251,18 +1298,18 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_dynamic_values (
       id            SERIAL       PRIMARY KEY,
-      passport_dpp_id TEXT         NOT NULL,
-      field_key     VARCHAR(100) NOT NULL,
+      "passportDppId" TEXT         NOT NULL,
+      "fieldKey"    VARCHAR(100) NOT NULL,
       value         TEXT,
-      updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      "updatedAt"   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_dv_passport ON passport_dynamic_values(passport_dpp_id)
+    CREATE INDEX IF NOT EXISTS idx_dv_passport ON passport_dynamic_values("passportDppId")
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dv_passport_field
-      ON passport_dynamic_values(passport_dpp_id, field_key, updated_at DESC)
+      ON passport_dynamic_values("passportDppId", "fieldKey", "updatedAt" DESC)
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS asset_management_jobs (
@@ -1317,36 +1364,36 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_signatures (
       id             SERIAL       PRIMARY KEY,
-      passport_dpp_id  TEXT         NOT NULL,
-      version_number INTEGER      NOT NULL DEFAULT 1,
-      data_hash      TEXT         NOT NULL,
+      "passportDppId" TEXT         NOT NULL,
+      "versionNumber" INTEGER      NOT NULL DEFAULT 1,
+      "dataHash"     TEXT         NOT NULL,
       signature      TEXT         NOT NULL,
       algorithm      VARCHAR(50)  NOT NULL DEFAULT 'ES256',
-      signing_key_id VARCHAR(64)  NOT NULL,
-      released_at    TIMESTAMPTZ  NOT NULL,
-      signed_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      vc_json        TEXT,
-      UNIQUE (passport_dpp_id, version_number)
+      "signingKeyId" VARCHAR(64)  NOT NULL,
+      "releasedAt"   TIMESTAMPTZ  NOT NULL,
+      "signedAt"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      "vcJson"       TEXT,
+      UNIQUE ("passportDppId", "versionNumber")
     )
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dpp_release_records (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      dpp_id TEXT NOT NULL REFERENCES passport_registry(dpp_id) ON DELETE CASCADE,
+      "dppId" TEXT NOT NULL REFERENCES passport_registry("dppId") ON DELETE CASCADE,
       companyname TEXT NOT NULL,
-      released_by_user_id INTEGER NOT NULL REFERENCES users(id),
-      released_by_email TEXT NOT NULL,
-      release_version INTEGER NOT NULL,
-      dpp_hash TEXT NOT NULL,
-      signature_id INTEGER REFERENCES passport_signatures(id) ON DELETE SET NULL,
-      release_note TEXT,
-      released_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE (dpp_id, release_version)
+      "releasedByUserId" INTEGER NOT NULL REFERENCES users(id),
+      "releasedByEmail" TEXT NOT NULL,
+      "releaseVersion" INTEGER NOT NULL,
+      "dppHash" TEXT NOT NULL,
+      "signatureId" INTEGER REFERENCES passport_signatures(id) ON DELETE SET NULL,
+      "releaseNote" TEXT,
+      "releasedAt" TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE ("dppId", "releaseVersion")
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_dpp_release_records_dpp
-      ON dpp_release_records(dpp_id, release_version DESC)
+      ON dpp_release_records("dppId", "releaseVersion" DESC)
   `);
   // Store public keys so verifiers can always look them up by key ID
   await pool.query(`
@@ -1377,169 +1424,169 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_edit_sessions (
       id               SERIAL PRIMARY KEY,
-      passport_dpp_id    TEXT         NOT NULL,
-      company_id       INTEGER      NOT NULL,
-      passport_type    VARCHAR(100) NOT NULL,
-      user_id          INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      last_activity_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      UNIQUE (passport_dpp_id, user_id)
+      "passportDppId" TEXT         NOT NULL,
+      "companyId"     INTEGER      NOT NULL,
+      "passportType"  VARCHAR(100) NOT NULL,
+      "userId"        INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "lastActivityAt" TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      "createdAt"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      "updatedAt"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      UNIQUE ("passportDppId", "userId")
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_edit_sessions_passport
-      ON passport_edit_sessions(passport_dpp_id, last_activity_at DESC)
+      ON passport_edit_sessions("passportDppId", "lastActivityAt" DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_edit_sessions_user
-      ON passport_edit_sessions(user_id)
+      ON passport_edit_sessions("userId")
   `);
 
   // Notifications table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notifications (
       id               SERIAL      PRIMARY KEY,
-      user_id          INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "userId"         INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       type             VARCHAR(50) NOT NULL,
       title            VARCHAR(255) NOT NULL,
       message          TEXT,
-      passport_dpp_id    TEXT,
-      action_url       VARCHAR(500),
+      "passportDppId"  TEXT,
+      "actionUrl"      VARCHAR(500),
       read             BOOLEAN     DEFAULT false,
-      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "createdAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_notifications_user_created
-      ON notifications(user_id, created_at DESC)
+      ON notifications("userId", "createdAt" DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_notifications_read
-      ON notifications(user_id, read)
+      ON notifications("userId", read)
   `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_workflow (
       id                      SERIAL PRIMARY KEY,
-      passport_dpp_id         TEXT NOT NULL,
-      passport_type           VARCHAR(100) NOT NULL,
-      company_id              INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-      submitted_by            INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      reviewer_id             INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      approver_id             INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      review_status           VARCHAR(30) NOT NULL DEFAULT 'pending',
-      approval_status         VARCHAR(30) NOT NULL DEFAULT 'pending',
-      overall_status          VARCHAR(30) NOT NULL DEFAULT 'in_progress',
-      reviewer_comment        TEXT,
-      approver_comment        TEXT,
-      previous_release_status VARCHAR(30),
-      reviewed_at             TIMESTAMPTZ,
-      approved_at             TIMESTAMPTZ,
-      rejected_at             TIMESTAMPTZ,
-      created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "passportDppId"         TEXT NOT NULL,
+      "passportType"          VARCHAR(100) NOT NULL,
+      "companyId"             INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      "submittedBy"           INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "reviewerId"            INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "approverId"            INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "reviewStatus"          VARCHAR(30) NOT NULL DEFAULT 'pending',
+      "approvalStatus"        VARCHAR(30) NOT NULL DEFAULT 'pending',
+      "overallStatus"         VARCHAR(30) NOT NULL DEFAULT 'in_progress',
+      "reviewerComment"       TEXT,
+      "approverComment"       TEXT,
+      "previousReleaseStatus" VARCHAR(30),
+      "reviewedAt"            TIMESTAMPTZ,
+      "approvedAt"            TIMESTAMPTZ,
+      "rejectedAt"            TIMESTAMPTZ,
+      "createdAt"             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"             TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_workflow_company_status
-      ON passport_workflow(company_id, overall_status, created_at DESC)
+      ON passport_workflow("companyId", "overallStatus", "createdAt" DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_workflow_passport_created
-      ON passport_workflow(passport_dpp_id, created_at DESC)
+      ON passport_workflow("passportDppId", "createdAt" DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_workflow_reviewer_pending
-      ON passport_workflow(reviewer_id, review_status, created_at DESC)
+      ON passport_workflow("reviewerId", "reviewStatus", "createdAt" DESC)
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_workflow_approver_pending
-      ON passport_workflow(approver_id, approval_status, created_at DESC)
+      ON passport_workflow("approverId", "approvalStatus", "createdAt" DESC)
   `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_revision_batches (
       id                SERIAL PRIMARY KEY,
-      company_id        INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-      passport_type     VARCHAR(100),
-      requested_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      scope_type        VARCHAR(50) NOT NULL DEFAULT 'selected',
-      scope_meta        JSONB NOT NULL DEFAULT '{}'::jsonb,
-      revision_note     TEXT,
-      changes_json      JSONB NOT NULL DEFAULT '{}'::jsonb,
-      submit_to_workflow BOOLEAN NOT NULL DEFAULT false,
-      reviewer_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      approver_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      total_targeted    INTEGER NOT NULL DEFAULT 0,
-      revised_count     INTEGER NOT NULL DEFAULT 0,
-      skipped_count     INTEGER NOT NULL DEFAULT 0,
-      failed_count      INTEGER NOT NULL DEFAULT 0,
-      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "companyId"       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      "passportType"    VARCHAR(100),
+      "requestedBy"     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "scopeType"       VARCHAR(50) NOT NULL DEFAULT 'selected',
+      "scopeMeta"       JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "revisionNote"    TEXT,
+      "changesJson"     JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "submitToWorkflow" BOOLEAN NOT NULL DEFAULT false,
+      "reviewerId"      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "approverId"      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "totalTargeted"   INTEGER NOT NULL DEFAULT 0,
+      "revisedCount"    INTEGER NOT NULL DEFAULT 0,
+      "skippedCount"    INTEGER NOT NULL DEFAULT 0,
+      "failedCount"     INTEGER NOT NULL DEFAULT 0,
+      "createdAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_revision_batches_company_created
-      ON passport_revision_batches(company_id, created_at DESC)
+      ON passport_revision_batches("companyId", "createdAt" DESC)
   `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_revision_batch_items (
       id                    SERIAL PRIMARY KEY,
-      batch_id              INTEGER NOT NULL REFERENCES passport_revision_batches(id) ON DELETE CASCADE,
-      passport_dpp_id         TEXT NOT NULL,
-      passport_type         VARCHAR(100) NOT NULL,
-      source_version_number INTEGER,
-      new_version_number    INTEGER,
+      "batchId"             INTEGER NOT NULL REFERENCES passport_revision_batches(id) ON DELETE CASCADE,
+      "passportDppId"       TEXT NOT NULL,
+      "passportType"        VARCHAR(100) NOT NULL,
+      "sourceVersionNumber" INTEGER,
+      "newVersionNumber"    INTEGER,
       status                VARCHAR(30) NOT NULL,
       message               TEXT,
-      created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "createdAt"           TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_revision_batch_items_batch
-      ON passport_revision_batch_items(batch_id, created_at DESC)
+      ON passport_revision_batch_items("batchId", "createdAt" DESC)
   `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_history_visibility (
-      passport_dpp_id   TEXT NOT NULL,
-      version_number  INTEGER NOT NULL,
-      is_public       BOOLEAN NOT NULL DEFAULT true,
-      updated_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (passport_dpp_id, version_number)
+      "passportDppId" TEXT NOT NULL,
+      "versionNumber" INTEGER NOT NULL,
+      "isPublic"      BOOLEAN NOT NULL DEFAULT true,
+      "updatedBy"     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY ("passportDppId", "versionNumber")
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_history_visibility_guid
-      ON passport_history_visibility(passport_dpp_id, version_number DESC)
+      ON passport_history_visibility("passportDppId", "versionNumber" DESC)
   `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_archives (
       id               SERIAL PRIMARY KEY,
-      dpp_id             TEXT NOT NULL,
-      lineage_id       TEXT,
-      company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-      passport_type    VARCHAR(100) NOT NULL,
-      version_number   INTEGER NOT NULL DEFAULT 1,
-      model_name       VARCHAR(255),
-      internal_alias_id       VARCHAR(255),
-      product_identifier_did TEXT,
-      actor_identifier TEXT,
-      snapshot_reason VARCHAR(100),
-      release_status   VARCHAR(50),
-      row_data         JSONB NOT NULL,
-      archived_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      archived_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "dppId"         TEXT NOT NULL,
+      "lineageId"     TEXT,
+      "companyId"     INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      "passportType"  VARCHAR(100) NOT NULL,
+      "versionNumber" INTEGER NOT NULL DEFAULT 1,
+      "modelName"     VARCHAR(255),
+      "internalAliasId" VARCHAR(255),
+      "productIdentifierDid" TEXT,
+      "actorIdentifier" TEXT,
+      "snapshotReason" VARCHAR(100),
+      "releaseStatus" VARCHAR(50),
+      "rowData"       JSONB NOT NULL,
+      "archivedBy"    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "archivedAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     ALTER TABLE passport_archives
-    ADD COLUMN IF NOT EXISTS lineage_id TEXT
+    ADD COLUMN IF NOT EXISTS "lineageId" TEXT
   `);
   await pool.query(`
     DO $$
@@ -1557,7 +1604,7 @@ async function initDb(pool, {
   `);
   await pool.query(`
     ALTER TABLE passport_archives
-    ADD COLUMN IF NOT EXISTS product_identifier_did TEXT
+    ADD COLUMN IF NOT EXISTS "productIdentifierDid" TEXT
   `);
   await pool.query(`
     ALTER TABLE passport_archives
@@ -1569,12 +1616,12 @@ async function initDb(pool, {
   `);
   await pool.query(`
     UPDATE passport_archives
-    SET lineage_id = dpp_id
-    WHERE lineage_id IS NULL
+    SET "lineageId" = "dppId"
+    WHERE "lineageId" IS NULL
   `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_company ON passport_archives(company_id)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_guid    ON passport_archives(dpp_id)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_lineage ON passport_archives(lineage_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_company ON passport_archives("companyId")`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_guid    ON passport_archives("dppId")`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_archives_lineage ON passport_archives("lineageId")`);
 
   // Ensure shared passport tables exist for all passport types.
   // Idempotent — uses CREATE TABLE IF NOT EXISTS.
@@ -1607,12 +1654,12 @@ async function initDb(pool, {
       }
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS lineage_id TEXT
+        ADD COLUMN IF NOT EXISTS "lineageId" TEXT
       `);
       await pool.query(`
         UPDATE ${tableName}
-        SET lineage_id = dpp_id
-        WHERE lineage_id IS NULL
+        SET "lineageId" = "dppId"
+        WHERE "lineageId" IS NULL
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
@@ -1620,7 +1667,7 @@ async function initDb(pool, {
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS product_identifier_did TEXT
+        ADD COLUMN IF NOT EXISTS "uniqueProductIdentifier" TEXT
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
@@ -1652,55 +1699,55 @@ async function initDb(pool, {
       `);
       await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did
-          ON ${tableName}(company_id, product_identifier_did)
-          WHERE deleted_at IS NULL
+          ON ${tableName}("companyId", "uniqueProductIdentifier")
+          WHERE "deletedAt" IS NULL
       `);
 
       if (productIdentifierService) {
         await runMigration(pool, `2026-04-27.backfill-product-identifier-did.${type_name}`, async (db) => {
           const liveRows = await db.query(
-            `SELECT id, company_id, internal_alias_id, granularity
+            `SELECT id, "companyId", "internalAliasId", granularity
              FROM ${tableName}
-             WHERE deleted_at IS NULL
-               AND COALESCE(TRIM(internal_alias_id), '') <> ''
-               AND COALESCE(TRIM(product_identifier_did), '') = ''`
+             WHERE "deletedAt" IS NULL
+               AND COALESCE(TRIM("internalAliasId"), '') <> ''
+               AND COALESCE(TRIM("uniqueProductIdentifier"), '') = ''`
           );
           for (const row of liveRows.rows) {
             const canonicalDid = productIdentifierService.buildCanonicalProductDid({
-              companyId: row.company_id,
+              companyId: row.companyId,
               passportType: type_name,
-              rawProductId: row.internal_alias_id,
+              rawProductId: row.internalAliasId,
               granularity: row.granularity || "item",
             });
             if (!canonicalDid) continue;
             await db.query(
               `UPDATE ${tableName}
-               SET product_identifier_did = $1
+               SET "uniqueProductIdentifier" = $1
                WHERE id = $2`,
               [canonicalDid, row.id]
             );
           }
 
           const archiveRows = await db.query(
-            `SELECT id, company_id, internal_alias_id, row_data
+            `SELECT id, "companyId", "internalAliasId", "rowData"
              FROM passport_archives
-             WHERE passport_type = $1
-               AND COALESCE(TRIM(internal_alias_id), '') <> ''
-               AND COALESCE(TRIM(product_identifier_did), '') = ''`,
+             WHERE "passportType" = $1
+               AND COALESCE(TRIM("internalAliasId"), '') <> ''
+               AND COALESCE(TRIM("productIdentifierDid"), '') = ''`,
             [type_name]
           );
           for (const row of archiveRows.rows) {
-            const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
+            const rowData = typeof row.rowData === "string" ? JSON.parse(row.rowData) : row.rowData;
             const canonicalDid = productIdentifierService.buildCanonicalProductDid({
-              companyId: row.company_id,
+              companyId: row.companyId,
               passportType: type_name,
-              rawProductId: row.internal_alias_id,
+              rawProductId: row.internalAliasId,
               granularity: rowData?.granularity || "item",
             });
             if (!canonicalDid) continue;
             await db.query(
               `UPDATE passport_archives
-               SET product_identifier_did = $1
+               SET "productIdentifierDid" = $1
                WHERE id = $2`,
               [canonicalDid, row.id]
             );
@@ -1868,43 +1915,43 @@ async function initDb(pool, {
   // ── Passport secret hardening ──────────────────────────────────────────────
   await pool.query(`
     UPDATE passport_registry
-    SET access_key_hash = encode(digest(access_key, 'sha256'), 'hex')
-    WHERE access_key_hash IS NULL AND access_key IS NOT NULL
+    SET "accessKeyHash" = encode(digest("accessKey", 'sha256'), 'hex')
+    WHERE "accessKeyHash" IS NULL AND "accessKey" IS NOT NULL
   `).catch(() => {});
   await pool.query(`
     UPDATE passport_registry
-    SET access_key_prefix = LEFT(access_key, 12)
-    WHERE access_key_prefix IS NULL AND access_key IS NOT NULL
+    SET "accessKeyPrefix" = LEFT("accessKey", 12)
+    WHERE "accessKeyPrefix" IS NULL AND "accessKey" IS NOT NULL
   `).catch(() => {});
   await pool.query(`
     UPDATE passport_registry
-    SET access_key_last_rotated_at = COALESCE(access_key_last_rotated_at, created_at, NOW())
-    WHERE access_key_hash IS NOT NULL AND access_key_last_rotated_at IS NULL
+    SET "accessKeyLastRotatedAt" = COALESCE("accessKeyLastRotatedAt", "createdAt", NOW())
+    WHERE "accessKeyHash" IS NOT NULL AND "accessKeyLastRotatedAt" IS NULL
   `).catch(() => {});
   await pool.query(`
     UPDATE passport_registry
-    SET device_api_key_hash = encode(digest(device_api_key, 'sha256'), 'hex')
-    WHERE device_api_key_hash IS NULL AND device_api_key IS NOT NULL
+    SET "deviceApiKeyHash" = encode(digest("deviceApiKey", 'sha256'), 'hex')
+    WHERE "deviceApiKeyHash" IS NULL AND "deviceApiKey" IS NOT NULL
   `).catch(() => {});
   await pool.query(`
     UPDATE passport_registry
-    SET device_api_key_prefix = LEFT(device_api_key, 12)
-    WHERE device_api_key_prefix IS NULL AND device_api_key IS NOT NULL
+    SET "deviceApiKeyPrefix" = LEFT("deviceApiKey", 12)
+    WHERE "deviceApiKeyPrefix" IS NULL AND "deviceApiKey" IS NOT NULL
   `).catch(() => {});
   await pool.query(`
     UPDATE passport_registry
-    SET device_key_last_rotated_at = COALESCE(device_key_last_rotated_at, created_at, NOW())
-    WHERE device_api_key_hash IS NOT NULL AND device_key_last_rotated_at IS NULL
+    SET "deviceKeyLastRotatedAt" = COALESCE("deviceKeyLastRotatedAt", "createdAt", NOW())
+    WHERE "deviceApiKeyHash" IS NOT NULL AND "deviceKeyLastRotatedAt" IS NULL
   `).catch(() => {});
   await pool.query(`
     UPDATE passport_registry
-    SET access_key = NULL
-    WHERE access_key IS NOT NULL
+    SET "accessKey" = NULL
+    WHERE "accessKey" IS NOT NULL
   `).catch(() => {});
   await pool.query(`
     UPDATE passport_registry
-    SET device_api_key = NULL
-    WHERE device_api_key IS NOT NULL
+    SET "deviceApiKey" = NULL
+    WHERE "deviceApiKey" IS NOT NULL
   `).catch(() => {});
 
   // ── Fix admin role access ────────────────────────────────────────────────
@@ -1933,27 +1980,27 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_attachments (
       id            SERIAL PRIMARY KEY,
-      public_id     VARCHAR(20)  NOT NULL UNIQUE,
-      company_id    INTEGER      NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-      passport_dpp_id TEXT         NOT NULL,
-      field_key     VARCHAR(100),
-      file_path     TEXT,
-      storage_key   TEXT,
-      storage_provider VARCHAR(50),
-      file_url      TEXT,
-      mime_type     VARCHAR(100) NOT NULL DEFAULT 'application/octet-stream',
-      size_bytes    BIGINT,
-      is_public     BOOLEAN      NOT NULL DEFAULT false,
-      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      "publicId"    VARCHAR(20)  NOT NULL UNIQUE,
+      "companyId"   INTEGER      NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      "passportDppId" TEXT       NOT NULL,
+      "fieldKey"    VARCHAR(100),
+      "filePath"    TEXT,
+      "storageKey"  TEXT,
+      "storageProvider" VARCHAR(50),
+      "fileUrl"     TEXT,
+      "mimeType"    VARCHAR(100) NOT NULL DEFAULT 'application/octet-stream',
+      "sizeBytes"   BIGINT,
+      "isPublic"    BOOLEAN      NOT NULL DEFAULT false,
+      "createdAt"   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `).catch(e => logger.error("passport_attachments init error:", e.message));
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_attachments_guid
-      ON passport_attachments(passport_dpp_id)
+      ON passport_attachments("passportDppId")
   `).catch(() => {});
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_attachments_company
-      ON passport_attachments(company_id)
+      ON passport_attachments("companyId")
   `).catch(() => {});
 
   await pool.query(`
@@ -1964,7 +2011,7 @@ async function initDb(pool, {
       ) THEN
         ALTER TABLE passport_registry
           ADD CONSTRAINT passport_registry_company_id_fkey
-          FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE;
+          FOREIGN KEY ("companyId") REFERENCES companies(id) ON DELETE CASCADE;
       END IF;
     END $$;
   `).catch(() => {});
@@ -1976,7 +2023,7 @@ async function initDb(pool, {
       ) THEN
         ALTER TABLE dpp_registry_registrations
           ADD CONSTRAINT dpp_registry_registrations_registered_by_fkey
-          FOREIGN KEY (registered_by) REFERENCES users(id) ON DELETE SET NULL;
+          FOREIGN KEY ("registeredBy") REFERENCES users(id) ON DELETE SET NULL;
       END IF;
     END $$;
   `).catch(() => {});
@@ -1992,21 +2039,26 @@ async function initDb(pool, {
       END IF;
     END $$;
   `).catch(() => {});
+
+  await runMigration(pool, "2026-05-24.camelcase-shared-passport-columns", async (db) => {
+    await migrateSharedPassportTablesToCamelCase(db);
+  });
+
   const passportRegistryReferences = [
-    ["dpp_subject_registry", "passport_dpp_id", "dpp_subject_registry_passport_dpp_id_fkey", false],
-    ["dpp_registry_registrations", "passport_dpp_id", "dpp_registry_registrations_passport_dpp_id_fkey", false],
-    ["passport_backup_replications", "passport_dpp_id", "passport_backup_replications_passport_dpp_id_fkey", false],
-    ["backup_public_handovers", "passport_dpp_id", "backup_public_handovers_passport_dpp_id_fkey", false],
-    ["passport_access_grants", "passport_dpp_id", "passport_access_grants_passport_dpp_id_fkey", false],
-    ["passport_scan_events", "passport_dpp_id", "passport_scan_events_passport_dpp_id_fkey", false],
-    ["passport_security_events", "passport_dpp_id", "passport_security_events_passport_dpp_id_fkey", false],
-    ["passport_dynamic_values", "passport_dpp_id", "passport_dynamic_values_passport_dpp_id_fkey", false],
-    ["passport_signatures", "passport_dpp_id", "passport_signatures_passport_dpp_id_fkey", false],
-    ["passport_edit_sessions", "passport_dpp_id", "passport_edit_sessions_passport_dpp_id_fkey", false],
-    ["notifications", "passport_dpp_id", "notifications_passport_dpp_id_fkey", true],
-    ["passport_revision_batch_items", "passport_dpp_id", "passport_revision_batch_items_passport_dpp_id_fkey", false],
-    ["passport_history_visibility", "passport_dpp_id", "passport_history_visibility_passport_dpp_id_fkey", false],
-    ["passport_attachments", "passport_dpp_id", "passport_attachments_passport_dpp_id_fkey", false],
+    ["dpp_subject_registry", "passportDppId", "dpp_subject_registry_passport_dpp_id_fkey", false],
+    ["dpp_registry_registrations", "passportDppId", "dpp_registry_registrations_passport_dpp_id_fkey", false],
+    ["passport_backup_replications", "passportDppId", "passport_backup_replications_passport_dpp_id_fkey", false],
+    ["backup_public_handovers", "passportDppId", "backup_public_handovers_passport_dpp_id_fkey", false],
+    ["passport_access_grants", "passportDppId", "passport_access_grants_passport_dpp_id_fkey", false],
+    ["passport_scan_events", "passportDppId", "passport_scan_events_passport_dpp_id_fkey", false],
+    ["passport_security_events", "passportDppId", "passport_security_events_passport_dpp_id_fkey", false],
+    ["passport_dynamic_values", "passportDppId", "passport_dynamic_values_passport_dpp_id_fkey", false],
+    ["passport_signatures", "passportDppId", "passport_signatures_passport_dpp_id_fkey", false],
+    ["passport_edit_sessions", "passportDppId", "passport_edit_sessions_passport_dpp_id_fkey", false],
+    ["notifications", "passportDppId", "notifications_passport_dpp_id_fkey", true],
+    ["passport_revision_batch_items", "passportDppId", "passport_revision_batch_items_passport_dpp_id_fkey", false],
+    ["passport_history_visibility", "passportDppId", "passport_history_visibility_passport_dpp_id_fkey", false],
+    ["passport_attachments", "passportDppId", "passport_attachments_passport_dpp_id_fkey", false],
   ];
   for (const [tableName, columnName, constraintName, nullable] of passportRegistryReferences) {
     await addPassportRegistryForeignKey(pool, {

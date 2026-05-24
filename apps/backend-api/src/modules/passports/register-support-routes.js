@@ -26,12 +26,12 @@ function registerPassportSupportRoutes(app, deps) {
       if (typeof isPublic !== "boolean") return res.status(400).json({ error: "isPublic must be true or false." });
 
       const reg = await pool.query(
-        `SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2`,
+        `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 AND "companyId" = $2`,
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      const passportType = reg.rows[0].passport_type;
+      const passportType = reg.rows[0].passportType;
       const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
       if (!lineageContext?.lineageId) return res.status(404).json({ error: "Passport not found" });
 
@@ -49,17 +49,20 @@ function registerPassportSupportRoutes(app, deps) {
       }
 
       const existingVisibilityRes = await pool.query(
-        `SELECT is_public FROM passport_history_visibility WHERE passport_dpp_id = $1 AND version_number = $2`,
+        `SELECT "isPublic"
+         FROM passport_history_visibility
+         WHERE "passportDppId" = $1 AND "versionNumber" = $2`,
         [versionRow.dppId, parsedVersion]
       );
       const previousVisibility = existingVisibilityRes.rows.length
-        ? !!existingVisibilityRes.rows[0].is_public
+        ? !!existingVisibilityRes.rows[0].isPublic
         : isPublicHistoryStatus(versionRow.releaseStatus);
 
       await pool.query(
-        `INSERT INTO passport_history_visibility (passport_dpp_id, version_number, is_public, updated_by, created_at, updated_at)
+        `INSERT INTO passport_history_visibility ("passportDppId", "versionNumber", "isPublic", "updatedBy", "createdAt", "updatedAt")
          VALUES ($1,$2,$3,$4,NOW(),NOW())
-         ON CONFLICT (passport_dpp_id, version_number) DO UPDATE SET is_public = EXCLUDED.is_public, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+         ON CONFLICT ("passportDppId", "versionNumber")
+         DO UPDATE SET "isPublic" = EXCLUDED."isPublic", "updatedBy" = EXCLUDED."updatedBy", "updatedAt" = NOW()`,
         [versionRow.dppId, parsedVersion, isPublic, req.user.userId]
       );
 
@@ -122,9 +125,9 @@ function registerPassportSupportRoutes(app, deps) {
         const publicFileUrl = `${appUrl}/public-files/${publicId}`;
         await pool.query(
           `INSERT INTO passport_attachments
-             (public_id, company_id, passport_dpp_id, field_key, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, is_public)
+             ("publicId", "companyId", "passportDppId", "fieldKey", "filePath", "storageKey", "storageProvider", "fileUrl", "mimeType", "sizeBytes", "isPublic")
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
-           ON CONFLICT (public_id) DO NOTHING`,
+           ON CONFLICT ("publicId") DO NOTHING`,
           [
             publicId,
             companyId,

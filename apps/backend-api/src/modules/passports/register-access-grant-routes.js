@@ -50,26 +50,26 @@ function registerAccessGrantRoutes(app, deps) {
       return { error: "audience must be a non-public supported audience" };
     }
 
-    const dppId = body.dppId ?? body.passport_dpp_id ?? body.passportDppId;
+    const dppId = body.dppId ?? body.passportDppId;
     const normalizedDppId = dppId !== undefined ? String(dppId || "").trim() : undefined;
     if (options.requireDppId && !normalizedDppId) {
       return { error: "dppId is required" };
     }
 
-    const granteeUserInput = body.granteeUserId ?? body.grantee_user_id;
+    const granteeUserInput = body.granteeUserId;
     const hasGranteeUserId = granteeUserInput !== undefined;
     const granteeUserId = hasGranteeUserId ? Number.parseInt(granteeUserInput, 10) : undefined;
     if (options.requireGranteeUserId && !Number.isFinite(granteeUserId)) {
-      return { error: "grantee_user_id is required" };
+      return { error: "granteeUserId is required" };
     }
     if (hasGranteeUserId && !Number.isFinite(granteeUserId)) {
-      return { error: "grantee_user_id must be a valid integer" };
+      return { error: "granteeUserId must be a valid integer" };
     }
 
-    const expiry = parseGrantExpiry(body.expiresAt ?? body.expires_at);
+    const expiry = parseGrantExpiry(body.expiresAt);
     if (expiry.error) return expiry;
 
-    const elementPath = normalizeGrantElementPath(body.elementIdPath ?? body.element_id_path);
+    const elementPath = normalizeGrantElementPath(body.elementIdPath);
     if (elementPath.error) return elementPath;
 
     return {
@@ -81,15 +81,15 @@ function registerAccessGrantRoutes(app, deps) {
       expiresAtProvided: expiry.provided,
       elementIdPath: elementPath.value,
       elementIdPathProvided: elementPath.provided,
-      isActive: body.isActive ?? body.is_active,
+      isActive: body.isActive,
     };
   }
 
   async function resolvePassportGrantTarget(dppId) {
     const result = await pool.query(
-      `SELECT dpp_id AS "dppId", lineage_id, company_id, passport_type
+      `SELECT "dppId", "lineageId", "companyId", "passportType"
        FROM passport_registry
-       WHERE dpp_id = $1
+       WHERE "dppId" = $1
        LIMIT 1`,
       [dppId]
     );
@@ -99,10 +99,10 @@ function registerAccessGrantRoutes(app, deps) {
   async function loadPassportAccessGrant(grantId) {
     const result = await pool.query(
       `SELECT pag.*,
-              pr.lineage_id,
-              pr.passport_type
+              pr."lineageId",
+              pr."passportType"
        FROM passport_access_grants pag
-       LEFT JOIN passport_registry pr ON pr.dpp_id = pag.passport_dpp_id
+       LEFT JOIN passport_registry pr ON pr."dppId" = pag."passportDppId"
        WHERE pag.id = $1
        LIMIT 1`,
       [grantId]
@@ -114,38 +114,23 @@ function registerAccessGrantRoutes(app, deps) {
     if (!row) return null;
     return {
       id: row.id,
-      dppId: row.passport_dpp_id,
-      passport_dpp_id: row.passport_dpp_id,
-      companyId: row.company_id,
-      company_id: row.company_id,
+      dppId: row.passportDppId,
+      companyId: row.companyId,
       audience: row.audience,
-      elementIdPath: row.element_id_path,
-      element_id_path: row.element_id_path,
-      granteeUserId: row.grantee_user_id,
-      grantee_user_id: row.grantee_user_id,
-      grantedBy: row.granted_by,
-      granted_by: row.granted_by,
+      elementIdPath: row.elementIdPath,
+      granteeUserId: row.granteeUserId,
+      grantedBy: row.grantedBy,
       reason: row.reason,
-      expiresAt: row.expires_at,
-      expires_at: row.expires_at,
-      isActive: row.is_active,
-      is_active: row.is_active,
-      createdAt: row.created_at,
-      created_at: row.created_at,
-      updatedAt: row.updated_at,
-      updated_at: row.updated_at,
-      granteeEmail: row.grantee_email,
-      grantee_email: row.grantee_email,
-      granteeFirstName: row.grantee_first_name,
-      grantee_first_name: row.grantee_first_name,
-      granteeLastName: row.grantee_last_name,
-      grantee_last_name: row.grantee_last_name,
-      grantorEmail: row.grantor_email,
-      grantor_email: row.grantor_email,
-      passportType: row.passport_type,
-      passport_type: row.passport_type,
-      lineageId: row.lineage_id,
-      lineage_id: row.lineage_id,
+      expiresAt: row.expiresAt,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      granteeEmail: row.granteeEmail,
+      granteeFirstName: row.granteeFirstName,
+      granteeLastName: row.granteeLastName,
+      grantorEmail: row.grantorEmail,
+      passportType: row.passportType,
+      lineageId: row.lineageId,
     };
   }
 
@@ -156,30 +141,30 @@ function registerAccessGrantRoutes(app, deps) {
 
       const target = await resolvePassportGrantTarget(dppId);
       if (!target) return res.status(404).json({ error: "Passport not found" });
-      if (!canViewGrantCompany(req, target.company_id)) {
+      if (!canViewGrantCompany(req, target.companyId)) {
         return res.status(403).json({ error: "Unauthorised access to this company" });
       }
 
       const result = await pool.query(
-        `SELECT pag.id, pag.passport_dpp_id, pag.company_id, pag.audience, pag.element_id_path,
-                pag.grantee_user_id, pag.granted_by, pag.reason, pag.expires_at, pag.is_active,
-                pag.created_at, pag.updated_at,
-                pr.passport_type, pr.lineage_id,
-                grantee.email AS grantee_email, grantee.first_name AS grantee_first_name, grantee.last_name AS grantee_last_name,
-                grantor.email AS grantor_email
+        `SELECT pag.id, pag."passportDppId", pag."companyId", pag.audience, pag."elementIdPath",
+                pag."granteeUserId", pag."grantedBy", pag.reason, pag."expiresAt", pag."isActive",
+                pag."createdAt", pag."updatedAt",
+                pr."passportType", pr."lineageId",
+                grantee.email AS "granteeEmail", grantee.first_name AS "granteeFirstName", grantee.last_name AS "granteeLastName",
+                grantor.email AS "grantorEmail"
          FROM passport_access_grants pag
-         LEFT JOIN passport_registry pr ON pr.dpp_id = pag.passport_dpp_id
-         LEFT JOIN users grantee ON grantee.id = pag.grantee_user_id
-         LEFT JOIN users grantor ON grantor.id = pag.granted_by
-         WHERE pag.company_id = $1
-           AND pag.passport_dpp_id = $2
-         ORDER BY pag.created_at DESC`,
-        [target.company_id, dppId]
+         LEFT JOIN passport_registry pr ON pr."dppId" = pag."passportDppId"
+         LEFT JOIN users grantee ON grantee.id = pag."granteeUserId"
+         LEFT JOIN users grantor ON grantor.id = pag."grantedBy"
+         WHERE pag."companyId" = $1
+           AND pag."passportDppId" = $2
+         ORDER BY pag."createdAt" DESC`,
+        [target.companyId, dppId]
       );
 
       res.json({
         dppId,
-        companyId: target.company_id,
+        companyId: target.companyId,
         grants: result.rows.map(mapPassportAccessGrantRow),
       });
     } catch {
@@ -198,26 +183,26 @@ function registerAccessGrantRoutes(app, deps) {
 
       const target = await resolvePassportGrantTarget(parsed.dppId);
       if (!target) return res.status(404).json({ error: "Passport not found" });
-      if (!canManageGrantCompany(req, target.company_id)) {
+      if (!canManageGrantCompany(req, target.companyId)) {
         return res.status(403).json({ error: "Company admin access required" });
       }
 
       const result = await pool.query(
         `INSERT INTO passport_access_grants (
-           passport_dpp_id, company_id, audience, element_id_path, grantee_user_id, granted_by, reason, expires_at, is_active, updated_at
+           "passportDppId", "companyId", audience, "elementIdPath", "granteeUserId", "grantedBy", reason, "expiresAt", "isActive", "updatedAt"
          )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
-         ON CONFLICT (passport_dpp_id, audience, grantee_user_id, element_id_path)
+         ON CONFLICT ("passportDppId", audience, "granteeUserId", "elementIdPath")
          DO UPDATE SET
-           granted_by = EXCLUDED.granted_by,
+           "grantedBy" = EXCLUDED."grantedBy",
            reason = EXCLUDED.reason,
-           expires_at = EXCLUDED.expires_at,
-           is_active = true,
-           updated_at = NOW()
+           "expiresAt" = EXCLUDED."expiresAt",
+           "isActive" = true,
+           "updatedAt" = NOW()
          RETURNING *`,
         [
           parsed.dppId,
-          target.company_id,
+          target.companyId,
           parsed.audience,
           parsed.elementIdPath || null,
           parsed.granteeUserId,
@@ -228,7 +213,7 @@ function registerAccessGrantRoutes(app, deps) {
       );
 
       await logAudit(
-        target.company_id,
+        target.companyId,
         req.user.userId,
         "GRANT_PASSPORT_AUDIENCE",
         "passport_access_grants",
@@ -236,9 +221,9 @@ function registerAccessGrantRoutes(app, deps) {
         null,
         {
           audience: parsed.audience,
-          grantee_user_id: parsed.granteeUserId,
-          element_id_path: parsed.elementIdPath || null,
-          expires_at: parsed.expiresAt ? parsed.expiresAt.toISOString() : null,
+          granteeUserId: parsed.granteeUserId,
+          elementIdPath: parsed.elementIdPath || null,
+          expiresAt: parsed.expiresAt ? parsed.expiresAt.toISOString() : null,
         },
         { audience: parsed.audience }
       );
@@ -262,7 +247,7 @@ function registerAccessGrantRoutes(app, deps) {
 
       const existing = await loadPassportAccessGrant(grantId);
       if (!existing) return res.status(404).json({ error: "Grant not found" });
-      if (!canManageGrantCompany(req, existing.company_id)) {
+      if (!canManageGrantCompany(req, existing.companyId)) {
         return res.status(403).json({ error: "Company admin access required" });
       }
 
@@ -278,11 +263,11 @@ function registerAccessGrantRoutes(app, deps) {
         values.push(parsed.audience);
       }
       if (parsed.elementIdPathProvided) {
-        updates.push(`element_id_path = $${index++}`);
+        updates.push(`"elementIdPath" = $${index++}`);
         values.push(parsed.elementIdPath || null);
       }
       if (parsed.granteeUserId !== undefined) {
-        updates.push(`grantee_user_id = $${index++}`);
+        updates.push(`"granteeUserId" = $${index++}`);
         values.push(parsed.granteeUserId);
       }
       if (parsed.reason !== undefined) {
@@ -290,16 +275,16 @@ function registerAccessGrantRoutes(app, deps) {
         values.push(parsed.reason);
       }
       if (parsed.expiresAtProvided) {
-        updates.push(`expires_at = $${index++}`);
+        updates.push(`"expiresAt" = $${index++}`);
         values.push(parsed.expiresAt ?? null);
       }
       if (parsed.isActive !== undefined) {
-        updates.push(`is_active = $${index++}`);
+        updates.push(`"isActive" = $${index++}`);
         values.push(Boolean(parsed.isActive));
       }
 
-      updates.push(`updated_at = NOW()`);
-      updates.push(`granted_by = $${index++}`);
+      updates.push(`"updatedAt" = NOW()`);
+      updates.push(`"grantedBy" = $${index++}`);
       values.push(req.user.userId);
 
       if (updates.length <= 2) {
@@ -316,11 +301,11 @@ function registerAccessGrantRoutes(app, deps) {
       );
 
       await logAudit(
-        existing.company_id,
+        existing.companyId,
         req.user.userId,
         "UPDATE_PASSPORT_ACCESS_GRANT",
         "passport_access_grants",
-        existing.passport_dpp_id,
+        existing.passportDppId,
         existing,
         result.rows[0],
         { audience: result.rows[0]?.audience || existing.audience }
@@ -345,7 +330,7 @@ function registerAccessGrantRoutes(app, deps) {
 
       const existing = await loadPassportAccessGrant(grantId);
       if (!existing) return res.status(404).json({ error: "Grant not found" });
-      if (!canManageGrantCompany(req, existing.company_id)) {
+      if (!canManageGrantCompany(req, existing.companyId)) {
         return res.status(403).json({ error: "Company admin access required" });
       }
 
@@ -357,11 +342,11 @@ function registerAccessGrantRoutes(app, deps) {
       );
 
       await logAudit(
-        existing.company_id,
+        existing.companyId,
         req.user.userId,
         "DELETE_PASSPORT_ACCESS_GRANT",
         "passport_access_grants",
-        existing.passport_dpp_id,
+        existing.passportDppId,
         existing,
         null,
         { audience: existing.audience }
@@ -384,42 +369,42 @@ function registerAccessGrantRoutes(app, deps) {
 
       const existing = await loadPassportAccessGrant(grantId);
       if (!existing) return res.status(404).json({ error: "Grant not found" });
-      if (!canManageGrantCompany(req, existing.company_id)) {
+      if (!canManageGrantCompany(req, existing.companyId)) {
         return res.status(403).json({ error: "Company admin access required" });
       }
 
       const reason = req.body?.reason !== undefined ? (req.body.reason || existing.reason || null) : existing.reason;
       const result = await pool.query(
         `UPDATE passport_access_grants
-         SET is_active = false,
+         SET "isActive" = false,
              reason = $2,
-             updated_at = NOW()
+             "updatedAt" = NOW()
          WHERE id = $1
          RETURNING *`,
         [grantId, reason]
       );
 
       await logAudit(
-        existing.company_id,
+        existing.companyId,
         req.user.userId,
         "REVOKE_PASSPORT_AUDIENCE",
         "passport_access_grants",
-        existing.passport_dpp_id,
+        existing.passportDppId,
         existing,
         { ...result.rows[0], revoked: true },
         { audience: existing.audience }
       );
       await replicateAccessControlEventToBackup({
-        companyId: existing.company_id,
+        companyId: existing.companyId,
         eventType: "PASSPORT_ACCESS_GRANT_REVOKED",
         severity: "high",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-        affectedUserId: existing.grantee_user_id,
+        affectedUserId: existing.granteeUserId,
         affectedGrantId: grantId,
-        passportDppId: existing.passport_dpp_id,
+        passportDppId: existing.passportDppId,
         audience: existing.audience,
-        elementIdPath: existing.element_id_path,
+        elementIdPath: existing.elementIdPath,
         revocationMode: "standard",
         reason,
       }).catch(() => {});
@@ -442,7 +427,7 @@ function registerAccessGrantRoutes(app, deps) {
 
       const existing = await loadPassportAccessGrant(grantId);
       if (!existing) return res.status(404).json({ error: "Grant not found" });
-      if (!canManageGrantCompany(req, existing.company_id)) {
+      if (!canManageGrantCompany(req, existing.companyId)) {
         return res.status(403).json({ error: "Company admin access required" });
       }
 
@@ -451,40 +436,40 @@ function registerAccessGrantRoutes(app, deps) {
         : existing.reason || "Emergency access revocation";
       const result = await pool.query(
         `UPDATE passport_access_grants
-         SET is_active = false,
-             expires_at = NOW(),
+         SET "isActive" = false,
+             "expiresAt" = NOW(),
              reason = $2,
-             updated_at = NOW()
+             "updatedAt" = NOW()
          WHERE id = $1
          RETURNING *`,
         [grantId, reason]
       );
 
       await logAudit(
-        existing.company_id,
+        existing.companyId,
         req.user.userId,
         "EMERGENCY_REVOKE_PASSPORT_AUDIENCE",
         "passport_access_grants",
-        existing.passport_dpp_id,
+        existing.passportDppId,
         existing,
         { ...result.rows[0], revoked: true, emergency: true },
         { audience: existing.audience }
       );
       await replicateAccessControlEventToBackup({
-        companyId: existing.company_id,
+        companyId: existing.companyId,
         eventType: "PASSPORT_ACCESS_GRANT_EMERGENCY_REVOKED",
         severity: "critical",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-        affectedUserId: existing.grantee_user_id,
+        affectedUserId: existing.granteeUserId,
         affectedGrantId: grantId,
-        passportDppId: existing.passport_dpp_id,
+        passportDppId: existing.passportDppId,
         audience: existing.audience,
-        elementIdPath: existing.element_id_path,
+        elementIdPath: existing.elementIdPath,
         revocationMode: "emergency",
         reason,
         metadata: {
-          effectiveAt: result.rows[0]?.expires_at || null,
+          effectiveAt: result.rows[0]?.expiresAt || null,
         },
       }).catch(() => {});
 
@@ -736,17 +721,17 @@ function registerAccessGrantRoutes(app, deps) {
   app.get("/api/companies/:companyId/passports/:dppId/access-grants", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT pag.id, pag.audience, pag.element_id_path, pag.grantee_user_id, pag.granted_by, pag.reason,
-                pag.expires_at, pag.is_active, pag.created_at, pag.updated_at,
-                u.email AS grantee_email, u.first_name AS grantee_first_name, u.last_name AS grantee_last_name
+        `SELECT pag.id, pag.audience, pag."elementIdPath", pag."granteeUserId", pag."grantedBy", pag.reason,
+                pag."expiresAt", pag."isActive", pag."createdAt", pag."updatedAt",
+                u.email AS "granteeEmail", u.first_name AS "granteeFirstName", u.last_name AS "granteeLastName"
          FROM passport_access_grants pag
-         LEFT JOIN users u ON u.id = pag.grantee_user_id
-         WHERE pag.company_id = $1
-           AND pag.passport_dpp_id = $2
-         ORDER BY pag.created_at DESC`,
+         LEFT JOIN users u ON u.id = pag."granteeUserId"
+         WHERE pag."companyId" = $1
+           AND pag."passportDppId" = $2
+         ORDER BY pag."createdAt" DESC`,
         [req.params.companyId, req.params.dppId]
       );
-      res.json(result.rows);
+      res.json(result.rows.map(mapPassportAccessGrantRow));
     } catch {
       res.status(500).json({ error: "Failed to fetch passport access grants" });
     }
@@ -758,33 +743,33 @@ function registerAccessGrantRoutes(app, deps) {
       if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
         return res.status(400).json({ error: "audience must be a non-public supported audience" });
       }
-      const granteeUserId = Number.parseInt(req.body?.grantee_user_id, 10);
+      const granteeUserId = Number.parseInt(req.body?.granteeUserId, 10);
       if (!Number.isFinite(granteeUserId)) {
-        return res.status(400).json({ error: "grantee_user_id is required" });
+        return res.status(400).json({ error: "granteeUserId is required" });
       }
-      const expiresAt = req.body?.expires_at ? new Date(req.body.expires_at) : null;
+      const expiresAt = req.body?.expiresAt ? new Date(req.body.expiresAt) : null;
       if (expiresAt && Number.isNaN(expiresAt.getTime())) {
-        return res.status(400).json({ error: "expires_at must be a valid ISO timestamp" });
+        return res.status(400).json({ error: "expiresAt must be a valid ISO timestamp" });
       }
 
       const result = await pool.query(
         `INSERT INTO passport_access_grants (
-           passport_dpp_id, company_id, audience, element_id_path, grantee_user_id, granted_by, reason, expires_at, is_active, updated_at
+           "passportDppId", "companyId", audience, "elementIdPath", "granteeUserId", "grantedBy", reason, "expiresAt", "isActive", "updatedAt"
          )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
-         ON CONFLICT (passport_dpp_id, audience, grantee_user_id, element_id_path)
+         ON CONFLICT ("passportDppId", audience, "granteeUserId", "elementIdPath")
          DO UPDATE SET
-           granted_by = EXCLUDED.granted_by,
+           "grantedBy" = EXCLUDED."grantedBy",
            reason = EXCLUDED.reason,
-           expires_at = EXCLUDED.expires_at,
-           is_active = true,
-           updated_at = NOW()
+           "expiresAt" = EXCLUDED."expiresAt",
+           "isActive" = true,
+           "updatedAt" = NOW()
          RETURNING *`,
         [
           req.params.dppId,
           req.params.companyId,
           audience,
-          req.body?.element_id_path || null,
+          req.body?.elementIdPath || null,
           granteeUserId,
           req.user.userId,
           req.body?.reason || null,
@@ -801,14 +786,14 @@ function registerAccessGrantRoutes(app, deps) {
         null,
         {
           audience,
-          grantee_user_id: granteeUserId,
-          element_id_path: req.body?.element_id_path || null,
-          expires_at: expiresAt ? expiresAt.toISOString() : null,
+          granteeUserId,
+          elementIdPath: req.body?.elementIdPath || null,
+          expiresAt: expiresAt ? expiresAt.toISOString() : null,
         },
         { audience }
       );
 
-      res.status(201).json(result.rows[0]);
+      res.status(201).json(mapPassportAccessGrantRow(result.rows[0]));
     } catch {
       res.status(500).json({ error: "Failed to grant passport access" });
     }
@@ -818,12 +803,12 @@ function registerAccessGrantRoutes(app, deps) {
     try {
       const result = await pool.query(
         `UPDATE passport_access_grants
-         SET is_active = false,
-             updated_at = NOW()
+         SET "isActive" = false,
+             "updatedAt" = NOW()
          WHERE id = $1
-           AND company_id = $2
-           AND passport_dpp_id = $3
-         RETURNING id, audience, grantee_user_id, element_id_path`,
+           AND "companyId" = $2
+           AND "passportDppId" = $3
+         RETURNING id, audience, "granteeUserId", "elementIdPath"`,
         [req.params.grantId, req.params.companyId, req.params.dppId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Grant not found" });
@@ -839,7 +824,7 @@ function registerAccessGrantRoutes(app, deps) {
         { audience: result.rows[0].audience }
       );
 
-      res.json({ success: true, grant: result.rows[0] });
+      res.json({ success: true, grant: mapPassportAccessGrantRow(result.rows[0]) });
     } catch {
       res.status(500).json({ error: "Failed to revoke passport access" });
     }

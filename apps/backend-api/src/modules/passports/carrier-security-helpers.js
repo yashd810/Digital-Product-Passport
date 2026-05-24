@@ -69,7 +69,7 @@ function createCarrierSecurityHelpers({
     if (!dppId || !eventType) return;
     await pool.query(
       `INSERT INTO passport_security_events
-         (passport_dpp_id, company_id, event_type, severity, source, details)
+         ("passportDppId", "companyId", "eventType", severity, source, details)
        VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
       [dppId, companyId, eventType, severity, source, JSON.stringify(details || {})]
     ).catch(() => {});

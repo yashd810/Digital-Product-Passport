@@ -16,6 +16,7 @@ module.exports = function registerDidRoutes(app, deps) {
     getAppUrl,
     didService,
     dppIdentity,
+    productIdentifierService,
   } = deps;
 
   const companyIdParamsSchema = {
@@ -262,13 +263,15 @@ module.exports = function registerDidRoutes(app, deps) {
       const { dppId } = req.params;
 
       const reg = await pool.query(
-        "SELECT passport_type, company_id FROM passport_registry WHERE dpp_id = $1",
+        `SELECT "passportType", "companyId"
+         FROM passport_registry
+         WHERE "dppId" = $1`,
         [dppId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      const { passport_type, company_id } = reg.rows[0];
-      const tableName = getTable(passport_type);
+      const { passportType, companyId } = reg.rows[0];
+      const tableName = getTable(passportType);
 
       const r = await pool.query(
         `SELECT "dppId", "internalAliasId", "modelName", "companyId" FROM ${tableName}
@@ -279,16 +282,16 @@ module.exports = function registerDidRoutes(app, deps) {
       if (!r.rows.length) return res.status(404).json({ error: "Passport record not found" });
 
       const passport = normalizePassportRow(r.rows[0]);
-      passport.passportType = passport_type;
+      passport.passportType = passportType;
 
-      const companyNameMap = await getCompanyNameMap([company_id]);
-      const companyName = companyNameMap.get(String(company_id)) || "";
+      const companyNameMap = await getCompanyNameMap([companyId]);
+      const companyName = companyNameMap.get(String(companyId)) || "";
 
       const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
       const productDid = businessIdentifier ? (passport.productIdentifierDid || passport.uniqueProductIdentifier || null) : null;
       const pDppDid = passport.internalAliasId ?
-        dppIdentity.dppDid("model", company_id, passport.internalAliasId) :
+        dppIdentity.dppDid("model", companyId, passport.internalAliasId) :
         null;
 
       res.json({

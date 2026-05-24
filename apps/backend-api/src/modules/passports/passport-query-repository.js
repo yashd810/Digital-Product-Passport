@@ -70,14 +70,14 @@ function createPassportQueryRepository({
     let archiveCompanyFilter = "";
     if (companyId !== null && companyId !== undefined) {
       archiveParams.push(companyId);
-      archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
+      archiveCompanyFilter = ` AND "companyId" = $${archiveParams.length}`;
     }
     const archiveRes = await pool.query(
-      `SELECT dpp_id AS "dppId", lineage_id, internal_alias_id
+      `SELECT "dppId", "lineageId", "internalAliasId"
        FROM passport_archives
-       WHERE dpp_id = $1
-         AND passport_type = $2${archiveCompanyFilter}
-       ORDER BY version_number DESC, archived_at DESC
+       WHERE "dppId" = $1
+         AND "passportType" = $2${archiveCompanyFilter}
+       ORDER BY "versionNumber" DESC, "archivedAt" DESC
        LIMIT 1`,
       archiveParams
     );
@@ -115,14 +115,14 @@ function createPassportQueryRepository({
     let archiveCompanyFilter = "";
     if (companyId !== null && companyId !== undefined) {
       archiveParams.push(companyId);
-      archiveCompanyFilter = ` AND company_id = $${archiveParams.length}`;
+      archiveCompanyFilter = ` AND "companyId" = $${archiveParams.length}`;
     }
     const archiveRes = await pool.query(
-      `SELECT dpp_id AS "dppId", lineage_id, company_id, passport_type, version_number, model_name, internal_alias_id, product_identifier_did, release_status, archived_at, row_data
+      `SELECT "dppId", "lineageId", "companyId", "passportType", "versionNumber", "modelName", "internalAliasId", "productIdentifierDid", "releaseStatus", "archivedAt", "rowData"
        FROM passport_archives
-       WHERE lineage_id = $1
-         AND passport_type = $2${archiveCompanyFilter}
-       ORDER BY version_number DESC, archived_at DESC`,
+       WHERE "lineageId" = $1
+         AND "passportType" = $2${archiveCompanyFilter}
+       ORDER BY "versionNumber" DESC, "archivedAt" DESC`,
       archiveParams
     );
 
@@ -130,20 +130,20 @@ function createPassportQueryRepository({
     const seenDppIds = new Set(liveVersions.map((row) => row.dppId));
     const archiveVersions = archiveRes.rows
       .map((row) => {
-        const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
+        const rowData = typeof row.rowData === "string" ? JSON.parse(row.rowData) : row.rowData;
         return {
           ...rowData,
           dppId: row.dppId || rowData?.dppId,
-          lineageId: row.lineage_id || rowData?.lineageId,
-          companyId: row.company_id || rowData?.companyId,
-          passportType: row.passport_type || rowData?.passportType,
-          versionNumber: row.version_number ?? rowData?.versionNumber,
-          modelName: row.model_name || rowData?.modelName,
-          internalAliasId: row.internal_alias_id || rowData?.internalAliasId,
-          uniqueProductIdentifier: row.product_identifier_did || rowData?.uniqueProductIdentifier,
-          releaseStatus: row.release_status || rowData?.releaseStatus,
+          lineageId: row.lineageId || rowData?.lineageId,
+          companyId: row.companyId || rowData?.companyId,
+          passportType: row.passportType || rowData?.passportType,
+          versionNumber: row.versionNumber ?? rowData?.versionNumber,
+          modelName: row.modelName || rowData?.modelName,
+          internalAliasId: row.internalAliasId || rowData?.internalAliasId,
+          uniqueProductIdentifier: row.productIdentifierDid || rowData?.uniqueProductIdentifier,
+          releaseStatus: row.releaseStatus || rowData?.releaseStatus,
           archived: true,
-          archivedAt: row.archived_at,
+          archivedAt: row.archivedAt,
         };
       })
       .map(normalizePassportRow)
@@ -163,22 +163,22 @@ function createPassportQueryRepository({
 
     if (!resolvedPassportType) {
       const regRes = await pool.query(
-        "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2",
+        `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 AND "companyId" = $2`,
         [dppId, companyId]
       );
-      if (regRes.rows.length) resolvedPassportType = regRes.rows[0].passport_type;
+      if (regRes.rows.length) resolvedPassportType = regRes.rows[0].passportType;
     }
 
     if (!resolvedPassportType) {
       const archiveTypeRes = await pool.query(
-        `SELECT passport_type
+        `SELECT "passportType"
          FROM passport_archives
-         WHERE dpp_id = $1 AND company_id = $2
-         ORDER BY version_number DESC, archived_at DESC
+         WHERE "dppId" = $1 AND "companyId" = $2
+         ORDER BY "versionNumber" DESC, "archivedAt" DESC
          LIMIT 1`,
         [dppId, companyId]
       );
-      if (archiveTypeRes.rows.length) resolvedPassportType = archiveTypeRes.rows[0].passport_type;
+      if (archiveTypeRes.rows.length) resolvedPassportType = archiveTypeRes.rows[0].passportType;
     }
 
     if (!resolvedPassportType) return null;
@@ -210,21 +210,21 @@ function createPassportQueryRepository({
     let archiveVersionSql = "";
     if (parsedVersionNumber !== null) {
       archiveParams.push(parsedVersionNumber);
-      archiveVersionSql = ` AND pa.version_number = $${archiveParams.length}`;
+      archiveVersionSql = ` AND pa."versionNumber" = $${archiveParams.length}`;
     }
     const archiveRes = await pool.query(
-      `SELECT pa.row_data
+      `SELECT pa."rowData"
        FROM passport_archives pa
-       WHERE pa.dpp_id = $1 AND pa.company_id = $2 AND pa.passport_type = $3${archiveVersionSql}
-       ORDER BY pa.version_number DESC, pa.archived_at DESC
+       WHERE pa."dppId" = $1 AND pa."companyId" = $2 AND pa."passportType" = $3${archiveVersionSql}
+       ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
        LIMIT 1`,
       archiveParams
     );
     if (!archiveRes.rows.length) return null;
 
-    const rowData = typeof archiveRes.rows[0].row_data === "string"
-      ? JSON.parse(archiveRes.rows[0].row_data)
-      : archiveRes.rows[0].row_data;
+    const rowData = typeof archiveRes.rows[0].rowData === "string"
+      ? JSON.parse(archiveRes.rows[0].rowData)
+      : archiveRes.rows[0].rowData;
 
     return {
       passport: { ...normalizePassportRow(rowData), passportType: resolvedPassportType, archived: true },
@@ -237,12 +237,12 @@ function createPassportQueryRepository({
     if (!normalizedDppId) return { passport: null, archived: false };
 
     const reg = await pool.query(
-      "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
+      `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 LIMIT 1`,
       [normalizedDppId]
     );
     if (!reg.rows.length) return { passport: null, archived: false };
 
-    const passportType = reg.rows[0].passport_type;
+    const passportType = reg.rows[0].passportType;
     const tableName = getTable(passportType);
 
     const liveRes = await pool.query(
@@ -262,25 +262,25 @@ function createPassportQueryRepository({
     }
 
     const archiveRes = await pool.query(
-      `SELECT pa.row_data,
-              pa.version_number,
-              phv.is_public
+      `SELECT pa."rowData",
+              pa."versionNumber",
+              phv."isPublic"
        FROM passport_archives pa
        LEFT JOIN passport_history_visibility phv
-         ON phv.passport_dpp_id = pa.dpp_id
-        AND phv.version_number = pa.version_number
-       WHERE pa.dpp_id = $1
-         AND pa.passport_type = $2
-       ORDER BY pa.version_number DESC, pa.archived_at DESC
+         ON phv."passportDppId" = pa."dppId"
+        AND phv."versionNumber" = pa."versionNumber"
+       WHERE pa."dppId" = $1
+         AND pa."passportType" = $2
+       ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
        LIMIT 1`,
       [normalizedDppId, passportType]
     );
     if (!archiveRes.rows.length) return { passport: null, archived: false };
 
-    const rowData = typeof archiveRes.rows[0].row_data === "string"
-      ? JSON.parse(archiveRes.rows[0].row_data)
-      : archiveRes.rows[0].row_data;
-    if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+    const rowData = typeof archiveRes.rows[0].rowData === "string"
+      ? JSON.parse(archiveRes.rows[0].rowData)
+      : archiveRes.rows[0].rowData;
+    if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].isPublic, isPublicHistoryStatus)) {
       return { passport: null, archived: false };
     }
     return {
@@ -313,8 +313,8 @@ function createPassportQueryRepository({
       ? `"internalAliasId" = ANY($1::text[])`
       : `("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))`;
     const archiveMatchSql = strictProductId
-      ? "pa.internal_alias_id = ANY($1::text[])"
-      : "(pa.internal_alias_id = ANY($1::text[]) OR pa.product_identifier_did = ANY($1::text[]))";
+      ? 'pa."internalAliasId" = ANY($1::text[])'
+      : '(pa."internalAliasId" = ANY($1::text[]) OR pa."productIdentifierDid" = ANY($1::text[]))';
 
     const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
     const matches = [];
@@ -326,11 +326,11 @@ function createPassportQueryRepository({
       let companySql = "";
       if (companyId !== null && companyId !== undefined) {
         liveParams.push(companyId);
-        companySql = ` AND company_id = $${liveParams.length}`;
+        companySql = ` AND "companyId" = $${liveParams.length}`;
       }
       if (versionNumber !== null && versionNumber !== undefined) {
         liveParams.push(versionNumber);
-        versionSql = ` AND version_number = $${liveParams.length}`;
+        versionSql = ` AND "versionNumber" = $${liveParams.length}`;
       }
 
       let liveRes;
@@ -369,39 +369,39 @@ function createPassportQueryRepository({
       let archiveVersionSql = "";
       if (companyId !== null && companyId !== undefined) {
         archiveParams.push(companyId);
-        archiveCompanySql = ` AND pa.company_id = $${archiveParams.length}`;
+        archiveCompanySql = ` AND pa."companyId" = $${archiveParams.length}`;
       }
       if (versionNumber !== null && versionNumber !== undefined) {
         archiveParams.push(versionNumber);
-        archiveVersionSql = ` AND pa.version_number = $${archiveParams.length}`;
+        archiveVersionSql = ` AND pa."versionNumber" = $${archiveParams.length}`;
       }
       const archiveRes = await pool.query(
-        `SELECT pa.product_identifier_did,
-                pa.version_number,
-                pa.row_data,
-                phv.is_public
+        `SELECT pa."productIdentifierDid",
+                pa."versionNumber",
+                pa."rowData",
+                phv."isPublic"
          FROM passport_archives pa
          LEFT JOIN passport_history_visibility phv
-           ON phv.passport_dpp_id = pa.dpp_id
-          AND phv.version_number = pa.version_number
+           ON phv."passportDppId" = pa."dppId"
+          AND phv."versionNumber" = pa."versionNumber"
          WHERE ${archiveMatchSql}
-           AND pa.passport_type = $2${archiveCompanySql}
+           AND pa."passportType" = $2${archiveCompanySql}
            ${archiveVersionSql}
-         ORDER BY pa.version_number DESC, pa.archived_at DESC
+         ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
          LIMIT 1`,
         archiveParams
       );
       if (archiveRes.rows.length) {
-        const rowData = typeof archiveRes.rows[0].row_data === "string"
-          ? JSON.parse(archiveRes.rows[0].row_data)
-          : archiveRes.rows[0].row_data;
-        if (!isPublicVersionVisible(rowData?.releaseStatus || rowData?.release_status, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+        const rowData = typeof archiveRes.rows[0].rowData === "string"
+          ? JSON.parse(archiveRes.rows[0].rowData)
+          : archiveRes.rows[0].rowData;
+        if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].isPublic, isPublicHistoryStatus)) {
           continue;
         }
         matches.push({
           passport: {
             ...normalizePassportRow(rowData),
-            uniqueProductIdentifier: archiveRes.rows[0].product_identifier_did || rowData?.uniqueProductIdentifier,
+            uniqueProductIdentifier: archiveRes.rows[0].productIdentifierDid || rowData?.uniqueProductIdentifier,
             passportType: type_name,
             archived: true,
           },
@@ -424,12 +424,12 @@ function createPassportQueryRepository({
     if (!normalizedDppId) return { passport: null, archived: false };
 
     const reg = await pool.query(
-      "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
+      `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 LIMIT 1`,
       [normalizedDppId]
     );
     if (!reg.rows.length) return { passport: null, archived: false };
 
-    const passportType = reg.rows[0].passport_type;
+    const passportType = reg.rows[0].passportType;
     const tableName = getTable(passportType);
 
     if (versionNumber !== null && versionNumber !== undefined) {
@@ -450,50 +450,50 @@ function createPassportQueryRepository({
       if (liveRes.rows.length) {
         const passport = { ...normalizePassportRow(liveRes.rows[0]), passportType };
         const visibilityRes = await pool.query(
-          `SELECT is_public
+          `SELECT "isPublic"
            FROM passport_history_visibility
-           WHERE passport_dpp_id = $1 AND version_number = $2
+           WHERE "passportDppId" = $1 AND "versionNumber" = $2
            LIMIT 1`,
           [passport.dppId, versionNumber]
         );
         const isVisible = visibilityRes.rows.length
-          ? !!visibilityRes.rows[0].is_public
+          ? !!visibilityRes.rows[0].isPublic
           : isPublicHistoryStatus(passport.releaseStatus);
         return isVisible ? { passport, archived: false } : { passport: null, archived: false };
       }
 
       const archiveRes = await pool.query(
-        `SELECT pa.row_data,
-                phv.is_public
+        `SELECT pa."rowData",
+                phv."isPublic"
          FROM passport_archives pa
          LEFT JOIN passport_history_visibility phv
-           ON phv.passport_dpp_id = pa.dpp_id
-          AND phv.version_number = pa.version_number
-         WHERE pa.lineage_id = $1
-           AND pa.passport_type = $2
-           AND pa.version_number = $3
-         ORDER BY pa.archived_at DESC
+           ON phv."passportDppId" = pa."dppId"
+          AND phv."versionNumber" = pa."versionNumber"
+         WHERE pa."lineageId" = $1
+           AND pa."passportType" = $2
+           AND pa."versionNumber" = $3
+         ORDER BY pa."archivedAt" DESC
          LIMIT 1`,
         [lineageContext.lineageId, passportType, versionNumber]
       );
       if (!archiveRes.rows.length) return { passport: null, archived: false };
 
-      const rowData = typeof archiveRes.rows[0].row_data === "string"
-        ? JSON.parse(archiveRes.rows[0].row_data)
-        : archiveRes.rows[0].row_data;
-      if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].is_public, isPublicHistoryStatus)) {
+      const rowData = typeof archiveRes.rows[0].rowData === "string"
+        ? JSON.parse(archiveRes.rows[0].rowData)
+        : archiveRes.rows[0].rowData;
+      if (!isPublicVersionVisible(rowData?.releaseStatus, archiveRes.rows[0].isPublic, isPublicHistoryStatus)) {
         return { passport: null, archived: false };
       }
       const passport = { ...normalizePassportRow(rowData), passportType, archived: true };
       const visibilityRes = await pool.query(
-        `SELECT is_public
+        `SELECT "isPublic"
          FROM passport_history_visibility
-         WHERE passport_dpp_id = $1 AND version_number = $2
+         WHERE "passportDppId" = $1 AND "versionNumber" = $2
          LIMIT 1`,
         [passport.dppId, versionNumber]
       );
       const isVisible = visibilityRes.rows.length
-        ? !!visibilityRes.rows[0].is_public
+        ? !!visibilityRes.rows[0].isPublic
         : isPublicHistoryStatus(passport.releaseStatus);
       return isVisible ? { passport, archived: true } : { passport: null, archived: false };
     }
@@ -551,19 +551,19 @@ function createPassportQueryRepository({
     const archiveMatches = [];
     for (const { type_name } of ptRows.rows) {
       const archiveRes = await pool.query(
-        `SELECT row_data
+        `SELECT "rowData"
          FROM passport_archives
-         WHERE company_id = $1
-           AND passport_type = $2
-           AND (internal_alias_id = ANY($3::text[]) OR product_identifier_did = ANY($3::text[]))
-         ORDER BY version_number DESC, archived_at DESC
+         WHERE "companyId" = $1
+           AND "passportType" = $2
+           AND ("internalAliasId" = ANY($3::text[]) OR "productIdentifierDid" = ANY($3::text[]))
+         ORDER BY "versionNumber" DESC, "archivedAt" DESC
          LIMIT 1`,
         [companyId, type_name, candidates]
       );
       if (archiveRes.rows.length) {
-        const rowData = typeof archiveRes.rows[0].row_data === "string"
-          ? JSON.parse(archiveRes.rows[0].row_data)
-          : archiveRes.rows[0].row_data;
+        const rowData = typeof archiveRes.rows[0].rowData === "string"
+          ? JSON.parse(archiveRes.rows[0].rowData)
+          : archiveRes.rows[0].rowData;
         archiveMatches.push({
           passport: { ...normalizePassportRow(rowData), passportType: type_name, archived: true },
           archived: true,

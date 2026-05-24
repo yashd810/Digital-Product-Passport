@@ -7,17 +7,17 @@ async function storePassportSignature(pool, {
 }) {
   const insertResult = await pool.query(
     `INSERT INTO passport_signatures (
-      passport_dpp_id,
-      version_number,
-      data_hash,
+      "passportDppId",
+      "versionNumber",
+      "dataHash",
       signature,
       algorithm,
-      signing_key_id,
-      released_at,
-      vc_json
+      "signingKeyId",
+      "releasedAt",
+      "vcJson"
     )
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    ON CONFLICT (passport_dpp_id, version_number) DO NOTHING
+    ON CONFLICT ("passportDppId", "versionNumber") DO NOTHING
     RETURNING id`,
     [
       passportDppId,
@@ -35,8 +35,8 @@ async function storePassportSignature(pool, {
   const existingResult = await pool.query(
     `SELECT id
      FROM passport_signatures
-     WHERE passport_dpp_id = $1
-       AND version_number = $2`,
+     WHERE "passportDppId" = $1
+       AND "versionNumber" = $2`,
     [passportDppId, versionNumber]
   );
   return existingResult.rows[0]?.id || null;
@@ -66,26 +66,26 @@ async function storeDppReleaseRecord(pool, {
   const companyname = await resolveReleaseCompanyName(pool, companyId);
   const result = await pool.query(
     `INSERT INTO dpp_release_records (
-      dpp_id,
+      "dppId",
       companyname,
-      released_by_user_id,
-      released_by_email,
-      release_version,
-      dpp_hash,
-      signature_id,
-      release_note,
-      released_at
+      "releasedByUserId",
+      "releasedByEmail",
+      "releaseVersion",
+      "dppHash",
+      "signatureId",
+      "releaseNote",
+      "releasedAt"
     )
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9::timestamptz, NOW()))
-    ON CONFLICT (dpp_id, release_version)
+    ON CONFLICT ("dppId", "releaseVersion")
     DO UPDATE SET
       companyname = EXCLUDED.companyname,
-      released_by_user_id = EXCLUDED.released_by_user_id,
-      released_by_email = EXCLUDED.released_by_email,
-      dpp_hash = EXCLUDED.dpp_hash,
-      signature_id = EXCLUDED.signature_id,
-      release_note = EXCLUDED.release_note,
-      released_at = EXCLUDED.released_at
+      "releasedByUserId" = EXCLUDED."releasedByUserId",
+      "releasedByEmail" = EXCLUDED."releasedByEmail",
+      "dppHash" = EXCLUDED."dppHash",
+      "signatureId" = EXCLUDED."signatureId",
+      "releaseNote" = EXCLUDED."releaseNote",
+      "releasedAt" = EXCLUDED."releasedAt"
     RETURNING *`,
     [
       dppId,

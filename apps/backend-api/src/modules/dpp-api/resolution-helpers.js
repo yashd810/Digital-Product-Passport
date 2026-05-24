@@ -50,7 +50,7 @@ function createResolutionHelpers({
   function buildIdentifierLineageEnvelope(passport, identifierLineage = []) {
     return {
       ...buildDppIdentifierFields(passport),
-      uniqueProductIdentifier: productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) ? (passport?.uniqueProductIdentifier || passport?.product_identifier_did || null) : null,
+      uniqueProductIdentifier: productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) ? (passport?.uniqueProductIdentifier || null) : null,
       internalAliasId: passport?.internalAliasId || null,
       granularity: passport?.granularity || "item",
       lineageId: passport?.lineageId || null,
@@ -89,23 +89,23 @@ function createResolutionHelpers({
       const tableName = getTable(typeRow.type_name);
       const liveParams = [stableId];
       const statusSql = editableOnly ?
-        "release_status IN ('draft', 'in_revision')" :
+        `"releaseStatus" IN ('draft', 'in_revision')` :
         versionNumber !== null && versionNumber !== undefined ?
-          "release_status IN ('released', 'obsolete')" :
-          "release_status = 'released'";
+          `"releaseStatus" IN ('released', 'obsolete')` :
+          `"releaseStatus" = 'released'`;
       let versionSql = "";
       if (versionNumber !== null && versionNumber !== undefined) {
         liveParams.push(versionNumber);
-        versionSql = ` AND version_number = $${liveParams.length}`;
+        versionSql = ` AND "versionNumber" = $${liveParams.length}`;
       }
 
       const liveRes = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE (lineage_id = $1 OR dpp_id::text = $1)
+         WHERE ("lineageId" = $1 OR "dppId"::text = $1)
            AND ${statusSql}
-           AND deleted_at IS NULL${versionSql}
-         ORDER BY version_number DESC, updated_at DESC`,
+           AND "deletedAt" IS NULL${versionSql}
+         ORDER BY "versionNumber" DESC, "updatedAt" DESC`,
         liveParams
       );
       for (const row of liveRes.rows) {
@@ -122,24 +122,24 @@ function createResolutionHelpers({
       let archiveVersionSql = "";
       if (versionNumber !== null && versionNumber !== undefined) {
         archiveParams.push(versionNumber);
-        archiveVersionSql = ` AND version_number = $${archiveParams.length}`;
+        archiveVersionSql = ` AND "versionNumber" = $${archiveParams.length}`;
       }
       const archiveRes = await pool.query(
-        `SELECT archived_at, product_identifier_did, row_data
+        `SELECT "archivedAt", "productIdentifierDid", "rowData"
          FROM passport_archives
-         WHERE (lineage_id = $1 OR dpp_id::text = $1)
-           AND passport_type = $2
-           AND ${versionNumber !== null && versionNumber !== undefined ? "release_status IN ('released', 'obsolete')" : "release_status = 'released'"}${archiveVersionSql}
-         ORDER BY version_number DESC, archived_at DESC`,
+         WHERE ("lineageId" = $1 OR "dppId"::text = $1)
+           AND "passportType" = $2
+           AND ${versionNumber !== null && versionNumber !== undefined ? `"releaseStatus" IN ('released', 'obsolete')` : `"releaseStatus" = 'released'`}${archiveVersionSql}
+         ORDER BY "versionNumber" DESC, "archivedAt" DESC`,
         archiveParams
       );
       for (const row of archiveRes.rows) {
-        const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
+        const rowData = typeof row.rowData === "string" ? JSON.parse(row.rowData) : row.rowData;
         matches.push({
           passport: {
             ...normalizePassportRow(rowData, typeRow),
-            uniqueProductIdentifier: row.product_identifier_did || rowData?.uniqueProductIdentifier || rowData?.product_identifier_did,
-            archivedAt: row.archived_at || rowData?.archivedAt || rowData?.archived_at,
+            uniqueProductIdentifier: row.productIdentifierDid || rowData?.uniqueProductIdentifier,
+            archivedAt: row.archivedAt || rowData?.archivedAt,
             passportType: typeRow.type_name,
             archived: true
           },
@@ -224,35 +224,35 @@ function createResolutionHelpers({
       passportType,
       internalAliasId: baseline.passport.internalAliasId,
       granularity: baseline.passport.granularity || "item"
-    }) || [baseline.passport.internalAliasId, baseline.passport.uniqueProductIdentifier || baseline.passport.product_identifier_did].filter(Boolean);
+    }) || [baseline.passport.internalAliasId, baseline.passport.uniqueProductIdentifier].filter(Boolean);
 
     const liveRes = await pool.query(
       `SELECT *
        FROM ${tableName}
-       WHERE company_id = $2
-         AND (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
-         AND release_status IN ('released', 'obsolete')
-         AND deleted_at IS NULL`,
+       WHERE "companyId" = $2
+         AND ("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))
+         AND "releaseStatus" IN ('released', 'obsolete')
+         AND "deletedAt" IS NULL`,
       [candidates, companyId]
     );
     const archiveRes = await pool.query(
-      `SELECT product_identifier_did, archived_at, row_data
+      `SELECT "productIdentifierDid", "archivedAt", "rowData"
        FROM passport_archives
-       WHERE company_id = $2
-         AND passport_type = $3
-         AND (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
-         AND release_status IN ('released', 'obsolete')`,
+       WHERE "companyId" = $2
+         AND "passportType" = $3
+         AND ("internalAliasId" = ANY($1::text[]) OR "productIdentifierDid" = ANY($1::text[]))
+         AND "releaseStatus" IN ('released', 'obsolete')`,
       [candidates, companyId, passportType]
     );
 
     const combined = [
       ...liveRes.rows.map((row) => ({ ...normalizePassportRow(row, baseline.typeDef), passportType })),
       ...archiveRes.rows.map((row) => {
-        const rowData = typeof row.row_data === "string" ? JSON.parse(row.row_data) : row.row_data;
+        const rowData = typeof row.rowData === "string" ? JSON.parse(row.rowData) : row.rowData;
         return {
           ...normalizePassportRow(rowData, baseline.typeDef),
-          uniqueProductIdentifier: row.product_identifier_did || rowData?.uniqueProductIdentifier || rowData?.product_identifier_did,
-          archivedAt: row.archived_at || rowData?.archivedAt || rowData?.archived_at,
+          uniqueProductIdentifier: row.productIdentifierDid || rowData?.uniqueProductIdentifier,
+          archivedAt: row.archivedAt || rowData?.archivedAt,
           passportType,
           archived: true
         };
@@ -304,11 +304,11 @@ function createResolutionHelpers({
       const result = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE company_id = $2
-           AND (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
-           AND release_status IN ('draft', 'in_revision')
-           AND deleted_at IS NULL
-         ORDER BY version_number DESC, updated_at DESC
+         WHERE "companyId" = $2
+           AND ("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))
+           AND "releaseStatus" IN ('draft', 'in_revision')
+           AND "deletedAt" IS NULL
+         ORDER BY "versionNumber" DESC, "updatedAt" DESC
          LIMIT 1`,
         [candidates, companyId]
       );
@@ -351,16 +351,16 @@ function createResolutionHelpers({
       let companySql = "";
       if (companyId !== null && companyId !== undefined) {
         params.push(companyId);
-        companySql = ` AND company_id = $${params.length}`;
+        companySql = ` AND "companyId" = $${params.length}`;
       }
 
       const result = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))${companySql}
-           AND release_status IN ('draft', 'in_revision')
-           AND deleted_at IS NULL
-         ORDER BY version_number DESC, updated_at DESC
+         WHERE ("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))${companySql}
+           AND "releaseStatus" IN ('draft', 'in_revision')
+           AND "deletedAt" IS NULL
+         ORDER BY "versionNumber" DESC, "updatedAt" DESC
          LIMIT 1`,
         params
       );
@@ -519,7 +519,7 @@ function createResolutionHelpers({
   async function resolveLegacyPassportDidTarget(companyId, internalAliasId, fallbackGranularity = "model") {
     const result = await dbLookupByCompanyAndProduct(companyId, internalAliasId);
     if (!result?.passport) return null;
-    const stableId = didService.normalizeStableId(result.passport.lineage_id || result.passport.dppId);
+    const stableId = didService.normalizeStableId(result.passport.lineageId || result.passport.dppId);
     const granularity = String(
       result.passport.granularity ||
       result.passport.dpp_granularity ||

@@ -39,12 +39,14 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
     try {
       const { companyId, dppId } = req.params;
       const reg = await pool.query(
-        "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2",
+        `SELECT "passportType"
+         FROM passport_registry
+         WHERE "dppId" = $1 AND "companyId" = $2`,
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      const passportType = reg.rows[0].passport_type;
+      const passportType = reg.rows[0].passportType;
       const historyPayload = await buildPassportVersionHistory({ dppId, passportType, companyId, publicOnly: false });
       res.json(historyPayload);
     } catch {
@@ -56,21 +58,24 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
     try {
       const { companyId, dppId } = req.params;
       const reg = await pool.query(
-        "SELECT passport_type, lineage_id FROM passport_registry WHERE dpp_id = $1 AND company_id = $2 LIMIT 1",
+        `SELECT "passportType", "lineageId"
+         FROM passport_registry
+         WHERE "dppId" = $1 AND "companyId" = $2
+         LIMIT 1`,
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
       const links = await productIdentifierService.listIdentifierLineage({
         companyId,
-        lineageId: reg.rows[0].lineage_id,
+        lineageId: reg.rows[0].lineageId,
         dppId,
       });
       res.json({
         dppId,
         digitalProductPassportId: dppId,
-        lineageId: reg.rows[0].lineage_id,
-        passportType: reg.rows[0].passport_type,
+        lineageId: reg.rows[0].lineageId,
+        passportType: reg.rows[0].passportType,
         identifierLineage: links,
       });
     } catch (error) {
