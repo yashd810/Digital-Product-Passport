@@ -59,13 +59,13 @@ function registerAuditAnalyticsRoutes(app, deps) {
 
           const tableName = getTable(type_name);
           const baselineRes = await pool.query(
-            `SELECT COUNT(*) AS count FROM ${tableName} WHERE company_id = $1 AND deleted_at IS NULL AND created_at < $2`,
+            `SELECT COUNT(*) AS count FROM ${tableName} WHERE "companyId" = $1 AND "deletedAt" IS NULL AND "createdAt" < $2`,
             [companyId, trendStart.toISOString()]
           );
           const monthlyRes = await pool.query(
-            `SELECT date_trunc('month', created_at) AS month_bucket, COUNT(*) AS count
+            `SELECT date_trunc('month', "createdAt") AS month_bucket, COUNT(*) AS count
              FROM ${tableName}
-             WHERE company_id = $1 AND deleted_at IS NULL AND created_at >= $2
+             WHERE "companyId" = $1 AND "deletedAt" IS NULL AND "createdAt" >= $2
              GROUP BY 1 ORDER BY 1`,
             [companyId, trendStart.toISOString()]
           );
@@ -89,16 +89,16 @@ function registerAuditAnalyticsRoutes(app, deps) {
       }
 
       const scanRes = await pool.query(
-        `SELECT COUNT(DISTINCT (pse.passport_dpp_id, pse.viewer_user_id)) FROM passport_scan_events pse
-         JOIN passport_registry pr ON pr.dpp_id = pse.passport_dpp_id
-         WHERE pr.company_id = $1 AND pse.viewer_user_id IS NOT NULL`,
+        `SELECT COUNT(DISTINCT (pse."passportDppId", pse."viewerUserId")) FROM passport_scan_events pse
+         JOIN passport_registry pr ON pr."dppId" = pse."passportDppId"
+         WHERE pr."companyId" = $1 AND pse."viewerUserId" IS NOT NULL`,
         [companyId]
       );
       const scanStats = parseInt(scanRes.rows[0].count, 10) || 0;
       const archivedRes = await pool.query(
-        `SELECT COUNT(DISTINCT dpp_id)
+        `SELECT COUNT(DISTINCT "dppId")
          FROM passport_archives
-         WHERE company_id = $1
+         WHERE "companyId" = $1
            AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
         [companyId]
       );

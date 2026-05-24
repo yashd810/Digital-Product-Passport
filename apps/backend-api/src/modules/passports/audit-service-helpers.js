@@ -314,7 +314,7 @@ function createAuditServiceHelpers({ pool, logger }) {
     if (!userId) return;
     try {
       await pool.query(
-        `INSERT INTO notifications (user_id,type,title,message,passport_dpp_id,action_url)
+        `INSERT INTO notifications ("userId",type,title,message,"passportDppId","actionUrl")
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [userId, type, title, message || null, passportDppId || null, actionUrl || null]
       );

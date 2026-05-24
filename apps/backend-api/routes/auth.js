@@ -632,7 +632,7 @@ module.exports = function registerAuthRoutes(app, {
       const r = await pool.query(
         `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.job_title, u.avatar_url,
                 u.is_active, u.created_at,
-                (SELECT COUNT(*) FROM passport_registry pr WHERE pr.company_id = u.company_id AND pr.passport_type IS NOT NULL) AS passport_count
+                (SELECT COUNT(*) FROM passport_registry pr WHERE pr."companyId" = u.company_id AND pr."passportType" IS NOT NULL) AS passport_count
          FROM users u
          WHERE u.company_id = $1 AND u.role != 'super_admin'
          ORDER BY u.role, u.first_name`,

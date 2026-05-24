@@ -87,12 +87,12 @@ function registerPublicApiV1Routes(app, deps) {
       const companyId = req.apiKey.companyId;
 
       const reg = await pool.query(
-        "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2",
+        "SELECT \"passportType\" FROM passport_registry WHERE \"dppId\" = $1 AND \"companyId\" = $2",
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      const passportType = reg.rows[0].passport_type;
+      const passportType = reg.rows[0].passportType;
       const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(passportType);
@@ -122,12 +122,12 @@ function registerPublicApiV1Routes(app, deps) {
 
       const companyId = req.apiKey.companyId;
       const reg = await pool.query(
-        "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 AND company_id = $2",
+        "SELECT \"passportType\" FROM passport_registry WHERE \"dppId\" = $1 AND \"companyId\" = $2",
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      const resolvedPassportType = reg.rows[0].passport_type;
+      const resolvedPassportType = reg.rows[0].passportType;
       const typeSchema = await getPassportTypeSchema(resolvedPassportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(resolvedPassportType);

@@ -172,9 +172,9 @@ function createDppUseCase(deps) {
       allValues
     );
     await pool.query(
-      `INSERT INTO passport_registry (dpp_id, lineage_id, company_id, passport_type)
+      `INSERT INTO passport_registry ("dppId", "lineageId", "companyId", "passportType")
        VALUES ($1, $2, $3, $4)
-       ON CONFLICT (dpp_id) DO NOTHING`,
+       ON CONFLICT ("dppId") DO NOTHING`,
       [dppId, lineageId, companyId, resolvedPassportType]
     );
 

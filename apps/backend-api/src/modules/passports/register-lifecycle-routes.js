@@ -236,7 +236,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       await markOlderVersionsObsolete(tableName, dppId, released.version_number, passportType);
       await pool.query(
-        "UPDATE passport_attachments SET is_public = true WHERE passport_dpp_id = $1",
+        "UPDATE passport_attachments SET \"isPublic\" = true WHERE \"passportDppId\" = $1",
         [dppId]
       ).catch(() => {});
       await logAudit(companyId, req.user.userId, "RELEASE", tableName, dppId, { release_status: "draft_or_in_revision" }, { release_status: "released" });

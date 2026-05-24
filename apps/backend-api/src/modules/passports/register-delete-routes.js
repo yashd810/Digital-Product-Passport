@@ -21,24 +21,24 @@ module.exports = function registerDeleteRoutes(app, deps) {
   } = deps;
 
   async function hardDeleteDraftPassport(client, { dppId, tableName, companyId = null, rowId = null }) {
-    await client.query("DELETE FROM passport_dynamic_values WHERE passport_dpp_id = $1", [dppId]);
-    await client.query("DELETE FROM passport_signatures WHERE passport_dpp_id = $1", [dppId]);
-    await client.query("DELETE FROM passport_scan_events WHERE passport_dpp_id = $1", [dppId]);
-    await client.query("DELETE FROM passport_workflow WHERE passport_dpp_id = $1", [dppId]);
-    await client.query("DELETE FROM passport_security_events WHERE passport_dpp_id = $1", [dppId]);
-    await client.query("DELETE FROM passport_edit_sessions WHERE passport_dpp_id = $1", [dppId]);
+    await client.query("DELETE FROM passport_dynamic_values WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM passport_signatures WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM passport_scan_events WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM passport_workflow WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM passport_security_events WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM passport_edit_sessions WHERE \"passportDppId\" = $1", [dppId]);
 
     if (rowId) {
       return client.query(
-        `DELETE FROM ${tableName} WHERE id = $1 AND release_status = 'draft' AND deleted_at IS NULL RETURNING dpp_id`,
+        `DELETE FROM ${tableName} WHERE id = $1 AND "releaseStatus" = 'draft' AND "deletedAt" IS NULL RETURNING "dppId"`,
         [rowId]
       );
     }
 
     return client.query(
       `DELETE FROM ${tableName}
-       WHERE dpp_id = $1${companyId ? " AND company_id = $2" : ""} AND release_status = 'draft' AND deleted_at IS NULL
-       RETURNING dpp_id`,
+       WHERE "dppId" = $1${companyId ? " AND \"companyId\" = $2" : ""} AND "releaseStatus" = 'draft' AND "deletedAt" IS NULL
+       RETURNING "dppId"`,
       companyId ? [dppId, companyId] : [dppId]
     );
   }
@@ -52,12 +52,12 @@ module.exports = function registerDeleteRoutes(app, deps) {
       const tableName = getTable(passportType);
       const existingRes = await pool.query(
         `SELECT * FROM ${tableName}
-         WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
+         WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
          LIMIT 1`,
         [dppId]
       );
       if (existingRes.rows.length) {
-        const isDraft = existingRes.rows[0].release_status === "draft";
+        const isDraft = existingRes.rows[0].releaseStatus === "draft";
         if (isDraft) {
           const client = await pool.connect();
           try {
@@ -85,9 +85,9 @@ module.exports = function registerDeleteRoutes(app, deps) {
       }
 
       const result = await pool.query(
-        `UPDATE ${tableName} SET deleted_at = NOW()
-         WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
-         RETURNING dpp_id`,
+        `UPDATE ${tableName} SET "deletedAt" = NOW()
+         WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+         RETURNING "dppId"`,
         [dppId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport not found or cannot delete a released passport" });

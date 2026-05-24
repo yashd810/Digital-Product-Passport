@@ -165,12 +165,12 @@ module.exports = function registerMutationRoutes(app, deps) {
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
-          await client.query("DELETE FROM passport_dynamic_values WHERE passport_dpp_id = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_signatures WHERE passport_dpp_id = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_scan_events WHERE passport_dpp_id = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_workflow WHERE passport_dpp_id = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_security_events WHERE passport_dpp_id = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_edit_sessions WHERE passport_dpp_id = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_dynamic_values WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_signatures WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_scan_events WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_workflow WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_security_events WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM passport_edit_sessions WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
           deleted = await client.query(
             `DELETE FROM ${editable.tableName}
              WHERE "dppId" = $1

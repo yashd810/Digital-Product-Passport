@@ -143,10 +143,10 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
       await clearExpiredEditSessions();
       await pool.query(
-        `INSERT INTO passport_edit_sessions (passport_dpp_id, company_id, passport_type, user_id, last_activity_at, updated_at)
+        `INSERT INTO passport_edit_sessions ("passportDppId", "companyId", "passportType", "userId", "lastActivityAt", "updatedAt")
          VALUES ($1, $2, $3, $4, NOW(), NOW())
-         ON CONFLICT (passport_dpp_id, user_id)
-         DO UPDATE SET company_id = EXCLUDED.company_id, passport_type = EXCLUDED.passport_type, last_activity_at = NOW(), updated_at = NOW()`,
+         ON CONFLICT ("passportDppId", "userId")
+         DO UPDATE SET "companyId" = EXCLUDED."companyId", "passportType" = EXCLUDED."passportType", "lastActivityAt" = NOW(), "updatedAt" = NOW()`,
         [dppId, companyId, passportType, req.user.userId]
       );
 
@@ -160,7 +160,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
   app.delete("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       await pool.query(
-        "DELETE FROM passport_edit_sessions WHERE passport_dpp_id = $1 AND user_id = $2",
+        "DELETE FROM passport_edit_sessions WHERE \"passportDppId\" = $1 AND \"userId\" = $2",
         [req.params.dppId, req.user.userId]
       );
       res.json({ success: true });
@@ -172,17 +172,17 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
   app.get("/api/companies/:companyId/passports/:dppId/access-key", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at
+        `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt"
          FROM passport_registry
-         WHERE dpp_id = $1 AND company_id = $2`,
+         WHERE "dppId" = $1 AND "companyId" = $2`,
         [req.params.dppId, req.params.companyId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport not found" });
 
       res.json({
-        hasAccessKey: !!result.rows[0].access_key_hash,
-        keyPrefix: result.rows[0].access_key_prefix || null,
-        lastRotatedAt: result.rows[0].access_key_last_rotated_at || null,
+        hasAccessKey: !!result.rows[0].accessKeyHash,
+        keyPrefix: result.rows[0].accessKeyPrefix || null,
+        lastRotatedAt: result.rows[0].accessKeyLastRotatedAt || null,
         revealable: false,
       });
     } catch {

@@ -110,9 +110,9 @@ module.exports = function createAssetService({
 
   async function insertPassportRegistry({ client = pool, dppId, lineageId, companyId, passportType }) {
     await client.query(
-      `INSERT INTO passport_registry (dpp_id, lineage_id, company_id, passport_type)
+      `INSERT INTO passport_registry ("dppId", "lineageId", "companyId", "passportType")
        VALUES ($1, $2, $3, $4)
-       ON CONFLICT (dpp_id) DO NOTHING`,
+       ON CONFLICT ("dppId") DO NOTHING`,
       [dppId, lineageId, companyId, passportType]
     );
   }
@@ -857,7 +857,7 @@ module.exports = function createAssetService({
         if (dynamicEntries.length) {
           for (const [fieldKey, value] of dynamicEntries) {
             await pool.query(
-              `INSERT INTO passport_dynamic_values (passport_dpp_id, field_key, value, updated_at)
+              `INSERT INTO passport_dynamic_values ("passportDppId", field_key, value, "updatedAt")
                VALUES ($1, $2, $3, NOW())`,
               [matchedGuid, fieldKey, toDynamicStoredValue(value)]
             );

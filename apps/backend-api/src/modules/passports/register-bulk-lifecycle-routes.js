@@ -59,11 +59,11 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       if (!uniqueGuids.length) return res.status(400).json({ error: "No valid passport GUIDs were provided." });
 
       const registryRes = await pool.query(
-        `SELECT dpp_id, passport_type FROM passport_registry WHERE company_id = $1 AND dpp_id = ANY($2::text[])`,
+        `SELECT "dppId", "passportType" FROM passport_registry WHERE "companyId" = $1 AND "dppId" = ANY($2::text[])`,
         [companyId, uniqueGuids]
       );
 
-      const registryByGuid = new Map(registryRes.rows.map((row) => [row.dpp_id, row.passport_type]));
+      const registryByGuid = new Map(registryRes.rows.map((row) => [row.dppId, row.passportType]));
       const resolvedItems = uniqueGuids
         .map((dppId) => ({ dppId, passportType: registryByGuid.get(dppId) || null }))
         .filter((item) => item.passportType);
@@ -75,9 +75,9 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
       const batchRes = await pool.query(
         `INSERT INTO passport_revision_batches
-           (company_id, passport_type, requested_by, scope_type, scope_meta, revision_note, changes_json,
-            submit_to_workflow, reviewer_id, approver_id, total_targeted)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, created_at`,
+           ("companyId", "passportType", "requestedBy", "scopeType", "scopeMeta", "revisionNote", "changesJson",
+            "submitToWorkflow", "reviewerId", "approverId", "totalTargeted")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, "createdAt"`,
         [companyId, batchPassportType, userId, scopeType, JSON.stringify(scopeMeta || {}), revisionNote || null, JSON.stringify(changes), !!submitToWorkflow,
         reviewerId ? parseInt(reviewerId, 10) : null, approverId ? parseInt(approverId, 10) : null, resolvedItems.length]
       );
@@ -115,7 +115,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           const insertBatchItem = async (status, message, sourceVersion = null, newVersion = null) => {
             await pool.query(
               `INSERT INTO passport_revision_batch_items
-                 (batch_id, passport_dpp_id, passport_type, source_version_number, new_version_number, status, message)
+                 ("batchId", "passportDppId", "passportType", "sourceVersionNumber", "newVersionNumber", status, message)
                VALUES ($1,$2,$3,$4,$5,$6,$7)`,
               [batch.id, dppId, passportType, sourceVersion, newVersion, status, message || null]
             );
@@ -181,10 +181,10 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             const insertedRevision = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allColumns)}) VALUES (${placeholders}) RETURNING *`, allValues);
 
             const sourceRegistry = await pool.query(
-              `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
-                      device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
+              `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
+                      "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
                FROM passport_registry
-               WHERE dpp_id = $1 AND company_id = $2
+               WHERE "dppId" = $1 AND "companyId" = $2
                LIMIT 1`,
               [dppId, companyId]
             );
@@ -194,12 +194,12 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
               lineageId: source.lineageId,
               companyId,
               passportType,
-              accessKeyHash: sourceKeys.access_key_hash || null,
-              accessKeyPrefix: sourceKeys.access_key_prefix || null,
-              accessKeyLastRotatedAt: sourceKeys.access_key_last_rotated_at || null,
-              deviceApiKeyHash: sourceKeys.device_api_key_hash || null,
-              deviceApiKeyPrefix: sourceKeys.device_api_key_prefix || null,
-              deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null,
+              accessKeyHash: sourceKeys.accessKeyHash || null,
+              accessKeyPrefix: sourceKeys.accessKeyPrefix || null,
+              accessKeyLastRotatedAt: sourceKeys.accessKeyLastRotatedAt || null,
+              deviceApiKeyHash: sourceKeys.deviceApiKeyHash || null,
+              deviceApiKeyPrefix: sourceKeys.deviceApiKeyPrefix || null,
+              deviceKeyLastRotatedAt: sourceKeys.deviceKeyLastRotatedAt || null,
             });
 
             await archivePassportSnapshot({
@@ -243,13 +243,13 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       }
 
       await pool.query(
-        `UPDATE passport_revision_batches SET revised_count=$1, skipped_count=$2, failed_count=$3, updated_at=NOW() WHERE id=$4`,
+        `UPDATE passport_revision_batches SET "revisedCount"=$1, "skippedCount"=$2, "failedCount"=$3, "updatedAt"=NOW() WHERE id=$4`,
         [revised, skipped, failed, batch.id]
       );
 
       res.json({
         success: true,
-        batch: { id: batch.id, createdAt: batch.created_at, passportType: batchPassportType, scopeType },
+        batch: { id: batch.id, createdAt: batch.createdAt, passportType: batchPassportType, scopeType },
         summary: { targeted: resolvedItems.length, revised, skipped, failed },
         details,
       });

@@ -325,7 +325,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
   async function verifyPassportSignature(dppId, versionNumber) {
     const sigRow = await pool.query(
-      "SELECT * FROM passport_signatures WHERE passport_dpp_id = $1 AND version_number = $2",
+      "SELECT * FROM passport_signatures WHERE \"passportDppId\" = $1 AND \"versionNumber\" = $2",
       [dppId, versionNumber]
     );
     if (!sigRow.rows.length) return { status: "unsigned" };

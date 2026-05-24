@@ -154,7 +154,7 @@ function createSchemaStorageHelpers({
     if (liveCount > 0) return true;
 
     const archivedCount = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM passport_archives WHERE passport_type = $1",
+      "SELECT COUNT(*)::int AS count FROM passport_archives WHERE \"passportType\" = $1",
       [typeName]
     ).then((result) => Number(result.rows[0]?.count) || 0).catch(() => 0);
     return archivedCount > 0;
@@ -471,19 +471,19 @@ function createSchemaStorageHelpers({
     const params = [];
     let companyFilter = "";
     if (companyId !== null && companyId !== undefined) {
-      companyFilter = " AND company_id = $1";
+      companyFilter = " AND \"companyId\" = $1";
       params.push(companyId);
     }
     const r = await pool.query(`
       SELECT
         COUNT(*)                                              AS total,
-        COUNT(CASE WHEN release_status = 'draft'     THEN 1 END) AS draft,
-        COUNT(CASE WHEN release_status = 'released'  THEN 1 END) AS released,
-        COUNT(CASE WHEN release_status IN ${IN_REVISION_STATUSES_SQL} THEN 1 END) AS revised,
-        COUNT(CASE WHEN release_status = 'in_review' THEN 1 END) AS in_review,
-        COUNT(CASE WHEN release_status = 'obsolete'  THEN 1 END) AS obsolete
+        COUNT(CASE WHEN "releaseStatus" = 'draft'     THEN 1 END) AS draft,
+        COUNT(CASE WHEN "releaseStatus" = 'released'  THEN 1 END) AS released,
+        COUNT(CASE WHEN "releaseStatus" IN ${IN_REVISION_STATUSES_SQL} THEN 1 END) AS revised,
+        COUNT(CASE WHEN "releaseStatus" = 'in_review' THEN 1 END) AS in_review,
+        COUNT(CASE WHEN "releaseStatus" = 'obsolete'  THEN 1 END) AS obsolete
       FROM ${tableName}
-      WHERE deleted_at IS NULL${companyFilter}
+      WHERE "deletedAt" IS NULL${companyFilter}
     `, params);
     const row = r.rows[0];
     return {

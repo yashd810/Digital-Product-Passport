@@ -37,29 +37,29 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const tableName = getTable(passportType);
       let query = `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
                FROM ${tableName} p
-               LEFT JOIN users u ON u.id = p.created_by
-               WHERE p.deleted_at IS NULL AND p.company_id = $1`;
+               LEFT JOIN users u ON u.id = p."createdBy"
+               WHERE p."deletedAt" IS NULL AND p."companyId" = $1`;
       const params = [companyId];
       let index = 2;
 
       if (status) {
         const normalizedStatus = normalizeReleaseStatus(status);
         if (normalizedStatus === IN_REVISION_STATUS) {
-          query += ` AND p.release_status IN ${IN_REVISION_STATUSES_SQL}`;
+          query += ` AND p."releaseStatus" IN ${IN_REVISION_STATUSES_SQL}`;
         } else {
-          query += ` AND p.release_status = $${index++}`;
+          query += ` AND p."releaseStatus" = $${index++}`;
           params.push(normalizedStatus);
         }
       }
       if (search) {
-        query += ` AND (p.model_name ILIKE $${index} OR p.internal_alias_id ILIKE $${index} OR p.product_identifier_did ILIKE $${index})`;
+        query += ` AND (p."modelName" ILIKE $${index} OR p."internalAliasId" ILIKE $${index} OR p."uniqueProductIdentifier" ILIKE $${index})`;
         params.push(`%${search}%`);
         index += 1;
       }
-      query += " ORDER BY p.lineage_id, p.version_number DESC";
+      query += " ORDER BY p.\"lineageId\", p.\"versionNumber\" DESC";
 
       const result = await pool.query(query, params);
-      res.json(result.rows.map((row) => ({ ...normalizePassportRow(row, typeSchema), passport_type: passportType })));
+      res.json(result.rows.map((row) => ({ ...normalizePassportRow(row, typeSchema), passportType })));
     } catch {
       res.status(500).json({ error: "Failed to fetch passports" });
     }
@@ -75,7 +75,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         passport_type = identifiers[0]?.passport_type || identifiers[0]?.passportType;
       } else {
         const normalizedBody = normalizePassportRequestBody(req.body);
-        passport_type = normalizedBody.passport_type;
+        passport_type = normalizedBody.passportType;
         identifiers = normalizedBody.passports || normalizedBody.identifiers;
       }
 
@@ -97,8 +97,8 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
           if (dppId) {
             const result = await pool.query(
               `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
-               FROM ${tableName} p LEFT JOIN users u ON u.id = p.created_by
-               WHERE p.dpp_id = $1 AND p.company_id = $2 AND p.deleted_at IS NULL LIMIT 1`,
+               FROM ${tableName} p LEFT JOIN users u ON u.id = p."createdBy"
+               WHERE p."dppId" = $1 AND p."companyId" = $2 AND p."deletedAt" IS NULL LIMIT 1`,
               [dppId, companyId]
             );
             row = result.rows[0];
@@ -111,23 +111,23 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
             });
             const result = await pool.query(
               `WITH latest AS (
-                 SELECT DISTINCT ON (lineage_id) *
+                 SELECT DISTINCT ON ("lineageId") *
                  FROM ${tableName}
-                 WHERE (internal_alias_id = ANY($1::text[]) OR product_identifier_did = ANY($1::text[]))
-                   AND company_id = $2
-                   AND deleted_at IS NULL
-                 ORDER BY lineage_id, version_number DESC, updated_at DESC
+                 WHERE ("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))
+                   AND "companyId" = $2
+                   AND "deletedAt" IS NULL
+                 ORDER BY "lineageId", "versionNumber" DESC, "updatedAt" DESC
                )
                SELECT latest.*, u.email AS created_by_email, u.first_name, u.last_name
-               FROM latest LEFT JOIN users u ON u.id = latest.created_by
-               ORDER BY latest.version_number DESC LIMIT 1`,
+               FROM latest LEFT JOIN users u ON u.id = latest."createdBy"
+               ORDER BY latest."versionNumber" DESC LIMIT 1`,
               [productIdCandidates, companyId]
             );
             row = result.rows[0];
           }
 
           if (row) {
-            results.push({ ...normalizePassportRow(row, typeSchema), passport_type: typeSchema.typeName, _status: "found" });
+            results.push({ ...normalizePassportRow(row, typeSchema), passportType: typeSchema.typeName, _status: "found" });
           } else {
             results.push({ dppId: dppId || undefined, internal_alias_id: internalAliasId || undefined, _status: "not_found" });
           }
@@ -181,8 +181,8 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
 
       const passportResult = await pool.query(
         `SELECT ${safeColumns.join(", ")} FROM ${tableName}
-         WHERE company_id=$1${statusSql} AND deleted_at IS NULL
-         ORDER BY created_at DESC`,
+         WHERE "companyId"=$1${statusSql} AND "deletedAt" IS NULL
+         ORDER BY "createdAt" DESC`,
         [companyId]
       );
       const rows = passportResult.rows;
@@ -195,7 +195,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
           : null;
         const exportRows = wantsFullRepresentation
           ? rows.map((row) => buildExpandedPassportPayload(
-              { ...normalizePassportRow(row), passport_type: passportType },
+              { ...normalizePassportRow(row), passportType },
               typeResult.rows[0],
               {
                 company,
@@ -217,10 +217,10 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       };
 
       const fieldRows = [
-        ["dppId", ...rows.map((row) => row.dpp_id)],
-        ["model_name", ...rows.map((row) => row.model_name || "")],
-        ["internal_alias_id", ...rows.map((row) => row.internal_alias_id || "")],
-        ["release_status", ...rows.map((row) => row.release_status || "")],
+        ["dppId", ...rows.map((row) => row.dppId)],
+        ["modelName", ...rows.map((row) => row.modelName || "")],
+        ["internalAliasId", ...rows.map((row) => row.internalAliasId || "")],
+        ["releaseStatus", ...rows.map((row) => row.releaseStatus || "")],
         ...schemaFields.map((field) => [field.label || field.key, ...rows.map((row) => getPassportFieldValue(row, field.key) ?? "")]),
       ];
 
@@ -243,18 +243,18 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
 
       let query = `SELECT pa.*, u.email AS archived_by_email, u.first_name AS archived_by_first_name, u.last_name AS archived_by_last_name
                FROM passport_archives pa
-               LEFT JOIN users u ON u.id = pa.archived_by
-               WHERE pa.company_id = $1
+               LEFT JOIN users u ON u.id = pa."archivedBy"
+               WHERE pa."companyId" = $1
                  AND ${ARCHIVED_HISTORY_FILTER_SQL}`;
       const params = [companyId];
       let index = 2;
 
       if (passportType) {
-        query += ` AND pa.passport_type = $${index++}`;
+        query += ` AND pa."passportType" = $${index++}`;
         params.push(passportType);
       }
       if (search) {
-        query += ` AND (pa.model_name ILIKE $${index} OR pa.internal_alias_id ILIKE $${index} OR pa.product_identifier_did ILIKE $${index} OR pa.dpp_id::text ILIKE $${index})`;
+        query += ` AND (pa."modelName" ILIKE $${index} OR pa."internalAliasId" ILIKE $${index} OR pa."productIdentifierDid" ILIKE $${index} OR pa."dppId"::text ILIKE $${index})`;
         params.push(`%${search}%`);
         index += 1;
       }
@@ -262,27 +262,27 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       query = `
         SELECT
           sub.*,
-          COALESCE(phv.is_public, sub.release_status IN ('released', 'obsolete')) AS is_public,
-          public_version.version_number AS public_version_number
+          COALESCE(phv."isPublic", sub."releaseStatus" IN ('released', 'obsolete')) AS "isPublic",
+          public_version."versionNumber" AS "publicVersionNumber"
         FROM (${query}) sub
         LEFT JOIN passport_history_visibility phv
-          ON phv.passport_dpp_id = sub.dpp_id
-         AND phv.version_number = sub.version_number
+          ON phv."passportDppId" = sub."dppId"
+         AND phv."versionNumber" = sub."versionNumber"
         LEFT JOIN LATERAL (
-          SELECT pa_public.version_number
+          SELECT pa_public."versionNumber"
           FROM passport_archives pa_public
           LEFT JOIN passport_history_visibility phv_public
-            ON phv_public.passport_dpp_id = pa_public.dpp_id
-           AND phv_public.version_number = pa_public.version_number
-          WHERE pa_public.lineage_id = sub.lineage_id
-            AND pa_public.company_id = sub.company_id
+            ON phv_public."passportDppId" = pa_public."dppId"
+           AND phv_public."versionNumber" = pa_public."versionNumber"
+          WHERE pa_public."lineageId" = sub."lineageId"
+            AND pa_public."companyId" = sub."companyId"
             AND ${ARCHIVED_HISTORY_FILTER_SQL.replaceAll("snapshot_reason", "pa_public.snapshot_reason")}
-            AND pa_public.release_status IN ('released', 'obsolete')
-            AND COALESCE(phv_public.is_public, true) = true
-          ORDER BY pa_public.version_number DESC, pa_public.archived_at DESC
+            AND pa_public."releaseStatus" IN ('released', 'obsolete')
+            AND COALESCE(phv_public."isPublic", true) = true
+          ORDER BY pa_public."versionNumber" DESC, pa_public."archivedAt" DESC
           LIMIT 1
         ) public_version ON true
-        ORDER BY sub.lineage_id, sub.version_number DESC, sub.archived_at DESC
+        ORDER BY sub."lineageId", sub."versionNumber" DESC, sub."archivedAt" DESC
       `;
 
       const result = await pool.query(query, params);
@@ -312,7 +312,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
          FROM passport_types
          WHERE type_name = $1
          LIMIT 1`,
-        [resolved.passport.passport_type || passportType]
+        [resolved.passport.passportType || passportType]
       );
       if (!typeDef.rows.length) {
         return res.status(404).json({ error: "Passport type not found" });

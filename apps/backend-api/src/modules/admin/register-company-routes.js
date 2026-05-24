@@ -377,26 +377,26 @@ module.exports = function registerCompanyRoutes(app, deps) {
       const userIds = userRes.rows.map((row) => row.id);
 
       const regRes = await client.query(
-        "SELECT dpp_id, passport_type FROM passport_registry WHERE company_id = $1", [companyId]
+        "SELECT \"dppId\", \"passportType\" FROM passport_registry WHERE \"companyId\" = $1", [companyId]
       );
-      passportDppIds = regRes.rows.map((row) => row.dppid || row.dpp_id);
-      const passportTypes = [...new Set(regRes.rows.map((row) => row.passport_type).filter(Boolean))];
+      passportDppIds = regRes.rows.map((row) => row.dppId);
+      const passportTypes = [...new Set(regRes.rows.map((row) => row.passportType).filter(Boolean))];
 
       if (passportDppIds.length) {
-        await client.query("DELETE FROM passport_dynamic_values WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_signatures WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_scan_events WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_workflow WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_security_events WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_edit_sessions WHERE passport_dpp_id = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM passport_dynamic_values WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM passport_signatures WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM passport_scan_events WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM passport_workflow WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM passport_security_events WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM passport_edit_sessions WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
       }
 
       for (const passportType of passportTypes) {
         const tableName = getTable(passportType);
-        await client.query(`DELETE FROM ${tableName} WHERE company_id = $1`, [companyId]);
+        await client.query(`DELETE FROM ${tableName} WHERE "companyId" = $1`, [companyId]);
       }
 
-      await client.query("DELETE FROM passport_registry WHERE company_id = $1", [companyId]);
+      await client.query("DELETE FROM passport_registry WHERE \"companyId\" = $1", [companyId]);
       await client.query("DELETE FROM invite_tokens WHERE company_id = $1", [companyId]);
       await client.query("DELETE FROM api_keys WHERE company_id = $1", [companyId]);
       const repoFiles = await client.query(
@@ -405,10 +405,10 @@ module.exports = function registerCompanyRoutes(app, deps) {
       );
       await client.query("DELETE FROM company_repository WHERE company_id = $1", [companyId]);
       await client.query("DELETE FROM company_passport_access WHERE company_id = $1", [companyId]);
-      await client.query("DELETE FROM passport_workflow WHERE company_id = $1", [companyId]);
+      await client.query("DELETE FROM passport_workflow WHERE \"companyId\" = $1", [companyId]);
 
       if (userIds.length) {
-        await client.query("DELETE FROM notifications WHERE user_id = ANY($1::int[])", [userIds]);
+        await client.query("DELETE FROM notifications WHERE \"userId\" = ANY($1::int[])", [userIds]);
         await client.query("DELETE FROM password_reset_tokens WHERE user_id = ANY($1::int[])", [userIds]);
       }
 

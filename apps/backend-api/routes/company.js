@@ -632,7 +632,7 @@ module.exports = function registerCompanyRoutes(app, {
               allVals
             );
             await pool.query(
-              `INSERT INTO passport_registry (dpp_id,lineage_id,company_id,passport_type) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+              `INSERT INTO passport_registry ("dppId","lineageId","companyId","passportType") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
               [newGuid, lineageId, companyId, resolvedPassportType]
             );
             details.push({ dppId: newGuid, internal_alias_id: normalizedProductId, model_name, status: "created" });
@@ -826,7 +826,7 @@ module.exports = function registerCompanyRoutes(app, {
               allVals
             );
             await pool.query(
-              `INSERT INTO passport_registry (dpp_id,lineage_id,company_id,passport_type) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+              `INSERT INTO passport_registry ("dppId","lineageId","companyId","passportType") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
               [newGuid, lineageId, companyId, resolvedPassportType]
             );
             details.push({ dppId: newGuid, internal_alias_id: normalizedProductId, model_name, status: "created" });
