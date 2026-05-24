@@ -114,20 +114,24 @@ module.exports = function registerCompanyRoutes(app, {
         [req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
-      res.json(r.rows[0]);
+      res.json({
+        id: r.rows[0].id,
+        companyName: r.rows[0].company_name || "",
+        companyLogo: r.rows[0].company_logo || null,
+      });
     } catch {res.status(500).json({ error: "Failed to fetch company profile" });}
   });
 
   app.post("/api/companies/:companyId/profile", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const { company_logo } = req.body;
+      const companyLogo = req.body?.companyLogo;
       await pool.query(
         `UPDATE companies
          SET company_logo = $1,
              updated_at = NOW()
          WHERE id = $2`,
         [
-        company_logo !== undefined ? company_logo : null,
+        companyLogo !== undefined ? companyLogo : null,
         req.params.companyId]
 
       );

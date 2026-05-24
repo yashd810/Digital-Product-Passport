@@ -31,7 +31,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       facts: [
         { label: "Best first stop", value: "Overview for activity, totals, and analytics snapshots" },
         { label: "Role-aware access", value: user?.role === "viewer" ? "You are currently read-only for passport content." : `${prettifyName(user?.role)} users can work directly in passport flows.` },
-        { label: "Current company", value: user?.company_name || (companyId ? `Company ${companyId}` : "Company assigned after login") },
+        { label: "Current company", value: user?.companyName || (companyId ? `Company ${companyId}` : "Company assigned after login") },
         { label: "Granted passport types", value: availableTypes.length ? availableTypes.join(", ") : "Passport types appear here after company access is granted" },
       ],
       journeys: [

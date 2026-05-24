@@ -13,6 +13,18 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     brandedEmail,
   } = deps;
 
+  function buildSuperAdminResponse(row = {}) {
+    return {
+      id: row.id,
+      email: row.email,
+      firstName: row.firstName ?? row.first_name ?? "",
+      lastName: row.lastName ?? row.last_name ?? "",
+      isActive: Boolean(row.isActive ?? row.is_active),
+      createdAt: row.createdAt ?? row.created_at ?? null,
+      lastLoginAt: row.lastLoginAt ?? row.last_login_at ?? null,
+    };
+  }
+
   app.get("/api/admin/super-admins", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const result = await pool.query(
@@ -20,7 +32,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
          FROM users WHERE role = 'super_admin'
          ORDER BY is_active DESC, created_at ASC`
       );
-      res.json(result.rows);
+      res.json(result.rows.map(buildSuperAdminResponse));
     } catch {
       res.status(500).json({ error: "Failed to fetch super admins" });
     }
@@ -134,7 +146,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
 
       res.json({
         success: true,
-        user: updated.rows[0],
+        user: buildSuperAdminResponse(updated.rows[0]),
         revokedCurrentSessionUser: !active && Number(userId) === Number(req.user.userId)
       });
     } catch (error) {

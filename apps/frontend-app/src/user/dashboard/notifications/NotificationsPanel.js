@@ -31,7 +31,7 @@ function timeAgo(dateStr) {
 function NotificationsPanel({ user }) {
   const navigate   = useNavigate();
   const notificationsPath = buildDashboardPath({
-    companyName: user?.company_name,
+    companyName: user?.companyName,
     subpath: "notifications",
   });
   const [open,     setOpen]     = useState(false);

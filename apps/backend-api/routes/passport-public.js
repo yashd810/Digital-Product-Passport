@@ -3,7 +3,6 @@
 const logger = require("../src/infrastructure/logging/logger");
 const { buildCanonicalIdentityBundle } = require("../src/shared/identifiers/canonical-identity-bundle");
 const { isPublicVersionVisible } = require("../src/modules/public-passports/visibility");
-const { addLegacyInternalAliasAliases } = require("../src/shared/passports/passport-helpers");
 const { rewriteRepositoryLinksForSignedAccessDeep } = require("../src/shared/repository/repository-file-links");
 
 module.exports = function registerPassportPublicRoutes(app, {
@@ -272,14 +271,14 @@ module.exports = function registerPassportPublicRoutes(app, {
       didService,
       productIdentifierService,
     });
-    return addLegacyInternalAliasAliases({
+    return {
       ...payload,
       digitalProductPassportId: payload?.digitalProductPassportId || identityBundle.digitalProductPassportId || null,
       uniqueProductIdentifier: payload?.uniqueProductIdentifier || identityBundle.uniqueProductIdentifier || null,
       subjectDid: payload?.subjectDid || identityBundle.subjectDid || null,
       dppDid: payload?.dppDid || identityBundle.dppDid || null,
       companyDid: payload?.companyDid || identityBundle.companyDid || null,
-    });
+    };
   }
 
   function buildPublicCompanyProfile(company) {
@@ -754,7 +753,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       };
       const requestedPayload = securePublicRepositoryLinks(buildRequestedPassportPayload(req, sanitizedPassport, typeDef, company));
 
-      const basePayload = addLegacyInternalAliasAliases({
+      const basePayload = {
         ...sanitizedPassport,
         digitalProductPassportId: canonicalPayload.digitalProductPassportId,
         uniqueProductIdentifier: canonicalPayload.uniqueProductIdentifier,
@@ -791,7 +790,7 @@ module.exports = function registerPassportPublicRoutes(app, {
                 : (sanitizedPassport.facilityId ? didService.generateFacilityDid(sanitizedPassport.facilityId) : null))
           }
         }
-      });
+      };
       delete basePayload.companyId;
 
       if (getRepresentation(req) === "full") {

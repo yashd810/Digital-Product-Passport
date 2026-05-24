@@ -73,13 +73,13 @@ function DashboardLayout({ user, companyId, onLogout }) {
   const isAdmin  = user?.role === "company_admin" || user?.role === "super_admin";
   const companySlug = resolveDashboardCompanySlug({
     companySlug: routeCompanySlug,
-    companyName: user?.company_name,
+    companyName: user?.companyName,
     companyId,
   });
   const dashboardPath = (subpath = "") => buildDashboardPath({ companySlug, subpath });
   const isDashboardSectionActive = (section) => location.pathname.startsWith(dashboardPath(section));
-  const displayName = user?.first_name ? `${user.first_name} ${user?.last_name || ""}`.trim() : user?.email;
-  const initials = `${(user?.first_name || "").trim().charAt(0)}${(user?.last_name || "").trim().charAt(0)}`.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "?";
+  const displayName = user?.firstName ? `${user.firstName} ${user?.lastName || ""}`.trim() : user?.email;
+  const initials = `${(user?.firstName || "").trim().charAt(0)}${(user?.lastName || "").trim().charAt(0)}`.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "?";
   const languageOptions = [
     { code: "en", label: "EN" },
     { code: "sv", label: "SV" },
@@ -122,7 +122,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
           <h1>Dashboard</h1>
           <div className="header-actions">
             <span className="user-info">
-              {user?.first_name ? `${user.first_name} ${user.last_name}` : user?.email}
+              {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}
             </span>
             <NotificationsPanel user={user} />
             {/* Theme toggle button in header */}
@@ -153,7 +153,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
               <div className="user-meta-row">
                 <span className={`role-chip role-${user?.role}`}>{roleLabel}</span>
-                <p className="user-company">{user?.company_name || "No company assigned"}</p>
+                <p className="user-company">{user?.companyName || "No company assigned"}</p>
               </div>
 
               <div className="setting-row sidebar-setting-row">
@@ -179,7 +179,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                   + Create Passport
                 </NavLink>
               )}
-              {isEditor && user?.asset_management_enabled && (
+              {isEditor && user?.assetManagementEnabled && (
                 <button
                   type="button"
                   className="sidebar-link sidebar-asset-btn"

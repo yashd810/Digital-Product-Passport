@@ -32,8 +32,8 @@ function CompanyProfile({ companyId, user }) {
       });
       if (r.ok) {
         const d = await r.json();
-        setLogoPreview(d.company_logo || null);
-        setCompanyName(d.company_name || "");
+        setLogoPreview(d.companyLogo || null);
+        setCompanyName(d.companyName || "");
       }
 
       if (isSuperAdminView) {
@@ -69,7 +69,7 @@ function CompanyProfile({ companyId, user }) {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
-          company_logo: logoPreview,
+          companyLogo: logoPreview,
         }),
       });
 

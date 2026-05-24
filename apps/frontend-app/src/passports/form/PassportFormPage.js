@@ -1395,7 +1395,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     ? activePassportType.charAt(0).toUpperCase() + activePassportType.slice(1)
     : "");
   const passportListPath = buildDashboardPath({
-    companyName: user?.company_name,
+    companyName: user?.companyName,
     companyId: effectiveCompanyId,
     subpath: `passports/${activePassportType}`,
   });

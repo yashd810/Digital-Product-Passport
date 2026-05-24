@@ -620,19 +620,19 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
   const { companySlug } = useParams();
   const templatesPath = buildDashboardPath({
     companySlug,
-    companyName: user?.company_name,
+    companyName: user?.companyName,
     companyId,
     subpath: "templates",
   });
   const newTemplatePath = buildDashboardPath({
     companySlug,
-    companyName: user?.company_name,
+    companyName: user?.companyName,
     companyId,
     subpath: "templates/new",
   });
   const templateEditPath = (templateId) => buildDashboardPath({
     companySlug,
-    companyName: user?.company_name,
+    companyName: user?.companyName,
     companyId,
     subpath: `templates/${templateId}/edit`,
   });

@@ -53,13 +53,42 @@ module.exports = function registerAuthRoutes(app, {
     return {
       id: row.id,
       email: row.email,
-      companyId: row.company_id,
+      companyId: row.companyId ?? row.company_id ?? null,
       role: row.role,
-      first_name: row.first_name,
-      last_name: row.last_name,
-      company_name: row.company_name || null,
-      asset_management_enabled: Boolean(row.asset_management_enabled),
+      firstName: row.firstName ?? row.first_name ?? "",
+      lastName: row.lastName ?? row.last_name ?? "",
+      companyName: row.companyName ?? row.company_name ?? null,
+      assetManagementEnabled: Boolean(row.assetManagementEnabled ?? row.asset_management_enabled),
+      avatarUrl: row.avatarUrl ?? row.avatar_url ?? null,
+      phone: row.phone ?? null,
+      jobTitle: row.jobTitle ?? row.job_title ?? null,
+      bio: row.bio ?? null,
+      authSource: row.authSource ?? row.auth_source ?? null,
+      ssoOnly: Boolean(row.ssoOnly ?? row.sso_only),
+      preferredLanguage: row.preferredLanguage ?? row.preferred_language ?? null,
+      defaultReviewerId: row.defaultReviewerId ?? row.default_reviewer_id ?? null,
+      defaultApproverId: row.defaultApproverId ?? row.default_approver_id ?? null,
+      createdAt: row.createdAt ?? row.created_at ?? null,
+      lastLoginAt: row.lastLoginAt ?? row.last_login_at ?? null,
+      twoFactorEnabled: Boolean(row.twoFactorEnabled ?? row.two_factor_enabled),
+      isActive: row.isActive ?? row.is_active ?? undefined,
+      sessionVersion: row.sessionVersion ?? row.session_version ?? undefined,
       ...buildAuthIdentityPayload(row),
+    };
+  }
+
+  function buildCompanyMemberResponse(row = {}) {
+    return {
+      id: row.id,
+      email: row.email,
+      firstName: row.firstName ?? row.first_name ?? "",
+      lastName: row.lastName ?? row.last_name ?? "",
+      role: row.role,
+      jobTitle: row.jobTitle ?? row.job_title ?? null,
+      avatarUrl: row.avatarUrl ?? row.avatar_url ?? null,
+      isActive: Boolean(row.isActive ?? row.is_active),
+      createdAt: row.createdAt ?? row.created_at ?? null,
+      passportCount: Number(row.passportCount ?? row.passport_count ?? 0),
     };
   }
 
@@ -545,10 +574,7 @@ module.exports = function registerAuthRoutes(app, {
         [req.user.userId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Not found" });
-      res.json({
-        ...r.rows[0],
-        ...buildAuthIdentityPayload(r.rows[0]),
-      });
+      res.json(buildAuthUserResponse(r.rows[0]));
     } catch { res.status(500).json({ error: "Failed" }); }
   });
 
@@ -566,13 +592,26 @@ module.exports = function registerAuthRoutes(app, {
 
   app.patch("/api/users/me", authenticateToken, async (req, res) => {
     try {
-      const allowed = ["first_name","last_name","phone","job_title","bio","avatar_url",
-                       "default_reviewer_id","default_approver_id","preferred_language"];
-      const fields = Object.keys(req.body).filter(k => allowed.includes(k));
-      if (!fields.length) return res.status(400).json({ error: "Nothing to update" });
-      const sets = fields.map((f, i) => `${f} = $${i + 1}`).join(", ");
-      const vals = fields.map(f => req.body[f] !== undefined ? req.body[f] : null);
-      await pool.query(`UPDATE users SET ${sets}, updated_at = NOW() WHERE id = $${fields.length + 1}`,
+      const fieldMap = new Map([
+        ["firstName", "first_name"],
+        ["lastName", "last_name"],
+        ["phone", "phone"],
+        ["jobTitle", "job_title"],
+        ["bio", "bio"],
+        ["avatarUrl", "avatar_url"],
+        ["defaultReviewerId", "default_reviewer_id"],
+        ["defaultApproverId", "default_approver_id"],
+        ["preferredLanguage", "preferred_language"],
+      ]);
+      const updates = [];
+      for (const [inputKey, columnName] of fieldMap.entries()) {
+        if (!Object.prototype.hasOwnProperty.call(req.body || {}, inputKey)) continue;
+        updates.push([columnName, req.body[inputKey] !== undefined ? req.body[inputKey] : null]);
+      }
+      if (!updates.length) return res.status(400).json({ error: "Nothing to update" });
+      const sets = updates.map(([columnName], i) => `${columnName} = $${i + 1}`).join(", ");
+      const vals = updates.map(([, value]) => value);
+      await pool.query(`UPDATE users SET ${sets}, updated_at = NOW() WHERE id = $${updates.length + 1}`,
         [...vals, req.user.userId]);
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: "Failed to update profile" }); }
@@ -593,7 +632,7 @@ module.exports = function registerAuthRoutes(app, {
         "UPDATE users SET two_factor_enabled = $1, updated_at = NOW() WHERE id = $2",
         [enable, req.user.userId]
       );
-      res.json({ success: true, two_factor_enabled: enable });
+      res.json({ success: true, twoFactorEnabled: enable });
     } catch (e) { logger.error("2FA toggle error:", e.message); res.status(500).json({ error: "Failed to update 2FA setting" }); }
   });
 
@@ -638,7 +677,7 @@ module.exports = function registerAuthRoutes(app, {
          ORDER BY u.role, u.first_name`,
         [req.params.companyId]
       );
-      res.json(r.rows);
+      res.json(r.rows.map(buildCompanyMemberResponse));
     } catch (e) { res.status(500).json({ error: "Failed" }); }
   });
 

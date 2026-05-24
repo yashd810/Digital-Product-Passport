@@ -21,10 +21,10 @@ function OAuthCallback({ setToken, setUser, setCompanyId }) {
         if (!response.ok) throw new Error(data.error || "SSO session could not be established");
 
         localStorage.setItem("user", JSON.stringify(data));
-        localStorage.setItem("companyId", data.company_id || "");
+        localStorage.setItem("companyId", data.companyId || "");
         setToken(true);
         setUser(data);
-        setCompanyId(data.company_id || "");
+        setCompanyId(data.companyId || "");
         navigate(next, { replace: true });
       } catch (err) {
         setError(err.message || "SSO login failed");

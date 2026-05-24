@@ -140,7 +140,7 @@ export function usePassportListActions({
 
         const qrCanvas = document.createElement("canvas");
         const passportPath = buildPublicPassportPath({
-          companyName: user?.company_name,
+          companyName: user?.companyName,
           modelName: passport.modelName,
           internalAliasId: passport.internalAliasId,
         });
@@ -186,7 +186,7 @@ export function usePassportListActions({
     } finally {
       setQrExporting(false);
     }
-  }, [activeType, selectedPassportList, setPrintQrModalOpen, setQrExporting, showError, showSuccess, user?.company_name]);
+  }, [activeType, selectedPassportList, setPrintQrModalOpen, setQrExporting, showError, showSuccess, user?.companyName]);
 
   const bulkRelease = useCallback(async () => {
     if (!selectedPassportList.length) return;

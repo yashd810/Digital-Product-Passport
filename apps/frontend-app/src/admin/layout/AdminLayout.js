@@ -6,8 +6,8 @@ import "../styles/AdminDashboard.css";
 function AdminLayout({ user, onLogout }) {
   const navigate = useNavigate();
   const [currentTheme, setCurrentTheme] = useState(() => getStoredTheme(user?.id));
-  const displayName = user?.first_name
-    ? `${user.first_name} ${user?.last_name || ""}`.trim()
+  const displayName = user?.firstName
+    ? `${user.firstName} ${user?.lastName || ""}`.trim()
     : user?.email;
 
   useEffect(() => {

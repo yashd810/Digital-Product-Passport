@@ -70,7 +70,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
   const { companySlug, passportType } = useParams();
   const passportListPath = buildDashboardPath({
     companySlug,
-    companyName: user?.company_name,
+    companyName: user?.companyName,
     companyId,
     subpath: `passports/${passportType}`,
   });

@@ -79,7 +79,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     const normalizedStatus = normalizePassportStatus(passport.releaseStatus);
     if (!forcePreview && normalizedStatus === "released" && passport.internalAliasId) {
       return buildPublicPassportPath({
-        companyName: user?.company_name,
+        companyName: user?.companyName,
         modelName: passport.modelName,
         internalAliasId: passport.internalAliasId,
       });
@@ -87,7 +87,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
 
     if (!forcePreview && isObsoletePassportStatus(normalizedStatus) && passport.internalAliasId && passport.versionNumber != null) {
       return buildInactivePassportPath({
-        companyName: user?.company_name,
+        companyName: user?.companyName,
         modelName: passport.modelName,
         internalAliasId: passport.internalAliasId,
         versionNumber: passport.versionNumber,
@@ -95,12 +95,12 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     }
 
     return buildPreviewPassportPath({
-      companyName: user?.company_name,
+      companyName: user?.companyName,
       modelName: passport.modelName,
       internalAliasId: passport.internalAliasId,
       previewId: passport.dppId,
     });
-  }, [user?.company_name]);
+  }, [user?.companyName]);
 
   const openPassportViewer = useCallback((passport, options = {}) => {
     const path = getViewerPath(passport, options);

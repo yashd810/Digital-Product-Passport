@@ -145,7 +145,7 @@ export function PassportListRow({
             passport={passport}
             pType={pType}
             isPinned={isPinned}
-            companyName={user?.company_name}
+            companyName={user?.companyName}
             companyId={companyId}
             navigate={navigate}
             openPassportViewer={openPassportViewer}

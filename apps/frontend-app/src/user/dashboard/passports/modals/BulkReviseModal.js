@@ -51,8 +51,8 @@ export function BulkReviseModal({
     fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data?.default_reviewer_id) setReviewerId(String(data.default_reviewer_id));
-        if (data?.default_approver_id) setApproverId(String(data.default_approver_id));
+        if (data?.defaultReviewerId) setReviewerId(String(data.defaultReviewerId));
+        if (data?.defaultApproverId) setApproverId(String(data.defaultApproverId));
       })
       .catch(() => {});
   }, [companyId, user?.id]);

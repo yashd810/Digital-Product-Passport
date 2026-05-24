@@ -206,8 +206,8 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
     .then(r => r.json())
     .then(d => {
-      if (d.default_reviewer_id) setReviewerId(String(d.default_reviewer_id));
-      if (d.default_approver_id) setApproverId(String(d.default_approver_id));
+      if (d.defaultReviewerId) setReviewerId(String(d.defaultReviewerId));
+      if (d.defaultApproverId) setApproverId(String(d.defaultApproverId));
     })
     .catch(() => {});
   }, [companyId, user?.id]);
@@ -556,19 +556,19 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     const normalizedStatus = normalizePassportStatus(getWorkflowReleaseStatus(wf));
     const path = normalizedStatus === "released" && getWorkflowInternalAliasId(wf)
       ? buildPublicPassportPath({
-          companyName: user?.company_name,
+          companyName: user?.companyName,
           modelName: getWorkflowModelName(wf),
           internalAliasId: getWorkflowInternalAliasId(wf),
         })
       : isObsoletePassportStatus(normalizedStatus) && getWorkflowInternalAliasId(wf) && getWorkflowVersionNumber(wf) != null
         ? buildInactivePassportPath({
-            companyName: user?.company_name,
+            companyName: user?.companyName,
             modelName: getWorkflowModelName(wf),
             internalAliasId: getWorkflowInternalAliasId(wf),
             versionNumber: getWorkflowVersionNumber(wf),
           })
       : buildPreviewPassportPath({
-          companyName: user?.company_name,
+          companyName: user?.companyName,
           modelName: getWorkflowModelName(wf),
           internalAliasId: getWorkflowInternalAliasId(wf),
           previewId: workflowPassportId,
@@ -683,7 +683,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
           <NavLink key={t.id}
             to={buildDashboardPath({
               companySlug,
-              companyName: user?.company_name,
+              companyName: user?.companyName,
               companyId,
               subpath: `workflow/${t.id}`,
             })}

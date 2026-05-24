@@ -46,10 +46,10 @@ function Login({ setToken, setUser, setCompanyId }) {
   const finishLogin = (data) => {
     // Save user info and company ID; authenticated browser requests use the httpOnly session cookie
     localStorage.setItem("user", JSON.stringify(data.user));
-    localStorage.setItem("companyId", data.user.companyId || data.user.company_id || "");
+    localStorage.setItem("companyId", data.user.companyId || "");
     setToken(true);
     setUser(data.user);
-    setCompanyId(data.user.companyId || data.user.company_id || "");
+    setCompanyId(data.user.companyId || "");
     if (data.user.role === "super_admin") navigate("/admin");
     else navigate("/dashboard");
   };

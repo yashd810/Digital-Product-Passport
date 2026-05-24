@@ -5,7 +5,7 @@ const batteryDictionaryTerms = require("../resources/semantics/battery/v1/terms.
 const batteryCategoryRules = require("../resources/semantics/battery/v1/category-rules.json");
 const { buildCarrierAuthenticityResponseFields } = require("../helpers/carrier-authenticity");
 const { buildCanonicalIdentityBundle } = require("../src/shared/identifiers/canonical-identity-bundle");
-const { getPassportFieldValue, addLegacyInternalAliasAliases } = require("../src/shared/passports/passport-helpers");
+const { getPassportFieldValue } = require("../src/shared/passports/passport-helpers");
 const {
   BATTERY_DICTIONARY_MODEL_KEY,
   shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
@@ -1088,7 +1088,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       }
     }
 
-    return addLegacyInternalAliasAliases({
+    return {
       digitalProductPassportId,
       uniqueProductIdentifier,
       internalAliasId,
@@ -1107,7 +1107,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       companyDid,
       fields,
       ...(extensions ? { extensions } : {}),
-    });
+    };
   }
 
   function buildExpandedPassportPayload(passport, typeDef, options = {}) {

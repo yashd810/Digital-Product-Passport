@@ -156,7 +156,7 @@ export default function CreateHub({ user, companyId }) {
   const [searchParams] = useSearchParams();
   const preselectedType = searchParams.get("type");
   const dashboardPath = (subpath = "") => buildDashboardPath({
-    companyName: user?.company_name,
+    companyName: user?.companyName,
     companyId,
     subpath,
   });

@@ -218,10 +218,6 @@ const collectRequestedInternalAliasIds = (body = {}) => {
   return [];
 };
 
-const addLegacyInternalAliasAliases = (payload) => {
-  return payload;
-};
-
 const generateInternalAliasIdValue = (dppId) =>
   String(dppId || "").trim();
 
@@ -353,15 +349,15 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
 
   for (const company of matchingCompanies) {
     const registryRows = await pool.query(
-      `SELECT dpp_id AS "dppId", passport_type
+      `SELECT "dppId", "passportType"
        FROM passport_registry
-       WHERE company_id = $1
-       ORDER BY created_at DESC`,
+       WHERE "companyId" = $1
+       ORDER BY "createdAt" DESC`,
       [company.id]
     );
 
     for (const registryRow of registryRows.rows) {
-      const tableName = getTable(registryRow.passport_type);
+      const tableName = getTable(registryRow.passportType);
       try {
         const params = [company.id, internalAliasId];
         let versionClause = "";
@@ -398,7 +394,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
         const subjectNamespace = didService.normalizePassportTypeSegment(company.company_name || company.did_slug || "battery");
         return {
           passportDppId: passport.dppId,
-          passportType: registryRow.passport_type,
+          passportType: registryRow.passportType,
           companyId: company.id,
           productDid: granularity === "item"
             ? didService.generateItemDid(subjectNamespace, stableId)
@@ -615,7 +611,6 @@ module.exports = {
   normalizePassportRequestBody,
   normalizeInternalAliasIdValue,
   collectRequestedInternalAliasIds,
-  addLegacyInternalAliasAliases,
   generateInternalAliasIdValue,
   extractExplicitFacilityId,
   getWritablePassportColumns,

@@ -37,7 +37,7 @@ function humanizeOption(value, options) {
 }
 
 function SecurityCenter({ user, companyId }) {
-  const resolvedCompanyId = companyId || user?.companyId || user?.company_id || "";
+  const resolvedCompanyId = companyId || user?.companyId || "";
   const canManageCompanyKeys = user?.role === "company_admin" || user?.role === "super_admin";
 
   const [message, setMessage] = useState({ type: "", text: "" });

@@ -26,17 +26,11 @@ export function useSessionAuth() {
         const sessionUser = await response.json();
         if (cancelled) return;
 
-        const normalizedUser = {
-          ...sessionUser,
-          companyId: sessionUser.company_id,
-          company_name: sessionUser.company_name,
-        };
-
         setToken(true);
-        setUser(normalizedUser);
-        setCompanyId(sessionUser.company_id || "");
-        localStorage.setItem("user", JSON.stringify(normalizedUser));
-        localStorage.setItem("companyId", sessionUser.company_id || "");
+        setUser(sessionUser);
+        setCompanyId(sessionUser.companyId || "");
+        localStorage.setItem("user", JSON.stringify(sessionUser));
+        localStorage.setItem("companyId", sessionUser.companyId || "");
       } catch {
         clearTimeout(timeout);
         if (cancelled) return;

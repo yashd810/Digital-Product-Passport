@@ -25,7 +25,7 @@ function ManageTeam({ user, companyId }) {
   const [editingId,    setEditingId]    = useState(null);
   const [editRole,     setEditRole]     = useState("");
   const [msg,          setMsg]          = useState({ type:"", text:"" });
-  const [sortConfig,   setSortConfig]   = useState({ key: "created_at", direction: "desc" });
+  const [sortConfig,   setSortConfig]   = useState({ key: "createdAt", direction: "desc" });
   const [columnFilters,setColumnFilters]= useState({});
   const [showFilters,  setShowFilters]  = useState(false);
   const alertRef = useRef(null);
@@ -33,10 +33,10 @@ function ManageTeam({ user, companyId }) {
   const isAdmin = user?.role === "company_admin" || user?.role === "super_admin";
 
   const teamColumns = useMemo(() => ([
-    { key: "member", type: "string", getValue: (m) => `${m.first_name || ""} ${m.last_name || ""} ${m.email || ""}`.trim() },
+    { key: "member", type: "string", getValue: (m) => `${m.firstName || ""} ${m.lastName || ""} ${m.email || ""}`.trim() },
     { key: "role", type: "string", getValue: (m) => m.role || "" },
-    { key: "passport_count", type: "number", getValue: (m) => m.passport_count || 0 },
-    { key: "created_at", type: "date", getValue: (m) => m.created_at },
+    { key: "passportCount", type: "number", getValue: (m) => m.passportCount || 0 },
+    { key: "createdAt", type: "date", getValue: (m) => m.createdAt },
   ]), []);
 
   const filteredMembers = useMemo(
@@ -59,8 +59,8 @@ function ManageTeam({ user, companyId }) {
       });
       if (!r.ok) throw new Error();
       const data = await r.json();
-      setMembers(data.filter(u => u.is_active === true));
-      setPending(data.filter(u => u.is_active === false));
+      setMembers(data.filter(u => u.isActive === true));
+      setPending(data.filter(u => u.isActive === false));
     } catch (e) { console.error("Failed to load team members:", e); }
     finally { setLoading(false); }
   };
@@ -210,15 +210,15 @@ function ManageTeam({ user, companyId }) {
               <tr>
                 <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("member")}>Member{sortIndicator(sortConfig, "member") && ` ${sortIndicator(sortConfig, "member")}`}</button></th>
                 <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("role")}>Role{sortIndicator(sortConfig, "role") && ` ${sortIndicator(sortConfig, "role")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("passport_count")}>Passports{sortIndicator(sortConfig, "passport_count") && ` ${sortIndicator(sortConfig, "passport_count")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("created_at")}>Joined{sortIndicator(sortConfig, "created_at") && ` ${sortIndicator(sortConfig, "created_at")}`}</button></th>
+                <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("passportCount")}>Passports{sortIndicator(sortConfig, "passportCount") && ` ${sortIndicator(sortConfig, "passportCount")}`}</button></th>
+                <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("createdAt")}>Joined{sortIndicator(sortConfig, "createdAt") && ` ${sortIndicator(sortConfig, "createdAt")}`}</button></th>
                 {isAdmin && <th>Actions</th>}
               </tr>
               {showFilters && <tr className="table-filter-row">
                 <th><input className="table-filter-input" value={columnFilters.member || ""} onChange={e => setColumnFilters(prev => ({ ...prev, member: e.target.value }))} placeholder="Filter" /></th>
                 <th><input className="table-filter-input" value={columnFilters.role || ""} onChange={e => setColumnFilters(prev => ({ ...prev, role: e.target.value }))} placeholder="Filter" /></th>
-                <th><input className="table-filter-input" value={columnFilters.passport_count || ""} onChange={e => setColumnFilters(prev => ({ ...prev, passport_count: e.target.value }))} placeholder="Filter" /></th>
-                <th><input className="table-filter-input" value={columnFilters.created_at || ""} onChange={e => setColumnFilters(prev => ({ ...prev, created_at: e.target.value }))} placeholder="Filter" /></th>
+                <th><input className="table-filter-input" value={columnFilters.passportCount || ""} onChange={e => setColumnFilters(prev => ({ ...prev, passportCount: e.target.value }))} placeholder="Filter" /></th>
+                <th><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={e => setColumnFilters(prev => ({ ...prev, createdAt: e.target.value }))} placeholder="Filter" /></th>
                 {isAdmin && <th></th>}
               </tr>}
             </thead>
@@ -233,16 +233,16 @@ function ManageTeam({ user, companyId }) {
                         <div className="member-avatar">
                           {m.avatar_url
                             ? <img src={m.avatar_url} alt="" />
-                            : <span>{(m.first_name?.[0] || "?").toUpperCase()}</span>
+                            : <span>{(m.firstName?.[0] || "?").toUpperCase()}</span>
                           }
                         </div>
                         <div>
                           <div className="member-name">
-                            {m.first_name} {m.last_name}
+                            {m.firstName} {m.lastName}
                             {isSelf && <span className="you-tag">You</span>}
                           </div>
                           <div className="member-email">{m.email}</div>
-                          {m.job_title && <div className="member-title">{m.job_title}</div>}
+                          {m.jobTitle && <div className="member-title">{m.jobTitle}</div>}
                         </div>
                       </div>
                     </td>
@@ -269,13 +269,13 @@ function ManageTeam({ user, companyId }) {
                         </div>
                       )}
                     </td>
-                    <td>{m.passport_count || 0}</td>
-                    <td>{new Date(m.created_at).toLocaleDateString()}</td>
+                    <td>{m.passportCount || 0}</td>
+                    <td>{new Date(m.createdAt).toLocaleDateString()}</td>
                     {isAdmin && (
                       <td>
                         {!isSelf && !isSuperAdmin && (
                           <button className="btn-deactivate"
-                            onClick={() => handleDeactivate(m.id, `${m.first_name} ${m.last_name}`)}>
+                            onClick={() => handleDeactivate(m.id, `${m.firstName} ${m.lastName}`)}>
                             Deactivate
                           </button>
                         )}

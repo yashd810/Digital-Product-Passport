@@ -50,14 +50,14 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
       if (!r.ok) throw new Error();
       const d = await r.json();
       setProfile(d);
-      setFirstName(d.first_name || "");
-      setLastName(d.last_name || "");
+      setFirstName(d.firstName || "");
+      setLastName(d.lastName || "");
       setPhone(d.phone || "");
-      setJobTitle(d.job_title || "");
+      setJobTitle(d.jobTitle || "");
       setBio(d.bio || "");
-      setDefReviewer(d.default_reviewer_id ? String(d.default_reviewer_id) : "");
-      setDefApprover(d.default_approver_id ? String(d.default_approver_id) : "");
-      setTwoFaEnabled(!!d.two_factor_enabled);
+      setDefReviewer(d.defaultReviewerId ? String(d.defaultReviewerId) : "");
+      setDefApprover(d.defaultApproverId ? String(d.defaultApproverId) : "");
+      setTwoFaEnabled(!!d.twoFactorEnabled);
     } catch { }
     finally { setLoading(false); }
   };
@@ -91,10 +91,13 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
     setSaving(true);
     try {
       const body = {
-        first_name: firstName, last_name: lastName,
-        phone, job_title: jobTitle, bio,
-        default_reviewer_id: defReviewer ? parseInt(defReviewer) : null,
-        default_approver_id: defApprover ? parseInt(defApprover) : null,
+        firstName,
+        lastName,
+        phone,
+        jobTitle,
+        bio,
+        defaultReviewerId: defReviewer ? parseInt(defReviewer) : null,
+        defaultApproverId: defApprover ? parseInt(defApprover) : null,
       };
       const r = await fetchWithAuth(`${API}/api/users/me`, {
         method: "PATCH",
@@ -103,7 +106,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
       });
       if (!r.ok) throw new Error("Failed to save");
       flash("success", "Profile updated!");
-      if (onUserUpdate) onUserUpdate({ ...user, first_name: firstName, last_name: lastName });
+      if (onUserUpdate) onUserUpdate({ ...user, firstName, lastName });
     } catch (err) {
       flash("error", err.message);
     } finally {
@@ -158,11 +161,11 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed");
-      setTwoFaEnabled(data.two_factor_enabled);
+      setTwoFaEnabled(data.twoFactorEnabled);
       setTwoFaPassword("");
       flash(
         "success",
-        data.two_factor_enabled
+        data.twoFactorEnabled
           ? "Two-factor authentication enabled successfully."
           : "Two-factor authentication disabled successfully."
       );
@@ -242,7 +245,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
                         <option value="">— None —</option>
                         {teamUsers.filter(u => u.id !== user?.id).map(u => (
                           <option key={u.id} value={u.id}>
-                            {u.first_name} {u.last_name} ({u.email})
+                            {u.firstName} {u.lastName} ({u.email})
                           </option>
                         ))}
                       </select>
@@ -254,7 +257,7 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
                         <option value="">— None —</option>
                         {teamUsers.filter(u => u.id !== user?.id).map(u => (
                           <option key={u.id} value={u.id}>
-                            {u.first_name} {u.last_name} ({u.email})
+                            {u.firstName} {u.lastName} ({u.email})
                           </option>
                         ))}
                       </select>
@@ -345,18 +348,18 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
             <h4 className="card-section-title">ℹ️ Account Info</h4>
             <div className="info-grid">
               <div className="info-row"><span>Email</span><strong>{user?.email}</strong></div>
-              <div className="info-row"><span>Company</span><strong>{user?.company_name}</strong></div>
+              <div className="info-row"><span>Company</span><strong>{user?.companyName}</strong></div>
               <div className="info-row"><span>Role</span>
                 <span className={`role-chip role-${profile?.role}`}>
                   {profile?.role?.replace("_", " ")}
                 </span>
               </div>
               <div className="info-row"><span>Member since</span>
-                <strong>{profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : "—"}</strong>
+                <strong>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "—"}</strong>
               </div>
-              {profile?.last_login_at && (
+              {profile?.lastLoginAt && (
                 <div className="info-row"><span>Last login</span>
-                  <strong>{new Date(profile.last_login_at).toLocaleString()}</strong>
+                  <strong>{new Date(profile.lastLoginAt).toLocaleString()}</strong>
                 </div>
               )}
             </div>

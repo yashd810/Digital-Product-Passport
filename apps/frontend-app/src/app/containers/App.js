@@ -85,7 +85,7 @@ function DashboardLegacyRedirect({ user, companyId }) {
   return (
     <Navigate
       to={`${buildDashboardPath({
-        companyName: user?.company_name,
+        companyName: user?.companyName,
         companyId,
         subpath,
       })}${location.search || ""}`}

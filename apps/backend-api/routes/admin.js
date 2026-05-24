@@ -32,8 +32,8 @@ const COMPANY_POLICY_BOOL_FIELDS = [
 
 const COMPANY_TRUST_LEVELS = new Set(["BASIC", "VERIFIED_BUSINESS", "ENTERPRISE"]);
 
-const ARCHIVED_HISTORY_REASON_SQL = `('before_archive_delete','before_bulk_archive_delete')`;
-const ARCHIVED_HISTORY_FILTER_SQL = `(snapshot_reason IS NULL OR snapshot_reason IN ${ARCHIVED_HISTORY_REASON_SQL})`;
+const ARCHIVED_HISTORY_REASON_SQL = `('before_archive_delete','before_bulk_archive_delete','before_delete','before_bulk_delete')`;
+const ARCHIVED_HISTORY_FILTER_SQL = `(snapshot_reason IN ${ARCHIVED_HISTORY_REASON_SQL})`;
 
 
 const RESERVED_PASSPORT_FIELD_KEYS = [

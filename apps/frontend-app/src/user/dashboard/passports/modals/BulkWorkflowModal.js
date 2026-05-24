@@ -29,8 +29,8 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
     fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => {
-        if (d.default_reviewer_id) setReviewerId(String(d.default_reviewer_id));
-        if (d.default_approver_id) setApproverId(String(d.default_approver_id));
+        if (d.defaultReviewerId) setReviewerId(String(d.defaultReviewerId));
+        if (d.defaultApproverId) setApproverId(String(d.defaultApproverId));
       })
       .catch(() => {});
   }, [companyId, user?.id]);

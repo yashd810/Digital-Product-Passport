@@ -22,9 +22,9 @@ function AdminSecurity({ user }) {
 
   const adminColumns = useMemo(() => ([
     { key: "email", type: "string", getValue: (admin) => admin.email || "" },
-    { key: "name", type: "string", getValue: (admin) => [admin.first_name, admin.last_name].filter(Boolean).join(" ") || "" },
-    { key: "status", type: "string", getValue: (admin) => admin.is_active ? "active" : "revoked" },
-    { key: "last_login_at", type: "date", getValue: (admin) => admin.last_login_at || "" },
+    { key: "name", type: "string", getValue: (admin) => [admin.firstName, admin.lastName].filter(Boolean).join(" ") || "" },
+    { key: "status", type: "string", getValue: (admin) => admin.isActive ? "active" : "revoked" },
+    { key: "lastLoginAt", type: "date", getValue: (admin) => admin.lastLoginAt || "" },
   ]), []);
 
   const filteredAdmins = useMemo(
@@ -105,7 +105,7 @@ function AdminSecurity({ user }) {
   const confirmToggleAccess = async () => {
     if (!accessTarget) return;
     const admin = accessTarget;
-    const nextActive = !admin.is_active;
+    const nextActive = !admin.isActive;
 
     try {
       setTogglingId(admin.id);
@@ -192,7 +192,7 @@ function AdminSecurity({ user }) {
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("email")}>Email{sortIndicator(sortConfig, "email") && ` ${sortIndicator(sortConfig, "email")}`}</button></th>
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("name")}>Name{sortIndicator(sortConfig, "name") && ` ${sortIndicator(sortConfig, "name")}`}</button></th>
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("status")}>Status{sortIndicator(sortConfig, "status") && ` ${sortIndicator(sortConfig, "status")}`}</button></th>
-                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("last_login_at")}>Last Login{sortIndicator(sortConfig, "last_login_at") && ` ${sortIndicator(sortConfig, "last_login_at")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("lastLoginAt")}>Last Login{sortIndicator(sortConfig, "lastLoginAt") && ` ${sortIndicator(sortConfig, "lastLoginAt")}`}</button></th>
                   <th>Actions</th>
                 </tr>
                 {showFilters && (
@@ -200,7 +200,7 @@ function AdminSecurity({ user }) {
                     <th><input className="table-filter-input" value={columnFilters.email || ""} onChange={(e) => setColumnFilters((prev) => ({ ...prev, email: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.name || ""} onChange={(e) => setColumnFilters((prev) => ({ ...prev, name: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.status || ""} onChange={(e) => setColumnFilters((prev) => ({ ...prev, status: e.target.value }))} placeholder="Filter" /></th>
-                    <th><input className="table-filter-input" value={columnFilters.last_login_at || ""} onChange={(e) => setColumnFilters((prev) => ({ ...prev, last_login_at: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={columnFilters.lastLoginAt || ""} onChange={(e) => setColumnFilters((prev) => ({ ...prev, lastLoginAt: e.target.value }))} placeholder="Filter" /></th>
                     <th></th>
                   </tr>
                 )}
@@ -210,25 +210,25 @@ function AdminSecurity({ user }) {
                   <tr key={admin.id}>
                     <td className="name-cell">{admin.email}</td>
                     <td className="date-cell">
-                      {[admin.first_name, admin.last_name].filter(Boolean).join(" ") || "—"}
+                      {[admin.firstName, admin.lastName].filter(Boolean).join(" ") || "—"}
                     </td>
                     <td>
-                      <span className={`admin-role-pill ${admin.is_active ? "active" : "inactive"}`}>
-                        {admin.is_active ? "Active" : "Revoked"}
+                      <span className={`admin-role-pill ${admin.isActive ? "active" : "inactive"}`}>
+                        {admin.isActive ? "Active" : "Revoked"}
                       </span>
                     </td>
                     <td className="date-cell">
-                      {admin.last_login_at ? new Date(admin.last_login_at).toLocaleString() : "Never"}
+                      {admin.lastLoginAt ? new Date(admin.lastLoginAt).toLocaleString() : "Never"}
                     </td>
                     <td className="actions-cell">
                       <button
-                        className={`manage-btn ${admin.is_active ? "manage-btn-danger" : ""}`}
+                        className={`manage-btn ${admin.isActive ? "manage-btn-danger" : ""}`}
                         onClick={() => handleToggleAccess(admin)}
                         disabled={togglingId === admin.id}
                       >
                         {togglingId === admin.id
                           ? "Updating…"
-                          : admin.is_active
+                          : admin.isActive
                             ? "🚫 Revoke Access"
                             : "✅ Restore Access"}
                       </button>
@@ -245,10 +245,10 @@ function AdminSecurity({ user }) {
         <div className="apt-modal-overlay" onClick={() => togglingId ? null : setAccessTarget(null)}>
           <div className="apt-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="apt-modal-title">
-              {accessTarget.is_active ? "Revoke Super Admin Access" : "Restore Super Admin Access"}
+              {accessTarget.isActive ? "Revoke Super Admin Access" : "Restore Super Admin Access"}
             </h3>
             <p className="apt-modal-warning">
-              {accessTarget.is_active ? (
+              {accessTarget.isActive ? (
                 <>
                   ⚠️ Are you sure you want to revoke access for <strong>{accessTarget.email}</strong>?
                 </>
@@ -269,13 +269,13 @@ function AdminSecurity({ user }) {
               </button>
               <button
                 type="button"
-                className={`manage-btn ${accessTarget.is_active ? "manage-btn-danger" : "manage-btn-access"}`}
+                className={`manage-btn ${accessTarget.isActive ? "manage-btn-danger" : "manage-btn-access"}`}
                 onClick={confirmToggleAccess}
                 disabled={togglingId === accessTarget.id}
               >
                 {togglingId === accessTarget.id
                   ? "Updating…"
-                  : accessTarget.is_active
+                  : accessTarget.isActive
                     ? "Revoke Access"
                     : "Restore Access"}
               </button>
