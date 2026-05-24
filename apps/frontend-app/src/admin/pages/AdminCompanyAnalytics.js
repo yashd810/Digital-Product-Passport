@@ -24,22 +24,22 @@ function normalizeAdminAnalyticsPayload(payload) {
   const analyticsRows = Array.isArray(payload?.analytics)
     ? payload.analytics.map((item) => ({
         ...item,
-        passportType: item.passportType || item.passportType || "",
-        displayName: item.displayName || item.display_name || "",
-        draftCount: item.draftCount ?? item.draft_count ?? 0,
-        inReviewCount: item.inReviewCount ?? item.in_review_count ?? 0,
-        releasedCount: item.releasedCount ?? item.released_count ?? 0,
-        revisedCount: item.revisedCount ?? item.revised_count ?? 0,
-        obsoleteCount: item.obsoleteCount ?? item.obsolete_count ?? 0,
+        passportType: item.passportType || "",
+        displayName: item.displayName || "",
+        draftCount: item.draftCount ?? 0,
+        inReviewCount: item.inReviewCount ?? 0,
+        releasedCount: item.releasedCount ?? 0,
+        revisedCount: item.revisedCount ?? 0,
+        obsoleteCount: item.obsoleteCount ?? 0,
       }))
     : [];
 
   const users = Array.isArray(payload?.users)
     ? payload.users.map((user) => ({
         ...user,
-        firstName: user.firstName || user.first_name || "",
-        lastName: user.lastName || user.last_name || "",
-        lastLoginAt: user.lastLoginAt || user.last_login_at || "",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        lastLoginAt: user.lastLoginAt || "",
       }))
     : [];
 
@@ -226,8 +226,8 @@ function LineChart({ labels, series }) {
               <div key={index} className="olt-row">
                 <span className="olt-swatch" style={{ background: color }} />
                 <span className="olt-name">
-                  {item.product_icon ? `${item.product_icon} ` : ""}
-                  {item.product_category}
+                  {item.productIcon ? `${item.productIcon} ` : ""}
+                  {item.productCategory}
                 </span>
                 <span className="olt-val">{value}</span>
               </div>
@@ -244,8 +244,8 @@ function LineChart({ labels, series }) {
               style={{ backgroundColor: item.color || OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length] }}
             />
             <span className="overview-line-legend-name">
-              {item.product_icon ? `${item.product_icon} ` : ""}
-              {item.product_category}
+              {item.productIcon ? `${item.productIcon} ` : ""}
+              {item.productCategory}
             </span>
           </div>
         ))}
@@ -284,7 +284,7 @@ function AdminCompanyAnalytics() {
       fetchWithAuth(`${API}/api/admin/companies`, { headers: authHeaders() })
         .then(r => r.json())
         .then(companies => {
-          const found = companies.find(c => slugify(c.company_name) === companySlug);
+          const found = companies.find(c => slugify(c.companyName) === companySlug);
           if (found) setCompanyId(found.id);
           else setError("Company not found");
         })
@@ -346,7 +346,7 @@ function AdminCompanyAnalytics() {
       setMsg({ type: "", text: "" });
 
       const now = new Date();
-      const companyName = data.company?.company_name || `Company ${companyId}`;
+      const companyName = data.company?.companyName || `Company ${companyId}`;
       const sumField = (field) => data.analytics?.reduce((sum, item) => sum + parseInt(item[field] || 0, 10), 0) || 0;
       const totalDraft = sumField("draftCount");
       const totalReleased = sumField("releasedCount");
@@ -403,7 +403,7 @@ function AdminCompanyAnalytics() {
               ? renderLineChartSvg(data.trend.labels, trendSeries, { width: 420, height: 220 })
               : "",
             legendItems: trendSeries.map((item) => ({
-              label: `${item.product_icon ? `${item.product_icon} ` : ""}${item.product_category}`,
+              label: `${item.productIcon ? `${item.productIcon} ` : ""}${item.productCategory}`,
               color: item.color,
             })),
             emptyText: "No trend data yet",
@@ -512,7 +512,7 @@ function AdminCompanyAnalytics() {
         </button>
         <div className="aca-header-main">
           <div>
-            <h2 className="aca-title">📊 {data.company?.company_name || "Company"} Analytics</h2>
+            <h2 className="aca-title">📊 {data.company?.companyName || "Company"} Analytics</h2>
             <p className="aca-subtitle">Company-specific passport statistics, trends, and exportable reporting.</p>
           </div>
           <button

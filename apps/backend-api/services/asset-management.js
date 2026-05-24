@@ -89,8 +89,8 @@ module.exports = function createAssetService({
   function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, internalAliasId, granularity }) {
     if (!productIdentifierService?.normalizeProductIdentifiers) {
       return {
-        internal_alias_id: internalAliasId || null,
-        product_identifier_did: null,
+        internalAliasId: internalAliasId || null,
+        productIdentifierDid: null,
       };
     }
 
@@ -103,8 +103,8 @@ module.exports = function createAssetService({
       granularity,
     });
     return {
-      internal_alias_id: normalized.internalAliasIdInput || null,
-      product_identifier_did: normalized.productIdentifierDid || null,
+      internalAliasId: normalized.internalAliasIdInput || null,
+      productIdentifierDid: normalized.productIdentifierDid || null,
     };
   }
 
@@ -269,7 +269,7 @@ module.exports = function createAssetService({
         records,
         sample: records.slice(0, 3),
         endpoint: parsedUrl.toString(),
-        fetched_at: new Date().toISOString()
+        fetchedAt: new Date().toISOString()
       };
     } finally {
       clearTimeout(timeout);
@@ -278,14 +278,14 @@ module.exports = function createAssetService({
 
   async function prepareAssetPayload({ companyId, passportType, records, options = {} }) {
     if (!companyId) throw new Error("companyId is required");
-    if (!passportType) throw new Error("passport_type is required");
+    if (!passportType) throw new Error("passportType is required");
     if (!Array.isArray(records) || !records.length) throw new Error("records array is required");
     if (records.length > 1000) throw new Error("Max 1000 asset rows per request");
 
     const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, passportType);
 
     const fieldMap = getAssetFieldMap(typeSchema);
-    const createIfNotExists = options?.create_if_not_exists !== false;
+    const createIfNotExists = options?.createIfNotExists !== false;
     const companyPolicy = await getCompanyDppPolicy(companyId);
     const currentRows = await getLatestCompanyPassports({
       companyId,
@@ -294,8 +294,8 @@ module.exports = function createAssetService({
     const currentByGuid = new Map(currentRows.map((row) => [row.dppId, row]));
     const currentByProductId = new Map(
       currentRows.
-      filter((row) => normalizeInternalAliasIdValue(row.internal_alias_id)).
-      map((row) => [normalizeInternalAliasIdValue(row.internal_alias_id), row])
+      filter((row) => normalizeInternalAliasIdValue(row.internalAliasId)).
+      map((row) => [normalizeInternalAliasIdValue(row.internalAliasId), row])
     );
 
     const batchTargets = new Set();
@@ -305,32 +305,32 @@ module.exports = function createAssetService({
     const summary = {
       total: records.length,
       ready: 0,
-      ready_for_passport_create: 0,
-      ready_for_passport_update: 0,
-      ready_for_dynamic_push: 0,
+      readyForPassportCreate: 0,
+      readyForPassportUpdate: 0,
+      readyForDynamicPush: 0,
       skipped: 0,
       failed: 0
     };
 
     records.forEach((rawRecord, index) => {
       if (!isPlainObject(rawRecord)) {
-        details.push({ row_index: index + 1, status: "failed", error: "Each asset row must be an object" });
+        details.push({ rowIndex: index + 1, status: "failed", error: "Each asset row must be an object" });
         summary.failed += 1;
         return;
       }
 
-      const matchGuid = String(rawRecord.match_dpp_id || rawRecord.match_guid || rawRecord.dppId || rawRecord.dpp_id || rawRecord.guid || "").trim();
+      const matchGuid = String(rawRecord.matchDppId || rawRecord.matchGuid || rawRecord.dppId || rawRecord.guid || "").trim();
       const matchProductId = normalizeInternalAliasIdValue(
-        rawRecord.match_product_id !== undefined ?
-        rawRecord.match_product_id :
-        !matchGuid ? rawRecord.internal_alias_id : ""
+        rawRecord.matchProductId !== undefined ?
+          rawRecord.matchProductId :
+          !matchGuid ? rawRecord.internalAliasId : ""
       );
 
       if (!matchGuid && !matchProductId) {
         details.push({
-          row_index: index + 1,
+          rowIndex: index + 1,
           status: "failed",
-          error: "Each asset row needs dppId/dpp_id/guid, match_dpp_id/match_guid, internal_alias_id, or match_product_id"
+          error: "Each asset row needs dppId, guid, matchDppId, matchGuid, internalAliasId, or matchProductId"
         });
         summary.failed += 1;
         return;
@@ -343,9 +343,9 @@ module.exports = function createAssetService({
       if (!matchedRow) {
         if (!createIfNotExists) {
           details.push({
-            row_index: index + 1,
+            rowIndex: index + 1,
             dppId: matchGuid || undefined,
-            internal_alias_id: matchProductId || undefined,
+            internalAliasId: matchProductId || undefined,
             status: "skipped",
             reason: "No matching passport was found"
           });
@@ -355,10 +355,10 @@ module.exports = function createAssetService({
 
         if (!matchProductId) {
           details.push({
-            row_index: index + 1,
+            rowIndex: index + 1,
             dppId: matchGuid || undefined,
             status: "failed",
-            error: "A new passport needs internal_alias_id or match_product_id so a draft can be created"
+            error: "A new passport needs internalAliasId or matchProductId so a draft can be created"
           });
           summary.failed += 1;
           return;
@@ -402,11 +402,11 @@ module.exports = function createAssetService({
           errors.push(`Unknown field "${key}"`);
         });
 
-        const normalizedProductId = normalizeInternalAliasIdValue(passportCreate.internal_alias_id || matchProductId);
+        const normalizedProductId = normalizeInternalAliasIdValue(passportCreate.internalAliasId || matchProductId);
         if (!normalizedProductId) {
-          errors.push("internal_alias_id cannot be blank");
+          errors.push("internalAliasId cannot be blank");
         } else {
-          passportCreate.internal_alias_id = normalizedProductId;
+          passportCreate.internalAliasId = normalizedProductId;
           const duplicate = currentByProductId.get(normalizedProductId);
           if (duplicate) {
             errors.push(`Serial Number "${normalizedProductId}" already belongs to another passport`);
@@ -426,8 +426,8 @@ module.exports = function createAssetService({
 
         if (errors.length) {
           details.push({
-            row_index: index + 1,
-            internal_alias_id: normalizedProductId || matchProductId || undefined,
+            rowIndex: index + 1,
+            internalAliasId: normalizedProductId || matchProductId || undefined,
             status: "failed",
             error: errors.join("; ")
           });
@@ -440,42 +440,42 @@ module.exports = function createAssetService({
         const resolvedProductIdentifiers = buildStoredProductIdentifiers({
           companyId,
           passportType: typeSchema.typeName,
-          internalAliasId: passportCreate.internal_alias_id || generateInternalAliasIdValue(generatedDppId),
+          internalAliasId: passportCreate.internalAliasId || generateInternalAliasIdValue(generatedDppId),
           granularity: effectiveGranularity,
         });
 
-        passportCreate.internal_alias_id = resolvedProductIdentifiers.internal_alias_id;
-        if (passportCreate.model_name === undefined) passportCreate.model_name = "";
-        batchProductIds.set(resolvedProductIdentifiers.internal_alias_id, generatedDppId);
+        passportCreate.internalAliasId = resolvedProductIdentifiers.internalAliasId;
+        if (passportCreate.modelName === undefined) passportCreate.modelName = "";
+        batchProductIds.set(resolvedProductIdentifiers.internalAliasId, generatedDppId);
         generatedRecords.push({
-          row_index: index + 1,
+          rowIndex: index + 1,
           action: "create",
-          generated_dpp_id: generatedDppId,
-          generated_lineage_id: lineageId,
-          generated_granularity: effectiveGranularity,
-          internal_alias_id: resolvedProductIdentifiers.internal_alias_id,
-          product_identifier_did: resolvedProductIdentifiers.product_identifier_did,
-          passport_create: passportCreate
+          generatedDppId: generatedDppId,
+          generatedLineageId: lineageId,
+          generatedGranularity: effectiveGranularity,
+          internalAliasId: resolvedProductIdentifiers.internalAliasId,
+          productIdentifierDid: resolvedProductIdentifiers.productIdentifierDid,
+          passportCreate
         });
 
         summary.ready += 1;
-        summary.ready_for_passport_create += 1;
+        summary.readyForPassportCreate += 1;
         details.push({
-          row_index: index + 1,
+          rowIndex: index + 1,
           dppId: generatedDppId,
-          internal_alias_id: resolvedProductIdentifiers.internal_alias_id,
+          internalAliasId: resolvedProductIdentifiers.internalAliasId,
           status: "ready",
           action: "create",
-          generated_dpp_id: generatedDppId,
-          passport_fields: Object.keys(passportCreate),
-          dynamic_fields: []
+          generatedDppId: generatedDppId,
+          passportFields: Object.keys(passportCreate),
+          dynamicFields: []
         });
         return;
       }
 
       if (batchTargets.has(matchedRow.dppId)) {
         details.push({
-          row_index: index + 1,
+          rowIndex: index + 1,
           dppId: matchedRow.dppId,
           status: "failed",
           error: "This passport is targeted more than once in the same asset batch"
@@ -487,7 +487,7 @@ module.exports = function createAssetService({
       const passportUpdate = {};
       const dynamicValues = {};
       const errors = [];
-      const nextProductIdProvided = rawRecord.next_product_id !== undefined;
+      const nextProductIdProvided = rawRecord.nextProductId !== undefined;
 
       Object.entries(rawRecord).forEach(([key, value]) => {
         if (ASSET_MATCH_FIELDS.has(key)) return;
@@ -507,7 +507,7 @@ module.exports = function createAssetService({
           }
 
           if (fieldDef) {
-            if (resolvedKey === "internal_alias_id" && !matchGuid && !nextProductIdProvided) return;
+            if (resolvedKey === "internalAliasId" && !matchGuid && !nextProductIdProvided) return;
             const coerced = coerceAssetFieldValue(fieldDef, value);
           if (!coerced.ok) {
             errors.push(coerced.error);
@@ -522,11 +522,11 @@ module.exports = function createAssetService({
         });
 
       if (nextProductIdProvided) {
-        const normalizedNextProductId = normalizeInternalAliasIdValue(rawRecord.next_product_id);
+        const normalizedNextProductId = normalizeInternalAliasIdValue(rawRecord.nextProductId);
         if (!normalizedNextProductId) {
-          errors.push("next_product_id cannot be blank");
+          errors.push("nextProductId cannot be blank");
         } else {
-          passportUpdate.internal_alias_id = normalizedNextProductId;
+          passportUpdate.internalAliasId = normalizedNextProductId;
         }
       }
 
@@ -542,16 +542,16 @@ module.exports = function createAssetService({
       const hasPassportUpdate = Object.keys(passportUpdate).length > 0;
       const hasDynamicValues = Object.keys(dynamicValues).length > 0;
 
-      if (hasPassportUpdate && !matchedRow.is_editable) {
-        errors.push(`Passport is ${matchedRow.release_status} and can only receive dynamic pushes right now`);
+      if (hasPassportUpdate && !matchedRow.isEditable) {
+        errors.push(`Passport is ${matchedRow.releaseStatus} and can only receive dynamic pushes right now`);
       }
 
-      if (passportUpdate.internal_alias_id !== undefined) {
-        const normalizedNextProductId = normalizeInternalAliasIdValue(passportUpdate.internal_alias_id);
+      if (passportUpdate.internalAliasId !== undefined) {
+        const normalizedNextProductId = normalizeInternalAliasIdValue(passportUpdate.internalAliasId);
         if (!normalizedNextProductId) {
-          errors.push("internal_alias_id cannot be blank");
+          errors.push("internalAliasId cannot be blank");
         } else {
-          passportUpdate.internal_alias_id = normalizedNextProductId;
+          passportUpdate.internalAliasId = normalizedNextProductId;
           const duplicate = currentByProductId.get(normalizedNextProductId);
           if (duplicate && duplicate.dppId !== matchedRow.dppId) {
             errors.push(`Serial Number "${normalizedNextProductId}" already belongs to another passport`);
@@ -567,9 +567,9 @@ module.exports = function createAssetService({
 
       if (errors.length) {
         details.push({
-          row_index: index + 1,
+          rowIndex: index + 1,
           dppId: matchedRow.dppId,
-          internal_alias_id: matchedRow.internal_alias_id,
+          internalAliasId: matchedRow.internalAliasId,
           status: "failed",
           error: errors.join("; ")
         });
@@ -579,9 +579,9 @@ module.exports = function createAssetService({
 
       if (!hasPassportUpdate && !hasDynamicValues) {
         details.push({
-          row_index: index + 1,
+          rowIndex: index + 1,
           dppId: matchedRow.dppId,
-          internal_alias_id: matchedRow.internal_alias_id,
+          internalAliasId: matchedRow.internalAliasId,
           status: "skipped",
           reason: "No changes detected for this row"
         });
@@ -591,87 +591,87 @@ module.exports = function createAssetService({
 
       batchTargets.add(matchedRow.dppId);
       generatedRecords.push({
-        row_index: index + 1,
+        rowIndex: index + 1,
         action: "update",
-        matched_dpp_id: matchedRow.dppId,
-        matched_product_id: matchedRow.internal_alias_id,
-        matched_release_status: matchedRow.release_status,
-        is_editable: matchedRow.is_editable,
+        matchedDppId: matchedRow.dppId,
+        matchedProductId: matchedRow.internalAliasId,
+        matchedReleaseStatus: matchedRow.releaseStatus,
+        isEditable: matchedRow.isEditable,
         match: {
           dppId: matchGuid || null,
-          internal_alias_id: matchProductId || null,
-          matched_by: matchGuid ? "dppId" : "internal_alias_id"
+          internalAliasId: matchProductId || null,
+          matchedBy: matchGuid ? "dppId" : "internalAliasId"
         },
-        passport_update: passportUpdate,
-        dynamic_values: dynamicValues
+        passportUpdate,
+        dynamicValues
       });
 
       summary.ready += 1;
-      if (hasPassportUpdate) summary.ready_for_passport_update += 1;
-      if (hasDynamicValues) summary.ready_for_dynamic_push += 1;
+      if (hasPassportUpdate) summary.readyForPassportUpdate += 1;
+      if (hasDynamicValues) summary.readyForDynamicPush += 1;
       details.push({
-        row_index: index + 1,
+        rowIndex: index + 1,
         dppId: matchedRow.dppId,
-        internal_alias_id: matchedRow.internal_alias_id,
+        internalAliasId: matchedRow.internalAliasId,
         status: "ready",
-        passport_fields: Object.keys(passportUpdate),
-        dynamic_fields: Object.keys(dynamicValues)
+        passportFields: Object.keys(passportUpdate),
+        dynamicFields: Object.keys(dynamicValues)
       });
     });
 
     return {
-      company_id: Number(companyId),
-      passport_type: typeSchema.typeName,
-      display_name: typeSchema.displayName,
-      generated_at: new Date().toISOString(),
+      companyId: Number(companyId),
+      passportType: typeSchema.typeName,
+      displayName: typeSchema.displayName,
+      generatedAt: new Date().toISOString(),
       fields: Array.from(fieldMap.values()),
       summary,
       details,
-      generated_payload: {
-        company_id: Number(companyId),
-        passport_type: typeSchema.typeName,
-        generated_at: new Date().toISOString(),
+      generatedPayload: {
+        companyId: Number(companyId),
+        passportType: typeSchema.typeName,
+        generatedAt: new Date().toISOString(),
         records: generatedRecords
       }
     };
   }
 
   async function executeAssetPush({ companyId, generatedPayload, source = "asset_management", userId = null }) {
-    const passportType = generatedPayload?.passport_type;
+    const passportType = generatedPayload?.passportType;
     const records = Array.isArray(generatedPayload?.records) ? generatedPayload.records : [];
-    if (!passportType) throw new Error("generated payload is missing passport_type");
+    if (!passportType) throw new Error("generated payload is missing passportType");
     if (!records.length) throw new Error("generated payload is empty");
 
     const tableName = getTable(passportType);
     const summary = {
       processed: records.length,
-      passports_created: 0,
-      passports_updated: 0,
-      dynamic_fields_pushed: 0,
+      passportsCreated: 0,
+      passportsUpdated: 0,
+      dynamicFieldsPushed: 0,
       skipped: 0,
       failed: 0
     };
     const details = [];
 
     for (const item of records) {
-      const action = String(item.action || (item.passport_create ? "create" : "update")).trim().toLowerCase();
-      const matchedGuid = String(item.matched_dpp_id || "").trim();
-      const generatedDppId = String(item.generated_dpp_id || "").trim();
-      const passportUpdate = isPlainObject(item.passport_update) ? { ...item.passport_update } : {};
-      const passportCreate = isPlainObject(item.passport_create) ? { ...item.passport_create } : {};
-      const dynamicValues = isPlainObject(item.dynamic_values) ? { ...item.dynamic_values } : {};
+      const action = String(item.action || (item.passportCreate ? "create" : "update")).trim().toLowerCase();
+      const matchedGuid = String(item.matchedDppId || "").trim();
+      const generatedDppId = String(item.generatedDppId || "").trim();
+      const passportUpdate = isPlainObject(item.passportUpdate) ? { ...item.passportUpdate } : {};
+      const passportCreate = isPlainObject(item.passportCreate) ? { ...item.passportCreate } : {};
+      const dynamicValues = isPlainObject(item.dynamicValues) ? { ...item.dynamicValues } : {};
       const detail = {
-        row_index: item.row_index,
+        rowIndex: item.rowIndex,
         dppId: matchedGuid || generatedDppId || undefined,
-        passport_fields: Object.keys(action === "create" ? passportCreate : passportUpdate),
-        dynamic_fields: Object.keys(dynamicValues)
+        passportFields: Object.keys(action === "create" ? passportCreate : passportUpdate),
+        dynamicFields: Object.keys(dynamicValues)
       };
 
       try {
         if (action === "create") {
-          const normalizedProductId = normalizeInternalAliasIdValue(passportCreate.internal_alias_id || item.internal_alias_id);
+          const normalizedProductId = normalizeInternalAliasIdValue(passportCreate.internalAliasId || item.internalAliasId);
           if (!normalizedProductId) {
-            throw new Error("internal_alias_id is required to create a passport");
+            throw new Error("internalAliasId is required to create a passport");
           }
 
           if (typeof createPassportTable === "function") {
@@ -691,10 +691,10 @@ module.exports = function createAssetService({
           }
 
           const dppId = generatedDppId || generateDppRecordId();
-          const lineageId = String(item.generated_lineage_id || dppId).trim() || dppId;
+          const lineageId = String(item.generatedLineageId || dppId).trim() || dppId;
           const effectiveGranularity = resolveGranularityForCreate(
             await getCompanyDppPolicy(companyId),
-            item.generated_granularity || "item"
+            item.generatedGranularity || "item"
           );
           const storedProductIdentifiers = buildStoredProductIdentifiers({
             companyId,
@@ -704,29 +704,29 @@ module.exports = function createAssetService({
           });
 
           const insertCols = [
-            "dpp_id",
-            "lineage_id",
-            "company_id",
-            "model_name",
-            "internal_alias_id",
-            "product_identifier_did",
-            "granularity",
-            "created_by"
+            "\"dppId\"",
+            "\"lineageId\"",
+            "\"companyId\"",
+            "\"modelName\"",
+            "\"internalAliasId\"",
+            "\"productIdentifierDid\"",
+            "\"granularity\"",
+            "\"createdBy\""
           ];
           const insertVals = [
             dppId,
             lineageId,
             companyId,
-            passportCreate.model_name || null,
-            storedProductIdentifiers.internal_alias_id,
-            storedProductIdentifiers.product_identifier_did,
+            passportCreate.modelName || null,
+            storedProductIdentifiers.internalAliasId,
+            storedProductIdentifiers.productIdentifierDid,
             effectiveGranularity,
             userId || null
           ];
 
           Object.entries(passportCreate).forEach(([key, value]) => {
-            if (["dpp_id", "dppId", "lineage_id", "lineageId", "company_id", "model_name", "internal_alias_id", "product_identifier_did", "granularity"].includes(key)) return;
-            insertCols.push(key);
+            if (["dppId", "lineageId", "companyId", "modelName", "internalAliasId", "productIdentifierDid", "granularity", "createdBy"].includes(key)) return;
+            insertCols.push(`"${key}"`);
             insertVals.push(value);
           });
 
@@ -764,8 +764,8 @@ module.exports = function createAssetService({
             null,
             {
               source,
-              internal_alias_id: storedProductIdentifiers.internal_alias_id,
-              product_identifier_did: storedProductIdentifiers.product_identifier_did,
+              internalAliasId: storedProductIdentifiers.internalAliasId,
+              productIdentifierDid: storedProductIdentifiers.productIdentifierDid,
               granularity: effectiveGranularity,
             }
           );
@@ -779,12 +779,12 @@ module.exports = function createAssetService({
             });
           }
 
-          summary.passports_created += 1;
+          summary.passportsCreated += 1;
           details.push({
             ...detail,
             status: "created",
-            internal_alias_id: storedProductIdentifiers.internal_alias_id,
-            generated_dpp_id: dppId,
+            internalAliasId: storedProductIdentifiers.internalAliasId,
+            generatedDppId: dppId,
           });
           continue;
         }
@@ -794,11 +794,11 @@ module.exports = function createAssetService({
           const editable = await pool.query(
             `SELECT id
              FROM ${tableName}
-             WHERE dpp_id = $1
-               AND company_id = $2
-               AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}
-               AND deleted_at IS NULL
-             ORDER BY version_number DESC
+             WHERE "dppId" = $1
+               AND "companyId" = $2
+               AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}
+               AND "deletedAt" IS NULL
+             ORDER BY "versionNumber" DESC
              LIMIT 1`,
             [matchedGuid, companyId]
           );
@@ -809,18 +809,18 @@ module.exports = function createAssetService({
               details.push({ ...detail, status: "skipped", reason: "Passport is no longer editable" });
               continue;
             }
-            detail.passport_status = "skipped";
-            detail.passport_reason = "Passport is no longer editable";
+            detail.passportStatus = "skipped";
+            detail.passportReason = "Passport is no longer editable";
           } else {
-            if (passportUpdate.internal_alias_id !== undefined) {
+            if (passportUpdate.internalAliasId !== undefined) {
               const duplicate = await findExistingPassportByInternalAliasId({
                 tableName,
                 companyId,
-                internalAliasId: normalizeInternalAliasIdValue(passportUpdate.internal_alias_id),
+                internalAliasId: normalizeInternalAliasIdValue(passportUpdate.internalAliasId),
                 excludeGuid: matchedGuid
               });
               if (duplicate) {
-                throw new Error(`Serial Number "${passportUpdate.internal_alias_id}" already belongs to another passport`);
+                throw new Error(`Serial Number "${passportUpdate.internalAliasId}" already belongs to another passport`);
               }
             }
 
@@ -839,19 +839,19 @@ module.exports = function createAssetService({
                 tableName,
                 matchedGuid,
                 null,
-                { source, fields_updated: updatedFields }
+                { source, fieldsUpdated: updatedFields }
               );
-              summary.passports_updated += 1;
-              detail.passport_status = "updated";
+              summary.passportsUpdated += 1;
+              detail.passportStatus = "updated";
             } else {
-              detail.passport_status = "skipped";
-              detail.passport_reason = "No passport field changes detected";
+              detail.passportStatus = "skipped";
+              detail.passportReason = "No passport field changes detected";
             }
           }
         }
 
         const dynamicEntries = Object.entries(dynamicValues).filter(([fieldKey]) =>
-        /^[a-z][a-z0-9_]{0,99}$/.test(fieldKey)
+        /^[a-z][A-Za-z0-9]{0,99}$/.test(fieldKey)
         );
 
         if (dynamicEntries.length) {
@@ -869,10 +869,10 @@ module.exports = function createAssetService({
             "passport_dynamic_values",
             matchedGuid,
             null,
-            { source, fields_updated: dynamicEntries.map(([fieldKey]) => fieldKey) }
+            { source, fieldsUpdated: dynamicEntries.map(([fieldKey]) => fieldKey) }
           );
-          summary.dynamic_fields_pushed += dynamicEntries.length;
-          detail.dynamic_status = "pushed";
+          summary.dynamicFieldsPushed += dynamicEntries.length;
+          detail.dynamicStatus = "pushed";
         }
 
         if (!updatedFields.length && !dynamicEntries.length) {
@@ -883,7 +883,7 @@ module.exports = function createAssetService({
 
         details.push({
           ...detail,
-          status: detail.passport_status === "skipped" ? "partial" : "updated"
+          status: detail.passportStatus === "skipped" ? "partial" : "updated"
         });
       } catch (error) {
         summary.failed += 1;
@@ -913,7 +913,7 @@ module.exports = function createAssetService({
       `INSERT INTO asset_management_runs
          (job_id, company_id, passport_type, trigger_type, source_kind, status, summary_json, request_json, generated_json)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, created_at`,
+       RETURNING id, created_at AS "createdAt"`,
       [
       jobId,
       companyId,
@@ -951,7 +951,7 @@ module.exports = function createAssetService({
         records: fetched.records,
         sourceMeta: {
           endpoint: fetched.endpoint,
-          fetched_at: fetched.fetched_at,
+          fetchedAt: fetched.fetchedAt,
           count: fetched.count
         }
       };
@@ -981,17 +981,17 @@ module.exports = function createAssetService({
       });
       const pushResult = await executeAssetPush({
         companyId: job.company_id,
-        generatedPayload: prepared.generated_payload,
+        generatedPayload: prepared.generatedPayload,
         source: `asset_job:${job.id || "manual"}`,
         userId
       });
 
       const status = pushResult.summary.failed ?
-      pushResult.summary.passports_created || pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed" :
+      pushResult.summary.passportsCreated || pushResult.summary.passportsUpdated || pushResult.summary.dynamicFieldsPushed ? "partial" : "failed" :
       "success";
       const nextRunAt = job.is_active ?
       resolveAssetJobNextRunAt({
-        startAt: job.start_at || prepared.generated_at,
+        startAt: job.start_at || prepared.generatedAt,
         intervalMinutes: job.interval_minutes,
         from: new Date()
       }) :
@@ -1029,7 +1029,7 @@ module.exports = function createAssetService({
           options,
           sourceMeta: resolved.sourceMeta
         },
-        generatedJson: prepared.generated_payload
+        generatedJson: prepared.generatedPayload
       });
 
       return {

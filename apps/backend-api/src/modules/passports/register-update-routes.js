@@ -49,19 +49,15 @@ module.exports = function registerUpdateRoutes(app, deps) {
   };
   const bulkUpdateAllSchema = {
     type: "object",
-    anyOf: [["passport_type", "passportType"]],
-    required: ["update"],
+    required: ["passportType", "update"],
     properties: {
-      passport_type: { type: "string", minLength: 1 },
       passportType: { type: "string", minLength: 1 },
       update: { type: "object", minProperties: 1 },
     },
   };
   const singleUpdateSchema = {
     type: "object",
-    anyOf: [["passport_type", "passportType"]],
     properties: {
-      passport_type: { type: "string", minLength: 1 },
       passportType: { type: "string", minLength: 1 },
     },
   };
@@ -80,8 +76,8 @@ module.exports = function registerUpdateRoutes(app, deps) {
       if (passports.length > 500) {
         return [{ path: "body.passports", message: "Max 500 per request" }];
       }
-      if (!(value.passport_type || value.passportType)) {
-        return [{ path: "body", message: "At least one of passport_type, passportType is required" }];
+      if (!value.passportType) {
+        return [{ path: "body.passportType", message: "passportType is required" }];
       }
       return [];
     },
@@ -123,20 +119,20 @@ module.exports = function registerUpdateRoutes(app, deps) {
         return res.status(400).json({ error: `Invalid status filter "${statusFilter}". Use: editable, draft_only, in_revision` });
       }
 
-      if (filterObj.product_id_like) {
-        params.push(`%${filterObj.product_id_like}%`);
+      if (filterObj.productIdLike) {
+        params.push(`%${filterObj.productIdLike}%`);
         filterSql += ` AND ("internalAliasId" ILIKE $${params.length} OR "uniqueProductIdentifier" ILIKE $${params.length})`;
       }
-      if (filterObj.model_name_like) {
-        params.push(`%${filterObj.model_name_like}%`);
+      if (filterObj.modelNameLike) {
+        params.push(`%${filterObj.modelNameLike}%`);
         filterSql += ` AND "modelName" ILIKE $${params.length}`;
       }
-      if (filterObj.created_after) {
-        params.push(filterObj.created_after);
+      if (filterObj.createdAfter) {
+        params.push(filterObj.createdAfter);
         filterSql += ` AND "createdAt" >= $${params.length}`;
       }
-      if (filterObj.created_before) {
-        params.push(filterObj.created_before);
+      if (filterObj.createdBefore) {
+        params.push(filterObj.createdBefore);
         filterSql += ` AND "createdAt" <= $${params.length}`;
       }
 
@@ -230,18 +226,18 @@ module.exports = function registerUpdateRoutes(app, deps) {
     try {
       const { companyId } = req.params;
       const userId = req.user.userId;
-      let passport_type;
+      let passportType;
       let passports;
 
       if (Array.isArray(req.body)) {
         passports = req.body;
-        passport_type = passports[0]?.passportType || passports[0]?.passport_type;
+        passportType = passports[0]?.passportType;
       } else {
         const normalizedBody = normalizePassportRequestBody(req.body);
-        passport_type = normalizedBody.passportType;
+        passportType = normalizedBody.passportType;
         passports = normalizedBody.passports;
       }
-      const typeSchema = await getPassportTypeSchema(passport_type);
+      const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       if (createPassportTable) {
         await createPassportTable(typeSchema.typeName, {
@@ -359,7 +355,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
 
           await archivePassportSnapshot({
             passport: currentRow,
-            passportType: passport_type,
+            passportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
             snapshotReason: "before_bulk_patch_update",
@@ -375,7 +371,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
           if (updateResult.updatedRow) {
             await archivePassportSnapshot({
               passport: updateResult.updatedRow,
-              passportType: passport_type,
+              passportType,
               archivedBy: userId,
               actorIdentifier: getActorIdentifier(req.user),
               snapshotReason: "after_bulk_patch_update",

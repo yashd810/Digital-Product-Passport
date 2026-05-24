@@ -46,21 +46,21 @@ function buildCanonicalIdentityBundle({
 } = {}) {
   const stableId = normalizeStableIdValue(
     didService,
-    passport?.lineage_id || passport?.dppId || passport?.dpp_id || passport?.guid || null
+    passport?.lineageId || passport?.dppId || passport?.guid || null
   );
   const resolvedGranularity = normalizeGranularityValue(
     didService,
-    granularity || company?.default_granularity || company?.dpp_granularity || passport?.granularity || "item"
+    granularity || company?.defaultGranularity || company?.dppGranularity || passport?.granularity || "item"
   );
 
-  const resolvedCompanyName = String(company?.company_name || companyName || "").trim() || null;
+  const resolvedCompanyName = String(company?.companyName || companyName || "").trim() || null;
   const companySlug = normalizeCompanySlugValue(
     didService,
-    company?.did_slug || resolvedCompanyName || null
+    company?.didSlug || resolvedCompanyName || null
   );
   const subjectNamespace = normalizePassportNamespace(
     didService,
-    company?.did_slug || resolvedCompanyName || passportType || passport?.passport_type || "battery"
+    company?.didSlug || resolvedCompanyName || passportType || passport?.passportType || "battery"
   );
 
   let companyDid = null;
@@ -98,10 +98,10 @@ function buildCanonicalIdentityBundle({
   if (businessIdentifier && productIdentifierService?.buildCanonicalProductDid) {
     try {
       uniqueProductIdentifier = productIdentifierService.buildCanonicalProductDid({
-        companyId: passport.company_id ?? passport.companyId ?? company?.id ?? null,
+        companyId: passport.companyId ?? company?.id ?? null,
         companySlug,
         companyName: resolvedCompanyName,
-        passportType: passportType || passport?.passport_type || "battery",
+        passportType: passportType || passport?.passportType || "battery",
         rawProductId: businessIdentifier,
         granularity: resolvedGranularity,
       }) || null;
@@ -113,7 +113,6 @@ function buildCanonicalIdentityBundle({
   const digitalProductPassportId =
     dppDid
     || passport?.dppId
-    || passport?.dpp_id
     || passport?.guid
     || null;
 

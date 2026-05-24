@@ -29,11 +29,11 @@ function createBackupEventHelpers({
     reason = "manual",
     snapshotScope = "released_current",
   }) {
-    if (!backupProviderService || !passport?.dppId || !passport?.company_id) {
+    if (!backupProviderService || !passport?.dppId || !passport?.companyId) {
       return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
     }
 
-    const resolvedPassportType = passportType || passport.passport_type;
+    const resolvedPassportType = passportType || passport.passportType;
     if (!resolvedPassportType) {
       return { success: true, skipped: true, reason: "PASSPORT_TYPE_REQUIRED" };
     }
@@ -44,7 +44,7 @@ function createBackupEventHelpers({
       || "";
 
     return assertBackupReplicationResult(await backupProviderService.replicatePassportSnapshot({
-      passport: { ...normalizePassportRow(passport), passport_type: resolvedPassportType },
+      passport: { ...normalizePassportRow(passport), passportType: resolvedPassportType },
       typeDef,
       companyName: resolvedCompanyName,
       reason,
@@ -113,8 +113,8 @@ function createBackupEventHelpers({
     if (!row || typeof row !== "object") return row;
     return {
       ...row,
-      globallyUniqueOperatorId: row.actor_identifier || null,
-      globallyUniqueOperatorIdentifier: row.actor_identifier || null,
+      globallyUniqueOperatorId: row.actorIdentifier || null,
+      globallyUniqueOperatorIdentifier: row.actorIdentifier || null,
     };
   }
 

@@ -94,7 +94,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
 
   const exportTypeToCSV = async (type, list) => {
     const data = await loadTypeSchema(type);
-    const sections = data.fields_json?.sections || [];
+    const sections = data.fieldsJson?.sections || [];
     const allFields = sections.flatMap((section) => section.fields || []);
     const aliasToKey = buildSchemaFieldAliasMap(sections);
     const normalizedRecords = await Promise.all(list.map(async (passport) => {
@@ -135,8 +135,8 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
 
   const exportTypeToJsonLd = async (type, list) => {
     const data = await loadTypeSchema(type);
-    const semanticModelKey = data.semantic_model_key || allPassportTypes.find((item) => item.type_name === type)?.semantic_model_key || "";
-    const productCategory = data.product_category || allPassportTypes.find((item) => item.type_name === type)?.product_category || "";
+    const semanticModelKey = data.semanticModelKey || allPassportTypes.find((item) => item.typeName === type)?.semanticModelKey || "";
+    const productCategory = data.productCategory || allPassportTypes.find((item) => item.typeName === type)?.productCategory || "";
     const output = await Promise.all(list.map((passport) => loadFullPassportPayload(type, passport)));
     const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, productCategory });
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });

@@ -2,6 +2,11 @@
 
 const logger = require("../src/infrastructure/logging/logger");
 const { generateDppRecordId } = require("../src/shared/identifiers/dpp-record-id");
+const {
+  mapCompanyRow,
+  mapCompanyFacilityRow,
+  mapPassportTemplateFieldRow,
+} = require("../src/shared/passports/passport-helpers");
 
 module.exports = function registerCompanyRoutes(app, {
   pool,
@@ -72,8 +77,8 @@ module.exports = function registerCompanyRoutes(app, {
       granularity
     });
     return {
-      internal_alias_id: normalized.internalAliasIdInput || null,
-      product_identifier_did: normalized.productIdentifierDid || null
+      internalAliasId: normalized.internalAliasIdInput || null,
+      uniqueProductIdentifier: normalized.productIdentifierDid || null
     };
   }
 
@@ -82,9 +87,36 @@ module.exports = function registerCompanyRoutes(app, {
     return value ?? null;
   }
 
+  function mapTemplateRow(row = {}) {
+    return {
+      id: row.id ?? null,
+      companyId: row.companyId ?? null,
+      passportType: row.passportType ?? null,
+      name: row.name ?? "",
+      description: row.description ?? null,
+      createdBy: row.createdBy ?? null,
+      createdAt: row.createdAt ?? null,
+      updatedAt: row.updatedAt ?? null,
+      firstName: row.firstName ?? null,
+      lastName: row.lastName ?? null,
+      modelFieldCount: row.modelFieldCount !== undefined
+        ? Number.parseInt(row.modelFieldCount, 10) || 0
+        : 0,
+    };
+  }
+
+  function normalizeBulkPassportRecord(input = {}) {
+    return {
+      ...input,
+      passportType: input.passportType ?? null,
+      modelName: input.modelName ?? null,
+      internalAliasId: input.internalAliasId ?? null,
+    };
+  }
+
   async function loadCompanyComplianceIdentity(companyId) {
     const result = await pool.query(
-      `SELECT economic_operator_identifier
+      `SELECT economic_operator_identifier AS "economicOperatorIdentifier"
        FROM companies
        WHERE id = $1
        LIMIT 1`,
@@ -97,11 +129,11 @@ module.exports = function registerCompanyRoutes(app, {
     const profile = complianceService.resolveProfileMetadata({ passportType, granularity: "item" });
     const companyIdentity = await loadCompanyComplianceIdentity(companyId);
     return {
-      compliance_profile_key: profile.key,
-      content_specification_ids: serializeProfileDefaultValue(profile.contentSpecificationIds),
-      carrier_policy_key: profile.defaultCarrierPolicyKey || null,
-      economic_operator_id: companyIdentity?.economic_operator_identifier || null,
-      facility_id: null
+      complianceProfileKey: profile.key,
+      contentSpecificationIds: serializeProfileDefaultValue(profile.contentSpecificationIds),
+      carrierPolicyKey: profile.defaultCarrierPolicyKey || null,
+      economicOperatorId: companyIdentity?.economicOperatorIdentifier || null,
+      facilityId: null
     };
   }
 
@@ -110,15 +142,15 @@ module.exports = function registerCompanyRoutes(app, {
   app.get("/api/companies/:companyId/profile", publicReadRateLimit, async (req, res) => {
     try {
       const r = await pool.query(
-        "SELECT id, company_name, company_logo FROM companies WHERE id = $1",
+        `SELECT id,
+                company_name AS "companyName",
+                company_logo AS "companyLogo"
+         FROM companies
+         WHERE id = $1`,
         [req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
-      res.json({
-        id: r.rows[0].id,
-        companyName: r.rows[0].company_name || "",
-        companyLogo: r.rows[0].company_logo || null,
-      });
+      res.json(mapCompanyRow(r.rows[0]));
     } catch {res.status(500).json({ error: "Failed to fetch company profile" });}
   });
 
@@ -142,7 +174,12 @@ module.exports = function registerCompanyRoutes(app, {
   app.get("/api/companies/:companyId/compliance-identity", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const companyRes = await pool.query(
-        `SELECT id, company_name, did_slug, economic_operator_identifier, economic_operator_identifier_scheme
+        `SELECT id,
+                company_name AS "companyName",
+                company_logo AS "companyLogo",
+                did_slug AS "didSlug",
+                economic_operator_identifier AS "economicOperatorIdentifier",
+                economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
          FROM companies
          WHERE id = $1
          LIMIT 1`,
@@ -151,7 +188,16 @@ module.exports = function registerCompanyRoutes(app, {
       if (!companyRes.rows.length) return res.status(404).json({ error: "Company not found" });
 
       const facilitiesRes = await pool.query(
-        `SELECT id, facility_identifier, identifier_scheme, display_name, metadata_json, is_active, created_at, updated_at
+        `SELECT id,
+                company_id AS "companyId",
+                facility_identifier AS "facilityIdentifier",
+                identifier_scheme AS "identifierScheme",
+                display_name AS "displayName",
+                metadata_json AS "metadataJson",
+                is_active AS "isActive",
+                created_by AS "createdBy",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt"
          FROM company_facilities
          WHERE company_id = $1
          ORDER BY updated_at DESC, id DESC`,
@@ -159,8 +205,8 @@ module.exports = function registerCompanyRoutes(app, {
       );
 
       res.json({
-        company: companyRes.rows[0],
-        facilities: facilitiesRes.rows
+        company: mapCompanyRow(companyRes.rows[0]),
+        facilities: facilitiesRes.rows.map(mapCompanyFacilityRow)
       });
     } catch {
       res.status(500).json({ error: "Failed to fetch compliance identity" });
@@ -169,12 +215,12 @@ module.exports = function registerCompanyRoutes(app, {
 
   app.post("/api/companies/:companyId/compliance-identity", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const economicOperatorIdentifier = req.body?.economic_operator_identifier === undefined ?
+      const economicOperatorIdentifier = req.body?.economicOperatorIdentifier === undefined ?
       undefined :
-      String(req.body.economic_operator_identifier || "").trim();
-      const economicOperatorIdentifierScheme = req.body?.economic_operator_identifier_scheme === undefined ?
+      String(req.body.economicOperatorIdentifier || "").trim();
+      const economicOperatorIdentifierScheme = req.body?.economicOperatorIdentifierScheme === undefined ?
       undefined :
-      String(req.body.economic_operator_identifier_scheme || "").trim();
+      String(req.body.economicOperatorIdentifierScheme || "").trim();
 
       await pool.query(
         `UPDATE companies
@@ -197,8 +243,8 @@ module.exports = function registerCompanyRoutes(app, {
         req.params.companyId,
         null,
         {
-          economic_operator_identifier: economicOperatorIdentifier === undefined ? null : economicOperatorIdentifier,
-          economic_operator_identifier_scheme: economicOperatorIdentifierScheme === undefined ? null : economicOperatorIdentifierScheme
+          economicOperatorIdentifier: economicOperatorIdentifier === undefined ? null : economicOperatorIdentifier,
+          economicOperatorIdentifierScheme: economicOperatorIdentifierScheme === undefined ? null : economicOperatorIdentifierScheme
         },
         { actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}` }
       );
@@ -211,10 +257,10 @@ module.exports = function registerCompanyRoutes(app, {
 
   app.post("/api/companies/:companyId/facilities", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
-      const facilityIdentifier = String(req.body?.facility_identifier || "").trim();
-      const identifierScheme = String(req.body?.identifier_scheme || "").trim();
+      const facilityIdentifier = String(req.body?.facilityIdentifier || "").trim();
+      const identifierScheme = String(req.body?.identifierScheme || "").trim();
       if (!facilityIdentifier || !identifierScheme) {
-        return res.status(400).json({ error: "facility_identifier and identifier_scheme are required" });
+        return res.status(400).json({ error: "facilityIdentifier and identifierScheme are required" });
       }
 
       const result = await pool.query(
@@ -228,13 +274,22 @@ module.exports = function registerCompanyRoutes(app, {
            metadata_json = EXCLUDED.metadata_json,
            is_active = true,
            updated_at = NOW()
-         RETURNING *`,
+         RETURNING id,
+                   company_id AS "companyId",
+                   facility_identifier AS "facilityIdentifier",
+                   identifier_scheme AS "identifierScheme",
+                   display_name AS "displayName",
+                   metadata_json AS "metadataJson",
+                   is_active AS "isActive",
+                   created_by AS "createdBy",
+                   created_at AS "createdAt",
+                   updated_at AS "updatedAt"`,
         [
         req.params.companyId,
         facilityIdentifier,
         identifierScheme,
-        req.body?.display_name || null,
-        JSON.stringify(req.body?.metadata_json || {}),
+        req.body?.displayName || null,
+        JSON.stringify(req.body?.metadataJson || {}),
         req.user.userId]
 
       );
@@ -247,14 +302,14 @@ module.exports = function registerCompanyRoutes(app, {
         facilityIdentifier,
         null,
         {
-          facility_identifier: facilityIdentifier,
-          identifier_scheme: identifierScheme,
-          display_name: req.body?.display_name || null
+          facilityIdentifier,
+          identifierScheme,
+          displayName: req.body?.displayName || null
         },
         { actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}` }
       );
 
-      res.status(201).json(result.rows[0]);
+      res.status(201).json(mapCompanyFacilityRow(result.rows[0]));
     } catch {
       res.status(500).json({ error: "Failed to save facility identifier" });
     }
@@ -265,17 +320,26 @@ module.exports = function registerCompanyRoutes(app, {
   app.get("/api/companies/:companyId/templates", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { companyId } = req.params;
-      const { passport_type } = req.query;
-      let q = `SELECT t.*, u.first_name, u.last_name,
-                 (SELECT COUNT(*) FROM passport_template_fields WHERE template_id = t.id AND is_model_data = true) AS model_field_count
+      const passportTypeFilter = req.query.passportType;
+      let q = `SELECT t.id,
+                      t.company_id AS "companyId",
+                      t.passport_type AS "passportType",
+                      t.name,
+                      t.description,
+                      t.created_by AS "createdBy",
+                      t.created_at AS "createdAt",
+                      t.updated_at AS "updatedAt",
+                      u.first_name AS "firstName",
+                      u.last_name AS "lastName",
+                      (SELECT COUNT(*) FROM passport_template_fields WHERE template_id = t.id AND is_model_data = true) AS "modelFieldCount"
                FROM passport_templates t
                LEFT JOIN users u ON u.id = t.created_by
                WHERE t.company_id = $1`;
       const params = [companyId];
-      if (passport_type) {q += ` AND t.passport_type = $2`;params.push(passport_type);}
+      if (passportTypeFilter) {q += ` AND t.passport_type = $2`;params.push(passportTypeFilter);}
       q += ` ORDER BY t.passport_type, t.name`;
       const r = await pool.query(q, params);
-      res.json(r.rows);
+      res.json(r.rows.map(mapTemplateRow));
     } catch (e) {logger.error(e);res.status(500).json({ error: "Failed" });}
   });
 
@@ -283,43 +347,67 @@ module.exports = function registerCompanyRoutes(app, {
     try {
       const { companyId, id } = req.params;
       const t = await pool.query(
-        "SELECT * FROM passport_templates WHERE id=$1 AND company_id=$2",
+        `SELECT id,
+                company_id AS "companyId",
+                passport_type AS "passportType",
+                name,
+                description,
+                created_by AS "createdBy",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt"
+         FROM passport_templates
+         WHERE id=$1 AND company_id=$2`,
         [id, companyId]
       );
       if (!t.rows.length) return res.status(404).json({ error: "Not found" });
       const fields = await pool.query(
-        "SELECT field_key, field_value, is_model_data FROM passport_template_fields WHERE template_id=$1",
+        `SELECT field_key AS "fieldKey",
+                field_value AS "fieldValue",
+                is_model_data AS "isModelData"
+         FROM passport_template_fields
+         WHERE template_id=$1`,
         [id]
       );
-      res.json({ ...t.rows[0], fields: fields.rows });
+      res.json({
+        ...mapTemplateRow(t.rows[0]),
+        fields: fields.rows.map(mapPassportTemplateFieldRow),
+      });
     } catch (e) {res.status(500).json({ error: "Failed" });}
   });
 
   app.post("/api/companies/:companyId/templates", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId } = req.params;
-      const { passport_type, name, description, fields } = req.body;
-      if (!passport_type || !name?.trim()) return res.status(400).json({ error: "passport_type and name required" });
+      const { passportType, name, description, fields } = req.body;
+      if (!passportType || !name?.trim()) return res.status(400).json({ error: "passportType and name required" });
 
       const t = await pool.query(
         `INSERT INTO passport_templates (company_id, passport_type, name, description, created_by)
-         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-        [companyId, passport_type, name.trim(), description || null, req.user.userId]
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING id,
+                   company_id AS "companyId",
+                   passport_type AS "passportType",
+                   name,
+                   description,
+                   created_by AS "createdBy",
+                   created_at AS "createdAt",
+                   updated_at AS "updatedAt"`,
+        [companyId, passportType, name.trim(), description || null, req.user.userId]
       );
       const tmplId = t.rows[0].id;
 
       if (Array.isArray(fields) && fields.length) {
         for (const f of fields) {
-          if (!f.field_key) continue;
+          if (!f.fieldKey) continue;
           await pool.query(
             `INSERT INTO passport_template_fields (template_id, field_key, field_value, is_model_data)
              VALUES ($1,$2,$3,$4) ON CONFLICT (template_id, field_key) DO UPDATE
              SET field_value=$3, is_model_data=$4`,
-            [tmplId, f.field_key, f.field_value ?? null, !!f.is_model_data]
+            [tmplId, f.fieldKey, f.fieldValue ?? null, !!f.isModelData]
           );
         }
       }
-      res.json(t.rows[0]);
+      res.json(mapTemplateRow(t.rows[0]));
     } catch (e) {logger.error(e);res.status(500).json({ error: "Failed" });}
   });
 
@@ -334,26 +422,47 @@ module.exports = function registerCompanyRoutes(app, {
       if (!existing.rows.length) return res.status(404).json({ error: "Not found" });
 
       const updated = await pool.query(
-        `UPDATE passport_templates SET name=$1, description=$2, updated_at=NOW() WHERE id=$3 RETURNING *`,
+        `UPDATE passport_templates
+         SET name=$1, description=$2, updated_at=NOW()
+         WHERE id=$3
+         RETURNING id,
+                   company_id AS "companyId",
+                   passport_type AS "passportType",
+                   name,
+                   description,
+                   created_by AS "createdBy",
+                   created_at AS "createdAt",
+                   updated_at AS "updatedAt"`,
         [name?.trim() || "Untitled", description || null, id]
       );
 
       if (Array.isArray(fields)) {
         await pool.query("DELETE FROM passport_template_fields WHERE template_id=$1", [id]);
         for (const f of fields) {
-          if (!f.field_key) continue;
+          if (!f.fieldKey) continue;
           await pool.query(
             `INSERT INTO passport_template_fields (template_id, field_key, field_value, is_model_data)
              VALUES ($1,$2,$3,$4)`,
-            [id, f.field_key, f.field_value ?? null, !!f.is_model_data]
+            [id, f.fieldKey, f.fieldValue ?? null, !!f.isModelData]
           );
         }
       }
       const fieldRows = await pool.query(
-        "SELECT field_key, field_value, is_model_data FROM passport_template_fields WHERE template_id=$1 ORDER BY field_key",
+        `SELECT field_key AS "fieldKey",
+                field_value AS "fieldValue",
+                is_model_data AS "isModelData"
+         FROM passport_template_fields
+         WHERE template_id=$1
+         ORDER BY field_key`,
         [id]
       );
-      res.json({ success: true, template: { ...updated.rows?.[0], fields: fieldRows.rows } });
+      res.json({
+        success: true,
+        template: {
+          ...mapTemplateRow(updated.rows?.[0] || {}),
+          fields: fieldRows.rows.map(mapPassportTemplateFieldRow),
+        }
+      });
     } catch (e) {res.status(500).json({ error: "Failed" });}
   });
 
@@ -371,48 +480,65 @@ module.exports = function registerCompanyRoutes(app, {
       const fmt = (req.query.format || "csv").toLowerCase();
 
       const tmplRes = await pool.query(
-        "SELECT * FROM passport_templates WHERE id=$1 AND company_id=$2",
+        `SELECT id,
+                company_id AS "companyId",
+                passport_type AS "passportType",
+                name,
+                description,
+                created_by AS "createdBy",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt"
+         FROM passport_templates
+         WHERE id=$1 AND company_id=$2`,
         [templateId, companyId]
       );
       if (!tmplRes.rows.length) return res.status(404).json({ error: "Template not found" });
-      const tmpl = tmplRes.rows[0];
+      const tmpl = mapTemplateRow(tmplRes.rows[0]);
 
       const fieldRes = await pool.query(
-        "SELECT field_key, field_value, is_model_data FROM passport_template_fields WHERE template_id=$1",
+        `SELECT field_key AS "fieldKey",
+                field_value AS "fieldValue",
+                is_model_data AS "isModelData"
+         FROM passport_template_fields
+         WHERE template_id=$1`,
         [templateId]
       );
-      const templateFields = Object.fromEntries(fieldRes.rows.map((f) => [f.field_key, f.field_value]));
+      const templateFields = Object.fromEntries(fieldRes.rows.map((f) => [f.fieldKey, f.fieldValue]));
 
       const typeRes = await pool.query(
-        "SELECT fields_json, product_category, semantic_model_key FROM passport_types WHERE type_name=$1",
-        [tmpl.passport_type]
+        `SELECT fields_json AS "fieldsJson",
+                product_category AS "productCategory",
+                semantic_model_key AS "semanticModelKey"
+         FROM passport_types
+         WHERE type_name=$1`,
+        [tmpl.passportType]
       );
-      const sections = typeRes.rows[0]?.fields_json?.sections || [];
+      const sections = typeRes.rows[0]?.fieldsJson?.sections || [];
       const schemaFields = sections.flatMap((s) => s.fields || []).
       filter((f) => f.type !== "file" && f.type !== "table");
 
-      const tableName = getTable(tmpl.passport_type);
+      const tableName = getTable(tmpl.passportType);
       const passRes = await pool.query(
         `SELECT * FROM ${tableName}
-         WHERE company_id=$1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
-         ORDER BY created_at DESC`,
+         WHERE "companyId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+         ORDER BY "createdAt" DESC`,
         [companyId]
       );
       const rows = passRes.rows;
 
       if (fmt === "json" || fmt === "jsonld") {
         res.setHeader("Content-Type", "application/ld+json");
-        res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passport_type}_drafts.jsonld"`);
+        res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passportType}_drafts.jsonld"`);
         const exportRows = rows.map((row) => buildExpandedPassportPayload(
-          { ...row, passport_type: tmpl.passport_type },
+          { ...row, passportType: tmpl.passportType },
           typeRes.rows[0],
           {
             granularity: row.granularity || "model",
           }
         ));
-        return res.json(buildBatteryPassJsonExport(exportRows, tmpl.passport_type, {
-          semanticModelKey: typeRes.rows[0]?.semantic_model_key || null,
-          productCategory: typeRes.rows[0]?.product_category || null
+        return res.json(buildBatteryPassJsonExport(exportRows, tmpl.passportType, {
+          semanticModelKey: typeRes.rows[0]?.semanticModelKey || null,
+          productCategory: typeRes.rows[0]?.productCategory || null
         }));
       }
 
@@ -424,9 +550,9 @@ module.exports = function registerCompanyRoutes(app, {
       };
 
       const fieldRows = [
-      ["dppId", ...rows.map((r) => r.dppId ?? r.dpp_id ?? "")],
-      ["model_name", ...rows.map((r) => r.model_name || "")],
-      ["internal_alias_id", ...rows.map((r) => r.internal_alias_id || "")],
+      ["dppId", ...rows.map((r) => r.dppId || "")],
+      ["modelName", ...rows.map((r) => r.modelName || "")],
+      ["internalAliasId", ...rows.map((r) => r.internalAliasId || "")],
       ...schemaFields.map((f) => [
       f.label,
       ...rows.map((r) => getPassportFieldValue(r, f.key) ?? templateFields[f.key] ?? "")]
@@ -436,7 +562,7 @@ module.exports = function registerCompanyRoutes(app, {
       const csvLines = [headerRow, ...fieldRows].map((row) => row.map(escCell).join(","));
 
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passport_type}_drafts.csv"`);
+      res.setHeader("Content-Disposition", `attachment; filename="${tmpl.passportType}_drafts.csv"`);
       res.send(csvLines.join("\n"));
     } catch (e) {
       logger.error("Export drafts error:", e.message);
@@ -450,10 +576,10 @@ module.exports = function registerCompanyRoutes(app, {
     try {
       const { companyId } = req.params;
       const normalizedBody = normalizePassportRequestBody(req.body);
-      const { passport_type, csv } = normalizedBody;
-      if (!passport_type || !csv) return res.status(400).json({ error: "passport_type and csv required" });
+      const { passportType, csv } = normalizedBody;
+      if (!passportType || !csv) return res.status(400).json({ error: "passportType and csv required" });
 
-      const typeSchema = await getPassportTypeSchema(passport_type);
+      const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const resolvedPassportType = typeSchema.typeName;
 
@@ -491,9 +617,11 @@ module.exports = function registerCompanyRoutes(app, {
 
       const tableName = getTable(resolvedPassportType);
       const userId = req.user.userId;
-      const excluded = new Set(["id", "dppId", "company_id", "created_by", "created_at", "passport_type",
-      "version_number", "release_status", "deleted_at", "qr_code",
-      "created_by_email", "first_name", "last_name", "updated_by", "updated_at"]);
+      const excluded = new Set([
+        "id", "dppId", "companyId", "createdBy", "createdAt", "passportType",
+        "versionNumber", "releaseStatus", "deletedAt", "qrCode",
+        "created_by_email", "first_name", "last_name", "updatedBy", "updatedAt",
+      ]);
 
       let created = 0,updated = 0,skipped = 0,failed = 0;
       const details = [];
@@ -509,9 +637,9 @@ module.exports = function registerCompanyRoutes(app, {
           const field =
           allFields.find((f) => f.label?.trim().toLowerCase() === normalized) ||
           allFields.find((f) => f.key?.toLowerCase() === normalized) || (
-          normalized === "model_name" ? { key: "model_name" } : null) || (
-          normalized === "internal_alias_id" ? { key: "internal_alias_id" } : null) || (
-          normalized === "dppId" ? { key: "dppId" } : null);
+          normalized === "modelname" ? { key: "modelName" } : null) || (
+          normalized === "internalaliasid" ? { key: "internalAliasId" } : null) || (
+          normalized === "dppid" ? { key: "dppId" } : null);
 
           if (field && value) {
             passport[field.key] = field.type === "boolean" ?
@@ -520,13 +648,13 @@ module.exports = function registerCompanyRoutes(app, {
           }
         });
 
-        const { dppId: incomingGuid, model_name, internal_alias_id, ...fields } = passport;
-        const normalizedProductId = normalizeInternalAliasIdValue(internal_alias_id);
+        const { dppId: incomingGuid, modelName, internalAliasId, ...fields } = normalizeBulkPassportRecord(passport);
+        const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
 
         try {
           if (incomingGuid) {
             const existing = await pool.query(
-              `SELECT id FROM ${tableName} WHERE dpp_id=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
+              `SELECT id FROM ${tableName} WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL`,
               [incomingGuid, companyId]
             );
             if (!existing.rows.length) {
@@ -534,33 +662,33 @@ module.exports = function registerCompanyRoutes(app, {
               skipped++;continue;
             }
             const rowId = existing.rows[0].id;
-            if (internal_alias_id !== undefined) {
+            if (internalAliasId !== undefined) {
               if (!normalizedProductId) {
-                details.push({ dppId: incomingGuid, status: "failed", error: "internal_alias_id cannot be blank" });
+                details.push({ dppId: incomingGuid, status: "failed", error: "internalAliasId cannot be blank" });
                 failed++;continue;
               }
               const existingByProductId = await findExistingPassportByInternalAliasId({
                 tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: incomingGuid
               });
               if (existingByProductId) {
-                details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
+                details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
                 failed++;continue;
               }
             }
-            const updateData = { model_name, ...fields };
-            if (internal_alias_id !== undefined) {
+            const updateData = { modelName, ...fields };
+            if (internalAliasId !== undefined) {
               const storedProductIdentifiers = buildStoredProductIdentifiers({
                 companyId,
                 passportType: resolvedPassportType,
                 internalAliasId: normalizedProductId
               });
-              updateData.internal_alias_id = storedProductIdentifiers.internal_alias_id;
-              updateData.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+              updateData.internalAliasId = storedProductIdentifiers.internalAliasId;
+              updateData.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
             }
             const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: updateData, excluded });
             if (!updateCols.length) {skipped++;continue;}
             await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "csv_upsert" });
-            details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "updated" });
+            details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "updated" });
             updated++;
           } else {
             if (!normalizedProductId) {
@@ -569,7 +697,7 @@ module.exports = function registerCompanyRoutes(app, {
             }
             const existingByProductId = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId });
             if (existingByProductId) {
-              const existingStatus = normalizeReleaseStatus(existingByProductId.release_status);
+              const existingStatus = normalizeReleaseStatus(existingByProductId.releaseStatus);
               if (isEditablePassportStatus(existingStatus)) {
                 const storedProductIdentifiers = buildStoredProductIdentifiers({
                   companyId,
@@ -577,22 +705,22 @@ module.exports = function registerCompanyRoutes(app, {
                   internalAliasId: normalizedProductId
                 });
                 const updateData = {
-                  model_name,
-                  internal_alias_id: storedProductIdentifiers.internal_alias_id,
-                  product_identifier_did: storedProductIdentifiers.product_identifier_did,
+                  modelName,
+                  internalAliasId: storedProductIdentifiers.internalAliasId,
+                  uniqueProductIdentifier: storedProductIdentifiers.uniqueProductIdentifier,
                   ...fields
                 };
                 const updateCols = await updatePassportRowById({ tableName, rowId: existingByProductId.id, userId, data: updateData, excluded });
                 if (!updateCols.length) {
-                  details.push({ dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
+                  details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped", reason: "no changes detected" });
                   skipped++;continue;
                 }
-                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "csv_upsert", matched_by: "internal_alias_id" });
-                details.push({ dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "updated" });
+                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "csv_upsert", matchedBy: "internalAliasId" });
+                details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "updated" });
                 updated++;continue;
               }
               details.push({
-                dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "skipped",
+                dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped",
                 reason: existingStatus === "in_review" ?
                 "matching passport is in review and cannot be edited" :
                 "matching passport already exists; revise it before importing changes"
@@ -612,22 +740,22 @@ module.exports = function registerCompanyRoutes(app, {
               passportType: resolvedPassportType
             });
             const allCols = [
-            "dppId", "lineage_id", "company_id", "model_name", "internal_alias_id", "product_identifier_did",
-            "compliance_profile_key", "content_specification_ids", "carrier_policy_key", "economic_operator_id", "facility_id",
-            "created_by", ...dataFields];
+            "dppId", "lineageId", "companyId", "modelName", "internalAliasId", "uniqueProductIdentifier",
+            "complianceProfileKey", "contentSpecificationIds", "carrierPolicyKey", "economicOperatorId", "facilityId",
+            "createdBy", ...dataFields];
 
             const allVals = [
             newGuid,
             lineageId,
             companyId,
-            model_name || null,
-            storedProductIdentifiers.internal_alias_id,
-            storedProductIdentifiers.product_identifier_did,
-            complianceManagedFields.compliance_profile_key,
-            complianceManagedFields.content_specification_ids,
-            complianceManagedFields.carrier_policy_key,
-            complianceManagedFields.economic_operator_id,
-            complianceManagedFields.facility_id,
+            modelName || null,
+            storedProductIdentifiers.internalAliasId,
+            storedProductIdentifiers.uniqueProductIdentifier,
+            complianceManagedFields.complianceProfileKey,
+            complianceManagedFields.contentSpecificationIds,
+            complianceManagedFields.carrierPolicyKey,
+            complianceManagedFields.economicOperatorId,
+            complianceManagedFields.facilityId,
             userId,
             ...getStoredPassportValues(dataFields, fields)];
 
@@ -639,7 +767,7 @@ module.exports = function registerCompanyRoutes(app, {
               `INSERT INTO passport_registry ("dppId","lineageId","companyId","passportType") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
               [newGuid, lineageId, companyId, resolvedPassportType]
             );
-            details.push({ dppId: newGuid, internal_alias_id: normalizedProductId, model_name, status: "created" });
+            details.push({ dppId: newGuid, internalAliasId: normalizedProductId, modelName, status: "created" });
             created++;
           }
         } catch (e) {
@@ -661,35 +789,37 @@ module.exports = function registerCompanyRoutes(app, {
   app.post("/api/companies/:companyId/passports/upsert-json", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId } = req.params;
-      let passport_type, passports;
+      let passportType, passports;
       if (Array.isArray(req.body)) {
         passports = req.body;
-        passport_type = passports[0]?.passport_type || passports[0]?.passportType;
+        passportType = passports[0]?.passportType;
       } else {
         const normalizedBody = normalizePassportRequestBody(req.body);
-        passport_type = normalizedBody.passport_type;
+        passportType = normalizedBody.passportType;
         passports = normalizedBody.passports;
       }
-      if (!passport_type) return res.status(400).json({ error: "passport_type required" });
+      if (!passportType) return res.status(400).json({ error: "passportType required" });
       if (!Array.isArray(passports) || !passports.length) return res.status(400).json({ error: "passports array required" });
       if (passports.length > 500) return res.status(400).json({ error: "Max 500 per request" });
 
-      const typeSchema = await getPassportTypeSchema(passport_type);
+      const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const resolvedPassportType = typeSchema.typeName;
       const tableName = getTable(resolvedPassportType);
       const userId = req.user.userId;
-      const excluded = new Set(["id", "company_id", "created_by", "created_at", "passport_type",
-      "version_number", "release_status", "deleted_at", "qr_code",
-      "created_by_email", "first_name", "last_name", "updated_by", "updated_at"]);
+      const excluded = new Set([
+        "id", "companyId", "createdBy", "createdAt", "passportType",
+        "versionNumber", "releaseStatus", "deletedAt", "qrCode",
+        "created_by_email", "first_name", "last_name", "updatedBy", "updatedAt",
+      ]);
 
       let created = 0,updated = 0,skipped = 0,failed = 0;
       const details = [];
 
       for (const item of passports) {
         const normalizedItem = normalizePassportRequestBody(item || {});
-        const { dppId: incomingGuid, model_name, internal_alias_id, ...fields } = normalizedItem;
-        const normalizedProductId = normalizeInternalAliasIdValue(internal_alias_id);
+        const { dppId: incomingGuid, modelName, internalAliasId, ...fields } = normalizeBulkPassportRecord(normalizedItem);
+        const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
         const governanceFieldKeys = Object.keys(fields).filter((key) => isSchemaGovernanceKey(key, typeSchema));
         const invalidFieldKeys = Object.keys(fields).filter((key) =>
         !SYSTEM_PASSPORT_FIELDS.has(key) &&
@@ -699,7 +829,7 @@ module.exports = function registerCompanyRoutes(app, {
           if (governanceFieldKeys.length) {
             details.push({
               dppId: incomingGuid || undefined,
-              internal_alias_id: normalizedProductId || undefined,
+              internalAliasId: normalizedProductId || undefined,
               status: "failed",
               error: buildGovernanceImportErrorMessage(governanceFieldKeys)
             });
@@ -709,7 +839,7 @@ module.exports = function registerCompanyRoutes(app, {
           if (invalidFieldKeys.length) {
             details.push({
               dppId: incomingGuid || undefined,
-              internal_alias_id: normalizedProductId || undefined,
+              internalAliasId: normalizedProductId || undefined,
               status: "failed",
               error: `Unknown passport field(s): ${invalidFieldKeys.join(", ")}`
             });
@@ -718,43 +848,43 @@ module.exports = function registerCompanyRoutes(app, {
           }
           if (incomingGuid) {
             const existing = await pool.query(
-              `SELECT id FROM ${tableName} WHERE dpp_id=$1 AND company_id=$2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL`,
+              `SELECT id FROM ${tableName} WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL`,
               [incomingGuid, companyId]
             );
             if (!existing.rows.length) {
               details.push({ dppId: incomingGuid, status: "skipped", reason: "not found or not editable" });
               skipped++;continue;
             }
-            if (internal_alias_id !== undefined) {
+            if (internalAliasId !== undefined) {
               if (!normalizedProductId) {
-                details.push({ dppId: incomingGuid, status: "failed", error: "internal_alias_id cannot be blank" });
+                details.push({ dppId: incomingGuid, status: "failed", error: "internalAliasId cannot be blank" });
                 failed++;continue;
               }
               const existingByProductId = await findExistingPassportByInternalAliasId({
                 tableName, companyId, internalAliasId: normalizedProductId, excludeGuid: incomingGuid
               });
               if (existingByProductId) {
-                details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
+                details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId, status: "failed", error: `Internal Alias ID "${normalizedProductId}" already belongs to another passport` });
                 failed++;continue;
               }
             }
-            const updateData = { model_name, ...fields };
-            if (internal_alias_id !== undefined) {
+            const updateData = { modelName, ...fields };
+            if (internalAliasId !== undefined) {
               const storedProductIdentifiers = buildStoredProductIdentifiers({
                 companyId,
                 passportType: resolvedPassportType,
                 internalAliasId: normalizedProductId
               });
-              updateData.internal_alias_id = storedProductIdentifiers.internal_alias_id;
-              updateData.product_identifier_did = storedProductIdentifiers.product_identifier_did;
+              updateData.internalAliasId = storedProductIdentifiers.internalAliasId;
+              updateData.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
             }
             const updateCols = await updatePassportRowById({ tableName, rowId: existing.rows[0].id, userId, data: updateData, excluded });
             if (!updateCols.length) {
-              details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "skipped", reason: "no changes detected" });
+              details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "skipped", reason: "no changes detected" });
               skipped++;continue;
             }
             await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "json_upsert" });
-            details.push({ dppId: incomingGuid, internal_alias_id: normalizedProductId || undefined, status: "updated" });
+            details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "updated" });
             updated++;
           } else {
             if (!normalizedProductId) {
@@ -763,7 +893,7 @@ module.exports = function registerCompanyRoutes(app, {
             }
             const existingByProductId = await findExistingPassportByInternalAliasId({ tableName, companyId, internalAliasId: normalizedProductId });
             if (existingByProductId) {
-              const existingStatus = normalizeReleaseStatus(existingByProductId.release_status);
+              const existingStatus = normalizeReleaseStatus(existingByProductId.releaseStatus);
               if (isEditablePassportStatus(existingStatus)) {
                 const storedProductIdentifiers = buildStoredProductIdentifiers({
                   companyId,
@@ -771,22 +901,22 @@ module.exports = function registerCompanyRoutes(app, {
                   internalAliasId: normalizedProductId
                 });
                 const allData = {
-                  model_name,
-                  internal_alias_id: storedProductIdentifiers.internal_alias_id,
-                  product_identifier_did: storedProductIdentifiers.product_identifier_did,
+                  modelName,
+                  internalAliasId: storedProductIdentifiers.internalAliasId,
+                  uniqueProductIdentifier: storedProductIdentifiers.uniqueProductIdentifier,
                   ...fields
                 };
                 const updateCols = await updatePassportRowById({ tableName, rowId: existingByProductId.id, userId, data: allData, excluded });
                 if (!updateCols.length) {
-                  details.push({ dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "skipped", reason: "no changes detected" });
+                  details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped", reason: "no changes detected" });
                   skipped++;continue;
                 }
-                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "json_upsert", matched_by: "internal_alias_id" });
-                details.push({ dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "updated" });
+                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "json_upsert", matchedBy: "internalAliasId" });
+                details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "updated" });
                 updated++;continue;
               }
               details.push({
-                dppId: existingByProductId.dppId, internal_alias_id: normalizedProductId, status: "skipped",
+                dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped",
                 reason: existingStatus === "in_review" ?
                 "matching passport is in review and cannot be edited" :
                 "matching passport already exists; revise it before importing changes"
@@ -806,22 +936,22 @@ module.exports = function registerCompanyRoutes(app, {
               passportType: resolvedPassportType
             });
             const allCols = [
-            "dppId", "lineage_id", "company_id", "model_name", "internal_alias_id", "product_identifier_did",
-            "compliance_profile_key", "content_specification_ids", "carrier_policy_key", "economic_operator_id", "facility_id",
-            "created_by", ...dataFields];
+            "dppId", "lineageId", "companyId", "modelName", "internalAliasId", "uniqueProductIdentifier",
+            "complianceProfileKey", "contentSpecificationIds", "carrierPolicyKey", "economicOperatorId", "facilityId",
+            "createdBy", ...dataFields];
 
             const allVals = [
             newGuid,
             lineageId,
             companyId,
-            model_name || null,
-            storedProductIdentifiers.internal_alias_id,
-            storedProductIdentifiers.product_identifier_did,
-            complianceManagedFields.compliance_profile_key,
-            complianceManagedFields.content_specification_ids,
-            complianceManagedFields.carrier_policy_key,
-            complianceManagedFields.economic_operator_id,
-            complianceManagedFields.facility_id,
+            modelName || null,
+            storedProductIdentifiers.internalAliasId,
+            storedProductIdentifiers.uniqueProductIdentifier,
+            complianceManagedFields.complianceProfileKey,
+            complianceManagedFields.contentSpecificationIds,
+            complianceManagedFields.carrierPolicyKey,
+            complianceManagedFields.economicOperatorId,
+            complianceManagedFields.facilityId,
             userId,
             ...getStoredPassportValues(dataFields, fields)];
 
@@ -833,7 +963,7 @@ module.exports = function registerCompanyRoutes(app, {
               `INSERT INTO passport_registry ("dppId","lineageId","companyId","passportType") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
               [newGuid, lineageId, companyId, resolvedPassportType]
             );
-            details.push({ dppId: newGuid, internal_alias_id: normalizedProductId, model_name, status: "created" });
+            details.push({ dppId: newGuid, internalAliasId: normalizedProductId, modelName, status: "created" });
             created++;
           }
         } catch (e) {

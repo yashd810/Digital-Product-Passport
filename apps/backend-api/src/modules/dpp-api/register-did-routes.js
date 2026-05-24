@@ -50,10 +50,8 @@ module.exports = function registerDidRoutes(app, deps) {
       if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
 
       const company = await loadCompanyById(companyId);
-      if (!company?.is_active) return res.status(404).json({ error: "Company not found" });
-      const companySlug = didService.normalizeCompanySlug(
-        company.did_slug || company.company_name || `company-${company.id}`
-      );
+      if (!company?.isActive) return res.status(404).json({ error: "Company not found" });
+      const companySlug = didService.normalizeCompanySlug(company.didSlug || company.companyName || `company-${company.id}`);
       return res.redirect(301, `/did/company/${encodeURIComponent(companySlug)}/did.json`);
     } catch (e) {
       logger.error({ err: e }, "[Company DID]");
@@ -315,10 +313,8 @@ module.exports = function registerDidRoutes(app, deps) {
 
     try {
       const company = await loadCompanyById(companyId);
-      if (!company?.is_active) return res.status(404).json({ error: "Company not found" });
-      const companySlug = didService.normalizeCompanySlug(
-        company.did_slug || company.company_name || `company-${company.id}`
-      );
+      if (!company?.isActive) return res.status(404).json({ error: "Company not found" });
+      const companySlug = didService.normalizeCompanySlug(company.didSlug || company.companyName || `company-${company.id}`);
       return res.redirect(301, `/did/company/${encodeURIComponent(companySlug)}/did.json`);
     } catch (e) {
       logger.error({ err: e }, "[Legacy Org DID]");

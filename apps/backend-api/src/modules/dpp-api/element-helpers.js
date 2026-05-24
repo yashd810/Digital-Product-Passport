@@ -298,22 +298,22 @@ function createElementHelpers({
     const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
     const derivedProductIdentifier = businessIdentifier ?
       productIdentifierService?.buildCanonicalProductDid?.({
-        companyId: passport.company_id,
-        passportType: passport.passport_type || typeDef?.type_name || "battery",
+        companyId: passport.companyId,
+        passportType: passport.passportType || typeDef?.typeName || "battery",
         rawProductId: businessIdentifier,
         granularity
       }) || null :
       null;
     let dppId = null;
     try {
-      if (passport?.company_id && passport?.internal_alias_id) {
-        dppId = dppIdentity.dppDid(granularity, passport.company_id, passport.internal_alias_id);
+      if (passport?.companyId && passport?.internalAliasId) {
+        dppId = dppIdentity.dppDid(granularity, passport.companyId, passport.internalAliasId);
       }
     } catch {}
 
     return {
-      productIdentifier: passport?.product_identifier_did || derivedProductIdentifier || null,
-      internalAliasId: passport?.internal_alias_id || null,
+      productIdentifier: passport?.productIdentifierDid || derivedProductIdentifier || null,
+      internalAliasId: passport?.internalAliasId || null,
       dppId,
       elementIdPath,
       ...buildExpandedDataElement({

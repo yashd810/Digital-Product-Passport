@@ -43,7 +43,7 @@ function CompanyAccess() {
 
         setAllTypes(types);
         setCompanyData(company);
-        setGrantedTypeIds(company.granted_types || []);
+        setGrantedTypeIds(company.grantedTypes || []);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -90,10 +90,10 @@ function CompanyAccess() {
     }
   };
 
-  // Group types by product_category
+  // Group types by product category
   const grouped = allTypes.reduce((acc, t) => {
-    const key = t.product_category;
-    if (!acc[key]) acc[key] = { icon: t.product_icon, types: [] };
+    const key = t.productCategory;
+    if (!acc[key]) acc[key] = { icon: t.productIcon, types: [] };
     acc[key].types.push(t);
     return acc;
   }, {});
@@ -118,7 +118,7 @@ function CompanyAccess() {
         <div className="access-container">
           {companyData && (
             <div className="company-info">
-              <h2>{companyData.company_name}</h2>
+              <h2>{companyData.companyName}</h2>
               <p><strong>Company ID:</strong> {companyData.id}</p>
             </div>
           )}
@@ -155,15 +155,15 @@ function CompanyAccess() {
                       return (
                         <div key={type.id} className={`type-card ${granted ? "granted" : "revoked"}`}>
                           <div className="access-type-meta">
-                            <h4 className="access-type-title">{type.display_name}</h4>
-                            <code className="access-type-code">{type.type_name}</code>
+                            <h4 className="access-type-title">{type.displayName}</h4>
+                            <code className="access-type-code">{type.typeName}</code>
                           </div>
                           <div className="access-type-count">
-                            {type.fields_json?.sections?.reduce((n, s) => n + (s.fields?.length || 0), 0) || 0} fields
+                            {type.fieldsJson?.sections?.reduce((n, s) => n + (s.fields?.length || 0), 0) || 0} fields
                           </div>
                           <button
                             className={`toggle-btn ${granted ? "active" : ""}`}
-                            onClick={() => handleToggleAccess(type.id, type.display_name)}
+                            onClick={() => handleToggleAccess(type.id, type.displayName)}
                             disabled={isSaving}
                           >
                             {granted ? "✓ Granted" : "✗ Revoked"}
@@ -182,7 +182,7 @@ function CompanyAccess() {
             <p>
               <strong>Granted Access:</strong>{" "}
               {grantedCount > 0
-                ? allTypes.filter(t => grantedTypeIds.includes(t.id)).map(t => t.display_name).join(", ")
+                ? allTypes.filter(t => grantedTypeIds.includes(t.id)).map(t => t.displayName).join(", ")
                 : "None"}
             </p>
             <p><strong>Total Granted:</strong> {grantedCount} of {allTypes.length}</p>

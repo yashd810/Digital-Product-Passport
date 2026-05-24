@@ -17,12 +17,7 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
       .then((r) => r.json())
       .then((data) => {
         setTeamUsers(data
-          .filter((member) => (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id)
-          .map((member) => ({
-            ...member,
-            firstName: member.firstName || member.first_name || "",
-            lastName: member.lastName || member.last_name || "",
-          })));
+          .filter((member) => (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id));
       })
       .catch(() => {});
 

@@ -41,6 +41,8 @@ function deriveRuntimePaths(serverDir) {
 }
 
 function ensureLocalDirectories(paths) {
+  const storageProvider = String(process.env.STORAGE_PROVIDER || "local").trim().toLowerCase();
+  if (storageProvider !== "local") return;
   [paths.localStorageDir, paths.filesBaseDir, paths.repoBaseDir, paths.globalSymbolsDir].forEach((dir) => {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   });
@@ -103,42 +105,11 @@ function normalizeJsonFriendlyValue(value) {
 }
 
 function normalizeIncomingDppIdentifiers(value) {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeIncomingDppIdentifiers(entry));
-  }
-  if (!isPlainRecord(value)) return value;
-
-  const normalized = {};
-  for (const [key, rawEntry] of Object.entries(value)) {
-    const entry = normalizeIncomingDppIdentifiers(rawEntry);
-    if (key === "dppId") normalized.dpp_id = entry;
-    else if (key === "dppIds") normalized.dpp_ids = entry;
-    else if (key === "dpp_id") normalized.dpp_id = entry;
-    else if (key === "match_dpp_id") normalized.match_dpp_id = entry;
-    else if (key === "matched_dpp_id") normalized.matched_dpp_id = entry;
-    else if (key === "passportDppId") normalized.passport_dpp_id = entry;
-    else if (key === "passport_dpp_id") normalized.passport_dpp_id = entry;
-    else normalized[key] = entry;
-  }
-  return normalized;
+  return normalizeJsonFriendlyValue(value);
 }
 
 function normalizeOutgoingDppIdentifiers(value) {
-  const normalizedValue = normalizeJsonFriendlyValue(value);
-  if (Array.isArray(normalizedValue)) {
-    return normalizedValue.map((entry) => normalizeOutgoingDppIdentifiers(entry));
-  }
-  if (!isPlainRecord(normalizedValue)) return normalizedValue;
-
-  const normalized = {};
-  for (const [key, rawEntry] of Object.entries(normalizedValue)) {
-    const entry = normalizeOutgoingDppIdentifiers(rawEntry);
-    if (key === "dpp_id") normalized.dppId = entry;
-    else if (key === "dppIds") normalized.dppIds = entry;
-    else if (key === "passportDppId" || key === "passport_dpp_id") normalized.passportDppId = entry;
-    else normalized[key] = entry;
-  }
-  return normalized;
+  return normalizeJsonFriendlyValue(value);
 }
 
 function toBooleanEnv(value, fallback = false) {

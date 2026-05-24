@@ -19,7 +19,7 @@ export function CsvUpdateModal({ passport, passportType, companyId, onClose, onD
     fetchWithAuth(`${API}/api/passport-types/${passportType}`)
       .then((r) => r.json())
       .then((d) => {
-        const sections = d.fields_json?.sections || [];
+        const sections = d.fieldsJson?.sections || [];
         setAllFields(sections.flatMap((section) => section.fields || []).filter((field) => field.type !== "table"));
         setPhase("upload");
       })

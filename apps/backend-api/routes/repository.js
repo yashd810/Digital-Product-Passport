@@ -20,7 +20,19 @@ module.exports = function registerRepositoryRoutes(app, {
   storageService,
 }) {
   const appBaseUrlFromRequest = (req) => `${req.protocol}://${req.get("host")}`;
+  const isAbsoluteHttpUrl = (value) => /^https?:\/\//i.test(String(value || "").trim());
+  const hasStorageProviderMismatch = (row) => {
+    const rowProvider = String(row?.storage_provider || row?.storageProvider || "").trim().toLowerCase();
+    const activeProvider = String(storageService?.provider || storageService?.name || "").trim().toLowerCase();
+    return Boolean(rowProvider && activeProvider && rowProvider !== activeProvider);
+  };
+  const canServeStoredObject = (row) =>
+    Boolean(row?.storage_key && storageService.fetchObject && !hasStorageProviderMismatch(row));
+
   const repositoryFileUrl = (req, row) => {
+    if (hasStorageProviderMismatch(row) && isAbsoluteHttpUrl(row?.file_url)) {
+      return row.file_url;
+    }
     if (row?.id && (row.storage_key || row.file_path)) {
       return buildRepositoryFilePublicUrl({
         appBaseUrl: appBaseUrlFromRequest(req),
@@ -32,8 +44,17 @@ module.exports = function registerRepositoryRoutes(app, {
   };
 
   const withResolvedFileUrl = (req, row) => ({
-    ...row,
-    file_url: repositoryFileUrl(req, row),
+    id: row.id,
+    companyId: row.companyId ?? row.company_id ?? null,
+    parentId: row.parentId ?? row.parent_id ?? null,
+    name: row.name || "",
+    type: row.type || "",
+    fileUrl: repositoryFileUrl(req, row),
+    storageKey: row.storageKey ?? row.storage_key ?? null,
+    filePath: row.filePath ?? row.file_path ?? null,
+    mimeType: row.mimeType ?? row.mime_type ?? null,
+    sizeBytes: row.sizeBytes ?? row.size_bytes ?? null,
+    createdAt: row.createdAt ?? row.created_at ?? null,
   });
 
   const setRepositoryFileHeaders = (res, row) => {
@@ -48,6 +69,12 @@ module.exports = function registerRepositoryRoutes(app, {
       res.removeHeader("X-Frame-Options");
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     }
+  };
+
+  const maybeRedirectToExternalFileUrl = (res, row) => {
+    if (!hasStorageProviderMismatch(row) || !isAbsoluteHttpUrl(row?.file_url)) return false;
+    res.redirect(302, row.file_url);
+    return true;
   };
 
   app.get("/api/companies/:companyId/repository", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -144,6 +171,9 @@ module.exports = function registerRepositoryRoutes(app, {
         );
         res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
       } catch (e) {
+        if (e.code === "STORAGE_DISABLED") {
+          return res.status(503).json({ error: e.message });
+        }
         if (e.code === "LIMIT_FILE_SIZE") {
           return res.status(413).json({ error: "File too large. Max 50 MB." });
         }
@@ -309,7 +339,10 @@ module.exports = function registerRepositoryRoutes(app, {
         );
         res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
       } catch (e) {
-      logger.error("Company symbol upload error:", e.message);
+        if (e.code === "STORAGE_DISABLED") {
+          return res.status(503).json({ error: e.message });
+        }
+        logger.error("Company symbol upload error:", e.message);
         res.status(500).json({ error: e.message || "Upload failed" });
       }
     }
@@ -337,7 +370,7 @@ module.exports = function registerRepositoryRoutes(app, {
 
         setRepositoryFileHeaders(res, row);
 
-        if (row.storage_key && storageService.fetchObject) {
+        if (canServeStoredObject(row)) {
           const objectResponse = await storageService.fetchObject(row.storage_key);
           const contentLength = objectResponse.headers?.get("content-length");
           const etag = objectResponse.headers?.get("etag");
@@ -345,6 +378,8 @@ module.exports = function registerRepositoryRoutes(app, {
           if (etag) res.setHeader("ETag", etag);
           return res.send(Buffer.from(await objectResponse.arrayBuffer()));
         }
+
+        if (maybeRedirectToExternalFileUrl(res, row)) return;
 
         if (row.file_path) {
           const safeFilePath = path.resolve(row.file_path);
@@ -384,7 +419,7 @@ module.exports = function registerRepositoryRoutes(app, {
 
         setRepositoryFileHeaders(res, row);
 
-        if (row.storage_key && storageService.fetchObject) {
+        if (canServeStoredObject(row)) {
           const objectResponse = await storageService.fetchObject(row.storage_key);
           const contentLength = objectResponse.headers?.get("content-length");
           const etag = objectResponse.headers?.get("etag");
@@ -392,6 +427,8 @@ module.exports = function registerRepositoryRoutes(app, {
           if (etag) res.setHeader("ETag", etag);
           return res.send(Buffer.from(await objectResponse.arrayBuffer()));
         }
+
+        if (maybeRedirectToExternalFileUrl(res, row)) return;
 
         if (row.file_path) {
           const safeFilePath = path.resolve(row.file_path);
@@ -429,7 +466,7 @@ module.exports = function registerRepositoryRoutes(app, {
 
         setRepositoryFileHeaders(res, row);
 
-        if (row.storage_key && storageService.fetchObject) {
+        if (canServeStoredObject(row)) {
           const objectResponse = await storageService.fetchObject(row.storage_key);
           const contentLength = objectResponse.headers?.get("content-length");
           const etag = objectResponse.headers?.get("etag");
@@ -437,6 +474,8 @@ module.exports = function registerRepositoryRoutes(app, {
           if (etag) res.setHeader("ETag", etag);
           return res.send(Buffer.from(await objectResponse.arrayBuffer()));
         }
+
+        if (maybeRedirectToExternalFileUrl(res, row)) return;
 
         if (row.file_path) {
           const safeFilePath = path.resolve(row.file_path);

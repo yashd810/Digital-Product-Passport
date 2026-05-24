@@ -4,6 +4,39 @@ module.exports = function registerNotificationRoutes(app, {
   pool,
   authenticateToken,
 }) {
+  const mapNotificationRow = (row = {}) => ({
+    id: row.id,
+    userId: row.userId ?? null,
+    type: row.type || null,
+    title: row.title || "",
+    message: row.message || "",
+    passportDppId: row.passportDppId ?? null,
+    actionUrl: row.actionUrl ?? null,
+    read: Boolean(row.read),
+    createdAt: row.createdAt ?? null,
+  });
+
+  const mapFullNotificationRow = (row = {}) => ({
+    ...mapNotificationRow(row),
+    reviewerId: row.reviewerId ?? null,
+    approverId: row.approverId ?? null,
+    reviewStatus: row.reviewStatus ?? null,
+    approvalStatus: row.approvalStatus ?? null,
+    overallStatus: row.overallStatus ?? null,
+    reviewerComment: row.reviewerComment ?? null,
+    approverComment: row.approverComment ?? null,
+    reviewedAt: row.reviewedAt ?? null,
+    approvedAt: row.approvedAt ?? null,
+    rejectedAt: row.rejectedAt ?? null,
+    workflowSubmittedAt: row.workflowSubmittedAt ?? null,
+    reviewerName: row.reviewerName ?? null,
+    reviewerEmail: row.reviewerEmail ?? null,
+    approverName: row.approverName ?? null,
+    approverEmail: row.approverEmail ?? null,
+    submitterName: row.submitterName ?? null,
+    submitterEmail: row.submitterEmail ?? null,
+  });
+
   app.get("/api/users/me/notifications", authenticateToken, async (req, res) => {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), 100);
@@ -11,7 +44,7 @@ module.exports = function registerNotificationRoutes(app, {
         "SELECT * FROM notifications WHERE \"userId\" = $1 ORDER BY \"createdAt\" DESC LIMIT $2",
         [req.user.userId, limit]
       );
-      res.json(r.rows);
+      res.json(r.rows.map(mapNotificationRow));
     } catch {
       res.status(500).json({ error: "Failed" });
     }
@@ -23,23 +56,23 @@ module.exports = function registerNotificationRoutes(app, {
       const r = await pool.query(
         `SELECT
            n.*,
-           pw.reviewer_id,
-           pw.approver_id,
-           pw.review_status,
-           pw.approval_status,
-           pw.overall_status,
-           pw.reviewer_comment,
-           pw.approver_comment,
-           pw.reviewed_at,
-           pw.approved_at,
-           pw.rejected_at,
-           pw.created_at  AS workflow_submitted_at,
-           CONCAT(ur.first_name, ' ', ur.last_name) AS reviewer_name,
-           ur.email                                  AS reviewer_email,
-           CONCAT(ua.first_name, ' ', ua.last_name) AS approver_name,
-           ua.email                                  AS approver_email,
-           CONCAT(us.first_name, ' ', us.last_name) AS submitter_name,
-           us.email                                  AS submitter_email
+           pw."reviewerId" AS "reviewerId",
+           pw."approverId" AS "approverId",
+           pw."reviewStatus" AS "reviewStatus",
+           pw."approvalStatus" AS "approvalStatus",
+           pw."overallStatus" AS "overallStatus",
+           pw."reviewerComment" AS "reviewerComment",
+           pw."approverComment" AS "approverComment",
+           pw."reviewedAt" AS "reviewedAt",
+           pw."approvedAt" AS "approvedAt",
+           pw."rejectedAt" AS "rejectedAt",
+           pw."createdAt" AS "workflowSubmittedAt",
+           CONCAT(ur.first_name, ' ', ur.last_name) AS "reviewerName",
+           ur.email AS "reviewerEmail",
+           CONCAT(ua.first_name, ' ', ua.last_name) AS "approverName",
+           ua.email AS "approverEmail",
+           CONCAT(us.first_name, ' ', us.last_name) AS "submitterName",
+           us.email AS "submitterEmail"
          FROM notifications n
          LEFT JOIN passport_workflow pw
            ON pw."passportDppId" = n."passportDppId"
@@ -55,7 +88,7 @@ module.exports = function registerNotificationRoutes(app, {
          LIMIT $2`,
         [req.user.userId, limit]
       );
-      res.json(r.rows);
+      res.json(r.rows.map(mapFullNotificationRow));
     } catch (e) {
       logger.error("Full notifications error:", e.message);
       res.status(500).json({ error: "Failed" });

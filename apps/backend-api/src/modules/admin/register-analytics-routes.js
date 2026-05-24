@@ -12,11 +12,87 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
     ARCHIVED_HISTORY_FILTER_SQL,
   } = deps;
 
+  const mapCompanyAnalyticsRow = (row = {}) => ({
+    id: row.id,
+    companyName: row.companyName ?? null,
+    totalPassports: row.totalPassports ?? 0,
+    draftCount: row.draftCount ?? 0,
+    inReviewCount: row.inReviewCount ?? 0,
+    releasedCount: row.releasedCount ?? 0,
+    revisedCount: row.revisedCount ?? 0,
+    obsoleteCount: row.obsoleteCount ?? 0,
+    archivedCount: row.archivedCount ?? 0,
+  });
+
+  const mapTypeAnalyticsRow = (row = {}) => ({
+    companyName: row.companyName ?? null,
+    passportType: row.passportType ?? null,
+    displayName: row.displayName ?? null,
+    productCategory: row.productCategory ?? null,
+    totalCount: row.totalCount ?? 0,
+    draftCount: row.draftCount ?? 0,
+    releasedCount: row.releasedCount ?? 0,
+    revisedCount: row.revisedCount ?? 0,
+  });
+
+  const mapCategoryRow = (row = {}) => ({
+    productCategory: row.productCategory ?? null,
+    productIcon: row.productIcon ?? null,
+    total: row.total ?? 0,
+    draft: row.draft ?? 0,
+    released: row.released ?? 0,
+    revised: row.revised ?? 0,
+    obsolete: row.obsolete ?? 0,
+    archived: row.archived ?? 0,
+    types: Array.isArray(row.types)
+      ? row.types.map((type) => ({
+          typeName: type.typeName ?? null,
+          displayName: type.displayName ?? null,
+          total: type.total ?? 0,
+          draft: type.draft ?? 0,
+          released: type.released ?? 0,
+          revised: type.revised ?? 0,
+          obsolete: type.obsolete ?? 0,
+          archived: type.archived ?? 0,
+        }))
+      : [],
+  });
+
+  const mapOverallRow = (row = {}) => ({
+    totalCompanies: row.totalCompanies ?? 0,
+    totalPassports: row.totalPassports ?? 0,
+    draftCount: row.draftCount ?? 0,
+    inReviewCount: row.inReviewCount ?? 0,
+    releasedCount: row.releasedCount ?? 0,
+    revisedCount: row.revisedCount ?? 0,
+    obsoleteCount: row.obsoleteCount ?? 0,
+    archivedCount: row.archivedCount ?? 0,
+  });
+
+  const mapUserRow = (row = {}) => ({
+    id: row.id,
+    email: row.email ?? null,
+    firstName: row.firstName ?? null,
+    lastName: row.lastName ?? null,
+    role: row.role ?? null,
+    isActive: row.isActive ?? null,
+    createdAt: row.createdAt ?? null,
+    lastLoginAt: row.lastLoginAt ?? null,
+  });
+
   app.get("/api/admin/analytics", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const companiesRes = await pool.query("SELECT id, company_name FROM companies ORDER BY company_name");
+      const companiesRes = await pool.query(
+        `SELECT id, company_name AS "companyName"
+         FROM companies
+         ORDER BY company_name`
+      );
       const accessRes = await pool.query(`
-        SELECT cpa.company_id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon
+        SELECT cpa.company_id AS "companyId",
+               pt.type_name AS "typeName",
+               pt.display_name AS "displayName",
+               pt.product_category AS "productCategory",
+               pt.product_icon AS "productIcon"
         FROM company_passport_access cpa
         JOIN passport_types pt ON pt.id = cpa.passport_type_id
       `);
@@ -45,47 +121,59 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       });
 
       const overall = {
-        total_companies: companiesRes.rows.length,
-        total_passports: 0, draft_count: 0, in_review_count: 0, released_count: 0, revised_count: 0, obsolete_count: 0,
-        archived_count: parseInt(archivedRes.rows[0].count, 10) || 0
+        totalCompanies: companiesRes.rows.length,
+        totalPassports: 0,
+        draftCount: 0,
+        inReviewCount: 0,
+        releasedCount: 0,
+        revisedCount: 0,
+        obsoleteCount: 0,
+        archivedCount: parseInt(archivedRes.rows[0].count, 10) || 0
       };
       const byCompany = [];
       const byType = [];
       const productCategoryMap = {};
 
       for (const company of companiesRes.rows) {
-        const grantedTypes = accessRes.rows.filter((access) => access.company_id === company.id);
+        const grantedTypes = accessRes.rows.filter((access) => access.companyId === company.id);
 
         const compStats = {
-          id: company.id, company_name: company.company_name,
-          total_passports: 0, draft_count: 0, in_review_count: 0, released_count: 0, revised_count: 0, obsolete_count: 0,
-          archived_count: archivedByCompany[company.id] || 0
+          id: company.id,
+          companyName: company.companyName,
+          totalPassports: 0,
+          draftCount: 0,
+          inReviewCount: 0,
+          releasedCount: 0,
+          revisedCount: 0,
+          obsoleteCount: 0,
+          archivedCount: archivedByCompany[company.id] || 0
         };
 
         for (const typeAccess of grantedTypes) {
           try {
-            const stats = await queryTableStats(typeAccess.type_name, company.id);
+            const stats = await queryTableStats(typeAccess.typeName, company.id);
             if (stats.total === 0) continue;
 
-            compStats.total_passports += stats.total;
-            compStats.draft_count += stats.draft;
-            compStats.in_review_count += stats.in_review;
-            compStats.released_count += stats.released;
-            compStats.revised_count += stats.revised;
-            compStats.obsolete_count += stats.obsolete;
+            compStats.totalPassports += stats.total;
+            compStats.draftCount += stats.draft;
+            compStats.inReviewCount += stats.in_review;
+            compStats.releasedCount += stats.released;
+            compStats.revisedCount += stats.revised;
+            compStats.obsoleteCount += stats.obsolete;
 
-            overall.total_passports += stats.total;
-            overall.draft_count += stats.draft;
-            overall.in_review_count += stats.in_review;
-            overall.released_count += stats.released;
-            overall.revised_count += stats.revised;
-            overall.obsolete_count += stats.obsolete;
+            overall.totalPassports += stats.total;
+            overall.draftCount += stats.draft;
+            overall.inReviewCount += stats.in_review;
+            overall.releasedCount += stats.released;
+            overall.revisedCount += stats.revised;
+            overall.obsoleteCount += stats.obsolete;
 
-            const category = typeAccess.product_category;
-            const typeArchived = archivedByType[`${company.id}:${typeAccess.type_name}`] || 0;
+            const category = typeAccess.productCategory;
+            const typeArchived = archivedByType[`${company.id}:${typeAccess.typeName}`] || 0;
             if (!productCategoryMap[category]) {
               productCategoryMap[category] = {
-                product_category: category, product_icon: typeAccess.product_icon,
+                productCategory: category,
+                productIcon: typeAccess.productIcon,
                 total: 0, draft: 0, released: 0, revised: 0, obsolete: 0, archived: 0, types: {}
               };
             }
@@ -96,10 +184,11 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
             productCategoryMap[category].obsolete += stats.obsolete;
             productCategoryMap[category].archived += typeArchived;
 
-            const typeKey = typeAccess.type_name;
+            const typeKey = typeAccess.typeName;
             if (!productCategoryMap[category].types[typeKey]) {
               productCategoryMap[category].types[typeKey] = {
-                type_name: typeKey, display_name: typeAccess.display_name,
+                typeName: typeKey,
+                displayName: typeAccess.displayName,
                 total: 0, draft: 0, released: 0, revised: 0, obsolete: 0, archived: 0
               };
             }
@@ -111,13 +200,17 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
             productCategoryMap[category].types[typeKey].archived += typeArchived;
 
             byType.push({
-              company_name: company.company_name, passport_type: typeAccess.type_name,
-              display_name: typeAccess.display_name, product_category: category,
-              total_count: stats.total, draft_count: stats.draft,
-              released_count: stats.released, revised_count: stats.revised
+              companyName: company.companyName,
+              passportType: typeAccess.typeName,
+              displayName: typeAccess.displayName,
+              productCategory: category,
+              totalCount: stats.total,
+              draftCount: stats.draft,
+              releasedCount: stats.released,
+              revisedCount: stats.revised
             });
           } catch (error) {
-            logger.error(`Analytics error for ${company.id}/${typeAccess.type_name}:`, error.message);
+            logger.error(`Analytics error for ${company.id}/${typeAccess.typeName}:`, error.message);
           }
         }
 
@@ -128,10 +221,15 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
         ...entry, types: Object.values(entry.types)
       }));
 
-      overall.total_passports += overall.archived_count;
-      byCompany.forEach((company) => { company.total_passports += company.archived_count; });
+      overall.totalPassports += overall.archivedCount;
+      byCompany.forEach((company) => { company.totalPassports += company.archivedCount; });
 
-      res.json({ overall, byCompany, byType, byProductCategory });
+      res.json({
+        overall: mapOverallRow(overall),
+        byCompany: byCompany.map(mapCompanyAnalyticsRow),
+        byType: byType.map(mapTypeAnalyticsRow),
+        byProductCategory: byProductCategory.map(mapCategoryRow),
+      });
     } catch (error) {
       logger.error("Admin analytics error:", error.message);
       res.status(500).json({ error: "Failed to fetch analytics" });
@@ -143,7 +241,11 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       const { companyId } = req.params;
 
       const accessRes = await pool.query(`
-        SELECT pt.type_name, pt.display_name, pt.product_category, pt.product_icon, cpa.granted_at
+        SELECT pt.type_name AS "typeName",
+               pt.display_name AS "displayName",
+               pt.product_category AS "productCategory",
+               pt.product_icon AS "productIcon",
+               cpa.granted_at AS "grantedAt"
         FROM company_passport_access cpa
         JOIN passport_types pt ON pt.id = cpa.passport_type_id
         WHERE cpa.company_id = $1
@@ -155,7 +257,7 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       const now = new Date();
       const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const firstGrantedAt = accessRes.rows
-        .map((row) => row.granted_at ? new Date(row.granted_at) : null)
+        .map((row) => row.grantedAt ? new Date(row.grantedAt) : null)
         .filter((value) => value && !Number.isNaN(value.getTime()))
         .sort((a, b) => a - b)[0];
       const trendStart = firstGrantedAt
@@ -167,18 +269,25 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       }
       const trendSeriesMap = {};
 
-      for (const { type_name, display_name, product_category, product_icon } of accessRes.rows) {
+      for (const { typeName, displayName, productCategory, productIcon } of accessRes.rows) {
         try {
-          const stats = await queryTableStats(type_name, companyId);
+          const stats = await queryTableStats(typeName, companyId);
           if (stats.total === 0) continue;
           totalPassports += stats.total;
           analytics.push({
-            passport_type: type_name, display_name, product_category, product_icon,
-            total: stats.total, draft_count: stats.draft, released_count: stats.released,
-            revised_count: stats.revised, in_review_count: stats.in_review, obsolete_count: stats.obsolete
+            passportType: typeName,
+            displayName,
+            productCategory,
+            productIcon,
+            total: stats.total,
+            draftCount: stats.draft,
+            releasedCount: stats.released,
+            revisedCount: stats.revised,
+            inReviewCount: stats.in_review,
+            obsoleteCount: stats.obsolete
           });
 
-          const tableName = getTable(type_name);
+          const tableName = getTable(typeName);
           const baselineRes = await pool.query(
             `SELECT COUNT(*) AS count FROM ${tableName}
              WHERE "companyId" = $1 AND "deletedAt" IS NULL AND "createdAt" < $2`,
@@ -192,23 +301,25 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
             [companyId, trendStart.toISOString()]
           );
 
-          if (!trendSeriesMap[product_category]) {
-            trendSeriesMap[product_category] = {
-              product_category, product_icon, baseline: 0,
+          if (!trendSeriesMap[productCategory]) {
+            trendSeriesMap[productCategory] = {
+              productCategory,
+              productIcon,
+              baseline: 0,
               monthlyCounts: Object.fromEntries(
                 trendMonths.map((month) => [month.toISOString().slice(0, 7), 0])
               )
             };
           }
 
-          trendSeriesMap[product_category].baseline += parseInt(baselineRes.rows[0]?.count || 0, 10);
+          trendSeriesMap[productCategory].baseline += parseInt(baselineRes.rows[0]?.count || 0, 10);
           monthlyRes.rows.forEach((row) => {
             const key = new Date(row.month_bucket).toISOString().slice(0, 7);
-            trendSeriesMap[product_category].monthlyCounts[key] =
-              (trendSeriesMap[product_category].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
+            trendSeriesMap[productCategory].monthlyCounts[key] =
+              (trendSeriesMap[productCategory].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
           });
         } catch (error) {
-          logger.error(`Per-company analytics error for ${companyId}/${type_name}:`, error.message);
+          logger.error(`Per-company analytics error for ${companyId}/${typeName}:`, error.message);
         }
       }
 
@@ -233,8 +344,8 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
         series: Object.values(trendSeriesMap).map((series) => {
           let running = series.baseline;
           return {
-            product_category: series.product_category,
-            product_icon: series.product_icon,
+            productCategory: series.productCategory,
+            productIcon: series.productIcon,
             values: trendMonths.map((month) => {
               const key = month.toISOString().slice(0, 7);
               running += series.monthlyCounts[key] || 0;
@@ -245,13 +356,38 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       };
 
       const users = await pool.query(
-        `SELECT id, email, first_name, last_name, role, is_active, created_at, last_login_at
-         FROM users WHERE company_id = $1 AND role != 'super_admin' ORDER BY role, first_name`,
+        `SELECT id,
+                email,
+                first_name AS "firstName",
+                last_name AS "lastName",
+                role,
+                is_active AS "isActive",
+                created_at AS "createdAt",
+                last_login_at AS "lastLoginAt"
+         FROM users
+         WHERE company_id = $1 AND role != 'super_admin'
+         ORDER BY role, first_name`,
         [companyId]
       );
-      const company = await pool.query("SELECT company_name FROM companies WHERE id = $1", [companyId]);
+      const company = await pool.query(
+        `SELECT company_name AS "companyName"
+         FROM companies
+         WHERE id = $1`,
+        [companyId]
+      );
 
-      res.json({ totalPassports, analytics, scanStats, archivedCount, trend, users: users.rows, company: company.rows[0] });
+      res.json({
+        totalPassports,
+        analytics,
+        scanStats,
+        archivedCount,
+        trend: {
+          labels: trend.labels,
+          series: trend.series || [],
+        },
+        users: users.rows.map(mapUserRow),
+        company: { companyName: company.rows[0]?.companyName || `Company ${companyId}` },
+      });
     } catch {
       res.status(500).json({ error: "Failed" });
     }

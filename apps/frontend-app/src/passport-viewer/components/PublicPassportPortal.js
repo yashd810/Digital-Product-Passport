@@ -89,13 +89,12 @@ function stableDidSegment(value, fallback = "passport") {
 
 function buildViewerDidFallbacks(passport, companyData) {
   const didDomain = "www.claros-dpp.online";
-  const companyName = companyData?.company_name
-    || passport?.company_profile?.company_name
+  const companyName = companyData?.companyName
+    || passport?.companyProfile?.companyName
     || passport?.companyName
-    || passport?.company_name
     || passport?.companyId
     || "company";
-  const companySlug = slugifyDidSegment(companyData?.did_slug || passport?.company_profile?.did_slug || companyName);
+  const companySlug = slugifyDidSegment(companyData?.didSlug || passport?.companyProfile?.didSlug || companyName);
   const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
   const stableId = stableDidSegment(passport?.lineageId || passport?.dppId || passport?.internalAliasId);
   return {
@@ -247,7 +246,7 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues,
 }
 
 function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
-  const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
+  const systemHeader = normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader || typeDef?.systemHeader);
   const canonicalSubjects = passport?.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport, companyData);
   const resolvedCompanyDid = passport?.companyDid || canonicalSubjects.companyDid || fallbackDids.companyDid;
@@ -259,14 +258,14 @@ function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
     uniqueProductIdentifier: passport?.uniqueProductIdentifier || null,
     internalAliasId: passport?.internalAliasId,
     granularity: passport?.granularity || "item",
-    dppSchemaVersion: passport?.dppSchemaVersion || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
+    dppSchemaVersion: passport?.dppSchemaVersion || typeDef?.fieldsJson?.dppSchemaVersion || "prEN 18223:2025",
     dppStatus: formatPassportStatus(passport?.releaseStatus),
     lastUpdate: formatIsoDate(lastUpdateAt || passport?.updatedAt || passport?.createdAt) || null,
     economicOperatorId: resolvedCompanyDid || passport?.economicOperatorId,
     facilityId: resolvedFacilityDid || passport?.facilityId,
     contentSpecificationIds: Array.isArray(passport?.contentSpecificationIds)
       ? passport.contentSpecificationIds.join(", ")
-      : passport?.contentSpecificationIds || passport?.complianceProfileKey || typeDef?.semantic_model_key,
+      : passport?.contentSpecificationIds || passport?.complianceProfileKey || typeDef?.semanticModelKey,
     subjectDid: resolvedSubjectDid,
     dppDid: resolvedDppDid,
     companyDid: resolvedCompanyDid,
@@ -581,7 +580,7 @@ export default function PublicPassportPortal({
 }) {
   const [activePage, setActivePage] = useState("overview");
   const [previewImage, setPreviewImage] = useState(null);
-  const sections = (typeDef?.fields_json?.sections || typeDef?.sections || []).map((section) => ({
+  const sections = (typeDef?.fieldsJson?.sections || typeDef?.sections || []).map((section) => ({
     ...section,
     fields: (section.fields || []).filter((field) => !isViewerHiddenField(field)),
   }));
@@ -633,7 +632,7 @@ export default function PublicPassportPortal({
 
   const currentStatus = formatPassportStatus(passport?.releaseStatus || "");
   const heroMetrics = [
-    ["Manufacturer", companyData?.company_name || passport?.manufacturer || passport?.manufactured_by || ""],
+    ["Manufacturer", companyData?.companyName || passport?.manufacturer || passport?.manufactured_by || ""],
     ["Serial number", passport?.batterySerialNumber || passport?.serialNumber || passport?.productSerialNumber || ""],
     ["Status", currentStatus || ""],
     ["Last update", formatIsoDate(lastUpdateAt || passport?.updatedAt || passport?.createdAt)],
@@ -671,7 +670,7 @@ export default function PublicPassportPortal({
       <header className="hero" id="portal-top">
         <div className="hero-main">
           <div>
-            <div className="kicker">{typeDef?.display_name || passport?.passportType || "Battery product passport"}</div>
+            <div className="kicker">{typeDef?.displayName || passport?.passportType || "Battery product passport"}</div>
             <h1>{displayModelName}</h1>
             {(isPreviewMode || isInactiveView || isObsolete || unlockedPassport) && (
               <div className="hero-badge-row">
@@ -695,8 +694,8 @@ export default function PublicPassportPortal({
           </div>
 
           <aside className="side-panel" aria-label="Product image and QR access">
-            <div className={`product-photo${companyData?.company_logo ? " has-img" : ""}`}>
-              {companyData?.company_logo && <img src={companyData.company_logo} alt={`${companyData.company_name || "Company"} logo`} />}
+            <div className={`product-photo${companyData?.companyLogo ? " has-img" : ""}`}>
+              {companyData?.companyLogo && <img src={companyData.companyLogo} alt={`${companyData.companyName || "Company"} logo`} />}
             </div>
             <div className="qr-row">
               <div className="qr" aria-label="Passport QR code">
@@ -956,7 +955,7 @@ export default function PublicPassportPortal({
 
       <footer className="footer">
         <div className="footer-inner">
-          <span>{companyData?.company_name || "ClarosDPP"} · Category-specific battery passport</span>
+          <span>{companyData?.companyName || "ClarosDPP"} · Category-specific battery passport</span>
           <span>Public passport viewer</span>
         </div>
       </footer>

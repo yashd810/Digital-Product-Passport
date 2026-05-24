@@ -251,12 +251,11 @@ function isViewerHiddenField(field) {
 
 function buildViewerDidFallbacks(passport) {
   const didDomain = "www.claros-dpp.online";
-  const companyName = passport?.company_profile?.company_name
+  const companyName = passport?.companyProfile?.companyName
     || passport?.companyName
-    || passport?.company_name
     || passport?.companyId
     || "company";
-  const companySlug = slugifyDidSegment(passport?.company_profile?.did_slug || companyName);
+  const companySlug = slugifyDidSegment(passport?.companyProfile?.didSlug || companyName);
   const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
   const stableId = stableDidSegment(passport?.lineageId || passport?.dppId || passport?.internalAliasId);
   return {
@@ -283,7 +282,7 @@ function parseHeaderArray(value) {
 
 export function PassportHeaderPanel({ passport, typeDef }) {
   if (!passport) return null;
-  const systemHeader = normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader || typeDef?.systemHeader);
+  const systemHeader = normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader || typeDef?.systemHeader);
   const fields = Array.isArray(systemHeader?.fields)
     ? systemHeader.fields.filter((field) => field?.key !== "internalAliasId" && !isViewerHiddenField(field))
     : [];
@@ -298,12 +297,12 @@ export function PassportHeaderPanel({ passport, typeDef }) {
     uniqueProductIdentifier: passport.uniqueProductIdentifier || null,
     internalAliasId: passport.internalAliasId,
     granularity: passport.granularity || "item",
-    dppSchemaVersion: passport.dppSchemaVersion || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
+    dppSchemaVersion: passport.dppSchemaVersion || typeDef?.fieldsJson?.dppSchemaVersion || "prEN 18223:2025",
     dppStatus: formatPassportStatus(passport.releaseStatus),
     lastUpdate: formatIsoDate(passport.updatedAt || passport.createdAt) || null,
     economicOperatorId: resolvedCompanyDid || passport.economicOperatorId,
     facilityId: resolvedFacilityDid || passport.facilityId,
-    contentSpecificationIds: parseHeaderArray(passport.contentSpecificationIds || passport.complianceProfileKey || typeDef?.semantic_model_key),
+    contentSpecificationIds: parseHeaderArray(passport.contentSpecificationIds || passport.complianceProfileKey || typeDef?.semanticModelKey),
     subjectDid: resolvedSubjectDid,
     dppDid: resolvedDppDid,
     companyDid: resolvedCompanyDid,
@@ -352,43 +351,27 @@ export function PassportIntro({
 }) {
   if (!passport) return null;
   const activityState = getPassportActivityState(passport);
-  const manufacturingDate =
-    passport.manufactured_date ||
-    passport.manufacture_date ||
-    passport.manufacturing_date ||
-    passport.date_of_manufacture ||
-    "—";
-  const uniqueBatteryIdentifier =
-    passport.uniqueProductIdentifier ||
-    passport.unique_battery_identifier ||
-    passport.battery_identifier ||
-    "—";
-  const batteryMass =
-    passport.battery_mass ||
-    passport.battery_weight ||
-    passport.weight ||
-    "—";
+  const manufacturingDate = passport.manufacturingDate || "—";
+  const uniqueBatteryIdentifier = passport.uniqueBatteryIdentifier || passport.uniqueProductIdentifier || "—";
+  const batteryMass = passport.batteryMass || "—";
   const serialNumber =
     passport.batterySerialNumber ||
     passport.productSerialNumber ||
     passport.serialNumber ||
     "—";
   const manufacturerInfo =
-    companyData?.company_name ||
+    companyData?.companyName ||
+    passport.manufacturerInformation ||
     passport.manufacturer ||
-    passport.manufactured_by ||
     "—";
-  const carbonFootprintRaw = passport.carbon_footprint_label_and_performance_class || "";
+  const carbonFootprintRaw = passport.carbonFootprintPerformanceClass || "";
   const carbonFootprintIsUrl = /^(https?:)?\/\//i.test(String(carbonFootprintRaw)) || String(carbonFootprintRaw).startsWith("/");
   const carbonFootprintLabelAndClass = carbonFootprintRaw
     ? (carbonFootprintIsUrl
         ? <img src={carbonFootprintRaw} alt="Carbon Footprint Label" className="pv-hero-stat-symbol" />
         : carbonFootprintRaw)
     : "—";
-  const batteryChemistry =
-    passport.battery_chemistry ||
-    passport.chemistry ||
-    "—";
+  const batteryChemistry = passport.batteryChemistry || "—";
   const summaryStats = [
     { label: "Digital Passport ID", value: passport.dppId || "—" },
     { label: "Manufacturing Date", value: manufacturingDate },
@@ -430,9 +413,9 @@ export function PassportIntro({
           </button>
         </div>
 
-        {companyData?.company_logo && (
+        {companyData?.companyLogo && (
           <div className="pv-company-card">
-            <img src={companyData.company_logo} alt="Company Logo" className="pv-company-logo" />
+            <img src={companyData.companyLogo} alt="Company Logo" className="pv-company-logo" />
           </div>
         )}
 
@@ -468,7 +451,7 @@ export function Header({ displayName, lang, setLang, dppId, companyData, brandTh
       <div className="viewer-header-inner viewer-header-shell">
         <div>
           <h1>{brandTheme?.title || "Digital Product Passport"}</h1>
-          <p>{companyData?.company_name ? `${companyData.company_name} · ${displayName}` : displayName}</p>
+          <p>{companyData?.companyName ? `${companyData.companyName} · ${displayName}` : displayName}</p>
           <ViewerDomainIndicator compact />
           {brandTheme?.companyWebsite && (
             <a href={brandTheme.companyWebsite} target="_blank" rel="noopener noreferrer" className="viewer-header-website">
@@ -477,8 +460,8 @@ export function Header({ displayName, lang, setLang, dppId, companyData, brandTh
           )}
         </div>
         <div className="viewer-header-actions">
-          {companyData?.company_logo && (
-            <img src={companyData.company_logo} alt={`${companyData.company_name || "Company"} logo`} className="viewer-header-brand-logo" />
+          {companyData?.companyLogo && (
+            <img src={companyData.companyLogo} alt={`${companyData.companyName || "Company"} logo`} className="viewer-header-brand-logo" />
           )}
           <ScanBadge dppId={dppId} />
           <ViewerLangSelector lang={lang} setLang={setLang} />

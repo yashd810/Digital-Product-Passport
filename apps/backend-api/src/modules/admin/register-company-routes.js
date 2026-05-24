@@ -24,6 +24,29 @@ module.exports = function registerCompanyRoutes(app, deps) {
     COMPANY_TRUST_LEVELS,
   } = deps;
 
+  function mapCompanyRow(row = {}) {
+    return {
+      id: row.id ?? null,
+      country: row.country ?? null,
+      companyName: row.companyName ?? row.company_name ?? null,
+      legalName: row.legalName ?? row.legal_name ?? null,
+      companyRegistrationNumber: row.companyRegistrationNumber ?? row.company_registration_number ?? null,
+      vatNumber: row.vatNumber ?? row.vat_number ?? null,
+      websiteDomain: row.websiteDomain ?? row.website_domain ?? null,
+      customerTrustLevel: row.customerTrustLevel ?? row.customer_trust_level ?? null,
+      verificationStatus: row.verificationStatus ?? row.verification_status ?? null,
+      authorizedContactName: row.authorizedContactName ?? row.authorized_contact_name ?? null,
+      authorizedContactEmail: row.authorizedContactEmail ?? row.authorized_contact_email ?? null,
+      isActive: row.isActive ?? row.is_active ?? null,
+      assetManagementEnabled: row.assetManagementEnabled ?? row.asset_management_enabled ?? null,
+      assetManagementRevokedAt: row.assetManagementRevokedAt ?? row.asset_management_revoked_at ?? null,
+      grantedTypeNames: row.grantedTypeNames ?? row.granted_type_names ?? [],
+      grantedTypes: row.grantedTypes ?? row.granted_types ?? [],
+      createdAt: row.createdAt ?? row.created_at ?? null,
+      updatedAt: row.updatedAt ?? row.updated_at ?? null,
+    };
+  }
+
   function normalizeCompanyIdentity(input = {}) {
     const normalizeText = (value) => {
       const normalized = String(value || "").trim();
@@ -81,7 +104,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
         ]
       );
       await ensureCompanyDppPolicy(result.rows[0].id);
-      res.status(201).json({ success: true, company: result.rows[0] });
+      res.status(201).json({ success: true, company: mapCompanyRow(result.rows[0]) });
     } catch (error) {
       if (error?.code === "23505") {
         return res.status(409).json({ error: "Company name already exists" });
@@ -118,7 +141,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       if (!company.rows.length) {
         return res.status(404).json({ error: "Company not found" });
       }
-      res.json(company.rows[0]);
+      res.json(mapCompanyRow(company.rows[0]));
     } catch {
       res.status(500).json({ error: "Failed to fetch company" });
     }
@@ -168,7 +191,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       if (!updated.rows.length) {
         return res.status(404).json({ error: "Company not found" });
       }
-      res.json({ success: true, company: updated.rows[0] });
+      res.json({ success: true, company: mapCompanyRow(updated.rows[0]) });
     } catch (error) {
       if (error?.code === "23505") {
         return res.status(409).json({ error: "Company name already exists" });
@@ -236,7 +259,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
         GROUP BY c.id
         ORDER BY c.created_at DESC
       `);
-      res.json(result.rows);
+      res.json(result.rows.map(mapCompanyRow));
     } catch {
       res.status(500).json({ error: "Failed to fetch companies" });
     }
@@ -274,7 +297,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
         );
       }
 
-      res.json({ success: true, company: updated.rows[0] });
+      res.json({ success: true, company: mapCompanyRow(updated.rows[0]) });
     } catch (error) {
       logger.error("Asset management toggle error:", error.message);
       res.status(500).json({ error: "Failed to update Asset Management access" });

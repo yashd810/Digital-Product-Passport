@@ -92,7 +92,7 @@ export default function NotificationsPage({ user }) {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
 
-  const hasWorkflow = (n) => n.workflow_submitted_at || n.reviewer_name || n.approver_name;
+  const hasWorkflow = (n) => n.workflowSubmittedAt || n.reviewerName || n.approverName;
 
   const filtered = notifs.filter(n => {
     if (filter === "unread")   return !n.read;
@@ -158,8 +158,8 @@ export default function NotificationsPage({ user }) {
                     </div>
                     {n.message && <div className="nwf-card-msg">{n.message}</div>}
                     <div className="nwf-card-meta">
-                      <span className="nwf-card-time">{fmt(n.created_at)}</span>
-                      <span className="nwf-card-ago">· {timeAgo(n.created_at)}</span>
+                      <span className="nwf-card-time">{fmt(n.createdAt)}</span>
+                      <span className="nwf-card-ago">· {timeAgo(n.createdAt)}</span>
                       {wf && <span className="nwf-has-detail">📋 Workflow details</span>}
                     </div>
                   </div>
@@ -174,80 +174,80 @@ export default function NotificationsPage({ user }) {
                     <div className="nwf-detail-title">Workflow Details</div>
                     <div className="nwf-detail-grid">
 
-                      {n.workflow_submitted_at && (
+                      {n.workflowSubmittedAt && (
                         <div className="nwf-detail-row">
                           <span className="nwf-detail-label">Submitted</span>
-                          <span className="nwf-detail-value">{fmt(n.workflow_submitted_at)}</span>
+                          <span className="nwf-detail-value">{fmt(n.workflowSubmittedAt)}</span>
                         </div>
                       )}
 
-                      {n.submitter_name?.trim() && (
+                      {n.submitterName?.trim() && (
                         <div className="nwf-detail-row">
                           <span className="nwf-detail-label">Submitted by</span>
-                          <span className="nwf-detail-value">{n.submitter_name} <span className="nwf-detail-email">({n.submitter_email})</span></span>
+                          <span className="nwf-detail-value">{n.submitterName} <span className="nwf-detail-email">({n.submitterEmail})</span></span>
                         </div>
                       )}
 
-                      {n.overall_status && (
+                      {n.overallStatus && (
                         <div className="nwf-detail-row">
                           <span className="nwf-detail-label">Overall status</span>
-                          <span className="nwf-detail-value"><StatusPill status={n.overall_status} /></span>
+                          <span className="nwf-detail-value"><StatusPill status={n.overallStatus} /></span>
                         </div>
                       )}
 
-                      {n.reviewer_name?.trim() && (
+                      {n.reviewerName?.trim() && (
                         <>
                           <div className="nwf-detail-section-label">Review</div>
                           <div className="nwf-detail-row">
                             <span className="nwf-detail-label">Reviewer</span>
-                            <span className="nwf-detail-value">{n.reviewer_name} <span className="nwf-detail-email">({n.reviewer_email})</span></span>
+                            <span className="nwf-detail-value">{n.reviewerName} <span className="nwf-detail-email">({n.reviewerEmail})</span></span>
                           </div>
                           <div className="nwf-detail-row">
                             <span className="nwf-detail-label">Status</span>
-                            <span className="nwf-detail-value"><StatusPill status={n.review_status} /></span>
+                            <span className="nwf-detail-value"><StatusPill status={n.reviewStatus} /></span>
                           </div>
-                          {n.reviewed_at && (
+                          {n.reviewedAt && (
                             <div className="nwf-detail-row">
                               <span className="nwf-detail-label">Reviewed at</span>
-                              <span className="nwf-detail-value">{fmt(n.reviewed_at)}</span>
+                              <span className="nwf-detail-value">{fmt(n.reviewedAt)}</span>
                             </div>
                           )}
-                          {n.reviewer_comment && (
+                          {n.reviewerComment && (
                             <div className="nwf-detail-row nwf-detail-row-full">
                               <span className="nwf-detail-label">Reviewer comment</span>
-                              <div className="nwf-comment-box">{n.reviewer_comment}</div>
+                              <div className="nwf-comment-box">{n.reviewerComment}</div>
                             </div>
                           )}
                         </>
                       )}
 
-                      {n.approver_name?.trim() && (
+                      {n.approverName?.trim() && (
                         <>
                           <div className="nwf-detail-section-label">Approval</div>
                           <div className="nwf-detail-row">
                             <span className="nwf-detail-label">Approver</span>
-                            <span className="nwf-detail-value">{n.approver_name} <span className="nwf-detail-email">({n.approver_email})</span></span>
+                            <span className="nwf-detail-value">{n.approverName} <span className="nwf-detail-email">({n.approverEmail})</span></span>
                           </div>
                           <div className="nwf-detail-row">
                             <span className="nwf-detail-label">Status</span>
-                            <span className="nwf-detail-value"><StatusPill status={n.approval_status} /></span>
+                            <span className="nwf-detail-value"><StatusPill status={n.approvalStatus} /></span>
                           </div>
-                          {n.approved_at && (
+                          {n.approvedAt && (
                             <div className="nwf-detail-row">
                               <span className="nwf-detail-label">Approved at</span>
-                              <span className="nwf-detail-value">{fmt(n.approved_at)}</span>
+                              <span className="nwf-detail-value">{fmt(n.approvedAt)}</span>
                             </div>
                           )}
-                          {n.rejected_at && (
+                          {n.rejectedAt && (
                             <div className="nwf-detail-row">
                               <span className="nwf-detail-label">Rejected at</span>
-                              <span className="nwf-detail-value">{fmt(n.rejected_at)}</span>
+                              <span className="nwf-detail-value">{fmt(n.rejectedAt)}</span>
                             </div>
                           )}
-                          {n.approver_comment && (
+                          {n.approverComment && (
                             <div className="nwf-detail-row nwf-detail-row-full">
                               <span className="nwf-detail-label">Approver comment</span>
-                              <div className="nwf-comment-box">{n.approver_comment}</div>
+                              <div className="nwf-comment-box">{n.approverComment}</div>
                             </div>
                           )}
                         </>

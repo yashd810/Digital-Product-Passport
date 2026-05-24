@@ -59,7 +59,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       : null;
 
   const activeTypeData = useMemo(
-    () => allPassportTypes.find((type) => type.type_name === activeType),
+    () => allPassportTypes.find((type) => type.typeName === activeType),
     [activeType, allPassportTypes]
   );
 
@@ -171,7 +171,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         let all = [];
 
         for (const type of types) {
-          const params = new URLSearchParams({ passportType: type.type_name });
+          const params = new URLSearchParams({ passportType: type.typeName });
           if (searchText) params.append("search", searchText);
           if (filterStatus) params.append("status", filterStatus);
 
@@ -205,7 +205,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         });
         const types = typeResponse.ok ? await typeResponse.json() : [];
         const all = await fetchForTypes(
-          (Array.isArray(types) ? types : []).filter((type) => type.product_category === activeProductCategory)
+          (Array.isArray(types) ? types : []).filter((type) => type.productCategory === activeProductCategory)
         );
         all.sort((left, right) => getPassportDateTimestamp(right) - getPassportDateTimestamp(left));
         setPassports(all);
@@ -257,7 +257,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     : activeProductCategory
       ? activeProductCategory
       : activeType
-        ? `${activeTypeData?.display_name || formatPassportTypeLabel(activeType)} Passports`
+        ? `${activeTypeData?.displayName || formatPassportTypeLabel(activeType)} Passports`
         : "Passports";
 
   const displayedPassports = useMemo(() => (
@@ -314,9 +314,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
         key: "createdBy",
         type: "string",
         getValue: (group) => (
-          group.latest?.first_name && group.latest?.last_name
-            ? `${group.latest.first_name} ${group.latest.last_name}`
-            : group.latest?.created_by_email || ""
+          group.latest?.createdByName || group.latest?.createdByEmail || ""
         ),
       });
     }

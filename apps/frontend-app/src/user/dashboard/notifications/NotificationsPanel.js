@@ -99,12 +99,12 @@ function NotificationsPanel({ user }) {
   const handleClick = (n) => {
     markRead(n.id);
     setOpen(false);
-    if (n.action_url) {
-      navigate(n.action_url);
+    if (n.actionUrl) {
+      navigate(n.actionUrl);
       return;
     }
-    if (n.passport_guid) {
-      window.open(`${window.location.origin}/dpp/preview/company/product/${encodeURIComponent(n.passport_guid)}`, "_blank", "noopener,noreferrer");
+    if (n.passportDppId) {
+      window.open(`${window.location.origin}/dpp/preview/company/product/${encodeURIComponent(n.passportDppId)}`, "_blank", "noopener,noreferrer");
       return;
     }
   };
@@ -158,7 +158,7 @@ function NotificationsPanel({ user }) {
                   <div className="notif-content">
                     <div className="notif-title">{n.title}</div>
                     {n.message && <div className="notif-msg">{n.message}</div>}
-                    <div className="notif-time">{timeAgo(n.created_at)}</div>
+                    <div className="notif-time">{timeAgo(n.createdAt)}</div>
                   </div>
                   {!n.read && <div className="notif-dot" />}
                 </div>

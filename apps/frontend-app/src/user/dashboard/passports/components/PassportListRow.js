@@ -128,9 +128,7 @@ export function PassportListRow({
       <td><CompletenessBar pct={pct} /></td>
       {!filterByUser && (
         <td className="small-text">
-          {passport.first_name && passport.last_name
-            ? `${passport.first_name} ${passport.last_name}`
-            : passport.created_by_email || "—"}
+          {passport.createdByName || passport.createdByEmail || "—"}
         </td>
       )}
       <td className="options-cell" onClick={e => e.stopPropagation()}>

@@ -36,7 +36,7 @@ function AdminPassportTypeFields() {
         const res = await fetchWithAuth(`${API}/api/passport-types/${typeName}`);
         if (!res.ok) throw new Error("Passport type not found");
         const data = await res.json();
-        setTypeDef({ ...data, type_name: typeName });
+        setTypeDef({ ...data, typeName });
       } catch (e) {
         setError(e.message);
       } finally {
@@ -50,8 +50,8 @@ function AdminPassportTypeFields() {
   if (error) return <div className="alert alert-error">{error}</div>;
   if (!typeDef) return <div className="alert alert-error">No type data available.</div>;
 
-  const sections = typeDef.fields_json?.sections || []; 
-  const systemHeader = normalizeSystemPassportHeader(typeDef.fields_json?.systemHeader);
+  const sections = typeDef.fieldsJson?.sections || []; 
+  const systemHeader = normalizeSystemPassportHeader(typeDef.fieldsJson?.systemHeader);
   const fieldCount = sections.reduce((sum, s) => sum + (s.fields?.length || 0), 0);
   const describeList = (values = [], labelMap = {}) =>
     (Array.isArray(values) ? values : [])
@@ -65,9 +65,9 @@ function AdminPassportTypeFields() {
           ← Back
         </button>
         <div>
-          <h2 className="apt-title">Fields for {typeDef.display_name || typeName}</h2>
+          <h2 className="apt-title">Fields for {typeDef.displayName || typeName}</h2>
           <p className="apt-subtitle">{fieldCount} field{fieldCount === 1 ? "" : "s"} in {sections.length} section{sections.length === 1 ? "" : "s"}.</p>
-          <p className="apt-subtitle">Semantic model: {getSemanticModelLabel(typeDef.semantic_model_key)}</p>
+          <p className="apt-subtitle">Semantic model: {getSemanticModelLabel(typeDef.semanticModelKey)}</p>
         </div>
       </div>
 

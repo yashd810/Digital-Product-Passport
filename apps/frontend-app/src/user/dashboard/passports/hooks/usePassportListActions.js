@@ -285,8 +285,8 @@ export function usePassportListActions({
         const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
-        const semanticModelKey = typeData.semantic_model_key || "";
-        const productCategory = typeData.product_category || "";
+        const semanticModelKey = typeData.semanticModelKey || "";
+        const productCategory = typeData.productCategory || "";
 
         const exported = [];
         for (const passport of passportsForType) {

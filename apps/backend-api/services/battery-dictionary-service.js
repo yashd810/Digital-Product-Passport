@@ -85,22 +85,22 @@ module.exports = function createBatteryDictionaryService() {
       dpp: "https://schema.digitalproductpassport.eu/ns/dpp#",
       DigitalProductPassport: "dpp:DigitalProductPassport",
       dppId: "dpp:dppId",
-      passport_type: "dpp:passportType",
-      semantic_model: "dpp:semanticModel",
-      model_name: "dpp:modelName",
-      internal_alias_id: "dpp:internalAliasId",
-      release_status: "dpp:releaseStatus",
-      version_number: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
-      created_at: { "@id": "dpp:createdAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
-      updated_at: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+      passportType: "dpp:passportType",
+      semanticModel: "dpp:semanticModel",
+      modelName: "dpp:modelName",
+      internalAliasId: "dpp:internalAliasId",
+      releaseStatus: "dpp:releaseStatus",
+      versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
+      createdAt: { "@id": "dpp:createdAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
+      updatedAt: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
     };
 
     const contexts = [dppContext, clarosContextUrl];
 
     // Add per-field inline mappings for any field not already in the context
-    if (typeDef?.fields_json?.sections) {
+    if (typeDef?.fieldsJson?.sections) {
       const inlineOverrides = {};
-      for (const section of typeDef.fields_json.sections) {
+      for (const section of typeDef.fieldsJson.sections) {
         for (const field of (section.fields || [])) {
           if (!field?.key) continue;
           const termIri = resolveFieldKey(field.key) || field.semanticId;

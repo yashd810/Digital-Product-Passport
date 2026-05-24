@@ -19,7 +19,7 @@ const STATUS_MAP = {
   rejected:                { label:"Rejected",    icon:"❌" },
 };
 
-const getWorkflowPassportId = (wf) => wf?.passport_guid || wf?.passport_dpp_id || null;
+const getWorkflowPassportId = (wf) => wf?.passportDppId || null;
 const getWorkflowPassportType = (wf) => wf?.passportType || "";
 const getWorkflowModelName = (wf) => wf?.modelName || "";
 const getWorkflowVersionNumber = (wf) => wf?.versionNumber;
@@ -194,11 +194,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
       const eligible = data.filter(u =>
         (u.role === "editor" || u.role === "company_admin") && u.id !== user?.id
       );
-      setTeamUsers(eligible.map((member) => ({
-        ...member,
-        firstName: member.firstName || member.first_name || "",
-        lastName: member.lastName || member.last_name || "",
-      })));
+      setTeamUsers(eligible);
     })
     .catch(() => {});
 
@@ -582,8 +578,8 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   };
 
   const renderRow = (wf, showActions) => {
-    const needsMyReview = showActions && String(wf.reviewer_id) === String(user?.id) && wf.review_status === "pending";
-    const needsMyApproval = showActions && String(wf.approver_id) === String(user?.id) && wf.approval_status === "pending" && wf.review_status !== "pending";
+    const needsMyReview = showActions && String(wf.reviewerId) === String(user?.id) && wf.reviewStatus === "pending";
+    const needsMyApproval = showActions && String(wf.approverId) === String(user?.id) && wf.approvalStatus === "pending" && wf.reviewStatus !== "pending";
     const workflowPassportId = getWorkflowPassportId(wf);
     const serialNumber = getPassportSerialNumber(wf);
     return (
@@ -598,21 +594,21 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
           </div>
         </td>
         <td><WorkflowBadge status={
-          wf.overall_status === "rejected" ? "rejected" :
-          wf.review_status === "pending" ? "submitted_for_review" :
-          wf.approval_status === "pending" ? "submitted_for_approval" :
+          wf.overallStatus === "rejected" ? "rejected" :
+          wf.reviewStatus === "pending" ? "submitted_for_review" :
+          wf.approvalStatus === "pending" ? "submitted_for_approval" :
           "released"
         } /></td>
         <td className="small-text">
-          {wf.reviewer_name || "—"}
-          {wf.review_status !== "pending" && (
-            <span className={`step-status ${wf.review_status}`}> ({wf.review_status})</span>
+          {wf.reviewerName || "—"}
+          {wf.reviewStatus !== "pending" && (
+            <span className={`step-status ${wf.reviewStatus}`}> ({wf.reviewStatus})</span>
           )}
         </td>
         <td className="small-text">
-          {wf.approver_name || "—"}
-          {wf.approval_status !== "pending" && (
-            <span className={`step-status ${wf.approval_status}`}> ({wf.approval_status})</span>
+          {wf.approverName || "—"}
+          {wf.approvalStatus !== "pending" && (
+            <span className={`step-status ${wf.approvalStatus}`}> ({wf.approvalStatus})</span>
           )}
         </td>
         <td className="small-text">{new Date(getWorkflowCreatedAt(wf)).toLocaleDateString()}</td>
@@ -646,16 +642,16 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
                     : data.history;
 
   const workflowColumns = useMemo(() => ([
-    { key: "serial_number", type: "string", getValue: (wf) => getPassportSerialNumber(wf) },
+    { key: "serialNumber", type: "string", getValue: (wf) => getPassportSerialNumber(wf) },
     { key: "modelName", type: "string", getValue: (wf) => getWorkflowModelName(wf) },
     { key: "status", type: "string", getValue: (wf) => (
-      wf.overall_status === "rejected" ? "rejected" :
-      wf.review_status === "pending" ? "submitted_for_review" :
-      wf.approval_status === "pending" ? "submitted_for_approval" :
+      wf.overallStatus === "rejected" ? "rejected" :
+      wf.reviewStatus === "pending" ? "submitted_for_review" :
+      wf.approvalStatus === "pending" ? "submitted_for_approval" :
       "released"
     ) },
-    { key: "reviewer_name", type: "string", getValue: (wf) => wf.reviewer_name || "" },
-    { key: "approver_name", type: "string", getValue: (wf) => wf.approver_name || "" },
+    { key: "reviewerName", type: "string", getValue: (wf) => wf.reviewerName || "" },
+    { key: "approverName", type: "string", getValue: (wf) => wf.approverName || "" },
     { key: "createdAt", type: "date", getValue: (wf) => getWorkflowCreatedAt(wf) },
   ]), []);
 
@@ -718,18 +714,18 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
             <table className="passports-table">
               <thead>
                 <tr>
-                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("serial_number")}>Passport{sortIndicator(sortConfig, "serial_number") && ` ${sortIndicator(sortConfig, "serial_number")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("serialNumber")}>Passport{sortIndicator(sortConfig, "serialNumber") && ` ${sortIndicator(sortConfig, "serialNumber")}`}</button></th>
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("status")}>Status{sortIndicator(sortConfig, "status") && ` ${sortIndicator(sortConfig, "status")}`}</button></th>
-                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("reviewer_name")}>Reviewer{sortIndicator(sortConfig, "reviewer_name") && ` ${sortIndicator(sortConfig, "reviewer_name")}`}</button></th>
-                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("approver_name")}>Approver{sortIndicator(sortConfig, "approver_name") && ` ${sortIndicator(sortConfig, "approver_name")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("reviewerName")}>Reviewer{sortIndicator(sortConfig, "reviewerName") && ` ${sortIndicator(sortConfig, "reviewerName")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("approverName")}>Approver{sortIndicator(sortConfig, "approverName") && ` ${sortIndicator(sortConfig, "approverName")}`}</button></th>
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("createdAt")}>Submitted{sortIndicator(sortConfig, "createdAt") && ` ${sortIndicator(sortConfig, "createdAt")}`}</button></th>
                   <th>Actions</th>
                 </tr>
                 {showFilters && <tr className="table-filter-row">
-                  <th><input className="table-filter-input" value={columnFilters.serial_number || ""} onChange={e => setColumnFilters(prev => ({ ...prev, serial_number: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={columnFilters.serialNumber || ""} onChange={e => setColumnFilters(prev => ({ ...prev, serialNumber: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={columnFilters.status || ""} onChange={e => setColumnFilters(prev => ({ ...prev, status: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={columnFilters.reviewer_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, reviewer_name: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={columnFilters.approver_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, approver_name: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={columnFilters.reviewerName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, reviewerName: e.target.value }))} placeholder="Filter" /></th>
+                  <th><input className="table-filter-input" value={columnFilters.approverName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, approverName: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={e => setColumnFilters(prev => ({ ...prev, createdAt: e.target.value }))} placeholder="Filter" /></th>
                   <th></th>
                 </tr>}

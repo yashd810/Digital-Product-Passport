@@ -53,11 +53,11 @@ function AuditLogs({ companyId }) {
 
     return logs.filter(log => {
       if (userQ) {
-        const nameStr = `${log.user_first_name || ""} ${log.user_last_name || ""} ${log.user_email || ""}`.toLowerCase();
+        const nameStr = `${log.userFirstName || ""} ${log.userLastName || ""} ${log.userEmail || ""}`.toLowerCase();
         if (!nameStr.includes(userQ)) return false;
       }
       if (filterAction && log.action !== filterAction) return false;
-      const ts = new Date(log.created_at).getTime();
+      const ts = new Date(log.createdAt).getTime();
       if (fromTs && ts < fromTs) return false;
       if (toTs   && ts > toTs)   return false;
       return true;
@@ -80,11 +80,11 @@ function AuditLogs({ companyId }) {
       };
       const headers = ["Timestamp", "User", "Action", "Table", "Record ID"];
       const rows = filteredLogs.map(l => [
-        new Date(l.created_at).toLocaleString(),
-        l.user_first_name || l.user_last_name ? `${l.user_first_name || ""} ${l.user_last_name || ""}`.trim() : (l.user_email || "System"),
+        new Date(l.createdAt).toLocaleString(),
+        l.userFirstName || l.userLastName ? `${l.userFirstName || ""} ${l.userLastName || ""}`.trim() : (l.userEmail || "System"),
         l.action,
-        l.table_name || "",
-        l.record_id || "",
+        l.tableName || "",
+        l.recordId || "",
       ]);
       const csv = [headers, ...rows].map(r => r.map(escape).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
@@ -124,10 +124,10 @@ function AuditLogs({ companyId }) {
   };
 
   const formatUserName = (log) => {
-    if (log.user_first_name || log.user_last_name) {
-      return `${log.user_first_name || ""} ${log.user_last_name || ""}`.trim();
+    if (log.userFirstName || log.userLastName) {
+      return `${log.userFirstName || ""} ${log.userLastName || ""}`.trim();
     }
-    return log.user_email || "System";
+    return log.userEmail || "System";
   };
 
   const toggleExpanded = (id) => setExpandedLog(expandedLog === id ? null : id);
@@ -246,15 +246,15 @@ function AuditLogs({ companyId }) {
                       <span className="log-action">
                         <strong>{(log.action || "").toUpperCase()}</strong>
                       </span>
-                      <span className="log-table">{log.table_name}</span>
-                      {log.record_id && (
-                        <span className="log-dppId">{log.record_id.substring(0, 8)}…</span>
+                      <span className="log-table">{log.tableName}</span>
+                      {log.recordId && (
+                        <span className="log-dppId">{log.recordId.substring(0, 8)}…</span>
                       )}
                     </div>
 
                     <div className="log-meta">
                       <span className="log-user">{formatUserName(log)}</span>
-                      <span className="log-time">{new Date(log.created_at).toLocaleString()}</span>
+                      <span className="log-time">{new Date(log.createdAt).toLocaleString()}</span>
                     </div>
 
                     <span className={`toggle-icon ${expandedLog === log.id ? "expanded" : ""}`}>▼</span>
@@ -267,7 +267,7 @@ function AuditLogs({ companyId }) {
                         <div className="detail-grid">
                           <div className="detail-item">
                             <span className="detail-label">User</span>
-                            <span className="detail-value">{formatUserName(log)}{log.user_email ? ` (${log.user_email})` : ""}</span>
+                            <span className="detail-value">{formatUserName(log)}{log.userEmail ? ` (${log.userEmail})` : ""}</span>
                           </div>
                           <div className="detail-item">
                             <span className="detail-label">Action</span>
@@ -275,34 +275,34 @@ function AuditLogs({ companyId }) {
                           </div>
                           <div className="detail-item">
                             <span className="detail-label">Table</span>
-                            <span className="detail-value">{log.table_name}</span>
+                            <span className="detail-value">{log.tableName}</span>
                           </div>
                           <div className="detail-item">
                             <span className="detail-label">Record ID</span>
-                            <span className="detail-value">{log.record_id || "—"}</span>
+                            <span className="detail-value">{log.recordId || "—"}</span>
                           </div>
                           <div className="detail-item">
                             <span className="detail-label">Passport DPP ID</span>
-                            <span className="detail-value">{log.record_id || "—"}</span>
+                            <span className="detail-value">{log.recordId || "—"}</span>
                           </div>
                           <div className="detail-item">
                             <span className="detail-label">Timestamp</span>
-                            <span className="detail-value">{new Date(log.created_at).toLocaleString()}</span>
+                            <span className="detail-value">{new Date(log.createdAt).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
 
-                      {log.new_values && (
+                      {log.newValues && (
                         <div className="detail-section">
                           <h4>New Values</h4>
-                          <pre className="json-display">{JSON.stringify(log.new_values, null, 2)}</pre>
+                          <pre className="json-display">{JSON.stringify(log.newValues, null, 2)}</pre>
                         </div>
                       )}
 
-                      {log.old_values && (
+                      {log.oldValues && (
                         <div className="detail-section">
                           <h4>Old Values</h4>
-                          <pre className="json-display">{JSON.stringify(log.old_values, null, 2)}</pre>
+                          <pre className="json-display">{JSON.stringify(log.oldValues, null, 2)}</pre>
                         </div>
                       )}
                     </div>

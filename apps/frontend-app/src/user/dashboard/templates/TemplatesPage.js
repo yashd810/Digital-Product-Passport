@@ -298,9 +298,9 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
     fetchWithAuth(`${API}/api/passport-types/${passportType}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.fields_json?.sections) {
+        if (data?.fieldsJson?.sections) {
           const s = {};
-          for (const sec of data.fields_json.sections) {
+          for (const sec of data.fieldsJson.sections) {
             s[sec.key] = { label: sec.label, fields: sec.fields || [] };
           }
           setSections(s);
@@ -332,8 +332,8 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
     const vals = {};
     const model = new Set();
     for (const f of sourceTemplate.fields || []) {
-      vals[f.field_key] = f.field_value || "";
-      if (f.is_model_data) model.add(f.field_key);
+      vals[f.fieldKey] = f.fieldValue || "";
+      if (f.isModelData) model.add(f.fieldKey);
     }
     if (!editingTemplate && cloneTemplate) {
       setPassportType(cloneTemplate.passportType || "");
@@ -361,9 +361,9 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
       for (const sec of Object.values(sections)) {
         for (const f of sec.fields) {
           fields.push({
-            field_key:    f.key,
-            field_value:  fieldValues[f.key] ?? "",
-            is_model_data: modelDataKeys.has(f.key),
+            fieldKey:    f.key,
+            fieldValue:  fieldValues[f.key] ?? "",
+            isModelData: modelDataKeys.has(f.key),
           });
         }
       }
@@ -410,8 +410,8 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
                 onChange={e => setPassportType(e.target.value)}>
                 <option value="">— Select type —</option>
                 {passportTypes.map(pt => (
-                  <option key={pt.id} value={pt.type_name}>
-                    {pt.display_name || pt.type_name}
+                  <option key={pt.id} value={pt.typeName}>
+                    {pt.displayName || pt.typeName}
                   </option>
                 ))}
               </select>
@@ -524,7 +524,7 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
       // Build the pre-fill data from model-data fields
       const prefill = {};
       for (const f of template.fields || []) {
-        if (f.field_value) prefill[f.field_key] = f.field_value;
+        if (f.fieldValue) prefill[f.fieldKey] = f.fieldValue;
       }
 
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk`, {
@@ -783,7 +783,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
             <button key={t}
               className={`tmpl-type-btn${filterType === t ? " active" : ""}`}
               onClick={() => setFilterType(t)}>
-              {passportTypes.find(pt => pt.type_name === t)?.display_name || t}
+              {passportTypes.find(pt => pt.typeName === t)?.displayName || t}
             </button>
           ))}
         </div>
@@ -803,7 +803,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
         </div>
       ) : (
         Object.entries(grouped).map(([pType, tmpls]) => {
-          const typeLabel = passportTypes.find(pt => pt.type_name === pType)?.display_name || pType;
+          const typeLabel = passportTypes.find(pt => pt.typeName === pType)?.displayName || pType;
           return (
             <div key={pType} className="tmpl-group">
               <div className="tmpl-group-header">

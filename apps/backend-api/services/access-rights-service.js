@@ -87,7 +87,7 @@ function expandAudienceAssignments(values) {
 }
 
 function flattenSchemaFields(typeDef) {
-  return (typeDef?.fields_json?.sections || []).
+  return (typeDef?.fieldsJson?.sections || typeDef?.fields_json?.sections || []).
   flatMap((section) => section.fields || []).
   filter((field) => field?.key);
 }
@@ -152,17 +152,13 @@ function findFieldDefinition(typeDef, elementIdPath) {
   return flattenSchemaFields(typeDef).find((field) =>
   field.key === normalizedElementIdPath ||
   field.semanticId === normalizedElementIdPath ||
-  field.semantic_id === normalizedElementIdPath ||
   field.elementId === normalizedElementIdPath ||
-  field.element_id === normalizedElementIdPath ||
   (
     rootElementIdPath &&
     (
       field.key === rootElementIdPath ||
       field.semanticId === rootElementIdPath ||
-      field.semantic_id === rootElementIdPath ||
-      field.elementId === rootElementIdPath ||
-      field.element_id === rootElementIdPath
+      field.elementId === rootElementIdPath
     )
   )
   ) || null;
@@ -216,12 +212,12 @@ function deriveRoleAudiences(user) {
 
 function isAuthorizedDelegator(row, targetCompanyId = null) {
   if (!row) return false;
-  const role = String(row.grantor_role || "").trim();
-  if (!row.grantor_is_active) return false;
+  const role = String(row.grantorRole || "").trim();
+  if (!row.grantorIsActive) return false;
   if (role === "super_admin") return true;
   if (role !== "company_admin") return false;
   if (targetCompanyId === null || targetCompanyId === undefined) return true;
-  return Number.parseInt(row.grantor_company_id, 10) === Number.parseInt(targetCompanyId, 10);
+  return Number.parseInt(row.grantorCompanyId, 10) === Number.parseInt(targetCompanyId, 10);
 }
 
 module.exports = function createAccessRightsService({ pool }) {
@@ -231,11 +227,11 @@ module.exports = function createAccessRightsService({ pool }) {
     const roleAudiences = deriveRoleAudiences(user);
     const result = await pool.query(
       `SELECT uaa.audience,
-              uaa.company_id,
-              uaa.granted_by,
-              grantor.role AS grantor_role,
-              grantor.company_id AS grantor_company_id,
-              COALESCE(grantor.is_active, false) AS grantor_is_active
+              uaa.company_id AS "companyId",
+              uaa.granted_by AS "grantedBy",
+              grantor.role AS "grantorRole",
+              grantor.company_id AS "grantorCompanyId",
+              COALESCE(grantor.is_active, false) AS "grantorIsActive"
        FROM user_access_audiences uaa
        LEFT JOIN users grantor ON grantor.id = uaa.granted_by
        WHERE user_id = $1
@@ -246,7 +242,7 @@ module.exports = function createAccessRightsService({ pool }) {
     ).catch(() => ({ rows: [] }));
 
     const grantedAudiences = result.rows.
-    filter((row) => isAuthorizedDelegator(row, row.company_id ?? user.companyId)).
+    filter((row) => isAuthorizedDelegator(row, row.companyId ?? user.companyId)).
     map((row) => String(row.audience || "").trim()).
     filter(Boolean);
 
@@ -257,12 +253,12 @@ module.exports = function createAccessRightsService({ pool }) {
     if (!passportDppId || !userId) return [];
     const result = await pool.query(
       `SELECT pag.audience,
-              pag.element_id_path,
-              pag.company_id,
-              pag.granted_by,
-              grantor.role AS grantor_role,
-              grantor.company_id AS grantor_company_id,
-              COALESCE(grantor.is_active, false) AS grantor_is_active
+              pag.element_id_path AS "elementIdPath",
+              pag.company_id AS "companyId",
+              pag.granted_by AS "grantedBy",
+              grantor.role AS "grantorRole",
+              grantor.company_id AS "grantorCompanyId",
+              COALESCE(grantor.is_active, false) AS "grantorIsActive"
        FROM passport_access_grants pag
        LEFT JOIN users grantor ON grantor.id = pag.granted_by
        WHERE pag.passport_dpp_id = $1
@@ -273,8 +269,8 @@ module.exports = function createAccessRightsService({ pool }) {
     ).catch(() => ({ rows: [] }));
 
     return result.rows.
-    filter((row) => isAuthorizedDelegator(row, passportCompanyId ?? row.company_id)).
-    filter((row) => grantPathAppliesToElementPath(row.element_id_path, elementIdPath)).
+    filter((row) => isAuthorizedDelegator(row, passportCompanyId ?? row.companyId)).
+    filter((row) => grantPathAppliesToElementPath(row.elementIdPath, elementIdPath)).
     map((row) => String(row.audience || "").trim()).
     filter(Boolean);
   }

@@ -86,14 +86,14 @@ module.exports = function createPassportRepresentationService({
     const resolvedGranularity = granularity || "model";
 
     // ── economicOperatorId uses company DID when dppIdentity available ────────
-    let economicOperatorId = passport.economic_operator_id || null;
+    let economicOperatorId = passport.economicOperatorId || null;
     if (!economicOperatorId && dppIdentity) {
-      economicOperatorId = dppIdentity.companyDid(passport.company_id);
+      economicOperatorId = dppIdentity.companyDid(passport.companyId);
     } else if (!economicOperatorId) {
       // Legacy fallback using :org: path
       const appUrl = process.env.APP_URL || "http://localhost:3001";
       const domain = new URL(appUrl).host;
-      economicOperatorId = `did:web:${domain}:org:${passport.company_id}`;
+      economicOperatorId = `did:web:${domain}:org:${passport.companyId}`;
     }
 
     // ── Product and DPP DIDs ──────────────────────────────────────────────────
@@ -104,31 +104,31 @@ module.exports = function createPassportRepresentationService({
     const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
     if (businessIdentifier) {
       productDid = productIdentifierService?.buildCanonicalProductDid?.({
-        companyId: passport.company_id,
-        passportType: passport.passport_type || typeDef?.type_name || "battery",
+        companyId: passport.companyId,
+        passportType: passport.passportType || typeDef?.typeName || "battery",
         rawProductId: businessIdentifier,
         granularity: resolvedGranularity,
       }) || null;
     }
 
-    if (dppIdentity && passport.internal_alias_id) {
+    if (dppIdentity && passport.internalAliasId) {
       try {
-        dppDidValue = dppIdentity.dppDid(resolvedGranularity, passport.company_id, passport.internal_alias_id);
+        dppDidValue = dppIdentity.dppDid(resolvedGranularity, passport.companyId, passport.internalAliasId);
         publicUrl   = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       } catch {
-        // internal_alias_id may be malformed; leave DIDs null
+        // internalAliasId may be malformed; leave DIDs null
       }
     }
 
     // ── Extract user-defined fields with native types ─────────────────────────
-    const sections = typeDef?.fields_json?.sections || [];
+    const sections = typeDef?.fieldsJson?.sections || [];
     const userFields = {};
-    const facilityId = passport.facility_id || null;
+    const facilityId = passport.facilityId || null;
     const companyStub = companyName ? {
-      company_name: companyName,
-      did_slug: slugify(companyName),
-      economic_operator_identifier: null,
-      default_granularity: resolvedGranularity,
+      companyName,
+      didSlug: slugify(companyName),
+      economicOperatorIdentifier: null,
+      defaultGranularity: resolvedGranularity,
     } : null;
     const canonicalPayload = typeof buildCanonicalPassportPayload === "function"
       ? buildCanonicalPassportPayload(passport, typeDef, {
@@ -151,42 +151,42 @@ module.exports = function createPassportRepresentationService({
     }
 
     const contentSpecificationIds = parseArrayValue(
-      passport.content_specification_ids
-      || typeDef?.semantic_model_key
-      || typeDef?.fields_json?.semanticModelKey
+      passport.contentSpecificationIds
+      || typeDef?.semanticModelKey
+      || typeDef?.fieldsJson?.semanticModelKey
       || []
     );
-    const resolvedVersionNumber = passport.version_number === null || passport.version_number === undefined || passport.version_number === ""
+    const resolvedVersionNumber = passport.versionNumber === null || passport.versionNumber === undefined || passport.versionNumber === ""
       ? null
-      : Number(passport.version_number);
+      : Number(passport.versionNumber);
     const extensions = buildClarosExtensions({
-      passportType: passport.passport_type || null,
-      versionNumber: Number.isFinite(resolvedVersionNumber) ? resolvedVersionNumber : passport.version_number,
-      internalId: passport.dppId || passport.dpp_id || passport.guid || null,
+      passportType: passport.passportType || null,
+      versionNumber: Number.isFinite(resolvedVersionNumber) ? resolvedVersionNumber : passport.versionNumber,
+      internalId: passport.dppId || passport.guid || null,
     });
     if (extensions?.claros && !canonicalPayload?.extensions?.claros?.validation) {
       extensions.claros.validation = buildValidationSummary();
     }
 
-    const internalAliasId = passport.internal_alias_id || null;
+    const internalAliasId = passport.internalAliasId || null;
     const uniqueProductIdentifier = canonicalPayload?.uniqueProductIdentifier || productDid || null;
 
     return {
       // JTC 18223 canonical header fields
-      digitalProductPassportId:  passport.dppId || passport.dpp_id || canonicalPayload?.digitalProductPassportId || dppDidValue || null,
+      digitalProductPassportId:  passport.dppId || canonicalPayload?.digitalProductPassportId || dppDidValue || null,
       uniqueProductIdentifier,
       internalAliasId,
       granularity:               resolvedGranularity,
-      dppSchemaVersion:          passport.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025",
-      dppStatus:                 canonicalPayload?.dppStatus || toStandardDppStatus(passport.release_status),
-      lastUpdate:                canonicalPayload?.lastUpdate || canonicalPayload?.lastUpdated || toIsoTimestamp(passport.updated_at || passport.created_at),
+      dppSchemaVersion:          passport.dppSchemaVersion || typeDef?.fieldsJson?.dppSchemaVersion || "prEN 18223:2025",
+      dppStatus:                 canonicalPayload?.dppStatus || toStandardDppStatus(passport.releaseStatus),
+      lastUpdate:                canonicalPayload?.lastUpdate || canonicalPayload?.lastUpdated || toIsoTimestamp(passport.updatedAt || passport.createdAt),
       economicOperatorId:        canonicalPayload?.economicOperatorId || economicOperatorId,
       contentSpecificationIds:   Array.isArray(canonicalPayload?.contentSpecificationIds)
         ? canonicalPayload.contentSpecificationIds
         : (Array.isArray(contentSpecificationIds) ? contentSpecificationIds : []),
-      complianceProfileKey:      canonicalPayload?.complianceProfileKey || passport.compliance_profile_key || null,
-      carrierPolicyKey:          canonicalPayload?.carrierPolicyKey || passport.carrier_policy_key || null,
-      ...buildCarrierAuthenticityResponseFields(passport.carrier_authenticity || canonicalPayload),
+      complianceProfileKey:      canonicalPayload?.complianceProfileKey || passport.complianceProfileKey || null,
+      carrierPolicyKey:          canonicalPayload?.carrierPolicyKey || passport.carrierPolicyKey || null,
+      ...buildCarrierAuthenticityResponseFields(passport.carrierAuthenticity || canonicalPayload),
       ...(companyName ? { economicOperatorName: companyName } : {}),
 
       // DID-based identifiers (product-id-based, not record-id-based)

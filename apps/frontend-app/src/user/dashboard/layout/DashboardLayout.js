@@ -109,7 +109,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
   // Group passport types by product category if available
   const groupedTypes = passportTypes.reduce((acc, pt) => {
-    const productCategory = pt.product_category || pt.display_name || formatPassportTypeLabel(pt.type_name);
+    const productCategory = pt.productCategory || pt.displayName || formatPassportTypeLabel(pt.typeName);
     if (!acc[productCategory]) acc[productCategory] = [];
     acc[productCategory].push(pt);
     return acc;
@@ -208,16 +208,16 @@ function DashboardLayout({ user, companyId, onLogout }) {
                         to={dashboardPath(`passports/product/${encodeURIComponent(productCategory)}`)}
                         className={({ isActive }) => `sidebar-link sidebar-link-productCategory${isActive ? " active" : ""}`}
                       >
-                        <span className="sidebar-productCategory-icon">{types[0]?.product_icon || "📋"}</span>
+                        <span className="sidebar-productCategory-icon">{types[0]?.productIcon || "📋"}</span>
                         <span className="sidebar-productCategory-label">{productCategory}</span>
                       </NavLink>
                       {types.map(pt => (
                         <NavLink
                           key={pt.id}
-                          to={dashboardPath(`passports/${pt.type_name}`)}
+                          to={dashboardPath(`passports/${pt.typeName}`)}
                           className={({isActive})=>`sidebar-link${isActive?" active":""}`}
                         >
-                          {pt.display_name || formatPassportTypeLabel(pt.type_name)}
+                          {pt.displayName || formatPassportTypeLabel(pt.typeName)}
                         </NavLink>
                       ))}
                     </React.Fragment>

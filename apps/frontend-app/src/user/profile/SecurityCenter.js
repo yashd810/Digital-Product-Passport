@@ -132,9 +132,9 @@ function SecurityCenter({ user, companyId }) {
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           name: keyName.trim(),
-          operator_type: operatorType,
-          access_mode: accessMode,
-          max_confidentiality: maxConfidentiality,
+          operatorType,
+          accessMode,
+          maxConfidentiality,
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -142,9 +142,9 @@ function SecurityCenter({ user, companyId }) {
       setNewKey({
         name: d.name,
         key: d.key,
-        operatorType: d.operator_type,
-        accessMode: d.access_mode,
-        maxConfidentiality: d.max_confidentiality,
+        operatorType: d.operatorType,
+        accessMode: d.accessMode,
+        maxConfidentiality: d.maxConfidentiality,
       });
       setKeyName("");
       setOperatorType("economic_operator");
@@ -384,26 +384,26 @@ function SecurityCenter({ user, companyId }) {
                         alignItems: "center",
                         gap: 12,
                         padding: "12px 14px",
-                        background: key.is_active ? "rgba(13, 181, 176, 0.1)" : "rgba(255, 255, 255, 0.04)",
+                        background: key.isActive ? "rgba(13, 181, 176, 0.1)" : "rgba(255, 255, 255, 0.04)",
                         borderRadius: 8,
-                        border: `1px solid ${key.is_active ? "rgba(13, 181, 176, 0.2)" : "rgba(13, 181, 176, 0.08)"}`,
+                        border: `1px solid ${key.isActive ? "rgba(13, 181, 176, 0.2)" : "rgba(13, 181, 176, 0.08)"}`,
                         flexWrap: "wrap",
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 180 }}>
                         <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>{key.name}</div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2, fontFamily: "monospace" }}>
-                          {key.key_prefix}...
+                          {key.keyPrefix}...
                         </div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>
-                          {humanizeOption(key.operator_type, OPERATOR_TYPE_OPTIONS)} · {humanizeOption(key.access_mode, ACCESS_MODE_OPTIONS)} · Up to {humanizeOption(key.max_confidentiality, CONFIDENTIALITY_OPTIONS)}
+                          {humanizeOption(key.operatorType, OPERATOR_TYPE_OPTIONS)} · {humanizeOption(key.accessMode, ACCESS_MODE_OPTIONS)} · Up to {humanizeOption(key.maxConfidentiality, CONFIDENTIALITY_OPTIONS)}
                         </div>
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text-secondary)", textAlign: "right" }}>
-                        <div>Created {new Date(key.created_at).toLocaleDateString()}</div>
-                        <div>{key.last_used_at ? `Last used ${new Date(key.last_used_at).toLocaleDateString()}` : "Never used"}</div>
+                        <div>Created {new Date(key.createdAt).toLocaleDateString()}</div>
+                        <div>{key.lastUsedAt ? `Last used ${new Date(key.lastUsedAt).toLocaleDateString()}` : "Never used"}</div>
                       </div>
-                      {key.is_active ? (
+                      {key.isActive ? (
                         <button
                           type="button"
                           onClick={() => revokeApiKey(key.id, key.name)}

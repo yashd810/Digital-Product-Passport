@@ -12,37 +12,37 @@ const BATTERY_DICTIONARY_MODEL_KEY = "claros_battery_dictionary_v1";
 const BATTERY_TERM_BASE_URL = "https://www.claros-dpp.online/dictionary/battery/v1/terms";
 const LEGACY_BATTERY_FIELD_UPGRADES = {
   raw_material_cf: {
-    key: "contribution_of_raw_material_and_preprocessing_lifecycle_stage",
+    key: "contributionOfRawMaterialAndPreprocessingLifecycleStage",
     label: "Contribution of raw material acquisition and pre-processing lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-raw-materials`,
   },
   lifetime_cf: {
-    key: "battery_carbon_footprint_per_functional_unit",
+    key: "batteryCarbonFootprintPerFunctionalUnit",
     label: "Battery carbon footprint per Functional Unit",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-per-kwh`,
   },
   recycling_cf: {
-    key: "contribution_of_end_of_life_and_recycling_lifecycle_stage",
+    key: "contributionOfEndOfLifeAndRecyclingLifecycleStage",
     label: "Contribution of end of life and recycling lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-end-of-life`,
   },
   total_cf: {
-    key: "absolute_carbon_footprint",
+    key: "absoluteCarbonFootprint",
     label: "Absolute Carbon Footprint",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/absolute-carbon-footprint`,
   },
   cf_class: {
-    key: "carbon_footprint_performance_class",
+    key: "carbonFootprintPerformanceClass",
     label: "Carbon footprint performance class",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-class`,
   },
   reference_study: {
-    key: "web_link_to_public_carbon_footprint_study",
+    key: "webLinkToPublicCarbonFootprintStudy",
     label: "Web link to public carbon footprint study",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-study-url`,
@@ -59,49 +59,49 @@ const BATTERY_FIELD_UPGRADES_BY_KEY = {
   contribution_of_raw_material_and_preprocessing_lifecycle_stage: LEGACY_BATTERY_FIELD_UPGRADES.raw_material_cf,
   contributionofrawmaterialacquisitionandpreprocessinglifecyclest: LEGACY_BATTERY_FIELD_UPGRADES.raw_material_cf,
   contributionOfMainProductProductionLifecycleStage: {
-    key: "contribution_of_main_product_production_lifecycle_stage",
+    key: "contributionOfMainProductProductionLifecycleStage",
     label: "Contribution of main product production lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-production`,
   },
   contribution_of_product_production: {
-    key: "contribution_of_main_product_production_lifecycle_stage",
+    key: "contributionOfMainProductProductionLifecycleStage",
     label: "Contribution of main product production lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-production`,
   },
   contribution_of_main_product_production_lifecycle_stage: {
-    key: "contribution_of_main_product_production_lifecycle_stage",
+    key: "contributionOfMainProductProductionLifecycleStage",
     label: "Contribution of main product production lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-production`,
   },
   contributionofmainproductproductionlifecyclestage: {
-    key: "contribution_of_main_product_production_lifecycle_stage",
+    key: "contributionOfMainProductProductionLifecycleStage",
     label: "Contribution of main product production lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-production`,
   },
   contributionOfDistributionLifecycleStage: {
-    key: "contribution_of_distribution_lifecycle_stage",
+    key: "contributionOfDistributionLifecycleStage",
     label: "Contribution of distribution lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-distribution`,
   },
   contribution_of_distribution: {
-    key: "contribution_of_distribution_lifecycle_stage",
+    key: "contributionOfDistributionLifecycleStage",
     label: "Contribution of distribution lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-distribution`,
   },
   contribution_of_distribution_lifecycle_stage: {
-    key: "contribution_of_distribution_lifecycle_stage",
+    key: "contributionOfDistributionLifecycleStage",
     label: "Contribution of distribution lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-distribution`,
   },
   contributionofdistributionlifecyclestage: {
-    key: "contribution_of_distribution_lifecycle_stage",
+    key: "contributionOfDistributionLifecycleStage",
     label: "Contribution of distribution lifecycle stage",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/carbon-footprint-distribution`,
@@ -118,19 +118,19 @@ const BATTERY_FIELD_UPGRADES_BY_KEY = {
   web_link_to_public_carbon_footprint_study: LEGACY_BATTERY_FIELD_UPGRADES.reference_study,
   weblinktopubliccarbonfootprintstudy: LEGACY_BATTERY_FIELD_UPGRADES.reference_study,
   absoluteBatteryCarbonFootprint: {
-    key: "absolute_carbon_footprint",
+    key: "absoluteCarbonFootprint",
     label: "Absolute Carbon Footprint",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/absolute-carbon-footprint`,
   },
   absolute_carbon_footprint: {
-    key: "absolute_carbon_footprint",
+    key: "absoluteCarbonFootprint",
     label: "Absolute Carbon Footprint",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/absolute-carbon-footprint`,
   },
   absolutebatterycarbonfootprint: {
-    key: "absolute_carbon_footprint",
+    key: "absoluteCarbonFootprint",
     label: "Absolute Carbon Footprint",
     type: "text",
     semanticId: `${BATTERY_TERM_BASE_URL}/absolute-carbon-footprint`,
@@ -169,6 +169,14 @@ function isBatteryPassportTypeRow(typeRow) {
 
 function isSafeSqlIdentifier(value) {
   return /^[a-z][a-z0-9_]*$/i.test(String(value || ""));
+}
+
+function quoteSqlIdentifier(value) {
+  const identifier = String(value || "").trim();
+  if (!isSafeSqlIdentifier(identifier)) {
+    throw new Error(`Unsafe SQL identifier: ${identifier}`);
+  }
+  return `"${identifier.replace(/"/g, "\"\"")}"`;
 }
 
 function buildBatteryFieldUpgradeMap(typeRow) {
@@ -332,12 +340,13 @@ async function repairBatteryPassportValues(db) {
 
     const tableName = getTable(typeRow.type_name);
     if (!isSafeSqlIdentifier(tableName)) continue;
+    const quotedTableName = quoteSqlIdentifier(tableName);
     const fieldUpgradeMap = buildBatteryFieldUpgradeMap(typeRow);
     const renameSources = buildBatteryFieldRenameSources(fieldUpgradeMap);
 
     for (const upgrade of new Map(Array.from(fieldUpgradeMap.values()).map((field) => [field.key, field])).values()) {
       if (!isSafeSqlIdentifier(upgrade.key)) continue;
-      await db.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${upgrade.key} TEXT`);
+      await db.query(`ALTER TABLE ${quotedTableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(upgrade.key)} TEXT`);
     }
 
     for (const { sourceKey, upgrade } of renameSources) {
@@ -356,26 +365,26 @@ async function repairBatteryPassportValues(db) {
       if (dbIdentifier(sourceKey) === dbIdentifier(upgrade.key)) continue;
 
       await db.query(
-        `UPDATE ${tableName}
-         SET ${upgrade.key} = CASE
-           WHEN ${upgrade.key} IS NULL OR ${upgrade.key} = '' THEN ${sourceKey}
-           ELSE ${upgrade.key}
+        `UPDATE ${quotedTableName}
+         SET ${quoteSqlIdentifier(upgrade.key)} = CASE
+           WHEN ${quoteSqlIdentifier(upgrade.key)} IS NULL OR ${quoteSqlIdentifier(upgrade.key)} = '' THEN ${quoteSqlIdentifier(sourceKey)}
+           ELSE ${quoteSqlIdentifier(upgrade.key)}
          END
-         WHERE ${sourceKey} IS NOT NULL`
+         WHERE ${quoteSqlIdentifier(sourceKey)} IS NOT NULL`
       );
-      await db.query(`ALTER TABLE ${tableName} DROP COLUMN IF EXISTS ${sourceKey}`);
+      await db.query(`ALTER TABLE ${quotedTableName} DROP COLUMN IF EXISTS ${quoteSqlIdentifier(sourceKey)}`);
       updatedColumns += 1;
 
       const archiveResult = await db.query(
         `UPDATE passport_archives
-         SET row_data = jsonb_set(
-           row_data - $2,
+         SET "rowData" = jsonb_set(
+           "rowData" - $2,
            ARRAY[$3],
-           COALESCE(row_data -> $3, row_data -> $2),
+           COALESCE("rowData" -> $3, "rowData" -> $2),
            true
          )
-         WHERE passport_type = $1
-           AND row_data ? $2`,
+         WHERE "passportType" = $1
+           AND "rowData" ? $2`,
         [typeRow.type_name, sourceKey, upgrade.key]
       );
       updatedArchives += archiveResult.rowCount || 0;

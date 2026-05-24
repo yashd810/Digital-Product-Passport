@@ -95,9 +95,7 @@ function isLikelySerialField(field = {}) {
     field.key,
     field.label,
     field.elementId,
-    field.element_id,
     field.semanticId,
-    field.semantic_id,
     field.dictionaryReference,
   ];
   return hints.some((hint) => {
@@ -146,8 +144,8 @@ function hasCompletionValue(value, field = {}) {
 }
 
 function getTypeFields(passportType, typeDefinitions = []) {
-  const dynamicType = typeDefinitions.find((type) => type.type_name === passportType);
-  const dynamicFields = dynamicType?.fields_json?.sections?.flatMap((section) => section.fields || []) || [];
+  const dynamicType = typeDefinitions.find((type) => type.typeName === passportType);
+  const dynamicFields = dynamicType?.fieldsJson?.sections?.flatMap((section) => section.fields || []) || [];
   if (dynamicFields.length) return dynamicFields;
 
   return PASSPORT_SECTIONS_MAP[passportType]

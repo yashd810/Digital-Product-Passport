@@ -2,7 +2,7 @@
 
 // ─── DPP IDENTITY SERVICE ─────────────────────────────────────────────────────
 // Stable, product-id-based DID generation for the Claros DPP platform.
-// All DIDs use companyId + internal_alias_id — never the record ID.
+// All DIDs use companyId + internalAliasId — never the record ID.
 //
 // Domain is derived from APP_URL env var at call time (not module load time)
 // so that tests or server can override APP_URL after require().
@@ -264,19 +264,19 @@ function didToDocumentUrl(did) {
  *
  * Pattern: <appUrl>/dpp/<manufacturerSlug>/<modelSlug>/<encodedProductId>
  *
- * Uses internal_alias_id (NOT the record ID). Falls back to the record DPP ID only if no internal_alias_id exists.
+ * Uses internalAliasId (NOT the record ID). Falls back to the record DPP ID only if no internalAliasId exists.
  *
- * @param {object} passport  - passport row (must have internal_alias_id, model_name, dppId, company_id)
+ * @param {object} passport  - passport row (must have internalAliasId, modelName, dppId, companyId)
  * @param {string} companyName - human-readable company name (used to derive manufacturerSlug)
  */
 function buildCanonicalPublicUrl(passport, companyName) {
   const appUrl = getAppUrl();
 
-  const internalAliasId = passport.internal_alias_id;
-  const routeProductId = internalAliasId || passport.dppId || passport.dpp_id || passport.guid;
+  const internalAliasId = passport.internalAliasId;
+  const routeProductId = internalAliasId || passport.dppId || passport.guid;
 
-  const manufacturerSlug = slugify(companyName || String(passport.company_id));
-  const modelSlug        = slugify(passport.model_name || routeProductId);
+  const manufacturerSlug = slugify(companyName || String(passport.companyId));
+  const modelSlug = slugify(passport.modelName || routeProductId);
   const encodedProductId = encodeURIComponent(String(routeProductId));
 
   return `${appUrl}/dpp/${manufacturerSlug}/${modelSlug}/${encodedProductId}`;

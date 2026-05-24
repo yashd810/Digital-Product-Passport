@@ -2,6 +2,7 @@
 
 const { randomUUID } = require("crypto");
 const { rewriteRepositoryLinksForSignedAccessDeep } = require("../../shared/repository/repository-file-links");
+const { mapPassportTypeRow } = require("../../shared/passports/passport-helpers");
 
 function createRequestResponseHelpers({
   pool,
@@ -143,12 +144,20 @@ function createRequestResponseHelpers({
 
     const [companyNameMap, typeRes] = await Promise.all([
       getCompanyNameMap([result.passport.companyId]),
-      pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [result.passport.passportType])]
+      pool.query(
+        `SELECT type_name AS "typeName",
+                product_category AS "productCategory",
+                semantic_model_key AS "semanticModelKey",
+                fields_json AS "fieldsJson"
+         FROM passport_types
+         WHERE type_name = $1`,
+        [result.passport.passportType]
+      )]
     );
 
     return {
       passport: result.passport,
-      typeDef: typeRes.rows[0] || null,
+      typeDef: typeRes.rows[0] ? mapPassportTypeRow(typeRes.rows[0]) : null,
       companyName: companyNameMap.get(String(result.passport.companyId)) || "",
       tableName: getTable(result.passport.passportType)
     };
@@ -202,11 +211,19 @@ function createRequestResponseHelpers({
     if (!result?.passport) return null;
     const [companyNameMap, typeRes] = await Promise.all([
       getCompanyNameMap([result.passport.companyId]),
-      pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [result.passport.passportType])]
+      pool.query(
+        `SELECT type_name AS "typeName",
+                product_category AS "productCategory",
+                semantic_model_key AS "semanticModelKey",
+                fields_json AS "fieldsJson"
+         FROM passport_types
+         WHERE type_name = $1`,
+        [result.passport.passportType]
+      )]
     );
     return {
       passport: result.passport,
-      typeDef: typeRes.rows[0] || null,
+      typeDef: typeRes.rows[0] ? mapPassportTypeRow(typeRes.rows[0]) : null,
       companyName: companyNameMap.get(String(result.passport.companyId)) || ""
     };
   }

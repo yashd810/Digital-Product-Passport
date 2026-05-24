@@ -59,7 +59,7 @@ function AdminCompanies() {
   const [policyError,    setPolicyError]    = useState("");
   const [policyLoading,  setPolicyLoading]  = useState(false);
   const [policySaving,   setPolicySaving]   = useState(false);
-  const [sortConfig,     setSortConfig]     = useState({ key: "created_at", direction: "desc" });
+  const [sortConfig,     setSortConfig]     = useState({ key: "createdAt", direction: "desc" });
   const [columnFilters,  setColumnFilters]  = useState({});
   const [showFilters,    setShowFilters]    = useState(false);
   const [openKebabId,    setOpenKebabId]    = useState(null);
@@ -88,12 +88,12 @@ function AdminCompanies() {
 
   const companyColumns = useMemo(() => ([
 	    { key: "id", type: "number", getValue: (company) => company.id },
-	    { key: "company_name", type: "string", getValue: (company) => company.company_name || "" },
-	    { key: "legal_name", type: "string", getValue: (company) => company.legal_name || "" },
-	    { key: "customer_trust_level", type: "string", getValue: (company) => company.customer_trust_level || "" },
-	    { key: "granted_type_names", type: "string", getValue: (company) => (company.granted_type_names || []).join(" ") },
-	    { key: "asset_management_enabled", type: "string", getValue: (company) => company.asset_management_enabled ? "enabled" : "disabled" },
-	    { key: "created_at", type: "date", getValue: (company) => company.created_at },
+	    { key: "companyName", type: "string", getValue: (company) => company.companyName || "" },
+	    { key: "legalName", type: "string", getValue: (company) => company.legalName || "" },
+	    { key: "customerTrustLevel", type: "string", getValue: (company) => company.customerTrustLevel || "" },
+	    { key: "grantedTypeNames", type: "string", getValue: (company) => (company.grantedTypeNames || []).join(" ") },
+	    { key: "assetManagementEnabled", type: "string", getValue: (company) => company.assetManagementEnabled ? "enabled" : "disabled" },
+	    { key: "createdAt", type: "date", getValue: (company) => company.createdAt },
 	  ]), []);
 
   const filteredCompanies = useMemo(
@@ -140,7 +140,7 @@ function AdminCompanies() {
 	      const data = await r.json();
 	      setCreatedCompany(data.company);
 	      setCompanyForm(INITIAL_COMPANY_FORM);
-	      setSuccessMsg(`Created ${data.company.company_name}`);
+	      setSuccessMsg(`Created ${data.company.companyName}`);
 	      fetchCompanies();
 	    } catch (e) { setError(e.message || "Failed to create company"); }
 	    finally { setIsLoading(false); }
@@ -155,15 +155,15 @@ function AdminCompanies() {
     setEditTarget(company);
     setEditError("");
     setEditForm({
-      companyName: company.company_name || "",
-      legalName: company.legal_name || "",
+      companyName: company.companyName || "",
+      legalName: company.legalName || "",
       country: company.country || "",
-      companyRegistrationNumber: company.company_registration_number || "",
-      vatNumber: company.vat_number || "",
-      websiteDomain: company.website_domain || "",
-      customerTrustLevel: company.customer_trust_level || "BASIC",
-      authorizedContactName: company.authorized_contact_name || "",
-      authorizedContactEmail: company.authorized_contact_email || "",
+      companyRegistrationNumber: company.companyRegistrationNumber || "",
+      vatNumber: company.vatNumber || "",
+      websiteDomain: company.websiteDomain || "",
+      customerTrustLevel: company.customerTrustLevel || "BASIC",
+      authorizedContactName: company.authorizedContactName || "",
+      authorizedContactEmail: company.authorizedContactEmail || "",
     });
   };
 
@@ -192,7 +192,7 @@ function AdminCompanies() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to update company");
-      setSuccessMsg(`Updated ${data.company.company_name}`);
+      setSuccessMsg(`Updated ${data.company.companyName}`);
       setEditTarget(null);
       await fetchCompanies();
     } catch (e) {
@@ -233,7 +233,7 @@ function AdminCompanies() {
       if (!r.ok) throw new Error(data.error || "Failed to delete company");
 
       setCreatedCompany(null);
-      setSuccessMsg(`Deleted ${deleteTarget.company_name} and all related company data.`);
+      setSuccessMsg(`Deleted ${deleteTarget.companyName} and all related company data.`);
       setDeleteTarget(null);
       setDeletePassword("");
       setDeleteError("");
@@ -255,7 +255,7 @@ function AdminCompanies() {
       setError("");
       setSuccessMsg("");
       setIsTogglingAssetId(company.id);
-      const nextEnabled = !company.asset_management_enabled;
+      const nextEnabled = !company.assetManagementEnabled;
       const r = await fetchWithAuth(`${API}/api/admin/companies/${company.id}/asset-management`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -265,8 +265,8 @@ function AdminCompanies() {
       if (!r.ok) throw new Error(data.error || "Failed to update Asset Management access");
       setSuccessMsg(
         nextEnabled
-          ? `Asset Management enabled for ${company.company_name}`
-          : `Asset Management revoked for ${company.company_name}`
+          ? `Asset Management enabled for ${company.companyName}`
+          : `Asset Management revoked for ${company.companyName}`
       );
       await fetchCompanies();
     } catch (e) {
@@ -320,7 +320,7 @@ function AdminCompanies() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to save company DPP policy");
-      setSuccessMsg(`Updated DPP policy for ${policyTarget.company_name}`);
+      setSuccessMsg(`Updated DPP policy for ${policyTarget.companyName}`);
       setPolicyTarget(null);
       setPolicyForm(null);
       setPolicyError("");
@@ -424,25 +424,25 @@ function AdminCompanies() {
               <div className="company-code-result-item">
                 <span className="company-code-result-label">Company</span>
 	                <strong className="company-code-result-value">
-	                  {createdCompany.company_name}
+	                  {createdCompany.companyName}
 	                </strong>
 	              </div>
 	              <div className="company-code-result-item">
 	                <span className="company-code-result-label">Legal Name</span>
 	                <strong className="company-code-result-value">
-	                  {createdCompany.legal_name || "Not set"}
+	                  {createdCompany.legalName || "Not set"}
 	                </strong>
 	              </div>
 	              <div className="company-code-result-item">
 	                <span className="company-code-result-label">Identity Level</span>
 	                <strong className="company-code-result-value">
-	                  {createdCompany.customer_trust_level || "BASIC"}
+	                  {createdCompany.customerTrustLevel || "BASIC"}
 	                </strong>
 	              </div>
 	              <div className="company-code-result-item">
 	                <span className="company-code-result-label">Verification</span>
 	                <strong className="company-code-result-value">
-	                  {createdCompany.verification_status || "unverified"}
+	                  {createdCompany.verificationStatus || "unverified"}
 	                </strong>
 	              </div>
 	            </div>
@@ -470,22 +470,22 @@ function AdminCompanies() {
           <thead>
             <tr>
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("id")}>ID{sortIndicator(sortConfig, "id") && ` ${sortIndicator(sortConfig, "id")}`}</button></th>
-	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("company_name")}>Company Name{sortIndicator(sortConfig, "company_name") && ` ${sortIndicator(sortConfig, "company_name")}`}</button></th>
-	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("legal_name")}>Legal Identity{sortIndicator(sortConfig, "legal_name") && ` ${sortIndicator(sortConfig, "legal_name")}`}</button></th>
-	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("customer_trust_level")}>Trust{sortIndicator(sortConfig, "customer_trust_level") && ` ${sortIndicator(sortConfig, "customer_trust_level")}`}</button></th>
-	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("granted_type_names")}>Access{sortIndicator(sortConfig, "granted_type_names") && ` ${sortIndicator(sortConfig, "granted_type_names")}`}</button></th>
-              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("asset_management_enabled")}>Asset Platform{sortIndicator(sortConfig, "asset_management_enabled") && ` ${sortIndicator(sortConfig, "asset_management_enabled")}`}</button></th>
-              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("created_at")}>Created{sortIndicator(sortConfig, "created_at") && ` ${sortIndicator(sortConfig, "created_at")}`}</button></th>
+	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("companyName")}>Company Name{sortIndicator(sortConfig, "companyName") && ` ${sortIndicator(sortConfig, "companyName")}`}</button></th>
+	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("legalName")}>Legal Identity{sortIndicator(sortConfig, "legalName") && ` ${sortIndicator(sortConfig, "legalName")}`}</button></th>
+	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("customerTrustLevel")}>Trust{sortIndicator(sortConfig, "customerTrustLevel") && ` ${sortIndicator(sortConfig, "customerTrustLevel")}`}</button></th>
+	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("grantedTypeNames")}>Access{sortIndicator(sortConfig, "grantedTypeNames") && ` ${sortIndicator(sortConfig, "grantedTypeNames")}`}</button></th>
+              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("assetManagementEnabled")}>Asset Platform{sortIndicator(sortConfig, "assetManagementEnabled") && ` ${sortIndicator(sortConfig, "assetManagementEnabled")}`}</button></th>
+              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("createdAt")}>Created{sortIndicator(sortConfig, "createdAt") && ` ${sortIndicator(sortConfig, "createdAt")}`}</button></th>
               <th>Actions</th>
             </tr>
             {showFilters && <tr className="table-filter-row">
               <th><input className="table-filter-input" value={columnFilters.id || ""} onChange={e => setColumnFilters(prev => ({ ...prev, id: e.target.value }))} placeholder="Filter" /></th>
-	              <th><input className="table-filter-input" value={columnFilters.company_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, company_name: e.target.value }))} placeholder="Filter" /></th>
-	              <th><input className="table-filter-input" value={columnFilters.legal_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, legal_name: e.target.value }))} placeholder="Filter" /></th>
-	              <th><input className="table-filter-input" value={columnFilters.customer_trust_level || ""} onChange={e => setColumnFilters(prev => ({ ...prev, customer_trust_level: e.target.value }))} placeholder="Filter" /></th>
-	              <th><input className="table-filter-input" value={columnFilters.granted_type_names || ""} onChange={e => setColumnFilters(prev => ({ ...prev, granted_type_names: e.target.value }))} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.asset_management_enabled || ""} onChange={e => setColumnFilters(prev => ({ ...prev, asset_management_enabled: e.target.value }))} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.created_at || ""} onChange={e => setColumnFilters(prev => ({ ...prev, created_at: e.target.value }))} placeholder="Filter" /></th>
+	              <th><input className="table-filter-input" value={columnFilters.companyName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, companyName: e.target.value }))} placeholder="Filter" /></th>
+	              <th><input className="table-filter-input" value={columnFilters.legalName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, legalName: e.target.value }))} placeholder="Filter" /></th>
+	              <th><input className="table-filter-input" value={columnFilters.customerTrustLevel || ""} onChange={e => setColumnFilters(prev => ({ ...prev, customerTrustLevel: e.target.value }))} placeholder="Filter" /></th>
+	              <th><input className="table-filter-input" value={columnFilters.grantedTypeNames || ""} onChange={e => setColumnFilters(prev => ({ ...prev, grantedTypeNames: e.target.value }))} placeholder="Filter" /></th>
+              <th><input className="table-filter-input" value={columnFilters.assetManagementEnabled || ""} onChange={e => setColumnFilters(prev => ({ ...prev, assetManagementEnabled: e.target.value }))} placeholder="Filter" /></th>
+              <th><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={e => setColumnFilters(prev => ({ ...prev, createdAt: e.target.value }))} placeholder="Filter" /></th>
               <th></th>
             </tr>}
           </thead>
@@ -493,22 +493,22 @@ function AdminCompanies() {
             {filteredCompanies.map(company => (
               <tr key={company.id}>
 	                <td className="id-cell">{company.id}</td>
-	                <td className="name-cell">{company.company_name}</td>
+	                <td className="name-cell">{company.companyName}</td>
 	                <td>
 	                  <div className="company-identity-cell">
-	                    <strong>{company.legal_name || company.company_name}</strong>
-	                    <span>{[company.country, company.company_registration_number].filter(Boolean).join(" · ") || "Identity pending"}</span>
+	                    <strong>{company.legalName || company.companyName}</strong>
+	                    <span>{[company.country, company.companyRegistrationNumber].filter(Boolean).join(" · ") || "Identity pending"}</span>
 	                  </div>
 	                </td>
 	                <td>
 	                  <span className="company-access-pill">
-	                    {company.customer_trust_level || "BASIC"}
+	                    {company.customerTrustLevel || "BASIC"}
 	                  </span>
 	                </td>
 	                <td>
                   <div className="company-access-list">
-                    {(company.granted_type_names || []).length > 0 ? (
-                      (company.granted_type_names || []).map((typeName) => (
+                    {(company.grantedTypeNames || []).length > 0 ? (
+                      (company.grantedTypeNames || []).map((typeName) => (
                         <span key={typeName} className="company-access-pill">{typeName}</span>
                       ))
                     ) : (
@@ -517,11 +517,11 @@ function AdminCompanies() {
                   </div>
                 </td>
                 <td>
-                  <span className={`company-access-pill ${company.asset_management_enabled ? "asset-pill-enabled" : "asset-pill-disabled"}`}>
-                    {company.asset_management_enabled ? "Enabled" : "Disabled"}
+                  <span className={`company-access-pill ${company.assetManagementEnabled ? "asset-pill-enabled" : "asset-pill-disabled"}`}>
+                    {company.assetManagementEnabled ? "Enabled" : "Disabled"}
                   </span>
                 </td>
-                <td className="date-cell">{new Date(company.created_at).toLocaleDateString()}</td>
+                <td className="date-cell">{new Date(company.createdAt).toLocaleDateString()}</td>
                 <td className="actions-cell">
                   <button
                     className="kebab-menu-btn"
@@ -537,7 +537,7 @@ function AdminCompanies() {
                         onClick={() => { setOpenKebabId(null); setAssetConfirm(company); }}
                         disabled={isTogglingAssetId === company.id}
                       >
-                        {company.asset_management_enabled ? "⛔ Revoke Asset" : "💼 Enable Asset"}
+                        {company.assetManagementEnabled ? "⛔ Revoke Asset" : "💼 Enable Asset"}
                       </button>
                       <button
                         className="menu-item"
@@ -593,7 +593,7 @@ function AdminCompanies() {
           <div className="apt-modal companies-delete-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="apt-modal-title">Delete Company</h3>
             <p className="apt-modal-warning">
-              This will permanently delete <strong>{deleteTarget.company_name}</strong> and all related users, passports,
+              This will permanently delete <strong>{deleteTarget.companyName}</strong> and all related users, passports,
               repository files, workflow records, and company data. This action cannot be undone.
             </p>
             <form onSubmit={confirmDeleteCompany}>
@@ -632,12 +632,12 @@ function AdminCompanies() {
         <div className="apt-modal-overlay" onClick={() => !isTogglingAssetId && setAssetConfirm(null)}>
           <div className="apt-modal companies-delete-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="apt-modal-title">
-              {assetConfirm.asset_management_enabled ? "Revoke Asset Management" : "Enable Asset Management"}
+              {assetConfirm.assetManagementEnabled ? "Revoke Asset Management" : "Enable Asset Management"}
             </h3>
-            <p className="apt-modal-warning" style={{ background: assetConfirm.asset_management_enabled ? undefined : "rgba(13,181,176,0.08)", borderColor: assetConfirm.asset_management_enabled ? undefined : "rgba(13,181,176,0.28)", color: assetConfirm.asset_management_enabled ? undefined : "var(--text-primary)" }}>
-              {assetConfirm.asset_management_enabled
-                ? <>This will revoke Asset Management access for <strong>{assetConfirm.company_name}</strong>. Their existing asset data will be preserved but they will no longer be able to use the Asset platform.</>
-                : <>This will enable Asset Management for <strong>{assetConfirm.company_name}</strong>. They will gain access to the Asset platform immediately.</>}
+            <p className="apt-modal-warning" style={{ background: assetConfirm.assetManagementEnabled ? undefined : "rgba(13,181,176,0.08)", borderColor: assetConfirm.assetManagementEnabled ? undefined : "rgba(13,181,176,0.28)", color: assetConfirm.assetManagementEnabled ? undefined : "var(--text-primary)" }}>
+              {assetConfirm.assetManagementEnabled
+                ? <>This will revoke Asset Management access for <strong>{assetConfirm.companyName}</strong>. Their existing asset data will be preserved but they will no longer be able to use the Asset platform.</>
+                : <>This will enable Asset Management for <strong>{assetConfirm.companyName}</strong>. They will gain access to the Asset platform immediately.</>}
             </p>
             <div className="apt-modal-actions">
               <button
@@ -650,7 +650,7 @@ function AdminCompanies() {
               </button>
               <button
                 type="button"
-                className={assetConfirm.asset_management_enabled ? "apt-modal-delete-btn" : "apt-modal-confirm-btn"}
+                className={assetConfirm.assetManagementEnabled ? "apt-modal-delete-btn" : "apt-modal-confirm-btn"}
                 disabled={!!isTogglingAssetId}
                 onClick={async () => {
                   const company = assetConfirm;
@@ -660,7 +660,7 @@ function AdminCompanies() {
               >
                 {isTogglingAssetId
                   ? "Updating…"
-                  : assetConfirm.asset_management_enabled
+                  : assetConfirm.assetManagementEnabled
                     ? "Revoke Access"
                     : "Enable Access"}
               </button>
@@ -674,7 +674,7 @@ function AdminCompanies() {
           <div className="apt-modal companies-delete-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="apt-modal-title">DPP Policy</h3>
             <p className="apt-modal-warning" style={{ background: "rgba(13,181,176,0.08)", borderColor: "rgba(13,181,176,0.28)", color: "var(--text-primary)" }}>
-              Configure DPP issuance behavior for <strong>{policyTarget.company_name}</strong>.
+              Configure DPP issuance behavior for <strong>{policyTarget.companyName}</strong>.
             </p>
             {policyLoading ? (
               <div className="loading">Loading policy…</div>
@@ -739,7 +739,7 @@ function AdminCompanies() {
           <div className="apt-modal companies-delete-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="apt-modal-title">Edit Company Information</h3>
             <p className="apt-modal-warning" style={{ background: "rgba(13,181,176,0.08)", borderColor: "rgba(13,181,176,0.28)", color: "var(--text-primary)" }}>
-              Update company identity details for <strong>{editTarget.company_name}</strong>. Only company name is mandatory.
+              Update company identity details for <strong>{editTarget.companyName}</strong>. Only company name is mandatory.
             </p>
             <form onSubmit={saveEditedCompany} className="company-form">
               {editError && <div className="alert alert-error admin-alert-inline-wide">{editError}</div>}

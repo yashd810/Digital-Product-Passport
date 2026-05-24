@@ -33,8 +33,8 @@ module.exports = function registerAuthRoutes(app, {
   backupProviderService,
 }) {
   function buildAuthIdentityPayload(row = {}) {
-    const operatorIdentifier = row.economic_operator_identifier || row.economicOperatorIdentifier || row.economicOperatorId || null;
-    const operatorIdentifierScheme = row.economic_operator_identifier_scheme || row.economicOperatorIdentifierScheme || row.operatorIdentifierScheme || null;
+    const operatorIdentifier = row.economicOperatorIdentifier || row.economicOperatorId || null;
+    const operatorIdentifierScheme = row.economicOperatorIdentifierScheme || row.operatorIdentifierScheme || null;
     return {
       actorIdentifier: operatorIdentifier,
       actorIdentifierScheme: operatorIdentifierScheme,
@@ -53,26 +53,26 @@ module.exports = function registerAuthRoutes(app, {
     return {
       id: row.id,
       email: row.email,
-      companyId: row.companyId ?? row.company_id ?? null,
+      companyId: row.companyId ?? null,
       role: row.role,
-      firstName: row.firstName ?? row.first_name ?? "",
-      lastName: row.lastName ?? row.last_name ?? "",
-      companyName: row.companyName ?? row.company_name ?? null,
-      assetManagementEnabled: Boolean(row.assetManagementEnabled ?? row.asset_management_enabled),
-      avatarUrl: row.avatarUrl ?? row.avatar_url ?? null,
+      firstName: row.firstName ?? "",
+      lastName: row.lastName ?? "",
+      companyName: row.companyName ?? null,
+      assetManagementEnabled: Boolean(row.assetManagementEnabled),
+      avatarUrl: row.avatarUrl ?? null,
       phone: row.phone ?? null,
-      jobTitle: row.jobTitle ?? row.job_title ?? null,
+      jobTitle: row.jobTitle ?? null,
       bio: row.bio ?? null,
-      authSource: row.authSource ?? row.auth_source ?? null,
-      ssoOnly: Boolean(row.ssoOnly ?? row.sso_only),
-      preferredLanguage: row.preferredLanguage ?? row.preferred_language ?? null,
-      defaultReviewerId: row.defaultReviewerId ?? row.default_reviewer_id ?? null,
-      defaultApproverId: row.defaultApproverId ?? row.default_approver_id ?? null,
-      createdAt: row.createdAt ?? row.created_at ?? null,
-      lastLoginAt: row.lastLoginAt ?? row.last_login_at ?? null,
-      twoFactorEnabled: Boolean(row.twoFactorEnabled ?? row.two_factor_enabled),
-      isActive: row.isActive ?? row.is_active ?? undefined,
-      sessionVersion: row.sessionVersion ?? row.session_version ?? undefined,
+      authSource: row.authSource ?? null,
+      ssoOnly: Boolean(row.ssoOnly),
+      preferredLanguage: row.preferredLanguage ?? null,
+      defaultReviewerId: row.defaultReviewerId ?? null,
+      defaultApproverId: row.defaultApproverId ?? null,
+      createdAt: row.createdAt ?? null,
+      lastLoginAt: row.lastLoginAt ?? null,
+      twoFactorEnabled: Boolean(row.twoFactorEnabled),
+      isActive: row.isActive ?? undefined,
+      sessionVersion: row.sessionVersion ?? undefined,
       ...buildAuthIdentityPayload(row),
     };
   }
@@ -81,14 +81,14 @@ module.exports = function registerAuthRoutes(app, {
     return {
       id: row.id,
       email: row.email,
-      firstName: row.firstName ?? row.first_name ?? "",
-      lastName: row.lastName ?? row.last_name ?? "",
+      firstName: row.firstName ?? "",
+      lastName: row.lastName ?? "",
       role: row.role,
-      jobTitle: row.jobTitle ?? row.job_title ?? null,
-      avatarUrl: row.avatarUrl ?? row.avatar_url ?? null,
-      isActive: Boolean(row.isActive ?? row.is_active),
-      createdAt: row.createdAt ?? row.created_at ?? null,
-      passportCount: Number(row.passportCount ?? row.passport_count ?? 0),
+      jobTitle: row.jobTitle ?? null,
+      avatarUrl: row.avatarUrl ?? null,
+      isActive: Boolean(row.isActive),
+      createdAt: row.createdAt ?? null,
+      passportCount: Number(row.passportCount ?? 0),
     };
   }
 
@@ -129,8 +129,11 @@ module.exports = function registerAuthRoutes(app, {
       if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
 
       const tokenRow = await pool.query(
-        `SELECT it.*, c.company_name, c.asset_management_enabled,
-                c.economic_operator_identifier, c.economic_operator_identifier_scheme
+        `SELECT it.*,
+                c.company_name AS "companyName",
+                c.asset_management_enabled AS "assetManagementEnabled",
+                c.economic_operator_identifier AS "economicOperatorIdentifier",
+                c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
          FROM invite_tokens it
          LEFT JOIN companies c ON c.id = it.company_id
          WHERE it.token = $1 AND it.used = false AND it.expires_at > NOW()`,
@@ -150,7 +153,13 @@ module.exports = function registerAuthRoutes(app, {
       const result = await pool.query(
         `INSERT INTO users (email, password_hash, first_name, last_name, company_id, role, pepper_version)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING id, email, company_id, role, first_name, last_name, session_version`,
+         RETURNING id,
+                   email,
+                   company_id AS "companyId",
+                   role,
+                   first_name AS "firstName",
+                   last_name AS "lastName",
+                   session_version AS "sessionVersion"`,
         [invite.email, hash, firstName, lastName, assignedCompanyId, role, pepperVersion]
       );
       await pool.query("UPDATE invite_tokens SET used = true WHERE token = $1", [token]);
@@ -162,10 +171,10 @@ module.exports = function registerAuthRoutes(app, {
         success: true,
         user: buildAuthUserResponse({
           ...u,
-          company_name: invite.company_name || null,
-          asset_management_enabled: invite.asset_management_enabled || false,
-          economic_operator_identifier: invite.economic_operator_identifier || null,
-          economic_operator_identifier_scheme: invite.economic_operator_identifier_scheme || null,
+          companyName: invite.companyName || null,
+          assetManagementEnabled: invite.assetManagementEnabled || false,
+          economicOperatorIdentifier: invite.economicOperatorIdentifier || null,
+          economicOperatorIdentifierScheme: invite.economicOperatorIdentifierScheme || null,
         }),
       });
     } catch (e) {
@@ -180,7 +189,7 @@ module.exports = function registerAuthRoutes(app, {
       const { token } = req.query;
       if (!token) return res.status(400).json({ error: "Token is required" });
       const row = await pool.query(
-        `SELECT it.email, it.expires_at, it.used, it.role_to_assign, c.company_name
+        `SELECT it.email, it.expires_at, it.used, it.role_to_assign, c.company_name AS "companyName"
          FROM invite_tokens it LEFT JOIN companies c ON c.id = it.company_id WHERE it.token = $1`,
         [token]
       );
@@ -191,9 +200,9 @@ module.exports = function registerAuthRoutes(app, {
       res.json({
         valid: true,
         email: invite.email,
-        company_name: invite.company_name || null,
-        role_to_assign: invite.role_to_assign || null,
-        expires_at: invite.expires_at,
+        companyName: invite.companyName || null,
+        roleToAssign: invite.role_to_assign || null,
+        expiresAt: invite.expires_at,
       });
     } catch (e) { res.status(500).json({ valid: false, error: "Failed to validate invitation" }); }
   });
@@ -215,15 +224,31 @@ module.exports = function registerAuthRoutes(app, {
       }
 
       const result = await pool.query(
-        `SELECT u.*, c.company_name, c.asset_management_enabled,
-                c.economic_operator_identifier, c.economic_operator_identifier_scheme FROM users u
+        `SELECT u.id,
+                u.email,
+                u.password_hash,
+                u.pepper_version,
+                u.company_id AS "companyId",
+                u.role,
+                u.is_active AS "isActive",
+                u.session_version AS "sessionVersion",
+                u.two_factor_enabled AS "twoFactorEnabled",
+                u.otp_code_hash,
+                u.otp_code,
+                u.otp_expires_at,
+                u.sso_only AS "ssoOnly",
+                c.company_name AS "companyName",
+                c.asset_management_enabled AS "assetManagementEnabled",
+                c.economic_operator_identifier AS "economicOperatorIdentifier",
+                c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
+         FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.email = $1 AND u.is_active = true`,
         [email]
       );
       if (!result.rows.length) return res.status(401).json({ error: "Invalid credentials" });
       const u  = result.rows[0];
-      if (u.sso_only) {
+      if (u.ssoOnly) {
         return res.status(400).json({ error: "This account uses enterprise SSO. Use the SSO sign-in option instead." });
       }
       const passwordCheck = await verifyPasswordAndUpgrade(password, u);
@@ -256,7 +281,7 @@ module.exports = function registerAuthRoutes(app, {
       // Clear lockout on successful login
       await pool.query("DELETE FROM request_rate_limits WHERE bucket_key = $1", [lockKey]).catch(() => {});
 
-      if (u.two_factor_enabled) {
+      if (u.twoFactorEnabled) {
         const otp     = generateOtpCode();
         const otpHash = hashOtpCode(otp);
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -278,7 +303,7 @@ module.exports = function registerAuthRoutes(app, {
         mfaVerifiedAt: new Date().toISOString(),
         amr: ["pwd", "otp"]
       });
-      logger.info({ userId: u.id, session_version: u.session_version, msg: "[LOGIN_TOKEN] Generated token with session version" });
+      logger.info({ userId: u.id, sessionVersion: u.sessionVersion, msg: "[LOGIN_TOKEN] Generated token with session version" });
       setAuthCookie(res, sessionToken);
       res.json({
         success: true,
@@ -300,8 +325,21 @@ module.exports = function registerAuthRoutes(app, {
       if (!payload.pre_auth) return res.status(401).json({ error: "Invalid session token" });
 
       const result = await pool.query(
-        `SELECT u.*, c.company_name, c.asset_management_enabled,
-                c.economic_operator_identifier, c.economic_operator_identifier_scheme FROM users u
+        `SELECT u.id,
+                u.email,
+                u.company_id AS "companyId",
+                u.role,
+                u.first_name AS "firstName",
+                u.last_name AS "lastName",
+                u.last_login_at AS "lastLoginAt",
+                u.otp_code_hash,
+                u.otp_code,
+                u.otp_expires_at,
+                c.company_name AS "companyName",
+                c.asset_management_enabled AS "assetManagementEnabled",
+                c.economic_operator_identifier AS "economicOperatorIdentifier",
+                c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
+         FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.id = $1 AND u.is_active = true`,
         [payload.userId]
@@ -563,11 +601,13 @@ module.exports = function registerAuthRoutes(app, {
   app.get("/api/users/me", authenticateToken, async (req, res) => {
     try {
       const r = await pool.query(
-        `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.company_id, u.avatar_url, u.phone, u.job_title, u.bio,
-                u.auth_source, u.sso_only,
-                u.preferred_language, u.default_reviewer_id, u.default_approver_id, u.created_at, u.last_login_at,
-                u.two_factor_enabled, c.company_name, c.asset_management_enabled,
-                c.economic_operator_identifier, c.economic_operator_identifier_scheme
+        `SELECT u.id, u.email, u.first_name AS "firstName", u.last_name AS "lastName", u.role,
+                u.company_id AS "companyId", u.avatar_url AS "avatarUrl", u.phone, u.job_title AS "jobTitle", u.bio,
+                u.auth_source AS "authSource", u.sso_only AS "ssoOnly",
+                u.preferred_language AS "preferredLanguage", u.default_reviewer_id AS "defaultReviewerId",
+                u.default_approver_id AS "defaultApproverId", u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt",
+                u.two_factor_enabled AS "twoFactorEnabled", c.company_name AS "companyName", c.asset_management_enabled AS "assetManagementEnabled",
+                c.economic_operator_identifier AS "economicOperatorIdentifier", c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
          FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.id = $1`,
@@ -669,9 +709,9 @@ module.exports = function registerAuthRoutes(app, {
   app.get("/api/companies/:companyId/users", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(
-        `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.job_title, u.avatar_url,
-                u.is_active, u.created_at,
-                (SELECT COUNT(*) FROM passport_registry pr WHERE pr."companyId" = u.company_id AND pr."passportType" IS NOT NULL) AS passport_count
+        `SELECT u.id, u.email, u.first_name AS "firstName", u.last_name AS "lastName", u.role, u.job_title AS "jobTitle", u.avatar_url AS "avatarUrl",
+                u.is_active AS "isActive", u.created_at AS "createdAt",
+                (SELECT COUNT(*) FROM passport_registry pr WHERE pr."companyId" = u.company_id AND pr."passportType" IS NOT NULL) AS "passportCount"
          FROM users u
          WHERE u.company_id = $1 AND u.role != 'super_admin'
          ORDER BY u.role, u.first_name`,

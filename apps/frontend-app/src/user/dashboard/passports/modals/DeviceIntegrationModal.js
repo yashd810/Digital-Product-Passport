@@ -29,7 +29,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (!d) return;
-        const sections = d.fields_json?.sections || [];
+        const sections = d.fieldsJson?.sections || [];
         setDynFields(sections.flatMap((section) => section.fields || []).filter((field) => field.dynamic));
       })
       .catch(() => {});
@@ -103,7 +103,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
   const endpoint = `${apiBase}/api/passports/${passport.dppId}/dynamic-values`;
   const exampleBody = dynFields.length
     ? `{\n${dynFields.map((field) => `  "${field.key}": "value"`).join(",\n")}\n}`
-    : `{\n  "field_key": "value"\n}`;
+    : `{\n  "fieldKey": "value"\n}`;
 
   return createPortal(
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>

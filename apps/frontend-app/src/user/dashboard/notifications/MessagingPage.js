@@ -6,12 +6,12 @@ const API = import.meta.env.VITE_API_URL || "";
 
 function initials(u) {
   if (!u) return "?";
-  return `${(u.first_name || "").charAt(0)}${(u.last_name || "").charAt(0)}`.toUpperCase() || u.email?.charAt(0)?.toUpperCase() || "?";
+  return `${(u.firstName || "").charAt(0)}${(u.lastName || "").charAt(0)}`.toUpperCase() || u.email?.charAt(0)?.toUpperCase() || "?";
 }
 
 function displayName(u) {
   if (!u) return "";
-  return `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.email;
+  return `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email;
 }
 
 function timeLabel(dateStr) {
@@ -34,7 +34,7 @@ function groupByDate(messages) {
   const groups = [];
   let lastDate = null;
   messages.forEach(m => {
-    const d = new Date(m.created_at);
+    const d = new Date(m.createdAt);
     const label = d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
     if (label !== lastDate) {
       groups.push({ type: "date", label });
@@ -165,11 +165,11 @@ export default function MessagingPage({ user }) {
 
   const activeConv = conversations.find(c => c.id === activeConvId);
   const filteredConvs = conversations.filter(c => {
-    const name = `${c.first_name || ""} ${c.last_name || ""} ${c.email || ""}`.toLowerCase();
+              const name = `${c.firstName || ""} ${c.lastName || ""} ${c.email || ""}`.toLowerCase();
     return name.includes(search.toLowerCase());
   });
   const filteredUsers = companyUsers.filter(u => {
-    const name = `${u.first_name || ""} ${u.last_name || ""} ${u.email || ""}`.toLowerCase();
+    const name = `${u.firstName || ""} ${u.lastName || ""} ${u.email || ""}`.toLowerCase();
     return name.includes(userSearch.toLowerCase());
   });
 
@@ -221,12 +221,12 @@ export default function MessagingPage({ user }) {
                   <div className="msg-conv-info">
                     <div className="msg-conv-name-row">
                       <span className="msg-conv-name">{displayName(c)}</span>
-                      <span className="msg-conv-time">{timeLabel(c.last_message_at)}</span>
+                      <span className="msg-conv-time">{timeLabel(c.lastMessageAt)}</span>
                     </div>
                     <div className="msg-conv-preview-row">
                       <span className="msg-conv-preview">
-                        {c.last_sender_id === user?.id ? "You: " : ""}
-                        {c.last_message || "Start the conversation"}
+                        {c.lastSenderId === user?.id ? "You: " : ""}
+                        {c.lastMessage || "Start the conversation"}
                       </span>
                       {unread > 0 && <span className="msg-unread-badge">{unread}</span>}
                     </div>
@@ -274,19 +274,19 @@ export default function MessagingPage({ user }) {
                     return <div key={`date-${idx}`} className="msg-date-divider"><span>{item.label}</span></div>;
                   }
                   const m = item.msg;
-                  const isMe = m.sender_id === user?.id;
+                  const isMe = m.senderId === user?.id;
                   return (
                     <div key={m.id} className={`msg-bubble-row${isMe ? " me" : ""}`}>
                       {!isMe && (
                         <div className="msg-bubble-avatar">
-                          {`${(m.first_name||"").charAt(0)}${(m.last_name||"").charAt(0)}`.toUpperCase() || "?"}
+                          {`${(m.firstName||"").charAt(0)}${(m.lastName||"").charAt(0)}`.toUpperCase() || "?"}
                         </div>
                       )}
                       <div className="msg-bubble-wrap">
                         <div className={`msg-bubble${isMe ? " msg-bubble-me" : " msg-bubble-them"}`}>
                           {m.body}
                         </div>
-                        <span className="msg-bubble-time">{msgTime(m.created_at)}</span>
+                        <span className="msg-bubble-time">{msgTime(m.createdAt)}</span>
                       </div>
                     </div>
                   );

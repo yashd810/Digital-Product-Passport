@@ -127,13 +127,13 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     if (!companyId) return null;
     const result = await pool.query(
       `SELECT c.id,
-              c.company_name,
-              c.did_slug,
-              COALESCE(p.default_granularity, 'model') AS default_granularity,
-              COALESCE(p.vc_issuance_enabled, true) AS vc_issuance_enabled,
-              COALESCE(p.mint_model_dids, true) AS mint_model_dids,
-              COALESCE(p.mint_item_dids, true) AS mint_item_dids,
-              COALESCE(p.mint_facility_dids, false) AS mint_facility_dids
+              c.company_name AS "companyName",
+              c.did_slug AS "didSlug",
+              COALESCE(p.default_granularity, 'model') AS "defaultGranularity",
+              COALESCE(p.vc_issuance_enabled, true) AS "vcIssuanceEnabled",
+              COALESCE(p.mint_model_dids, true) AS "mintModelDids",
+              COALESCE(p.mint_item_dids, true) AS "mintItemDids",
+              COALESCE(p.mint_facility_dids, false) AS "mintFacilityDids"
        FROM companies c
        LEFT JOIN company_dpp_policies p ON p.company_id = c.id
        WHERE c.id = $1
@@ -145,10 +145,10 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
   async function buildVC(passport, typeDef, releasedAt) {
     const appUrl = didService?.getPublicOrigin?.() || process.env.APP_URL || "http://localhost:3000";
-    const company = await loadCompanyForPassport(passport.company_id);
+    const company = await loadCompanyForPassport(passport.companyId);
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, {
       company,
-      granularity: passport.granularity || company?.default_granularity || "model"
+      granularity: passport.granularity || company?.defaultGranularity || "model"
     });
     const fields = {};
 
@@ -171,7 +171,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       "https://w3id.org/security/suites/jws-2020/v1",
       `${didService?.getApiOrigin?.() || process.env.SERVER_URL || "http://localhost:3001"}/contexts/dpp/v1`],
 
-      id: `${appUrl}/passport/${passport.dppId}/credential/v${passport.version_number}`,
+      id: `${appUrl}/passport/${passport.dppId}/credential/v${passport.versionNumber}`,
       type: ["VerifiableCredential", "DigitalProductPassport"],
       issuer: issuerDid(),
       validFrom: releasedAt,
@@ -190,7 +190,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
         subjectDid: canonicalPayload.subjectDid,
         dppDid: canonicalPayload.dppDid,
         companyDid: canonicalPayload.companyDid,
-        modelName: passport.model_name || null,
+        modelName: passport.modelName || null,
         ...fields
       }
     };
@@ -271,9 +271,9 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     if (!_signingKey) return null;
     const releasedAt = new Date().toISOString();
     const did = issuerDid();
-    const company = await loadCompanyForPassport(passport.company_id);
+    const company = await loadCompanyForPassport(passport.companyId);
 
-    if (company && company.vc_issuance_enabled === false) return null;
+    if (company && company.vcIssuanceEnabled === false) return null;
 
     const vc = await buildVC(passport, typeDef, releasedAt);
     const dataHash = crypto.createHash("sha256").update(canonicalJSON(vc)).digest("hex");
@@ -332,24 +332,24 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     const sig = sigRow.rows[0];
 
     const keyRow = await pool.query(
-      "SELECT public_key, algorithm, algorithm_version FROM passport_signing_keys WHERE key_id = $1", [sig.signing_key_id]
+      "SELECT public_key, algorithm, algorithm_version FROM passport_signing_keys WHERE key_id = $1", [sig.signingKeyId]
     );
-    if (!keyRow.rows.length) return { status: "key_missing", signedAt: sig.signed_at, keyId: sig.signing_key_id };
+    if (!keyRow.rows.length) return { status: "key_missing", signedAt: sig.signedAt, keyId: sig.signingKeyId };
     const publicKeyPem = keyRow.rows[0].public_key;
 
-    if (sig.vc_json) {
+    if (sig.vcJson) {
       try {
-        const vcWithProof = JSON.parse(sig.vc_json);
+        const vcWithProof = JSON.parse(sig.vcJson);
         const { proof, ...vcWithoutProof } = vcWithProof;
-        if (!proof?.jws) return { status: "invalid", signedAt: sig.signed_at, keyId: sig.signing_key_id };
+        if (!proof?.jws) return { status: "invalid", signedAt: sig.signedAt, keyId: sig.signingKeyId };
 
         const currentHash = crypto.createHash("sha256").update(canonicalJSON(vcWithoutProof)).digest("hex");
-        if (currentHash !== sig.data_hash) {
-          return { status: "tampered", signedAt: sig.signed_at, keyId: sig.signing_key_id, releasedAt: sig.released_at };
+        if (currentHash !== sig.dataHash) {
+          return { status: "tampered", signedAt: sig.signedAt, keyId: sig.signingKeyId, releasedAt: sig.releasedAt };
         }
 
         const jwsParts = proof.jws.split(".");
-        if (jwsParts.length !== 3) return { status: "invalid", signedAt: sig.signed_at, keyId: sig.signing_key_id };
+        if (jwsParts.length !== 3) return { status: "invalid", signedAt: sig.signedAt, keyId: sig.signingKeyId };
         const [jwsHeader, jwsPayloadSection, jwsSig] = jwsParts;
 
         const headerObj = JSON.parse(Buffer.from(jwsHeader, "base64url").toString());
@@ -375,25 +375,25 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
         return {
           status: valid ? "valid" : "invalid",
-          signedAt: sig.signed_at,
-          keyId: sig.signing_key_id,
-          dataHash: sig.data_hash,
-          releasedAt: sig.released_at,
+          signedAt: sig.signedAt,
+          keyId: sig.signingKeyId,
+          dataHash: sig.dataHash,
+          releasedAt: sig.releasedAt,
           algorithm: algorithmVersion,
           proofType: proof.type || "JsonWebSignature2020",
           issuer: vcWithoutProof.issuer,
           credentialId: vcWithoutProof.id
         };
       } catch {
-        return { status: "invalid", signedAt: sig.signed_at, keyId: sig.signing_key_id };
+        return { status: "invalid", signedAt: sig.signedAt, keyId: sig.signingKeyId };
       }
     }
 
     return {
       status: "invalid",
-      signedAt: sig.signed_at,
-      keyId: sig.signing_key_id,
-      releasedAt: sig.released_at
+      signedAt: sig.signedAt,
+      keyId: sig.signingKeyId,
+      releasedAt: sig.releasedAt
     };
   }
 

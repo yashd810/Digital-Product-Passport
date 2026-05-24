@@ -28,6 +28,13 @@ module.exports = function registerHealthRoutes(app, { pool, storageService }) {
 
   app.get("/health/storage", async (_req, res) => {
     const provider = storageService?.provider || storageService?.name || "unknown";
+    if (provider === "disabled") {
+      return res.status(200).json({
+        status: "OK",
+        storage: "disabled",
+        provider,
+      });
+    }
     if (!storageService?.saveObject || !storageService?.fetchObject || !storageService?.deleteObject) {
       return res.status(503).json({
         status: "UNAVAILABLE",

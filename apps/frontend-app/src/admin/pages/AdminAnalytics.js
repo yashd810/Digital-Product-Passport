@@ -11,12 +11,12 @@ const API = import.meta.env.VITE_API_URL || "";
 const slugify = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const ADMIN_BAR_COLORS = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e", "#f97316", "#a855f7"];
 const COMPANY_SERIES = [
-  { key: "draft_count",      label: "Draft",       color: STATUS_COLORS.draft },
-  { key: "in_review_count",  label: "In Review",   color: STATUS_COLORS.review },
-  { key: "released_count",   label: "Released",    color: STATUS_COLORS.released },
-  { key: "revised_count",    label: "In Revision", color: STATUS_COLORS.revised },
-  { key: "obsolete_count",   label: "Obsolete",    color: STATUS_COLORS.obsolete },
-  { key: "archived_count",   label: "Archived",    color: STATUS_COLORS.archived },
+  { key: "draftCount",      label: "Draft",       color: STATUS_COLORS.draft },
+  { key: "inReviewCount",   label: "In Review",   color: STATUS_COLORS.review },
+  { key: "releasedCount",   label: "Released",    color: STATUS_COLORS.released },
+  { key: "revisedCount",    label: "In Revision", color: STATUS_COLORS.revised },
+  { key: "obsoleteCount",   label: "Obsolete",    color: STATUS_COLORS.obsolete },
+  { key: "archivedCount",   label: "Archived",    color: STATUS_COLORS.archived },
 ];
 
 function BarChart({ data, height = 120 }) {
@@ -169,46 +169,46 @@ function AdminAnalytics() {
 
       const now = new Date();
       const summaryStats = [
-        { label: "Total Companies", value: analytics.overall.total_companies || 0, tone: "default" },
-        { label: "Total Passports", value: analytics.overall.total_passports || 0, tone: "default" },
-        { label: "Draft", value: analytics.overall.draft_count || 0, tone: "draft" },
-        { label: "In Review", value: analytics.overall.in_review_count || 0, tone: "review" },
-        { label: "Released", value: analytics.overall.released_count || 0, tone: "released" },
-        { label: "In Revision", value: analytics.overall.revised_count || 0, tone: "revised" },
-        { label: "Obsolete", value: analytics.overall.obsolete_count || 0, tone: "obsolete" },
-        { label: "Archived", value: analytics.overall.archived_count || 0, tone: "archived" },
+        { label: "Total Companies", value: analytics.overall.totalCompanies || 0, tone: "default" },
+        { label: "Total Passports", value: analytics.overall.totalPassports || 0, tone: "default" },
+        { label: "Draft", value: analytics.overall.draftCount || 0, tone: "draft" },
+        { label: "In Review", value: analytics.overall.inReviewCount || 0, tone: "review" },
+        { label: "Released", value: analytics.overall.releasedCount || 0, tone: "released" },
+        { label: "In Revision", value: analytics.overall.revisedCount || 0, tone: "revised" },
+        { label: "Obsolete", value: analytics.overall.obsoleteCount || 0, tone: "obsolete" },
+        { label: "Archived", value: analytics.overall.archivedCount || 0, tone: "archived" },
       ];
       const productCategoryRows = (analytics.byProductCategory || []).map((item) => [
-        item.product_category || "Uncategorized",
+        item.productCategory || "Uncategorized",
         item.total || 0,
         item.draft || 0,
         item.released || 0,
         item.revised || 0,
       ]);
       const companyRows = (analytics.byCompany || []).map((item) => [
-        item.company_name || `Company ${item.id}`,
-        item.total_passports || 0,
-        item.draft_count || 0,
-        item.released_count || 0,
-        item.revised_count || 0,
+        item.companyName || `Company ${item.id}`,
+        item.totalPassports || 0,
+        item.draftCount || 0,
+        item.releasedCount || 0,
+        item.revisedCount || 0,
       ]);
       const productCategoryChartItems = (analytics.byProductCategory || [])
         .filter((item) => (item.total || 0) > 0)
         .map((item, index) => ({
-          label: item.product_category || "Uncategorized",
+          label: item.productCategory || "Uncategorized",
           value: item.total || 0,
           color: ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length],
         }));
       const companyChartData = (analytics.byCompany || [])
-        .filter((item) => (item.total_passports || 0) > 0)
+        .filter((item) => (item.totalPassports || 0) > 0)
         .map((item) => ({
-          label: item.company_name || `Company ${item.id}`,
-          draft_count:     item.draft_count     || 0,
-          in_review_count: item.in_review_count || 0,
-          released_count:  item.released_count  || 0,
-          revised_count:   item.revised_count   || 0,
-          obsolete_count:  item.obsolete_count  || 0,
-          archived_count:  item.archived_count  || 0,
+          label: item.companyName || `Company ${item.id}`,
+          draftCount:     item.draftCount     || 0,
+          inReviewCount:  item.inReviewCount  || 0,
+          releasedCount:  item.releasedCount  || 0,
+          revisedCount:   item.revisedCount   || 0,
+          obsoleteCount:  item.obsoleteCount  || 0,
+          archivedCount:  item.archivedCount  || 0,
         }));
 
       openAnalyticsPrintReport({
@@ -258,28 +258,28 @@ function AdminAnalytics() {
   const productCategoryChartItems = (analytics.byProductCategory || [])
     .filter((item) => (item.total || 0) > 0)
     .map((item, index) => ({
-      label: item.product_category || "Uncategorized",
+      label: item.productCategory || "Uncategorized",
       value: item.total || 0,
       color: ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length],
     }));
 
   const companyChartData = (analytics.byCompany || [])
-    .filter((item) => (item.total_passports || 0) > 0)
+    .filter((item) => (item.totalPassports || 0) > 0)
     .map((item, index) => ({
-      label: item.company_name || `Company ${item.id}`,
-      total: item.total_passports || 0,
-      draft_count:     item.draft_count     || 0,
-      in_review_count: item.in_review_count || 0,
-      released_count:  item.released_count  || 0,
-      revised_count:   item.revised_count   || 0,
-      obsolete_count:  item.obsolete_count  || 0,
-      archived_count:  item.archived_count  || 0,
+      label: item.companyName || `Company ${item.id}`,
+      total: item.totalPassports || 0,
+      draftCount:     item.draftCount     || 0,
+      inReviewCount:  item.inReviewCount  || 0,
+      releasedCount:  item.releasedCount  || 0,
+      revisedCount:   item.revisedCount   || 0,
+      obsoleteCount:  item.obsoleteCount  || 0,
+      archivedCount:  item.archivedCount  || 0,
       color: ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length],
     }));
   const normalizedCompanyFilter = companyFilter.trim().toLowerCase();
   const filteredCompanies = (analytics.byCompany || []).filter((company) =>
     !normalizedCompanyFilter ||
-    (company.company_name || "").toLowerCase().includes(normalizedCompanyFilter)
+    (company.companyName || "").toLowerCase().includes(normalizedCompanyFilter)
   );
 
   return (
@@ -305,14 +305,14 @@ function AdminAnalytics() {
       )}
 
       <div className="overview-stats-row">
-        <div className="ov-stat"><div className="ov-stat-num">{analytics.overall.total_companies}</div><div className="ov-stat-label">🏢 Companies</div></div>
-        <div className="ov-stat"><div className="ov-stat-num">{analytics.overall.total_passports || 0}</div><div className="ov-stat-label">Total Passports</div></div>
-        <div className="ov-stat stat-draft"><div className="ov-stat-num">{analytics.overall.draft_count || 0}</div><div className="ov-stat-label">📋 Draft</div></div>
-        <div className="ov-stat stat-review"><div className="ov-stat-num">{analytics.overall.in_review_count || 0}</div><div className="ov-stat-label">🔍 In Review</div></div>
-        <div className="ov-stat stat-released"><div className="ov-stat-num">{analytics.overall.released_count || 0}</div><div className="ov-stat-label">✅ Released</div></div>
-        <div className="ov-stat stat-revised"><div className="ov-stat-num">{analytics.overall.revised_count || 0}</div><div className="ov-stat-label">📝 In Revision</div></div>
-        <div className="ov-stat stat-obsolete"><div className="ov-stat-num">{analytics.overall.obsolete_count || 0}</div><div className="ov-stat-label">⚪ Obsolete</div></div>
-        <div className="ov-stat stat-archived"><div className="ov-stat-num">{analytics.overall.archived_count || 0}</div><div className="ov-stat-label">📦 Archived</div></div>
+        <div className="ov-stat"><div className="ov-stat-num">{analytics.overall.totalCompanies}</div><div className="ov-stat-label">🏢 Companies</div></div>
+        <div className="ov-stat"><div className="ov-stat-num">{analytics.overall.totalPassports || 0}</div><div className="ov-stat-label">Total Passports</div></div>
+        <div className="ov-stat stat-draft"><div className="ov-stat-num">{analytics.overall.draftCount || 0}</div><div className="ov-stat-label">📋 Draft</div></div>
+        <div className="ov-stat stat-review"><div className="ov-stat-num">{analytics.overall.inReviewCount || 0}</div><div className="ov-stat-label">🔍 In Review</div></div>
+        <div className="ov-stat stat-released"><div className="ov-stat-num">{analytics.overall.releasedCount || 0}</div><div className="ov-stat-label">✅ Released</div></div>
+        <div className="ov-stat stat-revised"><div className="ov-stat-num">{analytics.overall.revisedCount || 0}</div><div className="ov-stat-label">📝 In Revision</div></div>
+        <div className="ov-stat stat-obsolete"><div className="ov-stat-num">{analytics.overall.obsoleteCount || 0}</div><div className="ov-stat-label">⚪ Obsolete</div></div>
+        <div className="ov-stat stat-archived"><div className="ov-stat-num">{analytics.overall.archivedCount || 0}</div><div className="ov-stat-label">📦 Archived</div></div>
       </div>
 
       <div className="aca-card admin-section-spaced">
@@ -357,13 +357,13 @@ function AdminAnalytics() {
             </thead>
             <tbody>
               {analytics.byProductCategory.map((productCategory) => (
-                <React.Fragment key={productCategory.product_category}>
-                  <tr className="productCategory-row" onClick={() => toggleProductCategory(productCategory.product_category)}>
+                <React.Fragment key={productCategory.productCategory}>
+                  <tr className="productCategory-row" onClick={() => toggleProductCategory(productCategory.productCategory)}>
                     <td>
-                      <span className="admin-inline-icon">{productCategory.product_icon}</span>
-                      <strong>{productCategory.product_category}</strong>
+                      <span className="admin-inline-icon">{productCategory.productIcon}</span>
+                      <strong>{productCategory.productCategory}</strong>
                       <span className="admin-inline-meta">
-                        {expanded[productCategory.product_category] ? "▲" : "▼"} {productCategory.types.length} type{productCategory.types.length !== 1 ? "s" : ""}
+                        {expanded[productCategory.productCategory] ? "▲" : "▼"} {productCategory.types.length} type{productCategory.types.length !== 1 ? "s" : ""}
                       </span>
                     </td>
                     <td><strong>{productCategory.total || 0}</strong></td>
@@ -373,11 +373,11 @@ function AdminAnalytics() {
                     <td><span className="mini-badge obsolete">{productCategory.obsolete || 0}</span></td>
                     <td><span className="mini-badge archived">{productCategory.archived || 0}</span></td>
                   </tr>
-                  {expanded[productCategory.product_category] && productCategory.types.map((type) => (
-                    <tr key={type.type_name} className="type-subrow">
+                  {expanded[productCategory.productCategory] && productCategory.types.map((type) => (
+                    <tr key={type.typeName} className="type-subrow">
                       <td className="admin-subrow-label">
-                        └── {type.display_name}
-                        <code className="admin-inline-code admin-inline-code-spaced">{type.type_name}</code>
+                        └── {type.displayName}
+                        <code className="admin-inline-code admin-inline-code-spaced">{type.typeName}</code>
                       </td>
                       <td>{type.total || 0}</td>
                       <td><span className="mini-badge draft">{type.draft || 0}</span></td>
@@ -426,18 +426,18 @@ function AdminAnalytics() {
               </tr>
             ) : filteredCompanies.map((company) => (
               <tr key={company.id}>
-                <td className="company-name">{company.company_name}</td>
-                <td>{company.total_passports || 0}</td>
-                <td><span className="mini-badge draft">{company.draft_count || 0}</span></td>
-                <td><span className="mini-badge review">{company.in_review_count || 0}</span></td>
-                <td><span className="mini-badge released">{company.released_count || 0}</span></td>
-                <td><span className="mini-badge revised">{company.revised_count || 0}</span></td>
-                <td><span className="mini-badge obsolete">{company.obsolete_count || 0}</span></td>
-                <td><span className="mini-badge archived">{company.archived_count || 0}</span></td>
+                <td className="company-name">{company.companyName}</td>
+                <td>{company.totalPassports || 0}</td>
+                <td><span className="mini-badge draft">{company.draftCount || 0}</span></td>
+                <td><span className="mini-badge review">{company.inReviewCount || 0}</span></td>
+                <td><span className="mini-badge released">{company.releasedCount || 0}</span></td>
+                <td><span className="mini-badge revised">{company.revisedCount || 0}</span></td>
+                <td><span className="mini-badge obsolete">{company.obsoleteCount || 0}</span></td>
+                <td><span className="mini-badge archived">{company.archivedCount || 0}</span></td>
                 <td>
                   <button
                     className="manage-btn manage-btn-analytics"
-                    onClick={() => navigate(`/admin/analytics/${slugify(company.company_name)}`, { state: { companyId: company.id } })}
+                    onClick={() => navigate(`/admin/analytics/${slugify(company.companyName)}`, { state: { companyId: company.id } })}
                   >
                     📊 Analytics
                   </button>

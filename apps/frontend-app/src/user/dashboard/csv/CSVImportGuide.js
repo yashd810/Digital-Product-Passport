@@ -98,7 +98,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const response = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
       if (!response.ok) { setCreateError("Failed to fetch passport type definition"); return; }
       const passportTypeData = await response.json();
-      const sections = passportTypeData.fields_json?.sections || [];
+      const sections = passportTypeData.fieldsJson?.sections || [];
       const csvRows = [];
       csvRows.push(["Field Name", "Passport 1", "Passport 2", "Passport 3"]);
       csvRows.push(["internalAliasId", "", "", ""]);
@@ -128,7 +128,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
       if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
       const passportTypeData = await typeResponse.json();
-      const sections = passportTypeData.fields_json?.sections || [];
+      const sections = passportTypeData.fieldsJson?.sections || [];
       const allFields = sections.flatMap(section => section.fields || []);
       const text = await file.text();
       const rows = parseCsvText(text);

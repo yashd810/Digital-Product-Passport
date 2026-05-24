@@ -25,7 +25,7 @@ function BulkModal({ passportType, typeLabel, companyId, templateId, templateNam
         const tr = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${templateId}`, { headers: authHeaders() });
         if (tr.ok) {
           const tmpl = await tr.json();
-          for (const f of tmpl.fields || []) { if (f.field_value) prefill[f.field_key] = f.field_value; }
+          for (const f of tmpl.fields || []) { if (f.fieldValue) prefill[f.fieldKey] = f.fieldValue; }
         }
       }
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk`, {
@@ -177,7 +177,7 @@ export default function CreateHub({ user, companyId }) {
       .then(types => {
         setPassportTypes(types);
         if (preselectedType) {
-          const match = types.find(t => t.type_name === preselectedType);
+          const match = types.find(t => t.typeName === preselectedType);
           if (match) { setSelectedType(match); setStep("method"); }
         }
       })
@@ -188,7 +188,7 @@ export default function CreateHub({ user, companyId }) {
   const loadTemplates = useCallback((type) => {
     if (!type) return;
     setLoadingTemplates(true);
-    fetchWithAuth(`${API}/api/companies/${companyId}/templates?passport_type=${type.type_name}`, { headers: authHeaders() })
+    fetchWithAuth(`${API}/api/companies/${companyId}/templates?passportType=${type.typeName}`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setTemplates)
       .catch(() => setTemplates([]))
@@ -203,9 +203,9 @@ export default function CreateHub({ user, companyId }) {
     setStep("method");
   };
 
-  const typeLabel = selectedType?.display_name || selectedType?.type_name || "";
+  const typeLabel = selectedType?.displayName || selectedType?.typeName || "";
   const grouped = passportTypes.reduce((acc, pt) => {
-    const cat = pt.product_category || "Other";
+    const cat = pt.productCategory || "Other";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(pt);
     return acc;
@@ -241,8 +241,8 @@ export default function CreateHub({ user, companyId }) {
                   <div className="ch-type-group-label">{cat}</div>
                   {types.map(pt => (
                     <button key={pt.id} className="ch-type-card" onClick={() => selectType(pt)}>
-                      <span className="ch-type-icon">{pt.product_icon || "📋"}</span>
-                      <span className="ch-type-name">{pt.display_name || pt.type_name}</span>
+                      <span className="ch-type-icon">{pt.productIcon || "📋"}</span>
+                      <span className="ch-type-name">{pt.displayName || pt.typeName}</span>
                       <span className="ch-method-arrow">→</span>
                     </button>
                   ))}
@@ -254,7 +254,7 @@ export default function CreateHub({ user, companyId }) {
             </div>
           ) : (
             <div className="ch-selected-type">
-              <span className="ch-type-icon">{selectedType?.product_icon || "📋"}</span>
+              <span className="ch-type-icon">{selectedType?.productIcon || "📋"}</span>
               <strong>{typeLabel}</strong>
             </div>
           )}
@@ -297,7 +297,7 @@ export default function CreateHub({ user, companyId }) {
                     description="Opens the passport form with model data pre-filled from this template. You fill in the unit-specific fields."
                     tag="One at a time"
                     tagColor="mint"
-                    onClick={() => navigate(`/create/${selectedType.type_name}?templateId=${chosenTemplate.id}`)}
+                    onClick={() => navigate(`/create/${selectedType.typeName}?templateId=${chosenTemplate.id}`)}
                   />
                   <MethodCard
                     icon="⚡"
@@ -317,7 +317,7 @@ export default function CreateHub({ user, companyId }) {
                   description="Create one passport at a time using the structured form. Best for individual records or when you want full control over each field."
                   tag="One at a time"
                   tagColor="mint"
-                  onClick={() => navigate(`/create/${selectedType.type_name}`)}
+                  onClick={() => navigate(`/create/${selectedType.typeName}`)}
                 />
                 <MethodCard
                   icon="📋"
@@ -342,7 +342,7 @@ export default function CreateHub({ user, companyId }) {
                   description="Create passports by uploading a spreadsheet. Download the template CSV first, fill in one column per passport, then upload. Best for large batches with structured data."
                   tag="Spreadsheet"
                   tagColor="blue"
-                  onClick={() => navigate(`/csv-import/${selectedType.type_name}`)}
+                  onClick={() => navigate(`/csv-import/${selectedType.typeName}`)}
                 />
                 <MethodCard
                   icon="🔧"
@@ -350,7 +350,7 @@ export default function CreateHub({ user, companyId }) {
                   description="Upload a JSON array or a CSV file to create new passports or update existing drafts. If a DPP ID is present in the file, the matching draft is updated instead of a new one created."
                   tag="Create + Update"
                   tagColor="blue"
-                  onClick={() => navigate(`/csv-import/${selectedType.type_name}/update-csv`)}
+                  onClick={() => navigate(`/csv-import/${selectedType.typeName}/update-csv`)}
                 />
               </div>
             )}
@@ -375,7 +375,7 @@ export default function CreateHub({ user, companyId }) {
       {/* Bulk modal */}
       {bulkModal && selectedType && (
         <BulkModal
-          passportType={selectedType.type_name}
+          passportType={selectedType.typeName}
           typeLabel={typeLabel}
           companyId={companyId}
           templateId={bulkModal.templateId}
@@ -383,7 +383,7 @@ export default function CreateHub({ user, companyId }) {
           onClose={() => setBulkModal(null)}
           onDone={() => {
             setBulkModal(null);
-            navigate(dashboardPath(`passports/${selectedType.type_name}`));
+            navigate(dashboardPath(`passports/${selectedType.typeName}`));
           }}
         />
       )}

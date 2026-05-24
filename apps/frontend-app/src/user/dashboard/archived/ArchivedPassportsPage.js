@@ -16,8 +16,8 @@ const API = import.meta.env.VITE_API_URL || "";
 function sortPassportsByVersionDesc(a, b) {
   const versionDiff = Number(b?.versionNumber || 0) - Number(a?.versionNumber || 0);
   if (versionDiff !== 0) return versionDiff;
-  return new Date(b?.archivedAt || b?.archived_at || b?.updatedAt || b?.createdAt || 0).getTime()
-    - new Date(a?.archivedAt || a?.archived_at || a?.updatedAt || a?.createdAt || 0).getTime();
+  return new Date(b?.archivedAt || b?.updatedAt || b?.createdAt || 0).getTime()
+    - new Date(a?.archivedAt || a?.updatedAt || a?.createdAt || 0).getTime();
 }
 
 function getPassportGroupKey(passport) {
@@ -188,8 +188,8 @@ function ArchivedPassports({ user, companyId }) {
         const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
-        const semanticModelKey = typeData.semantic_model_key || "";
-        const productCategory = typeData.product_category || "";
+        const semanticModelKey = typeData.semanticModelKey || "";
+        const productCategory = typeData.productCategory || "";
 
         const exported = [];
         for (const passport of passportsForType) {
@@ -300,8 +300,8 @@ function ArchivedPassports({ user, companyId }) {
     { key: "modelName", type: "string", getValue: group => group.latest?.modelName || "" },
     { key: "passportType", type: "string", getValue: group => group.latest?.passportType || "" },
     { key: "releaseStatus", type: "string", getValue: group => group.latest?.releaseStatus || "" },
-    { key: "archivedAt", type: "date", getValue: group => group.latest?.archivedAt || group.latest?.archived_at },
-    { key: "archived_by_name", type: "string", getValue: group => group.latest?.archived_by_first_name ? `${group.latest.archived_by_first_name} ${group.latest.archived_by_last_name}` : group.latest?.archived_by_email || "" },
+    { key: "archivedAt", type: "date", getValue: group => group.latest?.archivedAt },
+    { key: "archivedByName", type: "string", getValue: group => group.latest?.archivedByName || group.latest?.archivedByEmail || "" },
   ], []);
 
   const filteredAndSorted = useMemo(
@@ -429,11 +429,9 @@ function ArchivedPassports({ user, companyId }) {
           </span>
         </div>
       </td>
-      <td>{new Date(passport.archivedAt || passport.archived_at).toLocaleDateString()}</td>
+      <td>{new Date(passport.archivedAt).toLocaleDateString()}</td>
       <td className="small-text">
-        {passport.archived_by_first_name && passport.archived_by_last_name
-          ? `${passport.archived_by_first_name} ${passport.archived_by_last_name}`
-          : passport.archived_by_email || "—"}
+        {passport.archivedByName || passport.archivedByEmail || "—"}
       </td>
       {user?.role !== "viewer" && (
         <td className="options-cell" onClick={e => e.stopPropagation()}>
@@ -493,7 +491,7 @@ function ArchivedPassports({ user, companyId }) {
         <select value={filterType} onChange={e => setFilterType(e.target.value)} className="filter-select">
           <option value="">All Types</option>
           {passportTypes.map(t => (
-            <option key={t.type_name} value={t.type_name}>{t.display_name || t.type_name}</option>
+            <option key={t.typeName} value={t.typeName}>{t.displayName || t.typeName}</option>
           ))}
         </select>
         {(searchText || filterType) && (
@@ -546,7 +544,7 @@ function ArchivedPassports({ user, companyId }) {
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("passportType")}>Type{sortIndicator(sortConfig, "passportType") && ` ${sortIndicator(sortConfig, "passportType")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("releaseStatus")}>Last Status{sortIndicator(sortConfig, "releaseStatus") && ` ${sortIndicator(sortConfig, "releaseStatus")}`}</button></th>
                     <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("archivedAt")}>Archived{sortIndicator(sortConfig, "archivedAt") && ` ${sortIndicator(sortConfig, "archivedAt")}`}</button></th>
-                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("archived_by_name")}>Archived By{sortIndicator(sortConfig, "archived_by_name") && ` ${sortIndicator(sortConfig, "archived_by_name")}`}</button></th>
+                    <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("archivedByName")}>Archived By{sortIndicator(sortConfig, "archivedByName") && ` ${sortIndicator(sortConfig, "archivedByName")}`}</button></th>
                     {user?.role !== "viewer" && <th>Actions</th>}
                   </tr>
                   {showFilters && <tr className="table-filter-row">
@@ -557,7 +555,7 @@ function ArchivedPassports({ user, companyId }) {
                     <th><input className="table-filter-input" value={columnFilters.passportType || ""} onChange={e => setColumnFilters(prev => ({ ...prev, passportType: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.releaseStatus || ""} onChange={e => setColumnFilters(prev => ({ ...prev, releaseStatus: e.target.value }))} placeholder="Filter" /></th>
                     <th><input className="table-filter-input" value={columnFilters.archivedAt || ""} onChange={e => setColumnFilters(prev => ({ ...prev, archivedAt: e.target.value }))} placeholder="Filter" /></th>
-                    <th><input className="table-filter-input" value={columnFilters.archived_by_name || ""} onChange={e => setColumnFilters(prev => ({ ...prev, archived_by_name: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={columnFilters.archivedByName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, archivedByName: e.target.value }))} placeholder="Filter" /></th>
                     {user?.role !== "viewer" && <th></th>}
                   </tr>}
                 </thead>

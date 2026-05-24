@@ -71,13 +71,13 @@ export const BATTERY_SECTIONS = {
   carbonFootprint: {
     label: "Carbon Footprint",
     fields: [
-      { key: "battery_carbon_footprint_per_functional_unit", label: "Battery carbon footprint per Functional Unit", type: "text" },
-      { key: "contribution_of_raw_material_and_preprocessing_lifecycle_stage", label: "Contribution of raw material acquisition and pre-processing lifecycle stage", type: "text" },
-      { key: "contribution_of_main_product_production_lifecycle_stage", label: "Contribution of main product production lifecycle stage", type: "text" },
-      { key: "contribution_of_distribution_lifecycle_stage", label: "Contribution of distribution lifecycle stage", type: "text" },
-      { key: "contribution_of_end_of_life_and_recycling_lifecycle_stage", label: "Contribution of end of life and recycling lifecycle stage", type: "text" },
-      { key: "carbon_footprint_performance_class", label: "Carbon footprint performance class", type: "text" },
-      { key: "web_link_to_public_carbon_footprint_study", label: "Web link to public carbon footprint study", type: "text" },
+      { key: "batteryCarbonFootprintPerFunctionalUnit", label: "Battery carbon footprint per Functional Unit", type: "text" },
+      { key: "contributionOfRawMaterialAndPreprocessingLifecycleStage", label: "Contribution of raw material acquisition and pre-processing lifecycle stage", type: "text" },
+      { key: "contributionOfMainProductProductionLifecycleStage", label: "Contribution of main product production lifecycle stage", type: "text" },
+      { key: "contributionOfDistributionLifecycleStage", label: "Contribution of distribution lifecycle stage", type: "text" },
+      { key: "contributionOfEndOfLifeAndRecyclingLifecycleStage", label: "Contribution of end of life and recycling lifecycle stage", type: "text" },
+      { key: "carbonFootprintPerformanceClass", label: "Carbon footprint performance class", type: "text" },
+      { key: "webLinkToPublicCarbonFootprintStudy", label: "Web link to public carbon footprint study", type: "text" },
     ],
   },
 };

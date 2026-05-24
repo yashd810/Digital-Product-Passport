@@ -86,7 +86,7 @@ const PROFILE_CATALOG = {
   generic_dpp_v1: {
     key: "generic_dpp_v1",
     displayName: "Generic DPP Profile v1",
-    requiredPassportFields: ["compliance_profile_key", "content_specification_ids"],
+    requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds"],
     requireCompanyOperatorIdentifier: true,
     requireCarrierPolicy: false,
     requireFacilityAtGranularities: [],
@@ -95,7 +95,7 @@ const PROFILE_CATALOG = {
   battery_dpp_v1: {
     key: "battery_dpp_v1",
     displayName: "Battery DPP Profile v1",
-    requiredPassportFields: ["compliance_profile_key", "content_specification_ids", "carrier_policy_key"],
+    requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds", "carrierPolicyKey"],
     requireCompanyOperatorIdentifier: true,
     requireCarrierPolicy: true,
     requireFacilityAtGranularities: ["batch", "item"],
@@ -115,7 +115,7 @@ function normalizeLookupKey(value) {
 }
 
 function flattenSchemaFields(typeDef) {
-  const sections = typeDef?.fields_json?.sections || [];
+  const sections = typeDef?.fieldsJson?.sections || typeDef?.fields_json?.sections || [];
   return sections.flatMap((section) =>
     (section.fields || []).map((field) => ({
       ...field,
@@ -414,13 +414,13 @@ function isMandatoryRequirementLevel(level) {
 
 const MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS = {
   dpp_schema_version: ({ canonicalPayload, passport }) =>
-    canonicalPayload?.dppSchemaVersion || passport?.dpp_schema_version || null,
+    canonicalPayload?.dppSchemaVersion || passport?.dppSchemaVersion || null,
   dpp_status: ({ canonicalPayload, passport }) =>
-    canonicalPayload?.dppStatus || passport?.dpp_status || passport?.release_status || null,
+    canonicalPayload?.dppStatus || passport?.dppStatus || passport?.releaseStatus || null,
   dpp_granularity: ({ canonicalPayload, passport }) =>
     canonicalPayload?.granularity || passport?.granularity || null,
   last_updated_at: ({ canonicalPayload, passport }) =>
-    canonicalPayload?.lastUpdate || canonicalPayload?.lastUpdated || passport?.updated_at || passport?.created_at || null,
+    canonicalPayload?.lastUpdate || canonicalPayload?.lastUpdated || passport?.updatedAt || passport?.createdAt || null,
   unique_dpp_identifier: ({ canonicalPayload }) =>
     canonicalPayload?.digitalProductPassportId || canonicalPayload?.dppDid || null,
   unique_passport_identifier: ({ canonicalPayload }) =>
@@ -431,11 +431,11 @@ const MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS = {
     canonicalPayload?.uniqueProductIdentifier || canonicalPayload?.productDid || null,
   economic_operator_identifier: ({ canonicalPayload, company, passport }) =>
     canonicalPayload?.economicOperatorId
-    || passport?.economic_operator_id
-    || company?.economic_operator_identifier
+    || passport?.economicOperatorId
+    || company?.economicOperatorIdentifier
     || null,
   facility_identifier: ({ canonicalPayload, passport }) =>
-    canonicalPayload?.facilityId || passport?.facility_id || passport?.facility_identifier || null,
+    canonicalPayload?.facilityId || passport?.facilityId || passport?.facilityIdentifier || null,
 };
 
 module.exports = function createComplianceService({ pool, batteryDictionaryService, buildCanonicalPassportPayload = null }) {
@@ -463,7 +463,11 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
   async function loadCompanyGovernance(companyId) {
     if (!companyId) return null;
     const result = await pool.query(
-      `SELECT id, company_name, did_slug, economic_operator_identifier, economic_operator_identifier_scheme
+      `SELECT id,
+              company_name AS "companyName",
+              did_slug AS "didSlug",
+              economic_operator_identifier AS "economicOperatorIdentifier",
+              economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
        FROM companies
        WHERE id = $1
        LIMIT 1`,
@@ -481,7 +485,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       granularity: String(granularity || "item").trim().toLowerCase() || "item",
       contentSpecificationIds: isBatteryPassport(typeDef, passportType)
         ? [BATTERY_SEMANTIC_MODEL_KEY]
-        : [typeDef?.semantic_model_key || "generic_dpp_v1"],
+        : [typeDef?.semanticModelKey || typeDef?.semantic_model_key || "generic_dpp_v1"],
     };
   }
 
@@ -702,41 +706,41 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
 
     if (profile.requireCompanyOperatorIdentifier) {
       const effectiveEconomicOperatorId = normalizeText(
-        passport?.economic_operator_id || company?.economic_operator_identifier
+        passport?.economicOperatorId || company?.economicOperatorIdentifier
       );
       const effectiveEconomicOperatorIdentifierScheme = normalizeText(
-        passport?.economic_operator_identifier_scheme || company?.economic_operator_identifier_scheme
+        passport?.economicOperatorIdentifierScheme || company?.economicOperatorIdentifierScheme
       );
 
       if (!effectiveEconomicOperatorId) {
         issues.push(createIssue({
           code: "ECONOMIC_OPERATOR_IDENTIFIER_MISSING",
           message: "The passport must declare an economic operator identifier before regulated release.",
-          key: "economic_operator_id",
+          key: "economicOperatorId",
         }));
       }
       if (!effectiveEconomicOperatorIdentifierScheme) {
         issues.push(createIssue({
           code: "ECONOMIC_OPERATOR_IDENTIFIER_SCHEME_MISSING",
           message: "The passport must declare which identifier scheme governs its economic operator identifier.",
-          key: "economic_operator_identifier_scheme",
+          key: "economicOperatorIdentifierScheme",
         }));
       }
     }
 
-    if (profile.requireCarrierPolicy && !normalizeText(passport?.carrier_policy_key)) {
+    if (profile.requireCarrierPolicy && !normalizeText(passport?.carrierPolicyKey)) {
       issues.push(createIssue({
         code: "CARRIER_POLICY_MISSING",
-        message: `Compliance profile "${profile.displayName}" requires a carrier_policy_key before release.`,
-        key: "carrier_policy_key",
+        message: `Compliance profile "${profile.displayName}" requires a carrierPolicyKey before release.`,
+        key: "carrierPolicyKey",
       }));
     }
 
-    if ((profile.requireFacilityAtGranularities || []).includes(granularity) && !normalizeText(passport?.facility_id)) {
+    if ((profile.requireFacilityAtGranularities || []).includes(granularity) && !normalizeText(passport?.facilityId)) {
       issues.push(createIssue({
         code: "FACILITY_IDENTIFIER_MISSING",
-        message: `Granularity "${granularity}" requires a facility_id under compliance profile "${profile.displayName}".`,
-        key: "facility_id",
+        message: `Granularity "${granularity}" requires a facilityId under compliance profile "${profile.displayName}".`,
+        key: "facilityId",
       }));
     }
 
@@ -746,21 +750,21 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
   function applyManagedGovernanceDefaults(passport = {}, profile, company = null) {
     const normalized = { ...passport };
     if (profile?.key) {
-      normalized.compliance_profile_key = profile.key;
+      normalized.complianceProfileKey = profile.key;
     }
-    if ((!normalized.content_specification_ids || (Array.isArray(normalized.content_specification_ids) && normalized.content_specification_ids.length === 0))
+    if ((!normalized.contentSpecificationIds || (Array.isArray(normalized.contentSpecificationIds) && normalized.contentSpecificationIds.length === 0))
       && Array.isArray(profile?.contentSpecificationIds)
       && profile.contentSpecificationIds.length) {
-      normalized.content_specification_ids = profile.contentSpecificationIds;
+      normalized.contentSpecificationIds = profile.contentSpecificationIds;
     }
-    if (!normalizeText(normalized.carrier_policy_key) && profile?.defaultCarrierPolicyKey) {
-      normalized.carrier_policy_key = profile.defaultCarrierPolicyKey;
+    if (!normalizeText(normalized.carrierPolicyKey) && profile?.defaultCarrierPolicyKey) {
+      normalized.carrierPolicyKey = profile.defaultCarrierPolicyKey;
     }
-    if (!normalizeText(normalized.economic_operator_id) && company?.economic_operator_identifier) {
-      normalized.economic_operator_id = company.economic_operator_identifier;
+    if (!normalizeText(normalized.economicOperatorId) && company?.economicOperatorIdentifier) {
+      normalized.economicOperatorId = company.economicOperatorIdentifier;
     }
-    if (!normalizeText(normalized.economic_operator_identifier_scheme) && company?.economic_operator_identifier_scheme) {
-      normalized.economic_operator_identifier_scheme = company.economic_operator_identifier_scheme;
+    if (!normalizeText(normalized.economicOperatorIdentifierScheme) && company?.economicOperatorIdentifierScheme) {
+      normalized.economicOperatorIdentifierScheme = company.economicOperatorIdentifierScheme;
     }
     return normalized;
   }
@@ -1080,12 +1084,12 @@ function validateSemanticData(fields, passport) {
       profile,
       companyIdentity: company ? {
         companyId: company.id,
-        companyName: company.company_name || null,
-        economicOperatorIdentifier: company.economic_operator_identifier || null,
-        economicOperatorIdentifierScheme: company.economic_operator_identifier_scheme || null,
+        companyName: company.companyName || null,
+        economicOperatorIdentifier: company.economicOperatorIdentifier || null,
+        economicOperatorIdentifierScheme: company.economicOperatorIdentifierScheme || null,
       } : null,
-      passportType: resolvedTypeDef.type_name,
-      semanticModelKey: resolvedTypeDef.semantic_model_key || null,
+      passportType: resolvedTypeDef.typeName || resolvedTypeDef.type_name,
+      semanticModelKey: resolvedTypeDef.semanticModelKey || resolvedTypeDef.semantic_model_key || null,
       isBatteryPassport: batteryPassport,
       completeness,
       accessIssues,

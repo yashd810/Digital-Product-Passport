@@ -231,8 +231,8 @@ function LineChart({ labels, series }) {
               <div key={idx} className="olt-row">
                 <span className="olt-swatch" style={{ background: color }} />
                 <span className="olt-name">
-                  {item.product_icon ? `${item.product_icon} ` : ""}
-                  {item.product_category}
+                  {item.productIcon ? `${item.productIcon} ` : ""}
+                  {item.productCategory}
                 </span>
                 <span className="olt-val">{val}</span>
               </div>
@@ -250,8 +250,8 @@ function LineChart({ labels, series }) {
               style={{ backgroundColor: item.color || OVERVIEW_LINE_COLORS[idx % OVERVIEW_LINE_COLORS.length] }}
             />
             <span className="overview-line-legend-name">
-              {item.product_icon ? `${item.product_icon} ` : ""}
-              {item.product_category}
+              {item.productIcon ? `${item.productIcon} ` : ""}
+              {item.productCategory}
             </span>
           </div>
         ))}
@@ -268,21 +268,9 @@ function timeAgo(d) {
 }
 
 function normalizeOverviewAnalyticsPayload(payload) {
-  const analyticsRows = Array.isArray(payload?.analytics)
-    ? payload.analytics.map((item) => ({
-        ...item,
-        passportType: item.passportType || item.passportType || "",
-        draftCount: item.draftCount ?? item.draft_count ?? 0,
-        inReviewCount: item.inReviewCount ?? item.in_review_count ?? 0,
-        releasedCount: item.releasedCount ?? item.released_count ?? 0,
-        revisedCount: item.revisedCount ?? item.revised_count ?? 0,
-        obsoleteCount: item.obsoleteCount ?? item.obsolete_count ?? 0,
-      }))
-    : [];
-
   return {
     ...(payload || {}),
-    analytics: analyticsRows,
+    analytics: Array.isArray(payload?.analytics) ? payload.analytics : [],
   };
 }
 
@@ -290,11 +278,11 @@ function normalizeActivityRows(rows) {
   return Array.isArray(rows)
     ? rows.map((item) => ({
         ...item,
-        userFirstName: item.userFirstName || item.user_first_name || "",
-        userLastName: item.userLastName || item.user_last_name || "",
-        userEmail: item.userEmail || item.user_email || "",
-        recordId: item.recordId || item.record_id || "",
-        createdAt: item.createdAt || item.created_at || "",
+        userFirstName: item.userFirstName || "",
+        userLastName: item.userLastName || "",
+        userEmail: item.userEmail || "",
+        recordId: item.recordId || "",
+        createdAt: item.createdAt || "",
       }))
     : [];
 }
@@ -393,7 +381,7 @@ function Overview({ companyId }) {
               ? renderLineChartSvg(normalizedTrend.labels, trendSeries, { width: 420, height: 220 })
               : "",
             legendItems: trendSeries.map((item) => ({
-              label: `${item.product_icon ? `${item.product_icon} ` : ""}${item.product_category}`,
+              label: `${item.productIcon ? `${item.productIcon} ` : ""}${item.productCategory}`,
               color: item.color,
             })),
             emptyText: "No trend data yet",

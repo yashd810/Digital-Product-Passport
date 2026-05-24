@@ -15,6 +15,22 @@ module.exports = function registerApiKeyRoutes(app, deps) {
     replicateAccessControlEventToBackup,
   } = deps;
 
+  function mapApiKeyRow(row) {
+    return {
+      id: row.id,
+      name: row.name ?? null,
+      scopes: Array.isArray(row.scopes) ? row.scopes : [],
+      keyPrefix: row.keyPrefix ?? row.key_prefix ?? null,
+      operatorType: row.operatorType ?? row.operator_type ?? null,
+      accessMode: row.accessMode ?? row.access_mode ?? null,
+      maxConfidentiality: row.maxConfidentiality ?? row.max_confidentiality ?? null,
+      expiresAt: row.expiresAt ?? row.expires_at ?? null,
+      createdAt: row.createdAt ?? row.created_at ?? null,
+      lastUsedAt: row.lastUsedAt ?? row.last_used_at ?? null,
+      isActive: row.isActive ?? row.is_active ?? null,
+    };
+  }
+
   app.get("/api/companies/:companyId/api-keys", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const result = await pool.query(
@@ -23,7 +39,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
          FROM api_keys WHERE company_id = $1 ORDER BY created_at DESC`,
         [req.params.companyId]
       );
-      res.json(result.rows);
+      res.json(result.rows.map(mapApiKeyRow));
     } catch {
       res.status(500).json({ error: "Failed to fetch API keys" });
     }
@@ -93,7 +109,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
         ]
       );
 
-      res.status(201).json({ ...result.rows[0], key: rawKey });
+      res.status(201).json({ ...mapApiKeyRow(result.rows[0]), key: rawKey });
     } catch (error) {
       logger.error("Create API key error:", error.message);
       res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : "Failed to create API key" });

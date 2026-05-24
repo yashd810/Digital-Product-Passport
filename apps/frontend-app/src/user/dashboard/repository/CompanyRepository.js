@@ -286,7 +286,7 @@ function SymbolsTab({ token, companyId }) {
         <div className="repo-card-grid">
           {symbols.map(sym => (
             <div key={sym.id} className={`repo-card ${sym.type === "folder" ? "folder" : "sym-card-item"}`}>
-              <div className={`repo-card-body${sym.type !== "folder" && sym.file_url ? " repo-card-body-clickable" : ""}`} onClick={() => {
+              <div className={`repo-card-body${sym.type !== "folder" && sym.fileUrl ? " repo-card-body-clickable" : ""}`} onClick={() => {
                 if (sym.type === "folder") navigate(sym);
                 else if (!renamingId) setPreviewSym(sym);
               }}>
@@ -294,7 +294,7 @@ function SymbolsTab({ token, companyId }) {
                   <div className="repo-card-icon">📁</div>
                 ) : (
                   <div className="sym-card-img-wrap">
-                    <img src={sym.file_url} alt={sym.name} className="sym-card-img" loading="lazy" />
+                    <img src={sym.fileUrl} alt={sym.name} className="sym-card-img" loading="lazy" />
                   </div>
                 )}
                 <div className="repo-card-info">
@@ -309,7 +309,7 @@ function SymbolsTab({ token, companyId }) {
                   )}
                   {sym.type !== "folder" && (
                     <span className="repo-card-meta">
-                      {sym.created_at && new Date(sym.created_at).toLocaleDateString()}
+                      {sym.createdAt && new Date(sym.createdAt).toLocaleDateString()}
                     </span>
                   )}
                 </div>
@@ -322,9 +322,9 @@ function SymbolsTab({ token, companyId }) {
                   </>
                 ) : (
                   <>
-                    {sym.type !== "folder" && sym.file_url && (
+                    {sym.type !== "folder" && sym.fileUrl && (
                       <button className="repo-card-btn repo-card-btn-copy" onClick={() => {
-                        copyText(sym.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
+                        copyText(sym.fileUrl).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
                       }}>Copy Link</button>
                     )}
                     <button className="repo-card-btn repo-card-btn-rename" onClick={() => startRename(sym)}>Rename</button>
@@ -356,7 +356,7 @@ function SymbolsTab({ token, companyId }) {
 
 // ─── Preview Dialog ───────────────────────────────────────────────────────────
 function PreviewDialog({ item, onClose }) {
-  const isPdf = item.mime_type === "application/pdf" || item.file_url?.toLowerCase().endsWith(".pdf");
+  const isPdf = item.mimeType === "application/pdf" || item.fileUrl?.toLowerCase().endsWith(".pdf");
   return (
     <div className="repo-preview-overlay" onClick={onClose}>
       <div className="repo-preview-box" onClick={e => e.stopPropagation()}>
@@ -367,13 +367,13 @@ function PreviewDialog({ item, onClose }) {
         <div className="repo-preview-body">
           {isPdf ? (
             <iframe
-              src={item.file_url}
+              src={item.fileUrl}
               title={item.name}
               className="repo-preview-pdf"
             />
           ) : (
             <img
-              src={item.file_url}
+              src={item.fileUrl}
               alt={item.name}
               className="repo-preview-img"
             />
@@ -437,7 +437,7 @@ function FilesTab({ token, companyId }) {
       if (!r.ok) throw new Error();
       // Exclude image files (those are shown in Symbols tab)
       const data = await r.json();
-      setItems(data.filter(item => item.type === "folder" || !item.mime_type?.startsWith("image/")));
+      setItems(data.filter(item => item.type === "folder" || !item.mimeType?.startsWith("image/")));
     } catch { flash("Failed to load repository", true); }
     finally { setLoading(false); }
   }, [companyId, token, currentFolder]);
@@ -613,7 +613,7 @@ function FilesTab({ token, companyId }) {
         <div className="repo-card-grid">
           {items.map(item => (
             <div key={item.id} className={`repo-card ${item.type}`}>
-              <div className={`repo-card-body${item.type !== "folder" && item.file_url ? " repo-card-body-clickable" : ""}`} onClick={() => { if (item.type === "folder") navigate(item); else if (item.file_url && !renamingId) setPreviewItem(item); }}>
+              <div className={`repo-card-body${item.type !== "folder" && item.fileUrl ? " repo-card-body-clickable" : ""}`} onClick={() => { if (item.type === "folder") navigate(item); else if (item.fileUrl && !renamingId) setPreviewItem(item); }}>
                 <div className="repo-card-icon">{item.type === "folder" ? "📁" : "📄"}</div>
                 <div className="repo-card-info">
                   {renamingId === item.id ? (
@@ -628,8 +628,8 @@ function FilesTab({ token, companyId }) {
                   )}
                   {item.type === "file" && (
                     <span className="repo-card-meta">
-                      {formatSize(item.size_bytes)}
-                      {item.created_at && ` · ${new Date(item.created_at).toLocaleDateString()}`}
+                      {formatSize(item.sizeBytes)}
+                      {item.createdAt && ` · ${new Date(item.createdAt).toLocaleDateString()}`}
                     </span>
                   )}
                 </div>
@@ -642,9 +642,9 @@ function FilesTab({ token, companyId }) {
                   </>
                 ) : (
                   <>
-                    {item.type === "file" && item.file_url && (
+                    {item.type === "file" && item.fileUrl && (
                       <button className="repo-card-btn repo-card-btn-copy" onClick={() => {
-                        copyText(item.file_url).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
+                        copyText(item.fileUrl).then(() => flash("Link copied")).catch(() => flash("Copy failed", true));
                       }}>Copy Link</button>
                     )}
                     <button className="repo-card-btn repo-card-btn-rename" onClick={() => startRename(item)}>Rename</button>

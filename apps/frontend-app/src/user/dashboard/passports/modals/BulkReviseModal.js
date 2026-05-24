@@ -40,11 +40,7 @@ export function BulkReviseModal({
         const eligible = (Array.isArray(data) ? data : []).filter((member) =>
           (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id
         );
-        setTeamUsers(eligible.map((member) => ({
-          ...member,
-          firstName: member.firstName || member.first_name || "",
-          lastName: member.lastName || member.last_name || "",
-        })));
+        setTeamUsers(eligible);
       })
       .catch(() => {});
 
@@ -108,13 +104,13 @@ export function BulkReviseModal({
     [activeType, scopedPassports, selectedType]
   );
 
-  const typeDef = allPassportTypes.find((type) => type.type_name === selectedType);
+  const typeDef = allPassportTypes.find((type) => type.typeName === selectedType);
   const availableFields = useMemo(() => {
     const baseFields = [
       { key: "modelName", label: "Model Name", type: "text" },
       { key: "internalAliasId", label: "Internal Alias ID", type: "text" },
     ];
-    const schemaFields = (typeDef?.fields_json?.sections || [])
+    const schemaFields = (typeDef?.fieldsJson?.sections || [])
       .flatMap((section) => section.fields || [])
       .filter((field) => field?.key && field.type !== "table");
 
@@ -383,10 +379,10 @@ export function BulkReviseModal({
             <label>Passport type</label>
             <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
               {availableTypes.map((typeName) => {
-                const typeMeta = allPassportTypes.find((type) => type.type_name === typeName);
+                const typeMeta = allPassportTypes.find((type) => type.typeName === typeName);
                 return (
                   <option key={typeName} value={typeName}>
-                    {typeMeta?.displayName || typeMeta?.display_name || typeName}
+                    {typeMeta?.displayName || typeName}
                   </option>
                 );
               })}

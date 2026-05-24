@@ -13,9 +13,7 @@ export function getSchemaFieldDescriptors(sections) {
       aliases: [
         field.key,
         field.elementId,
-        field.element_id,
         field.semanticId,
-        field.semantic_id,
       ]
         .filter((alias) => typeof alias === "string")
         .map((alias) => alias.trim())
@@ -69,7 +67,6 @@ export function extractFieldValuesFromElements(elements, aliasToKey = new Map(),
     if (!element || typeof element !== "object") continue;
     const candidateAliases = [
       element.elementId,
-      element.element_id,
       element.dictionaryReference,
     ]
       .filter((entry) => typeof entry === "string")

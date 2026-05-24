@@ -57,7 +57,7 @@ function AdminPassportTypes() {
 
   const handleEditMetadata = (t) => {
     setOpenKebabId(null);
-    navigate(`/admin/passport-types/${t.type_name}/edit`, { state: { editData: t } });
+    navigate(`/admin/passport-types/${t.typeName}/edit`, { state: { editData: t } });
   };
 
   // Delete passport type
@@ -86,7 +86,7 @@ function AdminPassportTypes() {
       if (!r.ok) throw new Error(data.error || "Failed to delete");
       setDeleteTarget(null);
       setDeletePassword("");
-      showMsg(`"${deleteTarget.display_name}" deleted permanently.`);
+      showMsg(`"${deleteTarget.displayName}" deleted permanently.`);
       fetchAll();
     } catch (err) {
       setDeleteError(err.message);
@@ -115,7 +115,7 @@ function AdminPassportTypes() {
       if (umbRes.ok) setProductCategories(await umbRes.json());
       if (draftRes.ok) {
         const row = await draftRes.json();
-        setDraftType(row?.draft_json ? { savedAt: row.updated_at, ...row.draft_json } : null);
+        setDraftType(row?.draft_json ? { savedAt: row.updatedAt, ...row.draft_json } : null);
       } else if (draftRes.status === 404) {
         setDraftType(null);
       }
@@ -131,14 +131,14 @@ function AdminPassportTypes() {
   const showMsg = (text) => { setMsg(text); setTimeout(() => setMsg(""), 3000); };
 
   const handleToggle = async (type) => {
-    const action = type.is_active ? "deactivate" : "activate";
+    const action = type.isActive ? "deactivate" : "activate";
     try {
       const r = await fetchWithAuth(`${API}/api/admin/passport-types/${type.id}/${action}`, {
         method: "PATCH",
         headers: authHeaders(),
       });
       if (!r.ok) throw new Error(`Failed to ${action} type`);
-      showMsg(`${type.display_name} ${action}d.`);
+      showMsg(`${type.displayName} ${action}d.`);
       fetchAll();
     } catch (e) {
       setError(e.message);
@@ -218,8 +218,8 @@ function AdminPassportTypes() {
 
   // Group types by product category
   const grouped = types.reduce((acc, t) => {
-    const key = t.product_category;
-    if (!acc[key]) acc[key] = { icon: t.product_icon, types: [] };
+    const key = t.productCategory;
+    if (!acc[key]) acc[key] = { icon: t.productIcon, types: [] };
     acc[key].types.push(t);
     return acc;
   }, {});
@@ -401,15 +401,15 @@ function AdminPassportTypes() {
                 )}
 
                 {umbTypes.map(t => (
-                  <div key={t.id} className={`apt-card ${t.is_active ? "" : "apt-card-inactive"}`}>
+                  <div key={t.id} className={`apt-card ${t.isActive ? "" : "apt-card-inactive"}`}>
                     <div className="apt-card-header">
                       <div>
-                        <div className="apt-card-display-name">{t.display_name}</div>
-                        <code className="apt-card-type-name">{t.type_name}</code>
+                        <div className="apt-card-display-name">{t.displayName}</div>
+                        <code className="apt-card-type-name">{t.typeName}</code>
                       </div>
                       <div className="admin-inline-stack">
-                        <span className={`apt-badge ${t.is_active ? "apt-badge-active" : "apt-badge-inactive"}`}>
-                          {t.is_active ? "Active" : "Inactive"}
+                        <span className={`apt-badge ${t.isActive ? "apt-badge-active" : "apt-badge-inactive"}`}>
+                          {t.isActive ? "Active" : "Inactive"}
                         </span>
                         <button className="kebab-menu-btn admin-no-shrink" onClick={e => openKebab(e, t.id)}>⋮</button>
                       </div>
@@ -430,25 +430,25 @@ function AdminPassportTypes() {
 
                     <div className="apt-card-meta">
                       <span className="apt-card-meta-primary">
-                        {t.fields_json?.sections?.reduce((n, s) => n + (s.fields?.length || 0), 0) || 0} fields
-                        across {t.fields_json?.sections?.length || 0} sections
+                        {t.fieldsJson?.sections?.reduce((n, s) => n + (s.fields?.length || 0), 0) || 0} fields
+                        across {t.fieldsJson?.sections?.length || 0} sections
                       </span>
-                      <span className="apt-card-meta-secondary">Semantic model: {getSemanticModelLabel(t.semantic_model_key)}</span>
-                      <span className="apt-card-meta-secondary">Created {new Date(t.created_at).toLocaleDateString()}</span>
+                      <span className="apt-card-meta-secondary">Semantic model: {getSemanticModelLabel(t.semanticModelKey)}</span>
+                      <span className="apt-card-meta-secondary">Created {new Date(t.createdAt).toLocaleDateString()}</span>
                     </div>
 
                     <div className="apt-card-actions">
                       <button
                         className="apt-view-fields-btn"
-                        onClick={() => navigate(`/admin/passport-types/${t.type_name}/fields`, { state: { passportType: t } })}
+                        onClick={() => navigate(`/admin/passport-types/${t.typeName}/fields`, { state: { passportType: t } })}
                       >
                         ▼ View Fields
                       </button>
                       <button
-                        className={`apt-toggle-btn ${t.is_active ? "apt-toggle-deactivate" : "apt-toggle-activate"}`}
+                        className={`apt-toggle-btn ${t.isActive ? "apt-toggle-deactivate" : "apt-toggle-activate"}`}
                         onClick={() => handleToggle(t)}
                       >
-                        {t.is_active ? "Deactivate" : "Activate"}
+                        {t.isActive ? "Deactivate" : "Activate"}
                       </button>
                       <span className="apt-immutable-note">🔒 Fields locked after creation</span>
                     </div>
@@ -466,7 +466,7 @@ function AdminPassportTypes() {
           <div className="apt-modal" onClick={e => e.stopPropagation()}>
             <h3 className="apt-modal-title">Delete Passport Type</h3>
             <p className="apt-modal-warning">
-              ⚠️ This will permanently delete <strong>{deleteTarget.display_name}</strong> ({deleteTarget.type_name}) and <strong>all passport data</strong> inside it. This cannot be undone.
+              ⚠️ This will permanently delete <strong>{deleteTarget.displayName}</strong> ({deleteTarget.typeName}) and <strong>all passport data</strong> inside it. This cannot be undone.
             </p>
             <form onSubmit={handleDeleteType}>
               {deleteError && <div className="alert alert-error admin-alert-inline-wide">{deleteError}</div>}

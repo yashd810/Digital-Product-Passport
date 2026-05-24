@@ -301,7 +301,7 @@
       "@id": "clarosBattery:carbon-footprint-per-kwh",
       "@type": "xsd:decimal"
     },
-    "battery_carbon_footprint_per_functional_unit": {
+    "batteryCarbonFootprintPerFunctionalUnit": {
       "@id": "clarosBattery:carbon-footprint-per-kwh",
       "@type": "xsd:decimal"
     },
@@ -309,7 +309,7 @@
       "@id": "clarosBattery:carbon-footprint-raw-materials",
       "@type": "xsd:decimal"
     },
-    "contribution_of_raw_material_and_preprocessing_lifecycle_stage": {
+    "contributionOfRawMaterialAndPreprocessingLifecycleStage": {
       "@id": "clarosBattery:carbon-footprint-raw-materials",
       "@type": "xsd:decimal"
     },
@@ -317,7 +317,7 @@
       "@id": "clarosBattery:carbon-footprint-production",
       "@type": "xsd:decimal"
     },
-    "contribution_of_main_product_production_lifecycle_stage": {
+    "contributionOfMainProductProductionLifecycleStage": {
       "@id": "clarosBattery:carbon-footprint-production",
       "@type": "xsd:decimal"
     },
@@ -325,7 +325,7 @@
       "@id": "clarosBattery:carbon-footprint-distribution",
       "@type": "xsd:decimal"
     },
-    "contribution_of_distribution_lifecycle_stage": {
+    "contributionOfDistributionLifecycleStage": {
       "@id": "clarosBattery:carbon-footprint-distribution",
       "@type": "xsd:decimal"
     },
@@ -333,7 +333,7 @@
       "@id": "clarosBattery:carbon-footprint-end-of-life",
       "@type": "xsd:decimal"
     },
-    "contribution_of_end_of_life_and_recycling_lifecycle_stage": {
+    "contributionOfEndOfLifeAndRecyclingLifecycleStage": {
       "@id": "clarosBattery:carbon-footprint-end-of-life",
       "@type": "xsd:decimal"
     },
@@ -341,7 +341,7 @@
       "@id": "clarosBattery:carbon-footprint-class",
       "@type": "xsd:string"
     },
-    "carbon_footprint_performance_class": {
+    "carbonFootprintPerformanceClass": {
       "@id": "clarosBattery:carbon-footprint-class",
       "@type": "xsd:string"
     },
@@ -349,7 +349,7 @@
       "@id": "clarosBattery:carbon-footprint-study-url",
       "@type": "xsd:anyURI"
     },
-    "web_link_to_public_carbon_footprint_study": {
+    "webLinkToPublicCarbonFootprintStudy": {
       "@id": "clarosBattery:carbon-footprint-study-url",
       "@type": "xsd:anyURI"
     },
@@ -357,7 +357,7 @@
       "@id": "clarosBattery:absolute-carbon-footprint",
       "@type": "xsd:integer"
     },
-    "absolute_carbon_footprint": {
+    "absoluteCarbonFootprint": {
       "@id": "clarosBattery:absolute-carbon-footprint",
       "@type": "xsd:integer"
     },

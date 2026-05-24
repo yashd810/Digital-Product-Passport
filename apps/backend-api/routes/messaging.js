@@ -4,6 +4,37 @@ module.exports = function registerMessagingRoutes(app, {
   pool,
   authenticateToken,
 }) {
+  const mapConversationRow = (row = {}) => ({
+    id: row.id,
+    companyId: row.companyId ?? row.company_id ?? null,
+    otherId: row.otherId ?? row.other_id ?? null,
+    firstName: row.firstName ?? row.first_name ?? "",
+    lastName: row.lastName ?? row.last_name ?? "",
+    email: row.email || "",
+    lastMessage: row.lastMessage ?? row.last_message ?? null,
+    lastMessageAt: row.lastMessageAt ?? row.last_message_at ?? null,
+    lastSenderId: row.lastSenderId ?? row.last_sender_id ?? null,
+    unread: Number(row.unread || 0),
+  });
+
+  const mapMessageRow = (row = {}) => ({
+    id: row.id,
+    body: row.body || "",
+    createdAt: row.createdAt ?? row.created_at ?? null,
+    senderId: row.senderId ?? row.sender_id ?? null,
+    firstName: row.firstName ?? row.first_name ?? "",
+    lastName: row.lastName ?? row.last_name ?? "",
+    email: row.email || "",
+  });
+
+  const mapUserRow = (row = {}) => ({
+    id: row.id,
+    firstName: row.firstName ?? row.first_name ?? "",
+    lastName: row.lastName ?? row.last_name ?? "",
+    email: row.email || "",
+    role: row.role || "",
+  });
+
   app.get("/api/messaging/conversations", authenticateToken, async (req, res) => {
     try {
       const r = await pool.query(
@@ -38,7 +69,7 @@ module.exports = function registerMessagingRoutes(app, {
         ORDER BY COALESCE(lm.created_at, c.created_at) DESC`,
         [req.user.userId]
       );
-      res.json(r.rows);
+      res.json(r.rows.map(mapConversationRow));
     } catch (e) {
       logger.error("List conversations error:", e.message);
       res.status(500).json({ error: "Failed" });
@@ -124,7 +155,7 @@ module.exports = function registerMessagingRoutes(app, {
         "UPDATE conversation_members SET last_read_at=NOW() WHERE conversation_id=$1 AND user_id=$2",
         [convId, req.user.userId]
       );
-      res.json(r.rows.reverse());
+      res.json(r.rows.reverse().map(mapMessageRow));
     } catch (e) {
       logger.error("Get messages error:", e.message);
       res.status(500).json({ error: "Failed" });
@@ -151,7 +182,7 @@ module.exports = function registerMessagingRoutes(app, {
         "UPDATE conversation_members SET last_read_at=NOW() WHERE conversation_id=$1 AND user_id=$2",
         [convId, req.user.userId]
       );
-      res.json(r.rows[0]);
+      res.json(mapMessageRow(r.rows[0]));
     } catch (e) {
       logger.error("Send message error:", e.message);
       res.status(500).json({ error: "Failed" });
@@ -168,7 +199,7 @@ module.exports = function registerMessagingRoutes(app, {
          WHERE company_id=$1 AND id != $2 AND is_active=true ORDER BY first_name, last_name`,
         [companyId, req.user.userId]
       );
-      res.json(r.rows);
+      res.json(r.rows.map(mapUserRow));
     } catch {
       res.status(500).json({ error: "Failed" });
     }

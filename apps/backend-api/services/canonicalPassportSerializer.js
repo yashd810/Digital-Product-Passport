@@ -37,27 +37,12 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     ? batteryCategoryRules.categories
     : ["EV", "LMT", "Industrial", "Stationary"];
   const HEADER_FIELD_ALIASES = {
-    granularity: new Set(["granularity", "dpp_granularity", "dppgranularity"]),
-    dppSchemaVersion: new Set(["dpp_schema_version", "dppschemaversion"]),
-    dppStatus: new Set(["dpp_status", "dppstatus"]),
-    economicOperatorId: new Set([
-      "economic_operator_id",
-      "economic_operator_identifier",
-      "economicoperatorid",
-      "economicoperatoridentifier",
-    ]),
-    facilityId: new Set([
-      "facility_id",
-      "facility_identifier",
-      "facilityid",
-      "facilityidentifier",
-    ]),
-    contentSpecificationIds: new Set([
-      "content_specification_ids",
-      "content_specification_id",
-      "contentspecificationids",
-      "contentspecificationid",
-    ]),
+    granularity: new Set(["granularity"]),
+    dppSchemaVersion: new Set(["dppSchemaVersion"]),
+    dppStatus: new Set(["dppStatus"]),
+    economicOperatorId: new Set(["economicOperatorId"]),
+    facilityId: new Set(["facilityId"]),
+    contentSpecificationIds: new Set(["contentSpecificationIds"]),
   };
 
   function toIsoTimestamp(value) {
@@ -187,7 +172,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
   }
 
   function getSchemaFieldDefinitions(typeDef) {
-    return (typeDef?.fields_json?.sections || [])
+    return (typeDef?.fieldsJson?.sections || [])
       .flatMap((section) => section.fields || [])
       .filter((field) => field?.key);
   }
@@ -196,9 +181,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     return getSchemaFieldDefinitions(typeDef).find((field) =>
       field.key === elementIdPath
       || field.semanticId === elementIdPath
-      || field.semantic_id === elementIdPath
       || field.elementId === elementIdPath
-      || field.element_id === elementIdPath
     ) || null;
   }
 
@@ -225,9 +208,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       const aliases = new Set([
         term.slug,
         term.internalKey,
-        term.internal_key,
         term.elementId,
-        term.element_id,
       ]);
       for (const fieldKey of (term.appFieldKeys || [])) {
         aliases.add(fieldKey);
@@ -245,9 +226,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       const aliases = new Set([
         term.slug,
         term.internalKey,
-        term.internal_key,
         term.elementId,
-        term.element_id,
       ]);
       for (const fieldKey of (term.appFieldKeys || [])) {
         aliases.add(fieldKey);
@@ -260,13 +239,12 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
   })();
 
   function resolveDictionaryReference(fieldDef, elementIdPath = null) {
-    const explicitReference = fieldDef?.semanticId || fieldDef?.semantic_id || null;
+    const explicitReference = fieldDef?.semanticId || null;
     if (explicitReference) return explicitReference;
 
     const candidates = [
       fieldDef?.key,
       fieldDef?.elementId,
-      fieldDef?.element_id,
       elementIdPath,
     ].filter(Boolean);
 
@@ -279,7 +257,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
   }
 
   function resolveSemanticTerm(fieldDef, elementIdPath = null) {
-    const explicitReference = fieldDef?.semanticId || fieldDef?.semantic_id || null;
+    const explicitReference = fieldDef?.semanticId || null;
     if (explicitReference) {
       const byReference = batteryDictionaryTerms.find((term) =>
         term?.iri === explicitReference || term?.termIri === explicitReference
@@ -290,7 +268,6 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const candidates = [
       fieldDef?.key,
       fieldDef?.elementId,
-      fieldDef?.element_id,
       elementIdPath,
     ].filter(Boolean);
 
@@ -415,7 +392,6 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     return getSchemaFieldDefinitions(typeDef).find((field) =>
       field?.key === "battery_category"
       || field?.semanticId === "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-category"
-      || field?.semantic_id === "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-category"
       || normalizeLookupKey(field?.label) === "battery category"
     ) || null;
   }
@@ -624,9 +600,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const normalizedKeyCandidates = new Set([
       fieldDef?.key,
       fieldDef?.elementId,
-      fieldDef?.element_id,
       semanticTerm?.internalKey,
-      semanticTerm?.internal_key,
       ...(semanticTerm?.appFieldKeys || []),
     ].filter(Boolean));
 
@@ -898,7 +872,6 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const resolvedFieldDef = fieldDef || findSchemaFieldDefinition(typeDef, elementIdPath);
     const semanticTerm = resolveSemanticTerm(resolvedFieldDef, elementIdPath);
     const resolvedElementId = resolvedFieldDef?.elementId
-      || resolvedFieldDef?.element_id
       || resolvedFieldDef?.key
       || elementIdPath
       || null;
@@ -941,7 +914,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
   function buildCanonicalPassportPayload(passport, typeDef, options = {}) {
     const company = options.company || null;
     const companyName = String(options.companyName || "").trim();
-    const passportType = String(passport?.passport_type || typeDef?.type_name || options.passportType || "battery").trim().toLowerCase() || "battery";
+    const passportType = String(passport?.passportType || typeDef?.typeName || options.passportType || "battery").trim().toLowerCase() || "battery";
     const canonicalIdentity = buildCanonicalIdentityBundle({
       passport,
       company,
@@ -957,7 +930,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const dppDid = canonicalIdentity.dppDid || null;
     const derivedProductIdentifierDid = canonicalIdentity.uniqueProductIdentifier || null;
 
-    const schemaFields = (typeDef?.fields_json?.sections || [])
+    const schemaFields = (typeDef?.fieldsJson?.sections || [])
       .flatMap((section) => section.fields || [])
       .filter((field) => field?.key);
 
@@ -1015,15 +988,15 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       fields[fieldDef.key] = typedValue;
     }
 
-    const dppSchemaVersion = passport?.dpp_schema_version || typeDef?.fields_json?.dppSchemaVersion || "prEN 18223:2025";
-    const rawDppStatus = passport?.dpp_status || null;
-    const dppStatus = toDppStatus(passport?.release_status || rawDppStatus);
-    const economicOperatorId = passport?.economic_operator_id || company?.economic_operator_identifier || companyDid;
-    const facilityId = passport?.facility_id || passport?.facility_identifier || null;
+    const dppSchemaVersion = passport?.dppSchemaVersion || typeDef?.fieldsJson?.dppSchemaVersion || "prEN 18223:2025";
+    const rawDppStatus = passport?.dppStatus || null;
+    const dppStatus = toDppStatus(passport?.releaseStatus || rawDppStatus);
+    const economicOperatorId = passport?.economicOperatorId || company?.economicOperatorIdentifier || companyDid;
+    const facilityId = passport?.facilityId || passport?.facilityIdentifier || null;
     const contentSpecificationIdsRaw =
-      passport?.content_specification_ids
-      || typeDef?.semantic_model_key
-      || typeDef?.fields_json?.semanticModelKey
+      passport?.contentSpecificationIds
+      || typeDef?.semanticModelKey
+      || typeDef?.fieldsJson?.semanticModelKey
       || [];
     const contentSpecificationIds = Array.isArray(contentSpecificationIdsRaw)
       ? contentSpecificationIdsRaw
@@ -1038,17 +1011,17 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       });
     });
 
-    const internalAliasId = passport.internal_alias_id || null;
+    const internalAliasId = passport.internalAliasId || null;
     const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
-    const storedProductIdentifier = isUriLikeValue(passport.product_identifier_did)
-      ? passport.product_identifier_did
+    const storedProductIdentifier = isUriLikeValue(passport.uniqueProductIdentifier)
+      ? passport.uniqueProductIdentifier
       : null;
     const uniqueProductIdentifier = derivedProductIdentifierDid || (businessIdentifier ? storedProductIdentifier : null) || null;
-    const storedPassportIdentifier = isUriLikeValue(passport?.dppId || passport?.dpp_id || passport?.guid)
-      ? (passport?.dppId || passport?.dpp_id || passport?.guid)
+    const storedPassportIdentifier = isUriLikeValue(passport?.dppId || passport?.guid)
+      ? (passport?.dppId || passport?.guid)
       : null;
     const digitalProductPassportId = dppDid || storedPassportIdentifier || canonicalIdentity.digitalProductPassportId || null;
-    const lastUpdate = toIsoTimestamp(passport.updated_at || passport.created_at);
+    const lastUpdate = toIsoTimestamp(passport.updatedAt || passport.createdAt);
     const headerValues = {
       digitalProductPassportId,
       uniqueProductIdentifier,
@@ -1068,11 +1041,11 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       pushMissingHeaderIssue(validationIssues, typeDef, key, value);
     }
 
-    const resolvedVersionNumber = Number(passport.version_number) || 1;
+    const resolvedVersionNumber = Number(passport.versionNumber) || 1;
     const extensions = buildClarosExtensions({
       passportType,
       versionNumber: resolvedVersionNumber,
-      internalId: passport?.dppId || passport?.dpp_id || passport?.guid || null,
+      internalId: passport?.dppId || passport?.guid || null,
     });
     if (extensions?.claros) {
       extensions.claros.validation = summarizeValidationIssues(validationIssues);
@@ -1099,9 +1072,9 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       economicOperatorId,
       facilityId,
       contentSpecificationIds: Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],
-      complianceProfileKey: passport.compliance_profile_key || null,
-      carrierPolicyKey: passport.carrier_policy_key || null,
-      ...buildCarrierAuthenticityResponseFields(passport.carrier_authenticity),
+      complianceProfileKey: passport.complianceProfileKey || null,
+      carrierPolicyKey: passport.carrierPolicyKey || null,
+      ...buildCarrierAuthenticityResponseFields(passport.carrierAuthenticity),
       subjectDid,
       dppDid,
       companyDid,

@@ -166,7 +166,8 @@ module.exports = function registerDppApiRoutes(app, {
 
   async function loadCompanyComplianceIdentity(companyId) {
     const result = await pool.query(
-      `SELECT economic_operator_identifier, economic_operator_identifier_scheme
+      `SELECT economic_operator_identifier AS "economicOperatorIdentifier",
+              economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
        FROM companies
        WHERE id = $1
        LIMIT 1`,
@@ -210,13 +211,13 @@ module.exports = function registerDppApiRoutes(app, {
     const companyIdentity = await loadCompanyComplianceIdentity(companyId);
     const resolvedFacilityId = await resolveManagedFacilityId({ companyId, requestedFields });
     return {
-      compliance_profile_key: requestedFields.compliance_profile_key || profile.key,
-      content_specification_ids: serializeProfileDefaultValue(
-        requestedFields.content_specification_ids || profile.contentSpecificationIds || []
+      complianceProfileKey: requestedFields.complianceProfileKey || profile.key,
+      contentSpecificationIds: serializeProfileDefaultValue(
+        requestedFields.contentSpecificationIds || profile.contentSpecificationIds || []
       ),
-      carrier_policy_key: requestedFields.carrier_policy_key || profile.defaultCarrierPolicyKey || null,
-      economic_operator_id: requestedFields.economic_operator_id || companyIdentity?.economic_operator_identifier || null,
-      facility_id: resolvedFacilityId
+      carrierPolicyKey: requestedFields.carrierPolicyKey || profile.defaultCarrierPolicyKey || null,
+      economicOperatorId: requestedFields.economicOperatorId || companyIdentity?.economicOperatorIdentifier || null,
+      facilityId: resolvedFacilityId
     };
   }
 
@@ -227,8 +228,8 @@ module.exports = function registerDppApiRoutes(app, {
     reason = "manual",
     snapshotScope = "released_current"
   }) {
-    const passportDppId = passport?.dppId || passport?.dpp_id || null;
-    if (!backupProviderService || !passportDppId || !passport?.company_id) {
+    const passportDppId = passport?.dppId || null;
+    if (!backupProviderService || !passportDppId || !passport?.companyId) {
       return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
     }
     return backupProviderService.replicatePassportSnapshot({
@@ -242,12 +243,12 @@ module.exports = function registerDppApiRoutes(app, {
 
   async function updateEditableElement({ editable, normalizedPath, value, user }) {
     const headerFieldMap = {
-      dppSchemaVersion: "dpp_schema_version",
-      facilityId: "facility_id",
-      economicOperatorId: "economic_operator_id",
-      complianceProfileKey: "compliance_profile_key",
-      carrierPolicyKey: "carrier_policy_key",
-      contentSpecificationIds: "content_specification_ids"
+      dppSchemaVersion: "dppSchemaVersion",
+      facilityId: "facilityId",
+      economicOperatorId: "economicOperatorId",
+      complianceProfileKey: "complianceProfileKey",
+      carrierPolicyKey: "carrierPolicyKey",
+      contentSpecificationIds: "contentSpecificationIds"
     };
     const targetElementIdPath = normalizedPath?.path || "";
     const rootElementIdPath = normalizedPath?.rootElementIdPath || targetElementIdPath;

@@ -34,6 +34,35 @@ module.exports = function registerWorkflowRoutes(app, {
     user?.email ||
     (user?.userId ? `user:${user.userId}` : null);
 
+  const mapWorkflowRow = (row = {}) => ({
+    id: row.id ?? null,
+    passportDppId: row.passportDppId ?? null,
+    passportType: row.passportType ?? row.passport_type ?? null,
+    companyId: row.companyId ?? row.company_id ?? null,
+    submittedBy: row.submittedBy ?? row.submitted_by ?? null,
+    reviewerId: row.reviewerId ?? row.reviewer_id ?? null,
+    approverId: row.approverId ?? row.approver_id ?? null,
+    reviewStatus: row.reviewStatus ?? row.review_status ?? null,
+    approvalStatus: row.approvalStatus ?? row.approval_status ?? null,
+    overallStatus: row.overallStatus ?? row.overall_status ?? null,
+    previousReleaseStatus: row.previousReleaseStatus ?? row.previous_release_status ?? null,
+    reviewerComment: row.reviewerComment ?? row.reviewer_comment ?? null,
+    approverComment: row.approverComment ?? row.approver_comment ?? null,
+    reviewedAt: row.reviewedAt ?? row.reviewed_at ?? null,
+    approvedAt: row.approvedAt ?? row.approved_at ?? null,
+    rejectedAt: row.rejectedAt ?? row.rejected_at ?? null,
+    createdAt: row.createdAt ?? row.created_at ?? null,
+    updatedAt: row.updatedAt ?? row.updated_at ?? null,
+    reviewerName: row.reviewerName ?? row.reviewer_name ?? null,
+    approverName: row.approverName ?? row.approver_name ?? null,
+    submitterName: row.submitterName ?? row.submitter_name ?? null,
+    modelName: row.modelName ?? row.model_name ?? null,
+    internalAliasId: row.internalAliasId ?? row.internal_alias_id ?? null,
+    versionNumber: row.versionNumber ?? row.version_number ?? null,
+    releaseStatus: row.releaseStatus ?? row.release_status ?? null,
+    companyName: row.companyName ?? row.company_name ?? null,
+  });
+
   const loadLivePassportRow = async ({ companyId, dppId: dppId, passportType, status = null }) => {
     const tableName = getTable(passportType);
     const params = [dppId];
@@ -73,25 +102,25 @@ module.exports = function registerWorkflowRoutes(app, {
     const enriched = [];
     for (const row of rows) {
       let info = {
-        model_name: row.passport_dpp_id?.substring(0, 8) || "?",
-        version_number: 1,
-        internal_alias_id: null,
-        release_status: null
+        modelName: row.passportDppId?.substring(0, 8) || "?",
+        versionNumber: 1,
+        internalAliasId: null,
+        releaseStatus: null
       };
       try {
         const regRow = await pool.query(
-          "SELECT passport_type FROM passport_registry WHERE dpp_id = $1 LIMIT 1",
-          [row.passport_dpp_id]
+          `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 LIMIT 1`,
+          [row.passportDppId]
         );
-        const actualType = regRow.rows[0]?.passport_type || row.passport_type;
+        const actualType = regRow.rows[0]?.passportType || row.passportType;
         const tableName = getTable(actualType);
         const r = await pool.query(
-          `SELECT model_name, version_number, internal_alias_id, release_status
+          `SELECT "modelName", "versionNumber", "internalAliasId", "releaseStatus"
            FROM ${tableName}
-           WHERE dpp_id = $1
-           ORDER BY version_number DESC
+           WHERE "dppId" = $1
+           ORDER BY "versionNumber" DESC
            LIMIT 1`,
-          [row.passport_dpp_id]
+          [row.passportDppId]
         );
         if (r.rows.length) info = r.rows[0];
       } catch {}
@@ -506,48 +535,46 @@ module.exports = function registerWorkflowRoutes(app, {
 
       const inProgress = await pool.query(
         `SELECT pw.*,
-           pw.passport_dpp_id AS passport_guid,
-           CONCAT(ur.first_name,' ',ur.last_name) AS reviewer_name,
-           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name,
-           CONCAT(us.first_name,' ',us.last_name) AS submitter_name
+           CONCAT(ur.first_name,' ',ur.last_name) AS "reviewerName",
+           CONCAT(ua.first_name,' ',ua.last_name) AS "approverName",
+           CONCAT(us.first_name,' ',us.last_name) AS "submitterName"
          FROM passport_workflow pw
-         LEFT JOIN users ur ON ur.id = pw.reviewer_id
-         LEFT JOIN users ua ON ua.id = pw.approver_id
-         LEFT JOIN users us ON us.id = pw.submitted_by
-         WHERE pw.company_id = $1
-           AND pw.overall_status = 'in_progress'
+         LEFT JOIN users ur ON ur.id = pw."reviewerId"
+         LEFT JOIN users ua ON ua.id = pw."approverId"
+         LEFT JOIN users us ON us.id = pw."submittedBy"
+         WHERE pw."companyId" = $1
+           AND pw."overallStatus" = 'in_progress'
            AND (
-             pw.submitted_by = $2 OR
-             pw.reviewer_id = $2 OR
-             pw.approver_id = $2
+             pw."submittedBy" = $2 OR
+             pw."reviewerId" = $2 OR
+             pw."approverId" = $2
            )
-         ORDER BY pw.created_at DESC`,
+         ORDER BY pw."createdAt" DESC`,
         [companyId, userId]
       );
       const history = await pool.query(
         `SELECT pw.*,
-           pw.passport_dpp_id AS passport_guid,
-           CONCAT(ur.first_name,' ',ur.last_name) AS reviewer_name,
-           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name,
-           CONCAT(us.first_name,' ',us.last_name) AS submitter_name
+           CONCAT(ur.first_name,' ',ur.last_name) AS "reviewerName",
+           CONCAT(ua.first_name,' ',ua.last_name) AS "approverName",
+           CONCAT(us.first_name,' ',us.last_name) AS "submitterName"
          FROM passport_workflow pw
-         LEFT JOIN users ur ON ur.id = pw.reviewer_id
-         LEFT JOIN users ua ON ua.id = pw.approver_id
-         LEFT JOIN users us ON us.id = pw.submitted_by
-         WHERE pw.company_id = $1
-           AND pw.overall_status != 'in_progress'
+         LEFT JOIN users ur ON ur.id = pw."reviewerId"
+         LEFT JOIN users ua ON ua.id = pw."approverId"
+         LEFT JOIN users us ON us.id = pw."submittedBy"
+         WHERE pw."companyId" = $1
+           AND pw."overallStatus" != 'in_progress'
            AND (
-             pw.submitted_by = $2 OR
-             pw.reviewer_id = $2 OR
-             pw.approver_id = $2
+             pw."submittedBy" = $2 OR
+             pw."reviewerId" = $2 OR
+             pw."approverId" = $2
            )
-         ORDER BY pw.updated_at DESC LIMIT 50`,
+         ORDER BY pw."updatedAt" DESC LIMIT 50`,
         [companyId, userId]
       );
 
       res.json({
-        inProgress: await enrichWorkflowRows(inProgress.rows),
-        history: await enrichWorkflowRows(history.rows)
+        inProgress: (await enrichWorkflowRows(inProgress.rows)).map(mapWorkflowRow),
+        history: (await enrichWorkflowRows(history.rows)).map(mapWorkflowRow)
       });
     } catch {
       res.status(500).json({ error: "Failed" });
@@ -559,24 +586,23 @@ module.exports = function registerWorkflowRoutes(app, {
       const userId = req.user.userId;
       const r = await pool.query(
         `SELECT pw.*,
-           pw.passport_dpp_id AS passport_guid,
-           CONCAT(ur.first_name,' ',ur.last_name) AS reviewer_name,
-           CONCAT(ua.first_name,' ',ua.last_name) AS approver_name,
-           CONCAT(us.first_name,' ',us.last_name) AS submitter_name
+           CONCAT(ur.first_name,' ',ur.last_name) AS "reviewerName",
+           CONCAT(ua.first_name,' ',ua.last_name) AS "approverName",
+           CONCAT(us.first_name,' ',us.last_name) AS "submitterName"
          FROM passport_workflow pw
-         LEFT JOIN users ur ON ur.id = pw.reviewer_id
-         LEFT JOIN users ua ON ua.id = pw.approver_id
-         LEFT JOIN users us ON us.id = pw.submitted_by
-         WHERE pw.overall_status = 'in_progress'
+         LEFT JOIN users ur ON ur.id = pw."reviewerId"
+         LEFT JOIN users ua ON ua.id = pw."approverId"
+         LEFT JOIN users us ON us.id = pw."submittedBy"
+         WHERE pw."overallStatus" = 'in_progress'
            AND (
-             (pw.reviewer_id = $1 AND pw.review_status = 'pending') OR
-             (pw.approver_id = $1 AND pw.approval_status = 'pending' AND pw.review_status != 'pending')
+             (pw."reviewerId" = $1 AND pw."reviewStatus" = 'pending') OR
+             (pw."approverId" = $1 AND pw."approvalStatus" = 'pending' AND pw."reviewStatus" != 'pending')
            )
-         ORDER BY pw.created_at ASC`,
+         ORDER BY pw."createdAt" ASC`,
         [userId]
       );
 
-      res.json({ backlog: await enrichWorkflowRows(r.rows) });
+      res.json({ backlog: (await enrichWorkflowRows(r.rows)).map(mapWorkflowRow) });
     } catch {
       res.status(500).json({ error: "Failed" });
     }

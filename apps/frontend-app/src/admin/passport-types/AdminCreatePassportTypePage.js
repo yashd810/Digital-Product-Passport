@@ -467,11 +467,11 @@ function AdminCreatePassportType() {
       fieldKeyToId,
       cleanSections,
       payload: {
-        type_name: typeName,
-        display_name: displayName,
-        product_category: productCategory,
-        product_icon: productIcon,
-        semantic_model_key: normalizeSemanticModelKey(semanticModelKey) || null,
+        typeName,
+        displayName,
+        productCategory,
+        productIcon,
+        semanticModelKey: normalizeSemanticModelKey(semanticModelKey) || null,
         systemHeader: normalizeSystemPassportHeader(systemHeader),
         sections: cleanSections,
       },
@@ -579,21 +579,21 @@ function AdminCreatePassportType() {
   useEffect(() => {
     const ed = initialEditData.current;
     if (!ed) return;
-    setDisplayName(ed.display_name || "");
-    const nextProductCategory = ed.product_category || "";
+    setDisplayName(ed.displayName || "");
+    const nextProductCategory = ed.productCategory || "";
     setProductCategory(nextProductCategory);
-    setProductIcon(ed.product_icon || "📋");
-    const nextSemanticModelKey = normalizeSemanticModelKey(ed.semantic_model_key || "");
+    setProductIcon(ed.productIcon || "📋");
+    const nextSemanticModelKey = normalizeSemanticModelKey(ed.semanticModelKey || "");
     setSemanticModelKey(nextSemanticModelKey);
-    setTypeName(ed.type_name || "");
+    setTypeName(ed.typeName || "");
     setTypeNameManual(true); // lock type_name, it cannot change
-    const editSections = (ed.fields_json?.sections || []).map(sec => rekeySection({
+    const editSections = (ed.fieldsJson?.sections || []).map(sec => rekeySection({
       ...sec,
       _id:       Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
       fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
-    setSystemHeader(normalizeSystemPassportHeader(ed.fields_json?.systemHeader));
+    setSystemHeader(normalizeSystemPassportHeader(ed.fieldsJson?.systemHeader));
     if (editSections.length > 0) setSections(syncSectionsWithSemanticModel(editSections, nextSemanticModelKey));
   }, []); // runs once
 
@@ -602,20 +602,20 @@ function AdminCreatePassportType() {
   useEffect(() => {
     const cd = initialCloneData.current;
     if (!cd) return;
-    cloneSourceTypeName.current = cd.type_name;
-    setDisplayName(`Clone of ${cd.display_name || cd.type_name}`);
-    const nextProductCategory = cd.product_category || "";
+    cloneSourceTypeName.current = cd.typeName;
+    setDisplayName(`Clone of ${cd.displayName || cd.typeName}`);
+    const nextProductCategory = cd.productCategory || "";
     setProductCategory(nextProductCategory);
-    setProductIcon(cd.product_icon || "📋");
-    const nextSemanticModelKey = normalizeSemanticModelKey(cd.semantic_model_key || "");
+    setProductIcon(cd.productIcon || "📋");
+    const nextSemanticModelKey = normalizeSemanticModelKey(cd.semanticModelKey || "");
     setSemanticModelKey(nextSemanticModelKey);
-    const clonedSections = (cd.fields_json?.sections || []).map(sec => rekeySection({
+    const clonedSections = (cd.fieldsJson?.sections || []).map(sec => rekeySection({
       ...sec,
       _id:       Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
       fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
-    setSystemHeader(normalizeSystemPassportHeader(cd.fields_json?.systemHeader));
+    setSystemHeader(normalizeSystemPassportHeader(cd.fieldsJson?.systemHeader));
     if (clonedSections.length > 0) setSections(syncSectionsWithSemanticModel(clonedSections, nextSemanticModelKey));
   }, []); // runs once — initial clone data captured in ref above
 
@@ -1031,12 +1031,12 @@ function AdminCreatePassportType() {
 
       {editMode && (
         <div className="alert admin-alert-draft-success">
-          ✏️ Editing metadata for: <strong>{initialEditData.current?.display_name}</strong> — the type name is locked and cannot change.
+          ✏️ Editing metadata for: <strong>{initialEditData.current?.displayName}</strong> — the type name is locked and cannot change.
         </div>
       )}
       {location.state?.cloneData && (
         <div className="alert admin-alert-draft-info">
-          🔁 Cloning from: <strong>{location.state.cloneData.display_name}</strong> — change the display name and/or type name before saving.
+          🔁 Cloning from: <strong>{location.state.cloneData.displayName}</strong> — change the display name and/or type name before saving.
         </div>
       )}
       {success && <div ref={successAlertRef} className="alert alert-success admin-alert-bottom admin-alert-compact">{success}</div>}

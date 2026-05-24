@@ -103,6 +103,33 @@ function createLocalStorageService(options) {
   };
 }
 
+function createDisabledStorageService() {
+  const disabledError = () => {
+    const error = new Error("Storage is disabled in this environment.");
+    error.code = "STORAGE_DISABLED";
+    return error;
+  };
+
+  return {
+    name: "disabled",
+    provider: "disabled",
+    isLocal: false,
+    isEnabled: false,
+    async saveObject() {
+      throw disabledError();
+    },
+    async deleteObject() {
+      return;
+    },
+    getPublicUrl() {
+      return null;
+    },
+    async fetchObject() {
+      throw disabledError();
+    },
+  };
+}
+
 function createS3StorageService(options) {
   const {
     endpoint,
@@ -222,24 +249,26 @@ function createStorageService(options) {
   const repoBaseDir = path.resolve(options.repoBaseDir);
   const uploadsBaseDir = path.resolve(options.uploadsBaseDir);
 
-  const service = provider === "s3" ?
-  createS3StorageService({
-    endpoint: process.env.STORAGE_S3_ENDPOINT,
-    region: process.env.STORAGE_S3_REGION,
-    bucket: process.env.STORAGE_S3_BUCKET,
-    accessKeyId: process.env.STORAGE_S3_ACCESS_KEY_ID,
-    secretAccessKey: process.env.STORAGE_S3_SECRET_ACCESS_KEY,
-    publicBaseUrl: process.env.STORAGE_S3_PUBLIC_BASE_URL,
-    forcePathStyle: String(process.env.STORAGE_S3_FORCE_PATH_STYLE || "true") !== "false",
-    serverBaseUrl
-  }) :
-  createLocalStorageService({
-    localStorageDir,
-    filesBaseDir,
-    repoBaseDir,
-    uploadsBaseDir,
-    serverBaseUrl
-  });
+  const service = provider === "s3"
+    ? createS3StorageService({
+        endpoint: process.env.STORAGE_S3_ENDPOINT,
+        region: process.env.STORAGE_S3_REGION,
+        bucket: process.env.STORAGE_S3_BUCKET,
+        accessKeyId: process.env.STORAGE_S3_ACCESS_KEY_ID,
+        secretAccessKey: process.env.STORAGE_S3_SECRET_ACCESS_KEY,
+        publicBaseUrl: process.env.STORAGE_S3_PUBLIC_BASE_URL,
+        forcePathStyle: String(process.env.STORAGE_S3_FORCE_PATH_STYLE || "true") !== "false",
+        serverBaseUrl
+      })
+    : (provider === "disabled" || provider === "none")
+      ? createDisabledStorageService()
+      : createLocalStorageService({
+          localStorageDir,
+          filesBaseDir,
+          repoBaseDir,
+          uploadsBaseDir,
+          serverBaseUrl
+        });
 
   function buildPassportFileKey({ dppId: dppId, fieldKey, originalName }) {
     const ext = safeExtension(originalName, ".pdf");

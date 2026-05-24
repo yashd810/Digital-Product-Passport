@@ -31,11 +31,17 @@ const SYSTEM_PASSPORT_FIELDS = new Set([
   "safetyWarnings",
   "qrPrintSpecification",
   "signCarrierPayload",
-  "created_by_email",
-  "first_name",
-  "last_name",
+  "createdByEmail",
+  "firstName",
+  "lastName",
   "updatedBy",
   "updatedAt",
+]);
+
+const LEGACY_RESPONSE_KEY_MAP = new Map([
+  ["created_by_email", "createdByEmail"],
+  ["first_name", "firstName"],
+  ["last_name", "lastName"],
 ]);
 
 const EDITABLE_PASSPORT_STATUSES = new Set(["draft", IN_REVISION_STATUS]);
@@ -64,11 +70,57 @@ const extractSchemaFields = (schema) => {
       .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
       .filter((field) => field?.key);
   }
-  if (schema.fields_json && typeof schema.fields_json === "object") {
-    return extractSchemaFields(schema.fields_json);
-  }
   return [];
 };
+
+const mapCompanyRow = (row = {}) => ({
+  id: row.id ?? null,
+  companyName: row.companyName ?? "",
+  companyLogo: row.companyLogo ?? null,
+  didSlug: row.didSlug ?? null,
+  economicOperatorIdentifier: row.economicOperatorIdentifier ?? null,
+  economicOperatorIdentifierScheme: row.economicOperatorIdentifierScheme ?? null,
+  customerTrustLevel: row.customerTrustLevel ?? null,
+  dppGranularity: row.dppGranularity ?? row.defaultGranularity ?? "item",
+  defaultGranularity: row.defaultGranularity ?? row.dppGranularity ?? "item",
+  jsonldExportEnabled: row.jsonldExportEnabled ?? true,
+  isActive: row.isActive ?? null,
+  createdAt: row.createdAt ?? null,
+  updatedAt: row.updatedAt ?? null,
+});
+
+const mapCompanyFacilityRow = (row = {}) => ({
+  id: row.id ?? null,
+  companyId: row.companyId ?? null,
+  facilityIdentifier: row.facilityIdentifier ?? "",
+  identifierScheme: row.identifierScheme ?? "",
+  displayName: row.displayName ?? null,
+  metadataJson: row.metadataJson ?? {},
+  isActive: row.isActive ?? true,
+  createdBy: row.createdBy ?? null,
+  createdAt: row.createdAt ?? null,
+  updatedAt: row.updatedAt ?? null,
+});
+
+const mapPassportTemplateFieldRow = (row = {}) => ({
+  fieldKey: row.fieldKey ?? "",
+  fieldValue: row.fieldValue ?? null,
+  isModelData: row.isModelData ?? false,
+});
+
+const mapPassportTypeRow = (row = {}) => ({
+  id: row.id ?? null,
+  typeName: row.typeName ?? null,
+  displayName: row.displayName ?? null,
+  productCategory: row.productCategory ?? null,
+  productIcon: row.productIcon ?? null,
+  semanticModelKey: row.semanticModelKey ?? null,
+  fieldsJson: row.fieldsJson ?? null,
+  accessGranted: row.accessGranted ?? null,
+  createdBy: row.createdBy ?? null,
+  createdAt: row.createdAt ?? null,
+  updatedAt: row.updatedAt ?? null,
+});
 
 const quoteSqlIdentifier = (value) => {
   const identifier = String(value || "").trim();
@@ -89,6 +141,12 @@ const normalizePassportRow = (row, schema) => {
   
   // Deserialize JSONB fields
   let rowData = { ...row };
+
+  for (const [legacyKey, canonicalKey] of LEGACY_RESPONSE_KEY_MAP.entries()) {
+    if (rowData[canonicalKey] === undefined && rowData[legacyKey] !== undefined) {
+      rowData[canonicalKey] = rowData[legacyKey];
+    }
+  }
 
   if (schemaFields.length > 0) {
     const jsonbFields = new Set();
@@ -164,6 +222,11 @@ const normalizePassportRow = (row, schema) => {
   }, {
     appBaseUrl: process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001",
   });
+
+  for (const legacyKey of LEGACY_RESPONSE_KEY_MAP.keys()) {
+    delete normalized[legacyKey];
+  }
+
   return normalized;
 };
 
@@ -335,14 +398,16 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
   if (!internalAliasId) return null;
 
   const companyRows = await pool.query(
-    `SELECT id, company_name, did_slug
+    `SELECT id,
+            company_name AS "companyName",
+            did_slug AS "didSlug"
      FROM companies
      ORDER BY id ASC`
   );
 
   const matchingCompanies = companyRows.rows.filter((company) => {
-    const companySlug = String(company.did_slug || "").trim().toLowerCase();
-    const nameSlug = slugifyRouteSegment(company.company_name || "", "manufacturer");
+    const companySlug = String(company.didSlug || "").trim().toLowerCase();
+    const nameSlug = slugifyRouteSegment(company.companyName || "", "manufacturer");
     return companySlug === manufacturerSlug || nameSlug === manufacturerSlug;
   });
   if (!matchingCompanies.length) return null;
@@ -388,10 +453,10 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
 
         const stableId = didService.normalizeStableId(passport.lineageId || passport.dppId);
         const granularity = didService.normalizeGranularity(passport.granularity || "model");
-        const companySlug = didService.normalizeCompanySlug(company.company_name || company.did_slug || `company-${company.id}`);
+        const companySlug = didService.normalizeCompanySlug(company.companyName || company.didSlug || `company-${company.id}`);
         const facilityStableId = inferFacilityStableId(passport);
 
-        const subjectNamespace = didService.normalizePassportTypeSegment(company.company_name || company.did_slug || "battery");
+        const subjectNamespace = didService.normalizePassportTypeSegment(company.companyName || company.didSlug || "battery");
         return {
           passportDppId: passport.dppId,
           passportType: registryRow.passportType,
@@ -440,7 +505,7 @@ const getHistoryFieldDefs = (typeRow) => {
     { key: "modelName", label: "Model Name", type: "text" },
     { key: "internalAliasId", label: "Internal Alias ID", type: "text" },
   ];
-  const schemaFields = (typeRow?.fields_json?.sections || [])
+  const schemaFields = (typeRow?.fieldsJson?.sections || [])
     .flatMap((section) => section.fields || [])
     .filter((field) => field?.key);
   const seen = new Set();
@@ -626,6 +691,10 @@ module.exports = {
   comparableHistoryFieldValue,
   isPlainObject,
   extractSchemaFields,
+  mapCompanyRow,
+  mapCompanyFacilityRow,
+  mapPassportTemplateFieldRow,
+  mapPassportTypeRow,
   quoteSqlIdentifier,
   joinQuotedSqlIdentifiers,
   getPassportFieldLookupKeys,

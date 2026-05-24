@@ -1,3 +1,5 @@
+const { mapPassportTypeRow } = require("../../shared/passports/passport-helpers");
+
 function registerPassportSupportRoutes(app, deps) {
   const {
     pool,
@@ -149,6 +151,9 @@ function registerPassportSupportRoutes(app, deps) {
         await logAudit(companyId, req.user.userId, "UPLOAD", tableName, dppId, null, { fieldKey, publicFileUrl });
         res.json({ success: true, url: publicFileUrl, fieldKey });
       } catch (e) {
+        if (e.code === "STORAGE_DISABLED") {
+          return res.status(503).json({ error: e.message });
+        }
         if (e.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "File too large. Max 20 MB." });
         res.status(500).json({ error: "Upload failed" });
       }
@@ -158,14 +163,20 @@ function registerPassportSupportRoutes(app, deps) {
   app.get("/api/companies/:companyId/passport-types", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(`
-        SELECT DISTINCT pt.id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon, pt.semantic_model_key, pt.fields_json,
-          (NOT cpa.access_revoked) AS access_granted
+        SELECT DISTINCT pt.id,
+          pt.type_name AS "typeName",
+          pt.display_name AS "displayName",
+          pt.product_category AS "productCategory",
+          pt.product_icon AS "productIcon",
+          pt.semantic_model_key AS "semanticModelKey",
+          pt.fields_json AS "fieldsJson",
+          (NOT cpa.access_revoked) AS "accessGranted"
         FROM passport_types pt
         JOIN company_passport_access cpa ON pt.id = cpa.passport_type_id
         WHERE cpa.company_id = $1
         ORDER BY pt.product_category, pt.display_name
       `, [req.params.companyId]);
-      res.json(r.rows);
+      res.json(r.rows.map(mapPassportTypeRow));
     } catch (e) {
       logger.error("passport-types fetch error:", e.message);
       res.status(500).json({ error: "Failed to fetch passport types" });

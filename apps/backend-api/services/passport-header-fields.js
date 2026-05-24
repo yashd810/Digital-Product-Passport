@@ -159,7 +159,7 @@ function normalizeSystemPassportHeader(input = {}) {
 }
 
 function getSystemPassportHeader(typeDef = {}) {
-  return normalizeSystemPassportHeader(typeDef?.fields_json?.systemHeader);
+  return normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader);
 }
 
 function validateSystemPassportHeader(input = {}) {

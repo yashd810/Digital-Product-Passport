@@ -78,7 +78,7 @@ function createDppUseCase(deps) {
       conflict.statusCode = 409;
       conflict.payload = {
         existingDppId: existingByProductId.dppId,
-        release_status: existingByProductId.release_status || null,
+        releaseStatus: existingByProductId.releaseStatus || null,
       };
       throw conflict;
     }
@@ -131,19 +131,19 @@ function createDppUseCase(deps) {
     const nextCarrierAuthenticity = applyCarrierAuthenticityMutation(null, carrierAuthenticityMutation);
     const allColumns = [
       "dppId",
-      "lineage_id",
-      "company_id",
-      "model_name",
-      "internal_alias_id",
-      "product_identifier_did",
-      "compliance_profile_key",
-      "content_specification_ids",
-      "carrier_policy_key",
-      "carrier_authenticity",
-      "economic_operator_id",
-      "facility_id",
+      "lineageId",
+      "companyId",
+      "modelName",
+      "internalAliasId",
+      "uniqueProductIdentifier",
+      "complianceProfileKey",
+      "contentSpecificationIds",
+      "carrierPolicyKey",
+      "carrierAuthenticity",
+      "economicOperatorId",
+      "facilityId",
       "granularity",
-      "created_by",
+      "createdBy",
       ...dataFields,
     ];
     const allValues = [
@@ -153,12 +153,12 @@ function createDppUseCase(deps) {
       modelName || null,
       storedProductIdentifiers.internalAliasIdInput,
       storedProductIdentifiers.productIdentifierDid,
-      complianceManagedFields.compliance_profile_key,
-      complianceManagedFields.content_specification_ids,
-      complianceManagedFields.carrier_policy_key,
+      complianceManagedFields.complianceProfileKey,
+      complianceManagedFields.contentSpecificationIds,
+      complianceManagedFields.carrierPolicyKey,
       nextCarrierAuthenticity ? JSON.stringify(nextCarrierAuthenticity) : null,
-      complianceManagedFields.economic_operator_id,
-      complianceManagedFields.facility_id,
+      complianceManagedFields.economicOperatorId,
+      complianceManagedFields.facilityId,
       requestedGranularity,
       req.user.userId,
       ...dataFields.map((key) => processedFields[key]),
@@ -192,9 +192,9 @@ function createDppUseCase(deps) {
     );
 
     await logAudit(companyId, req.user.userId, "CREATE_DPP", tableName, dppId, null, {
-      passport_type: resolvedPassportType,
-      internal_alias_id: storedProductIdentifiers.internalAliasIdInput,
-      product_identifier_did: storedProductIdentifiers.productIdentifierDid,
+      passportType: resolvedPassportType,
+      internalAliasId: storedProductIdentifiers.internalAliasIdInput,
+      uniqueProductIdentifier: storedProductIdentifiers.productIdentifierDid,
       granularity: requestedGranularity,
     });
     await archivePassportSnapshot({

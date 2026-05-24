@@ -50,15 +50,15 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       res.json({
         company,
-        passport_types: types.rows,
-        erp_presets: ASSET_ERP_PRESETS,
+        passportTypes: types.rows,
+        erpPresets: ASSET_ERP_PRESETS,
         security: {
-          asset_key_required: true,
-          company_scoped: true,
+          assetKeyRequired: true,
+          companyScoped: true,
         },
         assumptions: {
-          editable_statuses: ["draft", IN_REVISION_STATUS],
-          dynamic_pushes_do_not_change_passport_versions: true,
+          editableStatuses: ["draft", IN_REVISION_STATUS],
+          dynamicPushesDoNotChangePassportVersions: true,
         },
       });
     } catch (error) {
@@ -84,7 +84,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const assetFieldMap = getAssetFieldMap(typeSchema);
       const fields = Array.from(assetFieldMap.values());
-      const allowedKeys = new Set([...assetFieldMap.keys(), ...ASSET_MATCH_FIELDS, "is_editable", "release_status", "version_number"]);
+      const allowedKeys = new Set([...assetFieldMap.keys(), ...ASSET_MATCH_FIELDS, "isEditable", "releaseStatus", "versionNumber"]);
 
       const cleanRows = rows.map(row => {
         const clean = {};
@@ -104,15 +104,15 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       });
 
       res.json({
-        company_id: companyId,
-        passport_type: typeSchema.typeName,
-        display_name: typeSchema.displayName,
+        companyId,
+        passportType: typeSchema.typeName,
+        displayName: typeSchema.displayName,
         fields,
         passports: cleanRows,
         summary: {
           total: cleanRows.length,
-          editable: cleanRows.filter((row) => row.is_editable).length,
-          released_or_locked: cleanRows.filter((row) => !row.is_editable).length,
+          editable: cleanRows.filter((row) => row.isEditable).length,
+          releasedOrLocked: cleanRows.filter((row) => !row.isEditable).length,
         },
       });
     } catch (error) {
@@ -137,7 +137,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const normalizedBody = normalizePassportRequestBody(req.body || {});
       const payload = await prepareAssetPayload({
         companyId: Number.parseInt(req.assetContext.companyId, 10),
-        passportType: normalizedBody.passport_type,
+        passportType: normalizedBody.passportType,
         records: normalizedBody.records,
         options: normalizedBody.options,
       });
@@ -154,12 +154,12 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const companyId = Number.parseInt(req.assetContext.companyId, 10);
 
       let preview;
-      if (normalizedBody.generated_payload?.passport_type) {
-        preview = { generated_payload: normalizedBody.generated_payload };
+      if (normalizedBody.generatedPayload?.passportType) {
+        preview = { generatedPayload: normalizedBody.generatedPayload };
       } else {
         preview = await prepareAssetPayload({
           companyId,
-          passportType: normalizedBody.passport_type,
+          passportType: normalizedBody.passportType,
           records: normalizedBody.records,
           options: normalizedBody.options,
         });
@@ -167,28 +167,28 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const pushResult = await executeAssetPush({
         companyId,
-        generatedPayload: preview.generated_payload,
+        generatedPayload: preview.generatedPayload,
         userId: req.assetContext.userId,
       });
       const status = pushResult.summary.failed
-        ? (pushResult.summary.passports_created || pushResult.summary.passports_updated || pushResult.summary.dynamic_fields_pushed ? "partial" : "failed")
+        ? (pushResult.summary.passportsCreated || pushResult.summary.passportsUpdated || pushResult.summary.dynamicFieldsPushed ? "partial" : "failed")
         : "success";
       const run = await recordAssetRun({
         companyId,
-        passportType: preview.generated_payload.passport_type,
+        passportType: preview.generatedPayload.passportType,
         triggerType: "manual",
         sourceKind: normalizedBody.sourceKind || "manual",
         status,
         summary: pushResult.summary,
         requestJson: { options: normalizedBody.options || {} },
-        generatedJson: preview.generated_payload,
+        generatedJson: preview.generatedPayload,
       });
 
       res.json({
         status, run,
         summary: pushResult.summary,
         details: pushResult.details,
-        generated_payload: preview.generated_payload,
+        generatedPayload: preview.generatedPayload,
       });
     } catch (error) {
       logger.error("Asset push error:", error.message);
@@ -215,7 +215,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
     try {
       const normalizedBody = normalizePassportRequestBody(req.body || {});
       const companyId = Number.parseInt(req.assetContext.companyId, 10);
-      const passportType = String(normalizedBody.passport_type || "").trim();
+      const passportType = String(normalizedBody.passportType || "").trim();
       const name = String(normalizedBody.name || "").trim();
       const sourceKind = String(normalizedBody.sourceKind || "manual").trim().toLowerCase();
       const sourceConfig = isPlainObject(normalizedBody.sourceConfig) ? normalizedBody.sourceConfig : {};
@@ -227,7 +227,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         : Number.parseInt(normalizedBody.intervalMinutes, 10);
       const isActive = normalizedBody.isActive !== false;
 
-      if (!passportType || !name) return res.status(400).json({ error: "passport_type and name are required" });
+      if (!passportType || !name) return res.status(400).json({ error: "passportType and name are required" });
 
       const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, passportType);
 
@@ -276,7 +276,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const current = existing.rows[0];
       const normalizedBody = normalizePassportRequestBody(req.body || {});
-      const passportType = normalizedBody.passport_type || current.passport_type;
+      const passportType = normalizedBody.passportType || current.passport_type;
       const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, passportType);
 
       const sourceKind = normalizedBody.sourceKind || current.source_kind;

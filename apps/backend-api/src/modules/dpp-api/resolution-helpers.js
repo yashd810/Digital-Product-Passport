@@ -522,7 +522,6 @@ function createResolutionHelpers({
     const stableId = didService.normalizeStableId(result.passport.lineageId || result.passport.dppId);
     const granularity = String(
       result.passport.granularity ||
-      result.passport.dpp_granularity ||
       result.typeDef?.granularity ||
       result.typeDef?.fields_json?.granularity ||
       fallbackGranularity

@@ -62,16 +62,16 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   };
 
   const buildActorIdentity = (row = {}) => ({
-    actorIdentifier: row.economic_operator_identifier || null,
-    actorIdentifierScheme: row.economic_operator_identifier_scheme || null,
-    globallyUniqueOperatorId: row.economic_operator_identifier || null,
-    globallyUniqueOperatorIdentifier: row.economic_operator_identifier || null,
-    globallyUniqueOperatorIdentifierScheme: row.economic_operator_identifier_scheme || null,
-    operatorIdentifier: row.economic_operator_identifier || null,
-    operatorIdentifierScheme: row.economic_operator_identifier_scheme || null,
-    economicOperatorId: row.economic_operator_identifier || null,
-    economicOperatorIdentifier: row.economic_operator_identifier || null,
-    economicOperatorIdentifierScheme: row.economic_operator_identifier_scheme || null,
+    actorIdentifier: row.economicOperatorIdentifier || null,
+    actorIdentifierScheme: row.economicOperatorIdentifierScheme || null,
+    globallyUniqueOperatorId: row.economicOperatorIdentifier || null,
+    globallyUniqueOperatorIdentifier: row.economicOperatorIdentifier || null,
+    globallyUniqueOperatorIdentifierScheme: row.economicOperatorIdentifierScheme || null,
+    operatorIdentifier: row.economicOperatorIdentifier || null,
+    operatorIdentifierScheme: row.economicOperatorIdentifierScheme || null,
+    economicOperatorId: row.economicOperatorIdentifier || null,
+    economicOperatorIdentifier: row.economicOperatorIdentifier || null,
+    economicOperatorIdentifierScheme: row.economicOperatorIdentifierScheme || null,
   });
 
   const authenticateToken = async (req, res, next) => {
@@ -94,21 +94,28 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
         return res.status(401).json({ error: "Session is no longer valid" });
       }
       const currentUserRes = await pool.query(
-        `SELECT u.id, u.email, u.company_id, u.role, u.is_active, u.session_version, u.two_factor_enabled,
-                c.economic_operator_identifier, c.economic_operator_identifier_scheme
+        `SELECT u.id,
+                u.email,
+                u.company_id AS "companyId",
+                u.role,
+                u.is_active AS "isActive",
+                u.session_version AS "sessionVersion",
+                u.two_factor_enabled AS "twoFactorEnabled",
+                c.economic_operator_identifier AS "economicOperatorIdentifier",
+                c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
          FROM users u
          LEFT JOIN companies c ON c.id = u.company_id
          WHERE u.id = $1
          LIMIT 1`,
         [payload.userId]
       );
-      if (!currentUserRes.rows.length || !currentUserRes.rows[0].is_active) {
+      if (!currentUserRes.rows.length || !currentUserRes.rows[0].isActive) {
         return res.status(401).json({ error: "Session is no longer valid" });
       }
 
       const currentUser = currentUserRes.rows[0];
       if (
-        Number(payload.sessionVersion) !== Number(currentUser.session_version || 1)
+        Number(payload.sessionVersion) !== Number(currentUser.sessionVersion || 1)
       ) {
         return res.status(401).json({ error: "Session is no longer valid" });
       }
@@ -120,15 +127,15 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
            AND is_active = true
            AND (company_id IS NULL OR company_id = $2)
            AND (expires_at IS NULL OR expires_at > NOW())`,
-        [currentUser.id, currentUser.company_id]
+        [currentUser.id, currentUser.companyId]
       ).catch(() => ({ rows: [] }));
 
       req.user = {
         userId: currentUser.id,
         email: currentUser.email,
-        companyId: currentUser.company_id,
+        companyId: currentUser.companyId,
         role: currentUser.role,
-        mfaEnabled: !!currentUser.two_factor_enabled,
+        mfaEnabled: !!currentUser.twoFactorEnabled,
         mfaVerifiedAt: payload.mfaVerifiedAt || null,
         authenticationMethods: Array.isArray(payload.amr) ? payload.amr : ["pwd"],
         accessAudiences: audienceRes.rows.map((row) => String(row.audience || "").trim()).filter(Boolean),
@@ -183,9 +190,18 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
 
       if (keyPrefix) {
         const prefixed = await pool.query(
-          `SELECT ak.id, ak.company_id, ak.scopes, ak.expires_at, ak.key_hash, ak.key_salt, ak.hash_algorithm,
-                  ak.operator_type, ak.access_mode, ak.max_confidentiality,
-                  c.economic_operator_identifier, c.economic_operator_identifier_scheme
+          `SELECT ak.id,
+                  ak.company_id AS "companyId",
+                  ak.scopes,
+                  ak.expires_at AS "expiresAt",
+                  ak.key_hash AS "keyHash",
+                  ak.key_salt AS "keySalt",
+                  ak.hash_algorithm AS "hashAlgorithm",
+                  ak.operator_type AS "operatorType",
+                  ak.access_mode AS "accessMode",
+                  ak.max_confidentiality AS "maxConfidentiality",
+                  c.economic_operator_identifier AS "economicOperatorIdentifier",
+                  c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
            FROM api_keys ak
            LEFT JOIN companies c ON c.id = ak.company_id
            WHERE key_prefix = $1
@@ -194,9 +210,9 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
           [keyPrefix]
         );
         matchedRow = prefixed.rows.find((row) => {
-          if (row.hash_algorithm !== "hmac_sha256" || !row.key_salt) return false;
-          const computed = hashApiKeyWithSalt(key, row.key_salt);
-          return computed === row.key_hash;
+          if (row.hashAlgorithm !== "hmac_sha256" || !row.keySalt) return false;
+          const computed = hashApiKeyWithSalt(key, row.keySalt);
+          return computed === row.keyHash;
         }) || null;
       }
 
@@ -204,12 +220,12 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       pool.query("UPDATE api_keys SET last_used_at = NOW() WHERE id = $1", [matchedRow.id]).catch(() => {});
       req.apiKey = {
         keyId: matchedRow.id,
-        companyId: String(matchedRow.company_id),
+        companyId: String(matchedRow.companyId),
         scopes: normalizeScopes(matchedRow.scopes),
-        expiresAt: matchedRow.expires_at || null,
-        operatorType: matchedRow.operator_type || "economic_operator",
-        accessMode: matchedRow.access_mode || "read",
-        maxConfidentiality: matchedRow.max_confidentiality || "regulated",
+        expiresAt: matchedRow.expiresAt || null,
+        operatorType: matchedRow.operatorType || "economic_operator",
+        accessMode: matchedRow.accessMode || "read",
+        maxConfidentiality: matchedRow.maxConfidentiality || "regulated",
         mfaEnabled: false,
         mfaVerifiedAt: null,
         authenticationMethods: ["api_key"],
