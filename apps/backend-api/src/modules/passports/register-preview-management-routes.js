@@ -36,9 +36,9 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const sourcePassport = resolved.passport;
       const resolvedCompanyId = sourcePassport.companyId ?? companyId ?? null;
       const typeDefResult = await pool.query(
-        `SELECT id, type_name, display_name, product_category, product_icon, fields_json
+        `SELECT id, "typeName", "displayName", "productCategory", "productIcon", "fieldsJson"
          FROM passport_types
-         WHERE type_name = $1
+         WHERE "typeName" = $1
          LIMIT 1`,
         [sourcePassport.passportType]
       );

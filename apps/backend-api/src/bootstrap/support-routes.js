@@ -89,27 +89,34 @@ function registerSupportRoutes(app, deps) {
       }
 
       const row = await pool.query(
-        "SELECT * FROM passport_attachments WHERE public_id = $1",
+        `SELECT id,
+                public_id AS "publicId",
+                is_public AS "isPublic",
+                mime_type AS "mimeType",
+                file_path AS "filePath",
+                storage_key AS "storageKey"
+         FROM passport_attachments
+         WHERE public_id = $1`,
         [publicId]
       );
       if (!row.rows.length) return res.status(404).json({ error: "File not found" });
 
       const attachment = row.rows[0];
-      if (!attachment.is_public) {
+      if (!attachment.isPublic) {
         return res.status(404).json({ error: "File not found" });
       }
 
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Cache-Control", "public, max-age=300");
-      res.setHeader("Cross-Origin-Resource-Policy", attachment.mime_type === "application/pdf" ? "cross-origin" : "same-site");
+      res.setHeader("Cross-Origin-Resource-Policy", attachment.mimeType === "application/pdf" ? "cross-origin" : "same-site");
 
-      if (storageService.isLocal && attachment.file_path) {
-        const safePath = path.resolve(attachment.file_path);
+      if (storageService.isLocal && attachment.filePath) {
+        const safePath = path.resolve(attachment.filePath);
         if (safePath !== FILES_BASE_DIR && !safePath.startsWith(`${FILES_BASE_DIR}${path.sep}`)) {
           return res.status(404).json({ error: "File not found" });
         }
         if (!fs.existsSync(safePath)) return res.status(404).json({ error: "File not found" });
-        const mimeType = attachment.mime_type || "application/octet-stream";
+        const mimeType = attachment.mimeType || "application/octet-stream";
         res.setHeader("Content-Type", mimeType);
         if (mimeType === "application/pdf") {
           res.setHeader("Content-Disposition", "inline");
@@ -118,9 +125,9 @@ function registerSupportRoutes(app, deps) {
         return res.sendFile(safePath);
       }
 
-      if (!storageService.isLocal && storageService.fetchObject && isPassportStorageKey(attachment.storage_key)) {
-        const objectResponse = await storageService.fetchObject(attachment.storage_key);
-        const contentType = objectResponse.headers?.get("content-type") || attachment.mime_type;
+      if (!storageService.isLocal && storageService.fetchObject && isPassportStorageKey(attachment.storageKey)) {
+        const objectResponse = await storageService.fetchObject(attachment.storageKey);
+        const contentType = objectResponse.headers?.get("content-type") || attachment.mimeType;
         const contentLength = objectResponse.headers?.get("content-length");
         const etag = objectResponse.headers?.get("etag");
         if (contentType) res.setHeader("Content-Type", contentType);
@@ -144,19 +151,19 @@ function registerSupportRoutes(app, deps) {
   app.post("/api/contact", publicReadRateLimit, async (req, res) => {
     try {
       const {
-        first_name,
-        last_name,
+        firstName,
+        lastName,
         email,
         company,
         sector,
-        service_interest,
+        serviceInterest,
         deadline,
         message,
-        how_found,
+        howFound,
       } = req.body || {};
 
-      if (!first_name || !last_name || !email || !message) {
-        return res.status(400).json({ error: "first_name, last_name, email, and message are required" });
+      if (!firstName || !lastName || !email || !message) {
+        return res.status(400).json({ error: "firstName, lastName, email, and message are required" });
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ error: "Invalid email address" });
@@ -173,17 +180,17 @@ function registerSupportRoutes(app, deps) {
         from: `"ClarosDPP Contact" <${process.env.EMAIL_FROM}>`,
         to: adminEmail,
         replyTo: email,
-        subject: `New Contact Form Submission — ${first_name} ${last_name}`,
+        subject: `New Contact Form Submission — ${firstName} ${lastName}`,
         html: brandedEmail({
           heading: "New Contact Form Submission",
           body: `
-          <p><strong>Name:</strong> ${first_name} ${last_name}</p>
+          <p><strong>Name:</strong> ${firstName} ${lastName}</p>
           <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
           ${company ? `<p><strong>Company:</strong> ${company}</p>` : ""}
           ${sector ? `<p><strong>Sector:</strong> ${sector}</p>` : ""}
-          ${service_interest ? `<p><strong>Service Interest:</strong> ${service_interest}</p>` : ""}
+          ${serviceInterest ? `<p><strong>Service Interest:</strong> ${serviceInterest}</p>` : ""}
           ${deadline ? `<p><strong>Compliance Deadline:</strong> ${deadline}</p>` : ""}
-          ${how_found ? `<p><strong>How Found:</strong> ${how_found}</p>` : ""}
+          ${howFound ? `<p><strong>How Found:</strong> ${howFound}</p>` : ""}
           <p><strong>Message:</strong></p>
           <p style="white-space:pre-wrap">${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
         `,

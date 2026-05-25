@@ -69,8 +69,8 @@ function createApiKeyHelpers({ accessRightsService, crypto }) {
     return [...derived];
   }
 
-  function flattenTypeFields(typeDef) {
-    return (typeDef?.fields_json?.sections || []).flatMap((section) => section.fields || []);
+function flattenTypeFields(typeDef) {
+    return (typeDef?.fieldsJson?.sections || []).flatMap((section) => section.fields || []);
   }
 
   function getApiKeyAudiences(apiKey) {

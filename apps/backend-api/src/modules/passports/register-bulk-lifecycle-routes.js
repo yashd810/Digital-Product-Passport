@@ -96,8 +96,8 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
       for (const [passportType, dppIds] of Object.entries(groupedItems)) {
         const tableName = getTable(passportType);
-        const typeRes = await pool.query("SELECT fields_json, display_name FROM passport_types WHERE type_name = $1", [passportType]);
-        const sections = typeRes.rows[0]?.fields_json?.sections || [];
+        const typeRes = await pool.query('SELECT "fieldsJson" AS "fieldsJson", "displayName" AS "displayName" FROM passport_types WHERE "typeName" = $1', [passportType]);
+        const sections = typeRes.rows[0]?.fieldsJson?.sections || [];
         const fieldMap = new Map(sections.flatMap((section) => section.fields || []).map((field) => [field.key, field]));
         fieldMap.set("modelName", { key: "modelName", label: "Model Name", type: "text" });
         fieldMap.set("internalAliasId", { key: "internalAliasId", label: "Internal Alias ID", type: "text" });
@@ -328,7 +328,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             snapshotReason: "after_bulk_release",
           });
 
-          const typeRes = await pool.query("SELECT * FROM passport_types WHERE type_name = $1", [passportType]);
+          const typeRes = await pool.query('SELECT * FROM passport_types WHERE "typeName" = $1', [passportType]);
           const sigData = await signPassport({ ...releasedRow, passportType }, typeRes.rows[0] || null);
           if (sigData) {
             await recordSignedDppRelease(pool, {

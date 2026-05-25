@@ -191,7 +191,7 @@ function createPassportQueryRepository({
       liveVersionSql = ` AND p."versionNumber" = $${liveParams.length}`;
     }
     const liveRes = await pool.query(
-      `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
+      `SELECT p.*, u.email AS "createdByEmail", u."firstName" AS "firstName", u."lastName" AS "lastName"
        FROM ${tableName} p
        LEFT JOIN users u ON u.id = p."createdBy"
        WHERE p."dppId" = $1 AND p."companyId" = $2 AND p."deletedAt" IS NULL${liveVersionSql}
@@ -316,11 +316,11 @@ function createPassportQueryRepository({
       ? 'pa."internalAliasId" = ANY($1::text[])'
       : '(pa."internalAliasId" = ANY($1::text[]) OR pa."productIdentifierDid" = ANY($1::text[]))';
 
-    const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
+    const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM passport_types ORDER BY "typeName"');
     const matches = [];
 
-    for (const { type_name } of ptRows.rows) {
-      const tableName = getTable(type_name);
+    for (const { typeName } of ptRows.rows) {
+      const tableName = getTable(typeName);
       const liveParams = [candidates];
       let versionSql = "";
       let companySql = "";
@@ -351,20 +351,20 @@ function createPassportQueryRepository({
         );
       } catch (error) {
         if (isMissingRelationError(error)) {
-          logger.warn({ tableName, passportType: type_name }, "Skipping passport type lookup because storage table does not exist yet");
+          logger.warn({ tableName, passportType: typeName }, "Skipping passport type lookup because storage table does not exist yet");
           continue;
         }
         throw error;
       }
       if (liveRes.rows.length) {
         matches.push({
-          passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: type_name },
+          passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: typeName },
           archived: false,
         });
         continue;
       }
 
-      const archiveParams = [candidates, type_name];
+      const archiveParams = [candidates, typeName];
       let archiveCompanySql = "";
       let archiveVersionSql = "";
       if (companyId !== null && companyId !== undefined) {
@@ -402,7 +402,7 @@ function createPassportQueryRepository({
           passport: {
             ...normalizePassportRow(rowData),
             uniqueProductIdentifier: archiveRes.rows[0].productIdentifierDid || rowData?.uniqueProductIdentifier,
-            passportType: type_name,
+            passportType: typeName,
             archived: true,
           },
           archived: true,
@@ -509,11 +509,11 @@ function createPassportQueryRepository({
       internalAliasId: normalizedProductId,
     }) || [normalizedProductId];
 
-    const ptRows = await pool.query("SELECT type_name FROM passport_types ORDER BY type_name");
+    const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM passport_types ORDER BY "typeName"');
     const liveMatches = [];
 
-    for (const { type_name } of ptRows.rows) {
-      const tableName = getTable(type_name);
+    for (const { typeName } of ptRows.rows) {
+      const tableName = getTable(typeName);
       let liveRes;
       try {
         liveRes = await pool.query(
@@ -528,14 +528,14 @@ function createPassportQueryRepository({
         );
       } catch (error) {
         if (isMissingRelationError(error)) {
-          logger.warn({ tableName, passportType: type_name }, "Skipping preview lookup because storage table does not exist yet");
+          logger.warn({ tableName, passportType: typeName }, "Skipping preview lookup because storage table does not exist yet");
           continue;
         }
         throw error;
       }
       if (liveRes.rows.length) {
         liveMatches.push({
-          passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: type_name },
+          passport: { ...normalizePassportRow(liveRes.rows[0]), passportType: typeName },
           archived: false,
         });
       }
@@ -549,7 +549,7 @@ function createPassportQueryRepository({
     if (liveMatches.length === 1) return liveMatches[0];
 
     const archiveMatches = [];
-    for (const { type_name } of ptRows.rows) {
+    for (const { typeName } of ptRows.rows) {
       const archiveRes = await pool.query(
         `SELECT "rowData"
          FROM passport_archives
@@ -558,14 +558,14 @@ function createPassportQueryRepository({
            AND ("internalAliasId" = ANY($3::text[]) OR "productIdentifierDid" = ANY($3::text[]))
          ORDER BY "versionNumber" DESC, "archivedAt" DESC
          LIMIT 1`,
-        [companyId, type_name, candidates]
+        [companyId, typeName, candidates]
       );
       if (archiveRes.rows.length) {
         const rowData = typeof archiveRes.rows[0].rowData === "string"
           ? JSON.parse(archiveRes.rows[0].rowData)
           : archiveRes.rows[0].rowData;
         archiveMatches.push({
-          passport: { ...normalizePassportRow(rowData), passportType: type_name, archived: true },
+          passport: { ...normalizePassportRow(rowData), passportType: typeName, archived: true },
           archived: true,
         });
       }

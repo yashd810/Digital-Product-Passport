@@ -91,22 +91,22 @@ function createCarrierSecurityHelpers({
   }
 
   function buildDataCarrierVerificationRecord(source = {}, actor = {}) {
-    const verifiedAt = source.verifiedAt || source.verified_at || new Date().toISOString();
+    const verifiedAt = source.verifiedAt || new Date().toISOString();
     return {
       evidenceType: "physical_data_carrier_verification",
       verifiedAt,
       recordedAt: new Date().toISOString(),
       recordedBy: actor.userId || null,
-      printGrade: String(source.printGrade || source.print_grade || "").trim().slice(0, 32) || null,
-      gradingStandard: String(source.gradingStandard || source.grading_standard || "ISO/IEC 15415 or ISO/IEC 15416").trim().slice(0, 160),
-      verifierDevice: String(source.verifierDevice || source.verifier_device || "").trim().slice(0, 160) || null,
-      verifierSerialNumber: String(source.verifierSerialNumber || source.verifier_serial_number || "").trim().slice(0, 160) || null,
-      labelSpecificationId: String(source.labelSpecificationId || source.label_specification_id || "").trim().slice(0, 160) || null,
-      hriPlacement: String(source.hriPlacement || source.hri_placement || "").trim().slice(0, 80) || null,
-      scannerTests: normalizeEvidenceItems(source.scannerTests || source.scanner_tests),
-      durabilityTests: normalizeEvidenceItems(source.durabilityTests || source.durability_tests),
-      placementChecks: normalizeEvidenceItems(source.placementChecks || source.placement_checks),
-      evidenceUris: (Array.isArray(source.evidenceUris || source.evidence_uris) ? (source.evidenceUris || source.evidence_uris) : [source.evidenceUri || source.evidence_uri])
+      printGrade: String(source.printGrade || "").trim().slice(0, 32) || null,
+      gradingStandard: String(source.gradingStandard || "ISO/IEC 15415 or ISO/IEC 15416").trim().slice(0, 160),
+      verifierDevice: String(source.verifierDevice || "").trim().slice(0, 160) || null,
+      verifierSerialNumber: String(source.verifierSerialNumber || "").trim().slice(0, 160) || null,
+      labelSpecificationId: String(source.labelSpecificationId || "").trim().slice(0, 160) || null,
+      hriPlacement: String(source.hriPlacement || "").trim().slice(0, 80) || null,
+      scannerTests: normalizeEvidenceItems(source.scannerTests),
+      durabilityTests: normalizeEvidenceItems(source.durabilityTests),
+      placementChecks: normalizeEvidenceItems(source.placementChecks),
+      evidenceUris: (Array.isArray(source.evidenceUris) ? source.evidenceUris : [source.evidenceUri])
         .map((uri) => String(uri || "").trim().slice(0, 2000))
         .filter(Boolean),
       notes: String(source.notes || "").trim().slice(0, 2000) || null,

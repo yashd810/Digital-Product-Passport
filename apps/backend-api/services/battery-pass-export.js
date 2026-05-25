@@ -84,7 +84,7 @@ function getSemanticIdForFieldKey(fieldKey) {
 }
 
 function resolveRequestedBatteryModelKey(options = {}, typeDef = null) {
-  const explicitModelKey = normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semantic_model_key);
+  const explicitModelKey = normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semanticModelKey);
   return explicitModelKey || BATTERY_PASS_MODEL_KEY;
 }
 
@@ -98,8 +98,8 @@ function isBatteryPassExportType(passportType) {
 
 function shouldUseBatteryDictionary(passportType, options = {}, typeDef = null) {
   if (!shouldTargetBatteryDictionary({ passportType, typeDef, options })) return false;
-  if (isBatteryProductCategory(options.productCategory || typeDef?.product_category)) return true;
-  const explicitModelKey = normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semantic_model_key);
+  if (isBatteryProductCategory(options.productCategory || typeDef?.productCategory)) return true;
+  const explicitModelKey = normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semanticModelKey);
   return !explicitModelKey || isSupportedBatterySemanticModel(resolveRequestedBatteryModelKey(options, typeDef));
 }
 
@@ -154,7 +154,7 @@ function sanitizePassport(passport, passportType) {
 }
 
 function buildPassportJsonLdContext(typeDef, passportType = null, options = {}) {
-  const resolvedType = String(passportType || typeDef?.type_name || "").trim().toLowerCase();
+  const resolvedType = String(passportType || typeDef?.typeName || "").trim().toLowerCase();
   const contexts = [DPP_CONTEXT];
 
   if (!shouldUseBatteryDictionary(resolvedType, options, typeDef)) {

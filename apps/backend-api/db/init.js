@@ -2,6 +2,7 @@
 
 const logger = require("../services/logger");
 const { SHARED_PASSPORT_TABLE_COLUMN_MAPPINGS } = require("../src/shared/passports/shared-passport-table-columns");
+const { CORE_TABLE_COLUMN_MAPPINGS } = require("../src/shared/core/core-table-column-mappings");
 const BATTERY_DICTIONARY_MODEL_KEY = "claros_battery_dictionary_v1";
 
 function isSafeSqlIdentifier(value) {
@@ -145,6 +146,17 @@ async function migrateSharedPassportTablesToCamelCase(pool) {
       pool,
       tableName,
       SHARED_PASSPORT_TABLE_COLUMN_MAPPINGS[tableName]
+    );
+  }
+}
+
+async function migrateCoreTablesToCamelCase(pool) {
+  const tableNames = Object.keys(CORE_TABLE_COLUMN_MAPPINGS);
+  for (const tableName of tableNames) {
+    await renameTableColumnsToCamelCase(
+      pool,
+      tableName,
+      CORE_TABLE_COLUMN_MAPPINGS[tableName]
     );
   }
 }
@@ -467,30 +479,30 @@ async function initDb(pool, {
     CREATE TABLE IF NOT EXISTS users (
       id               SERIAL PRIMARY KEY,
       email            VARCHAR(255) NOT NULL UNIQUE,
-      password_hash    VARCHAR(255) NOT NULL,
-      first_name       VARCHAR(100),
-      last_name        VARCHAR(100),
-      company_id       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+      "passwordHash"    VARCHAR(255) NOT NULL,
+      "firstName"       VARCHAR(100),
+      "lastName"        VARCHAR(100),
+      "companyId"       INTEGER REFERENCES companies(id) ON DELETE CASCADE,
       role             VARCHAR(50) NOT NULL DEFAULT 'viewer',
-      is_active        BOOLEAN NOT NULL DEFAULT true,
-      otp_code         VARCHAR(6),
-      otp_code_hash    TEXT,
-      otp_expires_at   TIMESTAMPTZ,
-      two_factor_enabled BOOLEAN NOT NULL DEFAULT false,
-      session_version  INTEGER NOT NULL DEFAULT 1,
-      pepper_version   INTEGER NOT NULL DEFAULT 1,
-      avatar_url       TEXT,
+      "isActive"        BOOLEAN NOT NULL DEFAULT true,
+      "otpCode"         VARCHAR(6),
+      "otpCodeHash"     TEXT,
+      "otpExpiresAt"    TIMESTAMPTZ,
+      "twoFactorEnabled" BOOLEAN NOT NULL DEFAULT false,
+      "sessionVersion"  INTEGER NOT NULL DEFAULT 1,
+      "pepperVersion"   INTEGER NOT NULL DEFAULT 1,
+      "avatarUrl"       TEXT,
       phone            VARCHAR(50),
-      job_title        VARCHAR(120),
+      "jobTitle"        VARCHAR(120),
       bio              TEXT,
-      preferred_language VARCHAR(12) DEFAULT 'en',
-      default_reviewer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      default_approver_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      auth_source      VARCHAR(100) NOT NULL DEFAULT 'local',
-      sso_only         BOOLEAN NOT NULL DEFAULT false,
-      last_login_at    TIMESTAMPTZ,
-      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "preferredLanguage" VARCHAR(12) DEFAULT 'en',
+      "defaultReviewerId" INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "defaultApproverId" INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "authSource"      VARCHAR(100) NOT NULL DEFAULT 'local',
+      "ssoOnly"         BOOLEAN NOT NULL DEFAULT false,
+      "lastLoginAt"    TIMESTAMPTZ,
+      "createdAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
 
@@ -551,25 +563,25 @@ async function initDb(pool, {
 
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS otp_code_hash TEXT
+    ADD COLUMN IF NOT EXISTS "otpCodeHash" TEXT
   `);
   await runMigration(pool, "2026-04-27.backfill-otp-code-hash", async (db) => {
     const otpRows = await db.query(`
-      SELECT id, otp_code
+      SELECT id, "otpCode"
       FROM users
-      WHERE otp_code IS NOT NULL
-        AND COALESCE(TRIM(otp_code_hash), '') = ''
+      WHERE "otpCode" IS NOT NULL
+        AND COALESCE(TRIM("otpCodeHash"), '') = ''
     `);
     for (const row of otpRows.rows) {
-      const rawOtp = String(row.otp_code || "").trim();
+      const rawOtp = String(row.otpCode || "").trim();
       if (!rawOtp) continue;
       const otpHash = /^[a-f0-9]{64}$/i.test(rawOtp)
         ? rawOtp.toLowerCase()
         : require("crypto").createHash("sha256").update(rawOtp).digest("hex");
       await db.query(
         `UPDATE users
-         SET otp_code_hash = $1,
-             updated_at = NOW()
+         SET "otpCodeHash" = $1,
+             "updatedAt" = NOW()
          WHERE id = $2`,
         [otpHash, row.id]
       );
@@ -579,19 +591,19 @@ async function initDb(pool, {
   /* Add missing columns to existing users table (for migrations) */
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT false
+    ADD COLUMN IF NOT EXISTS "twoFactorEnabled" BOOLEAN NOT NULL DEFAULT false
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 1
+    ADD COLUMN IF NOT EXISTS "sessionVersion" INTEGER NOT NULL DEFAULT 1
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS pepper_version INTEGER NOT NULL DEFAULT 1
+    ADD COLUMN IF NOT EXISTS "pepperVersion" INTEGER NOT NULL DEFAULT 1
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS avatar_url TEXT
+    ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT
   `);
   await pool.query(`
     ALTER TABLE users
@@ -599,7 +611,7 @@ async function initDb(pool, {
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS job_title VARCHAR(120)
+    ADD COLUMN IF NOT EXISTS "jobTitle" VARCHAR(120)
   `);
   await pool.query(`
     ALTER TABLE users
@@ -607,23 +619,23 @@ async function initDb(pool, {
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(12) DEFAULT 'en'
+    ADD COLUMN IF NOT EXISTS "preferredLanguage" VARCHAR(12) DEFAULT 'en'
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS default_reviewer_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+    ADD COLUMN IF NOT EXISTS "defaultReviewerId" INTEGER REFERENCES users(id) ON DELETE SET NULL
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS default_approver_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+    ADD COLUMN IF NOT EXISTS "defaultApproverId" INTEGER REFERENCES users(id) ON DELETE SET NULL
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS auth_source VARCHAR(100) NOT NULL DEFAULT 'local'
+    ADD COLUMN IF NOT EXISTS "authSource" VARCHAR(100) NOT NULL DEFAULT 'local'
   `);
   await pool.query(`
     ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS sso_only BOOLEAN NOT NULL DEFAULT false
+    ADD COLUMN IF NOT EXISTS "ssoOnly" BOOLEAN NOT NULL DEFAULT false
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_identities (
@@ -679,57 +691,53 @@ async function initDb(pool, {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_types (
       id               SERIAL PRIMARY KEY,
-      type_name        VARCHAR(100) NOT NULL UNIQUE,
-      display_name     VARCHAR(255) NOT NULL,
-      product_category VARCHAR(100),
-      product_icon    VARCHAR(10) DEFAULT '📋',
-      semantic_model_key VARCHAR(100),
-      fields_json      JSONB NOT NULL DEFAULT '{"sections":[]}',
-      is_active        BOOLEAN NOT NULL DEFAULT true,
-      created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "typeName"        VARCHAR(100) NOT NULL UNIQUE,
+      "displayName"     VARCHAR(255) NOT NULL,
+      "productCategory" VARCHAR(100),
+      "productIcon"    VARCHAR(10) DEFAULT '📋',
+      "semanticModelKey" VARCHAR(100),
+      "fieldsJson"      JSONB NOT NULL DEFAULT '{"sections":[]}',
+      "isActive"        BOOLEAN NOT NULL DEFAULT true,
+      "createdBy"       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "createdAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     UPDATE passport_types
-    SET fields_json = jsonb_set(
+    SET "fieldsJson" = jsonb_set(
       CASE
-        WHEN jsonb_typeof(fields_json) = 'object' THEN fields_json
+        WHEN jsonb_typeof("fieldsJson") = 'object' THEN "fieldsJson"
         ELSE '{"sections":[]}'::jsonb
       END,
       '{schemaVersion}',
-      COALESCE(fields_json->'schemaVersion', '1'::jsonb),
+      COALESCE("fieldsJson"->'schemaVersion', '1'::jsonb),
       true
     )
-    WHERE fields_json->'schemaVersion' IS NULL
+    WHERE "fieldsJson"->'schemaVersion' IS NULL
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS passport_type_schema_events (
       id                SERIAL PRIMARY KEY,
-      passport_type_id  INTEGER REFERENCES passport_types(id) ON DELETE SET NULL,
-      type_name         VARCHAR(100) NOT NULL,
-      table_name        VARCHAR(140) NOT NULL,
-      schema_version    INTEGER NOT NULL DEFAULT 1,
-      event_type        VARCHAR(60) NOT NULL,
-      change_summary    JSONB NOT NULL DEFAULT '{}'::jsonb,
-      created_by        INTEGER REFERENCES users(id) ON DELETE SET NULL,
-      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      "passportTypeId"  INTEGER REFERENCES passport_types(id) ON DELETE SET NULL,
+      "typeName"         VARCHAR(100) NOT NULL,
+      "tableName"        VARCHAR(140) NOT NULL,
+      "schemaVersion"    INTEGER NOT NULL DEFAULT 1,
+      "eventType"        VARCHAR(60) NOT NULL,
+      "changeSummary"    JSONB NOT NULL DEFAULT '{}'::jsonb,
+      "createdBy"        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      "createdAt"        TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_type_schema_events_type
-      ON passport_type_schema_events(type_name, created_at DESC)
-  `);
-  await pool.query(`
-    ALTER TABLE passport_types
-    ADD COLUMN IF NOT EXISTS semantic_model_key VARCHAR(100)
+      ON passport_type_schema_events("typeName", "createdAt" DESC)
   `);
   await pool.query(
     `UPDATE passport_types
-       SET semantic_model_key = $1
-     WHERE COALESCE(product_category, '') ~* 'battery'
-       AND semantic_model_key IS DISTINCT FROM $1`,
+       SET "semanticModelKey" = $1
+     WHERE COALESCE("productCategory", '') ~* 'battery'
+       AND "semanticModelKey" IS DISTINCT FROM $1`,
     [BATTERY_DICTIONARY_MODEL_KEY]
   );
   await pool.query(`
@@ -740,9 +748,9 @@ async function initDb(pool, {
     ALTER TABLE passport_types
     ADD CONSTRAINT passport_types_battery_semantic_model_key_ck
     CHECK (
-      product_category IS NULL
-      OR lower(product_category) NOT LIKE '%battery%'
-      OR semantic_model_key = '${BATTERY_DICTIONARY_MODEL_KEY}'
+      "productCategory" IS NULL
+      OR lower("productCategory") NOT LIKE '%battery%'
+      OR "semanticModelKey" = '${BATTERY_DICTIONARY_MODEL_KEY}'
     )
   `);
 
@@ -989,8 +997,8 @@ async function initDb(pool, {
     ALTER TABLE passport_registry
     ALTER COLUMN device_api_key DROP DEFAULT
   `).catch(() => {});
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_product_category ON passport_types(product_category)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_passport_types_active   ON passport_types(is_active)`);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_passport_types_product_category ON passport_types("productCategory")');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_passport_types_active ON passport_types("isActive")');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS company_passport_access (
@@ -1016,9 +1024,9 @@ async function initDb(pool, {
   // Seed from existing passport_types so nothing is orphaned
   await pool.query(`
     INSERT INTO product_categories (name, icon)
-    SELECT DISTINCT product_category, COALESCE(product_icon, '📋')
+    SELECT DISTINCT "productCategory", COALESCE("productIcon", '📋')
     FROM passport_types
-    WHERE product_category IS NOT NULL
+    WHERE "productCategory" IS NOT NULL
     ON CONFLICT (name) DO NOTHING
   `);
 
@@ -1625,15 +1633,15 @@ async function initDb(pool, {
 
   // Ensure shared passport tables exist for all passport types.
   // Idempotent — uses CREATE TABLE IF NOT EXISTS.
-  const ptRows = await pool.query("SELECT type_name FROM passport_types");
-  for (const { type_name } of ptRows.rows) {
-    await createPassportTable(type_name).catch(e =>
-      logger.warn({ err: e }, `Could not create table for ${type_name}`)
+  const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM passport_types');
+  for (const { typeName } of ptRows.rows) {
+    await createPassportTable(typeName).catch(e =>
+      logger.warn({ err: e }, `Could not create table for ${typeName}`)
     );
   }
 
-  for (const { type_name } of ptRows.rows) {
-    const tableName = getTable(type_name);
+  for (const { typeName } of ptRows.rows) {
+    const tableName = getTable(typeName);
     try {
       const legacyAliasColumn = await pool.query(
         `SELECT 1
@@ -1704,7 +1712,7 @@ async function initDb(pool, {
       `);
 
       if (productIdentifierService) {
-        await runMigration(pool, `2026-04-27.backfill-product-identifier-did.${type_name}`, async (db) => {
+        await runMigration(pool, `2026-04-27.backfill-product-identifier-did.${typeName}`, async (db) => {
           const liveRows = await db.query(
             `SELECT id, "companyId", "internalAliasId", granularity
              FROM ${tableName}
@@ -1715,7 +1723,7 @@ async function initDb(pool, {
           for (const row of liveRows.rows) {
             const canonicalDid = productIdentifierService.buildCanonicalProductDid({
               companyId: row.companyId,
-              passportType: type_name,
+              passportType: typeName,
               rawProductId: row.internalAliasId,
               granularity: row.granularity || "item",
             });
@@ -1734,13 +1742,13 @@ async function initDb(pool, {
              WHERE "passportType" = $1
                AND COALESCE(TRIM("internalAliasId"), '') <> ''
                AND COALESCE(TRIM("productIdentifierDid"), '') = ''`,
-            [type_name]
+            [typeName]
           );
           for (const row of archiveRows.rows) {
             const rowData = typeof row.rowData === "string" ? JSON.parse(row.rowData) : row.rowData;
             const canonicalDid = productIdentifierService.buildCanonicalProductDid({
               companyId: row.companyId,
-              passportType: type_name,
+              passportType: typeName,
               rawProductId: row.internalAliasId,
               granularity: rowData?.granularity || "item",
             });
@@ -1755,7 +1763,7 @@ async function initDb(pool, {
         });
       }
     } catch (e) {
-      logger.warn({ err: e }, `Could not normalize revision status for ${type_name}`);
+      logger.warn({ err: e }, `Could not normalize revision status for ${typeName}`);
     }
   }
 
@@ -1820,9 +1828,9 @@ async function initDb(pool, {
       }
     }
 
-    const typedPassportRows = await db.query("SELECT type_name FROM passport_types").catch(() => ({ rows: [] }));
-    for (const { type_name } of typedPassportRows.rows) {
-      const tableName = getTable(type_name);
+    const typedPassportRows = await db.query('SELECT "typeName" AS "typeName" FROM passport_types').catch(() => ({ rows: [] }));
+    for (const { typeName } of typedPassportRows.rows) {
+      const tableName = getTable(typeName);
       // Check if table exists before altering it
       const tableExists = await db.query(
         `SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1`,
@@ -2042,6 +2050,9 @@ async function initDb(pool, {
 
   await runMigration(pool, "2026-05-24.camelcase-shared-passport-columns", async (db) => {
     await migrateSharedPassportTablesToCamelCase(db);
+  });
+  await runMigration(pool, "2026-05-25.camelcase-core-table-columns", async (db) => {
+    await migrateCoreTablesToCamelCase(db);
   });
 
   const passportRegistryReferences = [

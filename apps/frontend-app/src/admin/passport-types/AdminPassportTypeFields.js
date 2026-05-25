@@ -132,7 +132,7 @@ function AdminPassportTypeFields() {
                       <td><span className={`apt-fv-type apt-fv-type-${field.type}`}>{field.type}</span></td>
                       <td>{describeList(field.access, ACCESS_LEVEL_LABELS)}</td>
                       <td>{CONFIDENTIALITY_LEVEL_LABELS[field.confidentiality] || field.confidentiality || "—"}</td>
-                      <td>{describeList(field.updateAuthority || field.update_authority, UPDATE_AUTHORITY_LABELS)}</td>
+                      <td>{describeList(field.updateAuthority, UPDATE_AUTHORITY_LABELS)}</td>
                     </tr>
                   ))}
                 </tbody>

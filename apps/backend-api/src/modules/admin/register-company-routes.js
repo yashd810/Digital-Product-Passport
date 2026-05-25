@@ -28,22 +28,22 @@ module.exports = function registerCompanyRoutes(app, deps) {
     return {
       id: row.id ?? null,
       country: row.country ?? null,
-      companyName: row.companyName ?? row.company_name ?? null,
-      legalName: row.legalName ?? row.legal_name ?? null,
-      companyRegistrationNumber: row.companyRegistrationNumber ?? row.company_registration_number ?? null,
-      vatNumber: row.vatNumber ?? row.vat_number ?? null,
-      websiteDomain: row.websiteDomain ?? row.website_domain ?? null,
-      customerTrustLevel: row.customerTrustLevel ?? row.customer_trust_level ?? null,
-      verificationStatus: row.verificationStatus ?? row.verification_status ?? null,
-      authorizedContactName: row.authorizedContactName ?? row.authorized_contact_name ?? null,
-      authorizedContactEmail: row.authorizedContactEmail ?? row.authorized_contact_email ?? null,
-      isActive: row.isActive ?? row.is_active ?? null,
-      assetManagementEnabled: row.assetManagementEnabled ?? row.asset_management_enabled ?? null,
-      assetManagementRevokedAt: row.assetManagementRevokedAt ?? row.asset_management_revoked_at ?? null,
-      grantedTypeNames: row.grantedTypeNames ?? row.granted_type_names ?? [],
-      grantedTypes: row.grantedTypes ?? row.granted_types ?? [],
-      createdAt: row.createdAt ?? row.created_at ?? null,
-      updatedAt: row.updatedAt ?? row.updated_at ?? null,
+      companyName: row.companyName ?? null,
+      legalName: row.legalName ?? null,
+      companyRegistrationNumber: row.companyRegistrationNumber ?? null,
+      vatNumber: row.vatNumber ?? null,
+      websiteDomain: row.websiteDomain ?? null,
+      customerTrustLevel: row.customerTrustLevel ?? null,
+      verificationStatus: row.verificationStatus ?? null,
+      authorizedContactName: row.authorizedContactName ?? null,
+      authorizedContactEmail: row.authorizedContactEmail ?? null,
+      isActive: row.isActive ?? null,
+      assetManagementEnabled: row.assetManagementEnabled ?? null,
+      assetManagementRevokedAt: row.assetManagementRevokedAt ?? null,
+      grantedTypeNames: row.grantedTypeNames ?? [],
+      grantedTypes: row.grantedTypes ?? [],
+      createdAt: row.createdAt ?? null,
+      updatedAt: row.updatedAt ?? null,
     };
   }
 
@@ -250,9 +250,9 @@ module.exports = function registerCompanyRoutes(app, deps) {
             '{}'
           ) AS granted_types,
           COALESCE(
-            ARRAY_AGG(DISTINCT pt.display_name ORDER BY pt.display_name) FILTER (WHERE pt.display_name IS NOT NULL),
+            ARRAY_AGG(DISTINCT pt."displayName" ORDER BY pt."displayName") FILTER (WHERE pt."displayName" IS NOT NULL),
             '{}'
-          ) AS granted_type_names
+          ) AS "grantedTypeNames"
         FROM companies c
         LEFT JOIN company_passport_access cpa ON cpa.company_id = c.id
         LEFT JOIN passport_types pt ON pt.id = cpa.passport_type_id
@@ -378,11 +378,12 @@ module.exports = function registerCompanyRoutes(app, deps) {
       if (!password) return res.status(400).json({ error: "Admin password is required" });
 
       const adminRes = await client.query(
-        "SELECT id, password_hash FROM users WHERE id = $1", [req.user.userId]
+        'SELECT id, "passwordHash" AS "passwordHash" FROM users WHERE id = $1',
+        [req.user.userId]
       );
       if (!adminRes.rows.length) return res.status(401).json({ error: "Admin user not found" });
 
-      const valid = await verifyPassword(password, adminRes.rows[0].password_hash);
+      const valid = await verifyPassword(password, adminRes.rows[0].passwordHash);
       if (!valid) return res.status(403).json({ error: "Incorrect admin password" });
 
       await client.query("BEGIN");
@@ -396,7 +397,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       }
 
       const company = companyRes.rows[0];
-      const userRes = await client.query("SELECT id FROM users WHERE company_id = $1", [companyId]);
+      const userRes = await client.query('SELECT id FROM users WHERE "companyId" = $1', [companyId]);
       const userIds = userRes.rows.map((row) => row.id);
 
       const regRes = await client.query(
@@ -435,7 +436,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
         await client.query("DELETE FROM password_reset_tokens WHERE user_id = ANY($1::int[])", [userIds]);
       }
 
-      await client.query("DELETE FROM users WHERE company_id = $1", [companyId]);
+      await client.query('DELETE FROM users WHERE "companyId" = $1', [companyId]);
       await client.query("DELETE FROM companies WHERE id = $1", [companyId]);
 
       await client.query("COMMIT");

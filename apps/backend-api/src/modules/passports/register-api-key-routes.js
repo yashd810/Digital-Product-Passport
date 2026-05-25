@@ -20,22 +20,22 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       id: row.id,
       name: row.name ?? null,
       scopes: Array.isArray(row.scopes) ? row.scopes : [],
-      keyPrefix: row.keyPrefix ?? row.key_prefix ?? null,
-      operatorType: row.operatorType ?? row.operator_type ?? null,
-      accessMode: row.accessMode ?? row.access_mode ?? null,
-      maxConfidentiality: row.maxConfidentiality ?? row.max_confidentiality ?? null,
-      expiresAt: row.expiresAt ?? row.expires_at ?? null,
-      createdAt: row.createdAt ?? row.created_at ?? null,
-      lastUsedAt: row.lastUsedAt ?? row.last_used_at ?? null,
-      isActive: row.isActive ?? row.is_active ?? null,
+      keyPrefix: row.keyPrefix ?? null,
+      operatorType: row.operatorType ?? null,
+      accessMode: row.accessMode ?? null,
+      maxConfidentiality: row.maxConfidentiality ?? null,
+      expiresAt: row.expiresAt ?? null,
+      createdAt: row.createdAt ?? null,
+      lastUsedAt: row.lastUsedAt ?? null,
+      isActive: row.isActive ?? null,
     };
   }
 
   app.get("/api/companies/:companyId/api-keys", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT id, name, key_prefix, scopes, operator_type, access_mode, max_confidentiality,
-                expires_at, created_at, last_used_at, is_active
+        `SELECT id, name, key_prefix AS "keyPrefix", scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality",
+                expires_at AS "expiresAt", created_at AS "createdAt", last_used_at AS "lastUsedAt", is_active AS "isActive"
          FROM api_keys WHERE company_id = $1 ORDER BY created_at DESC`,
         [req.params.companyId]
       );
@@ -50,13 +50,9 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       const {
         name,
         scopes,
-        expires_at,
         expiresAt,
-        operator_type,
         operatorType,
-        access_mode,
         accessMode,
-        max_confidentiality,
         maxConfidentiality,
       } = req.body;
 
@@ -65,14 +61,14 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       }
 
       const requestedScopes = Array.isArray(scopes) ? scopes : [];
-      const parsedAccessMode = parseApiKeyAccessMode(access_mode || accessMode, requestedScopes);
+      const parsedAccessMode = parseApiKeyAccessMode(accessMode, requestedScopes);
       const parsedScopes = buildApiKeyScopesForAccessMode(parsedAccessMode, requestedScopes);
-      const parsedOperatorType = parseApiKeyOperatorType(operator_type || operatorType);
-      const parsedMaxConfidentiality = parseApiKeyMaxConfidentiality(max_confidentiality || maxConfidentiality);
-      const resolvedExpiry = expires_at || expiresAt || null;
+      const parsedOperatorType = parseApiKeyOperatorType(operatorType);
+      const parsedMaxConfidentiality = parseApiKeyMaxConfidentiality(maxConfidentiality);
+      const resolvedExpiry = expiresAt || null;
       const expiresAtValue = resolvedExpiry ? new Date(resolvedExpiry) : null;
       if (expiresAtValue && Number.isNaN(expiresAtValue.getTime())) {
-        return res.status(400).json({ error: "expires_at must be a valid ISO timestamp" });
+        return res.status(400).json({ error: "expiresAt must be a valid ISO timestamp" });
       }
 
       const count = await pool.query(
@@ -92,7 +88,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
            operator_type, access_mode, max_confidentiality, expires_at, created_by
          )
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-         RETURNING id, name, key_prefix, scopes, operator_type, access_mode, max_confidentiality, expires_at, created_at`,
+         RETURNING id, name, key_prefix AS "keyPrefix", scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality", expires_at AS "expiresAt", created_at AS "createdAt"`,
         [
           req.params.companyId,
           name.trim(),
@@ -119,7 +115,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
   app.delete("/api/companies/:companyId/api-keys/:keyId", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const result = await pool.query(
-        "UPDATE api_keys SET is_active = false, updated_at = NOW() WHERE id = $1 AND company_id = $2 RETURNING id, company_id, name, scopes, operator_type, access_mode, max_confidentiality, expires_at, is_active",
+        'UPDATE api_keys SET is_active = false, updated_at = NOW() WHERE id = $1 AND company_id = $2 RETURNING id, company_id AS "companyId", name, scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality", expires_at AS "expiresAt", is_active AS "isActive"',
         [req.params.keyId, req.params.companyId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Key not found" });
@@ -166,7 +162,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
          SET is_active = false,
              updated_at = NOW()
          WHERE id = $1 AND company_id = $2
-         RETURNING id, company_id, name, scopes, operator_type, access_mode, max_confidentiality, expires_at, is_active`,
+         RETURNING id, company_id AS "companyId", name, scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality", expires_at AS "expiresAt", is_active AS "isActive"`,
         [req.params.keyId, req.params.companyId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Key not found" });
@@ -216,7 +212,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
              expires_at = NOW(),
              updated_at = NOW()
          WHERE id = $1 AND company_id = $2
-         RETURNING id, company_id, name, scopes, operator_type, access_mode, max_confidentiality, expires_at, is_active`,
+         RETURNING id, company_id AS "companyId", name, scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality", expires_at AS "expiresAt", is_active AS "isActive"`,
         [req.params.keyId, req.params.companyId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Key not found" });

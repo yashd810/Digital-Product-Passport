@@ -175,7 +175,7 @@ function Register({ setToken, setUser, setCompanyId }) {
         <div className="invite-banner">
           <p className="invite-banner-label">You have been invited to join</p>
           <p className="invite-banner-company">
-            {tokenData.company_name || (tokenData.role_to_assign === "super_admin" ? "Digital Product Passport" : "the platform")}
+            {tokenData.companyName || (tokenData.roleToAssign === "super_admin" ? "Digital Product Passport" : "the platform")}
           </p>
         </div>
 

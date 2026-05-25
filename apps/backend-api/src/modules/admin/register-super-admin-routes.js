@@ -17,20 +17,20 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     return {
       id: row.id,
       email: row.email,
-      firstName: row.firstName ?? row.first_name ?? "",
-      lastName: row.lastName ?? row.last_name ?? "",
-      isActive: Boolean(row.isActive ?? row.is_active),
-      createdAt: row.createdAt ?? row.created_at ?? null,
-      lastLoginAt: row.lastLoginAt ?? row.last_login_at ?? null,
+      firstName: row.firstName ?? "",
+      lastName: row.lastName ?? "",
+      isActive: Boolean(row.isActive),
+      createdAt: row.createdAt ?? null,
+      lastLoginAt: row.lastLoginAt ?? null,
     };
   }
 
   app.get("/api/admin/super-admins", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT id, email, first_name, last_name, is_active, created_at, last_login_at
+        `SELECT id, email, "firstName" AS "firstName", "lastName" AS "lastName", "isActive" AS "isActive", "createdAt" AS "createdAt", "lastLoginAt" AS "lastLoginAt"
          FROM users WHERE role = 'super_admin'
-         ORDER BY is_active DESC, created_at ASC`
+         ORDER BY "isActive" DESC, "createdAt" ASC`
       );
       res.json(result.rows.map(buildSuperAdminResponse));
     } catch {
@@ -52,9 +52,9 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
         [inviteeEmail]
       );
 
-      const inviter = await pool.query("SELECT first_name, last_name, email FROM users WHERE id = $1", [req.user.userId]);
+      const inviter = await pool.query('SELECT "firstName" AS "firstName", "lastName" AS "lastName", email FROM users WHERE id = $1', [req.user.userId]);
       const inviterName = inviter.rows.length
-        ? `${inviter.rows[0].first_name || ""} ${inviter.rows[0].last_name || ""}`.trim() || inviter.rows[0].email
+        ? `${inviter.rows[0].firstName || ""} ${inviter.rows[0].lastName || ""}`.trim() || inviter.rows[0].email
         : "A colleague";
       const tokenValue = uuidv4();
       const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -114,13 +114,13 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       if (typeof active !== "boolean") return res.status(400).json({ error: "active must be true or false" });
 
       const targetRes = await pool.query(
-        "SELECT id, email, is_active FROM users WHERE id = $1 AND role = 'super_admin'", [userId]
+        'SELECT id, email, "isActive" AS "isActive" FROM users WHERE id = $1 AND role = \'super_admin\'', [userId]
       );
       if (!targetRes.rows.length) return res.status(404).json({ error: "Super admin not found" });
 
       if (!active) {
         const countRes = await pool.query(
-          "SELECT COUNT(*)::int AS count FROM users WHERE role = 'super_admin' AND is_active = true"
+          'SELECT COUNT(*)::int AS count FROM users WHERE role = \'super_admin\' AND "isActive" = true'
         );
         const activeCount = countRes.rows[0]?.count || 0;
         if (activeCount <= 1 && targetRes.rows[0].is_active) {
@@ -130,11 +130,11 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
 
       const updated = await pool.query(
         `UPDATE users
-         SET is_active = $1,
-             session_version = COALESCE(session_version, 1) + 1,
-             updated_at = NOW()
+         SET "isActive" = $1,
+             "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+             "updatedAt" = NOW()
          WHERE id = $2 AND role = 'super_admin'
-         RETURNING id, email, first_name, last_name, is_active, created_at, last_login_at`,
+         RETURNING id, email, "firstName" AS "firstName", "lastName" AS "lastName", "isActive" AS "isActive", "createdAt" AS "createdAt", "lastLoginAt" AS "lastLoginAt"`,
         [active, userId]
       );
 

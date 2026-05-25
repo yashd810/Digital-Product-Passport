@@ -118,7 +118,7 @@ function createArchiveHistoryHelpers({
     publicOnly = false,
   }) {
     const typeRes = await pool.query(
-      "SELECT display_name, fields_json FROM passport_types WHERE type_name = $1",
+      'SELECT "displayName" AS "displayName", "fieldsJson" AS "fieldsJson" FROM passport_types WHERE "typeName" = $1',
       [passportType]
     );
     const typeRow = typeRes.rows[0] || null;
@@ -128,7 +128,7 @@ function createArchiveHistoryHelpers({
     if (!lineageContext?.lineageId) {
       return {
         passportType,
-        displayName: typeRow?.display_name || passportType,
+        displayName: typeRow?.displayName || passportType,
         history: [],
       };
     }
@@ -144,13 +144,13 @@ function createArchiveHistoryHelpers({
     const companyNameMap = await getCompanyNameMap(versions.map((row) => row.companyId).filter(Boolean));
     if (creatorIds.length) {
       const userRes = await pool.query(
-        "SELECT id, first_name, last_name, email FROM users WHERE id = ANY($1::int[])",
+        'SELECT id, "firstName" AS "firstName", "lastName" AS "lastName", email FROM users WHERE id = ANY($1::int[])',
         [creatorIds]
       );
       userRes.rows.forEach((row) => {
         creatorMap.set(
           row.id,
-          `${row.first_name || ""} ${row.last_name || ""}`.trim() || row.email || `User #${row.id}`
+          `${row.firstName || ""} ${row.lastName || ""}`.trim() || row.email || `User #${row.id}`
         );
       });
     }
@@ -217,14 +217,14 @@ function createArchiveHistoryHelpers({
           publicPath: buildCurrentPublicPassportPath({
             companyName: companyNameMap.get(String(version.companyId)) || "",
             manufacturerName: version.manufacturer,
-            manufacturedBy: version.manufactured_by,
+            manufacturedBy: version.manufacturedBy,
             modelName: version.modelName,
             internalAliasId: version.internalAliasId,
           }),
           inactivePath: buildInactivePublicPassportPath({
             companyName: companyNameMap.get(String(version.companyId)) || "",
             manufacturerName: version.manufacturer,
-            manufacturedBy: version.manufactured_by,
+            manufacturedBy: version.manufacturedBy,
             modelName: version.modelName,
             internalAliasId: version.internalAliasId,
             versionNumber,
@@ -245,7 +245,7 @@ function createArchiveHistoryHelpers({
 
     return {
       passportType,
-      displayName: typeRow?.display_name || passportType,
+      displayName: typeRow?.displayName || passportType,
       history,
     };
   }
@@ -269,8 +269,8 @@ function createArchiveHistoryHelpers({
       `SELECT
          pes."userId",
          pes."lastActivityAt",
-         u.first_name,
-         u.last_name,
+         u."firstName" AS "firstName",
+         u."lastName" AS "lastName",
          u.email
        FROM passport_edit_sessions pes
        JOIN users u ON u.id = pes."userId"
@@ -282,7 +282,7 @@ function createArchiveHistoryHelpers({
     );
     return res.rows.map((row) => ({
       userId: row.userId,
-      name: `${row.first_name || ""} ${row.last_name || ""}`.trim() || row.email,
+      name: `${row.firstName || ""} ${row.lastName || ""}`.trim() || row.email,
       email: row.email,
       lastActivityAt: row.lastActivityAt,
     }));

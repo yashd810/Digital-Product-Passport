@@ -110,7 +110,7 @@ function updateDppUseCase(deps) {
 
     const invalidFieldKeys = Object.keys(fields).filter((key) =>
       !SYSTEM_PASSPORT_FIELDS.has(key)
-      && !editable.typeDef?.fields_json?.sections?.some((section) => (section.fields || []).some((field) => field.key === key))
+      && !editable.typeDef?.fieldsJson?.sections?.some((section) => (section.fields || []).some((field) => field.key === key))
     );
     if (invalidFieldKeys.length) {
       return {
@@ -194,7 +194,7 @@ function updateDppUseCase(deps) {
     }
 
     const dataFields = getWritablePassportColumns(fields).filter((key) =>
-      (editable.typeDef?.fieldsJson?.sections || editable.typeDef?.fields_json?.sections || []).some((section) => (section.fields || []).some((field) => field.key === key))
+      (editable.typeDef?.fieldsJson?.sections || []).some((section) => (section.fields || []).some((field) => field.key === key))
     );
     const processedFields = Object.fromEntries(dataFields.map((key) => [key, toStoredPassportValue(fields[key])]));
     Object.assign(updateData, processedFields);

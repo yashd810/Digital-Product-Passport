@@ -68,8 +68,8 @@ function Login({ setToken, setUser, setCompanyId }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Invalid credentials");
 
-      if (data.requires_2fa) {
-        setPreAuthToken(data.pre_auth_token);
+      if (data.requiresTwoFactor) {
+        setPreAuthToken(data.preAuthToken);
         setStep("otp");
         setOtp("");
         startCooldown();
@@ -92,7 +92,7 @@ function Login({ setToken, setUser, setCompanyId }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ pre_auth_token: preAuthToken, otp }),
+        body: JSON.stringify({ preAuthToken, otp }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Invalid code");
@@ -112,7 +112,7 @@ function Login({ setToken, setUser, setCompanyId }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ pre_auth_token: preAuthToken }),
+        body: JSON.stringify({ preAuthToken }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to resend");

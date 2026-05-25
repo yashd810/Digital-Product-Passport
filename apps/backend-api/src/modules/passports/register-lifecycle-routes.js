@@ -127,8 +127,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const result = await pool.query(
         `SELECT *
          FROM ${tableName}
-         WHERE dpp_id = $1 AND company_id = $2 AND deleted_at IS NULL
-         ORDER BY version_number DESC
+         WHERE "dppId" = $1 AND "companyId" = $2 AND "deletedAt" IS NULL
+         ORDER BY "versionNumber" DESC
          LIMIT 1`,
         [dppId, companyId]
       );
@@ -146,12 +146,12 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       res.json({
         success: true,
         passport: {
-          dppId: currentPassport.dpp_id || currentPassport.dppId,
+          dppId: currentPassport.dppId,
           passportType,
-          versionNumber: currentPassport.version_number || null,
-          releaseStatus: currentPassport.release_status || null,
-          modelName: currentPassport.model_name || null,
-          internalAliasId: currentPassport.internal_alias_id || null,
+          versionNumber: currentPassport.versionNumber || null,
+          releaseStatus: currentPassport.releaseStatus || null,
+          modelName: currentPassport.modelName || null,
+          internalAliasId: currentPassport.internalAliasId || null,
         },
         verification: buildVerificationSummary(compliance),
         compliance,
@@ -196,8 +196,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         snapshotReason: "before_release",
       });
       const result = await pool.query(
-        `UPDATE ${tableName} SET release_status = 'released', updated_at = NOW()
-         WHERE dpp_id = $1 AND company_id = $2 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}
+        `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
+         WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}
          RETURNING *`,
         [dppId, companyId]
       );
@@ -213,35 +213,35 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
 
       const typeDef = await complianceService.loadPassportTypeDefinition(passportType);
-      const sigData = await signPassport({ ...released, passport_type: passportType }, typeDef || null);
+      const sigData = await signPassport({ ...released, passportType }, typeDef || null);
       if (sigData) {
         await recordSignedDppRelease(pool, {
           passportDppId: dppId,
           companyId,
           releasedByUserId: req.user.userId,
           releasedByEmail: req.user.email,
-          versionNumber: released.version_number,
+          versionNumber: released.versionNumber,
           sigData,
           releaseNote: req.body?.releaseNote || null,
         });
         await logAudit(companyId, req.user.userId, "SIGN_PASSPORT", "passport_signatures", dppId, null, {
-          version_number: released.version_number,
-          signing_key_id: sigData.keyId,
-          signature_algorithm: sigData.signatureAlgorithm,
+          versionNumber: released.versionNumber,
+          signingKeyId: sigData.keyId,
+          signatureAlgorithm: sigData.signatureAlgorithm,
         }, {
           actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || req.user.email || `user:${req.user.userId}`,
           audience: "economic_operator",
         });
       }
 
-      await markOlderVersionsObsolete(tableName, dppId, released.version_number, passportType);
+      await markOlderVersionsObsolete(tableName, dppId, released.versionNumber, passportType);
       await pool.query(
         "UPDATE passport_attachments SET \"isPublic\" = true WHERE \"passportDppId\" = $1",
         [dppId]
       ).catch(() => {});
-      await logAudit(companyId, req.user.userId, "RELEASE", tableName, dppId, { release_status: "draft_or_in_revision" }, { release_status: "released" });
+      await logAudit(companyId, req.user.userId, "RELEASE", tableName, dppId, { releaseStatus: "draft_or_in_revision" }, { releaseStatus: "released" });
       await replicatePassportToBackup({
-        passport: { ...released, passport_type: passportType },
+        passport: { ...released, passportType },
         passportType,
         reason: "release",
         snapshotScope: "released_current",
@@ -271,32 +271,32 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const tableName = getTable(passportType);
 
       const current = await pool.query(
-        `SELECT * FROM ${tableName} WHERE dpp_id = $1 AND release_status = 'released' LIMIT 1`,
+        `SELECT * FROM ${tableName} WHERE "dppId" = $1 AND "releaseStatus" = 'released' LIMIT 1`,
         [dppId]
       );
       if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
 
       const src = current.rows[0];
       const dup = await pool.query(
-        `SELECT id FROM ${tableName} WHERE lineage_id = $1 AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL} AND deleted_at IS NULL`,
-        [src.lineage_id]
+        `SELECT id FROM ${tableName} WHERE "lineageId" = $1 AND "releaseStatus" IN ${REVISION_BLOCKING_STATUSES_SQL} AND "deletedAt" IS NULL`,
+        [src.lineageId]
       );
       if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
 
       const newGuid = generateDppRecordId();
-      const newVersion = src.version_number + 1;
-      const excluded = new Set(["id", "dppId", "dpp_id", "created_at", "updated_at", "updated_by", "qr_code", "lineage_id"]);
+      const newVersion = src.versionNumber + 1;
+      const excluded = new Set(["id", "dppId", "createdAt", "updatedAt", "updatedBy", "qrCode", "lineageId"]);
       const cols = Object.keys(src).filter((key) => !excluded.has(key));
       const vals = cols.map((key) => {
-        if (key === "version_number") return newVersion;
-        if (key === "release_status") return IN_REVISION_STATUS;
-        if (key === "created_by") return userId;
-        if (key === "deleted_at") return null;
+        if (key === "versionNumber") return newVersion;
+        if (key === "releaseStatus") return IN_REVISION_STATUS;
+        if (key === "createdBy") return userId;
+        if (key === "deletedAt") return null;
         return src[key];
       });
 
-      const allCols = ["dpp_id", "lineage_id", ...cols];
-      const allVals = [newGuid, src.lineage_id, ...vals];
+      const allCols = ["dppId", "lineageId", ...cols];
+      const allVals = [newGuid, src.lineageId, ...vals];
       const places = allCols.map((_, index) => `$${index + 1}`).join(", ");
       const insertRes = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`, allVals);
 
@@ -304,14 +304,14 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
                 device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
          FROM passport_registry
-         WHERE dpp_id = $1 AND company_id = $2
+         WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
         [dppId, companyId]
       );
       const sourceKeys = sourceRegistry.rows[0] || {};
       await insertPassportRegistry({
         dppId: newGuid,
-        lineageId: src.lineage_id,
+        lineageId: src.lineageId,
         companyId,
         passportType,
         accessKeyHash: sourceKeys.access_key_hash || null,
@@ -354,7 +354,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       const tableName = getTable(passportType);
       const current = await pool.query(
-        `SELECT * FROM ${tableName} WHERE dpp_id = $1 AND company_id = $2 AND release_status = 'released' AND deleted_at IS NULL LIMIT 1`,
+        `SELECT * FROM ${tableName} WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" = 'released' AND "deletedAt" IS NULL LIMIT 1`,
         [dppId, companyId]
       );
       if (!current.rows.length) return res.status(404).json({ error: "Released passport not found" });
@@ -366,13 +366,13 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       }
 
       const dup = await pool.query(
-        `SELECT id FROM ${tableName} WHERE lineage_id = $1 AND release_status IN ${REVISION_BLOCKING_STATUSES_SQL} AND deleted_at IS NULL`,
-        [src.lineage_id]
+        `SELECT id FROM ${tableName} WHERE "lineageId" = $1 AND "releaseStatus" IN ${REVISION_BLOCKING_STATUSES_SQL} AND "deletedAt" IS NULL`,
+        [src.lineageId]
       );
       if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
 
       const requestedProductId = normalizeInternalAliasIdValue(
-        req.body?.internalAliasId ?? req.body?.internalAliasId ?? req.body?.internal_alias_id ?? src.internal_alias_id
+        req.body?.internalAliasId ?? src.internalAliasId
       );
       if (!requestedProductId) return res.status(400).json({ error: "internalAliasId cannot be blank" });
 
@@ -381,13 +381,13 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         companyId,
         internalAliasId: requestedProductId,
         excludeGuid: dppId,
-        excludeLineageId: src.lineage_id,
+        excludeLineageId: src.lineageId,
       });
       if (existingByProductId) {
         return res.status(409).json({
           error: `A passport with Internal Alias ID "${requestedProductId}" already exists.`,
           existing_dpp_id: existingByProductId.dppId,
-          release_status: normalizeReleaseStatus(existingByProductId.release_status),
+          releaseStatus: normalizeReleaseStatus(existingByProductId.releaseStatus),
         });
       }
 
@@ -399,22 +399,22 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         passportLike: src,
       });
       const newGuid = generateDppRecordId();
-      const newVersion = src.version_number + 1;
-      const excluded = new Set(["id", "dppId", "dpp_id", "created_at", "updated_at", "updated_by", "qr_code", "lineage_id"]);
+      const newVersion = src.versionNumber + 1;
+      const excluded = new Set(["id", "dppId", "createdAt", "updatedAt", "updatedBy", "qrCode", "lineageId"]);
       const cols = Object.keys(src).filter((key) => !excluded.has(key));
       const vals = cols.map((key) => {
-        if (key === "version_number") return newVersion;
-        if (key === "release_status") return IN_REVISION_STATUS;
-        if (key === "created_by") return userId;
-        if (key === "deleted_at") return null;
+        if (key === "versionNumber") return newVersion;
+        if (key === "releaseStatus") return IN_REVISION_STATUS;
+        if (key === "createdBy") return userId;
+        if (key === "deletedAt") return null;
         if (key === "granularity") return requestedGranularity;
-        if (key === "internal_alias_id") return nextIdentifiers.internal_alias_id;
-        if (key === "product_identifier_did") return nextIdentifiers.product_identifier_did;
+        if (key === "internalAliasId") return nextIdentifiers.internalAliasId;
+        if (key === "productIdentifierDid") return nextIdentifiers.productIdentifierDid;
         return src[key];
       });
 
-      const allCols = ["dpp_id", "lineage_id", ...cols];
-      const allVals = [newGuid, src.lineage_id, ...vals];
+      const allCols = ["dppId", "lineageId", ...cols];
+      const allVals = [newGuid, src.lineageId, ...vals];
       const places = allCols.map((_, index) => `$${index + 1}`).join(", ");
       const insertRes = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`, allVals);
 
@@ -422,14 +422,14 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
                 device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
          FROM passport_registry
-         WHERE dpp_id = $1 AND company_id = $2
+         WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
         [dppId, companyId]
       );
       const sourceKeys = sourceRegistry.rows[0] || {};
       await insertPassportRegistry({
         dppId: newGuid,
-        lineageId: src.lineage_id,
+        lineageId: src.lineageId,
         companyId,
         passportType,
         accessKeyHash: sourceKeys.access_key_hash || null,
@@ -442,13 +442,13 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       const lineageLink = await productIdentifierService.recordGranularityTransition({
         companyId,
-        lineageId: src.lineage_id,
-        previousPassportDppId: src.dpp_id || src.dppId,
+        lineageId: src.lineageId,
+        previousPassportDppId: src.dppId,
         replacementPassportDppId: newGuid,
-        previousIdentifier: src.product_identifier_did || src.internal_alias_id,
-        replacementIdentifier: nextIdentifiers.product_identifier_did || nextIdentifiers.internal_alias_id,
-        previousLocalProductId: src.internal_alias_id || null,
-        replacementLocalProductId: nextIdentifiers.internal_alias_id || null,
+        previousIdentifier: src.productIdentifierDid || src.internalAliasId,
+        replacementIdentifier: nextIdentifiers.productIdentifierDid || nextIdentifiers.internalAliasId,
+        previousLocalProductId: src.internalAliasId || null,
+        replacementLocalProductId: nextIdentifiers.internalAliasId || null,
         previousGranularity: currentGranularity,
         replacementGranularity: requestedGranularity,
         transitionReason: reason || "granularity_change",
@@ -464,24 +464,24 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
 
       await logAudit(companyId, userId, "TRANSITION_GRANULARITY", tableName, newGuid, {
-        previous_granularity: currentGranularity,
-        previous_identifier: src.product_identifier_did || src.internal_alias_id,
+        previousGranularity: currentGranularity,
+        previousIdentifier: src.productIdentifierDid || src.internalAliasId,
       }, {
-        replacement_granularity: requestedGranularity,
-        replacement_identifier: nextIdentifiers.product_identifier_did || nextIdentifiers.internal_alias_id,
-        previous_dpp_id: src.dpp_id || src.dppId,
+        replacementGranularity: requestedGranularity,
+        replacementIdentifier: nextIdentifiers.productIdentifierDid || nextIdentifiers.internalAliasId,
+        previousDppId: src.dppId,
       });
 
       res.json({
         success: true,
         dppId: newGuid,
         digitalProductPassportId: newGuid,
-        previousDppId: src.dpp_id || src.dppId,
-        lineageId: src.lineage_id,
+        previousDppId: src.dppId,
+        lineageId: src.lineageId,
         currentGranularity,
         requestedGranularity,
-        uniqueProductIdentifier: nextIdentifiers.product_identifier_did || null,
-        internalAliasId: nextIdentifiers.internal_alias_id || null,
+        uniqueProductIdentifier: nextIdentifiers.productIdentifierDid || null,
+        internalAliasId: nextIdentifiers.internalAliasId || null,
         identifierLineageLink: lineageLink,
       });
     } catch (error) {
@@ -500,7 +500,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       if (items.length > 500) return res.status(400).json({ error: "Maximum 500 passports per bulk workflow request" });
       if (!reviewerId && !approverId) return res.status(400).json({ error: "Select at least one reviewer or approver." });
 
-      const invalid = items.filter((item) => !item?.dppId || (!item?.passportType && !item?.passport_type));
+      const invalid = items.filter((item) => !item?.dppId || !item?.passportType);
       if (invalid.length) return res.status(400).json({ error: `${invalid.length} item(s) missing dppId or passportType` });
 
       let submitted = 0;
@@ -510,7 +510,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       for (const item of items) {
         const dppId = item?.dppId;
-        const passportType = item?.passportType || item?.passport_type;
+        const passportType = item?.passportType;
         if (!dppId || !passportType) {
           details.push({ dppId, status: "failed", message: "Missing dppId or passportType" });
           failed += 1;
@@ -545,8 +545,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
 
       const rows = await pool.query(
-        `SELECT * FROM ${tableName} WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-        [lineageContext.lineage_id, companyId]
+        `SELECT * FROM ${tableName} WHERE "lineageId" = $1 AND "companyId" = $2 AND "deletedAt" IS NULL`,
+        [lineageContext.lineageId, companyId]
       );
       if (!rows.rows.length) return res.status(404).json({ error: "Passport not found" });
 
@@ -558,12 +558,12 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         snapshotReason: "before_archive_delete",
       });
       await pool.query(
-        `UPDATE ${tableName} SET deleted_at = NOW() WHERE lineage_id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-        [lineageContext.lineage_id, companyId]
+        `UPDATE ${tableName} SET "deletedAt" = NOW() WHERE "lineageId" = $1 AND "companyId" = $2 AND "deletedAt" IS NULL`,
+        [lineageContext.lineageId, companyId]
       );
       for (const row of rows.rows) {
         await replicatePassportToBackup({
-          passport: { ...row, passport_type: passportType },
+          passport: { ...row, passportType },
           passportType,
           reason: "archive",
           snapshotScope: "archived_history",
@@ -584,12 +584,12 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const userId = req.user.userId;
 
       const archiveContext = await pool.query(
-        `SELECT lineage_id
+        `SELECT "lineageId"
          FROM passport_archives
-         WHERE (dpp_id = $1 OR lineage_id = $1)
-           AND company_id = $2
+         WHERE ("dppId" = $1 OR "lineageId" = $1)
+           AND "companyId" = $2
            AND ${ARCHIVED_HISTORY_FILTER_SQL}
-         ORDER BY version_number DESC LIMIT 1`,
+         ORDER BY "versionNumber" DESC LIMIT 1`,
         [dppId, companyId]
       );
       if (!archiveContext.rows.length) return res.status(404).json({ error: "Archived passport not found" });
@@ -597,36 +597,36 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const archiveRows = await pool.query(
         `SELECT *
          FROM passport_archives
-         WHERE lineage_id = $1
-           AND company_id = $2
+         WHERE "lineageId" = $1
+           AND "companyId" = $2
            AND ${ARCHIVED_HISTORY_FILTER_SQL}
-         ORDER BY version_number ASC`,
-        [archiveContext.rows[0].lineage_id, companyId]
+         ORDER BY "versionNumber" ASC`,
+        [archiveContext.rows[0].lineageId, companyId]
       );
       if (!archiveRows.rows.length) return res.status(404).json({ error: "Archived passport not found" });
 
-      const passportType = archiveRows.rows[0].passport_type;
+      const passportType = archiveRows.rows[0].passportType;
       const tableName = getTable(passportType);
 
       for (const archiveRow of archiveRows.rows) {
         const existing = await pool.query(
-          `SELECT id FROM ${tableName} WHERE dpp_id = $1 AND version_number = $2`,
-          [archiveRow.dppId, archiveRow.version_number]
+          `SELECT id FROM ${tableName} WHERE "dppId" = $1 AND "versionNumber" = $2`,
+          [archiveRow.dppId, archiveRow.versionNumber]
         );
         if (existing.rows.length) {
-          await pool.query(`UPDATE ${tableName} SET deleted_at = NULL WHERE dpp_id = $1 AND version_number = $2`, [archiveRow.dppId, archiveRow.version_number]);
+          await pool.query(`UPDATE ${tableName} SET "deletedAt" = NULL WHERE "dppId" = $1 AND "versionNumber" = $2`, [archiveRow.dppId, archiveRow.versionNumber]);
         }
       }
       await pool.query(
-        `UPDATE ${tableName} SET deleted_at = NULL WHERE lineage_id = $1 AND company_id = $2`,
-        [archiveRows.rows[0].lineage_id, companyId]
+        `UPDATE ${tableName} SET "deletedAt" = NULL WHERE "lineageId" = $1 AND "companyId" = $2`,
+        [archiveRows.rows[0].lineageId, companyId]
       );
       await pool.query(
         `DELETE FROM passport_archives
-         WHERE lineage_id = $1
-           AND company_id = $2
+         WHERE "lineageId" = $1
+           AND "companyId" = $2
            AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
-        [archiveRows.rows[0].lineage_id, companyId]
+        [archiveRows.rows[0].lineageId, companyId]
       );
 
       await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versions_restored: archiveRows.rows.length });

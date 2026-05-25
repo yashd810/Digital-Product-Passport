@@ -69,18 +69,18 @@ module.exports = function createPassportService({
     const normalizedInput = String(typeName || "").trim();
     if (!normalizedInput) return null;
     const typeRes = await pool.query(
-      `SELECT type_name, display_name, fields_json
+      `SELECT "typeName" AS "typeName", "displayName" AS "displayName", "fieldsJson" AS "fieldsJson"
        FROM passport_types
-       WHERE type_name = $1 OR LOWER(display_name) = LOWER($1)
+       WHERE "typeName" = $1 OR LOWER("displayName") = LOWER($1)
        LIMIT 1`,
       [normalizedInput]
     );
     if (!typeRes.rows.length) return null;
-    const sections = typeRes.rows[0]?.fields_json?.sections || [];
+    const sections = typeRes.rows[0]?.fieldsJson?.sections || [];
     const schemaFields = sections.flatMap(section => section.fields || []);
     return {
-      typeName: typeRes.rows[0].type_name,
-      displayName: typeRes.rows[0].display_name,
+      typeName: typeRes.rows[0].typeName,
+      displayName: typeRes.rows[0].displayName,
       schemaFields,
       allowedKeys: new Set(schemaFields.map(field => field.key).filter(Boolean)),
     };
@@ -182,11 +182,11 @@ module.exports = function createPassportService({
     delete sanitized.companyId;
     try {
       const typeRes = await pool.query(
-        "SELECT fields_json FROM passport_types WHERE type_name = $1",
+        'SELECT "fieldsJson" AS "fieldsJson" FROM passport_types WHERE "typeName" = $1',
         [passportType]
       );
       if (!typeRes.rows.length) return sanitized;
-      const sections = typeRes.rows[0].fields_json?.sections || [];
+      const sections = typeRes.rows[0].fieldsJson?.sections || [];
       for (const section of sections) {
         for (const field of (section.fields || [])) {
           const access = field.access || ["public"];

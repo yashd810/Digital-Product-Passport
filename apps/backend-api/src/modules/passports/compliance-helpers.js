@@ -145,10 +145,10 @@ function createComplianceHelpers({
         requestedFields.contentSpecificationIds || profile.contentSpecificationIds
       ),
       carrierPolicyKey: requestedFields.carrierPolicyKey || profile.defaultCarrierPolicyKey || null,
-      economicOperatorId: requestedFields.economicOperatorId || companyIdentity?.economic_operator_identifier || null,
+      economicOperatorId: requestedFields.economicOperatorId || companyIdentity?.economicOperatorIdentifier || null,
       economicOperatorIdentifierScheme:
         requestedFields.economicOperatorIdentifierScheme
-        || companyIdentity?.economic_operator_identifier_scheme
+        || companyIdentity?.economicOperatorIdentifierScheme
         || null,
       facilityId: resolvedFacilityId,
     };
@@ -157,10 +157,10 @@ function createComplianceHelpers({
   async function loadCompanySerializationContext(companyId) {
     const result = await pool.query(
       `SELECT c.id,
-              c.company_name,
-              c.did_slug,
-              COALESCE(p.default_granularity, 'item') AS dpp_granularity,
-              COALESCE(p.default_granularity, 'item') AS default_granularity
+              c.company_name AS "companyName",
+              c.did_slug AS "didSlug",
+              COALESCE(p.default_granularity, 'item') AS "dppGranularity",
+              COALESCE(p.default_granularity, 'item') AS "defaultGranularity"
        FROM companies c
        LEFT JOIN company_dpp_policies p ON p.company_id = c.id
        WHERE c.id = $1
@@ -175,7 +175,7 @@ function createComplianceHelpers({
   }
 
   function resolveGranularityForCreate(companyPolicy, requestedGranularity) {
-    const fallbackGranularity = String(companyPolicy?.default_granularity || "item").trim().toLowerCase();
+    const fallbackGranularity = String(companyPolicy?.defaultGranularity || "item").trim().toLowerCase();
     const normalizedRequested = requestedGranularity === undefined || requestedGranularity === null || requestedGranularity === ""
       ? null
       : String(requestedGranularity).trim().toLowerCase();
@@ -188,22 +188,22 @@ function createComplianceHelpers({
 
     if (!companyPolicy) return normalizedRequested || fallbackGranularity;
 
-    if (!companyPolicy.allow_granularity_override && normalizedRequested && normalizedRequested !== fallbackGranularity) {
+    if (!companyPolicy.allowGranularityOverride && normalizedRequested && normalizedRequested !== fallbackGranularity) {
       const error = new Error(`Granularity override is disabled for this company. The enforced value is "${fallbackGranularity}".`);
       error.statusCode = 400;
       throw error;
     }
 
-    const effectiveGranularity = normalizedRequested && companyPolicy.allow_granularity_override
+    const effectiveGranularity = normalizedRequested && companyPolicy.allowGranularityOverride
       ? normalizedRequested
       : fallbackGranularity;
 
-    if (effectiveGranularity === "model" && companyPolicy.mint_model_dids === false) {
+    if (effectiveGranularity === "model" && companyPolicy.mintModelDids === false) {
       const error = new Error("Model-level DIDs are disabled for this company policy.");
       error.statusCode = 400;
       throw error;
     }
-    if ((effectiveGranularity === "item" || effectiveGranularity === "batch") && companyPolicy.mint_item_dids === false) {
+    if ((effectiveGranularity === "item" || effectiveGranularity === "batch") && companyPolicy.mintItemDids === false) {
       const error = new Error("Item-level DIDs are disabled for this company policy.");
       error.statusCode = 400;
       throw error;

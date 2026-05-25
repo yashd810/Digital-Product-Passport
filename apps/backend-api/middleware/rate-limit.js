@@ -111,7 +111,7 @@ const createRateLimiters = (pool) => {
     }),
 
     otpRateLimit: rateLimit({
-      key: (req) => `otp:${req.ip}:${req.path}:${String(req.body?.pre_auth_token || "").slice(0, 32)}`,
+      key: (req) => `otp:${req.ip}:${req.path}:${String(req.body?.preAuthToken || "").slice(0, 32)}`,
       limit: envInt("RATE_LIMIT_OTP_MAX", 8),
       windowMs: envInt("RATE_LIMIT_OTP_WINDOW_MS", 15 * 60 * 1000),
       message: "Too many verification attempts. Please log in again in a few minutes."

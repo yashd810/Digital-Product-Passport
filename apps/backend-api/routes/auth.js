@@ -151,15 +151,15 @@ module.exports = function registerAuthRoutes(app, {
       const role = invite.role_to_assign || "editor";
       const assignedCompanyId = role === "super_admin" ? null : invite.company_id;
       const result = await pool.query(
-        `INSERT INTO users (email, password_hash, first_name, last_name, company_id, role, pepper_version)
+        `INSERT INTO users (email, "passwordHash", "firstName", "lastName", "companyId", role, "pepperVersion")
          VALUES ($1,$2,$3,$4,$5,$6,$7)
          RETURNING id,
                    email,
-                   company_id AS "companyId",
+                   "companyId" AS "companyId",
                    role,
-                   first_name AS "firstName",
-                   last_name AS "lastName",
-                   session_version AS "sessionVersion"`,
+                   "firstName" AS "firstName",
+                   "lastName" AS "lastName",
+                   "sessionVersion" AS "sessionVersion"`,
         [invite.email, hash, firstName, lastName, assignedCompanyId, role, pepperVersion]
       );
       await pool.query("UPDATE invite_tokens SET used = true WHERE token = $1", [token]);
@@ -226,24 +226,23 @@ module.exports = function registerAuthRoutes(app, {
       const result = await pool.query(
         `SELECT u.id,
                 u.email,
-                u.password_hash,
-                u.pepper_version,
-                u.company_id AS "companyId",
+                u."passwordHash" AS "passwordHash",
+                u."pepperVersion" AS "pepperVersion",
+                u."companyId" AS "companyId",
                 u.role,
-                u.is_active AS "isActive",
-                u.session_version AS "sessionVersion",
-                u.two_factor_enabled AS "twoFactorEnabled",
-                u.otp_code_hash,
-                u.otp_code,
-                u.otp_expires_at,
-                u.sso_only AS "ssoOnly",
+                u."isActive" AS "isActive",
+                u."sessionVersion" AS "sessionVersion",
+                u."twoFactorEnabled" AS "twoFactorEnabled",
+                u."otpCodeHash" AS "otpCodeHash",
+                u."otpExpiresAt" AS "otpExpiresAt",
+                u."ssoOnly" AS "ssoOnly",
                 c.company_name AS "companyName",
                 c.asset_management_enabled AS "assetManagementEnabled",
                 c.economic_operator_identifier AS "economicOperatorIdentifier",
                 c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
          FROM users u
-         LEFT JOIN companies c ON c.id = u.company_id
-         WHERE u.email = $1 AND u.is_active = true`,
+         LEFT JOIN companies c ON c.id = u."companyId"
+         WHERE u.email = $1 AND u."isActive" = true`,
         [email]
       );
       if (!result.rows.length) return res.status(401).json({ error: "Invalid credentials" });
@@ -270,9 +269,9 @@ module.exports = function registerAuthRoutes(app, {
       if (passwordCheck.needsUpgrade && passwordCheck.nextHash) {
         await pool.query(
           `UPDATE users
-           SET password_hash = $1,
-               pepper_version = $2,
-               updated_at = NOW()
+           SET "passwordHash" = $1,
+               "pepperVersion" = $2,
+               "updatedAt" = NOW()
            WHERE id = $3`,
           [passwordCheck.nextHash, passwordCheck.pepperVersion, u.id]
         ).catch(() => {});
@@ -286,7 +285,7 @@ module.exports = function registerAuthRoutes(app, {
         const otpHash = hashOtpCode(otp);
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         await pool.query(
-          "UPDATE users SET otp_code_hash = $1, otp_code = NULL, otp_expires_at = $2 WHERE id = $3",
+          'UPDATE users SET "otpCodeHash" = $1, "otpCode" = NULL, "otpExpiresAt" = $2 WHERE id = $3',
           [otpHash, expiresAt, u.id]
         );
         try { await sendOtpEmail(u, otp); }
@@ -295,10 +294,10 @@ module.exports = function registerAuthRoutes(app, {
           return res.status(500).json({ error: "Failed to send verification code. Please try again." });
         }
         const preAuthToken = jwt.sign({ userId: u.id, pre_auth: true }, JWT_SECRET, { expiresIn: "10m" });
-        return res.json({ requires_2fa: true, pre_auth_token: preAuthToken });
+        return res.json({ requiresTwoFactor: true, preAuthToken });
       }
 
-      await pool.query("UPDATE users SET last_login_at = NOW() WHERE id = $1", [u.id]).catch(() => {});
+      await pool.query('UPDATE users SET "lastLoginAt" = NOW() WHERE id = $1', [u.id]).catch(() => {});
       const sessionToken = generateToken(u, undefined, undefined, undefined, undefined, {
         mfaVerifiedAt: new Date().toISOString(),
         amr: ["pwd", "otp"]
@@ -316,39 +315,38 @@ module.exports = function registerAuthRoutes(app, {
   // ─── VERIFY OTP (2FA second step) ───────────────────────────────────────────
   app.post("/api/auth/verify-otp", otpRateLimit, async (req, res) => {
     try {
-      const { pre_auth_token, otp } = req.body;
-      if (!pre_auth_token || !otp) return res.status(400).json({ error: "Missing required fields" });
+      const { preAuthToken, otp } = req.body;
+      if (!preAuthToken || !otp) return res.status(400).json({ error: "Missing required fields" });
 
       let payload;
-      try { payload = jwt.verify(pre_auth_token, JWT_SECRET); }
+      try { payload = jwt.verify(preAuthToken, JWT_SECRET); }
       catch { return res.status(401).json({ error: "Session expired. Please log in again." }); }
       if (!payload.pre_auth) return res.status(401).json({ error: "Invalid session token" });
 
       const result = await pool.query(
         `SELECT u.id,
                 u.email,
-                u.company_id AS "companyId",
+                u."companyId" AS "companyId",
                 u.role,
-                u.first_name AS "firstName",
-                u.last_name AS "lastName",
-                u.last_login_at AS "lastLoginAt",
-                u.otp_code_hash,
-                u.otp_code,
-                u.otp_expires_at,
+                u."firstName" AS "firstName",
+                u."lastName" AS "lastName",
+                u."lastLoginAt" AS "lastLoginAt",
+                u."otpCodeHash" AS "otpCodeHash",
+                u."otpExpiresAt" AS "otpExpiresAt",
                 c.company_name AS "companyName",
                 c.asset_management_enabled AS "assetManagementEnabled",
                 c.economic_operator_identifier AS "economicOperatorIdentifier",
                 c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
          FROM users u
-         LEFT JOIN companies c ON c.id = u.company_id
-         WHERE u.id = $1 AND u.is_active = true`,
+         LEFT JOIN companies c ON c.id = u."companyId"
+         WHERE u.id = $1 AND u."isActive" = true`,
         [payload.userId]
       );
       if (!result.rows.length) return res.status(401).json({ error: "User not found" });
       const u = result.rows[0];
 
-      const storedOtpHash = String(u.otp_code_hash || u.otp_code || "").trim();
-      if (!storedOtpHash || !u.otp_expires_at || new Date() > new Date(u.otp_expires_at)) {
+      const storedOtpHash = String(u.otpCodeHash || "").trim();
+      if (!storedOtpHash || !u.otpExpiresAt || new Date() > new Date(u.otpExpiresAt)) {
         return res.status(401).json({ error: "Verification code has expired. Please log in again." });
       }
 
@@ -360,7 +358,7 @@ module.exports = function registerAuthRoutes(app, {
       }
 
       await pool.query(
-        "UPDATE users SET otp_code_hash = NULL, otp_code = NULL, otp_expires_at = NULL, last_login_at = NOW() WHERE id = $1",
+        'UPDATE users SET "otpCodeHash" = NULL, "otpCode" = NULL, "otpExpiresAt" = NULL, "lastLoginAt" = NOW() WHERE id = $1',
         [u.id]
       );
       const sessionToken = generateToken(u);
@@ -396,7 +394,7 @@ module.exports = function registerAuthRoutes(app, {
         try {
           const payload = jwt.verify(token, JWT_SECRET);
           await pool.query(
-            "UPDATE users SET session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $1",
+            'UPDATE users SET "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $1',
             [payload.userId]
           );
           break;
@@ -441,15 +439,15 @@ module.exports = function registerAuthRoutes(app, {
   // ─── RESEND OTP ─────────────────────────────────────────────────────────────
   app.post("/api/auth/resend-otp", otpRateLimit, async (req, res) => {
     try {
-      const { pre_auth_token } = req.body;
-      if (!pre_auth_token) return res.status(400).json({ error: "Missing token" });
+      const { preAuthToken } = req.body;
+      if (!preAuthToken) return res.status(400).json({ error: "Missing token" });
 
       let payload;
-      try { payload = jwt.verify(pre_auth_token, JWT_SECRET); }
+      try { payload = jwt.verify(preAuthToken, JWT_SECRET); }
       catch { return res.status(401).json({ error: "Session expired. Please log in again." }); }
       if (!payload.pre_auth) return res.status(401).json({ error: "Invalid session" });
 
-      const result = await pool.query("SELECT * FROM users WHERE id = $1 AND is_active = true", [payload.userId]);
+      const result = await pool.query('SELECT * FROM users WHERE id = $1 AND "isActive" = true', [payload.userId]);
       if (!result.rows.length) return res.status(401).json({ error: "User not found" });
       const u = result.rows[0];
 
@@ -457,7 +455,7 @@ module.exports = function registerAuthRoutes(app, {
       const otpHash = hashOtpCode(otp);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
       await pool.query(
-        "UPDATE users SET otp_code_hash = $1, otp_code = NULL, otp_expires_at = $2 WHERE id = $3",
+        'UPDATE users SET "otpCodeHash" = $1, "otpCode" = NULL, "otpExpiresAt" = $2 WHERE id = $3',
         [otpHash, expiresAt, u.id]
       );
       await sendOtpEmail(u, otp);
@@ -470,7 +468,7 @@ module.exports = function registerAuthRoutes(app, {
     try {
       const { email } = req.body;
       if (!email) return res.status(400).json({ error: "Email required" });
-      const u = await pool.query("SELECT id FROM users WHERE email = $1 AND is_active = true", [email]);
+      const u = await pool.query('SELECT id FROM users WHERE email = $1 AND "isActive" = true', [email]);
       if (!u.rows.length) return res.json({ success: true });
       const token = uuidv4();
       const tokenHash = hashOpaqueToken(token);
@@ -519,10 +517,10 @@ module.exports = function registerAuthRoutes(app, {
       const { hash, pepperVersion } = await hashPassword(newPassword);
       await pool.query(
         `UPDATE users
-         SET password_hash = $1,
-             pepper_version = $2,
-             session_version = COALESCE(session_version, 1) + 1,
-             updated_at = NOW()
+         SET "passwordHash" = $1,
+             "pepperVersion" = $2,
+             "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+             "updatedAt" = NOW()
          WHERE id = $3`,
         [hash, pepperVersion, r.rows[0].user_id]
       );
@@ -551,13 +549,13 @@ module.exports = function registerAuthRoutes(app, {
         [inviteeEmail, companyId]
       );
 
-      const company = await pool.query("SELECT company_name FROM companies WHERE id = $1", [companyId]);
+      const company = await pool.query('SELECT company_name AS "companyName" FROM companies WHERE id = $1', [companyId]);
       if (!company.rows.length) return res.status(404).json({ error: "Company not found" });
-      const company_name = company.rows[0].company_name;
+      const companyName = company.rows[0].companyName;
 
-      const inviter = await pool.query("SELECT first_name, last_name, email FROM users WHERE id = $1", [req.user.userId]);
+      const inviter = await pool.query('SELECT "firstName" AS "firstName", "lastName" AS "lastName", email FROM users WHERE id = $1', [req.user.userId]);
       const inviterName = inviter.rows.length
-        ? `${inviter.rows[0].first_name || ""} ${inviter.rows[0].last_name || ""}`.trim() || inviter.rows[0].email
+        ? `${inviter.rows[0].firstName || ""} ${inviter.rows[0].lastName || ""}`.trim() || inviter.rows[0].email
         : "A colleague";
 
       const tokenValue = uuidv4();
@@ -576,12 +574,12 @@ module.exports = function registerAuthRoutes(app, {
 
       await createTransporter().sendMail({
         from: process.env.EMAIL_FROM || "onboarding@resend.dev", to: inviteeEmail,
-        subject: `${inviterName} invited you to join ${company_name} on Digital Product Passport`,
-        html: brandedEmail({ preheader: `You have been invited to join ${company_name}`, bodyHtml: `
-          <p><strong>${inviterName}</strong> has invited you to join <strong>${company_name}</strong>.</p>
+        subject: `${inviterName} invited you to join ${companyName} on Digital Product Passport`,
+        html: brandedEmail({ preheader: `You have been invited to join ${companyName}`, bodyHtml: `
+          <p><strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong>.</p>
           <div class="info-box">
             <div class="info-row"><span class="info-label">Your Email</span><span class="info-value">${inviteeEmail}</span></div>
-            <div class="info-row"><span class="info-label">Company</span><span class="info-value">${company_name}</span></div>
+            <div class="info-row"><span class="info-label">Company</span><span class="info-value">${companyName}</span></div>
             <div class="info-row"><span class="info-label">Role</span><span class="info-value">${finalRole}</span></div>
           </div>
           <div style="background:rgba(245,183,50,0.12);border:1px solid rgba(245,183,50,0.4);border-radius:6px;padding:10px 14px;margin:16px 0;font-size:13px;color:#f5c842">
@@ -601,15 +599,15 @@ module.exports = function registerAuthRoutes(app, {
   app.get("/api/users/me", authenticateToken, async (req, res) => {
     try {
       const r = await pool.query(
-        `SELECT u.id, u.email, u.first_name AS "firstName", u.last_name AS "lastName", u.role,
-                u.company_id AS "companyId", u.avatar_url AS "avatarUrl", u.phone, u.job_title AS "jobTitle", u.bio,
-                u.auth_source AS "authSource", u.sso_only AS "ssoOnly",
-                u.preferred_language AS "preferredLanguage", u.default_reviewer_id AS "defaultReviewerId",
-                u.default_approver_id AS "defaultApproverId", u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt",
-                u.two_factor_enabled AS "twoFactorEnabled", c.company_name AS "companyName", c.asset_management_enabled AS "assetManagementEnabled",
+        `SELECT u.id, u.email, u."firstName" AS "firstName", u."lastName" AS "lastName", u.role,
+                u."companyId" AS "companyId", u."avatarUrl" AS "avatarUrl", u.phone, u."jobTitle" AS "jobTitle", u.bio,
+                u."authSource" AS "authSource", u."ssoOnly" AS "ssoOnly",
+                u."preferredLanguage" AS "preferredLanguage", u."defaultReviewerId" AS "defaultReviewerId",
+                u."defaultApproverId" AS "defaultApproverId", u."createdAt" AS "createdAt", u."lastLoginAt" AS "lastLoginAt",
+                u."twoFactorEnabled" AS "twoFactorEnabled", c.company_name AS "companyName", c.asset_management_enabled AS "assetManagementEnabled",
                 c.economic_operator_identifier AS "economicOperatorIdentifier", c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
          FROM users u
-         LEFT JOIN companies c ON c.id = u.company_id
+         LEFT JOIN companies c ON c.id = u."companyId"
          WHERE u.id = $1`,
         [req.user.userId]
       );
@@ -633,15 +631,15 @@ module.exports = function registerAuthRoutes(app, {
   app.patch("/api/users/me", authenticateToken, async (req, res) => {
     try {
       const fieldMap = new Map([
-        ["firstName", "first_name"],
-        ["lastName", "last_name"],
+        ["firstName", "\"firstName\""],
+        ["lastName", "\"lastName\""],
         ["phone", "phone"],
-        ["jobTitle", "job_title"],
+        ["jobTitle", "\"jobTitle\""],
         ["bio", "bio"],
-        ["avatarUrl", "avatar_url"],
-        ["defaultReviewerId", "default_reviewer_id"],
-        ["defaultApproverId", "default_approver_id"],
-        ["preferredLanguage", "preferred_language"],
+        ["avatarUrl", "\"avatarUrl\""],
+        ["defaultReviewerId", "\"defaultReviewerId\""],
+        ["defaultApproverId", "\"defaultApproverId\""],
+        ["preferredLanguage", "\"preferredLanguage\""],
       ]);
       const updates = [];
       for (const [inputKey, columnName] of fieldMap.entries()) {
@@ -651,7 +649,7 @@ module.exports = function registerAuthRoutes(app, {
       if (!updates.length) return res.status(400).json({ error: "Nothing to update" });
       const sets = updates.map(([columnName], i) => `${columnName} = $${i + 1}`).join(", ");
       const vals = updates.map(([, value]) => value);
-      await pool.query(`UPDATE users SET ${sets}, updated_at = NOW() WHERE id = $${updates.length + 1}`,
+      await pool.query(`UPDATE users SET ${sets}, "updatedAt" = NOW() WHERE id = $${updates.length + 1}`,
         [...vals, req.user.userId]);
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: "Failed to update profile" }); }
@@ -663,13 +661,13 @@ module.exports = function registerAuthRoutes(app, {
       if (typeof enable !== "boolean") return res.status(400).json({ error: "enable (boolean) required" });
       if (!currentPassword) return res.status(400).json({ error: "Current password required" });
 
-      const u = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.user.userId]);
+      const u = await pool.query('SELECT "passwordHash" AS "passwordHash" FROM users WHERE id = $1', [req.user.userId]);
       if (!u.rows.length) return res.status(404).json({ error: "User not found" });
-      if (!await verifyPassword(currentPassword, u.rows[0].password_hash))
+      if (!await verifyPassword(currentPassword, u.rows[0].passwordHash))
         return res.status(401).json({ error: "Current password is incorrect" });
 
       await pool.query(
-        "UPDATE users SET two_factor_enabled = $1, updated_at = NOW() WHERE id = $2",
+        'UPDATE users SET "twoFactorEnabled" = $1, "updatedAt" = NOW() WHERE id = $2',
         [enable, req.user.userId]
       );
       res.json({ success: true, twoFactorEnabled: enable });
@@ -682,23 +680,24 @@ module.exports = function registerAuthRoutes(app, {
       if (!currentPassword || !newPassword) return res.status(400).json({ error: "Both passwords required" });
       const passwordPolicyError = validatePasswordPolicy(newPassword);
       if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
-      const u = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.user.userId]);
-      if (!await verifyPassword(currentPassword, u.rows[0].password_hash))
+      const u = await pool.query('SELECT "passwordHash" AS "passwordHash" FROM users WHERE id = $1', [req.user.userId]);
+      if (!await verifyPassword(currentPassword, u.rows[0].passwordHash))
         return res.status(401).json({ error: "Current password is incorrect" });
       const { hash, pepperVersion } = await hashPassword(newPassword);
       const updated = await pool.query(
         `UPDATE users
-         SET password_hash = $1,
-             pepper_version = $2,
-             session_version = COALESCE(session_version, 1) + 1,
-             updated_at = NOW()
+         SET "passwordHash" = $1,
+             "pepperVersion" = $2,
+             "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+             "updatedAt" = NOW()
          WHERE id = $3
-         RETURNING id, email, company_id, role, session_version`,
+         RETURNING id, email, "companyId" AS "companyId", role, "sessionVersion" AS "sessionVersion"`,
         [hash, pepperVersion, req.user.userId]
       );
+      const mfaEnabled = !!req.user?.mfaEnabled;
       const freshToken = generateToken(updated.rows[0], undefined, undefined, undefined, undefined, {
-        mfaVerifiedAt: enable ? new Date().toISOString() : null,
-        amr: enable ? ["pwd", "otp"] : ["pwd"]
+        mfaVerifiedAt: mfaEnabled ? new Date().toISOString() : null,
+        amr: mfaEnabled ? ["pwd", "otp"] : ["pwd"]
       });
       setAuthCookie(res, freshToken);
       res.json({ success: true, min_password_length: PASSWORD_MIN_LENGTH });
@@ -709,12 +708,12 @@ module.exports = function registerAuthRoutes(app, {
   app.get("/api/companies/:companyId/users", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(
-        `SELECT u.id, u.email, u.first_name AS "firstName", u.last_name AS "lastName", u.role, u.job_title AS "jobTitle", u.avatar_url AS "avatarUrl",
-                u.is_active AS "isActive", u.created_at AS "createdAt",
-                (SELECT COUNT(*) FROM passport_registry pr WHERE pr."companyId" = u.company_id AND pr."passportType" IS NOT NULL) AS "passportCount"
+        `SELECT u.id, u.email, u."firstName" AS "firstName", u."lastName" AS "lastName", u.role, u."jobTitle" AS "jobTitle", u."avatarUrl" AS "avatarUrl",
+                u."isActive" AS "isActive", u."createdAt" AS "createdAt",
+                (SELECT COUNT(*) FROM passport_registry pr WHERE pr."companyId" = u."companyId" AND pr."passportType" IS NOT NULL) AS "passportCount"
          FROM users u
-         WHERE u.company_id = $1 AND u.role != 'super_admin'
-         ORDER BY u.role, u.first_name`,
+         WHERE u."companyId" = $1 AND u.role != 'super_admin'
+         ORDER BY u.role, u."firstName"`,
         [req.params.companyId]
       );
       res.json(r.rows.map(buildCompanyMemberResponse));
@@ -728,7 +727,7 @@ module.exports = function registerAuthRoutes(app, {
       const { role } = req.body;
       if (!["company_admin","editor","viewer"].includes(role))
         return res.status(400).json({ error: "Invalid role" });
-      const updated = await pool.query("UPDATE users SET role = $1, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $2 AND company_id = $3 RETURNING id, role, session_version, is_active",
+      const updated = await pool.query('UPDATE users SET role = $1, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $2 AND "companyId" = $3 RETURNING id, role, "sessionVersion" AS "sessionVersion", "isActive" AS "isActive"',
         [role, req.params.userId, req.params.companyId]);
       await logAudit(
         req.params.companyId,
@@ -737,7 +736,7 @@ module.exports = function registerAuthRoutes(app, {
         "users",
         String(req.params.userId),
         null,
-        { role, session_version: updated.rows[0]?.session_version || null },
+        { role, sessionVersion: updated.rows[0]?.sessionVersion || null },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
           audience: "company_admin",
@@ -761,7 +760,7 @@ module.exports = function registerAuthRoutes(app, {
     try {
       if (req.user.role !== "company_admin" && req.user.role !== "super_admin")
         return res.status(403).json({ error: "Admin only" });
-      const deactivated = await pool.query("UPDATE users SET is_active = false, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $1 AND company_id = $2 RETURNING id, role, session_version, is_active",
+      const deactivated = await pool.query('UPDATE users SET "isActive" = false, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $1 AND "companyId" = $2 RETURNING id, role, "sessionVersion" AS "sessionVersion", "isActive" AS "isActive"',
         [req.params.userId, req.params.companyId]);
       await pool.query(
         `UPDATE user_access_audiences
@@ -786,7 +785,7 @@ module.exports = function registerAuthRoutes(app, {
         "users",
         String(req.params.userId),
         null,
-        { is_active: false, session_version: deactivated.rows[0]?.session_version || null },
+        { isActive: false, sessionVersion: deactivated.rows[0]?.sessionVersion || null },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
           audience: "company_admin",
@@ -801,7 +800,7 @@ module.exports = function registerAuthRoutes(app, {
         affectedUserId: req.params.userId,
         revocationMode: "emergency",
         metadata: {
-          sessionVersion: deactivated.rows[0]?.session_version || null,
+          sessionVersion: deactivated.rows[0]?.sessionVersion || null,
           revokedDelegatedAudiences: true,
           revokedPassportGrants: true,
         },
@@ -817,10 +816,10 @@ module.exports = function registerAuthRoutes(app, {
       const reason = req.body?.reason || "User sessions revoked";
       const updated = await pool.query(
         `UPDATE users
-         SET session_version = COALESCE(session_version, 1) + 1,
-             updated_at = NOW()
-         WHERE id = $1 AND company_id = $2
-         RETURNING id, role, session_version, is_active`,
+         SET "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+             "updatedAt" = NOW()
+         WHERE id = $1 AND "companyId" = $2
+         RETURNING id, role, "sessionVersion" AS "sessionVersion", "isActive" AS "isActive"`,
         [req.params.userId, req.params.companyId]
       );
       if (!updated.rows.length) return res.status(404).json({ error: "User not found" });
@@ -832,7 +831,7 @@ module.exports = function registerAuthRoutes(app, {
         "users",
         String(req.params.userId),
         null,
-        { session_version: updated.rows[0].session_version, reason },
+        { sessionVersion: updated.rows[0].sessionVersion, reason },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
           audience: "company_admin",
@@ -847,14 +846,14 @@ module.exports = function registerAuthRoutes(app, {
         affectedUserId: req.params.userId,
         revocationMode: "emergency",
         reason,
-        metadata: { sessionVersion: updated.rows[0].session_version },
+        metadata: { sessionVersion: updated.rows[0].sessionVersion },
       }).catch(() => {});
 
       res.json({
         success: true,
         revoked: true,
         emergency: true,
-        sessionVersion: updated.rows[0].session_version,
+        sessionVersion: updated.rows[0].sessionVersion,
       });
     } catch {
       res.status(500).json({ error: "Failed to revoke user sessions" });

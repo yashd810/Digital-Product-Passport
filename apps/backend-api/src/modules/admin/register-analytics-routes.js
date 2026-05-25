@@ -89,10 +89,10 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       );
       const accessRes = await pool.query(`
         SELECT cpa.company_id AS "companyId",
-               pt.type_name AS "typeName",
-               pt.display_name AS "displayName",
-               pt.product_category AS "productCategory",
-               pt.product_icon AS "productIcon"
+               pt."typeName" AS "typeName",
+               pt."displayName" AS "displayName",
+               pt."productCategory" AS "productCategory",
+               pt."productIcon" AS "productIcon"
         FROM company_passport_access cpa
         JOIN passport_types pt ON pt.id = cpa.passport_type_id
       `);
@@ -241,10 +241,10 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       const { companyId } = req.params;
 
       const accessRes = await pool.query(`
-        SELECT pt.type_name AS "typeName",
-               pt.display_name AS "displayName",
-               pt.product_category AS "productCategory",
-               pt.product_icon AS "productIcon",
+        SELECT pt."typeName" AS "typeName",
+               pt."displayName" AS "displayName",
+               pt."productCategory" AS "productCategory",
+               pt."productIcon" AS "productIcon",
                cpa.granted_at AS "grantedAt"
         FROM company_passport_access cpa
         JOIN passport_types pt ON pt.id = cpa.passport_type_id
@@ -358,15 +358,15 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       const users = await pool.query(
         `SELECT id,
                 email,
-                first_name AS "firstName",
-                last_name AS "lastName",
+                "firstName" AS "firstName",
+                "lastName" AS "lastName",
                 role,
-                is_active AS "isActive",
-                created_at AS "createdAt",
-                last_login_at AS "lastLoginAt"
+                "isActive" AS "isActive",
+                "createdAt" AS "createdAt",
+                "lastLoginAt" AS "lastLoginAt"
          FROM users
-         WHERE company_id = $1 AND role != 'super_admin'
-         ORDER BY role, first_name`,
+         WHERE "companyId" = $1 AND role != 'super_admin'
+         ORDER BY role, "firstName"`,
         [companyId]
       );
       const company = await pool.query(

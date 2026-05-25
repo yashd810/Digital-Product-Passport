@@ -96,15 +96,15 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       const currentUserRes = await pool.query(
         `SELECT u.id,
                 u.email,
-                u.company_id AS "companyId",
+                u."companyId" AS "companyId",
                 u.role,
-                u.is_active AS "isActive",
-                u.session_version AS "sessionVersion",
-                u.two_factor_enabled AS "twoFactorEnabled",
+                u."isActive" AS "isActive",
+                u."sessionVersion" AS "sessionVersion",
+                u."twoFactorEnabled" AS "twoFactorEnabled",
                 c.economic_operator_identifier AS "economicOperatorIdentifier",
                 c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
          FROM users u
-         LEFT JOIN companies c ON c.id = u.company_id
+         LEFT JOIN companies c ON c.id = u."companyId"
          WHERE u.id = $1
          LIMIT 1`,
         [payload.userId]

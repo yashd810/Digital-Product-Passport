@@ -29,11 +29,11 @@ function hasRequiredBatterySemanticModel({ productCategory = null, semanticModel
 }
 
 function shouldUseBatteryDictionary({ passportType = null, typeDef = null, options = {} } = {}) {
-  if (isBatteryProductCategory(options.productCategory || typeDef?.product_category)) {
+  if (isBatteryProductCategory(options.productCategory || typeDef?.productCategory)) {
     return true;
   }
 
-  if (normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semantic_model_key) === BATTERY_DICTIONARY_MODEL_KEY) {
+  if (normalizeSemanticModelKey(options.semanticModelKey || typeDef?.semanticModelKey) === BATTERY_DICTIONARY_MODEL_KEY) {
     return true;
   }
 

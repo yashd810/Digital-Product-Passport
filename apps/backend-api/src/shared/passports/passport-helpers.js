@@ -38,11 +38,7 @@ const SYSTEM_PASSPORT_FIELDS = new Set([
   "updatedAt",
 ]);
 
-const LEGACY_RESPONSE_KEY_MAP = new Map([
-  ["created_by_email", "createdByEmail"],
-  ["first_name", "firstName"],
-  ["last_name", "lastName"],
-]);
+const LEGACY_RESPONSE_KEY_MAP = new Map();
 
 const EDITABLE_PASSPORT_STATUSES = new Set(["draft", IN_REVISION_STATUS]);
 
@@ -152,7 +148,7 @@ const normalizePassportRow = (row, schema) => {
     const jsonbFields = new Set();
     schemaFields.forEach((field) => {
       if (field && field.key) {
-        const storageType = String(field.storageType || field.storage_type || field.valueType || "").trim().toLowerCase();
+        const storageType = String(field.storageType || field.valueType || "").trim().toLowerCase();
         if (field.type === "table" || field.repeated === true || field.structured === true || ["json", "jsonb", "object", "array"].includes(storageType)) {
           jsonbFields.add(field.key);
         }

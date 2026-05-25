@@ -87,7 +87,7 @@ function expandAudienceAssignments(values) {
 }
 
 function flattenSchemaFields(typeDef) {
-  return (typeDef?.fieldsJson?.sections || typeDef?.fields_json?.sections || []).
+  return (typeDef?.fieldsJson?.sections || []).
   flatMap((section) => section.fields || []).
   filter((field) => field?.key);
 }
@@ -188,7 +188,7 @@ function buildFieldPolicy(typeDef, elementIdPath) {
 
   const access = normalizeList(fieldDef.access);
   const confidentiality = String(fieldDef.confidentiality || "").trim() || (access.includes("public") ? "public" : "restricted");
-  const updateAuthority = normalizeList(fieldDef.updateAuthority || fieldDef.update_authority);
+  const updateAuthority = normalizeList(fieldDef.updateAuthority);
 
   return {
     fieldDef,

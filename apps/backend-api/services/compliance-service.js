@@ -115,12 +115,12 @@ function normalizeLookupKey(value) {
 }
 
 function flattenSchemaFields(typeDef) {
-  const sections = typeDef?.fieldsJson?.sections || typeDef?.fields_json?.sections || [];
+  const sections = typeDef?.fieldsJson?.sections || [];
   return sections.flatMap((section) =>
     (section.fields || []).map((field) => ({
       ...field,
-      section_key: section.key || null,
-      section_label: section.label || null,
+      sectionKey: section.key || null,
+      sectionLabel: section.label || null,
     }))
   );
 }
@@ -257,7 +257,7 @@ function parseStructuredValue(field, value) {
 
 function isExplicitMultiLanguageField(field) {
   const key = normalizeText(field?.key).toLowerCase();
-  const valueKind = normalizeText(field?.valueKind || field?.value_kind || field?.expandedObjectType || field?.objectTypeHint).toLowerCase();
+  const valueKind = normalizeText(field?.valueKind || field?.expandedObjectType || field?.objectTypeHint).toLowerCase();
   return valueKind === "multilanguage"
     || valueKind === "multilingual"
     || valueKind === "i18n"
@@ -447,9 +447,9 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
 
   async function loadPassportTypeDefinition(passportType) {
     const result = await pool.query(
-      `SELECT id, type_name, display_name, product_category, semantic_model_key, fields_json
+      `SELECT id, "typeName" AS "typeName", "displayName" AS "displayName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson"
        FROM passport_types
-       WHERE type_name = $1
+       WHERE "typeName" = $1
        LIMIT 1`,
       [passportType]
     );
@@ -485,7 +485,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
       granularity: String(granularity || "item").trim().toLowerCase() || "item",
       contentSpecificationIds: isBatteryPassport(typeDef, passportType)
         ? [BATTERY_SEMANTIC_MODEL_KEY]
-        : [typeDef?.semanticModelKey || typeDef?.semantic_model_key || "generic_dpp_v1"],
+        : [typeDef?.semanticModelKey || "generic_dpp_v1"],
     };
   }
 
@@ -533,7 +533,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           key: field.key,
           label: field.label || field.key,
           requirementLevel,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         });
         continue;
       }
@@ -548,7 +548,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           requirementLevel,
           mandatory: isMandatory,
           filled: true,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         });
       } else {
         const missingField = {
@@ -558,7 +558,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           access: Array.isArray(field.access) ? field.access : ["public"],
           requirementLevel,
           mandatory: isMandatory,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         };
         missingFields.push(missingField);
         applicableFieldDetails.push({
@@ -567,7 +567,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           requirementLevel,
           mandatory: isMandatory,
           filled: false,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         });
       }
     }
@@ -600,7 +600,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           message: `Field "${field.label || field.key}" must expose at least one audience.`,
           key: field.key,
           label: field.label || field.key,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
         continue;
       }
@@ -612,7 +612,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           message: `Field "${field.label || field.key}" uses unsupported access values: ${invalidEntries.join(", ")}.`,
           key: field.key,
           label: field.label || field.key,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
       }
     }
@@ -631,7 +631,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           message: `Field "${field.label || field.key}" must declare a confidentiality classification.`,
           key: field.key,
           label: field.label || field.key,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
       } else if (!VALID_CONFIDENTIALITY_LEVELS.has(confidentiality)) {
         issues.push(createIssue({
@@ -639,7 +639,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           message: `Field "${field.label || field.key}" uses unsupported confidentiality value "${field.confidentiality}".`,
           key: field.key,
           label: field.label || field.key,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
       }
 
@@ -652,7 +652,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
           message: `Field "${field.label || field.key}" must declare at least one update authority.`,
           key: field.key,
           label: field.label || field.key,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
       } else {
         const invalidAuthorities = updateAuthority.filter((entry) => !VALID_UPDATE_AUTHORITIES.has(entry));
@@ -662,7 +662,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
             message: `Field "${field.label || field.key}" uses unsupported updateAuthority values: ${invalidAuthorities.join(", ")}.`,
             key: field.key,
             label: field.label || field.key,
-            section: field.section_label || field.section_key || null,
+            section: field.sectionLabel || field.sectionKey || null,
           }));
         }
       }
@@ -780,7 +780,7 @@ function validateSemanticData(fields, passport) {
         message: `Field "${field.label || field.key}" is not mapped to a dictionary term in terms.json.`,
         key: field.key,
         label: field.label || field.key,
-        section: field.section_label || field.section_key || null,
+        section: field.sectionLabel || field.sectionKey || null,
       }));
       continue;
     }
@@ -793,7 +793,7 @@ function validateSemanticData(fields, passport) {
           key: field.key,
           label: field.label || field.key,
           expectedType: formatExpectedType(term),
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
       }
 
@@ -806,7 +806,7 @@ function validateSemanticData(fields, passport) {
           message: `Field "${field.label || field.key}" contains array items with mixed JSON types.`,
           key: field.key,
           label: field.label || field.key,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
       }
 
@@ -818,7 +818,7 @@ function validateSemanticData(fields, passport) {
               message: `Field "${field.label || field.key}" uses invalid language tag "${languageTag}".`,
               key: field.key,
               label: field.label || field.key,
-              section: field.section_label || field.section_key || null,
+              section: field.sectionLabel || field.sectionKey || null,
             }));
           }
           if (!isScalarValue(localizedValue)) {
@@ -827,7 +827,7 @@ function validateSemanticData(fields, passport) {
               message: `Field "${field.label || field.key}" contains non-scalar content for language tag "${languageTag}".`,
               key: field.key,
               label: field.label || field.key,
-              section: field.section_label || field.section_key || null,
+              section: field.sectionLabel || field.sectionKey || null,
             }));
           }
         }
@@ -840,7 +840,7 @@ function validateSemanticData(fields, passport) {
           message: `Field "${field.label || field.key}" uses unit "${value.unit}" but the dictionary expects "${term.unit}".`,
           key: field.key,
           label: field.label || field.key,
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
       }
 
@@ -855,7 +855,7 @@ function validateSemanticData(fields, passport) {
           key: field.key,
           label: field.label || field.key,
           expectedType: formatExpectedType(term),
-          section: field.section_label || field.section_key || null,
+          section: field.sectionLabel || field.sectionKey || null,
         }));
       }
     }
@@ -943,7 +943,7 @@ function validateSemanticData(fields, passport) {
   }
 
   function evaluateBatteryCategory(fields, passport, completeness) {
-    const categoryField = fields.find((field) => field.key === "battery_category")
+    const categoryField = fields.find((field) => field.key === "batteryCategory")
       || fields.find((field) => normalizeLookupKey(field.label) === "battery category");
 
     const rawCategory = categoryField ? passport?.[categoryField.key] : null;
@@ -956,7 +956,7 @@ function validateSemanticData(fields, passport) {
         message: `Battery category "${rawCategory}" is not one of the supported categories: ${supportedBatteryCategories.join(", ")}.`,
         key: categoryField.key,
         label: categoryField.label || categoryField.key,
-        section: categoryField.section_label || categoryField.section_key || null,
+        section: categoryField.sectionLabel || categoryField.sectionKey || null,
       }));
     }
     const ruleCoverage = normalizedCategory
@@ -993,14 +993,14 @@ function validateSemanticData(fields, passport) {
   }
 
   async function evaluatePassport(passport, passportType = null, providedTypeDef = null) {
-    const resolvedTypeDef = providedTypeDef || await loadPassportTypeDefinition(passportType || passport?.passport_type || "");
+    const resolvedTypeDef = providedTypeDef || await loadPassportTypeDefinition(passportType || passport?.passportType || "");
     if (!resolvedTypeDef) {
       const issue = createIssue({
         code: "PASSPORT_TYPE_NOT_FOUND",
-        message: `Passport type "${passportType || passport?.passport_type || ""}" could not be resolved for compliance validation.`,
+        message: `Passport type "${passportType || passport?.passportType || ""}" could not be resolved for compliance validation.`,
       });
       return {
-        passportType: passportType || passport?.passport_type || null,
+        passportType: passportType || passport?.passportType || null,
         semanticModelKey: null,
         isBatteryPassport: false,
         completeness: { totalFields: 0, filledFields: 0, missingFields: [], percentage: 0 },
@@ -1020,21 +1020,21 @@ function validateSemanticData(fields, passport) {
       };
     }
 
-    const batteryPassport = isBatteryPassport(resolvedTypeDef, passportType || passport?.passport_type);
+    const batteryPassport = isBatteryPassport(resolvedTypeDef, passportType || passport?.passportType);
     const fields = flattenSchemaFields(resolvedTypeDef).map((field) => ({
       ...field,
       __isBatteryPassport: batteryPassport,
     }));
     const basePassport = passport || {};
     const normalizedCategory = batteryPassport
-      ? normalizeBatteryCategory(basePassport.battery_category)
+      ? normalizeBatteryCategory(basePassport.batteryCategory)
       : null;
     const profile = resolveProfileMetadata({
-      passportType: passportType || basePassport.passport_type,
+      passportType: passportType || basePassport.passportType,
       typeDef: resolvedTypeDef,
       granularity: basePassport.granularity,
     });
-    const company = await loadCompanyGovernance(basePassport.company_id);
+    const company = await loadCompanyGovernance(basePassport.companyId);
     const normalizedPassport = applyManagedGovernanceDefaults(basePassport, profile, company);
     const completeness = buildCompleteness(fields, normalizedPassport, { normalizedCategory });
     const accessIssues = validateAccess(fields);
@@ -1088,8 +1088,8 @@ function validateSemanticData(fields, passport) {
         economicOperatorIdentifier: company.economicOperatorIdentifier || null,
         economicOperatorIdentifierScheme: company.economicOperatorIdentifierScheme || null,
       } : null,
-      passportType: resolvedTypeDef.typeName || resolvedTypeDef.type_name,
-      semanticModelKey: resolvedTypeDef.semanticModelKey || resolvedTypeDef.semantic_model_key || null,
+      passportType: resolvedTypeDef.typeName || null,
+      semanticModelKey: resolvedTypeDef.semanticModelKey || null,
       isBatteryPassport: batteryPassport,
       completeness,
       accessIssues,

@@ -329,8 +329,8 @@ module.exports = function registerCompanyRoutes(app, {
                       t.created_by AS "createdBy",
                       t.created_at AS "createdAt",
                       t.updated_at AS "updatedAt",
-                      u.first_name AS "firstName",
-                      u.last_name AS "lastName",
+                      u."firstName" AS "firstName",
+                      u."lastName" AS "lastName",
                       (SELECT COUNT(*) FROM passport_template_fields WHERE template_id = t.id AND is_model_data = true) AS "modelFieldCount"
                FROM passport_templates t
                LEFT JOIN users u ON u.id = t.created_by
@@ -506,11 +506,11 @@ module.exports = function registerCompanyRoutes(app, {
       const templateFields = Object.fromEntries(fieldRes.rows.map((f) => [f.fieldKey, f.fieldValue]));
 
       const typeRes = await pool.query(
-        `SELECT fields_json AS "fieldsJson",
-                product_category AS "productCategory",
-                semantic_model_key AS "semanticModelKey"
+        `SELECT "fieldsJson" AS "fieldsJson",
+                "productCategory" AS "productCategory",
+                "semanticModelKey" AS "semanticModelKey"
          FROM passport_types
-         WHERE type_name=$1`,
+         WHERE "typeName"=$1`,
         [tmpl.passportType]
       );
       const sections = typeRes.rows[0]?.fieldsJson?.sections || [];
@@ -620,7 +620,7 @@ module.exports = function registerCompanyRoutes(app, {
       const excluded = new Set([
         "id", "dppId", "companyId", "createdBy", "createdAt", "passportType",
         "versionNumber", "releaseStatus", "deletedAt", "qrCode",
-        "created_by_email", "first_name", "last_name", "updatedBy", "updatedAt",
+        "createdByEmail", "firstName", "lastName", "updatedBy", "updatedAt",
       ]);
 
       let created = 0,updated = 0,skipped = 0,failed = 0;
@@ -810,7 +810,7 @@ module.exports = function registerCompanyRoutes(app, {
       const excluded = new Set([
         "id", "companyId", "createdBy", "createdAt", "passportType",
         "versionNumber", "releaseStatus", "deletedAt", "qrCode",
-        "created_by_email", "first_name", "last_name", "updatedBy", "updatedAt",
+        "createdByEmail", "firstName", "lastName", "updatedBy", "updatedAt",
       ]);
 
       let created = 0,updated = 0,skipped = 0,failed = 0;

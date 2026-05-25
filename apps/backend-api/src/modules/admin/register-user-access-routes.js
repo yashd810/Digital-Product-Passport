@@ -17,7 +17,7 @@ module.exports = function registerUserAccessRoutes(app, deps) {
         return res.status(400).json({ error: "Invalid role" });
       }
       await pool.query(
-        "UPDATE users SET role = $1, session_version = COALESCE(session_version, 1) + 1, updated_at = NOW() WHERE id = $2",
+        'UPDATE users SET role = $1, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $2',
         [role, req.params.userId]
       );
       res.json({ success: true });
@@ -34,10 +34,11 @@ module.exports = function registerUserAccessRoutes(app, deps) {
       }
 
       const typeRes = await pool.query(
-        "SELECT type_name, display_name FROM passport_types WHERE id = $1", [passportTypeId]
+        'SELECT "typeName" AS "typeName", "displayName" AS "displayName" FROM passport_types WHERE id = $1',
+        [passportTypeId]
       );
       if (!typeRes.rows.length) return res.status(404).json({ error: "Passport type not found" });
-      const { type_name, display_name } = typeRes.rows[0];
+      const { typeName, displayName } = typeRes.rows[0];
 
       const result = await pool.query(
         `INSERT INTO company_passport_access (company_id, passport_type_id, access_revoked)
@@ -48,7 +49,7 @@ module.exports = function registerUserAccessRoutes(app, deps) {
       );
 
       res.status(201).json({
-        success: true, access: result.rows[0], table: getTable(type_name), display_name
+        success: true, access: result.rows[0], table: getTable(typeName), displayName
       });
     } catch (error) {
       if (error.code === "23505") return res.status(400).json({ error: "Access already granted" });
@@ -68,9 +69,9 @@ module.exports = function registerUserAccessRoutes(app, deps) {
       );
       if (!result.rows.length) return res.status(404).json({ error: "Access record not found" });
 
-      const typeRes = await pool.query("SELECT type_name FROM passport_types WHERE id = $1", [typeId]);
+      const typeRes = await pool.query('SELECT "typeName" AS "typeName" FROM passport_types WHERE id = $1', [typeId]);
       if (typeRes.rows.length) {
-        const tableName = getTable(typeRes.rows[0].type_name);
+        const tableName = getTable(typeRes.rows[0].typeName);
         await pool.query(
           `UPDATE ${tableName} SET release_status = 'released', updated_at = NOW()
            WHERE company_id = $1 AND release_status IN ('draft', 'in_review')`,

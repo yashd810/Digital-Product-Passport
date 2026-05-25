@@ -22,43 +22,43 @@ module.exports = function registerRepositoryRoutes(app, {
   const appBaseUrlFromRequest = (req) => `${req.protocol}://${req.get("host")}`;
   const isAbsoluteHttpUrl = (value) => /^https?:\/\//i.test(String(value || "").trim());
   const hasStorageProviderMismatch = (row) => {
-    const rowProvider = String(row?.storage_provider || row?.storageProvider || "").trim().toLowerCase();
+    const rowProvider = String(row?.storageProvider || "").trim().toLowerCase();
     const activeProvider = String(storageService?.provider || storageService?.name || "").trim().toLowerCase();
     return Boolean(rowProvider && activeProvider && rowProvider !== activeProvider);
   };
   const canServeStoredObject = (row) =>
-    Boolean(row?.storage_key && storageService.fetchObject && !hasStorageProviderMismatch(row));
+    Boolean(row?.storageKey && storageService.fetchObject && !hasStorageProviderMismatch(row));
 
   const repositoryFileUrl = (req, row) => {
-    if (hasStorageProviderMismatch(row) && isAbsoluteHttpUrl(row?.file_url)) {
-      return row.file_url;
+    if (hasStorageProviderMismatch(row) && isAbsoluteHttpUrl(row?.fileUrl)) {
+      return row.fileUrl;
     }
-    if (row?.id && (row.storage_key || row.file_path)) {
+    if (row?.id && (row.storageKey || row.filePath)) {
       return buildRepositoryFilePublicUrl({
         appBaseUrl: appBaseUrlFromRequest(req),
-        companyId: row.company_id,
+        companyId: row.companyId,
         itemId: row.id,
       });
     }
-    return row?.file_url || null;
+    return row?.fileUrl || null;
   };
 
   const withResolvedFileUrl = (req, row) => ({
     id: row.id,
-    companyId: row.companyId ?? row.company_id ?? null,
-    parentId: row.parentId ?? row.parent_id ?? null,
+    companyId: row.companyId ?? null,
+    parentId: row.parentId ?? null,
     name: row.name || "",
     type: row.type || "",
     fileUrl: repositoryFileUrl(req, row),
-    storageKey: row.storageKey ?? row.storage_key ?? null,
-    filePath: row.filePath ?? row.file_path ?? null,
-    mimeType: row.mimeType ?? row.mime_type ?? null,
-    sizeBytes: row.sizeBytes ?? row.size_bytes ?? null,
-    createdAt: row.createdAt ?? row.created_at ?? null,
+    storageKey: row.storageKey ?? null,
+    filePath: row.filePath ?? null,
+    mimeType: row.mimeType ?? null,
+    sizeBytes: row.sizeBytes ?? null,
+    createdAt: row.createdAt ?? null,
   });
 
   const setRepositoryFileHeaders = (res, row) => {
-    const mimeType = row.mime_type || "application/octet-stream";
+    const mimeType = row.mimeType || "application/octet-stream";
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Cache-Control", "private, max-age=300");
@@ -72,8 +72,8 @@ module.exports = function registerRepositoryRoutes(app, {
   };
 
   const maybeRedirectToExternalFileUrl = (res, row) => {
-    if (!hasStorageProviderMismatch(row) || !isAbsoluteHttpUrl(row?.file_url)) return false;
-    res.redirect(302, row.file_url);
+    if (!hasStorageProviderMismatch(row) || !isAbsoluteHttpUrl(row?.fileUrl)) return false;
+    res.redirect(302, row.fileUrl);
     return true;
   };
 
@@ -82,7 +82,7 @@ module.exports = function registerRepositoryRoutes(app, {
       const { companyId } = req.params;
       const parentId = req.query.parentId ? parseInt(req.query.parentId, 10) : null;
       const r = await pool.query(
-        `SELECT id, company_id, parent_id, name, type, file_url, storage_key, file_path, mime_type, size_bytes, created_at
+        `SELECT id, company_id AS "companyId", parent_id AS "parentId", name, type, file_url AS "fileUrl", storage_key AS "storageKey", file_path AS "filePath", mime_type AS "mimeType", size_bytes AS "sizeBytes", created_at AS "createdAt"
          FROM company_repository
          WHERE company_id = $1 AND repository_scope = 'files' AND parent_id IS NOT DISTINCT FROM $2
          ORDER BY type DESC, name ASC`,
@@ -98,7 +98,7 @@ module.exports = function registerRepositoryRoutes(app, {
     try {
       const scope = req.query.scope === "symbols" ? "symbols" : "files";
       const r = await pool.query(
-        `SELECT id, parent_id, name, type FROM company_repository
+        `SELECT id, parent_id AS "parentId", name, type FROM company_repository
          WHERE company_id = $1 AND repository_scope = $2 ORDER BY type DESC, name ASC`,
         [req.params.companyId, scope]
       );
@@ -231,7 +231,7 @@ module.exports = function registerRepositoryRoutes(app, {
         if (children.rows.length) {
           return res.status(409).json({ error: "Folder must be empty before deleting" });
         }
-      } else if (row.storage_key || row.file_path) {
+      } else if (row.storageKey || row.filePath) {
         if (row.file_path && !row.storage_key) {
           const safeFilePath = path.resolve(row.file_path);
           if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR)) {

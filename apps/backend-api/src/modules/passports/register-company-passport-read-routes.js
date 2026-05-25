@@ -35,7 +35,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
 
       const tableName = getTable(passportType);
-      let query = `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
+      let query = `SELECT p.*, u.email AS "createdByEmail", u."firstName" AS "firstName", u."lastName" AS "lastName"
                FROM ${tableName} p
                LEFT JOIN users u ON u.id = p."createdBy"
                WHERE p."deletedAt" IS NULL AND p."companyId" = $1`;
@@ -68,35 +68,35 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
   app.post("/api/companies/:companyId/passports/bulk-fetch", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const { companyId } = req.params;
-      let passport_type;
+      let passportType;
       let identifiers;
       if (Array.isArray(req.body)) {
         identifiers = req.body;
-        passport_type = identifiers[0]?.passport_type || identifiers[0]?.passportType;
+        passportType = identifiers[0]?.passportType;
       } else {
         const normalizedBody = normalizePassportRequestBody(req.body);
-        passport_type = normalizedBody.passportType;
+        passportType = normalizedBody.passportType;
         identifiers = normalizedBody.passports || normalizedBody.identifiers;
       }
 
-      if (!passport_type) return res.status(400).json({ error: "passport_type required" });
+      if (!passportType) return res.status(400).json({ error: "passportType required" });
       if (!Array.isArray(identifiers) || !identifiers.length) return res.status(400).json({ error: "passports or identifiers array required" });
       if (identifiers.length > 500) return res.status(400).json({ error: "Max 500 per request" });
 
-      const typeSchema = await getPassportTypeSchema(passport_type);
+      const typeSchema = await getPassportTypeSchema(passportType);
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const tableName = getTable(typeSchema.typeName);
       const results = [];
 
       for (const item of identifiers) {
-        const raw = typeof item === "string" ? { internal_alias_id: item } : item || {};
+        const raw = typeof item === "string" ? { internalAliasId: item } : item || {};
         const dppId = raw.dppId;
-        const internalAliasId = normalizeInternalAliasIdValue(raw.internal_alias_id || raw.internalAliasId);
+        const internalAliasId = normalizeInternalAliasIdValue(raw.internalAliasId);
         try {
           let row = null;
           if (dppId) {
             const result = await pool.query(
-              `SELECT p.*, u.email AS created_by_email, u.first_name, u.last_name
+              `SELECT p.*, u.email AS "createdByEmail", u."firstName" AS "firstName", u."lastName" AS "lastName"
                FROM ${tableName} p LEFT JOIN users u ON u.id = p."createdBy"
                WHERE p."dppId" = $1 AND p."companyId" = $2 AND p."deletedAt" IS NULL LIMIT 1`,
               [dppId, companyId]
@@ -118,7 +118,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
                    AND "deletedAt" IS NULL
                  ORDER BY "lineageId", "versionNumber" DESC, "updatedAt" DESC
                )
-               SELECT latest.*, u.email AS created_by_email, u.first_name, u.last_name
+               SELECT latest.*, u.email AS "createdByEmail", u."firstName" AS "firstName", u."lastName" AS "lastName"
                FROM latest LEFT JOIN users u ON u.id = latest."createdBy"
                ORDER BY latest."versionNumber" DESC LIMIT 1`,
               [productIdCandidates, companyId]
@@ -129,10 +129,10 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
           if (row) {
             results.push({ ...normalizePassportRow(row, typeSchema), passportType: typeSchema.typeName, _status: "found" });
           } else {
-            results.push({ dppId: dppId || undefined, internal_alias_id: internalAliasId || undefined, _status: "not_found" });
+            results.push({ dppId: dppId || undefined, internalAliasId: internalAliasId || undefined, _status: "not_found" });
           }
         } catch (error) {
-          results.push({ dppId: dppId || undefined, internal_alias_id: internalAliasId || undefined, _status: "error", error: error.message });
+          results.push({ dppId: dppId || undefined, internalAliasId: internalAliasId || undefined, _status: "error", error: error.message });
         }
       }
 
@@ -153,12 +153,12 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       if (!passportType) return res.status(400).json({ error: "passportType is required" });
 
       const typeResult = await pool.query(
-        "SELECT fields_json, product_category, semantic_model_key FROM passport_types WHERE type_name=$1",
+        'SELECT "fieldsJson" AS "fieldsJson", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey" FROM passport_types WHERE "typeName" = $1',
         [passportType]
       );
       if (!typeResult.rows.length) return res.status(404).json({ error: "Passport type not found" });
 
-      const sections = typeResult.rows[0]?.fields_json?.sections || [];
+      const sections = typeResult.rows[0]?.fieldsJson?.sections || [];
       const schemaFields = sections.flatMap((section) => section.fields || []);
       const wantsFullRepresentation = isFullRepresentationRequest(req.query.representation);
       const tableName = getTable(passportType);
@@ -199,13 +199,13 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
               typeResult.rows[0],
               {
                 company,
-                granularity: company?.default_granularity || row.granularity || "model",
+                granularity: company?.defaultGranularity || row.granularity || "model",
               }
             ))
           : rows;
         return res.json(buildBatteryPassJsonExport(exportRows, passportType, {
-          semanticModelKey: typeResult.rows[0]?.semantic_model_key || null,
-          productCategory: typeResult.rows[0]?.product_category || null,
+          semanticModelKey: typeResult.rows[0]?.semanticModelKey || null,
+          productCategory: typeResult.rows[0]?.productCategory || null,
         }));
       }
 
@@ -241,8 +241,8 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const { companyId } = req.params;
       const { search, passportType } = req.query;
 
-      let query = `SELECT pa.*, u.email AS archived_by_email, u.first_name AS archived_by_first_name, u.last_name AS archived_by_last_name
-               FROM passport_archives pa
+      let query = `SELECT pa.*, u.email AS "archivedByEmail", u."firstName" AS "archivedByFirstName", u."lastName" AS "archivedByLastName"
+                   FROM passport_archives pa
                LEFT JOIN users u ON u.id = pa."archivedBy"
                WHERE pa."companyId" = $1
                  AND ${ARCHIVED_HISTORY_FILTER_SQL}`;
@@ -308,9 +308,9 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
 
       // Get passport type schema for normalization
       const typeDef = await pool.query(
-        `SELECT type_name, product_category, semantic_model_key, fields_json
+        `SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson"
          FROM passport_types
-         WHERE type_name = $1
+         WHERE "typeName" = $1
          LIMIT 1`,
         [resolved.passport.passportType || passportType]
       );
@@ -329,7 +329,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         return res.json(
           buildExpandedPassportPayload(normalizedPassport, typeDef.rows[0], {
             company,
-            granularity: company?.default_granularity || normalizedPassport.granularity || "model",
+            granularity: company?.defaultGranularity || normalizedPassport.granularity || "model",
           })
         );
       }

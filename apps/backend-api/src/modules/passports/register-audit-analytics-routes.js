@@ -41,10 +41,10 @@ function registerAuditAnalyticsRoutes(app, deps) {
       const { companyId } = req.params;
 
       const accessRes = await pool.query(`
-        SELECT pt.type_name AS "typeName",
-               pt.display_name AS "displayName",
-               pt.product_category AS "productCategory",
-               pt.product_icon AS "productIcon"
+        SELECT pt."typeName" AS "typeName",
+               pt."displayName" AS "displayName",
+               pt."productCategory" AS "productCategory",
+               pt."productIcon" AS "productIcon"
         FROM company_passport_access cpa
         JOIN passport_types pt ON pt.id = cpa.passport_type_id
         WHERE cpa.company_id = $1
@@ -169,8 +169,8 @@ function registerAuditAnalyticsRoutes(app, deps) {
                 al.old_values AS "oldValues",
                 al.new_values AS "newValues",
                 u.email AS "userEmail",
-                u.first_name AS "userFirstName",
-                u.last_name AS "userLastName"
+                u."firstName" AS "userFirstName",
+                u."lastName" AS "userLastName"
          FROM audit_logs al
          LEFT JOIN users u ON al.user_id = u.id
          WHERE al.company_id = $1 ORDER BY al.created_at DESC LIMIT $2`,
@@ -202,8 +202,8 @@ function registerAuditAnalyticsRoutes(app, deps) {
                 al.old_values AS "oldValues",
                 al.new_values AS "newValues",
                 u.email AS "userEmail",
-                u.first_name AS "userFirstName",
-                u.last_name AS "userLastName"
+                u."firstName" AS "userFirstName",
+                u."lastName" AS "userLastName"
          FROM audit_logs al
          LEFT JOIN users u ON al.user_id = u.id
          WHERE al.company_id = $1 ORDER BY al.created_at DESC LIMIT $2 OFFSET $3`,
@@ -250,10 +250,10 @@ function registerAuditAnalyticsRoutes(app, deps) {
   app.post("/api/companies/:companyId/audit-logs/anchors", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const companyId = Number.parseInt(req.params.companyId, 10);
-      const anchorType = String(req.body?.anchorType || req.body?.anchor_type || "internal_record").trim() || "internal_record";
-      const anchorReference = req.body?.anchorReference ?? req.body?.anchor_reference ?? null;
+      const anchorType = String(req.body?.anchorType || "internal_record").trim() || "internal_record";
+      const anchorReference = req.body?.anchorReference ?? null;
       const notes = req.body?.notes ?? null;
-      const metadata = req.body?.metadata ?? req.body?.metadata_json ?? {};
+      const metadata = req.body?.metadata ?? {};
       const anchored = await anchorAuditLogRoot({
         companyId,
         anchoredBy: req.user?.userId || null,

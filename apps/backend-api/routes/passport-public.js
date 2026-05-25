@@ -179,12 +179,12 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   async function loadTypeDef(passportType) {
     const result = await pool.query(
-      `SELECT type_name AS "typeName",
-              product_category AS "productCategory",
-              semantic_model_key AS "semanticModelKey",
-              fields_json AS "fieldsJson"
+      `SELECT "typeName" AS "typeName",
+              "productCategory" AS "productCategory",
+              "semanticModelKey" AS "semanticModelKey",
+              "fieldsJson" AS "fieldsJson"
        FROM passport_types
-       WHERE type_name = $1
+       WHERE "typeName" = $1
        LIMIT 1`,
       [passportType]
     );
@@ -638,11 +638,11 @@ module.exports = function registerPassportPublicRoutes(app, {
   async function loadFacilitySubject(stableId) {
     const normalizedStableId = didService.normalizeFacilityStableId(stableId);
     const passportTypes = await pool.query(
-      `SELECT type_name AS "typeName",
-              semantic_model_key AS "semanticModelKey",
-              fields_json AS "fieldsJson"
+      `SELECT "typeName" AS "typeName",
+              "semanticModelKey" AS "semanticModelKey",
+              "fieldsJson" AS "fieldsJson"
        FROM passport_types
-       ORDER BY type_name ASC`
+       ORDER BY "typeName" ASC`
     );
 
     for (const typeDef of passportTypes.rows) {
@@ -682,13 +682,13 @@ module.exports = function registerPassportPublicRoutes(app, {
   async function loadPassportTypeSchema(passportType) {
     const result = await pool.query(
       `SELECT id,
-              type_name AS "typeName",
-              display_name AS "displayName",
-              product_category AS "productCategory",
-              product_icon AS "productIcon",
-              fields_json AS "fieldsJson"
+              "typeName" AS "typeName",
+              "displayName" AS "displayName",
+              "productCategory" AS "productCategory",
+              "productIcon" AS "productIcon",
+              "fieldsJson" AS "fieldsJson"
        FROM passport_types
-       WHERE type_name = $1`,
+       WHERE "typeName" = $1`,
       [passportType]
     );
     return result.rows[0] ? mapPassportTypeRow(result.rows[0]) : null;

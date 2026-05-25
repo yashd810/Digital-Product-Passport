@@ -145,12 +145,12 @@ function createRequestResponseHelpers({
     const [companyNameMap, typeRes] = await Promise.all([
       getCompanyNameMap([result.passport.companyId]),
       pool.query(
-        `SELECT type_name AS "typeName",
-                product_category AS "productCategory",
-                semantic_model_key AS "semanticModelKey",
-                fields_json AS "fieldsJson"
+        `SELECT "typeName" AS "typeName",
+                "productCategory" AS "productCategory",
+                "semanticModelKey" AS "semanticModelKey",
+                "fieldsJson" AS "fieldsJson"
          FROM passport_types
-         WHERE type_name = $1`,
+         WHERE "typeName" = $1`,
         [result.passport.passportType]
       )]
     );
@@ -212,12 +212,12 @@ function createRequestResponseHelpers({
     const [companyNameMap, typeRes] = await Promise.all([
       getCompanyNameMap([result.passport.companyId]),
       pool.query(
-        `SELECT type_name AS "typeName",
-                product_category AS "productCategory",
-                semantic_model_key AS "semanticModelKey",
-                fields_json AS "fieldsJson"
+        `SELECT "typeName" AS "typeName",
+                "productCategory" AS "productCategory",
+                "semanticModelKey" AS "semanticModelKey",
+                "fieldsJson" AS "fieldsJson"
          FROM passport_types
-         WHERE type_name = $1`,
+         WHERE "typeName" = $1`,
         [result.passport.passportType]
       )]
     );

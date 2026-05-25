@@ -837,7 +837,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       fieldDef?.expandedObjectType
       || fieldDef?.objectTypeHint
       || fieldDef?.valueKind
-      || fieldDef?.value_kind
+      || fieldDef?.valueKind
       || fieldDef?.objectType
     );
   }

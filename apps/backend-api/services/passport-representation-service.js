@@ -77,7 +77,7 @@ module.exports = function createPassportRepresentationService({
   // appended with their native types preserved (no String coercion).
   //
   // @param {object} passport  - normalised passport row
-  // @param {object} typeDef   - passport_types row with fields_json
+  // @param {object} typeDef   - passport_types row with fieldsJson
   // @param {object} options
   //   @param {string}  options.companyName  - human-readable company name
   //   @param {string}  options.granularity  - 'model' | 'item' | 'batch' (default: 'model')

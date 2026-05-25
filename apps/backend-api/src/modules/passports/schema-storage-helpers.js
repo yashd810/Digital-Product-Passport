@@ -53,11 +53,11 @@ function createSchemaStorageHelpers({
   async function getLatestCompanyPassports({ companyId, passportType }) {
     const tableName = getTable(passportType);
     const result = await pool.query(
-      `SELECT DISTINCT ON (lineage_id) *
+      `SELECT DISTINCT ON ("lineageId") *
        FROM ${tableName}
-       WHERE company_id = $1
-         AND deleted_at IS NULL
-       ORDER BY lineage_id, version_number DESC, updated_at DESC`,
+       WHERE "companyId" = $1
+         AND "deletedAt" IS NULL
+       ORDER BY "lineageId", "versionNumber" DESC, "updatedAt" DESC`,
       [companyId]
     );
     return result.rows.map((row) => {
@@ -93,7 +93,7 @@ function createSchemaStorageHelpers({
   }
 
   function isStructuredPassportField(field) {
-    const storageType = String(field?.storageType || field?.storage_type || field?.valueType || "").trim().toLowerCase();
+    const storageType = String(field?.storageType || field?.valueType || "").trim().toLowerCase();
     return field?.type === "table"
       || field?.repeated === true
       || field?.structured === true
@@ -168,10 +168,10 @@ function createSchemaStorageHelpers({
     changeSummary = {},
     createdBy = null,
   }) {
-    const typeRes = await pool.query("SELECT id FROM passport_types WHERE type_name = $1", [typeName]).catch(() => ({ rows: [] }));
+    const typeRes = await pool.query('SELECT id FROM passport_types WHERE "typeName" = $1', [typeName]).catch(() => ({ rows: [] }));
     await pool.query(
       `INSERT INTO passport_type_schema_events
-         (passport_type_id, type_name, table_name, schema_version, event_type, change_summary, created_by)
+         ("passportTypeId", "typeName", "tableName", "schemaVersion", "eventType", "changeSummary", "createdBy")
        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
       [
         typeRes.rows[0]?.id || null,
@@ -196,7 +196,7 @@ function createSchemaStorageHelpers({
     if (getPassportFieldDataType(field) === "jsonb") {
       await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} USING GIN (${quoteSqlIdentifier(field.key)})`);
     } else {
-      await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} (${quoteSqlIdentifier(field.key)}) WHERE deleted_at IS NULL`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${tableName} (${quoteSqlIdentifier(field.key)}) WHERE "deletedAt" IS NULL`);
     }
     return indexName;
   }
@@ -204,13 +204,13 @@ function createSchemaStorageHelpers({
   async function createPassportTable(typeName, { createdBy = null, eventType = "create_or_reconcile_table" } = {}) {
     const tableName = getTable(typeName);
     const typeRes = await pool.query(
-      "SELECT fields_json FROM passport_types WHERE type_name = $1",
+      'SELECT "fieldsJson" AS "fieldsJson" FROM passport_types WHERE "typeName" = $1',
       [typeName]
     );
     if (!typeRes.rows.length)
       throw new Error(`Passport type '${typeName}' not found in passport_types`);
 
-    const sections = typeRes.rows[0].fields_json?.sections || [];
+    const sections = typeRes.rows[0].fieldsJson?.sections || [];
     const ddlCols = [];
     for (const section of sections) {
       for (const field of (section.fields || [])) {
@@ -264,7 +264,7 @@ function createSchemaStorageHelpers({
 
     const addedColumns = [];
     const indexedColumns = [];
-    for (const field of flattenTypeFields(typeRes.rows[0].fields_json)) {
+    for (const field of flattenTypeFields(typeRes.rows[0].fieldsJson)) {
       await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(field.key)} ${getPassportFieldColumnType(field)}`);
       addedColumns.push({
         key: field.key,
@@ -277,7 +277,7 @@ function createSchemaStorageHelpers({
     await recordPassportTypeSchemaEvent({
       typeName,
       tableName,
-      schemaVersion: getTypeSchemaVersion(typeRes.rows[0].fields_json),
+      schemaVersion: getTypeSchemaVersion(typeRes.rows[0].fieldsJson),
       eventType,
       changeSummary: { ensuredColumns: addedColumns, indexedColumns },
       createdBy,
@@ -286,14 +286,14 @@ function createSchemaStorageHelpers({
 
   async function migratePassportStorageToSchemaKeys({ apply = false, includeArchives = true } = {}) {
     const typeRows = await pool.query(
-      `SELECT type_name, fields_json
+      `SELECT "typeName" AS "typeName", "fieldsJson" AS "fieldsJson"
        FROM passport_types
-       ORDER BY type_name`
+       ORDER BY "typeName"`
     );
     const results = [];
 
     for (const typeRow of typeRows.rows) {
-      const tableName = getTable(typeRow.type_name);
+      const tableName = getTable(typeRow.typeName);
       const tableExists = await pool.query(
         `SELECT 1
          FROM information_schema.tables
@@ -304,7 +304,7 @@ function createSchemaStorageHelpers({
 
       if (!tableExists) {
         results.push({
-          typeName: typeRow.type_name,
+          typeName: typeRow.typeName,
           tableName,
           status: "skipped_missing_table",
           columnRenames: [],
@@ -317,7 +317,7 @@ function createSchemaStorageHelpers({
       const columnRenames = [];
       const archiveKeyUpdates = [];
 
-      for (const field of flattenTypeFields(typeRow.fields_json)) {
+      for (const field of flattenTypeFields(typeRow.fieldsJson)) {
         const exactKey = String(field?.key || "").trim();
         if (!exactKey || !isSafeSqlIdentifier(exactKey)) continue;
         const legacyKeys = buildLegacyFieldColumnCandidates(exactKey).filter((candidate) =>
@@ -372,7 +372,7 @@ function createSchemaStorageHelpers({
                  )
                  WHERE passport_type = $1
                    AND row_data ? $2`,
-                [typeRow.type_name, legacyKey, exactKey]
+                [typeRow.typeName, legacyKey, exactKey]
               );
               affectedRows = archiveResult.rowCount || 0;
             }
@@ -382,7 +382,7 @@ function createSchemaStorageHelpers({
       }
 
       results.push({
-        typeName: typeRow.type_name,
+        typeName: typeRow.typeName,
         tableName,
         status: columnRenames.length || archiveKeyUpdates.length ? (apply ? "migrated" : "pending") : "ok",
         columnRenames,
@@ -399,11 +399,11 @@ function createSchemaStorageHelpers({
   }
 
   async function validatePassportTypeStorage({ repair = false } = {}) {
-    const typeRows = await pool.query("SELECT id, type_name, fields_json FROM passport_types ORDER BY type_name");
+    const typeRows = await pool.query('SELECT id, "typeName" AS "typeName", "fieldsJson" AS "fieldsJson" FROM passport_types ORDER BY "typeName"');
     const results = [];
 
     for (const typeRow of typeRows.rows) {
-      const tableName = getTable(typeRow.type_name);
+      const tableName = getTable(typeRow.typeName);
       const tableExists = await pool.query(
         `SELECT 1
          FROM information_schema.tables
@@ -414,10 +414,10 @@ function createSchemaStorageHelpers({
 
       if (!tableExists) {
         if (repair) {
-          await createPassportTable(typeRow.type_name);
-          results.push({ typeName: typeRow.type_name, tableName, status: "repaired_missing_table", issues: [] });
+          await createPassportTable(typeRow.typeName);
+          results.push({ typeName: typeRow.typeName, tableName, status: "repaired_missing_table", issues: [] });
         } else {
-          results.push({ typeName: typeRow.type_name, tableName, status: "failed", issues: [{ type: "missing_table" }] });
+          results.push({ typeName: typeRow.typeName, tableName, status: "failed", issues: [{ type: "missing_table" }] });
         }
         continue;
       }
@@ -426,7 +426,7 @@ function createSchemaStorageHelpers({
       const issues = [];
       const expectedFieldKeys = new Set();
 
-      for (const field of flattenTypeFields(typeRow.fields_json)) {
+      for (const field of flattenTypeFields(typeRow.fieldsJson)) {
         expectedFieldKeys.add(field.key);
         const actualDataType = columnMap.get(field.key);
         const expectedDataType = getPassportFieldDataType(field);
@@ -446,14 +446,14 @@ function createSchemaStorageHelpers({
       }
 
       if (repair && issues.some((issue) => issue.type === "missing_column")) {
-        await createPassportTable(typeRow.type_name);
+        await createPassportTable(typeRow.typeName);
         await migratePassportStorageToSchemaKeys({ apply: true, includeArchives: true });
       }
 
       results.push({
-        typeName: typeRow.type_name,
+        typeName: typeRow.typeName,
         tableName,
-        schemaVersion: getTypeSchemaVersion(typeRow.fields_json),
+        schemaVersion: getTypeSchemaVersion(typeRow.fieldsJson),
         status: issues.length ? "failed" : "ok",
         issues,
       });

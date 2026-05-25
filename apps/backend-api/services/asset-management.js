@@ -69,18 +69,18 @@ module.exports = function createAssetService({
       throw new Error("granularity must be one of: model, batch, item");
     }
     if (!companyPolicy) return normalizedRequested || fallbackGranularity;
-    if (!companyPolicy.allow_granularity_override && normalizedRequested && normalizedRequested !== fallbackGranularity) {
+    if (!companyPolicy.allowGranularityOverride && normalizedRequested && normalizedRequested !== fallbackGranularity) {
       throw new Error(`Granularity override is disabled for this company. The enforced value is "${fallbackGranularity}".`);
     }
 
-    const effectiveGranularity = normalizedRequested && companyPolicy.allow_granularity_override
+    const effectiveGranularity = normalizedRequested && companyPolicy.allowGranularityOverride
       ? normalizedRequested
       : fallbackGranularity;
 
-    if (effectiveGranularity === "model" && companyPolicy.mint_model_dids === false) {
+    if (effectiveGranularity === "model" && companyPolicy.mintModelDids === false) {
       throw new Error("Model-level DIDs are disabled for this company policy.");
     }
-    if ((effectiveGranularity === "item" || effectiveGranularity === "batch") && companyPolicy.mint_item_dids === false) {
+    if ((effectiveGranularity === "item" || effectiveGranularity === "batch") && companyPolicy.mintItemDids === false) {
       throw new Error("Item-level DIDs are disabled for this company policy.");
     }
     return effectiveGranularity;

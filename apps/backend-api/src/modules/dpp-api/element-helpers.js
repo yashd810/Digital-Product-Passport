@@ -253,7 +253,7 @@ function setStructuredElementValue(rootValue, childSegments, nextValue) {
 }
 
 function getSchemaFieldDefinitions(typeDef) {
-  return (typeDef?.fields_json?.sections || [])
+  return (typeDef?.fieldsJson?.sections || [])
     .flatMap((section) => section.fields || [])
     .filter((field) => field?.key);
 }
@@ -266,22 +266,16 @@ function findSchemaFieldDefinition(typeDef, elementIdPath) {
   return getSchemaFieldDefinitions(typeDef).find((field) =>
     field.key === exactPath ||
     field.semanticId === exactPath ||
-    field.semantic_id === exactPath ||
     field.elementId === exactPath ||
-    field.element_id === exactPath ||
     field.key === rootPath ||
     field.semanticId === rootPath ||
-    field.semantic_id === rootPath ||
     field.elementId === rootPath ||
-    field.element_id === rootPath ||
     (
       rootPath &&
       (
         field.key === rootPath ||
         field.semanticId === rootPath ||
-        field.semantic_id === rootPath ||
-        field.elementId === rootPath ||
-        field.element_id === rootPath
+        field.elementId === rootPath
       )
     )) || null;
 }
@@ -336,7 +330,6 @@ function createElementHelpers({
     const allowedElementIds = new Set(
       [
         fieldDef?.elementId,
-        fieldDef?.element_id,
         fieldDef?.key,
         elementIdPath,
         normalizedPath?.leafElementId,
@@ -353,7 +346,7 @@ function createElementHelpers({
       return { error: "elementId does not match the target elementIdPath" };
     }
 
-    const expectedDictionaryReference = fieldDef?.semanticId || fieldDef?.semantic_id || null;
+    const expectedDictionaryReference = fieldDef?.semanticId || null;
     if (
       payload.dictionaryReference !== undefined &&
       payload.dictionaryReference !== null &&

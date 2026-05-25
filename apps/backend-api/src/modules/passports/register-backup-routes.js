@@ -30,15 +30,15 @@ function registerBackupRoutes(app, deps) {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
       const provider = await backupProviderService.upsertProvider({
         companyId: req.params.companyId,
-        providerKey: req.body?.provider_key || req.body?.providerKey,
-        providerType: req.body?.provider_type || req.body?.providerType || "oci_object_storage",
-        displayName: req.body?.display_name || req.body?.displayName || "OCI Object Storage Backup",
-        objectPrefix: req.body?.object_prefix || req.body?.objectPrefix || "backup-provider",
-        publicBaseUrl: req.body?.public_base_url || req.body?.publicBaseUrl || null,
-        supportsPublicHandover: req.body?.supports_public_handover !== false && req.body?.supportsPublicHandover !== false,
-        config: req.body?.config_json || req.body?.config || {},
+        providerKey: req.body?.providerKey,
+        providerType: req.body?.providerType || "oci_object_storage",
+        displayName: req.body?.displayName || "OCI Object Storage Backup",
+        objectPrefix: req.body?.objectPrefix || "backup-provider",
+        publicBaseUrl: req.body?.publicBaseUrl || null,
+        supportsPublicHandover: req.body?.supportsPublicHandover !== false,
+        config: req.body?.config || {},
         createdBy: req.user.userId,
-        isActive: req.body?.is_active !== false && req.body?.isActive !== false,
+        isActive: req.body?.isActive !== false,
       });
       await logAudit(
         req.params.companyId,
@@ -47,7 +47,7 @@ function registerBackupRoutes(app, deps) {
         "backup_service_providers",
         null,
         null,
-        { provider_key: provider.provider_key, provider_type: provider.provider_type }
+        { providerKey: provider.providerKey, providerType: provider.providerType }
       );
       res.status(201).json(provider);
     } catch (error) {
@@ -97,7 +97,7 @@ function registerBackupRoutes(app, deps) {
         companyId: req.params.companyId,
         passportDppId: req.params.dppId,
       });
-      const active = handovers.find((row) => row.handover_status === "active") || null;
+      const active = handovers.find((row) => row.handoverStatus === "active") || null;
       return res.json({
         active,
         history: handovers,
@@ -112,7 +112,7 @@ function registerBackupRoutes(app, deps) {
       if (!backupProviderService) {
         return res.status(503).json({ error: "Backup provider service is unavailable" });
       }
-      const passportType = req.body?.passportType || req.body?.passport_type;
+      const passportType = req.body?.passportType;
       if (!passportType) return res.status(400).json({ error: "passportType required in body" });
 
       const currentPassport = await loadLatestLivePassport({
@@ -123,17 +123,17 @@ function registerBackupRoutes(app, deps) {
       });
       if (!currentPassport) return res.status(404).json({ error: "Released passport not found" });
 
-      const normalizedPassport = { ...normalizePassportRow(currentPassport), passport_type: passportType };
+      const normalizedPassport = { ...normalizePassportRow(currentPassport), passportType };
       const publicRowData = await stripRestrictedFieldsForPublicView(normalizedPassport, passportType);
       const companyName = (await getCompanyNameMap([req.params.companyId])).get(String(req.params.companyId)) || "";
 
       const handover = await backupProviderService.activatePublicHandover({
         companyId: req.params.companyId,
         passportDppId: req.params.dppId,
-        lineageId: normalizedPassport.lineage_id || normalizedPassport.dppId,
+        lineageId: normalizedPassport.lineageId || normalizedPassport.dppId,
         passportType,
-        internalAliasId: normalizedPassport.internal_alias_id,
-        versionNumber: normalizedPassport.version_number,
+        internalAliasId: normalizedPassport.internalAliasId,
+        versionNumber: normalizedPassport.versionNumber,
         publicRowData,
         publicCompanyName: companyName,
         activatedBy: req.user.userId,
@@ -150,9 +150,9 @@ function registerBackupRoutes(app, deps) {
         null,
         {
           passportType,
-          sourceReplicationId: handover?.source_replication_id || null,
-          backupProviderKey: handover?.backup_provider_key || null,
-          publicUrl: handover?.public_url || null,
+          sourceReplicationId: handover?.sourceReplicationId || null,
+          backupProviderKey: handover?.backupProviderKey || null,
+          publicUrl: handover?.publicUrl || null,
         },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || null,
@@ -203,8 +203,8 @@ function registerBackupRoutes(app, deps) {
         req.params.dppId,
         null,
         {
-          backupProviderKey: handover.backup_provider_key || null,
-          publicUrl: handover.public_url || null,
+          backupProviderKey: handover.backupProviderKey || null,
+          publicUrl: handover.publicUrl || null,
         },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || null,
@@ -224,7 +224,7 @@ function registerBackupRoutes(app, deps) {
   app.post("/api/companies/:companyId/passports/:dppId/backup-replications", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
-      const passportType = req.body?.passportType || req.body?.passport_type;
+      const passportType = req.body?.passportType;
       if (!passportType) return res.status(400).json({ error: "passportType required in body" });
 
       const currentPassport = await loadLatestLivePassport({
@@ -236,10 +236,10 @@ function registerBackupRoutes(app, deps) {
       if (!currentPassport) return res.status(404).json({ error: "Released passport not found" });
 
       const result = await replicatePassportToBackup({
-        passport: { ...currentPassport, passport_type: passportType },
+        passport: { ...currentPassport, passportType },
         passportType,
         reason: "manual_replication",
-        snapshotScope: req.body?.snapshotScope || req.body?.snapshot_scope || "released_current",
+        snapshotScope: req.body?.snapshotScope || "released_current",
       });
 
       await logAudit(
@@ -261,7 +261,7 @@ function registerBackupRoutes(app, deps) {
   app.post("/api/companies/:companyId/passports/:dppId/backup-replications/verify", authenticateToken, backupAdminGuard, async (req, res) => {
     try {
       if (!backupProviderService) return res.status(503).json({ error: "Backup provider service is unavailable" });
-      const replicationId = req.body?.replicationId ?? req.body?.replication_id ?? null;
+      const replicationId = req.body?.replicationId ?? null;
       if (replicationId !== null && replicationId !== undefined && !Number.isFinite(Number(replicationId))) {
         return res.status(400).json({ error: "replicationId must be a valid integer" });
       }

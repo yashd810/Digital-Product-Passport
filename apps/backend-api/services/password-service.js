@@ -42,7 +42,7 @@ function createPasswordService({ crypto, pepper, currentPepperVersion = 1 }) {
   }
 
   async function verifyPasswordAndUpgrade(password, user) {
-    const passwordHash = user?.password_hash || "";
+    const passwordHash = user?.passwordHash || "";
     const algorithm = detectHashAlgorithm(passwordHash);
     const valid = await verifyPassword(password, passwordHash);
     if (!valid) {

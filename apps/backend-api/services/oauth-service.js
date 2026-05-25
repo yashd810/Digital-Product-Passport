@@ -36,17 +36,17 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     ? rawProviders.map((provider) => ({
         key: String(provider.key || "").trim(),
         label: String(provider.label || provider.key || "Enterprise SSO").trim(),
-        discoveryUrl: provider.discoveryUrl || provider.discovery_url || null,
+        discoveryUrl: provider.discoveryUrl || null,
         issuer: provider.issuer || null,
-        clientId: provider.clientId || provider.client_id || null,
-        clientSecret: provider.clientSecret || provider.client_secret || null,
+        clientId: provider.clientId || null,
+        clientSecret: provider.clientSecret || null,
         scopes: normalizeArray(provider.scopes, ["openid", "profile", "email"]),
-        defaultCompanyId: provider.defaultCompanyId || provider.default_company_id || null,
-        defaultRole: provider.defaultRole || provider.default_role || "viewer",
+        defaultCompanyId: provider.defaultCompanyId || null,
+        defaultRole: provider.defaultRole || "viewer",
         autoLinkByEmail: provider.autoLinkByEmail !== false,
         allowCreateUser: provider.allowCreateUser !== false,
         ssoOnly: provider.ssoOnly === true,
-        allowedEmailDomains: normalizeArray(provider.allowedEmailDomains || provider.allowed_email_domains),
+        allowedEmailDomains: normalizeArray(provider.allowedEmailDomains),
       })).filter((provider) => provider.key && provider.clientId && provider.clientSecret && (provider.discoveryUrl || provider.issuer))
     : [];
 
@@ -160,7 +160,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     assertEmailAllowed(provider, email);
 
     const existingIdentity = await pool.query(
-      `SELECT u.id, u.email, u.company_id, u.role, u.first_name, u.last_name, u.is_active, u.session_version
+      `SELECT u.id, u.email, u."companyId" AS "companyId", u.role, u."firstName" AS "firstName", u."lastName" AS "lastName", u."isActive" AS "isActive", u."sessionVersion" AS "sessionVersion"
          FROM user_identities ui
          JOIN users u ON u.id = ui.user_id
         WHERE ui.provider_key = $1 AND ui.provider_subject = $2
@@ -169,7 +169,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     );
     if (existingIdentity.rows.length) {
       const user = existingIdentity.rows[0];
-      if (!user.is_active) throw new Error("Your account is inactive");
+      if (!user.isActive) throw new Error("Your account is inactive");
       await pool.query(
         `UPDATE user_identities
             SET email = $1, raw_profile = $2, last_login_at = NOW()
@@ -182,7 +182,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     let user = null;
     if (provider.autoLinkByEmail) {
       const existingUser = await pool.query(
-        `SELECT id, email, company_id, role, first_name, last_name, is_active, session_version
+        `SELECT id, email, "companyId" AS "companyId", role, "firstName" AS "firstName", "lastName" AS "lastName", "isActive" AS "isActive", "sessionVersion" AS "sessionVersion"
            FROM users
           WHERE email = $1
           LIMIT 1`,
@@ -205,9 +205,9 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       const lastName = profile.family_name || String(profile.name || "").split(" ").filter(Boolean).slice(1).join(" ") || null;
       const randomPassword = await hashPassword(crypto.randomUUID());
       const insertedUser = await pool.query(
-        `INSERT INTO users (email, password_hash, first_name, last_name, company_id, role, pepper_version, auth_source, sso_only)
+        `INSERT INTO users (email, "passwordHash", "firstName", "lastName", "companyId", role, "pepperVersion", "authSource", "ssoOnly")
          VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8)
-         RETURNING id, email, company_id, role, first_name, last_name, is_active, session_version`,
+         RETURNING id, email, "companyId" AS "companyId", role, "firstName" AS "firstName", "lastName" AS "lastName", "isActive" AS "isActive", "sessionVersion" AS "sessionVersion"`,
         [
           email,
           randomPassword.hash,
@@ -282,7 +282,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     const user = await resolveUserForOauth(provider, profile);
 
     await pool.query(
-      "UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1",
+      'UPDATE users SET "lastLoginAt" = NOW(), "updatedAt" = NOW() WHERE id = $1',
       [user.id]
     ).catch(() => {});
 

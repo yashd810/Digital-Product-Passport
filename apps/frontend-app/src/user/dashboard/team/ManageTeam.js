@@ -231,8 +231,8 @@ function ManageTeam({ user, companyId }) {
                     <td>
                       <div className="member-cell">
                         <div className="member-avatar">
-                          {m.avatar_url
-                            ? <img src={m.avatar_url} alt="" />
+                          {m.avatarUrl
+                            ? <img src={m.avatarUrl} alt="" />
                             : <span>{(m.firstName?.[0] || "?").toUpperCase()}</span>
                           }
                         </div>

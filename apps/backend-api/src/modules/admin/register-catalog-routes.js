@@ -27,16 +27,16 @@ module.exports = function registerCatalogRoutes(app, deps) {
 
   const mapPassportTypeRow = (row = {}) => ({
     id: row.id ?? null,
-    typeName: row.typeName ?? row.type_name ?? null,
-    displayName: row.displayName ?? row.display_name ?? null,
-    productCategory: row.productCategory ?? row.product_category ?? null,
-    productIcon: row.productIcon ?? row.product_icon ?? null,
-    semanticModelKey: row.semanticModelKey ?? row.semantic_model_key ?? null,
-    fieldsJson: row.fieldsJson ?? row.fields_json ?? null,
-    isActive: row.isActive ?? row.is_active ?? null,
-    accessGranted: row.accessGranted ?? row.access_granted ?? null,
-    createdAt: row.createdAt ?? row.created_at ?? null,
-    createdByEmail: row.createdByEmail ?? row.created_by_email ?? null,
+    typeName: row.typeName ?? null,
+    displayName: row.displayName ?? null,
+    productCategory: row.productCategory ?? null,
+    productIcon: row.productIcon ?? null,
+    semanticModelKey: row.semanticModelKey ?? null,
+    fieldsJson: row.fieldsJson ?? null,
+    isActive: row.isActive ?? null,
+    accessGranted: row.accessGranted ?? null,
+    createdAt: row.createdAt ?? null,
+    createdByEmail: row.createdByEmail ?? null,
   });
 
   app.get("/api/admin/product-categories", authenticateToken, isSuperAdmin, async (req, res) => {
@@ -69,15 +69,15 @@ module.exports = function registerCatalogRoutes(app, deps) {
       const { password } = req.body || {};
       if (!password) return res.status(400).json({ error: "Password is required" });
 
-      const userRow = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.user.userId]);
+      const userRow = await pool.query('SELECT "passwordHash" AS "passwordHash" FROM users WHERE id = $1', [req.user.userId]);
       if (!userRow.rows.length) return res.status(401).json({ error: "User not found" });
-      const valid = await verifyPassword(password, userRow.rows[0].password_hash);
+      const valid = await verifyPassword(password, userRow.rows[0].passwordHash);
       if (!valid) return res.status(403).json({ error: "Incorrect password" });
 
       const category = await pool.query("SELECT name FROM product_categories WHERE id = $1", [req.params.id]);
       if (!category.rows.length) return res.status(404).json({ error: "Category not found" });
       const usage = await pool.query(
-        "SELECT COUNT(*) FROM passport_types WHERE product_category = $1", [category.rows[0].name]
+        'SELECT COUNT(*) FROM passport_types WHERE "productCategory" = $1', [category.rows[0].name]
       );
       if (parseInt(usage.rows[0].count, 10) > 0) {
         return res.status(400).json({ error: "Cannot delete — passport types are using this category" });
@@ -95,18 +95,18 @@ module.exports = function registerCatalogRoutes(app, deps) {
     try {
       const result = await pool.query(`
         SELECT pt.id,
-               pt.type_name AS "typeName",
-               pt.display_name AS "displayName",
-               pt.product_category AS "productCategory",
-               pt.product_icon AS "productIcon",
-               pt.semantic_model_key AS "semanticModelKey",
-               pt.fields_json AS "fieldsJson",
-               pt.is_active AS "isActive",
-               pt.created_at AS "createdAt",
+               pt."typeName" AS "typeName",
+               pt."displayName" AS "displayName",
+               pt."productCategory" AS "productCategory",
+               pt."productIcon" AS "productIcon",
+               pt."semanticModelKey" AS "semanticModelKey",
+               pt."fieldsJson" AS "fieldsJson",
+               pt."isActive" AS "isActive",
+               pt."createdAt" AS "createdAt",
                u.email AS "createdByEmail"
         FROM passport_types pt
-        LEFT JOIN users u ON u.id = pt.created_by
-        ORDER BY pt.product_category, pt.display_name
+        LEFT JOIN users u ON u.id = pt."createdBy"
+        ORDER BY pt."productCategory", pt."displayName"
       `);
       res.json(result.rows.map(mapPassportTypeRow));
     } catch (error) {
@@ -119,13 +119,13 @@ module.exports = function registerCatalogRoutes(app, deps) {
     try {
       const result = await pool.query(
         `SELECT id,
-                type_name AS "typeName",
-                display_name AS "displayName",
-                product_category AS "productCategory",
-                product_icon AS "productIcon",
-                semantic_model_key AS "semanticModelKey",
-                fields_json AS "fieldsJson"
-         FROM passport_types WHERE type_name = $1`,
+                "typeName" AS "typeName",
+                "displayName" AS "displayName",
+                "productCategory" AS "productCategory",
+                "productIcon" AS "productIcon",
+                "semanticModelKey" AS "semanticModelKey",
+                "fieldsJson" AS "fieldsJson"
+         FROM passport_types WHERE "typeName" = $1`,
         [req.params.typeName]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport type not found" });
@@ -154,10 +154,10 @@ module.exports = function registerCatalogRoutes(app, deps) {
       const values = [];
       let index = 1;
 
-      if (displayName !== undefined) { updates.push(`display_name = $${index++}`); values.push(displayName); }
-      if (productCategory !== undefined) { updates.push(`product_category = $${index++}`); values.push(productCategory); }
-      if (productIcon !== undefined) { updates.push(`product_icon = $${index++}`); values.push(productIcon); }
-      if (semanticModelKey !== undefined) { updates.push(`semantic_model_key = $${index++}`); values.push(semanticModelKey || null); }
+      if (displayName !== undefined) { updates.push(`"displayName" = $${index++}`); values.push(displayName); }
+      if (productCategory !== undefined) { updates.push(`"productCategory" = $${index++}`); values.push(productCategory); }
+      if (productIcon !== undefined) { updates.push(`"productIcon" = $${index++}`); values.push(productIcon); }
+      if (semanticModelKey !== undefined) { updates.push(`"semanticModelKey" = $${index++}`); values.push(semanticModelKey || null); }
       if (sections !== undefined) {
         const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
         if (reservedFieldConflicts.length) {
@@ -169,10 +169,10 @@ module.exports = function registerCatalogRoutes(app, deps) {
         const sectionValidationError = validatePassportTypeSections(sections);
         if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
         const schemaChange = buildPassportTypeSchemaChange({
-          currentFieldsJson: currentType.fields_json || {},
+          currentFieldsJson: currentType.fieldsJson || {},
           nextSections: sections,
         });
-        const hasStoredRecords = await passportTypeHasStoredRecords(currentType.type_name);
+        const hasStoredRecords = await passportTypeHasStoredRecords(currentType.typeName);
         if (hasStoredRecords && !schemaChange.additive) {
           return res.status(409).json({
             error: "PASSPORT_TYPE_SCHEMA_CHANGE_REQUIRES_NEW_VERSION",
@@ -181,13 +181,13 @@ module.exports = function registerCatalogRoutes(app, deps) {
             typeChanged: schemaChange.typeChanged,
           });
         }
-        const fields_json = normalizeRequestedPassportTypeSchema({
+        const fieldsJson = normalizeRequestedPassportTypeSchema({
           sections,
           systemHeader,
-          currentSchemaVersion: getTypeSchemaVersion(currentType.fields_json || {}) + 1,
+          currentSchemaVersion: getTypeSchemaVersion(currentType.fieldsJson || {}) + 1,
         });
-        updates.push(`fields_json = $${index++}`);
-        values.push(JSON.stringify(fields_json));
+        updates.push(`"fieldsJson" = $${index++}`);
+        values.push(JSON.stringify(fieldsJson));
       }
 
       if (updates.length === 0) return res.status(400).json({ error: "Nothing to update" });
@@ -199,10 +199,10 @@ module.exports = function registerCatalogRoutes(app, deps) {
       );
 
       await logAudit(null, req.user.userId, "UPDATE_PASSPORT_TYPE_METADATA", "passport_types", null, null,
-        { type_name: existing.rows[0].type_name, updated_fields: updates });
+        { typeName: existing.rows[0].typeName, updatedFields: updates });
 
       if (sections !== undefined) {
-        await createPassportTable(currentType.type_name, {
+        await createPassportTable(currentType.typeName, {
           createdBy: req.user.userId,
           eventType: "admin_update_reconcile_table",
         });
@@ -210,7 +210,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
 
       const verification = sections !== undefined
         ? buildPassportTypeGovernanceCheck(sections)
-        : buildPassportTypeGovernanceCheck((result.rows[0]?.fields_json || {}).sections || []);
+        : buildPassportTypeGovernanceCheck((result.rows[0]?.fieldsJson || {}).sections || []);
 
       res.json({
         success: true,
@@ -232,27 +232,28 @@ module.exports = function registerCatalogRoutes(app, deps) {
       const { password } = req.body;
       if (!password) return res.status(400).json({ error: "Password is required" });
 
-      const userRow = await pool.query("SELECT password_hash FROM users WHERE id = $1", [req.user.userId]);
+      const userRow = await pool.query('SELECT "passwordHash" AS "passwordHash" FROM users WHERE id = $1', [req.user.userId]);
       if (!userRow.rows.length) return res.status(401).json({ error: "User not found" });
-      const valid = await verifyPassword(password, userRow.rows[0].password_hash);
+      const valid = await verifyPassword(password, userRow.rows[0].passwordHash);
       if (!valid) return res.status(403).json({ error: "Incorrect password" });
 
       const typeRow = await pool.query(
-        "SELECT type_name, display_name FROM passport_types WHERE id = $1", [typeId]
+        'SELECT "typeName" AS "typeName", "displayName" AS "displayName" FROM passport_types WHERE id = $1',
+        [typeId]
       );
       if (!typeRow.rows.length) return res.status(404).json({ error: "Passport type not found" });
-      const { type_name, display_name } = typeRow.rows[0];
+      const { typeName, displayName } = typeRow.rows[0];
 
       await pool.query("DELETE FROM passport_types WHERE id = $1", [typeId]);
 
-      const tableName = getTable(type_name);
+      const tableName = getTable(typeName);
       if (!/^passport_type_[a-z0-9_]+$/.test(tableName)) {
         throw new Error(`Refusing to drop table with unexpected name: ${tableName}`);
       }
       await pool.query(`DROP TABLE IF EXISTS "${tableName}"`);
 
       await logAudit(null, req.user.userId, "DELETE_PASSPORT_TYPE", "passport_types", null, null,
-        { type_name, display_name });
+        { typeName, displayName });
 
       res.json({ success: true });
     } catch (error) {
@@ -286,13 +287,13 @@ module.exports = function registerCatalogRoutes(app, deps) {
       const sectionValidationError = validatePassportTypeSections(sections);
       if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
 
-      const fields_json = normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion: 1 });
+      const fieldsJson = normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion: 1 });
 
       const result = await pool.query(
-        `INSERT INTO passport_types (type_name, display_name, product_category, product_icon, semantic_model_key, fields_json, created_by)
+        `INSERT INTO passport_types ("typeName", "displayName", "productCategory", "productIcon", "semanticModelKey", "fieldsJson", "createdBy")
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [typeName, displayName, productCategory, productIcon || "📋",
-          semanticModelKey || null, JSON.stringify(fields_json), req.user.userId]
+          semanticModelKey || null, JSON.stringify(fieldsJson), req.user.userId]
       );
 
       await pool.query(
@@ -318,7 +319,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
           : null,
       });
     } catch (error) {
-      if (error.code === "23505") return res.status(400).json({ error: "A passport type with this type_name already exists" });
+      if (error.code === "23505") return res.status(400).json({ error: "A passport type with this typeName already exists" });
       logger.error("Create passport type error:", error.message);
       res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : "Failed to create passport type" });
     }
@@ -466,12 +467,12 @@ module.exports = function registerCatalogRoutes(app, deps) {
     try {
       const result = await pool.query(
         `UPDATE passport_types
-            SET is_active = false
+            SET "isActive" = false
           WHERE id = $1
       RETURNING id,
-                type_name AS "typeName",
-                display_name AS "displayName",
-                is_active AS "isActive"`,
+                "typeName" AS "typeName",
+                "displayName" AS "displayName",
+                "isActive" AS "isActive"`,
         [req.params.id]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport type not found" });
@@ -485,12 +486,12 @@ module.exports = function registerCatalogRoutes(app, deps) {
     try {
       const result = await pool.query(
         `UPDATE passport_types
-            SET is_active = true
+            SET "isActive" = true
           WHERE id = $1
       RETURNING id,
-                type_name AS "typeName",
-                display_name AS "displayName",
-                is_active AS "isActive"`,
+                "typeName" AS "typeName",
+                "displayName" AS "displayName",
+                "isActive" AS "isActive"`,
         [req.params.id]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport type not found" });
@@ -504,16 +505,16 @@ module.exports = function registerCatalogRoutes(app, deps) {
     try {
       const result = await pool.query(`
         SELECT DISTINCT pt.id,
-          pt.type_name AS "typeName",
-          pt.display_name AS "displayName",
-          pt.product_category AS "productCategory",
-          pt.product_icon AS "productIcon",
-          pt.fields_json AS "fieldsJson",
+          pt."typeName" AS "typeName",
+          pt."displayName" AS "displayName",
+          pt."productCategory" AS "productCategory",
+          pt."productIcon" AS "productIcon",
+          pt."fieldsJson" AS "fieldsJson",
           (NOT cpa.access_revoked) AS "accessGranted"
         FROM passport_types pt
         JOIN company_passport_access cpa ON pt.id = cpa.passport_type_id
         WHERE cpa.company_id = $1
-        ORDER BY pt.product_category, pt.display_name
+        ORDER BY pt."productCategory", pt."displayName"
       `, [req.params.companyId]);
 
       res.json(result.rows.map(mapPassportTypeRow));

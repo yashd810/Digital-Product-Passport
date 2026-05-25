@@ -133,11 +133,11 @@ const ASSET_SOURCE_ALLOWED_HOSTS = new Set(
 
 const ASSET_SCHEDULER_INTERVAL_MS = 60 * 1000;
 const ASSET_IGNORED_SYSTEM_COLUMNS = new Set([
-  "id", "company_id", "qr_code", "created_by", "created_at", "updated_at", "updated_by",
-  "deleted_at", "release_status", "version_number", "is_editable", "field_label",
-  "created_by_email", "first_name", "last_name",
+  "id", "companyId", "qrCode", "createdBy", "createdAt", "updatedAt", "updatedBy",
+  "deletedAt", "releaseStatus", "versionNumber", "isEditable", "fieldLabel",
+  "createdByEmail", "firstName", "lastName",
 ]);
-const ASSET_MATCH_FIELDS = new Set(["dppId", "dpp_id", "match_dpp_id", "guid", "match_guid", "internal_alias_id", "match_product_id", "next_product_id"]);
+const ASSET_MATCH_FIELDS = new Set(["dppId", "matchDppId", "guid", "matchGuid", "internalAliasId", "matchProductId", "nextProductId"]);
 const ASSET_ERP_PRESETS = [
   {
     key: "generic_rest", label: "Generic REST",
@@ -190,13 +190,13 @@ const { hashPassword, verifyPassword, verifyPasswordAndUpgrade } = passwordServi
 const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, extraClaims = {}) => {
   const user = typeof userOrId === "object" && userOrId !== null
     ? userOrId
-    : { id: userOrId, email, company_id: companyId, role, session_version: sessionVersion };
+    : { id: userOrId, email, companyId, role, sessionVersion };
   const payload = {
     userId: user.id || user.userId,
     email: user.email,
-    companyId: user.company_id !== undefined ? user.company_id : (user.companyId ?? null),
+    companyId: user.companyId ?? null,
     role: user.role,
-    sessionVersion: user.session_version !== undefined ? user.session_version : (user.sessionVersion ?? 1),
+    sessionVersion: user.sessionVersion ?? 1,
     mfaVerifiedAt: extraClaims.mfaVerifiedAt || null,
     amr: Array.isArray(extraClaims.amr) && extraClaims.amr.length ? extraClaims.amr : ["pwd"],
   };
@@ -303,7 +303,8 @@ async function assertAssetManagementEnabled(companyId) {
 async function getCurrentAssetSessionUser(userId) {
   if (!userId) return null;
   const result = await pool.query(
-    "SELECT id, company_id, role, is_active FROM users WHERE id = $1", [userId]
+    'SELECT id, "companyId" AS "companyId", role, "isActive" AS "isActive" FROM users WHERE id = $1',
+    [userId]
   );
   return result.rows[0] || null;
 }
@@ -312,17 +313,24 @@ async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
   const normalizedType = String(passportType || "").trim();
   if (!normalizedType) { const e = new Error("passport_type is required"); e.statusCode = 400; throw e; }
   const result = await pool.query(
-    `SELECT pt.id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon, pt.semantic_model_key, pt.fields_json, pt.is_active
+    `SELECT pt.id,
+            pt."typeName" AS "typeName",
+            pt."displayName" AS "displayName",
+            pt."productCategory" AS "productCategory",
+            pt."productIcon" AS "productIcon",
+            pt."semanticModelKey" AS "semanticModelKey",
+            pt."fieldsJson" AS "fieldsJson",
+            pt."isActive" AS "isActive"
      FROM passport_types pt
      JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
-     WHERE cpa.company_id = $1 AND cpa.access_revoked = false AND pt.is_active = true AND pt.type_name = $2
+     WHERE cpa.company_id = $1 AND cpa.access_revoked = false AND pt."isActive" = true AND pt."typeName" = $2
      LIMIT 1`,
     [companyId, normalizedType]
   );
   if (!result.rows.length) { const e = new Error("Passport type is not enabled for this company"); e.statusCode = 403; throw e; }
-  const sections = result.rows[0]?.fields_json?.sections || [];
+  const sections = result.rows[0]?.fieldsJson?.sections || [];
   const schemaFields = sections.flatMap(s => s.fields || []);
-  return { typeName: result.rows[0].type_name, displayName: result.rows[0].display_name, schemaFields, allowedKeys: new Set(schemaFields.map(f => f.key).filter(Boolean)) };
+  return { typeName: result.rows[0].typeName, displayName: result.rows[0].displayName, schemaFields, allowedKeys: new Set(schemaFields.map(f => f.key).filter(Boolean)) };
 }
 
 const authenticateAssetPlatform = async (req, res, next) => {
@@ -335,8 +343,8 @@ const authenticateAssetPlatform = async (req, res, next) => {
     }
     await assertAssetManagementEnabled(decoded.companyId);
     const currentUser = await getCurrentAssetSessionUser(decoded.userId);
-    if (!currentUser || !currentUser.is_active) return res.status(403).json({ error: "Asset platform user is no longer active" });
-    if (currentUser.role !== "super_admin" && String(currentUser.company_id) !== String(decoded.companyId)) {
+    if (!currentUser || !currentUser.isActive) return res.status(403).json({ error: "Asset platform user is no longer active" });
+    if (currentUser.role !== "super_admin" && String(currentUser.companyId) !== String(decoded.companyId)) {
       return res.status(403).json({ error: "Asset platform session no longer matches this company" });
     }
     if (currentUser.role === "viewer") return res.status(403).json({ error: "Viewers do not have permission to access Asset Management." });

@@ -365,7 +365,7 @@ function AdminCreatePassportType() {
   const [semanticModelKey, setSemanticModelKey] = useState("");
   const [typeName,       setTypeName]       = useState("");
   const [typeNameManual, setTypeNameManual] = useState(false);
-  const cloneSourceTypeName = useRef(null); // tracks original type_name when cloning
+  const cloneSourceTypeName = useRef(null); // tracks original typeName when cloning
 
   // ── Edit mode (patch existing type metadata) ───────────────
   const initialEditData = useRef(location.state?.editData || null);
@@ -427,7 +427,7 @@ function AdminCreatePassportType() {
         label: sec.label,
         fields: sec.fields.map(f => {
           const normalizedField = normalizeFieldToBatteryPass(f, semanticModelKey);
-          fieldKeyToId.set(normalizedField.key, f._id);
+          fieldKeyToId.set(normalizedField.key, f.localId);
           const base = {
             key: normalizedField.key,
             label: normalizedField.label,
@@ -489,9 +489,9 @@ function AdminCreatePassportType() {
     setTypeNameManual(draft.typeNameManual || false);
     const restored = (draft.sections || []).map(sec => rekeySection({
       ...sec,
-      _id:       Math.random().toString(36).slice(2),
+      localId:   Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
-      fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
+      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
     setSystemHeader(normalizeSystemPassportHeader(draft.systemHeader));
     if (restored.length > 0) setSections(syncSectionsWithSemanticModel(restored, nextSemanticModelKey));
@@ -586,12 +586,12 @@ function AdminCreatePassportType() {
     const nextSemanticModelKey = normalizeSemanticModelKey(ed.semanticModelKey || "");
     setSemanticModelKey(nextSemanticModelKey);
     setTypeName(ed.typeName || "");
-    setTypeNameManual(true); // lock type_name, it cannot change
+    setTypeNameManual(true); // lock typeName, it cannot change
     const editSections = (ed.fieldsJson?.sections || []).map(sec => rekeySection({
       ...sec,
-      _id:       Math.random().toString(36).slice(2),
+      localId:   Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
-      fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
+      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
     setSystemHeader(normalizeSystemPassportHeader(ed.fieldsJson?.systemHeader));
     if (editSections.length > 0) setSections(syncSectionsWithSemanticModel(editSections, nextSemanticModelKey));
@@ -611,15 +611,15 @@ function AdminCreatePassportType() {
     setSemanticModelKey(nextSemanticModelKey);
     const clonedSections = (cd.fieldsJson?.sections || []).map(sec => rekeySection({
       ...sec,
-      _id:       Math.random().toString(36).slice(2),
+      localId:   Math.random().toString(36).slice(2),
       label_i18n: sec.label_i18n || {},
-      fields: (sec.fields || []).map(f => ({ ...f, _id: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
+      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
     }));
     setSystemHeader(normalizeSystemPassportHeader(cd.fieldsJson?.systemHeader));
     if (clonedSections.length > 0) setSections(syncSectionsWithSemanticModel(clonedSections, nextSemanticModelKey));
   }, []); // runs once — initial clone data captured in ref above
 
-  // Auto-generate type_name from display_name unless user has manually overridden it
+  // Auto-generate typeName from displayName unless user has manually overridden it
   useEffect(() => {
     if (!typeNameManual) {
       setTypeName(toSlug(displayName));
@@ -635,11 +635,11 @@ function AdminCreatePassportType() {
     setSections(s => [...s, newSection("")]);
 
   const removeSection = (id) =>
-    setSections(s => s.filter(sec => sec._id !== id));
+    setSections(s => s.filter(sec => sec.localId !== id));
 
   const updateSection = (id, patch) =>
     setSections(s => s.map(sec => {
-      if (sec._id !== id) return sec;
+      if (sec.localId !== id) return sec;
       const updated = { ...sec, ...patch };
       if ("label" in patch && !sec._keyManual) {
         updated.key = toSlug(patch.label);
@@ -649,31 +649,31 @@ function AdminCreatePassportType() {
 
   const setSectionKeyManual = (id) =>
     setSections(s => s.map(sec =>
-      sec._id === id ? { ...sec, _keyManual: true } : sec
+      sec.localId === id ? { ...sec, _keyManual: true } : sec
     ));
 
   // ── Field helpers ──────────────────────────────────────────
   const addField = (sectionId) =>
     setSections(s => s.map(sec =>
-      sec._id === sectionId
+      sec.localId === sectionId
         ? { ...sec, fields: [...sec.fields, newField("")] }
         : sec
     ));
 
   const removeField = (sectionId, fieldId) =>
     setSections(s => s.map(sec =>
-      sec._id === sectionId
-        ? { ...sec, fields: sec.fields.filter(f => f._id !== fieldId) }
+      sec.localId === sectionId
+        ? { ...sec, fields: sec.fields.filter(f => f.localId !== fieldId) }
         : sec
     ));
 
   const updateField = (sectionId, fieldId, patch) =>
     setSections(s => s.map(sec => {
-      if (sec._id !== sectionId) return sec;
+      if (sec.localId !== sectionId) return sec;
       return {
         ...sec,
         fields: sec.fields.map(f => {
-          if (f._id !== fieldId) return f;
+          if (f.localId !== fieldId) return f;
           let updated = { ...f, ...patch };
           const shouldNormalizeSemantic =
             "label" in patch ||
@@ -725,11 +725,11 @@ function AdminCreatePassportType() {
 
   const setFieldKeyManual = (sectionId, fieldId) =>
     setSections(s => s.map(sec => {
-      if (sec._id !== sectionId) return sec;
+      if (sec.localId !== sectionId) return sec;
       return {
         ...sec,
         fields: sec.fields.map(f => {
-          if (f._id !== fieldId) return f;
+          if (f.localId !== fieldId) return f;
           return normalizeFieldToBatteryPass({ ...f, _keyManual: true }, semanticModelKey);
         }),
       };
@@ -737,11 +737,11 @@ function AdminCreatePassportType() {
 
   const applyManualSemanticSelection = (sectionId, fieldId, selectionValue) =>
     setSections(s => s.map(sec => {
-      if (sec._id !== sectionId) return sec;
+      if (sec.localId !== sectionId) return sec;
       return {
         ...sec,
         fields: sec.fields.map(f => {
-          if (f._id !== fieldId) return f;
+          if (f.localId !== fieldId) return f;
           const selected = resolveBatteryPassFieldDefinitionByInput(selectionValue);
           if (!selected) {
             return {
@@ -763,11 +763,11 @@ function AdminCreatePassportType() {
 
   const updateSemanticSearchInput = (sectionId, fieldId, value) =>
     setSections(s => s.map(sec => {
-      if (sec._id !== sectionId) return sec;
+      if (sec.localId !== sectionId) return sec;
       return {
         ...sec,
         fields: sec.fields.map(f => {
-          if (f._id !== fieldId) return f;
+          if (f.localId !== fieldId) return f;
           const nextValue = String(value || "");
           if (!nextValue.trim()) {
             return {
@@ -789,22 +789,22 @@ function AdminCreatePassportType() {
 
   const setSemanticPickerOpen = (sectionId, fieldId, isOpen) =>
     setSections(s => s.map(sec => {
-      if (sec._id !== sectionId) return sec;
+      if (sec.localId !== sectionId) return sec;
       return {
         ...sec,
         fields: sec.fields.map(f =>
-          f._id === fieldId ? { ...f, _semanticOpen: isOpen } : f
+          f.localId === fieldId ? { ...f, _semanticOpen: isOpen } : f
         ),
       };
     }));
 
   const clearManualSemanticSelection = (sectionId, fieldId) =>
     setSections(s => s.map(sec => {
-      if (sec._id !== sectionId) return sec;
+      if (sec.localId !== sectionId) return sec;
       return {
         ...sec,
         fields: sec.fields.map(f => {
-          if (f._id !== fieldId) return f;
+          if (f.localId !== fieldId) return f;
           const normalized = normalizeFieldToBatteryPass({
             ...f,
             semanticId: undefined,
@@ -817,8 +817,8 @@ function AdminCreatePassportType() {
 
   const moveFieldWithinSection = (sectionId, fieldId, direction) =>
     setSections(s => s.map(sec => {
-      if (sec._id !== sectionId) return sec;
-      const index = sec.fields.findIndex(f => f._id === fieldId);
+      if (sec.localId !== sectionId) return sec;
+      const index = sec.fields.findIndex(f => f.localId === fieldId);
       if (index < 0) return sec;
       const targetIndex = direction === "up" ? index - 1 : index + 1;
       if (targetIndex < 0 || targetIndex >= sec.fields.length) return sec;
@@ -833,16 +833,16 @@ function AdminCreatePassportType() {
 
       let fieldToMove = null;
       const nextSections = currentSections.map(sec => {
-        if (sec._id !== sourceSectionId) return sec;
-        fieldToMove = sec.fields.find(f => f._id === fieldId) || null;
+        if (sec.localId !== sourceSectionId) return sec;
+        fieldToMove = sec.fields.find(f => f.localId === fieldId) || null;
         if (!fieldToMove) return sec;
-        return { ...sec, fields: sec.fields.filter(f => f._id !== fieldId) };
+        return { ...sec, fields: sec.fields.filter(f => f.localId !== fieldId) };
       });
 
       if (!fieldToMove) return currentSections;
 
       return nextSections.map(sec =>
-        sec._id === targetSectionId
+        sec.localId === targetSectionId
           ? { ...sec, fields: [...sec.fields, fieldToMove] }
           : sec
       );
@@ -896,23 +896,23 @@ function AdminCreatePassportType() {
 
     const invalidSection = cleanSections.find(s => !s.key || !s.label);
     if (invalidSection) {
-      setInvalidFields([invalidSection._id]);
+      setInvalidFields([invalidSection.localId]);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return setError("All sections must have a key and a name.");
     }
 
     const invalidField = cleanSections
-      .flatMap(s => s.fields.map(f => ({ sectionId: s._id, field: f })))
+      .flatMap(s => s.fields.map(f => ({ sectionId: s.localId, field: f })))
       .find(x => !x.field.key || !x.field.label);
     if (invalidField) {
-      setInvalidFields([invalidField.field._id]);
+      setInvalidFields([invalidField.field.localId]);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return setError("All fields must have a key and a name.");
     }
 
     const emptySection = cleanSections.find(s => s.fields.length === 0);
     if (emptySection) {
-      setInvalidFields([emptySection._id]);
+      setInvalidFields([emptySection.localId]);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return setError("Each section must have at least one field.");
     }
@@ -925,7 +925,7 @@ function AdminCreatePassportType() {
       return setError(`Duplicate field keys found: ${[...new Set(dupes)].join(", ")}. Each field key must be unique across all sections.`);
     }
 
-    // Clone guard: type_name must differ from the original
+    // Clone guard: typeName must differ from the original
     if (cloneSourceTypeName.current && typeName === cloneSourceTypeName.current) {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return setError(`Type name "${typeName}" is the same as the original. Change the display name or type name to save as a new type.`);
@@ -1203,12 +1203,12 @@ function AdminCreatePassportType() {
           </div>
 
           {sections.map((section, si) => (
-            <div key={section._id} className="acpt-section">
+            <div key={section.localId} className="acpt-section">
               <div className="acpt-section-head">
                 <button
                   type="button"
                   className={`acpt-collapse-btn${section._collapsed ? " collapsed" : ""}`}
-                  onClick={() => updateSection(section._id, { _collapsed: !section._collapsed })}
+                  onClick={() => updateSection(section.localId, { _collapsed: !section._collapsed })}
                   title={section._collapsed ? "Expand section" : "Collapse section"}
                 >
                   ▾
@@ -1219,16 +1219,16 @@ function AdminCreatePassportType() {
                     <input
                       type="text"
                       value={section.label}
-                      onChange={e => { updateSection(section._id, { label: e.target.value }); setError(""); setInvalidFields([]); }}
+                      onChange={e => { updateSection(section.localId, { label: e.target.value }); setError(""); setInvalidFields([]); }}
                       placeholder="Section name, e.g. General"
-                      className={`acpt-section-name-input${hasInvalid(section._id) ? " acpt-input-error" : ""}`}
+                      className={`acpt-section-name-input${hasInvalid(section.localId) ? " acpt-input-error" : ""}`}
                     />
                     <div className="acpt-section-key-row">
                       <span className="acpt-key-label">key:</span>
                       <input
                         type="text"
                         value={section.key}
-                        onChange={e => { updateSection(section._id, { key: e.target.value.toLowerCase() }); setSectionKeyManual(section._id); }}
+                        onChange={e => { updateSection(section.localId, { key: e.target.value.toLowerCase() }); setSectionKeyManual(section.localId); }}
                         className="acpt-key-input acpt-mono"
                         placeholder="section_key"
                       />
@@ -1236,7 +1236,7 @@ function AdminCreatePassportType() {
                     <button
                       type="button"
                       className={`acpt-i18n-toggle${section._i18nOpen ? " open" : ""}`}
-                      onClick={() => updateSection(section._id, { _i18nOpen: !section._i18nOpen })}
+                      onClick={() => updateSection(section.localId, { _i18nOpen: !section._i18nOpen })}
                       title="Add translations for this section name"
                     >
                       🌐
@@ -1258,7 +1258,7 @@ function AdminCreatePassportType() {
                           <input
                             type="text"
                             value={(section.label_i18n || {})[l.code] || ""}
-                            onChange={e => updateSection(section._id, {
+                            onChange={e => updateSection(section.localId, {
                               label_i18n: { ...(section.label_i18n || {}), [l.code]: e.target.value },
                             })}
                             placeholder={`"${section.label || "Section"}" in ${l.name}`}
@@ -1271,7 +1271,7 @@ function AdminCreatePassportType() {
                 </div>
                 {sections.length > 1 && (
                   <button type="button" className="acpt-remove-btn"
-                    onClick={() => removeSection(section._id)} title="Remove section">✕</button>
+                    onClick={() => removeSection(section.localId)} title="Remove section">✕</button>
                 )}
               </div>
 
@@ -1281,7 +1281,7 @@ function AdminCreatePassportType() {
                   <div className="acpt-fields-empty">No fields yet — add one below</div>
                 )}
                 {section.fields.map((field, fi) => (
-                  <div key={field._id} className="acpt-field-wrap">
+                  <div key={field.localId} className="acpt-field-wrap">
                     {(() => {
                       const selectedSemanticMatch = resolveSelectedSemanticMatch(field, semanticModelKey);
                       const semanticSearchOptions = getFilteredBatteryPassCatalog(
@@ -1291,8 +1291,8 @@ function AdminCreatePassportType() {
                       const semanticSearchValue = getSemanticSearchDisplayValue(field);
                       const accessSummary = summarizeSelectedValues(field.access || ["public"], ACCESS_LEVEL_LABELS, "Select access");
                       const updateAuthoritySummary = summarizeSelectedValues(field.updateAuthority || ["economic_operator"], UPDATE_AUTHORITY_LABELS, "Select authority");
-                      const accessDropdownId = `${section._id}:${field._id}:access`;
-                      const updateDropdownId = `${section._id}:${field._id}:authority`;
+                      const accessDropdownId = `${section.localId}:${field.localId}:access`;
+                      const updateDropdownId = `${section.localId}:${field.localId}:authority`;
                       return (
                         <>
                     <div className="acpt-field-row">
@@ -1302,9 +1302,9 @@ function AdminCreatePassportType() {
                         <input
                           type="text"
                           value={field.label}
-                          onChange={e => { updateField(section._id, field._id, { label: e.target.value }); setError(""); setInvalidFields([]); }}
+                          onChange={e => { updateField(section.localId, field.localId, { label: e.target.value }); setError(""); setInvalidFields([]); }}
                           placeholder="Field label, e.g. Manufacturer"
-                          className={`acpt-input acpt-field-label-input${hasInvalid(field._id) ? " acpt-input-error" : ""}`}
+                          className={`acpt-input acpt-field-label-input${hasInvalid(field.localId) ? " acpt-input-error" : ""}`}
                         />
                         {field._i18nOpen && (
                           <div className="acpt-i18n-panel acpt-i18n-panel-field">
@@ -1314,7 +1314,7 @@ function AdminCreatePassportType() {
                                 <input
                                   type="text"
                                   value={(field.label_i18n || {})[l.code] || ""}
-                                  onChange={e => updateField(section._id, field._id, {
+                                  onChange={e => updateField(section.localId, field.localId, {
                                     label_i18n: { ...(field.label_i18n || {}), [l.code]: e.target.value },
                                   })}
                                   placeholder={`"${field.label || "Field"}" in ${l.name}`}
@@ -1329,7 +1329,7 @@ function AdminCreatePassportType() {
                       <button
                         type="button"
                         className={`acpt-i18n-toggle${field._i18nOpen ? " open" : ""}`}
-                        onClick={() => updateField(section._id, field._id, { _i18nOpen: !field._i18nOpen })}
+                        onClick={() => updateField(section.localId, field.localId, { _i18nOpen: !field._i18nOpen })}
                         title="Add translations for this field label"
                       >
                         🌐
@@ -1337,7 +1337,7 @@ function AdminCreatePassportType() {
 
                       <select
                         value={field.type}
-                        onChange={e => updateField(section._id, field._id, { type: e.target.value })}
+                        onChange={e => updateField(section.localId, field.localId, { type: e.target.value })}
                         className="acpt-type-select"
                       >
                         {FIELD_TYPES.map(t => (
@@ -1349,7 +1349,7 @@ function AdminCreatePassportType() {
                         <button
                           type="button"
                           className="acpt-move-btn"
-                          onClick={() => { moveFieldWithinSection(section._id, field._id, "up"); setError(""); setInvalidFields([]); }}
+                          onClick={() => { moveFieldWithinSection(section.localId, field.localId, "up"); setError(""); setInvalidFields([]); }}
                           title="Move field up"
                           disabled={fi === 0}
                         >
@@ -1358,18 +1358,18 @@ function AdminCreatePassportType() {
                         <button
                           type="button"
                           className="acpt-move-btn"
-                          onClick={() => { moveFieldWithinSection(section._id, field._id, "down"); setError(""); setInvalidFields([]); }}
+                          onClick={() => { moveFieldWithinSection(section.localId, field.localId, "down"); setError(""); setInvalidFields([]); }}
                           title="Move field down"
                           disabled={fi === section.fields.length - 1}
                         >
                           ↓
                         </button>
                         <select
-                          value={section._id}
+                          value={section.localId}
                           onChange={e => {
                             const targetSectionId = e.target.value;
-                            if (targetSectionId !== section._id) {
-                              moveFieldToSection(section._id, targetSectionId, field._id);
+                            if (targetSectionId !== section.localId) {
+                              moveFieldToSection(section.localId, targetSectionId, field.localId);
                               setError("");
                               setInvalidFields([]);
                             }
@@ -1378,9 +1378,9 @@ function AdminCreatePassportType() {
                           title="Move field to another section"
                           disabled={sections.length < 2}
                         >
-                          <option value={section._id}>Move section</option>
+                          <option value={section.localId}>Move section</option>
                           {sections.map(sec => (
-                            <option key={sec._id} value={sec._id}>
+                            <option key={sec.localId} value={sec.localId}>
                               {sec.label?.trim() || "Untitled section"}
                             </option>
                           ))}
@@ -1388,7 +1388,7 @@ function AdminCreatePassportType() {
                       </div>
 
                       <button type="button" className="acpt-remove-btn"
-                        onClick={() => removeField(section._id, field._id)} title="Remove field">✕</button>
+                        onClick={() => removeField(section.localId, field.localId)} title="Remove field">✕</button>
                     </div>
 
                     <div className="acpt-field-top-row">
@@ -1415,14 +1415,14 @@ function AdminCreatePassportType() {
                                     disabled={isDisabled}
                                     onChange={e => {
                                       if (level.value === "public") {
-                                        updateField(section._id, field._id, {
+                                        updateField(section.localId, field.localId, {
                                           access: e.target.checked ? ["public"] : [],
                                         });
                                       } else {
                                         const next = e.target.checked
                                           ? [...currentAccess.filter(a => a !== "public"), level.value]
                                           : currentAccess.filter(a => a !== level.value);
-                                        updateField(section._id, field._id, { access: next });
+                                        updateField(section.localId, field.localId, { access: next });
                                       }
                                     }}
                                   />
@@ -1438,7 +1438,7 @@ function AdminCreatePassportType() {
                             <span>🛡️ Confidentiality:</span>
                             <select
                               value={field.confidentiality || "public"}
-                              onChange={e => updateField(section._id, field._id, { confidentiality: e.target.value })}
+                              onChange={e => updateField(section.localId, field.localId, { confidentiality: e.target.value })}
                               className="acpt-governance-select"
                             >
                               {CONFIDENTIALITY_LEVELS.map(level => (
@@ -1470,7 +1470,7 @@ function AdminCreatePassportType() {
                                       const next = e.target.checked
                                         ? [...new Set([...currentAuthorities, level.value])]
                                         : currentAuthorities.filter(a => a !== level.value);
-                                      updateField(section._id, field._id, {
+                                      updateField(section.localId, field.localId, {
                                         updateAuthority: next.length ? next : ["economic_operator"],
                                       });
                                     }}
@@ -1490,7 +1490,7 @@ function AdminCreatePassportType() {
                             <input
                               type="checkbox"
                               checked={!!field.composition}
-                              onChange={e => updateField(section._id, field._id, { composition: e.target.checked })}
+                              onChange={e => updateField(section.localId, field.localId, { composition: e.target.checked })}
                             />
                             <span className="acpt-composition-label">
                               Composition (pie chart)
@@ -1504,7 +1504,7 @@ function AdminCreatePassportType() {
                             <input
                               type="checkbox"
                               checked={!!field.dynamic}
-                              onChange={e => updateField(section._id, field._id, { dynamic: e.target.checked })}
+                              onChange={e => updateField(section.localId, field.localId, { dynamic: e.target.checked })}
                             />
                             <span className="acpt-dynamic-label">
                               Dynamic (live data)
@@ -1526,7 +1526,7 @@ function AdminCreatePassportType() {
                             <input
                               type="text"
                               value={field.unit || ""}
-                              onChange={e => updateField(section._id, field._id, { unit: e.target.value })}
+                              onChange={e => updateField(section.localId, field.localId, { unit: e.target.value })}
                               placeholder="kg CO₂-eq, %, kWh…"
                               className="acpt-input acpt-input-small"
                             />
@@ -1535,7 +1535,7 @@ function AdminCreatePassportType() {
                             <span className="acpt-meta-sub-label">Data Type</span>
                             <select
                               value={field.dataType || ""}
-                              onChange={e => updateField(section._id, field._id, { dataType: e.target.value })}
+                              onChange={e => updateField(section.localId, field.localId, { dataType: e.target.value })}
                               className="acpt-type-select acpt-type-select-sm"
                             >
                               <option value="">Auto-detect</option>
@@ -1553,9 +1553,9 @@ function AdminCreatePassportType() {
                               <input
                                 type="text"
                                 value={semanticSearchValue}
-                                onFocus={() => setSemanticPickerOpen(section._id, field._id, true)}
-                                onBlur={() => window.setTimeout(() => setSemanticPickerOpen(section._id, field._id, false), 120)}
-                                onChange={e => updateSemanticSearchInput(section._id, field._id, e.target.value)}
+                                onFocus={() => setSemanticPickerOpen(section.localId, field.localId, true)}
+                                onBlur={() => window.setTimeout(() => setSemanticPickerOpen(section.localId, field.localId, false), 120)}
+                                onChange={e => updateSemanticSearchInput(section.localId, field.localId, e.target.value)}
                                 placeholder="Search battery dictionary by key, label, or semantic ID"
                                 className="acpt-input acpt-input-small acpt-semantic-search"
                               />
@@ -1566,7 +1566,7 @@ function AdminCreatePassportType() {
                                     className={`acpt-semantic-option${!selectedSemanticMatch ? " selected" : ""}`}
                                     onMouseDown={(e) => {
                                       e.preventDefault();
-                                      clearManualSemanticSelection(section._id, field._id);
+                                      clearManualSemanticSelection(section.localId, field.localId);
                                     }}
                                   >
                                     <span className="acpt-semantic-option-title">No semantic term selected</span>
@@ -1578,7 +1578,7 @@ function AdminCreatePassportType() {
                                       className={`acpt-semantic-option${field.semanticId === entry.semanticId ? " selected" : ""}`}
                                       onMouseDown={(e) => {
                                         e.preventDefault();
-                                        applyManualSemanticSelection(section._id, field._id, entry.semanticId);
+                                        applyManualSemanticSelection(section.localId, field.localId, entry.semanticId);
                                       }}
                                     >
                                       <span className="acpt-semantic-option-title">{entry.key} - {entry.label}</span>
@@ -1609,7 +1609,7 @@ function AdminCreatePassportType() {
                           <input
                             type="number" min="1" max="10"
                             value={field.table_cols || 2}
-                            onChange={e => updateField(section._id, field._id, { table_cols: parseInt(e.target.value) || 1 })}
+                            onChange={e => updateField(section.localId, field.localId, { table_cols: parseInt(e.target.value) || 1 })}
                             className="acpt-table-num-input"
                           />
                         </div>
@@ -1625,7 +1625,7 @@ function AdminCreatePassportType() {
                               onChange={e => {
                                 const cols = [...(field.table_columns || [])];
                                 cols[ci] = e.target.value;
-                                updateField(section._id, field._id, { table_columns: cols });
+                                updateField(section.localId, field.localId, { table_columns: cols });
                               }}
                             />
                           ))}
@@ -1659,7 +1659,7 @@ function AdminCreatePassportType() {
                                           onChange={e => {
                                             const rows = (field.table_default_rows || []).map(r => [...r]);
                                             rows[ri][ci] = e.target.value;
-                                            updateField(section._id, field._id, { table_default_rows: rows });
+                                            updateField(section.localId, field.localId, { table_default_rows: rows });
                                           }}
                                         />
                                       </td>
@@ -1671,7 +1671,7 @@ function AdminCreatePassportType() {
                                         title="Remove row"
                                         onClick={() => {
                                           const rows = (field.table_default_rows || []).filter((_, i) => i !== ri);
-                                          updateField(section._id, field._id, { table_default_rows: rows });
+                                          updateField(section.localId, field.localId, { table_default_rows: rows });
                                         }}
                                       >✕</button>
                                     </td>
@@ -1686,7 +1686,7 @@ function AdminCreatePassportType() {
                             onClick={() => {
                               const cols = field.table_cols || 2;
                               const rows = [...(field.table_default_rows || []), Array(cols).fill("")];
-                              updateField(section._id, field._id, { table_default_rows: rows });
+                              updateField(section.localId, field.localId, { table_default_rows: rows });
                             }}
                           >+ Add Default Row</button>
                         </div>
@@ -1699,7 +1699,7 @@ function AdminCreatePassportType() {
                 ))}
 
                 <button type="button" className="acpt-add-field-btn"
-                  onClick={() => addField(section._id)}>
+                  onClick={() => addField(section.localId)}>
                   + Add Field
                 </button>
               </div>}

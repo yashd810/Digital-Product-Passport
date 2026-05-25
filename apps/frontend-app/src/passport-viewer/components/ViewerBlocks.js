@@ -5,7 +5,7 @@ import { PieChart, parseCompositionFromTable, parseCompositionFromText } from ".
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
-import { ACCESS_LABEL_MAP, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
+import { ACCESS_LABEL_MAP, appendUnitToDisplayValue, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
 import { getMarketingContactUrl } from "../utils/QRcode";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -264,6 +264,12 @@ function buildViewerDidFallbacks(passport) {
   };
 }
 
+function buildFacilityDidFallback(facilityId) {
+  const rawFacilityId = String(facilityId || "").trim();
+  if (!rawFacilityId) return null;
+  return `did:web:www.claros-dpp.online:did:facility:${encodeURIComponent(rawFacilityId)}`;
+}
+
 function parseHeaderArray(value) {
   if (Array.isArray(value)) return value;
   if (typeof value !== "string") return value ? [value] : [];
@@ -289,7 +295,7 @@ export function PassportHeaderPanel({ passport, typeDef }) {
   const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport);
   const resolvedCompanyDid = passport.companyDid || canonicalSubjects.companyDid || fallbackDids.companyDid;
-  const resolvedFacilityDid = passport.facilityDid || canonicalSubjects.facilityDid || null;
+  const resolvedFacilityDid = passport.facilityDid || canonicalSubjects.facilityDid || buildFacilityDidFallback(passport.facilityId);
   const resolvedSubjectDid = passport.subjectDid || canonicalSubjects.subjectDid || passport.uniqueProductIdentifier || null;
   const resolvedDppDid = passport.dppDid || canonicalSubjects.dppDid || fallbackDids.dppDid;
   const headerValues = {
@@ -301,7 +307,7 @@ export function PassportHeaderPanel({ passport, typeDef }) {
     dppStatus: formatPassportStatus(passport.releaseStatus),
     lastUpdate: formatIsoDate(passport.updatedAt || passport.createdAt) || null,
     economicOperatorId: resolvedCompanyDid || passport.economicOperatorId,
-    facilityId: resolvedFacilityDid || passport.facilityId,
+    facilityId: resolvedFacilityDid,
     contentSpecificationIds: parseHeaderArray(passport.contentSpecificationIds || passport.complianceProfileKey || typeDef?.semanticModelKey),
     subjectDid: resolvedSubjectDid,
     dppDid: resolvedDppDid,
@@ -617,7 +623,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     } else if (typeof raw === "string" && raw.includes("\n")) {
       display = renderTextBlock(raw, "pv-field-text-block");
     } else if (raw || raw === 0) {
-      display = <div className="pv-field-value">{String(raw)}</div>;
+      display = <div className="pv-field-value">{appendUnitToDisplayValue(String(raw), f)}</div>;
     }
 
     let pieItems = null;

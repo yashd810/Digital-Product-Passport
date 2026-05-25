@@ -6,7 +6,7 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
 import { FileCell, LiveBadge, LockedFieldCell, RefreshableImage, ViewerDomainIndicator } from "./ViewerBlocks";
-import { formatFieldLabelWithUnit, formatIsoDate, renderTextBlock } from "../utils/viewerHelpers";
+import { appendUnitToDisplayValue, formatFieldLabelWithUnit, formatIsoDate, renderTextBlock } from "../utils/viewerHelpers";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -68,6 +68,10 @@ function formatValue(value) {
   return String(value);
 }
 
+function formatDisplayValue(field, value) {
+  return appendUnitToDisplayValue(formatValue(value), field);
+}
+
 function slugifyDidSegment(value, fallback = "company") {
   const slug = String(value || "")
     .normalize("NFKD")
@@ -101,6 +105,12 @@ function buildViewerDidFallbacks(passport, companyData) {
     companyDid: `did:web:${didDomain}:did:company:${companySlug}`,
     dppDid: `did:web:${didDomain}:did:dpp:${granularity}:${stableId}`,
   };
+}
+
+function buildFacilityDidFallback(facilityId) {
+  const rawFacilityId = String(facilityId || "").trim();
+  if (!rawFacilityId) return null;
+  return `did:web:www.claros-dpp.online:did:facility:${encodeURIComponent(rawFacilityId)}`;
 }
 
 function flattenSections(sections) {
@@ -250,7 +260,7 @@ function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
   const canonicalSubjects = passport?.linked_data?.canonical_subjects || {};
   const fallbackDids = buildViewerDidFallbacks(passport, companyData);
   const resolvedCompanyDid = passport?.companyDid || canonicalSubjects.companyDid || fallbackDids.companyDid;
-  const resolvedFacilityDid = passport?.facilityDid || canonicalSubjects.facilityDid || null;
+  const resolvedFacilityDid = passport?.facilityDid || canonicalSubjects.facilityDid || buildFacilityDidFallback(passport?.facilityId);
   const resolvedSubjectDid = passport?.subjectDid || canonicalSubjects.subjectDid || passport?.uniqueProductIdentifier || null;
   const resolvedDppDid = passport?.dppDid || canonicalSubjects.dppDid || fallbackDids.dppDid;
   const values = {
@@ -262,7 +272,7 @@ function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
     dppStatus: formatPassportStatus(passport?.releaseStatus),
     lastUpdate: formatIsoDate(lastUpdateAt || passport?.updatedAt || passport?.createdAt) || null,
     economicOperatorId: resolvedCompanyDid || passport?.economicOperatorId,
-    facilityId: resolvedFacilityDid || passport?.facilityId,
+    facilityId: resolvedFacilityDid,
     contentSpecificationIds: Array.isArray(passport?.contentSpecificationIds)
       ? passport.contentSpecificationIds.join(", ")
       : passport?.contentSpecificationIds || passport?.complianceProfileKey || typeDef?.semanticModelKey,
@@ -453,7 +463,7 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
   } else if (typeof raw === "string" && raw.includes("\n")) {
     content = renderTextBlock(raw, "field-value-text");
   } else if (isFilled(raw)) {
-    content = <strong className="field-value-strong">{formatValue(raw)}</strong>;
+    content = <strong className="field-value-strong">{formatDisplayValue(field, raw)}</strong>;
   }
 
   return (
@@ -632,7 +642,7 @@ export default function PublicPassportPortal({
 
   const currentStatus = formatPassportStatus(passport?.releaseStatus || "");
   const heroMetrics = [
-    ["Manufacturer", companyData?.companyName || passport?.manufacturer || passport?.manufactured_by || ""],
+    ["Manufacturer", companyData?.companyName || passport?.manufacturer || passport?.manufacturedBy || ""],
     ["Serial number", passport?.batterySerialNumber || passport?.serialNumber || passport?.productSerialNumber || ""],
     ["Status", currentStatus || ""],
     ["Last update", formatIsoDate(lastUpdateAt || passport?.updatedAt || passport?.createdAt)],
@@ -734,7 +744,7 @@ export default function PublicPassportPortal({
               <div className="overview-meta">
                 {[
                   ["Model", displayModelName],
-                  ["Capacity", capacityEntry ? formatValue(capacityEntry.raw) : ""],
+                  ["Capacity", capacityEntry ? formatDisplayValue(capacityEntry.field, capacityEntry.raw) : ""],
                   ["Category", categoryEntry ? formatValue(categoryEntry.raw) : ""],
                 ].map(([label, value]) => (
                   <div key={label} className="mini">
@@ -773,7 +783,7 @@ export default function PublicPassportPortal({
                               />
                             </button>
                           ) : (
-                            <strong>{formatValue(entry.raw)}</strong>
+                            <strong>{formatDisplayValue(entry.field, entry.raw)}</strong>
                           )}
                         </div>
                       </div>

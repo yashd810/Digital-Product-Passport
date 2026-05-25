@@ -41,13 +41,13 @@ function createWorkflowHelpers({
 
     const pRes = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL} AND deleted_at IS NULL
-       ORDER BY version_number DESC LIMIT 1`,
+       WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+       ORDER BY "versionNumber" DESC LIMIT 1`,
       [dppId]
     );
     if (!pRes.rows.length) throw new Error("Editable passport not found");
     const passport = normalizePassportRow(pRes.rows[0]);
-    const previousReleaseStatus = normalizeReleaseStatus(passport.release_status) || IN_REVISION_STATUS;
+    const previousReleaseStatus = normalizeReleaseStatus(passport.releaseStatus) || IN_REVISION_STATUS;
 
     await runBestEffort("Workflow archive before submit error", async () => archivePassportSnapshot({
       passport: pRes.rows[0],
@@ -61,15 +61,15 @@ function createWorkflowHelpers({
     try {
       await client.query("BEGIN");
       await client.query(
-        `UPDATE ${tableName} SET release_status = 'in_review', updated_at = NOW()
-         WHERE dpp_id = $1 AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
+        `UPDATE ${tableName} SET "releaseStatus" = 'in_review', "updatedAt" = NOW()
+         WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
         [dppId]
       );
 
       wfRes = await client.query(
         `INSERT INTO passport_workflow
-           (passport_dpp_id, passport_type, company_id, submitted_by, reviewer_id, approver_id,
-            review_status, approval_status, overall_status, previous_release_status)
+           ("passportDppId", "passportType", "companyId", "submittedBy", "reviewerId", "approverId",
+            "reviewStatus", "approvalStatus", "overallStatus", "previousReleaseStatus")
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'in_progress',$9)
          RETURNING id`,
         [
@@ -95,8 +95,8 @@ function createWorkflowHelpers({
     const updatedRes = await pool.query(
       `SELECT *
        FROM ${tableName}
-       WHERE dpp_id = $1
-       ORDER BY version_number DESC LIMIT 1`,
+       WHERE "dppId" = $1
+       ORDER BY "versionNumber" DESC LIMIT 1`,
       [dppId]
     );
     if (updatedRes.rows.length) {
@@ -114,33 +114,33 @@ function createWorkflowHelpers({
       await runBestEffort("Workflow reviewer notification error", async () => createNotification(
         resolvedReviewerId,
         "workflow_review",
-        `Review requested: ${passport.internal_alias_id}`,
-        `v${passport.version_number} needs your review`,
+        `Review requested: ${passport.internalAliasId}`,
+        `v${passport.versionNumber} needs your review`,
         dppId,
         "/dashboard/workflow"
       ));
       try {
-        const reviewer = await pool.query("SELECT email, first_name FROM users WHERE id = $1", [resolvedReviewerId]);
-        const submitter = await pool.query("SELECT first_name, last_name, email FROM users WHERE id = $1", [userId]);
+        const reviewer = await pool.query('SELECT email, "firstName" AS "firstName" FROM users WHERE id = $1', [resolvedReviewerId]);
+        const submitter = await pool.query('SELECT "firstName" AS "firstName", "lastName" AS "lastName", email FROM users WHERE id = $1', [userId]);
         if (reviewer.rows.length) {
-          const reviewerName = reviewer.rows[0].first_name || "Reviewer";
+          const reviewerName = reviewer.rows[0].firstName || "Reviewer";
           const submitterName =
-            `${submitter.rows[0]?.first_name || ""} ${submitter.rows[0]?.last_name || ""}`.trim() ||
+            `${submitter.rows[0]?.firstName || ""} ${submitter.rows[0]?.lastName || ""}`.trim() ||
             submitter.rows[0]?.email ||
             "A colleague";
           await createTransporter().sendMail({
             from: process.env.EMAIL_FROM || "noreply@example.com",
             to: reviewer.rows[0].email,
-            subject: `[DPP] Review requested — ${passport.internal_alias_id}`,
+            subject: `[DPP] Review requested — ${passport.internalAliasId}`,
             html: brandedEmail({
               preheader: `${submitterName} submitted a passport for your review`,
               bodyHtml: `
                 <p>Hi <strong>${reviewerName}</strong>,</p>
                 <p><strong>${submitterName}</strong> has submitted a passport for your review.</p>
                 <div class="info-box">
-                  <div class="info-row"><span class="info-label">Internal Alias ID</span><span class="info-value">${passport.internal_alias_id}</span></div>
-                  ${passport.model_name ? `<div class="info-row"><span class="info-label">Model</span><span class="info-value">${passport.model_name}</span></div>` : ""}
-                  <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.version_number}</span></div>
+                  <div class="info-row"><span class="info-label">Internal Alias ID</span><span class="info-value">${passport.internalAliasId}</span></div>
+                  ${passport.modelName ? `<div class="info-row"><span class="info-label">Model</span><span class="info-value">${passport.modelName}</span></div>` : ""}
+                  <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.versionNumber}</span></div>
                   <div class="info-row"><span class="info-label">Type</span><span class="info-value">${passportType}</span></div>
                 </div>
                 <div class="cta-wrap"><a href="${appUrl}/dashboard/workflow" class="cta-btn">🔍 Review Now →</a></div>`,
@@ -156,8 +156,8 @@ function createWorkflowHelpers({
       await runBestEffort("Workflow approver notification error", async () => createNotification(
         resolvedApproverId,
         "workflow_approval",
-        `Approval requested: ${passport.internal_alias_id}`,
-        `v${passport.version_number} needs your approval`,
+        `Approval requested: ${passport.internalAliasId}`,
+        `v${passport.versionNumber} needs your approval`,
         dppId,
         "/dashboard/workflow"
       ));

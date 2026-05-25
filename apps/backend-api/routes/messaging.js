@@ -6,31 +6,31 @@ module.exports = function registerMessagingRoutes(app, {
 }) {
   const mapConversationRow = (row = {}) => ({
     id: row.id,
-    companyId: row.companyId ?? row.company_id ?? null,
-    otherId: row.otherId ?? row.other_id ?? null,
-    firstName: row.firstName ?? row.first_name ?? "",
-    lastName: row.lastName ?? row.last_name ?? "",
+    companyId: row.companyId ?? null,
+    otherId: row.otherId ?? null,
+    firstName: row.firstName ?? "",
+    lastName: row.lastName ?? "",
     email: row.email || "",
-    lastMessage: row.lastMessage ?? row.last_message ?? null,
-    lastMessageAt: row.lastMessageAt ?? row.last_message_at ?? null,
-    lastSenderId: row.lastSenderId ?? row.last_sender_id ?? null,
+    lastMessage: row.lastMessage ?? null,
+    lastMessageAt: row.lastMessageAt ?? null,
+    lastSenderId: row.lastSenderId ?? null,
     unread: Number(row.unread || 0),
   });
 
   const mapMessageRow = (row = {}) => ({
     id: row.id,
     body: row.body || "",
-    createdAt: row.createdAt ?? row.created_at ?? null,
-    senderId: row.senderId ?? row.sender_id ?? null,
-    firstName: row.firstName ?? row.first_name ?? "",
-    lastName: row.lastName ?? row.last_name ?? "",
+    createdAt: row.createdAt ?? null,
+    senderId: row.senderId ?? null,
+    firstName: row.firstName ?? "",
+    lastName: row.lastName ?? "",
     email: row.email || "",
   });
 
   const mapUserRow = (row = {}) => ({
     id: row.id,
-    firstName: row.firstName ?? row.first_name ?? "",
-    lastName: row.lastName ?? row.last_name ?? "",
+    firstName: row.firstName ?? "",
+    lastName: row.lastName ?? "",
     email: row.email || "",
     role: row.role || "",
   });
@@ -40,14 +40,14 @@ module.exports = function registerMessagingRoutes(app, {
       const r = await pool.query(
         `SELECT
           c.id,
-          c.company_id,
-          u.id AS other_id,
-          u.first_name,
-          u.last_name,
+          c.company_id AS "companyId",
+          u.id AS "otherId",
+          u."firstName" AS "firstName",
+          u."lastName" AS "lastName",
           u.email,
-          lm.body AS last_message,
-          lm.created_at AS last_message_at,
-          ls.sender_id AS last_sender_id,
+          lm.body AS "lastMessage",
+          lm.created_at AS "lastMessageAt",
+          ls.sender_id AS "lastSenderId",
           (SELECT COUNT(*) FROM messages m2
            WHERE m2.conversation_id = c.id
              AND m2.created_at > COALESCE(cm_me.last_read_at, '1970-01-01')
@@ -65,7 +65,7 @@ module.exports = function registerMessagingRoutes(app, {
         LEFT JOIN messages ls ON ls.id = (
           SELECT id FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1
         )
-        WHERE c.company_id = (SELECT company_id FROM users WHERE id = $1)
+        WHERE c.company_id = (SELECT "companyId" FROM users WHERE id = $1)
         ORDER BY COALESCE(lm.created_at, c.created_at) DESC`,
         [req.user.userId]
       );
@@ -83,13 +83,13 @@ module.exports = function registerMessagingRoutes(app, {
       const meId = req.user.userId;
       if (parseInt(otherUserId, 10) === meId) return res.status(400).json({ error: "Cannot message yourself" });
 
-      const meRes = await pool.query("SELECT company_id FROM users WHERE id = $1", [meId]);
+      const meRes = await pool.query('SELECT "companyId" AS "companyId" FROM users WHERE id = $1', [meId]);
       const otherRes = await pool.query(
-        "SELECT company_id, first_name, last_name, email FROM users WHERE id = $1",
+        'SELECT "companyId" AS "companyId", "firstName" AS "firstName", "lastName" AS "lastName", email FROM users WHERE id = $1',
         [otherUserId]
       );
       if (!otherRes.rows.length) return res.status(404).json({ error: "User not found" });
-      if (meRes.rows[0].company_id !== otherRes.rows[0].company_id) {
+      if (meRes.rows[0].companyId !== otherRes.rows[0].companyId) {
         return res.status(403).json({ error: "Different company" });
       }
 
@@ -98,7 +98,7 @@ module.exports = function registerMessagingRoutes(app, {
          JOIN conversation_members cm1 ON cm1.conversation_id = c.id AND cm1.user_id = $1
          JOIN conversation_members cm2 ON cm2.conversation_id = c.id AND cm2.user_id = $2
          WHERE c.company_id = $3 LIMIT 1`,
-        [meId, otherUserId, meRes.rows[0].company_id]
+        [meId, otherUserId, meRes.rows[0].companyId]
       );
 
       let convId;
@@ -107,7 +107,7 @@ module.exports = function registerMessagingRoutes(app, {
       } else {
         const newConv = await pool.query(
           "INSERT INTO conversations (company_id) VALUES ($1) RETURNING id",
-          [meRes.rows[0].company_id]
+          [meRes.rows[0].companyId]
         );
         convId = newConv.rows[0].id;
         await pool.query(
@@ -136,15 +136,15 @@ module.exports = function registerMessagingRoutes(app, {
       let q;
       let params;
       if (before) {
-        q = `SELECT m.id, m.body, m.created_at, m.sender_id,
-                    u.first_name, u.last_name, u.email
+        q = `SELECT m.id, m.body, m.created_at AS "createdAt", m.sender_id AS "senderId",
+                    u."firstName" AS "firstName", u."lastName" AS "lastName", u.email
              FROM messages m JOIN users u ON u.id = m.sender_id
              WHERE m.conversation_id=$1 AND m.id < $2
              ORDER BY m.id DESC LIMIT $3`;
         params = [convId, before, limit];
       } else {
-        q = `SELECT m.id, m.body, m.created_at, m.sender_id,
-                    u.first_name, u.last_name, u.email
+        q = `SELECT m.id, m.body, m.created_at AS "createdAt", m.sender_id AS "senderId",
+                    u."firstName" AS "firstName", u."lastName" AS "lastName", u.email
              FROM messages m JOIN users u ON u.id = m.sender_id
              WHERE m.conversation_id=$1
              ORDER BY m.id DESC LIMIT $2`;
@@ -191,12 +191,12 @@ module.exports = function registerMessagingRoutes(app, {
 
   app.get("/api/messaging/users", authenticateToken, async (req, res) => {
     try {
-      const meRes = await pool.query("SELECT company_id FROM users WHERE id=$1", [req.user.userId]);
-      const companyId = meRes.rows[0]?.company_id;
+      const meRes = await pool.query('SELECT "companyId" AS "companyId" FROM users WHERE id=$1', [req.user.userId]);
+      const companyId = meRes.rows[0]?.companyId;
       if (!companyId) return res.json([]);
       const r = await pool.query(
-        `SELECT id, first_name, last_name, email, role FROM users
-         WHERE company_id=$1 AND id != $2 AND is_active=true ORDER BY first_name, last_name`,
+        `SELECT id, "firstName" AS "firstName", "lastName" AS "lastName", email, role FROM users
+         WHERE "companyId"=$1 AND id != $2 AND "isActive"=true ORDER BY "firstName", "lastName"`,
         [companyId, req.user.userId]
       );
       res.json(r.rows.map(mapUserRow));

@@ -48,7 +48,7 @@ const sendOtpEmail = async (user, otp) => {
     html: brandedEmail({
       preheader: "Two-factor authentication code",
       bodyHtml: `
-        <p>Hello ${user.first_name || "there"},</p>
+        <p>Hello ${user.firstName || "there"},</p>
         <p>Your one-time verification code is:</p>
         <div style="text-align:center;margin:28px 0">
           <span style="font-size:38px;font-weight:900;letter-spacing:14px;color:#1C3738;font-family:monospace;background:#F4FFF8;padding:14px 20px;border-radius:10px;border:2px solid #d0e4e0;display:inline-block">${otp}</span>

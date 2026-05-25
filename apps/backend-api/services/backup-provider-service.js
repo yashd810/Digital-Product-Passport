@@ -238,8 +238,8 @@ module.exports = function createBackupProviderService({
     }
 
     const result = await pool.query(
-      `SELECT id, company_id, provider_key, provider_type, display_name, object_prefix, public_base_url,
-              supports_public_handover, config_json, is_active, created_at, updated_at
+      `SELECT id, company_id AS "companyId", provider_key AS "providerKey", provider_type AS "providerType", display_name AS "displayName", object_prefix AS "objectPrefix", public_base_url AS "publicBaseUrl",
+              supports_public_handover AS "supportsPublicHandover", config_json AS "configJson", is_active AS "isActive", created_at AS "createdAt", updated_at AS "updatedAt"
        FROM backup_service_providers
        WHERE ${filters.join(" AND ")}
        ORDER BY company_id NULLS FIRST, provider_key ASC`,
@@ -248,7 +248,7 @@ module.exports = function createBackupProviderService({
 
     const rows = [...result.rows];
     const implicitProvider = buildImplicitProvider(companyId);
-    if (implicitProvider && !rows.some((row) => row.provider_key === implicitProvider.provider_key)) {
+    if (implicitProvider && !rows.some((row) => row.providerKey === implicitProvider.providerKey)) {
       rows.unshift(implicitProvider);
     }
     return rows;
@@ -279,22 +279,22 @@ module.exports = function createBackupProviderService({
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, { companyName });
     return {
       backupProvider: {
-        providerKey: provider.provider_key,
-        providerType: provider.provider_type,
-        displayName: provider.display_name,
-        supportsPublicHandover: provider.supports_public_handover !== false
+        providerKey: provider.providerKey,
+        providerType: provider.providerType,
+        displayName: provider.displayName,
+        supportsPublicHandover: provider.supportsPublicHandover !== false
       },
       snapshotScope,
       reason,
       capturedAt: new Date().toISOString(),
       source: {
-        companyId: passport.company_id || null,
+        companyId: passport.companyId || null,
         companyName: companyName || null,
         passportDppId: passport.dppId || null,
-        lineageId: passport.lineage_id || passport.dppId || null,
-        passportType: passport.passport_type || typeDef?.type_name || null,
-        versionNumber: Number(passport.version_number) || 1,
-        releaseStatus: passport.release_status || null
+        lineageId: passport.lineageId || passport.dppId || null,
+        passportType: passport.passportType || typeDef?.typeName || null,
+        versionNumber: Number(passport.versionNumber) || 1,
+        releaseStatus: passport.releaseStatus || null
       },
       documentation: documentation || {
         includedByReference: [],
@@ -307,11 +307,11 @@ module.exports = function createBackupProviderService({
   }
 
   function buildStorageKey({ provider, passport, snapshotScope }) {
-    const lineageId = normalizeText(passport.lineage_id || passport.dppId || "unknown-lineage", "unknown-lineage");
-    const versionNumber = Number(passport.version_number) || 1;
+    const lineageId = normalizeText(passport.lineageId || passport.dppId || "unknown-lineage", "unknown-lineage");
+    const versionNumber = Number(passport.versionNumber) || 1;
     return path.posix.join(
-      normalizeObjectPrefix(provider.object_prefix),
-      `company-${passport.company_id || "unknown"}`,
+      normalizeObjectPrefix(provider.objectPrefix),
+      `company-${passport.companyId || "unknown"}`,
       `passport-${lineageId}`,
       `v${versionNumber}`,
       `${snapshotScope}.json`
@@ -319,15 +319,15 @@ module.exports = function createBackupProviderService({
   }
 
   function buildAttachmentStorageKey({ provider, passport, attachment, fallbackFieldKey = "document" }) {
-    const lineageId = normalizeText(passport.lineage_id || passport.dppId || "unknown-lineage", "unknown-lineage");
-    const versionNumber = Number(passport.version_number) || 1;
-    const fieldKey = normalizeStorageSegment(attachment?.field_key || fallbackFieldKey, "document");
-    const publicId = normalizeStorageSegment(attachment?.public_id || Date.now(), "document");
-    const ext = path.extname(String(attachment?.storage_key || attachment?.file_path || attachment?.file_url || "")).toLowerCase();
+    const lineageId = normalizeText(passport.lineageId || passport.dppId || "unknown-lineage", "unknown-lineage");
+    const versionNumber = Number(passport.versionNumber) || 1;
+    const fieldKey = normalizeStorageSegment(attachment?.fieldKey || fallbackFieldKey, "document");
+    const publicId = normalizeStorageSegment(attachment?.publicId || Date.now(), "document");
+    const ext = path.extname(String(attachment?.storageKey || attachment?.filePath || attachment?.fileUrl || "")).toLowerCase();
     const safeExt = ext && ext.length <= 10 ? ext.replace(/[^a-z0-9.]/g, "") : "";
     return path.posix.join(
-      normalizeObjectPrefix(provider.object_prefix),
-      `company-${passport.company_id || "unknown"}`,
+      normalizeObjectPrefix(provider.objectPrefix),
+      `company-${passport.companyId || "unknown"}`,
       `passport-${lineageId}`,
       `v${versionNumber}`,
       "documents",
@@ -336,8 +336,8 @@ module.exports = function createBackupProviderService({
   }
 
   function collectTypeFields(typeDef) {
-    return Array.isArray(typeDef?.fields_json?.sections) ?
-      typeDef.fields_json.sections.flatMap((section) => Array.isArray(section?.fields) ? section.fields : []) :
+    return Array.isArray(typeDef?.fieldsJson?.sections) ?
+      typeDef.fieldsJson.sections.flatMap((section) => Array.isArray(section?.fields) ? section.fields : []) :
       [];
   }
 
@@ -405,7 +405,7 @@ module.exports = function createBackupProviderService({
       const publicDownloadUrl = attachment.public_id ? `${appBaseUrl}/public-files/${attachment.public_id}` : null;
       const manifestEntry = {
         fieldKey: attachment.field_key || null,
-        label: fieldDef?.label || attachment.field_key || "Attachment",
+        label: fieldDef?.label || attachment.fieldKey || "Attachment",
         mandatory: isMandatoryField(fieldDef),
         accessMode: attachment.is_public ? "public_download" : "controlled_private",
         isPublic: attachment.is_public === true,
@@ -629,12 +629,12 @@ module.exports = function createBackupProviderService({
        RETURNING *`,
       [
       provider.id || null,
-      provider.provider_key,
+      provider.providerKey,
       passport.dppId,
-      passport.lineage_id || passport.dppId,
-      passport.company_id,
-      passport.passport_type || null,
-      Number(passport.version_number) || 1,
+      passport.lineageId || passport.dppId,
+      passport.companyId,
+      passport.passportType || null,
+      Number(passport.versionNumber) || 1,
       envelope?.passport?.digitalProductPassportId || null,
       snapshotScope,
       replicationStatus,
@@ -657,12 +657,12 @@ module.exports = function createBackupProviderService({
     snapshotScope = "released_current",
     providerKey = null
   }) {
-    if (!passport?.dppId || !passport?.company_id) {
+    if (!passport?.dppId || !passport?.companyId) {
       return { success: false, error: "Passport identity is required for backup replication", results: [] };
     }
 
-    const providers = (await listProviders({ companyId: passport.company_id })).
-    filter((provider) => !providerKey || provider.provider_key === providerKey);
+    const providers = (await listProviders({ companyId: passport.companyId })).
+    filter((provider) => !providerKey || provider.providerKey === providerKey);
 
     if (!providers.length) {
       return buildNoProviderResult("NO_BACKUP_PROVIDER");
@@ -757,7 +757,7 @@ module.exports = function createBackupProviderService({
     }
 
     const providers = (await listProviders({ companyId })).
-      filter((provider) => !providerKey || provider.provider_key === providerKey);
+      filter((provider) => !providerKey || provider.providerKey === providerKey);
 
     if (!providers.length) {
       return buildNoProviderResult("NO_BACKUP_PROVIDER");
@@ -837,7 +837,7 @@ module.exports = function createBackupProviderService({
     }
 
     const providers = (await listProviders({ companyId })).
-      filter((provider) => !providerKey || provider.provider_key === providerKey);
+      filter((provider) => !providerKey || provider.providerKey === providerKey);
 
     if (!providers.length) {
       return buildNoProviderResult("NO_BACKUP_PROVIDER");
@@ -953,7 +953,7 @@ module.exports = function createBackupProviderService({
         verificationErrorMessage: "Configured storage service does not support backup verification reads"
       });
     }
-    if (!row?.storage_key) {
+    if (!row?.storageKey) {
       return updateVerificationResult({
         id: row.id,
         verificationStatus: "failed",
@@ -962,17 +962,17 @@ module.exports = function createBackupProviderService({
     }
 
     try {
-      const objectResponse = await storageService.fetchObject(row.storage_key);
+      const objectResponse = await storageService.fetchObject(row.storageKey);
       const buffer = Buffer.from(await objectResponse.arrayBuffer());
       const parsed = JSON.parse(buffer.toString("utf8"));
       const verifiedPayloadHash = computeEnvelopeHash(parsed);
-      const expectedPayloadHash = normalizeHash(row.payload_hash);
+      const expectedPayloadHash = normalizeHash(row.payloadHash);
       const actualPayloadHash = normalizeHash(verifiedPayloadHash);
 
       if (!parsed?.passport?.digitalProductPassportId) {
         throw new Error("Backup payload is missing digitalProductPassportId");
       }
-      if (!parsed?.source?.passportDppId || String(parsed.source.passportDppId) !== String(row.passport_dpp_id)) {
+      if (!parsed?.source?.passportDppId || String(parsed.source.passportDppId) !== String(row.passportDppId)) {
         throw new Error("Backup payload passport GUID does not match the replication record");
       }
       if (expectedPayloadHash && expectedPayloadHash !== actualPayloadHash) {
@@ -1010,8 +1010,30 @@ module.exports = function createBackupProviderService({
       const payloadJson = parseStoredJson(row.payload_json, {});
       const documentation = payloadJson?.documentation || {};
       return {
-        ...row,
-        documentation_summary: {
+        id: row.id,
+        backupProviderId: row.backup_provider_id,
+        backupProviderKey: row.backup_provider_key,
+        passportDppId: row.passport_dpp_id,
+        lineageId: row.lineage_id,
+        companyId: row.company_id,
+        passportType: row.passport_type,
+        versionNumber: row.version_number,
+        dppId: row.dpp_id,
+        snapshotScope: row.snapshot_scope,
+        replicationStatus: row.replication_status,
+        storageProvider: row.storage_provider,
+        storageKey: row.storage_key,
+        publicUrl: row.public_url,
+        payloadHash: row.payload_hash,
+        payloadJson,
+        errorMessage: row.error_message,
+        verificationStatus: row.verification_status,
+        verificationErrorMessage: row.verification_error_message,
+        verifiedPayloadHash: row.verified_payload_hash,
+        lastVerifiedAt: row.last_verified_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        documentationSummary: {
           mandatoryDocumentCount: Number(documentation.mandatoryDocumentCount) || 0,
           publicDocumentCount: Number(documentation.publicDocumentCount) || 0,
           mandatoryBackupSatisfied: documentation.mandatoryBackupSatisfied !== false,
@@ -1059,11 +1081,11 @@ module.exports = function createBackupProviderService({
     if (!result.rows.length) return null;
 
     const providers = await listProviders({ companyId: normalizedCompanyId, activeOnly: true });
-    const providerMap = new Map(providers.map((provider) => [provider.provider_key, provider]));
+    const providerMap = new Map(providers.map((provider) => [provider.providerKey, provider]));
 
     for (const row of result.rows) {
       const provider = providerMap.get(row.backup_provider_key) || null;
-      const supportsPublicHandover = provider ? provider.supports_public_handover !== false : true;
+      const supportsPublicHandover = provider ? provider.supportsPublicHandover !== false : true;
       if (!supportsPublicHandover) continue;
       return {
         ...row,
@@ -1334,35 +1356,35 @@ module.exports = function createBackupProviderService({
 
     for (const replication of replicationResult.rows) {
       const existing = await getActivePublicHandover({
-        companyId: replication.company_id,
-        passportDppId: replication.passport_dpp_id,
+        companyId: replication.companyId,
+        passportDppId: replication.passportDppId,
       });
       if (existing) return existing;
 
       const companyResult = await pool.query(
-        `SELECT id, company_name, is_active
+        `SELECT id, company_name AS "companyName", is_active AS "isActive"
          FROM companies
          WHERE id = $1
          LIMIT 1`,
-        [replication.company_id]
+        [replication.companyId]
       ).catch(() => ({ rows: [] }));
       const company = companyResult.rows[0] || null;
-      if (!company || company.is_active !== false) continue;
+      if (!company || company.isActive !== false) continue;
 
-      const payloadJson = parseStoredJson(replication.payload_json, {});
+      const payloadJson = parseStoredJson(replication.payloadJson, {});
       const publicRowData = payloadJson?.passport && typeof payloadJson.passport === "object" ? payloadJson.passport : null;
       const payloadSource = payloadJson?.source && typeof payloadJson.source === "object" ? payloadJson.source : {};
       if (!publicRowData) continue;
 
       return activatePublicHandover({
-        companyId: replication.company_id,
-        passportDppId: replication.passport_dpp_id,
-        lineageId: replication.lineage_id || payloadSource.lineageId || replication.passport_dpp_id,
-        passportType: replication.passport_type || payloadSource.passportType,
-        internalAliasId: replication.internal_alias_id || publicRowData.internal_alias_id || publicRowData.internalAliasId,
-        versionNumber: replication.version_number || payloadSource.versionNumber || 1,
+        companyId: replication.companyId,
+        passportDppId: replication.passportDppId,
+        lineageId: replication.lineageId || payloadSource.lineageId || replication.passportDppId,
+        passportType: replication.passportType || payloadSource.passportType,
+        internalAliasId: replication.internalAliasId || publicRowData.internalAliasId,
+        versionNumber: replication.versionNumber || payloadSource.versionNumber || 1,
         publicRowData,
-        publicCompanyName: company.company_name || "",
+        publicCompanyName: company.companyName || "",
         activatedBy: null,
         actorIdentifier: "system:auto-backup-handover",
         notes: "Automatically activated from verified backup replication because the economic operator is inactive.",
@@ -1466,7 +1488,22 @@ module.exports = function createBackupProviderService({
       createdBy || null]
 
     );
-    return result.rows[0] || null;
+    const row = result.rows[0] || null;
+    if (!row) return null;
+    return {
+      id: row.id,
+      companyId: row.company_id,
+      providerKey: row.provider_key,
+      providerType: row.provider_type,
+      displayName: row.display_name,
+      objectPrefix: row.object_prefix,
+      publicBaseUrl: row.public_base_url,
+      supportsPublicHandover: row.supports_public_handover,
+      configJson: row.config_json,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   async function revokeProvider({ providerKey }) {
@@ -1478,7 +1515,22 @@ module.exports = function createBackupProviderService({
        RETURNING *`,
       [providerKey]
     );
-    return result.rows[0] || null;
+    const row = result.rows[0] || null;
+    if (!row) return null;
+    return {
+      id: row.id,
+      companyId: row.company_id,
+      providerKey: row.provider_key,
+      providerType: row.provider_type,
+      displayName: row.display_name,
+      objectPrefix: row.object_prefix,
+      publicBaseUrl: row.public_base_url,
+      supportsPublicHandover: row.supports_public_handover,
+      configJson: row.config_json,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 
   return {

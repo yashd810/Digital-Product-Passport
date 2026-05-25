@@ -64,7 +64,7 @@ function VersionDiff({ companyId }) {
     </div>
   );
 
-  const sections  = typeDef?.fields_json?.sections || {};
+  const sections  = typeDef?.fieldsJson?.sections || [];
   const allFields = sections.flatMap(s => s.fields || []).filter(f => !SKIP.has(f.key));
   const norm = v => (v === null || v === undefined) ? "" : String(v);
   const changes   = allFields.map(f => ({ ...f, a:vA?.[f.key], b:vB?.[f.key], changed: norm(vA?.[f.key]) !== norm(vB?.[f.key]) }));

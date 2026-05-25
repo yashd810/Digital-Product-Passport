@@ -142,8 +142,8 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath }) 
             <DetailRow label="Granularity" value={term.granularityLevel} />
             <DetailRow label="DIN/DKE chapter" value={term.dinDkeSpec99100Chapter} />
             <DetailRow label="Workbook row" value={term.sourceWorkbookRow} />
-            <DetailRow label="Internal key" value={term.internalKey || term.internal_key} mono />
-            <DetailRow label="Element ID" value={term.elementId || term.element_id} mono />
+            <DetailRow label="Internal key" value={term.internalKey} mono />
+            <DetailRow label="Element ID" value={term.elementId} mono />
           </div>
 
           <div className="dictionary-detail-section">

@@ -177,7 +177,7 @@ module.exports = function registerAdminRoutes(app, {
           });
         }
 
-        const semanticId = field?.semanticId || field?.semantic_id || null;
+        const semanticId = field?.semanticId || null;
         if (RESERVED_PASSPORT_SEMANTIC_ID_SET.has(semanticId)) {
           conflicts.push({
             field: field.key,

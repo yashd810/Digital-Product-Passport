@@ -52,7 +52,7 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
   };
 
   const pick = (item) => {
-    if (item.type !== "file" || !item.file_url) return;
+    if (item.type !== "file" || !item.fileUrl) return;
     onSelect(item.file_url, item.name);
   };
 

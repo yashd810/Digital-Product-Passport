@@ -82,11 +82,11 @@ function createResolutionHelpers({
     editableOnly = false,
     atDate = null
   } = {}) {
-    const typeRows = await pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
+    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM passport_types ORDER BY "typeName"');
     const matches = [];
 
     for (const typeRow of typeRows.rows) {
-      const tableName = getTable(typeRow.type_name);
+      const tableName = getTable(typeRow.typeName);
       const liveParams = [stableId];
       const statusSql = editableOnly ?
         `"releaseStatus" IN ('draft', 'in_revision')` :
@@ -110,7 +110,7 @@ function createResolutionHelpers({
       );
       for (const row of liveRes.rows) {
         matches.push({
-          passport: { ...normalizePassportRow(row, typeRow), passportType: typeRow.type_name },
+          passport: { ...normalizePassportRow(row, typeRow), passportType: typeRow.typeName },
           typeDef: typeRow,
           tableName
         });
@@ -118,7 +118,7 @@ function createResolutionHelpers({
 
       if (editableOnly) continue;
 
-      const archiveParams = [stableId, typeRow.type_name];
+      const archiveParams = [stableId, typeRow.typeName];
       let archiveVersionSql = "";
       if (versionNumber !== null && versionNumber !== undefined) {
         archiveParams.push(versionNumber);
@@ -140,7 +140,7 @@ function createResolutionHelpers({
             ...normalizePassportRow(rowData, typeRow),
             uniqueProductIdentifier: row.productIdentifierDid || rowData?.uniqueProductIdentifier,
             archivedAt: row.archivedAt || rowData?.archivedAt,
-            passportType: typeRow.type_name,
+            passportType: typeRow.typeName,
             archived: true
           },
           typeDef: typeRow,
@@ -272,7 +272,7 @@ function createResolutionHelpers({
 
     const [companyNameMap, typeRes] = await Promise.all([
       getCompanyNameMap([companyId]),
-      pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types WHERE type_name = $1", [passportType])]
+      pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM passport_types WHERE "typeName" = $1', [passportType])]
     );
 
     return {
@@ -296,11 +296,11 @@ function createResolutionHelpers({
       internalAliasId: parsed.internalAliasId,
       granularity: parsed.granularity || "item"
     }) || [parsed.internalAliasId];
-    const typeRows = await pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
+    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM passport_types ORDER BY "typeName"');
 
     const matches = [];
     for (const typeRow of typeRows.rows) {
-      const tableName = getTable(typeRow.type_name);
+      const tableName = getTable(typeRow.typeName);
       const result = await pool.query(
         `SELECT *
          FROM ${tableName}
@@ -314,7 +314,7 @@ function createResolutionHelpers({
       );
       if (result.rows.length) {
         matches.push({
-          passport: { ...normalizePassportRow(result.rows[0]), passportType: typeRow.type_name },
+          passport: { ...normalizePassportRow(result.rows[0]), passportType: typeRow.typeName },
           typeDef: typeRow,
           tableName
         });
@@ -336,14 +336,14 @@ function createResolutionHelpers({
       return resolveEditablePassportByDppId(productIdentifier);
     }
 
-    const typeRows = await pool.query("SELECT type_name, product_category, semantic_model_key, fields_json FROM passport_types ORDER BY type_name");
+    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM passport_types ORDER BY "typeName"');
     const matches = [];
 
     for (const typeRow of typeRows.rows) {
-      const tableName = getTable(typeRow.type_name);
+      const tableName = getTable(typeRow.typeName);
       const candidates = productIdentifierService?.buildLookupCandidates?.({
         companyId,
-        passportType: typeRow.type_name,
+        passportType: typeRow.typeName,
         internalAliasId: productIdentifier,
         granularity: "item"
       }) || [productIdentifier];
@@ -366,7 +366,7 @@ function createResolutionHelpers({
       );
       if (result.rows.length) {
         matches.push({
-          passport: { ...normalizePassportRow(result.rows[0]), passportType: typeRow.type_name },
+          passport: { ...normalizePassportRow(result.rows[0]), passportType: typeRow.typeName },
           typeDef: typeRow,
           tableName
         });
@@ -523,7 +523,7 @@ function createResolutionHelpers({
     const granularity = String(
       result.passport.granularity ||
       result.typeDef?.granularity ||
-      result.typeDef?.fields_json?.granularity ||
+      result.typeDef?.fieldsJson?.granularity ||
       fallbackGranularity
     ).trim().toLowerCase() || fallbackGranularity;
     return {

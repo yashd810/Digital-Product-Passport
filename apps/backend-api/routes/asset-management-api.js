@@ -38,13 +38,13 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const company = await assertAssetManagementEnabled(companyId);
 
       const types = await pool.query(
-        `SELECT pt.id, pt.type_name, pt.display_name, pt.product_category, pt.product_icon, pt.fields_json
+        `SELECT pt.id, pt."typeName", pt."displayName", pt."productCategory", pt."productIcon", pt."fieldsJson"
          FROM passport_types pt
          JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
          WHERE cpa.company_id = $1
            AND cpa.access_revoked = false
-           AND pt.is_active = true
-         ORDER BY pt.product_category NULLS FIRST, pt.display_name ASC`,
+           AND pt."isActive" = true
+         ORDER BY pt."productCategory" NULLS FIRST, pt."displayName" ASC`,
         [companyId]
       );
 
@@ -276,26 +276,26 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const current = existing.rows[0];
       const normalizedBody = normalizePassportRequestBody(req.body || {});
-      const passportType = normalizedBody.passportType || current.passport_type;
+      const passportType = normalizedBody.passportType || current.passportType;
       const typeSchema = await assertCompanyAssetPassportTypeAccess(companyId, passportType);
 
-      const sourceKind = normalizedBody.sourceKind || current.source_kind;
+      const sourceKind = normalizedBody.sourceKind || current.sourceKind;
       const sourceConfig = normalizedBody.sourceConfig !== undefined
         ? (isPlainObject(normalizedBody.sourceConfig) ? normalizedBody.sourceConfig : {})
-        : (current.source_config || {});
+        : (current.sourceConfig || {});
       const records = normalizedBody.records !== undefined
         ? (Array.isArray(normalizedBody.records) ? normalizedBody.records : [])
-        : (Array.isArray(current.records_json) ? current.records_json : []);
+        : (Array.isArray(current.recordsJson) ? current.recordsJson : []);
       const options = normalizedBody.options !== undefined
         ? (isPlainObject(normalizedBody.options) ? normalizedBody.options : {})
-        : (isPlainObject(current.options_json) ? current.options_json : {});
+        : (isPlainObject(current.optionsJson) ? current.optionsJson : {});
       const startAt = normalizedBody.startAt !== undefined
         ? (normalizedBody.startAt ? new Date(normalizedBody.startAt) : null)
-        : current.start_at;
+        : current.startAt;
       const intervalMinutes = normalizedBody.intervalMinutes !== undefined
         ? (normalizedBody.intervalMinutes === "" ? null : Number.parseInt(normalizedBody.intervalMinutes, 10))
-        : current.interval_minutes;
-      const isActive = normalizedBody.isActive !== undefined ? normalizedBody.isActive !== false : current.is_active;
+        : current.intervalMinutes;
+      const isActive = normalizedBody.isActive !== undefined ? normalizedBody.isActive !== false : current.isActive;
       const name = normalizedBody.name !== undefined ? String(normalizedBody.name || "").trim() : current.name;
 
       if (!name) return res.status(400).json({ error: "Job name cannot be blank" });

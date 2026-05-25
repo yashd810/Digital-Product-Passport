@@ -164,17 +164,17 @@ function registerPassportSupportRoutes(app, deps) {
     try {
       const r = await pool.query(`
         SELECT DISTINCT pt.id,
-          pt.type_name AS "typeName",
-          pt.display_name AS "displayName",
-          pt.product_category AS "productCategory",
-          pt.product_icon AS "productIcon",
-          pt.semantic_model_key AS "semanticModelKey",
-          pt.fields_json AS "fieldsJson",
+          pt."typeName" AS "typeName",
+          pt."displayName" AS "displayName",
+          pt."productCategory" AS "productCategory",
+          pt."productIcon" AS "productIcon",
+          pt."semanticModelKey" AS "semanticModelKey",
+          pt."fieldsJson" AS "fieldsJson",
           (NOT cpa.access_revoked) AS "accessGranted"
         FROM passport_types pt
         JOIN company_passport_access cpa ON pt.id = cpa.passport_type_id
         WHERE cpa.company_id = $1
-        ORDER BY pt.product_category, pt.display_name
+        ORDER BY pt."productCategory", pt."displayName"
       `, [req.params.companyId]);
       res.json(r.rows.map(mapPassportTypeRow));
     } catch (e) {

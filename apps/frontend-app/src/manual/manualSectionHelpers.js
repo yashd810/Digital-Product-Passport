@@ -21,11 +21,11 @@ export function prettifyName(value) {
 }
 
 export function getPassportTypeLabel(passportType) {
-  return passportType?.display_name || prettifyName(passportType?.type_name) || "Passport type";
+  return passportType?.displayName || prettifyName(passportType?.typeName) || "Passport type";
 }
 
 export function getCompanyLabel(company) {
-  return company?.company_name || company?.name || `Company ${company?.id || ""}`.trim();
+  return company?.companyName || company?.name || `Company ${company?.id || ""}`.trim();
 }
 
 export function buildPreview(id, title, route, description, unavailableReason = "", screenshot = "") {

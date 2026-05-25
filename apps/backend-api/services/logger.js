@@ -5,10 +5,10 @@ const pino = require("pino");
 
 const REDACT_PATHS = [
   "password",
-  "password_hash",
+  "passwordHash",
   "token",
-  "otp_code",
-  "otp_code_hash",
+  "otpCode",
+  "otpCodeHash",
   "accessKey",
   "access_key",
   "req.headers.authorization",

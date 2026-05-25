@@ -96,12 +96,12 @@ function validateQrPrintSpecification(value) {
   if (!isPlainObject(value)) return { valid: true, errors: [] };
 
   const errors = [];
-  const quietZone = Number(value.quietZoneModules ?? value.quiet_zone_modules);
+  const quietZone = Number(value.quietZoneModules);
   if (Number.isFinite(quietZone) && quietZone < 4) {
     errors.push("qrPrintSpecification.quietZoneModules must be at least 4");
   }
 
-  const modulePixels = Number(value.modulePixelSize ?? value.module_pixel_size);
+  const modulePixels = Number(value.modulePixelSize);
   if (Number.isFinite(modulePixels) && modulePixels < 4) {
     errors.push("qrPrintSpecification.modulePixelSize must be at least 4 for print-source exports");
   }

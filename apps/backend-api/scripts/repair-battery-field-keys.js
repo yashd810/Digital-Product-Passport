@@ -163,8 +163,8 @@ function dbIdentifier(value) {
 }
 
 function isBatteryPassportTypeRow(typeRow) {
-  return String(typeRow?.semantic_model_key || "").trim() === BATTERY_DICTIONARY_MODEL_KEY
-    || /battery/i.test(String(typeRow?.product_category || ""));
+  return String(typeRow?.semanticModelKey || "").trim() === BATTERY_DICTIONARY_MODEL_KEY
+    || /battery/i.test(String(typeRow?.productCategory || ""));
 }
 
 function isSafeSqlIdentifier(value) {
@@ -181,7 +181,7 @@ function quoteSqlIdentifier(value) {
 
 function buildBatteryFieldUpgradeMap(typeRow) {
   const upgradeMap = new Map(Object.entries(BATTERY_FIELD_UPGRADES_BY_KEY));
-  const sections = Array.isArray(typeRow?.fields_json?.sections) ? typeRow.fields_json.sections : [];
+  const sections = Array.isArray(typeRow?.fieldsJson?.sections) ? typeRow.fieldsJson.sections : [];
 
   for (const section of sections) {
     for (const field of Array.isArray(section?.fields) ? section.fields : []) {
@@ -288,7 +288,11 @@ const pool = new Pool({
 
 async function repairBatteryPassportTypes(db) {
   const typeRows = await db.query(
-    `SELECT id, type_name, product_category, semantic_model_key, fields_json
+    `SELECT id,
+            type_name AS "typeName",
+            product_category AS "productCategory",
+            semantic_model_key AS "semanticModelKey",
+            fields_json AS "fieldsJson"
      FROM passport_types
      ORDER BY type_name`
   );
@@ -298,8 +302,8 @@ async function repairBatteryPassportTypes(db) {
   for (const typeRow of typeRows.rows) {
     if (!isBatteryPassportTypeRow(typeRow)) continue;
     const fieldUpgradeMap = buildBatteryFieldUpgradeMap(typeRow);
-    const currentFieldsJson = typeRow.fields_json && typeof typeRow.fields_json === "object"
-      ? typeRow.fields_json
+    const currentFieldsJson = typeRow.fieldsJson && typeof typeRow.fieldsJson === "object"
+      ? typeRow.fieldsJson
       : { sections: [] };
     const normalized = normalizeBatteryPassportFieldsJson(currentFieldsJson, fieldUpgradeMap);
     if (!normalized.changed) continue;
@@ -327,7 +331,9 @@ async function repairBatteryPassportTypes(db) {
 
 async function repairBatteryPassportValues(db) {
   const typeRows = await db.query(
-    `SELECT type_name, product_category, semantic_model_key
+    `SELECT type_name AS "typeName",
+            product_category AS "productCategory",
+            semantic_model_key AS "semanticModelKey"
      FROM passport_types
      ORDER BY type_name`
   );

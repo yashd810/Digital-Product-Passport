@@ -25,7 +25,7 @@ function registerAccessGrantRoutes(app, deps) {
     if (rawValue === null || rawValue === "") return { provided: true, value: null };
     const parsed = new Date(rawValue);
     if (Number.isNaN(parsed.getTime())) {
-      return { error: "expires_at must be a valid ISO timestamp" };
+      return { error: "expiresAt must be a valid ISO timestamp" };
     }
     return { provided: true, value: parsed };
   }
@@ -150,7 +150,7 @@ function registerAccessGrantRoutes(app, deps) {
                 pag."granteeUserId", pag."grantedBy", pag.reason, pag."expiresAt", pag."isActive",
                 pag."createdAt", pag."updatedAt",
                 pr."passportType", pr."lineageId",
-                grantee.email AS "granteeEmail", grantee.first_name AS "granteeFirstName", grantee.last_name AS "granteeLastName",
+                grantee.email AS "granteeEmail", grantee."firstName" AS "granteeFirstName", grantee."lastName" AS "granteeLastName",
                 grantor.email AS "grantorEmail"
          FROM passport_access_grants pag
          LEFT JOIN passport_registry pr ON pr."dppId" = pag."passportDppId"
@@ -677,9 +677,9 @@ function registerAccessGrantRoutes(app, deps) {
 
       await pool.query(
         `UPDATE users
-         SET session_version = COALESCE(session_version, 1) + 1,
-             updated_at = NOW()
-         WHERE id = $1 AND company_id = $2`,
+         SET "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
+             "updatedAt" = NOW()
+         WHERE id = $1 AND "companyId" = $2`,
         [existing.rows[0].user_id, req.params.companyId]
       ).catch(() => {});
 
@@ -723,7 +723,7 @@ function registerAccessGrantRoutes(app, deps) {
       const result = await pool.query(
         `SELECT pag.id, pag.audience, pag."elementIdPath", pag."granteeUserId", pag."grantedBy", pag.reason,
                 pag."expiresAt", pag."isActive", pag."createdAt", pag."updatedAt",
-                u.email AS "granteeEmail", u.first_name AS "granteeFirstName", u.last_name AS "granteeLastName"
+                u.email AS "granteeEmail", u."firstName" AS "granteeFirstName", u."lastName" AS "granteeLastName"
          FROM passport_access_grants pag
          LEFT JOIN users u ON u.id = pag."granteeUserId"
          WHERE pag."companyId" = $1

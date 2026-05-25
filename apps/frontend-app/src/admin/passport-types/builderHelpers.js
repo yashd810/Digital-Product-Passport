@@ -289,11 +289,11 @@ export const buildSectionsFromCSV = (rows) => {
     });
   }
   return [...map.entries()].map(([sectionLabel, fields]) => ({
-    _id: Math.random().toString(36).slice(2),
+    localId: Math.random().toString(36).slice(2),
     key: toSlug(sectionLabel),
     label: sectionLabel,
     fields: fields.map(({ label, type, access, confidentiality, updateAuthority }) => ({
-      _id: Math.random().toString(36).slice(2),
+      localId: Math.random().toString(36).slice(2),
       key: toFieldKey(label),
       label,
       type,
@@ -330,7 +330,7 @@ export const downloadTemplate = () => {
 
 export function newSection(label = "") {
   return {
-    _id: Math.random().toString(36).slice(2),
+    localId: Math.random().toString(36).slice(2),
     key: toSlug(label),
     label,
     label_i18n: {},
@@ -340,7 +340,7 @@ export function newSection(label = "") {
 
 export function newField(label = "") {
   return {
-    _id: Math.random().toString(36).slice(2),
+    localId: Math.random().toString(36).slice(2),
     key: toFieldKey(label),
     label,
     label_i18n: {},

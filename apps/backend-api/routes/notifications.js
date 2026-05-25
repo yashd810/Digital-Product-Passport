@@ -67,11 +67,11 @@ module.exports = function registerNotificationRoutes(app, {
            pw."approvedAt" AS "approvedAt",
            pw."rejectedAt" AS "rejectedAt",
            pw."createdAt" AS "workflowSubmittedAt",
-           CONCAT(ur.first_name, ' ', ur.last_name) AS "reviewerName",
+           CONCAT(ur."firstName", ' ', ur."lastName") AS "reviewerName",
            ur.email AS "reviewerEmail",
-           CONCAT(ua.first_name, ' ', ua.last_name) AS "approverName",
+           CONCAT(ua."firstName", ' ', ua."lastName") AS "approverName",
            ua.email AS "approverEmail",
-           CONCAT(us.first_name, ' ', us.last_name) AS "submitterName",
+           CONCAT(us."firstName", ' ', us."lastName") AS "submitterName",
            us.email AS "submitterEmail"
          FROM notifications n
          LEFT JOIN passport_workflow pw

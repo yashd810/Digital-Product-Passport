@@ -121,6 +121,23 @@ export function formatFieldLabelWithUnit(label, field) {
   return unitLabel ? `${baseLabel} (${unitLabel})` : baseLabel;
 }
 
+export function appendUnitToDisplayValue(value, field) {
+  const baseValue = String(value ?? "").trim();
+  const unitLabel = getFieldUnitLabel(field);
+  if (!baseValue || !unitLabel) return baseValue;
+
+  const normalizedValue = baseValue.toLowerCase();
+  const normalizedUnit = unitLabel.toLowerCase();
+  if (
+    normalizedValue.endsWith(normalizedUnit)
+    || normalizedValue.endsWith(`(${normalizedUnit})`)
+  ) {
+    return baseValue;
+  }
+
+  return `${baseValue} ${unitLabel}`;
+}
+
 export function formatIsoDate(value, { dateOnly = false } = {}) {
   if (value === null || value === undefined || value === "") return "";
   const parsed = new Date(value);
@@ -156,7 +173,8 @@ export function getSummaryValue(field, raw, isLocked, lang) {
   if (raw === 0) return "0";
   if (!raw) return "Not provided";
   const text = toInlineText(raw);
-  return text.length > 58 ? `${text.slice(0, 58).trim()}…` : text;
+  const displayValue = appendUnitToDisplayValue(text, field);
+  return displayValue.length > 58 ? `${displayValue.slice(0, 58).trim()}…` : displayValue;
 }
 
 export function shouldFeatureInSummary(field, raw, isLocked, pieItems) {

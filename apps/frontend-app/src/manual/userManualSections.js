@@ -16,9 +16,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
   const firstType = passportTypes[0];
   const firstTypeLabel = getPassportTypeLabel(firstType) || "your first granted passport type";
   const availableTypes = passportTypes.map(getPassportTypeLabel);
-  const createRoute = firstType ? `/create/${encodeURIComponent(firstType.type_name)}` : "";
-  const csvRoute = firstType ? `/csv-import/${encodeURIComponent(firstType.type_name)}` : "";
-  const listRoute = firstType ? `/dashboard/passports/${encodeURIComponent(firstType.type_name)}` : "/dashboard/my-passports";
+  const createRoute = firstType ? `/create/${encodeURIComponent(firstType.typeName)}` : "";
+  const csvRoute = firstType ? `/csv-import/${encodeURIComponent(firstType.typeName)}` : "";
+  const listRoute = firstType ? `/dashboard/passports/${encodeURIComponent(firstType.typeName)}` : "/dashboard/my-passports";
 
   return [
     {

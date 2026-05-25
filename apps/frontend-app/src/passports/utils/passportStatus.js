@@ -37,7 +37,7 @@ export const getPassportLinkType = (status) =>
 
 export const getPassportActivityState = (passport) => {
   if (passport?.archived) return "archived";
-  if (isObsoletePassportStatus(passport?.release_status)) return "obsolete";
+  if (isObsoletePassportStatus(passport?.releaseStatus)) return "obsolete";
   return "active";
 };
 

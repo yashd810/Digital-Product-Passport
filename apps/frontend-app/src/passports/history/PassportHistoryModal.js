@@ -152,7 +152,7 @@ function PassportHistoryModal({
 
                   <p className="pv-history-summary">{entry.summary}</p>
 
-                  {(entry.public_path || entry.inactive_path) && (
+                  {(entry.publicPath || entry.inactivePath) && (
                     <div className="pv-history-meta">
                       <a
                         href={entry.isCurrent ? entry.publicPath : entry.inactivePath}
