@@ -1,8 +1,6 @@
 "use strict";
 
 const logger = require("../services/logger");
-const { SHARED_PASSPORT_TABLE_COLUMN_MAPPINGS } = require("../src/shared/passports/shared-passport-table-columns");
-const { CORE_TABLE_COLUMN_MAPPINGS } = require("../src/shared/core/core-table-column-mappings");
 const BATTERY_DICTIONARY_MODEL_KEY = "claros_battery_dictionary_v1";
 
 function isSafeSqlIdentifier(value) {
@@ -111,53 +109,6 @@ async function addPassportRegistryForeignKey(pool, {
       ALTER TABLE ${quotedTableName}
       ALTER COLUMN ${quotedColumnName} SET NOT NULL
     `).catch(() => {});
-  }
-}
-
-async function renameTableColumnsToCamelCase(pool, tableName, columnMappings = []) {
-  const columns = await pool.query(
-    `SELECT column_name
-     FROM information_schema.columns
-     WHERE table_schema = 'public' AND table_name = $1`,
-    [tableName]
-  );
-  const existingColumns = new Set(columns.rows.map((row) => row.column_name));
-  if (!existingColumns.size) return false;
-
-  let changed = false;
-  for (const [legacyName, camelName] of columnMappings) {
-    if (!existingColumns.has(legacyName) || existingColumns.has(camelName)) continue;
-    await pool.query(
-      `ALTER TABLE ${quoteDbIdentifier(tableName)}
-       RENAME COLUMN ${quoteDbIdentifier(legacyName)}
-       TO ${quoteDbIdentifier(camelName)}`
-    );
-    existingColumns.delete(legacyName);
-    existingColumns.add(camelName);
-    changed = true;
-  }
-  return changed;
-}
-
-async function migrateSharedPassportTablesToCamelCase(pool) {
-  const tableNames = Object.keys(SHARED_PASSPORT_TABLE_COLUMN_MAPPINGS);
-  for (const tableName of tableNames) {
-    await renameTableColumnsToCamelCase(
-      pool,
-      tableName,
-      SHARED_PASSPORT_TABLE_COLUMN_MAPPINGS[tableName]
-    );
-  }
-}
-
-async function migrateCoreTablesToCamelCase(pool) {
-  const tableNames = Object.keys(CORE_TABLE_COLUMN_MAPPINGS);
-  for (const tableName of tableNames) {
-    await renameTableColumnsToCamelCase(
-      pool,
-      tableName,
-      CORE_TABLE_COLUMN_MAPPINGS[tableName]
-    );
   }
 }
 
@@ -2047,13 +1998,6 @@ async function initDb(pool, {
       END IF;
     END $$;
   `).catch(() => {});
-
-  await runMigration(pool, "2026-05-24.camelcase-shared-passport-columns", async (db) => {
-    await migrateSharedPassportTablesToCamelCase(db);
-  });
-  await runMigration(pool, "2026-05-25.camelcase-core-table-columns", async (db) => {
-    await migrateCoreTablesToCamelCase(db);
-  });
 
   const passportRegistryReferences = [
     ["dpp_subject_registry", "passportDppId", "dpp_subject_registry_passport_dpp_id_fkey", false],
