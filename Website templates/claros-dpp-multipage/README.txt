@@ -6,7 +6,6 @@ Pages included:
 - index.html
 - product.html
 - services.html
-- timeline.html
 - about.html
 - sample-passport.html
 - contact.html

@@ -278,7 +278,6 @@ After implementing fixes, verify:
 | [about.html](apps/marketing-site/about.html) | Inherits spacing issues | 🟡 Moderate |
 | [services.html](apps/marketing-site/services.html) | Inherits spacing issues | 🟡 Moderate |
 | [contact.html](apps/marketing-site/contact.html) | Not audited | ⚪️ Unknown |
-| [timeline.html](apps/marketing-site/timeline.html) | Not audited | ⚪️ Unknown |
 | [sample-passport.html](apps/marketing-site/sample-passport.html) | Not audited | ⚪️ Unknown |
 
 ---
@@ -293,4 +292,3 @@ After implementing fixes, verify:
 | Section-to-section gaps missing | ✅ Across entire site |
 | Pages affected | 7+ |
 | Visual uniformity score | 65/100 |
-
