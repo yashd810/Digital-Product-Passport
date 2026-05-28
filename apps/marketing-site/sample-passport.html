@@ -3,625 +3,500 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Static Digital Product Passport demo showing how a ClarosDPP passport can look for customers scanning a QR code." />
+  <meta name="description" content="Static public passport viewer demo with dummy data and the same UI structure as the live ClarosDPP passport viewer." />
   <meta name="robots" content="index, follow" />
   <meta name="author" content="ClarosDPP" />
   <meta name="theme-color" content="#f5f8fb" />
   <link rel="canonical" href="https://claros-dpp.online/sample-passport.html" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='DM Sans,sans-serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
   <title>Sample Passport Demo - ClarosDPP</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <style>
-    body.page-body {
-      background:
-        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
-        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
-        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
-        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
-      background-size: 64px 64px, 64px 64px, auto, auto, auto;
-      color: #10243a;
-    }
-
-    .sample-page {
-      color: #10243a;
-      min-height: 100vh;
-    }
-
-    .sample-hero {
-      padding: var(--hero-pad-y) 0 calc(var(--section-pad-y) * 0.5);
-    }
-
-    .sample-intro {
-      position: relative;
-      z-index: 1;
-      max-width: 1180px;
-      margin: 0 auto 1.5rem;
-      padding: 0 var(--layout-x);
-    }
-
-    .sample-kicker {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.45rem 1rem;
-      border-radius: 999px;
-      background: rgba(13,181,176,0.12);
-      border: 1px solid rgba(13,181,176,0.22);
-      color: #0db5b0;
-      font-size: 0.78rem;
-      font-weight: 800;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-    }
-
-    .sample-intro h1 {
-      margin: 1rem 0 1rem;
-      font-family: var(--sans);
-      font-size: clamp(1.95rem, 3.5vw, 3.1rem);
-      font-weight: 700;
-      line-height: 1.15;
-      letter-spacing: -0.5px;
-      color: #10243a;
-      max-width: 760px;
-    }
-
-    .sample-intro p {
-      max-width: 760px;
-      font-size: 1.02rem;
-      color: #4d667b;
-      line-height: 1.82;
-    }
-
-    .sample-shell {
-      position: relative;
-      z-index: 1;
-      max-width: 1180px;
-      margin: var(--section-gap) auto 0;
-      padding: 0 var(--layout-x);
-      display: grid;
-      grid-template-columns: 1.22fr 0.78fr;
-      gap: 22px;
-    }
-
-    .sample-panel,
-    .sample-side-card,
-    .sample-tab-rail,
-    .sample-section {
-      background: rgba(255,255,255,0.5);
-      border: 1px solid rgba(23,48,74,0.1);
-      box-shadow: 0 18px 36px rgba(17,44,72,0.08);
-    }
-
-    .sample-panel {
-      border-radius: 30px;
-      padding: 26px;
-      display: flex;
-      flex-direction: column;
-      gap: 1.2rem;
-    }
-
-    .sample-topline {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-    }
-
-    .sample-logo {
-      width: min(100%, 280px);
-      height: auto;
-    }
-
-    .sample-demo-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 74px;
-      min-height: 74px;
-      border-radius: 24px;
-      background: rgba(13,181,176,0.12);
-      color: #0db5b0;
-      font-size: 1.8rem;
-      border: 1px solid rgba(13,181,176,0.2);
-    }
-
-    .sample-panel h2 {
-      margin: 0;
-      font-family: var(--serif);
-      font-size: clamp(2rem, 3.2vw, 3rem);
-      line-height: 1.04;
-      color: #10243a;
-    }
-
-    .sample-subtitle {
-      margin: 0;
-      color: #4d667b;
-      font-size: 0.98rem;
-      line-height: 1.8;
-    }
-
-    .sample-chip-row,
-    .sample-stat-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.8rem;
-    }
-
-    .sample-chip {
-      display: inline-flex;
-      align-items: center;
-      min-height: 36px;
-      padding: 0 0.95rem;
-      border-radius: 999px;
-      background: #edf5f9;
-      color: #17304a;
-      font-size: 0.8rem;
-      font-weight: 700;
-    }
-
-    .sample-stat-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .sample-stat {
-      position: relative;
-      overflow: hidden;
-      min-height: 104px;
-      padding: 14px 16px;
-      border-radius: 24px;
-      background: rgba(255,255,255,0.5);
-      border: 1px solid rgba(23,48,74,0.08);
-      box-shadow: 0 14px 32px rgba(17,44,72,0.08);
-    }
-
-    .sample-stat::before,
-    .sample-side-card::before,
-    .sample-field::before {
-      content: "";
-      position: absolute;
-      inset: 0 0 auto;
-      height: 3px;
-      background: linear-gradient(90deg, rgba(23,48,74,0.12), rgba(13,181,176,0.62));
-    }
-
-    .sample-stat span {
-      display: block;
-      margin-bottom: 0.75rem;
-      color: #5f7991;
-      font-size: 0.76rem;
-      font-weight: 800;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
-
-    .sample-stat strong {
-      display: block;
-      color: #0b1826;
-      font-size: 1.08rem;
-      line-height: 1.5;
-      font-weight: 800;
-    }
-
-    .sample-sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
-
-    .sample-side-card {
-      position: relative;
-      overflow: hidden;
-      border-radius: 26px;
-      padding: 18px;
-      background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
-    }
-
-    .sample-side-card h3 {
-      margin: 0 0 0.55rem;
-      color: #10243a;
-      font-size: 0.96rem;
-      font-weight: 800;
-    }
-
-    .sample-side-card p {
-      margin: 0;
-      color: #4d667b;
-      font-size: 0.9rem;
-      line-height: 1.72;
-    }
-
-    .sample-qr {
-      display: block;
-      width: min(100%, 190px);
-      margin: 0 auto 1rem;
-      border-radius: 22px;
-      background: #fff;
-      padding: 0.45rem;
-      border: 1px solid rgba(23,48,74,0.08);
-    }
-
-    .sample-status {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      margin-top: 1rem;
-      padding: 0.42rem 0.85rem;
-      border-radius: 999px;
-      background: rgba(16,185,129,0.12);
-      color: #059669;
-      font-size: 0.78rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .sample-status::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 8px rgba(16,185,129,0.45);
-    }
-
-    .sample-tab-wrap {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: calc(var(--section-pad-y) * 0.5) 5% var(--section-pad-y);
-    }
-
-    .sample-tab-rail {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      border-radius: 24px;
-      padding: 10px;
-      margin-bottom: 18px;
-    }
-
-    .sample-tab-rail a {
-      display: inline-flex;
-      align-items: center;
-      min-height: 46px;
-      padding: 0 1rem;
-      border-radius: 14px;
-      background: transparent;
-      color: #5f7991;
-      font-size: 0.9rem;
-      font-weight: 700;
-      transition: background 0.2s ease, color 0.2s ease;
-    }
-
-    .sample-tab-rail a:hover,
-    .sample-tab-rail a:focus-visible {
-      background: rgba(13,181,176,0.14);
-      color: #10243a;
-      outline: none;
-    }
-
-    .sample-section {
-      border-radius: 30px;
-      padding: 24px;
-      margin-bottom: 0;
-      background:
-        radial-gradient(circle at top right, rgba(13,181,176,0.08), transparent 36%),
-        linear-gradient(180deg, #ffffff 0%, #f6fbff 100%);
-    }
-
-    .sample-section-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-      margin-bottom: 1.2rem;
-    }
-
-    .sample-section-head h3 {
-      margin: 0;
-      font-family: var(--sans);
-      font-size: 1.9rem;
-      color: #10243a;
-    }
-
-    .sample-section-head p {
-      margin: 0.5rem 0 0;
-      color: #4d667b;
-      line-height: 1.72;
-      max-width: 700px;
-    }
-
-    .sample-count {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 40px;
-      padding: 0 0.9rem;
-      border-radius: 999px;
-      background: rgba(23,48,74,0.06);
-      border: 1px solid rgba(23,48,74,0.1);
-      color: #17304a;
-      font-size: 0.8rem;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    .sample-field-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-
-    .sample-field {
-      position: relative;
-      overflow: hidden;
-      min-height: 118px;
-      padding: 15px;
-      border-radius: 24px;
-      background: rgba(255,255,255,0.5);
-      border: 1px solid rgba(23,48,74,0.08);
-      box-shadow: 0 14px 32px rgba(17,44,72,0.08);
-    }
-
-    .sample-field-kicker {
-      margin: 0 0 0.8rem;
-      color: #5f7991;
-      font-size: 0.72rem;
-      font-weight: 800;
-      letter-spacing: 0.13em;
-      text-transform: uppercase;
-    }
-
-    .sample-field h4 {
-      margin: 0 0 0.5rem;
-      color: #0b1826;
-      font-size: 1rem;
-      font-weight: 800;
-    }
-
-    .sample-field p {
-      margin: 0;
-      color: #4d667b;
-      line-height: 1.72;
-      font-size: 0.94rem;
-    }
-
-    .sample-field strong {
-      color: #0b1826;
-      font-size: 1.05rem;
-    }
-
-    .sample-note {
-      margin-top: 1.2rem;
-      padding: 1rem 1.1rem;
-      border-radius: 18px;
-      background: rgba(240,165,0,0.12);
-      border: 1px solid rgba(240,165,0,0.25);
-      color: #805200;
-      font-size: 0.9rem;
-      line-height: 1.72;
-      font-weight: 600;
-    }
-
-    @media (max-width: 980px) {
-      .sample-shell {
-        grid-template-columns: 1fr;
-      }
-
-      .sample-tab-wrap {
-        padding-bottom: 4rem;
-      }
-    }
-
-    @media (max-width: 760px) {
-      .sample-stat-grid,
-      .sample-field-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .sample-section-head {
-        flex-direction: column;
-      }
-    }
-  </style>
 </head>
 <body class="page-body sample-page">
-  <section class="sample-hero" aria-labelledby="sample-title">
-    <div class="sample-intro">
-      <h1 id="sample-title">A scan-ready Digital Product Passport experience customers can understand in seconds.</h1>
-      <p>This page is intentionally static and uses dummy data only. It mirrors the feel of the live ClarosDPP passport journey so prospects can see what opens after a QR scan, without connecting to any customer record or backend system.</p>
-    </div>
+  <div class="passport-portal">
+    <nav class="nav" aria-label="Passport sections">
+      <div class="nav-inner">
+        <a class="brand" href="#portal-top" aria-label="Back to passport top">
+          <div class="logo">
+            <img src="assets/sample-brand-mark.svg" alt="" aria-hidden="true" />
+          </div>
+          <div>
+            <strong>NovaLoop Energy</strong>
+            <span>Public DPP · static sample</span>
+          </div>
+        </a>
+        <div class="nav-links" role="tablist" aria-label="Viewer pages">
+          <button type="button" class="active" data-page="overview" role="tab" aria-selected="true">Overview</button>
+          <button type="button" data-page="header" role="tab" aria-selected="false">Header</button>
+          <button type="button" data-page="data" role="tab" aria-selected="false">Data</button>
+          <button type="button" data-page="trustPage" role="tab" aria-selected="false">Trust</button>
+          <button type="button" data-page="documents" role="tab" aria-selected="false">Documents</button>
+        </div>
+      </div>
+    </nav>
 
-    <div class="sample-shell">
-      <section class="sample-panel" aria-label="Sample passport summary">
+    <header class="hero" id="portal-top">
+      <div class="hero-main">
         <div>
-          <h2>NovaLoop Grid Cell 72</h2>
+          <div class="kicker">Battery product passport</div>
+          <h1>NovaLoop Grid Cell 72</h1>
+          <div class="hero-badge-row">
+            <span class="badge ok">Released sample</span>
+            <span class="badge">Static dummy data</span>
+            <span class="badge neutral">Public viewer match</span>
+          </div>
+          <p class="hero-note">
+            This demo mirrors the public passport viewer UI and uses static dummy data only, so prospects can explore the
+            same structure without touching a backend or customer record.
+          </p>
+          <div class="hero-cards" aria-label="Key passport facts">
+            <div class="hero-card">
+              <span>Manufacturer</span>
+              <strong>NovaLoop Energy</strong>
+            </div>
+            <div class="hero-card">
+              <span>Serial number</span>
+              <strong>NL-72-0048</strong>
+            </div>
+            <div class="hero-card">
+              <span>Status</span>
+              <strong>Released sample passport</strong>
+            </div>
+            <div class="hero-card">
+              <span>Last update</span>
+              <strong>27 May 2026</strong>
+            </div>
+          </div>
         </div>
-        <p class="sample-subtitle">A static example of a battery-focused passport view showing a friendly landing layer, essential compliance indicators, and a compact technical summary.</p>
-        <div class="sample-chip-row">
-          <span class="sample-chip">EU Battery Regulation</span>
-          <span class="sample-chip">Repair-ready summary</span>
-          <span class="sample-chip">Static dummy data</span>
-          <span class="sample-chip">Customer-safe demo</span>
-        </div>
-        <div class="sample-stat-grid">
-          <article class="sample-stat">
-            <span>Passport ID</span>
-            <strong>DPP-DEMO-72-ALPHA</strong>
+
+        <aside class="side-panel" aria-label="Product image and QR access">
+          <div class="product-photo has-img">
+            <img src="assets/sample-brand-mark.svg" alt="NovaLoop logo mark" />
+          </div>
+          <div class="qr-row">
+            <div class="qr" aria-label="Passport QR code">
+              <img src="assets/sample-passport-qr.svg" alt="QR code for the sample passport page" />
+            </div>
+            <div class="scan-copy">
+              <strong>Scan to open public URL</strong>
+              <div class="viewer-domain-indicator viewer-domain-indicator-trusted compact">
+                <span class="viewer-domain-indicator-label">Verified viewer host · demo only</span>
+                <strong class="viewer-domain-indicator-host">claros-dpp.online</strong>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </header>
+
+    <main>
+      <section class="page active" id="overview" role="tabpanel">
+        <div class="grid2 overview-only-layout">
+          <article class="card">
+            <h2>Product overview</h2>
+            <div class="energy-art has-img">
+              <img src="assets/pack.png" alt="Pack image for the sample passport" class="overview-product-image" />
+            </div>
+            <div class="overview-meta">
+              <div class="mini">
+                <span>Model</span>
+                <strong>NVL-GRID-72</strong>
+              </div>
+              <div class="mini">
+                <span>Capacity</span>
+                <strong>72 kWh</strong>
+              </div>
+              <div class="mini">
+                <span>Category</span>
+                <strong>Stationary storage battery</strong>
+              </div>
+            </div>
+
+            <div class="overview-symbols">
+              <div class="overview-symbols-head">
+                <h3>Labels &amp; symbols</h3>
+                <span>3 fields</span>
+              </div>
+              <div class="symbol-list">
+                <div class="symbol-item">
+                  <div>
+                    <span>Separate Collection Symbol</span>
+                    <img src="assets/bin.svg" alt="Separate collection symbol" class="overview-symbol-image" />
+                  </div>
+                </div>
+                <div class="symbol-item">
+                  <div>
+                    <span>QR label</span>
+                    <strong>Scan-ready public entry</strong>
+                    <img src="assets/sample-passport-qr.svg" alt="Sample passport QR code" class="overview-symbol-image" />
+                  </div>
+                </div>
+                <div class="symbol-item">
+                  <div>
+                    <span>Passport type</span>
+                    <strong>Battery passport sample</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <section class="verification-panel" aria-label="Verification">
+              <div class="verification-panel-head">
+                <span class="badge ok">Verification</span>
+                <h3>Static passport preview is signed for demo use.</h3>
+                <p>The sample follows the same viewer structure as the live public passport, but every value below is dummy data.</p>
+              </div>
+              <div class="verification-grid">
+                <div class="verification-card">
+                  <span>Issuer</span>
+                  <strong>Claros demo signer</strong>
+                </div>
+                <div class="verification-card">
+                  <span>Integrity</span>
+                  <strong>Verified for visual demo</strong>
+                </div>
+                <div class="verification-card">
+                  <span>Carrier</span>
+                  <strong>Trusted HTTPS viewer</strong>
+                </div>
+                <div class="verification-card">
+                  <span>Bundle</span>
+                  <strong>Static reference only</strong>
+                </div>
+              </div>
+            </section>
           </article>
-          <article class="sample-stat">
-            <span>Release State</span>
-            <strong>Demo approved for sales preview</strong>
-          </article>
-          <article class="sample-stat">
-            <span>Product Category</span>
-            <strong>Stationary energy storage battery</strong>
-          </article>
-          <article class="sample-stat">
-            <span>QR Destination</span>
-            <strong>Branded public landing plus technical summary</strong>
+
+          <article class="card">
+            <h2>Lifecycle snapshot</h2>
+            <div class="timeline">
+              <div class="event">
+                <div class="date">2026-01-08</div>
+                <div>
+                  <strong>Manufactured</strong>
+                  <span>Produced by NovaLoop Energy for demo release.</span>
+                </div>
+              </div>
+              <div class="event">
+                <div class="date">2026-02-14</div>
+                <div>
+                  <strong>Quality review</strong>
+                  <span>Compliance pack, labels, and traceability fields were checked.</span>
+                </div>
+              </div>
+              <div class="event">
+                <div class="date">2026-03-01</div>
+                <div>
+                  <strong>Public passport published</strong>
+                  <span>The public QR was generated for a customer-facing demo journey.</span>
+                </div>
+              </div>
+              <div class="event">
+                <div class="date">2026-05-27</div>
+                <div>
+                  <strong>Static sample refreshed</strong>
+                  <span>The demo content was updated to mirror the public viewer layout.</span>
+                </div>
+              </div>
+            </div>
           </article>
         </div>
       </section>
 
-      <aside class="sample-sidebar" aria-label="Demo passport side information">
-        <section class="sample-side-card">
-          <img src="assets/sample-passport-qr.svg" alt="QR code for the sample passport page" class="sample-qr" />
-          <h3>Scan or click the QR</h3>
-          <p>The homepage QR links here. In a production setup, each product would have its own QR and its own passport record, but this example stays static for demos.</p>
-          <div class="sample-status">Demo live</div>
+      <section class="page" id="header" role="tabpanel" hidden>
+        <div class="page-head">
+          <div>
+            <span class="badge">Separate header tab</span>
+            <h2>DPP header</h2>
+            <p>This identity and schema context is shown in the same card format as the live public passport viewer.</p>
+          </div>
+        </div>
+        <div class="header-grid">
+          <div class="header-field">
+            <span>Passport ID</span>
+            <strong>DPP-DEMO-72-ALPHA</strong>
+          </div>
+          <div class="header-field">
+            <span>Passport type</span>
+            <strong>Battery passport</strong>
+          </div>
+          <div class="header-field">
+            <span>Release status</span>
+            <strong>Released sample</strong>
+          </div>
+          <div class="header-field">
+            <span>Access mode</span>
+            <strong>Public demo</strong>
+          </div>
+          <div class="header-field">
+            <span>Data owner</span>
+            <strong>NovaLoop Energy</strong>
+          </div>
+          <div class="header-field">
+            <span>Market region</span>
+            <strong>EU / EEA</strong>
+          </div>
+          <div class="header-field">
+            <span>Language</span>
+            <strong>English</strong>
+          </div>
+          <div class="header-field">
+            <span>Last published</span>
+            <strong>27 May 2026</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="data" role="tabpanel" hidden>
+        <div class="page-head">
+          <div>
+            <span class="badge">Structured data</span>
+            <h2>Data</h2>
+            <p>Static sections and rows follow the same expandable-card pattern as the public viewer.</p>
+          </div>
+        </div>
+        <div class="category-stack">
+          <details class="category" open>
+            <summary>
+              <div class="cat-title">
+                <span class="cat-index">01</span>
+                <div>
+                  <h3>Core identity</h3>
+                </div>
+              </div>
+              <div class="cat-meta">
+                <span class="badge neutral">4 fields</span>
+                <span class="chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <ul class="field-list">
+              <li class="field-row">
+                <span class="field-key">Model name</span>
+                <div class="field-value">NVL-GRID-72</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Product name</span>
+                <div class="field-value">NovaLoop Grid Cell 72</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Battery serial number</span>
+                <div class="field-value">NL-72-0048</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Manufacture date</span>
+                <div class="field-value">08 Jan 2026</div>
+              </li>
+            </ul>
+          </details>
+
+          <details class="category">
+            <summary>
+              <div class="cat-title">
+                <span class="cat-index">02</span>
+                <div>
+                  <h3>Materials and composition</h3>
+                </div>
+              </div>
+              <div class="cat-meta">
+                <span class="badge neutral">4 fields</span>
+                <span class="chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <ul class="field-list">
+              <li class="field-row">
+                <span class="field-key">Cell chemistry</span>
+                <div class="field-value">LFP with graphite anode</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Recycled aluminum</span>
+                <div class="field-value">28.4%</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Traceability coverage</span>
+                <div class="field-value">Tier 2 mapped</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Composition evidence</span>
+                <div class="field-value">Static declarations attached for demo review</div>
+              </li>
+            </ul>
+          </details>
+
+          <details class="category">
+            <summary>
+              <div class="cat-title">
+                <span class="cat-index">03</span>
+                <div>
+                  <h3>Compliance and serviceability</h3>
+                </div>
+              </div>
+              <div class="cat-meta">
+                <span class="badge neutral">4 fields</span>
+                <span class="chevron" aria-hidden="true"></span>
+              </div>
+            </summary>
+            <ul class="field-list">
+              <li class="field-row">
+                <span class="field-key">Applicable framework</span>
+                <div class="field-value">EU Battery Regulation 2023/1542</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Compliance status</span>
+                <div class="field-value">Demo pass</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Service guide availability</span>
+                <div class="field-value">Public summary available</div>
+              </li>
+              <li class="field-row">
+                <span class="field-key">Passport revision</span>
+                <div class="field-value">v1.3</div>
+              </li>
+            </ul>
+          </details>
+        </div>
+      </section>
+
+      <section class="page" id="trustPage" role="tabpanel" hidden>
+        <div class="page-head">
+          <div>
+            <span class="badge ok">Verifier credentials</span>
+            <h2>Trust identity</h2>
+            <p>These cards match the public viewer's trust page layout but use static dummy values for the sample passport.</p>
+          </div>
+        </div>
+        <section class="trust-panel">
+          <div class="verification-inline-note">
+            <strong>DPP integrity: Verified demo build</strong>
+            <span>Signer: Claros demo signer</span>
+          </div>
+          <div class="trust-grid">
+            <div class="trust-card">
+              <span>Trusted viewer host</span>
+              <strong>claros-dpp.online</strong>
+            </div>
+            <div class="trust-card">
+              <span>Carrier protection</span>
+              <strong>Verified HTTPS viewer</strong>
+            </div>
+            <div class="trust-card">
+              <span>Counterfeit risk</span>
+              <strong>Low</strong>
+            </div>
+            <div class="trust-card">
+              <span>Protected verification</span>
+              <strong>Demo certificate ID 9F7A-22C1</strong>
+            </div>
+            <div class="trust-card">
+              <span>Print specification</span>
+              <strong>Static QR label v1.2</strong>
+            </div>
+            <div class="trust-card">
+              <span>Security note</span>
+              <strong>Trust only the verified viewer domain</strong>
+            </div>
+          </div>
         </section>
-        <section class="sample-side-card">
-          <h3>Why this page exists</h3>
-          <p>Prospects often want to understand the end-user experience before they discuss integrations, data readiness, or rollout. This demo gives them that view immediately.</p>
-        </section>
-      </aside>
-    </div>
-  </section>
+      </section>
 
-  <div class="sample-tab-wrap">
-    <nav class="sample-tab-rail" aria-label="Sample passport sections">
-      <a href="#overview">Overview</a>
-      <a href="#materials">Materials</a>
-      <a href="#compliance">Compliance</a>
-      <a href="#circularity">Circularity</a>
-    </nav>
-
-    <section class="sample-section" id="overview" aria-labelledby="overview-title">
-      <div class="sample-section-head">
-        <div>
-          <h3 id="overview-title">Product overview</h3>
-          <p>A few high-signal fields give customers a quick understanding of the product and the kind of traceable data available inside a passport.</p>
+      <section class="page" id="documents" role="tabpanel" hidden>
+        <div class="page-head">
+          <div>
+            <span class="badge">Linked resources</span>
+            <h2>Documents</h2>
+            <p>Static artifacts are presented in the same document-card grid as the live public passport viewer.</p>
+          </div>
         </div>
-        <div class="sample-count">4 fields</div>
-      </div>
-      <div class="sample-field-grid">
-        <article class="sample-field">
-          <p class="sample-field-kicker">Identity</p>
-          <h4>Model reference</h4>
-          <p><strong>NVL-GRID-72</strong><br />Configured for modular stationary storage systems.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Manufacture</p>
-          <h4>Manufactured date</h4>
-          <p><strong>2026-01-14</strong><br />Example production batch shown for demonstration only.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Performance</p>
-          <h4>Rated energy</h4>
-          <p><strong>72 kWh</strong><br />Nominal configuration presented for sample viewing.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Use case</p>
-          <h4>Intended application</h4>
-          <p><strong>Commercial energy storage</strong><br />Suitable for site resilience and peak management demos.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="sample-section" id="materials" aria-labelledby="materials-title">
-      <div class="sample-section-head">
-        <div>
-          <h3 id="materials-title">Materials and composition</h3>
-          <p>This section shows how a passport can summarize material composition and supplier-derived inputs without overwhelming a first-time viewer.</p>
+        <div class="document-grid">
+          <article class="doc-card">
+            <div class="doc-icon">PDF</div>
+            <div>
+              <h3>Compliance declaration</h3>
+              <p>Dummy declaration of conformity for the sample passport release.</p>
+            </div>
+            <span class="badge neutral">Static</span>
+          </article>
+          <article class="doc-card">
+            <div class="doc-icon">CSV</div>
+            <div>
+              <h3>Materials export</h3>
+              <p>Illustrative composition and sourcing export for the sample battery.</p>
+            </div>
+            <span class="badge neutral">Static</span>
+          </article>
+          <article class="doc-card">
+            <div class="doc-icon">QR</div>
+            <div>
+              <h3>Label artwork</h3>
+              <p>QR label artwork and carrier layout used for the demo presentation.</p>
+            </div>
+            <span class="badge neutral">Static</span>
+          </article>
+          <article class="doc-card">
+            <div class="doc-icon">DOC</div>
+            <div>
+              <h3>Service guide</h3>
+              <p>Public summary of repair, reuse, and end-of-life handling guidance.</p>
+            </div>
+            <span class="badge neutral">Static</span>
+          </article>
         </div>
-        <div class="sample-count">4 fields</div>
-      </div>
-      <div class="sample-field-grid">
-        <article class="sample-field">
-          <p class="sample-field-kicker">Chemistry</p>
-          <h4>Cell chemistry</h4>
-          <p><strong>LFP with graphite anode</strong><br />Chosen here as a neutral dummy chemistry example.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Recycled content</p>
-          <h4>Recovered aluminum</h4>
-          <p><strong>28.4%</strong><br />Sample recycled content percentage for illustrative use.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Material visibility</p>
-          <h4>Traceability coverage</h4>
-          <p><strong>Tier 2 mapped</strong><br />Demonstrates supplier and component traceability depth.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Documentation</p>
-          <h4>Composition evidence</h4>
-          <p><strong>Structured declarations attached</strong><br />Evidence can sit behind technical access controls in production.</p>
-        </article>
-      </div>
-    </section>
+      </section>
+    </main>
 
-    <section class="sample-section" id="compliance" aria-labelledby="compliance-title">
-      <div class="sample-section-head">
-        <div>
-          <h3 id="compliance-title">Compliance and serviceability</h3>
-          <p>A practical passport combines regulation-specific checks with service information that helps internal teams, partners, and auditors work from the same record.</p>
-        </div>
-        <div class="sample-count">4 fields</div>
+    <footer class="footer">
+      <div class="footer-inner">
+        <span>NovaLoop Energy · Category-specific battery passport</span>
+        <span>Public passport viewer</span>
       </div>
-      <div class="sample-field-grid">
-        <article class="sample-field">
-          <p class="sample-field-kicker">Regulation</p>
-          <h4>Applicable framework</h4>
-          <p><strong>EU Battery Regulation 2023/1542</strong><br />Included here because it is the clearest current DPP use case.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Safety</p>
-          <h4>Compliance status</h4>
-          <p><strong>Demo pass</strong><br />Represents how release state and evidence status can surface clearly.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Repairability</p>
-          <h4>Service guide availability</h4>
-          <p><strong>Public summary available</strong><br />Repair and disassembly guidance can be exposed per audience.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Versioning</p>
-          <h4>Passport revision</h4>
-          <p><strong>v1.3</strong><br />Demonstrates how customers see the latest published passport version.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="sample-section" id="circularity" aria-labelledby="circularity-title">
-      <div class="sample-section-head">
-        <div>
-          <h3 id="circularity-title">Circularity and end-of-life</h3>
-          <p>Customers typically want to see what happens after use, so this section highlights circularity, carbon, and collection information in plain language.</p>
-        </div>
-        <div class="sample-count">4 fields</div>
-      </div>
-      <div class="sample-field-grid">
-        <article class="sample-field">
-          <p class="sample-field-kicker">Footprint</p>
-          <h4>Carbon footprint</h4>
-          <p><strong>61.8 kg CO2e / kWh</strong><br />Example value shown in the same concise card language used across the app.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Longevity</p>
-          <h4>Expected cycle life</h4>
-          <p><strong>3,500 cycles</strong><br />Enough detail for an informed first impression without full technical overload.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">End of life</p>
-          <h4>Collection route</h4>
-          <p><strong>Authorized industrial take-back</strong><br />Illustrates how return and recovery instructions can be surfaced.</p>
-        </article>
-        <article class="sample-field">
-          <p class="sample-field-kicker">Disassembly</p>
-          <h4>Removal guidance</h4>
-          <p><strong>Service-only removal path</strong><br />Sample wording for clear and safe end-of-life handling guidance.</p>
-        </article>
-      </div>
-      <div class="sample-note">This sample page is intentionally brand-neutral and static. It is meant to show the experience and layout, not to represent a real customer, real product, or live compliance claim.</div>
-    </section>
+    </footer>
   </div>
 
-  <script src="shared.js?v=20260423"></script>
+  <script>
+    (() => {
+      const portal = document.querySelector(".passport-portal");
+      if (!portal) return;
+
+      const tabs = Array.from(portal.querySelectorAll("[data-page]"));
+      const pages = Array.from(portal.querySelectorAll(".page"));
+
+      const activate = (pageId, updateHash = true) => {
+        tabs.forEach((tab) => {
+          const isActive = tab.dataset.page === pageId;
+          tab.classList.toggle("active", isActive);
+          tab.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+
+        pages.forEach((page) => {
+          const isActive = page.id === pageId;
+          page.classList.toggle("active", isActive);
+          page.hidden = !isActive;
+        });
+
+        if (updateHash) {
+          history.replaceState(null, "", `#${pageId}`);
+        }
+      };
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => activate(tab.dataset.page));
+      });
+
+      const initialPage = tabs.some((tab) => tab.dataset.page === location.hash.slice(1))
+        ? location.hash.slice(1)
+        : "overview";
+      activate(initialPage, false);
+
+      window.addEventListener("hashchange", () => {
+        const nextPage = tabs.some((tab) => tab.dataset.page === location.hash.slice(1))
+          ? location.hash.slice(1)
+          : "overview";
+        activate(nextPage, false);
+      });
+    })();
+  </script>
 </body>
 </html>

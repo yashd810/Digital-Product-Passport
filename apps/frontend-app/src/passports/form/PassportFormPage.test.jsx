@@ -67,8 +67,8 @@ describe("PassportForm draft editing", () => {
         return jsonResponse({
           dppId: "dpp-1",
           dpp_id: "dpp-1",
-          internal_alias_id: "SKU-1",
-          model_name: "Model A",
+          internalAliasId: "SKU-1",
+          modelName: "Model A",
           manufacturer: "Acme",
           category: "Primary",
           passport_type: "battery",
@@ -82,8 +82,8 @@ describe("PassportForm draft editing", () => {
         return jsonResponse({
           dppId: "dpp-1",
           dpp_id: "dpp-1",
-          internal_alias_id: "SKU-1",
-          model_name: "Model A",
+          internalAliasId: "SKU-1",
+          modelName: "Model A",
           manufacturer: "Acme",
           category: "Primary",
           passport_type: "battery",
@@ -97,8 +97,8 @@ describe("PassportForm draft editing", () => {
           passport: {
             dppId: "dpp-1",
             dpp_id: "dpp-1",
-            internal_alias_id: "SKU-1",
-            model_name: "Model A",
+            internalAliasId: "SKU-1",
+            modelName: "Model A",
             manufacturer: parsedBody.manufacturer || "Acme",
             category: "Primary",
             passport_type: "battery",

@@ -36,21 +36,6 @@ function createProductIdentifierService({ didService, pool = null }) {
     return didService.normalizeStableId(normalized);
   }
 
-  function buildLegacyStableProductId({ companyId, rawProductId }) {
-    const normalized = normalizeRawProductId(rawProductId);
-    if (!normalized) return "";
-
-    const slugBase = didService.slugify(normalized).slice(0, 48) || "product";
-    const crypto = require("crypto");
-    const hash = crypto
-      .createHash("sha256")
-      .update(`${companyId || "global"}::${normalized}`)
-      .digest("hex")
-      .slice(0, 12);
-
-    return didService.normalizeStableId(`c${companyId}-${slugBase}-${hash}`);
-  }
-
   function normalizeGranularity(granularity) {
     const value = String(granularity || "").trim().toLowerCase();
     if (value === "model") return "model";
@@ -138,21 +123,6 @@ function createProductIdentifierService({ didService, pool = null }) {
         granularity,
       });
       if (canonicalDid) candidates.push(canonicalDid);
-
-      const legacyStableId = buildLegacyStableProductId({
-        companyId,
-        rawProductId: normalized,
-      });
-      if (legacyStableId && legacyStableId !== normalized) {
-        const legacyNamespace = didService.normalizePassportTypeSegment(passportType || "battery");
-        const normalizedGranularity = normalizeGranularity(granularity);
-        const legacyDid = normalizedGranularity === "model"
-          ? didService.generateModelDid(legacyNamespace, legacyStableId)
-          : normalizedGranularity === "batch"
-            ? didService.generateBatchDid(legacyNamespace, legacyStableId)
-            : didService.generateItemDid(legacyNamespace, legacyStableId);
-        if (legacyDid) candidates.push(legacyDid);
-      }
     }
     return [...new Set(candidates)];
   }

@@ -1,12 +1,12 @@
 import React, { Suspense, lazy, useState, useEffect } from "react";
-import { Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import "../styles/App.css";
 import { I18nProvider } from "../providers/i18n";
 import { useSessionAuth } from "../hooks/useSessionAuth";
 import { AdminRoute, ProtectedRoute } from "../routes/RouteGuards";
 import { applyTheme, getStoredTheme } from "../providers/ThemeContext";
 import AppSkipLink from "../components/AppSkipLink";
-import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
+import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 
 // Auth
 const Login = lazy(() => import("../../auth/containers/Login"));
@@ -58,13 +58,13 @@ function RouteFallback() {
 
 function CreatePassportRoute({ user, companyId }) {
   const { passportType } = useParams();
-  if (user?.role === "viewer") return <Navigate to="/dashboard" replace />;
+  if (user?.role === "viewer") return <Navigate to={buildUserDashboardHomePath({ user, companyId })} replace />;
   return <PassportForm mode="create" passportType={passportType}
            user={user} companyId={companyId} />;
 }
 
 function EditPassportRoute({ user, companyId }) {
-  if (user?.role === "viewer") return <Navigate to="/dashboard" replace />;
+  if (user?.role === "viewer") return <Navigate to={buildUserDashboardHomePath({ user, companyId })} replace />;
   return <PassportForm mode="edit" user={user} companyId={companyId} />;
 }
 
@@ -76,22 +76,6 @@ function TemplateEditRoute({ user, companyId }) {
 function CSVImportTabRoute({ user, companyId }) {
   const { tab } = useParams();
   return <CSVImportGuide user={user} companyId={companyId} activeTab={tab || "create"} />;
-}
-
-function DashboardLegacyRedirect({ user, companyId }) {
-  const location = useLocation();
-  const legacySuffix = location.pathname.replace(/^\/dashboard\/?/, "");
-  const subpath = legacySuffix || "overview";
-  return (
-    <Navigate
-      to={`${buildDashboardPath({
-        companyName: user?.companyName,
-        companyId,
-        subpath,
-      })}${location.search || ""}`}
-      replace
-    />
-  );
 }
 
 function App() {
@@ -161,11 +145,6 @@ function App() {
         } />
 
         {/* Dashboard */}
-        <Route path="/dashboard/*" element={
-          <ProtectedRoute token={token} authReady={authReady}>
-            <DashboardLegacyRedirect user={user} companyId={companyId} />
-          </ProtectedRoute>
-        } />
         <Route path="/dashboard/:companySlug" element={
           <ProtectedRoute token={token} authReady={authReady}>
             <DashboardLayout user={user} companyId={companyId} onLogout={handleLogout} />

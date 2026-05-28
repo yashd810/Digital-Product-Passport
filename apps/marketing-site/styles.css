@@ -248,7 +248,7 @@ section + section {
   line-height: 1.35;
   text-transform: uppercase;
   color: var(--teal);
-  margin: 0 0 0.75rem;
+  margin: 0 0 2.25rem;
 }
 .section-title {
   font-family: var(--sans); font-size: clamp(1.95rem, 3.5vw, 3.1rem);

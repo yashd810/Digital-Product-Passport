@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_REQUIREMENT_TEXT,
@@ -104,7 +105,11 @@ function Register({ setToken, setUser, setCompanyId }) {
       setUser(data.user);
       setCompanyId(data.user.companyId);
 
-      navigate(data.user.role === "super_admin" ? "/admin" : "/dashboard");
+      navigate(
+        data.user.role === "super_admin"
+          ? "/admin"
+          : buildUserDashboardHomePath({ user: data.user, companyId: data.user.companyId || "" })
+      );
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {

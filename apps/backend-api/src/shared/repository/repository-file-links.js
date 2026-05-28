@@ -68,7 +68,6 @@ function buildRepositoryFilePublicUrl({ appBaseUrl, companyId, itemId }) {
   return joinUrl(appBaseUrl, buildRepositoryFilePublicPath({ companyId, itemId }));
 }
 
-const LEGACY_REPOSITORY_FILE_ROUTE = /\/api\/companies\/(\d+)\/repository\/(\d+)\/file(?:[/?#].*)?$/i;
 const OPAQUE_REPOSITORY_FILE_ROUTE = /\/repository-files\/([^/?#]+)(?:[/?#].*)?$/i;
 
 function buildRepositoryFileAccessPayload({ companyId, itemId, expiresAt }) {
@@ -134,38 +133,28 @@ function parseRepositoryFileReference(value) {
     pathname = trimmed;
   }
 
-  const legacyMatch = pathname.match(LEGACY_REPOSITORY_FILE_ROUTE);
-  if (legacyMatch) {
-    const companyId = Number.parseInt(legacyMatch[1], 10);
-    const itemId = Number.parseInt(legacyMatch[2], 10);
-    if (Number.isInteger(companyId) && companyId > 0 && Number.isInteger(itemId) && itemId > 0) {
-      return { companyId, itemId };
-    }
-    return null;
-  }
-
   const opaqueMatch = pathname.match(OPAQUE_REPOSITORY_FILE_ROUTE);
   if (!opaqueMatch) return null;
   return decodeRepositoryFileToken(opaqueMatch[1]);
 }
 
-function rewriteLegacyRepositoryFileLink(value, { appBaseUrl } = {}) {
+function rewriteRepositoryFileLink(value, { appBaseUrl } = {}) {
   const resolved = parseRepositoryFileReference(value);
   if (!resolved) return value;
   if (!appBaseUrl) return buildRepositoryFilePublicPath(resolved);
   return buildRepositoryFilePublicUrl({ appBaseUrl, ...resolved });
 }
 
-function rewriteLegacyRepositoryLinksDeep(value, options = {}) {
-  if (typeof value === "string") return rewriteLegacyRepositoryFileLink(value, options);
-  if (Array.isArray(value)) return value.map((entry) => rewriteLegacyRepositoryLinksDeep(entry, options));
+function rewriteRepositoryLinksDeep(value, options = {}) {
+  if (typeof value === "string") return rewriteRepositoryFileLink(value, options);
+  if (Array.isArray(value)) return value.map((entry) => rewriteRepositoryLinksDeep(entry, options));
   if (!value || typeof value !== "object") return value;
   if (value instanceof Date) return value;
   if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return value;
 
   const next = {};
   for (const [key, entry] of Object.entries(value)) {
-    next[key] = rewriteLegacyRepositoryLinksDeep(entry, options);
+    next[key] = rewriteRepositoryLinksDeep(entry, options);
   }
   return next;
 }
@@ -199,8 +188,8 @@ module.exports = {
   decodeRepositoryFileAccessToken,
   decodeRepositoryFileToken,
   parseRepositoryFileReference,
-  rewriteLegacyRepositoryFileLink,
-  rewriteLegacyRepositoryLinksDeep,
+  rewriteRepositoryFileLink,
+  rewriteRepositoryLinksDeep,
   rewriteRepositoryFileLinkForSignedAccess,
   rewriteRepositoryLinksForSignedAccessDeep,
 };

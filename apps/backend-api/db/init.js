@@ -1605,11 +1605,11 @@ async function initDb(pool, {
         `SELECT 1
          FROM information_schema.columns
          WHERE table_name = $1
-           AND column_name = 'internal_alias_id'`,
+           AND column_name = 'internalAliasId'`,
         [tableName]
       );
       if (legacyAliasColumn.rows.length && !currentAliasColumn.rows.length) {
-        await pool.query(`ALTER TABLE ${tableName} RENAME COLUMN product_id TO internal_alias_id`);
+        logger.warn({ tableName }, "Legacy product_id column detected; run the explicit passport column migration before startup.");
       }
       await pool.query(`
         ALTER TABLE ${tableName}
@@ -1630,31 +1630,31 @@ async function initDb(pool, {
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS compliance_profile_key VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1'
+        ADD COLUMN IF NOT EXISTS "complianceProfileKey" VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1'
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS content_specification_ids TEXT
+        ADD COLUMN IF NOT EXISTS "contentSpecificationIds" TEXT
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS carrier_policy_key VARCHAR(120)
+        ADD COLUMN IF NOT EXISTS "carrierPolicyKey" VARCHAR(120)
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS carrier_authenticity JSONB
+        ADD COLUMN IF NOT EXISTS "carrierAuthenticity" JSONB
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS economic_operator_id TEXT
+        ADD COLUMN IF NOT EXISTS "economicOperatorId" TEXT
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS economic_operator_identifier_scheme VARCHAR(80)
+        ADD COLUMN IF NOT EXISTS "economicOperatorIdentifierScheme" VARCHAR(80)
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS facility_id TEXT
+        ADD COLUMN IF NOT EXISTS "facilityId" TEXT
       `);
       await pool.query(`
         CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did

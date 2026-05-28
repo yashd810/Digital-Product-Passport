@@ -6,9 +6,31 @@ require("dotenv").config({
 });
 
 const { Pool } = require("pg");
-const {
-  SYSTEM_PASSPORT_COLUMN_MAPPINGS,
-} = require("../src/shared/passports/system-passport-columns");
+
+const LEGACY_SYSTEM_PASSPORT_COLUMNS = [
+  ["dpp_id", "dppId"],
+  ["lineage_id", "lineageId"],
+  ["company_id", "companyId"],
+  ["model_name", "modelName"],
+  ["internal_alias_id", "internalAliasId"],
+  ["product_identifier_did", "uniqueProductIdentifier"],
+  ["product_image", "productImage"],
+  ["compliance_profile_key", "complianceProfileKey"],
+  ["content_specification_ids", "contentSpecificationIds"],
+  ["carrier_policy_key", "carrierPolicyKey"],
+  ["carrier_authenticity", "carrierAuthenticity"],
+  ["economic_operator_id", "economicOperatorId"],
+  ["economic_operator_identifier_scheme", "economicOperatorIdentifierScheme"],
+  ["facility_id", "facilityId"],
+  ["release_status", "releaseStatus"],
+  ["version_number", "versionNumber"],
+  ["qr_code", "qrCode"],
+  ["created_by", "createdBy"],
+  ["updated_by", "updatedBy"],
+  ["created_at", "createdAt"],
+  ["updated_at", "updatedAt"],
+  ["deleted_at", "deletedAt"],
+];
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -51,12 +73,12 @@ async function main() {
 
   for (const tableName of tables) {
     const columns = await getColumnNames(tableName);
-    const plannedRenames = SYSTEM_PASSPORT_COLUMN_MAPPINGS
-      .filter(({ storageKey, legacyKey }) => legacyKey && columns.has(legacyKey) && !columns.has(storageKey))
-      .map(({ storageKey, legacyKey }) => ({ from: legacyKey, to: storageKey }));
-    const plannedLegacyDrops = SYSTEM_PASSPORT_COLUMN_MAPPINGS
-      .filter(({ storageKey, legacyKey }) => legacyKey && columns.has(storageKey) && columns.has(legacyKey))
-      .map(({ storageKey, legacyKey }) => ({ storageKey, legacyKey }));
+    const plannedRenames = LEGACY_SYSTEM_PASSPORT_COLUMNS
+      .filter(([legacyKey, storageKey]) => columns.has(legacyKey) && !columns.has(storageKey))
+      .map(([legacyKey, storageKey]) => ({ from: legacyKey, to: storageKey }));
+    const plannedLegacyDrops = LEGACY_SYSTEM_PASSPORT_COLUMNS
+      .filter(([legacyKey, storageKey]) => columns.has(storageKey) && columns.has(legacyKey))
+      .map(([legacyKey, storageKey]) => ({ storageKey, legacyKey }));
 
     if (apply) {
       for (const rename of plannedRenames) {

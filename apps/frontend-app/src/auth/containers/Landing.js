@@ -1,9 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import "../styles/Landing.css";
 
 function Landing({ token, user, onLogout }) {
   const navigate = useNavigate();
+  const dashboardHomePath = buildUserDashboardHomePath({ user });
 
   const handleLogout = async () => {
     await onLogout?.();
@@ -32,7 +34,7 @@ function Landing({ token, user, onLogout }) {
           <nav className="lp-nav" aria-label="App navigation">
             {token ? (
               <>
-                <button onClick={() => navigate("/dashboard")} className="lp-nav-btn">
+                <button onClick={() => navigate(dashboardHomePath)} className="lp-nav-btn">
                   Dashboard
                 </button>
                 {user?.role === "super_admin" && (
@@ -83,7 +85,7 @@ function Landing({ token, user, onLogout }) {
             </div>
           ) : (
             <div className="lp-hero-btns">
-              <button onClick={() => navigate("/dashboard")} className="lp-btn lp-btn-primary">
+              <button onClick={() => navigate(dashboardHomePath)} className="lp-btn lp-btn-primary">
                 Go to Dashboard →
               </button>
               {user?.role === "super_admin" && (

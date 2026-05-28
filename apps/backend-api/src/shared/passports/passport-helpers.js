@@ -1,6 +1,6 @@
 "use strict";
 
-const { rewriteLegacyRepositoryLinksDeep } = require("../repository/repository-file-links");
+const { rewriteRepositoryLinksDeep } = require("../repository/repository-file-links");
 
 const IN_REVISION_STATUS = "in_revision";
 
@@ -37,8 +37,6 @@ const SYSTEM_PASSPORT_FIELDS = new Set([
   "updatedBy",
   "updatedAt",
 ]);
-
-const LEGACY_RESPONSE_KEY_MAP = new Map();
 
 const EDITABLE_PASSPORT_STATUSES = new Set(["draft", IN_REVISION_STATUS]);
 
@@ -138,12 +136,6 @@ const normalizePassportRow = (row, schema) => {
   // Deserialize JSONB fields
   let rowData = { ...row };
 
-  for (const [legacyKey, canonicalKey] of LEGACY_RESPONSE_KEY_MAP.entries()) {
-    if (rowData[canonicalKey] === undefined && rowData[legacyKey] !== undefined) {
-      rowData[canonicalKey] = rowData[legacyKey];
-    }
-  }
-
   if (schemaFields.length > 0) {
     const jsonbFields = new Set();
     schemaFields.forEach((field) => {
@@ -176,7 +168,7 @@ const normalizePassportRow = (row, schema) => {
     }
   }
   
-  const normalized = rewriteLegacyRepositoryLinksDeep({
+  const normalized = rewriteRepositoryLinksDeep({
     ...rowData,
     dppId,
     companyId,
@@ -218,10 +210,6 @@ const normalizePassportRow = (row, schema) => {
   }, {
     appBaseUrl: process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001",
   });
-
-  for (const legacyKey of LEGACY_RESPONSE_KEY_MAP.keys()) {
-    delete normalized[legacyKey];
-  }
 
   return normalized;
 };

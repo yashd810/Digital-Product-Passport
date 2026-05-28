@@ -342,60 +342,76 @@
       left: 0;
       animation: bob 5s ease-in-out infinite 0.8s;
     }
-    .hero-demo-card {
-      width: min(100%, 400px);
-      background: var(--card-bg);
-      border: 1px solid rgba(16,36,58,0.08);
-      border-radius: 22px;
-      padding: 1.25rem;
-      box-shadow: 0 16px 40px rgba(16,36,58,0.08);
+    #work-modes {
+      margin-top: 0;
+      padding-top: 1.5rem;
     }
-    .hero-demo-card h3 {
-      font-family: var(--serif);
-      font-size: 1.35rem;
-      color: #10243a;
-      margin-bottom: 0.65rem;
-    }
-    .hero-demo-card p {
-      color: #607a90;
-      font-size: 0.88rem;
-      line-height: 1.8;
-      margin-bottom: 1rem;
-      text-align: justify;
-      text-justify: inter-word;
-      text-align-last: left;
-      hyphens: auto;
-      -webkit-hyphens: auto;
-      -ms-hyphens: auto;
-    }
-    .sample-qr-link {
-      display: inline-flex;
-      justify-content: center;
+    #work-modes .work-mode-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+      gap: 2rem;
       align-items: center;
-      padding: 1rem;
-      background: #ffffff;
-      border-radius: 18px;
-      margin: 0 0 1rem;
     }
-    .sample-qr-image {
-      width: 180px;
-      height: 180px;
-      object-fit: contain;
+    #work-modes .work-mode-title {
+      max-width: 880px;
+      margin: 0;
+      color: #10243a;
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.28;
+      margin-bottom: 1rem;
     }
-    .hero-demo-meta {
+    #work-modes .work-mode-copy p {
+      max-width: 680px;
+      color: #50697f;
+      font-size: 1.1rem;
+      line-height: 1.82;
+      margin: 0;
+    }
+    #work-modes .work-mode-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
+      gap: 0.75rem;
+      margin-top: 1.35rem;
     }
-    .hero-demo-tag {
-      padding: 0.25rem 0.7rem;
+    #work-modes .work-mode-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.1rem;
+    }
+    #work-modes .work-mode-card {
+      min-height: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-bdr);
+      border-radius: 18px;
+      padding: 1.45rem;
+      box-shadow: 0 10px 28px rgba(27,61,86,0.06);
+    }
+    #work-modes .work-mode-kicker {
+      display: inline-flex;
+      margin-bottom: 0.85rem;
+      padding: 0.22rem 0.58rem;
       border-radius: 999px;
       background: rgba(13,181,176,0.1);
       border: 1px solid rgba(13,181,176,0.18);
       color: var(--teal);
-      font-size: 0.72rem;
+      font-family: var(--mono);
+      font-size: 0.68rem;
       font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    #work-modes .work-mode-card h3 {
+      margin: 0 0 0.55rem;
+      color: #20344b;
+      font-size: 0.98rem;
+      line-height: 1.25;
+    }
+    #work-modes .work-mode-card p {
+      margin: 0;
+      color: #5d738a;
+      font-size: 0.82rem;
+      line-height: 1.8;
     }
     #what-is-dpp .section-lead {
       max-width: 980px;
@@ -408,15 +424,82 @@
       -ms-hyphens: auto;
       display: block;
     }
-    #why-mandatory .section-lead {
-      max-width: 980px;
-      text-align: justify;
-      text-justify: inter-word;
-      text-align-last: left;
-      hyphens: auto;
-      -webkit-hyphens: auto;
-      -ms-hyphens: auto;
+    #what-is-title {
+      width: 100%;
+      max-width: none;
+      white-space: nowrap;
+      margin-bottom: 2rem;
+    }
+    #dpp-contents {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(13,181,176,0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(13,181,176,0.045) 1px, transparent 1px),
+        linear-gradient(180deg, #f8fdff 0%, #eef9fc 100%);
+      background-size: 40px 40px, 40px 40px, auto;
+    }
+    #dpp-contents .section-title {
+      max-width: 920px;
+      margin-bottom: 1rem;
+    }
+    #dpp-contents {
+      margin-top: 0;
+    }
+    #dpp-contents .hero-dpp-label {
+      margin: 0 0 1rem;
+    }
+    #dpp-contents .section-spacer {
+      margin: 0 0 0.85rem;
+      line-height: 1;
+      font-size: 1rem;
+      color: transparent;
+    }
+    .dpp-content-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.6rem;
+    }
+    .dpp-content-card {
+      min-height: 210px;
+      padding: 1.55rem 1.6rem 1.4rem;
+      border-radius: 28px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(16,36,58,0.08);
+      box-shadow: 0 22px 60px rgba(16,36,58,0.08);
+    }
+    .dpp-content-icon {
+      width: 46px;
+      height: 46px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.85rem;
+      border-radius: 18px;
+      background: rgba(13,181,176,0.1);
+      color: var(--teal);
+      border: 1px solid rgba(13,181,176,0.22);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    #dpp-contents .dpp-content-card h5 {
       display: block;
+      margin: 0 0 0.6rem;
+      color: #10243a;
+      font-family: var(--sans);
+      font-size: clamp(1.05rem, 1.5vw, 1.28rem);
+      font-weight: 700;
+      line-height: 1.22;
+      letter-spacing: -0.03em;
+    }
+    #dpp-contents .dpp-content-card p {
+      margin: 0;
+      color: #607a90;
+      font-size: 0.95rem;
+      line-height: 1.62;
+      font-weight: 500;
     }
     @keyframes bob {
       0%, 100% { transform: translateY(0); }
@@ -425,7 +508,7 @@
 
     .dpp-explainer {
       display: grid;
-      grid-template-columns: 1.22fr 0.78fr;
+      grid-template-columns: 1.12fr 0.88fr;
       gap: 3.25rem;
       align-items: start;
       margin-top: 0;
@@ -438,7 +521,7 @@
       border: 1px solid rgba(16,36,58,0.08);
       border-radius: 22px;
       padding: 0.9rem;
-      margin-top: 2rem;
+      margin-top: 1rem;
       overflow: hidden;
       box-shadow: 0 18px 50px rgba(16,36,58,0.07);
     }
@@ -568,9 +651,7 @@
     #opportunity .section-lead {
       max-width: 980px;
     }
-    #opportunity .section-lead,
-    #opportunity .flow-step p,
-    #opportunity .loop-copy p {
+    #opportunity .section-lead {
       text-align: justify;
       text-justify: inter-word;
       text-align-last: left;
@@ -578,46 +659,39 @@
       -webkit-hyphens: auto;
       -ms-hyphens: auto;
     }
-    #opportunity .flow-step p {
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      overflow: hidden;
-    }
     #opportunity .loop-visual-stack {
       margin-top: 3.5rem;
     }
-    #opportunity .loop-card {
-      margin-top: 1.75rem;
+    #opportunity .opportunity-cta {
+      width: 100%;
+      margin-top: 2.4rem;
     }
     .flow-steps {
       display: grid;
-      gap: 1rem;
+      gap: 0.3rem;
       margin-top: 1.2rem;
     }
     .flow-step {
       display: grid;
-      grid-template-columns: 46px 1fr;
-      gap: 1rem;
-      padding: 1rem 1.1rem;
-      background: var(--card-bg);
-      border: 1px solid var(--card-bdr);
-      border-radius: 16px;
+      grid-template-columns: 30px 1fr;
+      gap: 0.62rem;
+      align-items: center;
+      min-height: 34px;
+      padding: 0.25rem 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
     }
     .flow-step strong {
       display: block;
-      margin-bottom: 0.25rem;
+      margin: 0;
       font-size: 0.9rem;
-    }
-    .flow-step p {
-      color: var(--lgray);
-      font-size: 0.82rem;
-      line-height: 1.7;
+      line-height: 1.18;
     }
     .flow-num {
-      width: 46px;
-      height: 46px;
-      border-radius: 14px;
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
       background: var(--teal-dim);
       border: 1px solid var(--teal-bdr);
       color: var(--teal);
@@ -625,12 +699,7 @@
       align-items: center;
       justify-content: center;
       font-weight: 800;
-    }
-    .loop-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-bdr);
-      border-radius: 26px;
-      padding: 1.5rem;
+      font-size: 0.76rem;
     }
     .circularity-diagram {
       position: relative;
@@ -724,27 +793,6 @@
       margin-bottom: 0.35rem;
       line-height: 1.3;
     }
-    .loop-copy p {
-      color: var(--lgray);
-      font-size: 0.88rem;
-      line-height: 1.86;
-      margin-bottom: 1rem;
-    }
-    .loop-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.55rem;
-    }
-    .loop-tags span {
-      padding: 0.32rem 0.72rem;
-      border-radius: 999px;
-      background: rgba(13,181,176,0.1);
-      border: 1px solid var(--teal-bdr);
-      color: var(--teal);
-      font-size: 0.72rem;
-      font-weight: 700;
-    }
-
     .reg-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -872,7 +920,8 @@
       .hero-inner,
       .flow-shell,
       .mandate-grid,
-      .reg-grid {
+      .reg-grid,
+      .dpp-content-grid {
         grid-template-columns: 1fr;
       }
       .passport-stage {
@@ -892,14 +941,8 @@
       .dpp-explainer {
         grid-template-columns: 1fr;
       }
-      .data-card {
-        grid-template-columns: 74px 1fr;
-      }
-      .data-icon {
-        width: 74px;
-        height: 74px;
-        border-radius: 20px;
-        font-size: 1.7rem;
+      .dpp-content-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .dpp-visual-card {
         margin-top: 1rem;
@@ -919,8 +962,15 @@
     @media (max-width: 640px) {
       .hero-meta,
       .mini-grid,
-      .data-grid {
+      .data-grid,
+      #work-modes .work-mode-grid,
+      #work-modes .work-mode-cards,
+      .dpp-content-grid {
         grid-template-columns: 1fr;
+      }
+      .dpp-content-card {
+        min-height: auto;
+        padding: 1.65rem;
       }
       .hero-meta-card {
         min-height: auto;
@@ -962,61 +1012,6 @@
           through a passport framework aligned with the Ecodesign for Sustainable Products Regulation (ESPR) and
           other applicable EU compliance requirements.
         </p>
-        <div class="hero-actions">
-          <a href="product.html" class="btn btn-primary">Explore Our Digital Passport Platform →</a>
-          <a href="services.html" class="btn btn-outline">See Compliance Services</a>
-        </div>
-        <h3 class="hero-dpp-label">What a DPP must contain</h3>
-        <div class="hero-dpp-blocks">
-          <div class="hero-dpp-block">
-            <div class="hero-dpp-block-head">
-              <span class="hero-dpp-block-icon">🪪</span>
-              <span class="hero-dpp-block-num">01</span>
-            </div>
-            <strong>Product identity</strong>
-            <span>Unique identifiers, model details, manufacturer info, and market placement records.</span>
-          </div>
-          <div class="hero-dpp-block">
-            <div class="hero-dpp-block-head">
-              <span class="hero-dpp-block-icon">⚗️</span>
-              <span class="hero-dpp-block-num">02</span>
-            </div>
-            <strong>Material &amp; substance data</strong>
-            <span>Component breakdown, material origin, hazardous substance declarations, and SCIP alignment.</span>
-          </div>
-          <div class="hero-dpp-block">
-            <div class="hero-dpp-block-head">
-              <span class="hero-dpp-block-icon">🌿</span>
-              <span class="hero-dpp-block-num">03</span>
-            </div>
-            <strong>Environmental evidence</strong>
-            <span>Carbon footprint, recycled content ratios, durability metrics, and lifecycle impact data.</span>
-          </div>
-          <div class="hero-dpp-block">
-            <div class="hero-dpp-block-head">
-              <span class="hero-dpp-block-icon">🔧</span>
-              <span class="hero-dpp-block-num">04</span>
-            </div>
-            <strong>Use, repair &amp; end-of-life</strong>
-            <span>Repair instructions, spare part availability, disassembly guidance, and recycling routes.</span>
-          </div>
-          <div class="hero-dpp-block">
-            <div class="hero-dpp-block-head">
-              <span class="hero-dpp-block-icon">📋</span>
-              <span class="hero-dpp-block-num">05</span>
-            </div>
-            <strong>Compliance documentation</strong>
-            <span>Declarations of conformity, test reports, certifications, and applicable regulation references.</span>
-          </div>
-          <div class="hero-dpp-block">
-            <div class="hero-dpp-block-head">
-              <span class="hero-dpp-block-icon">🔒</span>
-              <span class="hero-dpp-block-num">06</span>
-            </div>
-            <strong>Governance &amp; history</strong>
-            <span>Access control rules, data provenance, version history, and audit trail records.</span>
-          </div>
-        </div>
       </div>
 
       <div class="passport-stage reveal visible">
@@ -1051,19 +1046,34 @@
             </div>
           </div>
         </div>
-        <aside class="hero-demo-card">
-          <h3>Access a product passport through a real QR code.</h3>
-          <p>This sample version is static and intended for demonstration, but it illustrates the user journey we can tailor for your products.</p>
-          <a href="sample-passport.html" class="sample-qr-link" aria-label="Open sample passport">
-            <img src="assets/sample-passport-qr.svg" alt="QR code linking to a sample passport page" class="sample-qr-image" />
-          </a>
-          <div class="hero-demo-meta">
-            <span class="hero-demo-tag">Static demo</span>
-            <span class="hero-demo-tag">Dummy data</span>
-            <span class="hero-demo-tag">Sales safe</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Two ways to work with us -->
+  <section class="section section-alt" id="work-modes" aria-labelledby="work-modes-title">
+    <div class="container">
+      <div class="work-mode-grid">
+        <div class="work-mode-cards">
+          <article class="work-mode-card reveal reveal-d1">
+            <span class="work-mode-kicker">Platform</span>
+            <h3>ClarosDPP platform</h3>
+            <p>Passport issuance, QR-linked public delivery, workflow, access logic, analytics, ingestion, and audit visibility.</p>
+          </article>
+          <article class="work-mode-card reveal reveal-d2">
+            <span class="work-mode-kicker">Advisory</span>
+            <h3>Consultancy Support</h3>
+            <p>DPP readiness, gap analysis, data ownership, regulatory monitoring, supplier evidence, PCF/LCA guidance, and rollout planning.</p>
+          </article>
+        </div>
+        <div class="work-mode-copy reveal">
+          <p class="section-eyebrow">Work with us</p>
+          <h3 class="work-mode-title" id="work-modes-title">Platform for teams that need software. Consultancy for teams that need expert guidance.</h3>
+          <div class="work-mode-actions">
+            <a href="product.html" class="btn btn-primary">Explore Our Digital Passport Platform →</a>
+            <a href="services.html" class="btn btn-outline">See Compliance Services</a>
           </div>
-          <a href="sample-passport.html" class="btn btn-primary">Open Sample Passport →</a>
-        </aside>
+        </div>
       </div>
     </div>
   </section>
@@ -1071,17 +1081,20 @@
   <!-- What Is DPP -->
   <section class="section section-alt" id="what-is-dpp" aria-labelledby="what-is-title">
     <div class="container">
+      <h2 class="section-title" id="what-is-title">What&nbsp;is&nbsp;a&nbsp;<span class="hl">Digital&nbsp;Product&nbsp;Passport</span>?</h2>
       <div class="dpp-explainer">
         <div class="dpp-copy reveal visible">
-          <h2 class="section-title" id="what-is-title">What is a <span class="hl">Digital Product Passport</span>?</h2>
           <p class="section-lead">
-            In simple terms, a Digital Product Passport (DPP) acts as a digital identity for a product. It connects the
-            physical item to reliable digital information, typically via a QR code or similar data carrier, allowing users
-            to understand what the product is made of, how to use and repair it, how to handle it safely, and how it can
-            be recovered or recycled at the end of its life. It also creates a consistent way to share verified product
-            data across the entire value chain, from manufacturers to regulators and end users. By improving transparency
-            and traceability, a DPP helps companies meet regulatory requirements while enabling more sustainable and
-            circular product practices.
+            Policymakers require reliable, standardized information to track products across their entire lifecycle-from
+            supply chains and usage to repair and end-of-life handling. By making DPPs mandatory, the EU aims to improve
+            transparency, strengthen regulatory compliance, and enable better decision-making for businesses, authorities,
+            and consumers alike.
+          </p>
+          <p class="section-lead">
+            In simple terms, a Digital Product Passport (DPP) acts as a digital identity for a product. It also creates a
+            consistent way to share verified product data across the entire value chain, from manufacturers to regulators
+            and end users. By improving transparency and traceability, a DPP helps companies meet regulatory requirements
+            while enabling more sustainable and circular product practices.
           </p>
         </div>
 
@@ -1094,69 +1107,44 @@
     </div>
   </section>
 
-  <!-- Why Mandatory -->
-  <section class="section section-dark" id="why-mandatory" aria-labelledby="mandatory-title">
+  <!-- What A DPP Contains -->
+  <section class="section section-alt" id="dpp-contents" aria-labelledby="dpp-contents-title">
     <div class="container">
       <div class="reveal">
-        <h2 class="section-title" id="mandatory-title">Why DPP Was Made <span class="hl">Mandatory</span></h2>
-        <p class="section-lead">
-          The EU introduced Digital Product Passports because circular economy goals cannot be effectively achieved with
-          fragmented and inconsistent product data. Policymakers require reliable, standardized information to track
-          products across their entire lifecycle-from supply chains and usage to repair and end-of-life handling. By
-          making DPPs mandatory, the EU aims to improve transparency, strengthen regulatory compliance, and enable
-          better decision-making for businesses, authorities, and consumers alike. This ensures products are easier to
-          reuse, repair, and recycle, ultimately reducing waste and environmental impact.
-        </p>
+        <p class="section-spacer" aria-hidden="true">&nbsp;</p>
+        <h3 class="hero-dpp-label" id="dpp-contents-title">What a DPP must contain</h3>
       </div>
 
-      <div class="mandate-grid">
-        <article class="mandate-card reveal reveal-d1">
-          <h3>To establish a unified product data framework</h3>
-          <span class="ref">ESPR (EU) 2024/1781</span>
-          <p>
-            ESPR establishes the legal basis for DPPs and standardises durability, reparability, and circularity data in a
-            structured, machine-readable format across the EU market and its regulatory systems.
-          </p>
+      <div class="dpp-content-grid">
+        <article class="dpp-content-card reveal reveal-d1">
+          <span class="dpp-content-icon" aria-hidden="true">01</span>
+          <h5>Product identity</h5>
+          <p>Unique identifiers, model details, and market-ready product records.</p>
         </article>
-        <article class="mandate-card reveal reveal-d2">
-          <h3>To enable data-driven market surveillance</h3>
-          <span class="ref">EU market surveillance framework</span>
-          <p>
-            DPPs give authorities direct access to verified product data, improving enforcement efficiency, strengthening
-            oversight, and reducing the circulation of non-compliant products across the internal market.
-          </p>
+        <article class="dpp-content-card reveal reveal-d2">
+          <span class="dpp-content-icon" aria-hidden="true">02</span>
+          <h5>Material &amp; substance data</h5>
+          <p>Component structure, material origin, chemistry, and evidence-backed declarations.</p>
         </article>
-        <article class="mandate-card reveal reveal-d3">
-          <h3>To improve traceability across value chains</h3>
-          <span class="ref">REACH, RoHS, waste, due diligence data</span>
-          <p>
-            DPPs keep substances, restricted materials, sourcing, waste, and due diligence data consistently recorded and
-            accessible across the product lifecycle for compliance checks and reporting needs.
-          </p>
+        <article class="dpp-content-card reveal reveal-d3">
+          <span class="dpp-content-icon" aria-hidden="true">03</span>
+          <h5>Environmental evidence</h5>
+          <p>Carbon footprint, recycled content, and lifecycle indicators that support circularity.</p>
         </article>
-        <article class="mandate-card reveal reveal-d4">
-          <h3>To enable repair, reuse, and recycling</h3>
-          <span class="ref">Circular economy objective</span>
-          <p>
-            DPPs make post-market product information accessible so repairers, refurbishers, and recyclers can handle products
-            correctly, extend product lifetimes, and improve material recovery outcomes over time.
-          </p>
+        <article class="dpp-content-card reveal reveal-d4">
+          <span class="dpp-content-icon" aria-hidden="true">04</span>
+          <h5>Use, repair &amp; end-of-life</h5>
+          <p>Repair guidance, spare parts, disassembly steps, and recovery pathways.</p>
         </article>
-        <article class="mandate-card reveal reveal-d1">
-          <h3>To improve industrial data interoperability</h3>
-          <span class="ref">Interoperability objective under ESPR</span>
-          <p>
-            DPPs introduce a harmonised data structure that improves interoperability between manufacturers, suppliers,
-            platforms, and regulators across European value chains and connected digital systems.
-          </p>
+        <article class="dpp-content-card reveal reveal-d1">
+          <span class="dpp-content-icon" aria-hidden="true">05</span>
+          <h5>Compliance Documents</h5>
+          <p>Declarations, certificates, test reports, and rule-specific evidence.</p>
         </article>
-        <article class="mandate-card reveal reveal-d2">
-          <h3>To improve waste traceability and compliance</h3>
-          <span class="ref">Waste Framework Directive (2008/98/EC)</span>
-          <p>
-            DPPs support waste policy by providing structured data on material composition, hazardous substances, and
-            disassembly, improving classification accuracy and recycling efficiency in practice.
-          </p>
+        <article class="dpp-content-card reveal reveal-d2">
+          <span class="dpp-content-icon" aria-hidden="true">06</span>
+          <h5>Governance &amp; history</h5>
+          <p>Access rules, data provenance, workflow status, version history, and audit trail records.</p>
         </article>
       </div>
     </div>
@@ -1168,68 +1156,53 @@
       <div class="flow-shell">
         <div class="reveal">
           <h2 class="section-title" id="opportunity-title">Turning Compliance into <span class="hl">Competitive Advantage</span></h2>
-          <p class="section-lead">
-            A well-designed Digital Product Passport should extend beyond regulatory compliance. Its real value emerges when it
-            becomes a strategic data infrastructure that helps organisations understand product behaviour in the market, trace
-            lifecycle movement, and see how materials circulate through reuse and recovery systems. When combined with analytics,
-            the passport evolves from a reporting obligation into a source of commercial intelligence.
-          </p>
-
           <div class="flow-steps">
             <div class="flow-step reveal reveal-d1">
               <div class="flow-num">1</div>
               <div>
                 <strong>Improve product design and engineering feedback loops</strong>
-                <p>Lifecycle and service data can feed R&amp;D and engineering teams directly, improving durability, modularity, repairability, and cost efficiency in future product development.</p>
               </div>
             </div>
             <div class="flow-step reveal reveal-d2">
               <div class="flow-num">2</div>
               <div>
                 <strong>Reduce compliance and supply chain risk exposure</strong>
-                <p>A structured and continuously updated passport reduces uncertainty across ESPR, REACH, RoHS, and related obligations by keeping compliance evidence accessible and defensible.</p>
               </div>
             </div>
             <div class="flow-step reveal reveal-d3">
               <div class="flow-num">3</div>
               <div>
                 <strong>Increase asset value through lifecycle traceability</strong>
-                <p>Verified histories covering materials, usage, repairs, and end-of-life pathways strengthen resale, leasing, refurbishment, and recovery economics by reducing uncertainty.</p>
               </div>
             </div>
             <div class="flow-step reveal reveal-d4">
               <div class="flow-num">4</div>
               <div>
                 <strong>Unify fragmented product and sustainability data</strong>
-                <p>Consolidating ERP systems, supplier declarations, LCA studies, material data, and service records into one passport layer creates the foundation for downstream value creation.</p>
               </div>
             </div>
             <div class="flow-step reveal reveal-d1">
               <div class="flow-num">5</div>
               <div>
                 <strong>Enable full lifecycle visibility of products and materials</strong>
-                <p>End-to-end tracking from raw material sourcing through production, use, and recovery improves transparency over product and material flows across the lifecycle.</p>
               </div>
             </div>
             <div class="flow-step reveal reveal-d2">
               <div class="flow-num">6</div>
               <div>
                 <strong>Generate actionable internal intelligence through analytics</strong>
-                <p>Structured passport data enables lifecycle modelling, performance tracking, and anomaly detection that turn compliance information into practical decision-support intelligence.</p>
               </div>
             </div>
             <div class="flow-step reveal reveal-d3">
               <div class="flow-num">7</div>
               <div>
                 <strong>Strengthen circular strategy and operational efficiency</strong>
-                <p>Reliable lifecycle data helps organisations optimise sourcing, repair, remanufacturing, and recovery planning while improving overall resource efficiency.</p>
               </div>
             </div>
             <div class="flow-step reveal reveal-d4">
               <div class="flow-num">8</div>
               <div>
                 <strong>Strengthen customer and downstream partner transparency</strong>
-                <p>Standardised product information improves trust and coordination across customers, procurement teams, recyclers, and service partners throughout the value chain.</p>
               </div>
             </div>
           </div>
@@ -1238,30 +1211,11 @@
 
         <div class="loop-visual-stack">
           <div class="circularity-diagram reveal reveal-d2" id="dpp-loop-diagram" aria-hidden="true"></div>
-          <div class="loop-card reveal reveal-d2">
-            <div class="loop-copy">
-              <p>
-                The passport acts as a continuous thread across the product lifecycle, linking inputs, manufacturing,
-                in-use performance, and end-of-life recovery into one connected record.
-              </p>
-              <p>
-                This is essential for compliance, but equally valuable for strategy, as it improves visibility into
-                material flows, product performance, service behaviour, and opportunities for reuse and secondary value creation.
-              </p>
-            </div>
-            <div class="loop-tags">
-              <span>Material flow</span>
-              <span>Scan analytics</span>
-              <span>Recovery insight</span>
-              <span>Lifecycle dashboards</span>
-              <span>Telematics-ready patterns</span>
-            </div>
-          </div>
-          <div class="cta-strip reveal">
-            <p>Want to see how this works in the real platform? <span>Explore the product page for the full operating view.</span></p>
-            <a href="product.html" class="btn btn-primary btn-sm">View Product →</a>
-          </div>
         </div>
+      </div>
+      <div class="cta-strip opportunity-cta reveal">
+        <p>Want to see how this works in the real platform? <span>Explore the product page for the full operating view.</span></p>
+        <a href="product.html" class="btn btn-primary btn-sm">View Product →</a>
       </div>
     </div>
   </section>
@@ -1323,42 +1277,36 @@
           id: 0,
           baseAngle: -90,
           label: "DESIGN BETTER PRODUCTS",
-          desc: "Use real-world data to improve durability, repairability, and future product performance.",
           icon: "🚛"
         },
         {
           id: 1,
           baseAngle: -30,
           label: "REDUCE RISKS",
-          desc: "Stay compliant, reduce supply chain risk, and protect market access.",
           icon: "🔨"
         },
         {
           id: 2,
           baseAngle: 30,
           label: "INCREASE ASSET VALUE",
-          desc: "Build trust with verified product histories that strengthen resale, leasing, and refurbishment value.",
           icon: "💳"
         },
         {
           id: 3,
           baseAngle: 90,
           label: "MAKE SMARTER DECISIONS",
-          desc: "Turn passport data into dashboards, insights, and action.",
           icon: "📊"
         },
         {
           id: 4,
           baseAngle: 150,
           label: "OPERATE MORE CIRCULAR",
-          desc: "Optimize sourcing, repair programmes, recovery, and material efficiency.",
           icon: "♻️"
         },
         {
           id: 5,
           baseAngle: 210,
           label: "SEE THE WHOLE PICTURE",
-          desc: "Track materials and products from raw input to recovery.",
           icon: "🗺️"
         }
       ];

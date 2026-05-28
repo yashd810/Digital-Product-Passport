@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const { buildDashboardPath } = require("../src/shared/navigation/dashboard-paths");
 
 function parseJsonEnv(name, fallback) {
   const raw = process.env[name];
@@ -22,7 +23,7 @@ function sha256Base64Url(value) {
   return crypto.createHash("sha256").update(String(value || "")).digest("base64url");
 }
 
-function normalizeRedirectPath(redirectTo, fallback = "/dashboard") {
+function normalizeRedirectPath(redirectTo, fallback = "/") {
   const raw = String(redirectTo || "").trim();
   if (!raw) return fallback;
   if (!raw.startsWith("/")) return fallback;
@@ -243,7 +244,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       provider: provider.key,
       nonce,
       codeVerifier,
-      redirectTo: normalizeRedirectPath(redirectTo, "/dashboard"),
+      redirectTo: normalizeRedirectPath(redirectTo, "/"),
     });
     const redirectUri = `${process.env.SERVER_URL || `${req.protocol}://${req.get("host")}`}/api/auth/sso/${provider.key}/callback`;
     const params = new URLSearchParams({
@@ -290,7 +291,9 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     setAuthCookie(res, sessionToken);
 
     const appBase = String(process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "");
-    const defaultRedirectPath = user.role === "super_admin" ? "/admin" : "/dashboard";
+    const defaultRedirectPath = user.role === "super_admin"
+      ? "/admin"
+      : buildDashboardPath({ companyId: user.companyId, subpath: "overview" });
     const redirectPath = normalizeRedirectPath(statePayload.redirectTo, defaultRedirectPath);
     return `${appBase}/oauth/callback?next=${encodeURIComponent(redirectPath)}`;
   }

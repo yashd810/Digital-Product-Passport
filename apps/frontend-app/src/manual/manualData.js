@@ -329,7 +329,7 @@ export const BACKEND_API_FAMILIES = [
       "Returns the public passport payload with public fields only by default.",
       "Unlocks restricted field groups when a valid passport access key is provided.",
       "Serves canonical passport payloads, signatures, signing-key metadata, DID documents, DID resolution, scan logging, security reports, public dynamic-value endpoints, and DPP JSON-LD contexts.",
-      "Current DID documents are lineage/stable-ID based; numeric company/product DID URLs redirect to the canonical DID document URLs.",
+      "Current DID documents are lineage/stable-ID based and resolve only through canonical company slugs and stable subject identifiers.",
     ],
   },
   {
@@ -691,7 +691,7 @@ export const PUBLIC_AND_LIVE_API_TABLE = {
     ["Get current signing key", "GET /api/signing-key", "No auth", "No body", "The active public signing key metadata."],
     ["Get DID document", "GET /.well-known/did.json", "No auth", "No body", "A DID document that helps outside verifiers validate released passport signatures."],
     ["Resolve DID", "GET /resolve?did=did:web:...", "No auth", "Accept header decides browser redirect or DID document redirect", "Universal resolver for platform, company, battery model/batch/item, DPP, and facility DIDs."],
-    ["DID documents", "GET /did/company/:slug/did.json, /did/battery/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities. Numeric/product routes redirect to stable-ID versions."],
+    ["DID documents", "GET /did/company/:slug/did.json, /did/battery/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities through canonical slug and stable-ID routes."],
     ["DPP JSON-LD context", "GET /contexts/dpp/v1", "No auth", "No body", "JSON-LD context for DPP linked-data payloads."],
     ["Record scan", "POST /api/passports/:dppId/scan", "No auth", "Optional scan metadata", "Stores public scan event telemetry."],
     ["Read scan stats", "GET /api/passports/:dppId/scan-stats", "No auth", "No body", "Returns aggregate scan information."],
@@ -736,7 +736,7 @@ export const DICTIONARY_API_TABLE = {
   title: "Battery dictionary browser and semantic API",
   columns: ["Action", "Endpoint or route", "Authentication", "What it gives you", "Where it is used"],
   rows: [
-    ["Open dictionary in user dashboard", "/dashboard/dictionary/battery/v1", "Signed-in dashboard session", "Searchable browser for categories, terms, units, IRIs, field keys, access rights, and regulation references", "Company users checking Battery Pass field meanings and JSON-LD identifiers."],
+    ["Open dictionary in user dashboard", "/dashboard/:companySlug/dictionary/battery/v1", "Signed-in dashboard session", "Searchable browser for categories, terms, units, IRIs, field keys, access rights, and regulation references", "Company users checking Battery Pass field meanings and JSON-LD identifiers."],
     ["Open dictionary in admin dashboard", "/admin/dictionary/battery/v1", "Super-admin session", "The same dictionary browser inside the admin shell", "Super admins designing battery passport types and checking semantic mappings."],
     ["Public dictionary browser", "/dictionary/battery/v1", "No login", "Public term browser and term detail pages", "External implementers and verifiers."],
     ["JSON-LD context", "GET /dictionary/battery/v1/context.jsonld or /api/dictionary/battery/v1/context.jsonld", "No login", "Canonical JSON-LD context", "Battery JSON-LD exports and linked-data verification."],

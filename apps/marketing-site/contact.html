@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#f5f8fb" />
   <link rel="canonical"    href="https://claros-dpp.online/contact.html" />
   <!-- Favicon: inline SVG — no files needed in dev. Before launch replace with real favicon.ico + site.webmanifest -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='DM Sans,sans-serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
   <meta property="og:type"         content="website" />
   <meta property="og:site_name"    content="ClarosDPP" />
   <meta property="og:title"        content="Contact & Book a Free Demo — ClarosDPP" />
@@ -46,68 +46,12 @@
   <title>Contact & Book a Free Demo — ClarosDPP</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <style>
-    body.page-body {
-      background:
-        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
-        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
-        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
-        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
-      background-size: 64px 64px, 64px 64px, auto, auto, auto;
-      color: #10243a;
-    }
-    .section,
-    .section-alt,
-    .section-dark {
-      background: transparent !important;
-    }
-
-    .contact-detail {
-      display: flex; gap: 1rem; align-items: flex-start;
-      padding: 1rem; border-radius: 12px;
-      background: var(--card-bg); border: 1px solid var(--card-bdr);
-      margin-bottom: 0.9rem; transition: border-color 0.2s;
-    }
-    .contact-detail:hover { border-color: var(--teal-bdr); }
-    .cd-icon {
-      width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
-      background: var(--teal-dim); display: flex; align-items: center; justify-content: center; font-size: 1rem;
-    }
-    .cd-label { font-size: 0.75rem; font-weight: 700; color: var(--teal); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 0.2rem; }
-    .cd-value { font-size: 0.88rem; color: var(--lgray); }
-    .cd-value a { color: var(--teal); }
-    .cd-value a:hover { color: var(--teal2); }
-
-    .free-consult-box {
-      background: linear-gradient(135deg, rgba(13,181,176,0.1) 0%, rgba(6,214,208,0.05) 100%);
-      border: 1px solid var(--teal-bdr); border-radius: 16px; padding: 1.8rem; margin-top: 1.2rem;
-    }
-    .free-consult-box h4 { color: var(--teal); font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; }
-    .free-consult-box p { font-size: 0.84rem; color: var(--lgray); line-height: 1.75; }
-    .contact-faq {
-      margin-top: 1.75rem;
-    }
-
-    .faq-item {
-      border-bottom: 1px solid var(--divider); padding: 1.2rem 0; cursor: pointer;
-    }
-    .faq-item:last-child { border-bottom: none; }
-    .faq-q {
-      display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.92rem; font-weight: 600; gap: 1rem;
-    }
-    .faq-q .arrow { color: var(--teal); font-size: 1rem; flex-shrink: 0; transition: transform 0.25s; }
-    .faq-a { font-size: 0.85rem; color: var(--lgray); line-height: 1.75; margin-top: 0.8rem; display: none; }
-    .faq-item.open .faq-a { display: block; }
-    .faq-item.open .arrow { transform: rotate(180deg); }
-  </style>
 </head>
-<body class="page-body">
+<body class="page-body contact-page">
 
-  <div class="page-hero">
+  <div class="page-intro">
     <div class="container">
       <div class="reveal">
         <h1>Reach Out to Our <span class="hl">Expert Team</span></h1>
@@ -123,7 +67,7 @@
         <!-- Left: info -->
         <div class="reveal">
           <h2 class="section-title">Start a <span class="hl">Conversation</span></h2>
-          <p style="font-size:0.9rem;color:var(--lgray);line-height:1.8;margin-bottom:1.8rem;">
+          <p class="contact-copy">
             Every engagement starts with a no-obligation consultation where we understand your current compliance position, identify the most pressing regulatory deadlines for your products, and outline a practical, proportionate path forward.
           </p>
 
@@ -169,7 +113,7 @@
 
           <!-- FAQ -->
           <div class="contact-faq">
-            <h3 style="font-family:var(--sans);font-size:1.2rem;font-weight:700;margin-bottom:1rem;">Common Questions</h3>
+            <h3 class="contact-faq-title">Common Questions</h3>
             <div class="faq-item" onclick="toggleFaq(this)">
               <div class="faq-q">How long does it take to build a DPP? <span class="arrow">▾</span></div>
               <div class="faq-a">For companies with reasonable data availability, we can issue first compliant DPPs within 8–12 weeks. Full portfolio coverage with material, carbon, and compliance data collection typically takes 6–18 months depending on product complexity and data readiness.</div>
@@ -197,7 +141,7 @@
             <form id="contact-form" novalidate>
 
               <!-- Honeypot anti-spam field (hidden) -->
-              <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off" />
+              <input type="text" name="_gotcha" class="hidden-field" tabindex="-1" autocomplete="off" />
 
               <!-- Formspree redirect after success (optional) -->
               <!-- <input type="hidden" name="_next" value="https://yourdomain.com/thank-you.html" /> -->
@@ -284,7 +228,7 @@
                 Send Message — Let's Get Started →
               </button>
 
-              <p style="font-size:0.75rem;color:var(--gray);text-align:center;margin-top:0.9rem;">
+              <p class="form-privacy-note">
                 We reply within 1 business day. Your data is handled in accordance with GDPR.
               </p>
 
@@ -325,10 +269,10 @@
       let valid = true;
       required.forEach(field => {
         if (!field.value.trim()) {
-          field.style.borderColor = '#ef4444';
+          field.classList.add('is-invalid');
           valid = false;
         } else {
-          field.style.borderColor = '';
+          field.classList.remove('is-invalid');
         }
       });
       if (!valid) return;
@@ -336,8 +280,8 @@
       // Loading state
       submitBtn.disabled    = true;
       submitBtn.textContent = 'Sending…';
-      successEl.style.display = 'none';
-      errorEl.style.display   = 'none';
+      successEl.className = 'form-message';
+      errorEl.className = 'form-message';
 
       // Collect form fields into a plain object for JSON POST
       const payload = {
@@ -364,7 +308,6 @@
         if (response.ok && data.ok) {
           form.reset();
           successEl.className    = 'form-message success';
-          successEl.style.display = 'block';
           submitBtn.textContent  = '✓ Message Sent';
           successEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
@@ -372,7 +315,6 @@
         }
       } catch (err) {
         errorEl.className    = 'form-message error';
-        errorEl.style.display = 'block';
         errorEl.textContent  = '❌ ' + (err.message || 'Something went wrong. Please email us directly at hello@claros-dpp.online');
         submitBtn.disabled    = false;
         submitBtn.textContent = 'Send Message — Let\'s Get Started →';
@@ -382,7 +324,7 @@
 
     // Clear red borders as user types
     form.querySelectorAll('input, textarea').forEach(field => {
-      field.addEventListener('input', () => { field.style.borderColor = ''; });
+      field.addEventListener('input', () => { field.classList.remove('is-invalid'); });
     });
 
     // FAQ accordion

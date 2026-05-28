@@ -10,6 +10,7 @@ import {
   SECURITY_KEY_TABLE,
 } from "./manualData";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../passports/utils/passportRoutes";
+import { buildDashboardPath } from "../user/dashboard/utils/dashboardRoutes";
 import { buildPreview, getPassportTypeLabel, prettifyName } from "./manualSectionHelpers";
 
 export function buildUserSections({ user, companyId, passportTypes }) {
@@ -18,7 +19,12 @@ export function buildUserSections({ user, companyId, passportTypes }) {
   const availableTypes = passportTypes.map(getPassportTypeLabel);
   const createRoute = firstType ? `/create/${encodeURIComponent(firstType.typeName)}` : "";
   const csvRoute = firstType ? `/csv-import/${encodeURIComponent(firstType.typeName)}` : "";
-  const listRoute = firstType ? `/dashboard/passports/${encodeURIComponent(firstType.typeName)}` : "/dashboard/my-passports";
+  const dashboardPath = (subpath = "") => buildDashboardPath({
+    companyName: user?.companyName,
+    companyId,
+    subpath,
+  });
+  const listRoute = firstType ? dashboardPath(`passports/${encodeURIComponent(firstType.typeName)}`) : dashboardPath("my-passports");
 
   return [
     {
@@ -61,15 +67,15 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Overview", route: "/dashboard/overview", description: "See KPI cards, activity, and analytics export." },
-        { label: "Open Notifications", route: "/dashboard/notifications", description: "Review unread system and workflow events." },
-        { label: "Open Messages", route: "/dashboard/messages", description: "Continue internal company conversations." },
+        { label: "Open Overview", route: dashboardPath("overview"), description: "See KPI cards, activity, and analytics export." },
+        { label: "Open Notifications", route: dashboardPath("notifications"), description: "Review unread system and workflow events." },
+        { label: "Open Messages", route: dashboardPath("messages"), description: "Continue internal company conversations." },
       ],
       previews: [
         buildPreview(
           "user-overview",
           "Dashboard overview snapshot",
-          "/dashboard/overview",
+          dashboardPath("overview"),
           "This page is the operational landing zone for totals, recent activity, and exported analytics."
         ),
       ],
@@ -149,15 +155,15 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Create Hub", route: "/dashboard/create", description: "The single entry point for all creation methods." },
-        { label: "Open Templates", route: "/dashboard/templates", description: "Manage reusable model templates for single and bulk creation." },
-        { label: "Open CSV Import Guide", route: csvRoute || "/dashboard/my-passports", description: "Detailed import/update guide for the first available type." },
+        { label: "Open Create Hub", route: dashboardPath("create"), description: "The single entry point for all creation methods." },
+        { label: "Open Templates", route: dashboardPath("templates"), description: "Manage reusable model templates for single and bulk creation." },
+        { label: "Open CSV Import Guide", route: csvRoute || dashboardPath("my-passports"), description: "Detailed import/update guide for the first available type." },
       ],
       previews: [
         buildPreview(
           "user-create-hub",
           "Create Passport hub",
-          "/dashboard/create",
+          dashboardPath("create"),
           "Pick a type and a method. The hub adapts based on your selection  -  template picker, bulk modal, and instructions are all inline."
         ),
         buildPreview(
@@ -274,8 +280,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         ],
       },
       links: [
-        { label: "Open My Passports", route: "/dashboard/my-passports", description: "See records assigned to or created by you." },
-        { label: "Open Workflow", route: "/dashboard/workflow/inprogress", description: "Monitor approvals and backlog items." },
+        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "See records assigned to or created by you." },
+        { label: "Open Workflow", route: dashboardPath("workflow/inprogress"), description: "Monitor approvals and backlog items." },
       ],
       previews: [
         buildPreview(
@@ -330,13 +336,13 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Templates", route: "/dashboard/templates", description: "Create, edit, delete, export, and import template-driven draft content." },
+        { label: "Open Templates", route: dashboardPath("templates"), description: "Create, edit, delete, export, and import template-driven draft content." },
       ],
       previews: [
         buildPreview(
           "user-templates",
           "Templates workspace",
-          "/dashboard/templates",
+          dashboardPath("templates"),
           "Use this page for template CRUD, model-data setup, and template-driven create flows."
         ),
       ],
@@ -384,20 +390,20 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Workflow", route: "/dashboard/workflow/inprogress", description: "Work through backlog, history, and in-progress approvals." },
-        { label: "Open Notifications", route: "/dashboard/notifications", description: "Review action prompts tied to workflow events." },
+        { label: "Open Workflow", route: dashboardPath("workflow/inprogress"), description: "Work through backlog, history, and in-progress approvals." },
+        { label: "Open Notifications", route: dashboardPath("notifications"), description: "Review action prompts tied to workflow events." },
       ],
       previews: [
         buildPreview(
           "user-workflow",
           "Workflow dashboard",
-          "/dashboard/workflow/inprogress",
+          dashboardPath("workflow/inprogress"),
           "This is where release approvals, backlog items, and history stay visible."
         ),
         buildPreview(
           "user-notifications",
           "Notifications feed",
-          "/dashboard/notifications",
+          dashboardPath("notifications"),
           "Notifications help reviewers and authors stay aligned on release activity."
         ),
       ],
@@ -437,13 +443,13 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Repository", route: "/dashboard/repository", description: "Manage folders, PDFs, and reusable symbols." },
+        { label: "Open Repository", route: dashboardPath("repository"), description: "Manage folders, PDFs, and reusable symbols." },
       ],
       previews: [
         buildPreview(
           "user-repository",
           "Repository and symbols",
-          "/dashboard/repository",
+          dashboardPath("repository"),
           "Files and symbols added here become reusable content inside passport forms."
         ),
       ],
@@ -459,7 +465,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       title: "Use the Battery Dictionary to check terms, units, access rights, and semantic IDs",
       summary: "The dashboard includes a Battery Dictionary browser for Battery Pass style work. Use it to search terms, open detail pages, check canonical IRIs, see expected units and data formats, and understand which application field keys map to each dictionary element.",
       facts: [
-        { label: "Dashboard route", value: "/dashboard/dictionary/battery/v1" },
+        { label: "Dashboard route", value: dashboardPath("dictionary/battery/v1") },
         { label: "Public route", value: "/dictionary/battery/v1" },
         { label: "Term detail", value: "Each term has a slug page plus a raw JSON endpoint" },
         { label: "Best use", value: "Validate field meaning before exporting JSON-LD or discussing Battery Pass data with partners" },
@@ -484,7 +490,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Battery Dictionary", route: "/dashboard/dictionary/battery/v1", description: "Search terms, categories, units, and semantic identifiers." },
+        { label: "Open Battery Dictionary", route: dashboardPath("dictionary/battery/v1"), description: "Search terms, categories, units, and semantic identifiers." },
       ],
       table: DICTIONARY_API_TABLE,
       tips: [
@@ -546,27 +552,27 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
       table: SECURITY_KEY_TABLE,
       links: [
-        { label: "Open Security", route: "/dashboard/security", description: "Manage optional bearer tokens and company API keys in one place." },
-        { label: "Open Company Profile", route: "/dashboard/company-profile", description: "Update branding, introduction copy, and public experience settings." },
-        { label: "Open My Profile", route: "/dashboard/profile", description: "Manage password, 2FA, workflow defaults, and profile details." },
+        { label: "Open Security", route: dashboardPath("security"), description: "Manage optional bearer tokens and company API keys in one place." },
+        { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Update branding, introduction copy, and public experience settings." },
+        { label: "Open My Profile", route: dashboardPath("profile"), description: "Manage password, 2FA, workflow defaults, and profile details." },
       ],
       previews: [
         buildPreview(
           "user-security",
           "Security",
-          "/dashboard/security",
+          dashboardPath("security"),
           "Optional bearer-token access and company API-key management now live together on this page."
         ),
         buildPreview(
           "user-company-profile",
           "Company profile",
-          "/dashboard/company-profile",
+          dashboardPath("company-profile"),
           "Branding, introduction content, and public experience settings live on this page."
         ),
         buildPreview(
           "user-profile",
           "My profile",
-          "/dashboard/profile",
+          dashboardPath("profile"),
           "Use this page for password changes, 2FA, workflow defaults, and account details."
         ),
       ],
@@ -619,8 +625,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Company Profile", route: "/dashboard/company-profile", description: "Review company identity and public presentation settings." },
-        { label: "Open My Passports", route: "/dashboard/my-passports", description: "Find DPP IDs, public links, versions, and passport actions." },
+        { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Review company identity and public presentation settings." },
+        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "Find DPP IDs, public links, versions, and passport actions." },
       ],
       table: GOVERNANCE_SECURITY_API_TABLE,
       tips: [
@@ -857,21 +863,21 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Manage Team", route: "/dashboard/team", description: "Invite, role-manage, and deactivate users." },
-        { label: "Open Messages", route: "/dashboard/messages", description: "Create and continue internal conversations." },
-        { label: "Open Audit Logs", route: "/dashboard/audit-logs", description: "Filter and export change history." },
+        { label: "Open Manage Team", route: dashboardPath("team"), description: "Invite, role-manage, and deactivate users." },
+        { label: "Open Messages", route: dashboardPath("messages"), description: "Create and continue internal conversations." },
+        { label: "Open Audit Logs", route: dashboardPath("audit-logs"), description: "Filter and export change history." },
       ],
       previews: [
         buildPreview(
           "user-team",
           "Team management screen",
-          "/dashboard/team",
+          dashboardPath("team"),
           "This page handles invites, role changes, and member deactivation."
         ),
         buildPreview(
           "user-audit",
           "Audit logs view",
-          "/dashboard/audit-logs",
+          dashboardPath("audit-logs"),
           "Use this for filtered change tracking and CSV exports."
         ),
       ],
@@ -931,8 +937,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         },
       ],
       links: [
-        { label: "Open Company Profile", route: "/dashboard/company-profile", description: "Set the public introduction and public-view styling." },
-        { label: "Open My Passports", route: "/dashboard/my-passports", description: "Use row actions to copy links, export, and print QR labels." },
+        { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Set the public introduction and public-view styling." },
+        { label: "Open My Passports", route: dashboardPath("my-passports"), description: "Use row actions to copy links, export, and print QR labels." },
       ],
       tips: [
         "Treat the public viewer as the final external presentation layer. Company introduction text and release quality matter as much as raw field completeness.",

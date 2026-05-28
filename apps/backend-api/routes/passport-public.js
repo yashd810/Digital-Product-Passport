@@ -1135,16 +1135,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   app.get("/did/company/:slug/did.json", publicReadRateLimit, async (req, res) => {
     try {
-      let company = await hydrateCompanyBySlug(req.params.slug);
-
-      if (!company && /^\d+$/.test(String(req.params.slug || ""))) {
-        const legacyCompany = await hydrateCompany(Number.parseInt(req.params.slug, 10));
-        if (legacyCompany?.isActive && legacyCompany.didSlug && legacyCompany.didSlug !== req.params.slug) {
-          return res.redirect(301, `/did/company/${encodeURIComponent(legacyCompany.didSlug)}/did.json`);
-        }
-        company = legacyCompany;
-      }
-
+      const company = await hydrateCompanyBySlug(req.params.slug);
       if (!company?.isActive) return res.status(404).json({ error: "DID not found" });
 
       const did = didService.generateCompanyDid(company.didSlug);

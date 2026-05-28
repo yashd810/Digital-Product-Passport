@@ -1,0 +1,6 @@
+<svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="carbon icon">
+  <rect x="4" y="4" width="64" height="64" rx="20" fill="#EAF6F4"/>
+  <g stroke="#0F766E" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 48c-5 0-9-4-9-9s4-9 9-9c2 0 4 .6 5.5 1.7C25.6 25 31.8 20 39 20c8 0 14.6 5.7 16 13.2 3.9.5 7 3.8 7 7.8 0 4.4-3.6 8-8 8H18z"/><path d="M26 55c5-8 11-13 22-17"/><path d="M48 35c0 5-4 9-9 9 0-6 4-10 9-10v1z" fill="#0F766E" stroke="none"/>
+  </g>
+</svg>

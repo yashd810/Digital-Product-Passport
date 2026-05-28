@@ -1,5 +1,6 @@
 const logger = require("../src/infrastructure/logging/logger");
 const { recordSignedDppRelease } = require("../src/infrastructure/audit/dpp-release-record-service");
+const { buildDashboardPath } = require("../src/shared/navigation/dashboard-paths");
 
 module.exports = function registerWorkflowRoutes(app, {
   pool,
@@ -255,7 +256,7 @@ module.exports = function registerWorkflowRoutes(app, {
       const tableName = getTable(resolvedPassportType);
       const currentPassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType });
       const pRes = await pool.query(
-        `SELECT p."modelName" AS "modelName", p."internalAliasId" AS "internalAliasId", p."versionNumber" AS "versionNumber", c.company_name AS "companyName"
+        `SELECT p."modelName" AS "modelName", p."internalAliasId" AS "internalAliasId", p."versionNumber" AS "versionNumber", c.company_name AS "companyName", c.did_slug AS "didSlug"
          FROM ${tableName} p
          LEFT JOIN companies c ON c.id = p.company_id
          WHERE p."dppId" = $1
@@ -263,7 +264,13 @@ module.exports = function registerWorkflowRoutes(app, {
          LIMIT 1`,
         [dppId]
       );
-      const pInfo = pRes.rows[0] || { modelName: dppId.substring(0, 8), internalAliasId: null, versionNumber: 1, companyName: "" };
+      const pInfo = pRes.rows[0] || { modelName: dppId.substring(0, 8), internalAliasId: null, versionNumber: 1, companyName: "", didSlug: null };
+      const companyDashboardPath = (subpath = "") => buildDashboardPath({
+        companySlug: pInfo.didSlug,
+        companyName: pInfo.companyName,
+        companyId: wf.companyId,
+        subpath,
+      });
 
       if (action === "reject") {
         const col = isReviewer ? '"reviewStatus"' : '"approvalStatus"';
@@ -303,11 +310,11 @@ module.exports = function registerWorkflowRoutes(app, {
           await runBestEffort("Workflow reject notification error", async () => createNotification(
             wf.submittedBy,
             "workflow_rejected",
-            `❌ ${pInfo.modelName} was rejected`,
-            `${isReviewer ? "Review" : "Approval"} rejected by ${actorName}${comment ? ` — ${comment.substring(0, 80)}` : ""}`,
-            dppId,
-            `/dashboard/passports/${resolvedPassportType}`
-          ));
+              `❌ ${pInfo.modelName} was rejected`,
+              `${isReviewer ? "Review" : "Approval"} rejected by ${actorName}${comment ? ` — ${comment.substring(0, 80)}` : ""}`,
+              dppId,
+              companyDashboardPath(`passports/${resolvedPassportType}`)
+            ));
         }
         return res.json({ success: true, status: "rejected" });
       }
@@ -416,12 +423,12 @@ module.exports = function registerWorkflowRoutes(app, {
         } else {
           await runBestEffort("Workflow approval-request notification error", async () => createNotification(
             wf.approverId,
-            "workflow_approval",
-            `Approval needed: ${pInfo.modelName}`,
-            "Review passed — your approval is required",
-            dppId,
-            "/dashboard/workflow"
-          ));
+              "workflow_approval",
+              `Approval needed: ${pInfo.modelName}`,
+              "Review passed — your approval is required",
+              dppId,
+              companyDashboardPath("workflow/inprogress")
+            ));
         }
       } else if (isApprover) {
         const approvalReleaseTarget = await evaluateWorkflowReleaseCompliance({

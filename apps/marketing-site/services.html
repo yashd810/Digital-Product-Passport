@@ -9,7 +9,7 @@
   <meta name="keywords" content="compliance governance, regulation intelligence, ESPR compliance, battery regulation compliance, construction product passport, detergents digital product passport, toy safety passport" />
   <meta name="theme-color" content="#f5f8fb" />
   <link rel="canonical" href="https://claros-dpp.online/services.html" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='DM Sans,sans-serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="ClarosDPP" />
   <meta property="og:title" content="Compliance Governance & Regulation Intelligence — ClarosDPP" />
@@ -35,426 +35,17 @@
   <title>Compliance Governance & Regulation Intelligence — ClarosDPP</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <style>
-    body.page-body {
-      background:
-        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
-        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
-        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
-        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
-      background-size: 64px 64px, 64px 64px, auto, auto, auto;
-      color: #10243a;
-    }
-    .section,
-    .section-alt,
-    .section-dark {
-      background: transparent !important;
-    }
-
-    .service-hero {
-      padding: var(--hero-pad-y) 0 calc(var(--section-pad-y) * 0.5);
-    }
-    #compliance,
-    #beyond-espr,
-    #how-we-help,
-    #sustainability-goals {
-      padding: calc(var(--section-pad-y) * 0.5) 0;
-    }
-    .hero-layout {
-      display: grid;
-      grid-template-columns: 1.22fr 0.78fr;
-      gap: 3rem;
-      align-items: center;
-    }
-    .hero-layout h1 {
-      font-family: var(--sans);
-      font-size: clamp(1.95rem, 3.5vw, 3.1rem);
-      font-weight: 700;
-      line-height: 1.15;
-      letter-spacing: -0.5px;
-      color: #10243a;
-      margin-bottom: 1rem;
-    }
-    .hero-layout h1 .hl {
-      color: var(--teal);
-    }
-    .hero-layout p {
-      color: var(--lgray);
-      font-size: 1rem;
-      line-height: 1.84;
-      margin-bottom: 1.5rem;
-      max-width: 620px;
-    }
-    .hero-pill {
-      display: inline-flex;
-      padding: 0.38rem 0.92rem;
-      border-radius: 999px;
-      background: rgba(13,181,176,0.12);
-      border: 1px solid var(--teal-bdr);
-      color: var(--teal);
-      font-size: 0.72rem;
-      font-weight: 800;
-      letter-spacing: 1.8px;
-      text-transform: uppercase;
-      margin-bottom: 1rem;
-    }
-    .hero-actions {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 1rem;
-    }
-    .hero-panel {
-      background: rgba(255,255,255,0.5);
-      border: 1px solid var(--card-bdr);
-      border-radius: 24px;
-      padding: 1.8rem;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.18);
-    }
-    .hero-panel h3 {
-      font-family: var(--serif);
-      font-size: 1.35rem;
-      margin-bottom: 0.9rem;
-    }
-    .hero-panel ul {
-      display: flex;
-      flex-direction: column;
-      gap: 0.8rem;
-    }
-    .hero-panel li {
-      display: flex;
-      gap: 0.7rem;
-      align-items: flex-start;
-      color: var(--lgray);
-      font-size: 0.84rem;
-      line-height: 1.72;
-    }
-    .hero-panel li::before {
-      content: "◆";
-      color: var(--teal);
-      margin-top: 0.1rem;
-      flex-shrink: 0;
-    }
-
-    .service-full {
-      background: var(--card-bg);
-      border: 1px solid var(--card-bdr);
-      border-radius: 20px;
-      padding: 2rem;
-      position: relative;
-      overflow: hidden;
-    }
-    .service-full::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--teal), var(--teal2));
-    }
-    .sf-header {
-      display: flex;
-      gap: 1rem;
-      align-items: flex-start;
-      margin-bottom: 1rem;
-    }
-    .sf-icon {
-      width: 52px;
-      height: 52px;
-      border-radius: 14px;
-      background: var(--teal-dim);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.5rem;
-      flex-shrink: 0;
-    }
-    .sf-label h2 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin-bottom: 0.3rem;
-    }
-    .sf-label span {
-      display: inline-flex;
-      padding: 0.22rem 0.62rem;
-      border-radius: 999px;
-      background: rgba(13,181,176,0.1);
-      color: var(--teal);
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-    .service-full p {
-      color: var(--lgray);
-      font-size: 0.87rem;
-      line-height: 1.82;
-      margin-bottom: 1rem;
-    }
-    .sf-features {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.8rem;
-    }
-    .sf-feature {
-      display: grid;
-      gap: 0.35rem;
-      align-items: start;
-      background: var(--card-bg);
-      border: 1px solid var(--card-bdr);
-      border-radius: 16px;
-      padding: 1rem 1rem 0.95rem;
-      color: var(--lgray);
-      font-size: 0.83rem;
-      line-height: 1.66;
-    }
-    .sf-feature::before {
-      content: attr(data-kicker);
-      color: #10243a;
-      font-weight: 800;
-      font-size: 0.78rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 0.15rem;
-    }
-    .reg-landscape-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.8rem;
-      margin-top: 0.2rem;
-    }
-    .reg-group-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-bdr);
-      border-radius: 16px;
-      padding: 0.95rem 1rem;
-      box-shadow: 0 10px 24px rgba(16,36,58,0.045);
-    }
-    .reg-group-card h3 {
-      font-size: 0.9rem;
-      line-height: 1.35;
-      color: #10243a;
-      margin-bottom: 0.65rem;
-    }
-    .reg-list {
-      display: grid;
-      gap: 0.5rem;
-    }
-    .reg-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 0.55rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid rgba(189, 217, 229, 0.5);
-    }
-    .reg-item:last-child {
-      padding-bottom: 0;
-      border-bottom: 0;
-    }
-    .reg-item strong {
-      display: block;
-      color: #18324a;
-      font-size: 0.77rem;
-      line-height: 1.45;
-      font-weight: 600;
-    }
-    .reg-status {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      white-space: nowrap;
-      padding: 0.24rem 0.52rem;
-      border-radius: 999px;
-      background: rgba(13,181,176,0.1);
-      border: 1px solid rgba(13,181,176,0.18);
-      color: var(--teal);
-      font-size: 0.6rem;
-      font-weight: 700;
-      letter-spacing: 0.65px;
-      text-transform: uppercase;
-    }
-    @media (max-width: 1180px) {
-      .reg-landscape-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-    @media (max-width: 860px) {
-      .reg-landscape-grid {
-        grid-template-columns: 1fr;
-      }
-      .sf-features {
-        grid-template-columns: 1fr;
-      }
-      .reg-item {
-        flex-direction: column;
-      }
-    }
-
-    .reg-cat-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-      margin-top: 1.5rem;
-    }
-    .rc-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-bdr);
-      border-radius: 16px;
-      padding: 1.35rem;
-      position: relative;
-    }
-    .rc-card.rc-featured {
-      border-color: rgba(240,165,0,0.38);
-      background: linear-gradient(145deg, rgba(240,165,0,0.08), rgba(13,181,176,0.04));
-    }
-    .rc-icon {
-      font-size: 1.8rem;
-      margin-bottom: 0.6rem;
-    }
-    .rc-name {
-      font-size: 0.92rem;
-      font-weight: 700;
-      margin-bottom: 0.3rem;
-    }
-    .rc-reg {
-      font-size: 0.68rem;
-      color: var(--gray);
-      font-family: var(--mono);
-      line-height: 1.6;
-      margin-bottom: 0.7rem;
-    }
-    .rc-copy {
-      font-size: 0.78rem;
-      color: var(--lgray);
-      line-height: 1.62;
-      margin-bottom: 0.8rem;
-    }
-    .rc-badge {
-      display: inline-flex;
-      padding: 0.24rem 0.68rem;
-      border-radius: 999px;
-      font-size: 0.62rem;
-      font-weight: 800;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-    }
-    .rc-live { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
-    .rc-dev  { background: rgba(13,181,176,0.12); color: var(--teal); border: 1px solid var(--teal-bdr); }
-    .rc-upcoming { background: rgba(240,165,0,0.15); color: var(--gold); border: 1px solid rgba(240,165,0,0.35); }
-
-    .help-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.2rem;
-      margin-top: 1.5rem;
-    }
-    .help-card {
-      background: rgba(255,255,255,0.5);
-      border: 1px solid var(--card-bdr);
-      border-radius: 18px;
-      padding: 1.5rem;
-      position: relative;
-      overflow: hidden;
-    }
-    .help-card::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--teal), rgba(8,145,178,0.4));
-    }
-    .help-card-head {
-      display: flex;
-      align-items: center;
-      gap: 0.65rem;
-      margin-bottom: 0.75rem;
-    }
-    .help-card-icon {
-      width: 40px; height: 40px;
-      border-radius: 12px;
-      background: rgba(13,181,176,0.1);
-      border: 1px solid rgba(13,181,176,0.2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.1rem;
-      flex-shrink: 0;
-    }
-    .help-card-num {
-      font-size: 0.62rem;
-      font-weight: 800;
-      color: var(--teal);
-      letter-spacing: 1.5px;
-      font-family: var(--mono);
-    }
-    .help-card h3 {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #10243a;
-      margin-bottom: 0.5rem;
-      line-height: 1.3;
-    }
-    .help-card p {
-      color: var(--lgray);
-      font-size: 0.83rem;
-      line-height: 1.74;
-    }
-
-    .sustain-shell {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-top: 1.5rem;
-    }
-    .sustain-panel {
-      background: rgba(255,255,255,0.5);
-      border: 1px solid var(--teal-bdr);
-      border-radius: 22px;
-      padding: 1.7rem;
-    }
-    .sustain-panel h3 {
-      font-size: 1.02rem;
-      margin-bottom: 0.75rem;
-    }
-    .sustain-panel p {
-      color: var(--lgray);
-      font-size: 0.86rem;
-      line-height: 1.82;
-      margin-bottom: 0.9rem;
-    }
-
-    @media (max-width: 980px) {
-      .hero-layout,
-      .two-col,
-      .help-grid,
-      .sustain-shell {
-        grid-template-columns: 1fr;
-      }
-      .reg-cat-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-    @media (max-width: 640px) {
-      .reg-cat-grid {
-        grid-template-columns: 1fr;
-      }
-      .help-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
 </head>
-<body class="page-body">
+<body class="page-body services-page">
 
-  <!-- Hero -->
-  <section class="service-hero" aria-labelledby="services-hero-title">
+  <!-- Intro -->
+  <section class="service-intro" aria-labelledby="services-intro-title">
     <div class="container">
-      <div class="hero-layout">
+      <div class="intro-layout">
         <div class="reveal">
-          <h1 id="services-hero-title">From Regulation to Action: <span class="hl">DPP Compliance</span></h1>
+          <h1 id="services-intro-title">From Regulation to Action: <span class="hl">DPP Compliance</span></h1>
           <p>
             Building the passport is only half the work. The harder half is staying aligned with an expanding web of regulations,
             delegated acts, standards, chemical rules, waste rules, carbon methodologies, and product-specific obligations that
@@ -464,13 +55,13 @@
             That is where ClarosDPP helps most. We translate complexity into an operating plan so your product teams can focus on
             building strong products while we help you manage the regulatory burden around them.
           </p>
-          <div class="hero-actions">
+          <div class="intro-actions">
             <a href="contact.html" class="btn btn-primary">Talk to a Compliance Expert →</a>
             <a href="timeline.html" class="btn btn-outline">View Regulation Timeline</a>
           </div>
         </div>
 
-        <aside class="hero-panel reveal reveal-d2">
+        <aside class="intro-panel reveal reveal-d2">
           <h3>What this service covers</h3>
           <ul>
             <li>Core Digital Product Passport (DPP) requirements under frameworks such as the ESPR, the EU Battery Regulation, and the Construction Products Regulation.</li>
@@ -488,15 +79,15 @@
     <div class="container">
       <div class="reveal">
         <h2 class="section-title" id="compliance-title">DPP Compliance: <span class="hl">Navigating a Complex Regulatory Landscape</span></h2>
-        <p class="section-lead" style="max-width: none; margin-bottom: 1rem;">
+        <p class="section-lead lead-full mb-1">
           The Digital Product Passport (DPP) landscape is not defined by a single piece of legislation; rather, it operates as a connected ecosystem. It brings together overarching framework regulations, sector-specific rules, standardization efforts, chemical compliance requirements, carbon accounting methodologies, waste management obligations, and market surveillance expectations. As a result, continuous monitoring of evolving regulations is essential to maintain compliance.
         </p>
-        <p class="section-lead" style="max-width: none;">
+        <p class="section-lead lead-full">
           Below, you can see the breadth of regulations that various sector-specific DPPs intersect with; this is where our expertise in navigating complex regulatory frameworks provides significant value. Please note that the list is not exhaustive and highlights only the major regulations involved.
         </p>
       </div>
 
-      <div style="display:grid; gap: 2rem;">
+      <div class="stack-gap">
         <div class="reveal reveal-d2">
           <div class="service-full">
             <div class="sf-header">
@@ -600,8 +191,8 @@
   <section class="section section-alt" id="beyond-espr" aria-labelledby="beyond-title">
     <div class="container">
       <div class="reveal">
-        <h3 class="hero-dpp-label" id="beyond-title" style="font-size: 1.2rem;">Digital Product Passports: Expanding Beyond ESPR</h3>
-        <p class="section-lead" style="max-width: none;">
+        <h3 class="section-eyebrow eyebrow-lg" id="beyond-title">Digital Product Passports: Expanding Beyond ESPR</h3>
+        <p class="section-lead lead-full">
           Below are key sector specific Digital Product Passports (DPPs) currently in the pipeline and expected in the near term. The Battery Passport will be the first to go live on 18 February 2027, and our platform already provides a fully compliant solution. Other DPPs are under development in close alignment with European Commission requirements, alongside our advisory support. These are not the only product groups in scope under ESPR, and 30+ product groups are expected to require DPPs by 2030.
         </p>
       </div>
@@ -677,7 +268,7 @@
     <div class="container">
       <div class="reveal">
         <h2 class="section-title" id="help-title">A Structured Path to <span class="hl">Compliance</span></h2>
-        <p class="section-lead" style="max-width: 100%;">
+        <p class="section-lead lead-wide">
           Product companies often feel the pain of this work in many teams at once: product, sustainability, procurement,
           quality, regulatory, and operations. We help reduce that burden with a structured pathway.
         </p>

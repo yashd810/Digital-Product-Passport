@@ -10,30 +10,12 @@ module.exports = function registerDidRoutes(app, deps) {
     getTable,
     normalizePassportRow,
     getCompanyNameMap,
-    loadCompanyById,
-    resolveLegacyPassportDidTarget,
     dbLookupByCompanyAndProduct,
     getAppUrl,
     didService,
     dppIdentity,
     productIdentifierService,
   } = deps;
-
-  const companyIdParamsSchema = {
-    type: "object",
-    required: ["companyId"],
-    properties: {
-      companyId: { type: "string", minLength: 1 },
-    },
-  };
-  const companyProductParamsSchema = {
-    type: "object",
-    required: ["companyId", "internalAliasId"],
-    properties: {
-      companyId: { type: "string", minLength: 1 },
-      internalAliasId: { type: "string", minLength: 1 },
-    },
-  };
   const facilityParamsSchema = {
     type: "object",
     required: ["facilityId"],
@@ -41,106 +23,6 @@ module.exports = function registerDidRoutes(app, deps) {
       facilityId: { type: "string", minLength: 1 },
     },
   };
-
-  app.get("/did/company/:companyId/did.json", createValidationMiddleware({
-    params: companyIdParamsSchema,
-  }), async (req, res) => {
-    try {
-      const companyId = parseInt(req.params.companyId, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
-
-      const company = await loadCompanyById(companyId);
-      if (!company?.isActive) return res.status(404).json({ error: "Company not found" });
-      const companySlug = didService.normalizeCompanySlug(company.didSlug || company.companyName || `company-${company.id}`);
-      return res.redirect(301, `/did/company/${encodeURIComponent(companySlug)}/did.json`);
-    } catch (e) {
-      logger.error({ err: e }, "[Company DID]");
-      res.status(500).json({ error: "Failed to resolve DID document" });
-    }
-  });
-
-  app.get("/did/battery/model/:companyId/:internalAliasId/did.json", createValidationMiddleware({
-    params: companyProductParamsSchema,
-  }), async (req, res) => {
-    try {
-      const companyId = parseInt(req.params.companyId, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
-
-      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
-      const target = await resolveLegacyPassportDidTarget(companyId, internalAliasId, "model");
-      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
-      return res.redirect(301, `/did/battery/model/${encodeURIComponent(target.stableId)}/did.json`);
-    } catch (e) {
-      logger.error({ err: e }, "[Battery Model DID]");
-      res.status(500).json({ error: "Failed to resolve DID document" });
-    }
-  });
-
-  app.get("/did/battery/item/:companyId/:internalAliasId/did.json", createValidationMiddleware({
-    params: companyProductParamsSchema,
-  }), async (req, res) => {
-    try {
-      const companyId = parseInt(req.params.companyId, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
-
-      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
-      const target = await resolveLegacyPassportDidTarget(companyId, internalAliasId, "item");
-      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
-      return res.redirect(301, `/did/battery/item/${encodeURIComponent(target.stableId)}/did.json`);
-    } catch (e) {
-      logger.error({ err: e }, "[Battery Item DID]");
-      res.status(500).json({ error: "Failed to resolve DID document" });
-    }
-  });
-
-  app.get("/did/battery/batch/:companyId/:internalAliasId/did.json", createValidationMiddleware({
-    params: companyProductParamsSchema,
-  }), async (req, res) => {
-    try {
-      const companyId = parseInt(req.params.companyId, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
-
-      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
-      const target = await resolveLegacyPassportDidTarget(companyId, internalAliasId, "batch");
-      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
-      return res.redirect(301, `/did/battery/batch/${encodeURIComponent(target.stableId)}/did.json`);
-    } catch (e) {
-      logger.error({ err: e }, "[Battery Batch DID]");
-      res.status(500).json({ error: "Failed to resolve DID document" });
-    }
-  });
-
-  app.get("/did/dpp/:granularity/:companyId/:internalAliasId/did.json", createValidationMiddleware({
-    params: {
-      type: "object",
-      required: ["granularity", "companyId", "internalAliasId"],
-      properties: {
-        granularity: { type: "string", minLength: 1 },
-        companyId: { type: "string", minLength: 1 },
-        internalAliasId: { type: "string", minLength: 1 },
-      },
-    },
-  }), async (req, res) => {
-    try {
-      const { granularity } = req.params;
-      const validGranularities = ["model", "item", "batch"];
-      if (!validGranularities.includes(granularity)) {
-        return res.status(400).json({ error: `granularity must be one of: ${validGranularities.join(", ")}` });
-      }
-
-      const companyId = parseInt(req.params.companyId, 10);
-      if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
-
-      const internalAliasId = decodeURIComponent(req.params.internalAliasId);
-      const target = await resolveLegacyPassportDidTarget(companyId, internalAliasId, granularity);
-      if (!target) return res.status(404).json({ error: "Passport not found or not released" });
-      const nextGranularity = didService.normalizeGranularity(target.granularity || granularity);
-      return res.redirect(301, `/did/dpp/${encodeURIComponent(nextGranularity)}/${encodeURIComponent(target.stableId)}/did.json`);
-    } catch (e) {
-      logger.error({ err: e }, "[DPP DID]");
-      res.status(500).json({ error: "Failed to resolve DID document" });
-    }
-  });
 
   app.get("/did/facility/:facilityId/did.json", createValidationMiddleware({
     params: facilityParamsSchema,
@@ -304,21 +186,6 @@ module.exports = function registerDidRoutes(app, deps) {
     } catch (e) {
       logger.error({ err: e }, "[Public URL]");
       res.status(500).json({ error: "Failed to resolve public URL" });
-    }
-  });
-
-  app.get("/did/org/:companyId/did.json", async (req, res) => {
-    const companyId = parseInt(req.params.companyId, 10);
-    if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
-
-    try {
-      const company = await loadCompanyById(companyId);
-      if (!company?.isActive) return res.status(404).json({ error: "Company not found" });
-      const companySlug = didService.normalizeCompanySlug(company.didSlug || company.companyName || `company-${company.id}`);
-      return res.redirect(301, `/did/company/${encodeURIComponent(companySlug)}/did.json`);
-    } catch (e) {
-      logger.error({ err: e }, "[Legacy Org DID]");
-      return res.status(500).json({ error: "Failed to resolve DID document" });
     }
   });
 };

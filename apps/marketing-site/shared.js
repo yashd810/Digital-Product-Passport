@@ -75,7 +75,7 @@
     <div class="footer-inner">
       <div class="footer-grid">
         <div>
-          <a href="index.html" class="nav-logo" style="display:inline-flex;margin-bottom:0.7rem;">
+          <a href="index.html" class="nav-logo footer-logo">
             <svg viewBox="0 0 36 36" fill="none" width="28" height="28" aria-hidden="true">
               <rect x="2" y="6" width="22" height="22" rx="4" stroke="#0db5b0" stroke-width="1.8"/>
               <rect x="10" y="2" width="22" height="22" rx="4" fill="rgba(13,181,176,0.1)"
@@ -210,11 +210,11 @@
     // ① Top-level content blocks inside every .container
     document.querySelectorAll('.container > *').forEach(tag);
 
-    // ② Hero / split-layout wrappers (not always inside a .container)
+    // ② Intro / split-layout wrappers (not always inside a .container)
     document.querySelectorAll([
-      '.hero-inner > *',
-      '.hero-grid > *',
-      '.hero-layout > *',
+      '.intro-inner > *',
+      '.intro-grid > *',
+      '.intro-layout > *',
       '.bcs-inner > *',
     ].join(', ')).forEach(tag);
 

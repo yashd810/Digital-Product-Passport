@@ -17,7 +17,7 @@ const registerMutationRoutes = require("../src/modules/dpp-api/register-mutation
 const registerPublicReadRoutes = require("../src/modules/dpp-api/register-public-read-routes");
 
 // ─── DPP API ROUTES ───────────────────────────────────────────────────────────
-// All DID paths use companyId + internal_alias_id — never the record ID.
+// All DID paths use companyId + internalAliasId — never the record ID.
 // Conforms to the did:web spec for DID document resolution.
 
 module.exports = function registerDppApiRoutes(app, {
@@ -138,8 +138,6 @@ module.exports = function registerDppApiRoutes(app, {
     parseBatchLimit,
     usesConfiguredGlobalProductIdentifierScheme,
     buildPassportServiceEndpoints,
-    loadCompanyById,
-    resolveLegacyPassportDidTarget,
   } = createResolutionHelpers({
     pool,
     getTable,
@@ -435,8 +433,6 @@ module.exports = function registerDppApiRoutes(app, {
     getTable,
     normalizePassportRow,
     getCompanyNameMap,
-    loadCompanyById,
-    resolveLegacyPassportDidTarget,
     dbLookupByCompanyAndProduct,
     getAppUrl,
     didService,

@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 
 function OAuthCallback({ setToken, setUser, setCompanyId }) {
   const API_BASE_URL = import.meta.env.VITE_API_URL || "";
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState("");
+  const requestedNext = new URLSearchParams(location.search).get("next") || "";
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const next = params.get("next") || "/dashboard";
-
     (async () => {
       try {
         const response = await fetchWithAuth(`${API_BASE_URL}/api/users/me`, {
@@ -25,12 +24,17 @@ function OAuthCallback({ setToken, setUser, setCompanyId }) {
         setToken(true);
         setUser(data);
         setCompanyId(data.companyId || "");
+        const next = requestedNext || (
+          data.role === "super_admin"
+            ? "/admin"
+            : buildUserDashboardHomePath({ user: data, companyId: data.companyId || "" })
+        );
         navigate(next, { replace: true });
       } catch (err) {
         setError(err.message || "SSO login failed");
       }
     })();
-  }, [API_BASE_URL, location.search, navigate, setCompanyId, setToken, setUser]);
+  }, [API_BASE_URL, navigate, requestedNext, setCompanyId, setToken, setUser]);
 
   return (
     <div className="auth-container">

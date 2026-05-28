@@ -1,0 +1,6 @@
+<svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="audit icon">
+  <rect x="4" y="4" width="64" height="64" rx="20" fill="#EAF6F4"/>
+  <g stroke="#0F766E" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="36" cy="37" r="20"/><path d="M36 25v13l9 6"/><path d="M15 22V12h10"/><path d="M15 12c6-5 13-7 21-7 18 0 32 14 32 32"/>
+  </g>
+</svg>

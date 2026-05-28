@@ -169,7 +169,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           items: [
             "Managed facilities are stored in company_facilities and must match a known active facility identifier before standards APIs accept them.",
             "Facility DID documents are public at `/did/facility/:stableId/did.json`.",
-            "Numeric company/product DID URLs redirect to the canonical stable-ID DID routes.",
+            "Only canonical company-slug and stable-ID DID routes are supported.",
             "Browser requests to `/resolve?did=...` can redirect to public passport pages; API-style requests redirect to DID documents.",
           ],
         },

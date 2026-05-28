@@ -1,5 +1,7 @@
 "use strict";
 
+const { buildDashboardPath } = require("../../shared/navigation/dashboard-paths");
+
 function createWorkflowHelpers({
   pool,
   logger,
@@ -109,6 +111,7 @@ function createWorkflowHelpers({
     }
 
     const appUrl = process.env.APP_URL || "http://localhost:3000";
+    const companyDashboardWorkflowPath = buildDashboardPath({ companyId, subpath: "workflow/inprogress" });
 
     if (resolvedReviewerId) {
       await runBestEffort("Workflow reviewer notification error", async () => createNotification(
@@ -117,7 +120,7 @@ function createWorkflowHelpers({
         `Review requested: ${passport.internalAliasId}`,
         `v${passport.versionNumber} needs your review`,
         dppId,
-        "/dashboard/workflow"
+        companyDashboardWorkflowPath
       ));
       try {
         const reviewer = await pool.query('SELECT email, "firstName" AS "firstName" FROM users WHERE id = $1', [resolvedReviewerId]);
@@ -143,7 +146,7 @@ function createWorkflowHelpers({
                   <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.versionNumber}</span></div>
                   <div class="info-row"><span class="info-label">Type</span><span class="info-value">${passportType}</span></div>
                 </div>
-                <div class="cta-wrap"><a href="${appUrl}/dashboard/workflow" class="cta-btn">🔍 Review Now →</a></div>`,
+                <div class="cta-wrap"><a href="${appUrl}${companyDashboardWorkflowPath}" class="cta-btn">🔍 Review Now →</a></div>`,
             }),
           });
         }
@@ -159,7 +162,7 @@ function createWorkflowHelpers({
         `Approval requested: ${passport.internalAliasId}`,
         `v${passport.versionNumber} needs your approval`,
         dppId,
-        "/dashboard/workflow"
+        companyDashboardWorkflowPath
       ));
     }
 

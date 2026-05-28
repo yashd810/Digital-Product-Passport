@@ -9,7 +9,7 @@
   <meta name="keywords" content="about digital product passport platform, DPP mission, DPP expertise, DPP FAQ, battery passport, ESPR passport, product traceability platform" />
   <meta name="theme-color" content="#f5f8fb" />
   <link rel="canonical" href="https://claros-dpp.online/about.html" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='Georgia,serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b1826'/><rect x='2' y='2' width='28' height='28' rx='5' fill='none' stroke='%230db5b0' stroke-width='2'/><text x='16' y='23' font-size='18' text-anchor='middle' font-family='DM Sans,sans-serif' fill='%230db5b0' font-weight='700'>C</text></svg>" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="ClarosDPP" />
   <meta property="og:title" content="About ClarosDPP - Mission, Expertise, and DPP FAQ" />
@@ -42,269 +42,16 @@
   <title>About ClarosDPP - Mission, Expertise, and DPP FAQ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <style>
-    body.page-body {
-      background:
-        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
-        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
-        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
-        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
-      background-size: 64px 64px, 64px 64px, auto, auto, auto;
-      color: #10243a;
-    }
-    .section,
-    .section-alt,
-    .section-dark {
-      background: transparent !important;
-    }
-
-    #mission-section {
-      padding-top: var(--hero-pad-y);
-      margin-top: 0;
-    }
-
-    .about-hero-inner {
-      position: relative;
-      z-index: 1;
-      max-width: 1200px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1.22fr 0.78fr;
-      gap: 2rem;
-      align-items: center;
-    }
-
-    .about-hero h1 {
-      margin: 0 0 1rem;
-      font-family: var(--sans);
-      font-size: clamp(1.95rem, 3.5vw, 3.1rem);
-      font-weight: 700;
-      line-height: 1.15;
-      letter-spacing: -0.5px;
-      color: #10243a;
-      max-width: 760px;
-    }
-
-    .about-hero p {
-      color: #4d667b;
-      font-size: 1.03rem;
-      line-height: 1.85;
-      max-width: 760px;
-    }
-
-    .about-hero-card,
-    .mission-card,
-    .expertise-card,
-    .impact-card,
-    .approach-card,
-    .faq-item {
-      background: rgba(255,255,255,0.5);
-      border: 1px solid rgba(23,48,74,0.1);
-      box-shadow: 0 18px 36px rgba(17,44,72,0.08);
-    }
-
-    .about-hero-card {
-      border-radius: 30px;
-      padding: 1.6rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .about-hero-metric {
-      padding: 1rem 1rem 1.05rem;
-      border-radius: 22px;
-      background: rgba(255,255,255,0.5);
-      border: 1px solid rgba(23,48,74,0.08);
-    }
-
-    .about-hero-metric span {
-      display: block;
-      margin-bottom: 0.45rem;
-      color: #5f7991;
-      font-size: 0.74rem;
-      font-weight: 800;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
-
-    .about-hero-metric strong {
-      color: #10243a;
-      font-size: 1rem;
-      line-height: 1.55;
-    }
-
-    .mission-grid,
-    .expertise-grid,
-    .impact-grid,
-    .approach-grid {
-      display: grid;
-      gap: 16px;
-    }
-
-    .mission-grid {
-      grid-template-columns: 1.22fr 0.78fr;
-    }
-
-    .expertise-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .impact-grid,
-    .approach-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .mission-card,
-    .expertise-card,
-    .impact-card,
-    .approach-card {
-      position: relative;
-      overflow: hidden;
-      border-radius: 28px;
-      padding: 1.5rem;
-      background: rgba(255,255,255,0.5);
-    }
-
-    .about-hero-card::before { display: none; }
-
-    .mission-card::before,
-    .expertise-card::before,
-    .impact-card::before,
-    .approach-card::before,
-    .faq-item::before {
-      content: "";
-      position: absolute;
-      inset: 0 0 auto;
-      height: 3px;
-      background: linear-gradient(90deg, rgba(23,48,74,0.12), rgba(13,181,176,0.62));
-    }
-
-    .mission-card h3,
-    .expertise-card h3,
-    .impact-card h3,
-    .approach-card h3 {
-      margin: 0 0 0.7rem;
-      color: #10243a;
-      font-size: 1.02rem;
-      font-weight: 800;
-    }
-
-    .mission-card p,
-    .expertise-card p,
-    .impact-card p,
-    .approach-card p {
-      margin: 0;
-      color: #4d667b;
-      line-height: 1.75;
-      font-size: 0.95rem;
-    }
-
-    .impact-card strong,
-    .approach-step {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 42px;
-      min-height: 42px;
-      margin-bottom: 0.85rem;
-      border-radius: 14px;
-      background: rgba(13,181,176,0.12);
-      color: #0db5b0;
-      font-size: 0.95rem;
-      font-weight: 800;
-    }
-
-    .faq-list {
-      display: grid;
-      gap: 14px;
-    }
-
-    .faq-item {
-      position: relative;
-      overflow: hidden;
-      border-radius: 24px;
-      padding: 1.2rem 1.25rem;
-      background: rgba(255,255,255,0.5);
-    }
-
-    .faq-item summary {
-      list-style: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      color: #10243a;
-      font-size: 1rem;
-      font-weight: 800;
-    }
-
-    .faq-item summary::-webkit-details-marker {
-      display: none;
-    }
-
-    .faq-item summary::after {
-      content: "+";
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      background: rgba(13,181,176,0.12);
-      color: #0db5b0;
-      font-size: 1.2rem;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    .faq-item[open] summary::after {
-      content: "-";
-    }
-
-    .faq-answer {
-      margin-top: 0.95rem;
-      color: #4d667b;
-      font-size: 0.95rem;
-      line-height: 1.82;
-      max-width: 860px;
-    }
-
-    .about-cta {
-      margin-top: 1.75rem;
-    }
-
-    @media (max-width: 980px) {
-      .about-hero-inner,
-      .mission-grid,
-      .impact-grid,
-      .approach-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .expertise-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    @media (max-width: 680px) {
-      .expertise-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
 </head>
-<body class="page-body">
+<body class="page-body about-page">
   <section class="section section-dark" id="mission-section" aria-labelledby="mission-title">
     <div class="container">
       <div class="section-intro reveal">
         <h2 class="section-title" id="mission-title">Not just a passport. <span class="hl">A system that holds up.</span></h2>
       </div>
-      <div class="mission-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="mission-grid grid-two">
         <article class="mission-card reveal">
           <h3>The problem we solve</h3>
           <p>Companies need a way to map data sources, coordinate suppliers, and publish a passport that customers and auditors can actually use.</p>
@@ -315,7 +62,7 @@
         </article>
       </div>
 
-      <div class="mission-grid" style="margin-top: 16px; grid-template-columns: 1fr 1fr;">
+      <div class="mission-grid grid-two mt-16">
         <article class="mission-card reveal reveal-d2">
           <h3>Mission focus</h3>
           <p>Turn complex product, material, and compliance data into one trusted passport experience.</p>

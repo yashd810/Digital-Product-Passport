@@ -1,0 +1,6 @@
+<svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="qr icon">
+  <rect x="4" y="4" width="64" height="64" rx="20" fill="#EAF6F4"/>
+  <g stroke="#0F766E" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="17" y="17" width="14" height="14" rx="2"/><rect x="41" y="17" width="14" height="14" rx="2"/><rect x="17" y="41" width="14" height="14" rx="2"/><path d="M42 42h5v5h-5z" fill="#0F766E" stroke="none"/><path d="M52 42v13"/><path d="M42 55h5"/><path d="M11 25v-8a6 6 0 0 1 6-6h8"/><path d="M47 11h8a6 6 0 0 1 6 6v8"/><path d="M61 47v8a6 6 0 0 1-6 6h-8"/><path d="M25 61h-8a6 6 0 0 1-6-6v-8"/>
+  </g>
+</svg>

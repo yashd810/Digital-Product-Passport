@@ -23,3 +23,23 @@ export function buildDashboardPath({ companySlug = "", companyName = "", company
     : `/dashboard/${slug}`;
 }
 
+export function buildUserDashboardPath({ user = null, companyId = "", subpath = "" } = {}) {
+  const resolvedCompanyId = user?.companyId || companyId || "";
+  const resolvedCompanyName = user?.companyName || "";
+  const resolvedCompanySlug = user?.companySlug || user?.didSlug || "";
+
+  if (!resolvedCompanyId && !resolvedCompanyName && !resolvedCompanySlug) {
+    return "/";
+  }
+
+  return buildDashboardPath({
+    companySlug: resolvedCompanySlug,
+    companyName: resolvedCompanyName,
+    companyId: resolvedCompanyId,
+    subpath,
+  });
+}
+
+export function buildUserDashboardHomePath({ user = null, companyId = "", subpath = "overview" } = {}) {
+  return buildUserDashboardPath({ user, companyId, subpath: subpath || "overview" });
+}

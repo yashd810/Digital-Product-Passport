@@ -20,24 +20,19 @@ function createSchemaStorageHelpers({
     return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || "").trim());
   }
 
-  function camelToSnakeCase(value) {
-    return String(value || "")
+  function buildLegacyFieldMigrationCandidates(fieldKey) {
+    const exactKey = String(fieldKey || "").trim();
+    if (!exactKey) return [];
+
+    const snakeCaseKey = exactKey
       .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
       .replace(/[^A-Za-z0-9_]+/g, "_")
       .replace(/_+/g, "_")
       .replace(/^_+|_+$/g, "")
       .toLowerCase();
-  }
+    const compactKey = exactKey.replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
 
-  function compactLowercase(value) {
-    return String(value || "").replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
-  }
-
-  function buildLegacyFieldColumnCandidates(fieldKey) {
-    const exactKey = String(fieldKey || "").trim();
-    if (!exactKey) return [];
-    const candidates = [exactKey.toLowerCase(), camelToSnakeCase(exactKey), compactLowercase(exactKey)];
-    return Array.from(new Set(candidates.filter(Boolean).filter((candidate) => candidate !== exactKey)));
+    return Array.from(new Set([snakeCaseKey, compactKey].filter((candidate) => candidate && candidate !== exactKey)));
   }
 
   async function getLiveTableColumnMap(tableName) {
@@ -259,8 +254,6 @@ function createSchemaStorageHelpers({
     for (const [columnName, columnDefinition] of LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS) {
       await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(columnName)} ${columnDefinition}`);
     }
-    await pool.query(`DROP TRIGGER IF EXISTS sync_legacy_passport_system_columns_trigger ON ${tableName}`).catch(() => {});
-    await pool.query("DROP FUNCTION IF EXISTS sync_legacy_passport_system_columns()").catch(() => {});
 
     const addedColumns = [];
     const indexedColumns = [];
@@ -320,16 +313,16 @@ function createSchemaStorageHelpers({
       for (const field of flattenTypeFields(typeRow.fieldsJson)) {
         const exactKey = String(field?.key || "").trim();
         if (!exactKey || !isSafeSqlIdentifier(exactKey)) continue;
-        const legacyKeys = buildLegacyFieldColumnCandidates(exactKey).filter((candidate) =>
-          candidate && columnMap.has(candidate) && !LIVE_PASSPORT_SYSTEM_COLUMNS.has(candidate)
-        );
+
+        const legacyKeys = buildLegacyFieldMigrationCandidates(exactKey)
+          .filter((candidate) => candidate && columnMap.has(candidate) && !LIVE_PASSPORT_SYSTEM_COLUMNS.has(candidate));
         if (!legacyKeys.length) continue;
 
         let exactColumnExists = columnMap.has(exactKey);
         const dataType = getPassportFieldDataType(field);
 
         for (const legacyKey of legacyKeys) {
-          let action = exactColumnExists ? "merge_drop" : "rename";
+          const action = exactColumnExists ? "merge_drop" : "rename";
           if (apply) {
             if (!exactColumnExists) {
               const legacyDataType = columnMap.get(legacyKey);
@@ -447,7 +440,6 @@ function createSchemaStorageHelpers({
 
       if (repair && issues.some((issue) => issue.type === "missing_column")) {
         await createPassportTable(typeRow.typeName);
-        await migratePassportStorageToSchemaKeys({ apply: true, includeArchives: true });
       }
 
       results.push({

@@ -500,39 +500,6 @@ function createResolutionHelpers({
     ];
   }
 
-  async function loadCompanyById(companyId) {
-    const result = await pool.query(
-      `SELECT c.id,
-              c.company_name,
-              c.did_slug,
-              c.is_active,
-              COALESCE(p.default_granularity, 'item') AS dpp_granularity
-       FROM companies c
-       LEFT JOIN company_dpp_policies p ON p.company_id = c.id
-       WHERE c.id = $1
-       LIMIT 1`,
-      [companyId]
-    );
-    return result.rows[0] || null;
-  }
-
-  async function resolveLegacyPassportDidTarget(companyId, internalAliasId, fallbackGranularity = "model") {
-    const result = await dbLookupByCompanyAndProduct(companyId, internalAliasId);
-    if (!result?.passport) return null;
-    const stableId = didService.normalizeStableId(result.passport.lineageId || result.passport.dppId);
-    const granularity = String(
-      result.passport.granularity ||
-      result.typeDef?.granularity ||
-      result.typeDef?.fieldsJson?.granularity ||
-      fallbackGranularity
-    ).trim().toLowerCase() || fallbackGranularity;
-    return {
-      ...result,
-      stableId,
-      granularity
-    };
-  }
-
   return {
     parseDppIdentifier,
     buildDppIdentifierFields,
@@ -554,8 +521,6 @@ function createResolutionHelpers({
     parseBatchLimit,
     usesConfiguredGlobalProductIdentifierScheme,
     buildPassportServiceEndpoints,
-    loadCompanyById,
-    resolveLegacyPassportDidTarget,
   };
 }
 

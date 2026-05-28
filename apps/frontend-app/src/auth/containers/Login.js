@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import "../styles/Landing.css";
 
 function Login({ setToken, setUser, setCompanyId }) {
@@ -51,7 +52,7 @@ function Login({ setToken, setUser, setCompanyId }) {
     setUser(data.user);
     setCompanyId(data.user.companyId || "");
     if (data.user.role === "super_admin") navigate("/admin");
-    else navigate("/dashboard");
+    else navigate(buildUserDashboardHomePath({ user: data.user, companyId: data.user.companyId || "" }));
   };
 
   const handleLogin = async (e) => {
