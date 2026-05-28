@@ -35,7 +35,7 @@
   <title>ClarosDPP Product Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <style>
     .sample-passport-card {
@@ -45,6 +45,10 @@
       border-radius: 22px;
       padding: 1.25rem;
       box-shadow: 0 16px 40px rgba(16,36,58,0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
     }
     .sample-passport-card h3 {
       font-family: var(--sans);
@@ -71,6 +75,7 @@
       background: #ffffff;
       border-radius: 18px;
       margin: 0 0 1rem;
+      align-self: center;
     }
     .sample-qr-image {
       width: 180px;
@@ -82,6 +87,7 @@
       flex-wrap: wrap;
       gap: 0.5rem;
       margin-bottom: 1rem;
+      justify-content: center;
     }
     .sample-passport-tag {
       padding: 0.25rem 0.7rem;
@@ -92,6 +98,870 @@
       font-size: 0.72rem;
       font-weight: 700;
     }
+    .sample-passport-card .btn {
+      align-self: center;
+    }
+    body.page-body {
+      background:
+        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
+        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
+        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
+        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
+      background-size: 64px 64px, 64px 64px, auto, auto, auto;
+      color: #10243a;
+    }
+    body.modal-open {
+      overflow: hidden;
+    }
+    .section,
+    .section-alt,
+    .section-dark {
+      background: transparent !important;
+    }
+    .product-intro {
+      padding: var(--hero-pad-y) 0 calc(var(--section-pad-y) * 0.5);
+    }
+    .product-intro .container {
+      position: relative;
+      z-index: 1;
+    }
+    .intro-grid {
+      display: grid;
+      grid-template-columns: 1.22fr 0.78fr;
+      gap: 3.5rem;
+      align-items: flex-start;
+    }
+    .product-intro .section-title {
+      font-family: var(--sans);
+      font-size: clamp(1.95rem, 3.5vw, 3.1rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      color: #10243a;
+      margin-bottom: 1rem;
+    }
+    .product-intro .section-title .hl {
+      color: var(--teal);
+    }
+    .product-intro p {
+      color: #50697f;
+      font-size: 1.06rem;
+      line-height: 1.9;
+      margin-bottom: 1.5rem;
+      max-width: 620px;
+    }
+    .intro-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.8rem;
+    }
+    .intro-points {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .intro-points span {
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-bdr);
+      color: var(--lgray);
+      font-size: 0.74rem;
+      font-weight: 600;
+    }
+    #core-features,
+    #architecture,
+    #platform-in-action {
+      padding: calc(var(--section-pad-y) * 0.5) 0;
+    }
+    .sample-passport-card {
+      align-self: start;
+      margin-top: 2rem;
+      background: rgba(255,255,255,0.82);
+      border: 1px solid rgba(16,36,58,0.08);
+    }
+    .sample-passport-card h3 {
+      color: #10243a;
+    }
+    .sample-passport-card p {
+      color: #50697f;
+    }
+    .sample-passport-card .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .sample-qr-link {
+      margin: 0 0 1rem;
+    }
+    .pf-pillars {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 0 0 2.5rem;
+    }
+    .pf-pillar {
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(23,48,74,0.09);
+      border-radius: 20px;
+      padding: 1.4rem 1.3rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(17,44,72,0.06);
+    }
+    .pf-pillar::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--teal), rgba(8,145,178,0.55));
+    }
+    .pf-pillar-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: rgba(13,181,176,0.1);
+      border: 1px solid rgba(13,181,176,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      margin-bottom: 0.85rem;
+    }
+    .pf-pillar strong {
+      display: block;
+      color: #10243a;
+      font-size: 0.95rem;
+      font-weight: 800;
+      margin-bottom: 0.3rem;
+    }
+    .pf-pillar span {
+      color: #516b82;
+      font-size: 0.83rem;
+      line-height: 1.65;
+    }
+    .pf-tracks {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.4rem;
+    }
+    .pf-track {
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(23,48,74,0.09);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(17,44,72,0.07);
+    }
+    .pf-track-head {
+      padding: 1.3rem 1.5rem 1.1rem;
+      border-bottom: 1px solid rgba(23,48,74,0.07);
+      background: rgba(13,181,176,0.04);
+    }
+    .pf-track-head h3 {
+      font-size: 1.02rem;
+      font-weight: 800;
+      color: #10243a;
+      margin-bottom: 0.4rem;
+    }
+    .pf-track-body {
+      padding: 1.2rem 1.5rem 1.5rem;
+    }
+    .pf-cap-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-bottom: 1.2rem;
+    }
+    .pf-cap {
+      display: flex;
+      gap: 0.8rem;
+      align-items: flex-start;
+      padding: 0.75rem 0.9rem;
+      border-radius: 14px;
+      background: rgba(13,181,176,0.04);
+      border: 1px solid rgba(13,181,176,0.1);
+      transition: background 0.2s;
+    }
+    .pf-cap:hover {
+      background: rgba(13,181,176,0.08);
+    }
+    .pf-cap-num {
+      min-width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: rgba(13,181,176,0.14);
+      color: #0db5b0;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .pf-cap-text strong {
+      display: block;
+      font-size: 0.87rem;
+      color: #10243a;
+      font-weight: 700;
+      margin-bottom: 0.18rem;
+    }
+    .pf-cap-text span {
+      font-size: 0.79rem;
+      color: #516b82;
+      line-height: 1.6;
+    }
+    .pf-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 0.6rem;
+    }
+    .pf-mini {
+      padding: 0.8rem 0.9rem;
+      border-radius: 12px;
+      background: rgba(23,48,74,0.03);
+      border: 1px solid rgba(23,48,74,0.07);
+      display: flex;
+      flex-direction: column;
+    }
+    .pf-mini strong {
+      display: block;
+      font-size: 0.81rem;
+      color: #10243a;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+    }
+    .pf-mini span {
+      font-size: 0.75rem;
+      color: #516b82;
+      line-height: 1.55;
+    }
+    .bcs-strip {
+      padding: 0;
+    }
+    .bcs-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--layout-x);
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1.22fr 0.78fr;
+      gap: 3.5rem;
+      align-items: center;
+    }
+    .bcs-headline {
+      font-family: var(--sans);
+      font-size: clamp(1.95rem, 3.5vw, 3.1rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      margin-bottom: 1rem;
+      color: #10243a;
+    }
+    .bcs-body {
+      font-size: 0.93rem;
+      color: #4d667b;
+      line-height: 1.82;
+      margin-bottom: 1rem;
+    }
+    .bcs-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.2rem;
+    }
+    .bcs-tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(13,181,176,0.1);
+      border: 1px solid rgba(13,181,176,0.2);
+      color: var(--teal);
+      padding: 0.25rem 0.7rem;
+      border-radius: 50px;
+    }
+    .bcs-passport-card {
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(16,36,58,0.08);
+      border-radius: 20px;
+      padding: 1.6rem;
+      box-shadow: 0 28px 70px rgba(16,36,58,0.12);
+      position: relative;
+    }
+    .bcs-pc-top,
+    .bcs-pc-footer,
+    .bcs-pc-field {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .bcs-pc-top {
+      margin-bottom: 1.2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(16,36,58,0.08);
+    }
+    .bcs-pc-type {
+      font-size: 0.68rem;
+      color: var(--teal);
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+    .bcs-pc-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #17304a;
+    }
+    .bcs-glow-badge {
+      font-size: 0.58rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: rgba(240,165,0,0.15);
+      border: 1px solid rgba(240,165,0,0.45);
+      color: #f0a500;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .bcs-pc-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 0.48rem;
+      margin-bottom: 1rem;
+    }
+    .bcs-pc-field {
+      font-size: 0.76rem;
+      padding: 0.32rem 0;
+    }
+    .bcs-pc-field span:first-child {
+      color: #6b8498;
+    }
+    .bcs-pc-field span:last-child {
+      color: #17304a;
+      font-weight: 600;
+      text-align: right;
+    }
+    .bcs-val-teal,
+    .text-teal {
+      color: var(--teal) !important;
+    }
+    .bcs-val-green,
+    .text-green {
+      color: var(--green) !important;
+    }
+    .text-gold {
+      color: var(--gold) !important;
+    }
+    .bcs-pc-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.68rem;
+      color: var(--green);
+      font-weight: 600;
+    }
+    .bcs-status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+    .bcs-pc-qr {
+      width: 42px;
+      height: 42px;
+      background: var(--white);
+      border-radius: 4px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1.5px;
+      padding: 4px;
+    }
+    .bcs-pc-qr div {
+      border-radius: 1px;
+    }
+    .bcs-qr-b {
+      background: #10243a;
+    }
+    .bcs-deadline-badge {
+      position: absolute;
+      bottom: -18px;
+      right: 24px;
+      background: linear-gradient(135deg, var(--navy3), var(--navy4));
+      border: 1px solid var(--teal-bdr);
+      border-radius: 12px;
+      padding: 0.65rem 1.1rem;
+      text-align: center;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+    }
+    .bcs-dl-label {
+      font-size: 0.6rem;
+      color: var(--gray);
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .bcs-dl-date {
+      font-family: var(--serif);
+      font-size: 1.05rem;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .bcs-visual {
+      position: relative;
+      padding-bottom: 1.5rem;
+      align-self: start;
+    }
+    .architecture-diagram-card {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      margin-top: 1.5rem;
+    }
+    .section-title-tight {
+      margin-bottom: 0.5rem;
+    }
+    .eyebrow-tight {
+      margin-bottom: 0.75rem;
+    }
+    .arch-diagram-wrap {
+      position: relative;
+      cursor: zoom-in;
+    }
+    .arch-diagram-wrap:hover .arch-zoom-hint {
+      opacity: 1;
+    }
+    .arch-zoom-hint {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      background: rgba(16,36,58,0.75);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    .architecture-diagram {
+      width: 100%;
+      border-radius: 16px;
+      display: block;
+      margin-bottom: 0;
+    }
+    .template-flex {
+      display: flex;
+      gap: 1.4rem;
+      align-items: flex-start;
+      margin-top: 1rem;
+    }
+    .template-flex > div,
+    .template-flex > aside {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .template-visual {
+      flex: 1 1 0;
+      min-width: 0;
+      margin-top: 1.25rem;
+    }
+    .template-visual-img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .platform-section-lead {
+      max-width: none;
+      width: 100%;
+    }
+    .dash-list {
+      list-style: none;
+      padding: 0;
+      margin: 18px 0 0;
+      display: grid;
+      gap: 12px;
+    }
+    .dash-list li {
+      position: relative;
+      padding-left: 28px;
+      color: #50697f;
+      line-height: 1.55;
+    }
+    .dash-list li::before {
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 0.62em;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 0 6px rgba(13,181,176,0.11);
+    }
+    .arch-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .arch-modal--open {
+      display: flex;
+    }
+    .arch-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(10,22,36,0.8);
+      backdrop-filter: blur(4px);
+    }
+    .arch-modal-inner {
+      position: relative;
+      z-index: 1;
+      width: 95vw;
+      max-width: 1400px;
+      height: 90vh;
+      background: #f8fbfe;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(10,22,36,0.35);
+    }
+    .arch-modal-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid rgba(16,36,58,0.08);
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .arch-modal-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #10243a;
+      letter-spacing: 0.5px;
+    }
+    .arch-modal-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .arch-ctrl-btn {
+      background: rgba(16,36,58,0.06);
+      border: 1px solid rgba(16,36,58,0.1);
+      border-radius: 8px;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #10243a;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .arch-ctrl-btn:hover {
+      background: rgba(13,181,176,0.12);
+      border-color: var(--teal);
+      color: var(--teal);
+    }
+    .arch-ctrl-close {
+      margin-left: 0.4rem;
+      color: #888;
+    }
+    .arch-zoom-level {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #50697f;
+      min-width: 3rem;
+      text-align: center;
+    }
+    .arch-modal-viewport {
+      flex: 1;
+      overflow: auto;
+      padding: 1.5rem;
+    }
+    .arch-modal-img {
+      display: block;
+      width: 100%;
+      transition: width 0.2s ease;
+    }
+    .platform-screens {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.3rem;
+      margin-top: 3rem;
+    }
+    .ps-card {
+      background: rgba(255,255,255,0.5);
+      border: 1px solid rgba(16,36,58,0.08);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 18px 45px rgba(16,36,58,0.08);
+    }
+    .ps-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: rgba(13,181,176,0.04);
+      border-bottom: 1px solid rgba(16,36,58,0.07);
+      gap: 1rem;
+    }
+    .ps-card-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--teal);
+    }
+    .ps-header-label {
+      font-size: 0.63rem;
+      color: var(--teal);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .ps-live {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      flex: 0 0 auto;
+    }
+    .ps-body {
+      padding: 1rem;
+    }
+    .ps-stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+      margin-bottom: 0.9rem;
+    }
+    .ps-stat-box {
+      background: #f4f9fc;
+      border-radius: 8px;
+      padding: 0.7rem;
+      text-align: center;
+      border: 1px solid rgba(16,36,58,0.06);
+    }
+    .ps-stat-num {
+      font-family: var(--serif);
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+    .ps-stat-lbl {
+      font-size: 0.62rem;
+      color: var(--gray);
+      margin-top: 0.15rem;
+    }
+    .ps-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.42rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.73rem;
+      margin-bottom: 0.35rem;
+      background: #f6fafc;
+      border: 1px solid rgba(16,36,58,0.05);
+      color: #4d667b;
+      gap: 0.6rem;
+    }
+    .ps-badge {
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    .ps-badge-green {
+      background: rgba(16,185,129,0.15);
+      color: var(--green);
+      border: 1px solid rgba(16,185,129,0.25);
+    }
+    .ps-badge-gold {
+      background: rgba(240,165,0,0.12);
+      color: var(--gold);
+      border: 1px solid rgba(240,165,0,0.25);
+    }
+    .ps-badge-blue {
+      background: rgba(13,181,176,0.12);
+      color: var(--teal);
+      border: 1px solid var(--teal-bdr);
+    }
+    .ps-analytics-head {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.9rem;
+      gap: 1rem;
+    }
+    .ps-analytics-num {
+      font-family: var(--serif);
+      font-size: 1.8rem;
+      color: var(--teal);
+      font-weight: 700;
+      line-height: 1;
+    }
+    .ps-analytics-label {
+      font-size: 0.65rem;
+      color: var(--gray);
+    }
+    .ps-analytics-delta {
+      text-align: right;
+    }
+    .ps-analytics-delta strong {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--green);
+    }
+    .ps-analytics-delta span {
+      display: block;
+      font-size: 0.62rem;
+      color: var(--gray);
+    }
+    .ps-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 70px;
+      margin-bottom: 0.8rem;
+    }
+    .ps-bar-c {
+      flex: 1;
+      min-width: 8px;
+      border-radius: 3px 3px 0 0;
+      background: linear-gradient(180deg, var(--teal) 0%, rgba(13,181,176,0.4) 100%);
+    }
+    .bar-30 { height: 30%; }
+    .bar-38 { height: 38%; }
+    .bar-45 { height: 45%; }
+    .bar-52 { height: 52%; }
+    .bar-60 { height: 60%; }
+    .bar-65 { height: 65%; }
+    .bar-72 { height: 72%; }
+    .bar-78 { height: 78%; }
+    .bar-80 { height: 80%; }
+    .bar-85 { height: 85%; }
+    .bar-90 { height: 90%; }
+    .bar-96 { height: 96%; }
+    .ps-chart-axis {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.62rem;
+      color: var(--gray);
+      margin-bottom: 0.7rem;
+    }
+    .ps-insight {
+      background: rgba(13,181,176,0.07);
+      border: 1px solid var(--teal-bdr);
+      border-radius: 8px;
+      padding: 0.6rem 0.8rem;
+      font-size: 0.7rem;
+      color: #4d667b;
+    }
+    .ps-insight strong {
+      color: var(--teal);
+      font-weight: 700;
+    }
+    .ps-log-row {
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-start;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(16,36,58,0.06);
+      font-size: 0.7rem;
+    }
+    .ps-log-time {
+      color: var(--gray);
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      width: 72px;
+      flex-shrink: 0;
+    }
+    .ps-log-action {
+      font-weight: 700;
+      font-size: 0.68rem;
+    }
+    .ps-log-user {
+      color: var(--lgray);
+      font-size: 0.65rem;
+    }
+    @media (max-width: 980px) {
+      .intro-grid,
+      .pf-pillars,
+      .pf-tracks,
+      .bcs-inner,
+      .platform-screens {
+        grid-template-columns: 1fr;
+      }
+      .sample-passport-card {
+        width: 100%;
+        max-width: 100%;
+        margin-top: 0;
+      }
+    }
+    @media (max-width: 640px) {
+      .product-intro {
+        padding-top: 6rem;
+      }
+      .product-intro .section-title {
+        font-size: clamp(1.7rem, 8vw, 2.35rem) !important;
+      }
+      .product-intro p {
+        font-size: 1rem !important;
+        line-height: 1.75 !important;
+      }
+      .intro-actions,
+      .intro-points,
+      .sample-passport-meta {
+        width: 100%;
+      }
+      .intro-actions .btn,
+      .sample-passport-card .btn {
+        width: 100%;
+      }
+      .pf-pillars,
+      .pf-mini-grid,
+      .ps-stat-row {
+        grid-template-columns: 1fr;
+      }
+      .template-flex {
+        flex-direction: column;
+      }
+      .template-visual {
+        margin-top: 0;
+      }
+      .ps-row,
+      .bcs-pc-field {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .bcs-pc-field span:last-child {
+        text-align: left;
+      }
+      .arch-modal-inner {
+        width: 96vw;
+        height: 86vh;
+      }
+      .arch-modal-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .arch-modal-controls {
+        flex-wrap: wrap;
+      }
+    }
   </style>
 </head>
 <body class="page-body product-page">
@@ -101,7 +971,7 @@
     <div class="container">
       <div class="intro-grid">
         <div class="reveal">
-          <h1 id="product-intro-title">One Platform, Built for Every <span class="hl">Digital Product Passport.</span></h1>
+          <h2 class="section-title" id="product-intro-title">One Platform, Built for Every <span class="hl">Digital Product Passport.</span></h2>
           <p>
             ClarosDPP is the working software layer behind passport issuance, QR-linked delivery, regulated data management,
             audit-friendly governance, and lifecycle analytics. It is the platform that turns the promise of a Digital Product Passport into a real operating system for your product data.
@@ -120,8 +990,7 @@
         </div>
 
         <aside class="sample-passport-card reveal reveal-d2" aria-label="Sample passport QR code">
-          <h3>Access a product passport through a real QR code.</h3>
-          <p>This sample version is static and intended for demonstration, but it illustrates the user journey we can tailor for your products.</p>
+          <h3>Scan QR for Passport Sneak Peak</h3>
           <a href="sample-passport.html" class="sample-qr-link" aria-label="Open sample passport">
             <img src="assets/sample-passport-qr.svg" alt="QR code linking to a sample passport page" class="sample-qr-image" />
           </a>
@@ -237,7 +1106,7 @@
               <div class="pf-cap">
                 <div class="pf-cap-num">03</div>
                 <div class="pf-cap-text">
-                  <strong>Battery-ready data model</strong>
+                  <strong>Product-ready data model</strong>
                   <span>Structured support for carbon footprint, recycled content, chemistry, due diligence, and service records.</span>
                 </div>
               </div>
@@ -273,76 +1142,25 @@
     </div>
   </section>
 
-  <!-- Battery -->
-  <section class="bcs-strip" id="battery-passport" aria-labelledby="battery-title">
-    <div class="bcs-inner">
-      <div class="reveal">
-        <div class="bcs-headline" id="battery-title">Battery Digital Product <span class="text-teal">Passport</span></div>
-        <p class="bcs-body">
-          The first hard DPP deadline is already fixed. From <strong>18 February 2027</strong>, relevant industrial batteries
-          and EV batteries placed on the EU market will need a compliant battery passport under Regulation (EU) 2023/1542.
-          ClarosDPP is built to operationalise that work now rather than treat it as a last-minute formatting exercise.
-        </p>
-        <p class="bcs-body">
-          Battery passport delivery is where governance matters most: carbon footprint declarations, recycled content evidence,
-          chemistry, due diligence, and lifecycle records all need to stay connected and reviewable.
-        </p>
-        <div class="bcs-tags">
-          <span class="bcs-tag">Carbon footprint</span>
-          <span class="bcs-tag">Recycled content</span>
-          <span class="bcs-tag">Battery chemistry</span>
-          <span class="bcs-tag">Due diligence</span>
-          <span class="bcs-tag">QR data carrier</span>
-          <span class="bcs-tag">Versioned release</span>
-        </div>
-        <a href="contact.html" class="btn btn-primary">Start Battery Readiness →</a>
-      </div>
-
-      <div class="reveal reveal-d2 bcs-visual">
-        <div class="bcs-passport-card">
-          <div class="bcs-pc-top">
-            <div>
-              <div class="bcs-pc-type">EU Battery Regulation · Digital passport</div>
-              <div class="bcs-pc-name">Industrial Li-NMC Module 85 kWh</div>
-            </div>
-            <div class="bcs-glow-badge">GOING LIVE</div>
-          </div>
-          <div class="bcs-pc-fields">
-            <div class="bcs-pc-field"><span>Battery chemistry</span><span>Lithium NMC 811</span></div>
-            <div class="bcs-pc-field"><span>Rated capacity</span><span>85 kWh · 3.7 V nominal</span></div>
-            <div class="bcs-pc-field"><span>Carbon footprint</span><span class="bcs-val-teal">72.4 kg CO₂e / kWh</span></div>
-            <div class="bcs-pc-field"><span>Recycled cobalt</span><span class="bcs-val-green">18.4% mapped</span></div>
-            <div class="bcs-pc-field"><span>Cycle life</span><span>3,200 charge cycles</span></div>
-            <div class="bcs-pc-field"><span>Manufacturer</span><span>DE certified entity</span></div>
-          </div>
-          <div class="bcs-pc-footer">
-            <div class="bcs-pc-status"><span class="bcs-status-dot"></span>Platform ready</div>
-            <div class="bcs-pc-qr">
-              <div class="bcs-qr-b"></div><div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div><div class="bcs-qr-b"></div>
-              <div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div>
-              <div></div><div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div><div></div>
-              <div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div><div class="bcs-qr-b"></div><div class="bcs-qr-b"></div>
-              <div class="bcs-qr-b"></div><div class="bcs-qr-b"></div><div></div><div></div><div class="bcs-qr-b"></div>
-            </div>
-          </div>
-        </div>
-        <div class="bcs-deadline-badge">
-          <div class="bcs-dl-label">Mandatory from</div>
-          <div class="bcs-dl-date">18 Feb 2027</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Architecture -->
   <section class="section section-alt" id="architecture" aria-labelledby="architecture-title">
     <div class="container">
       <div class="architecture-diagram-card reveal">
         <h2 class="section-title section-title-tight" id="architecture-title">From Raw Data to <span class="hl">Passport Ready</span></h2>
-        <p class="section-eyebrow eyebrow-tight">Platform Architecture at a Glance</p>
-        <div class="arch-diagram-wrap" id="arch-diagram-trigger" title="Click to enlarge">
-          <img src="assets/architecture-diagram.png" alt="Architecture diagram showing ClarosDPP inputs, services, storage, and outputs" class="architecture-diagram" />
-          <div class="arch-zoom-hint">🔍 Click to enlarge</div>
+        <div class="template-flex">
+          <div class="reveal">
+            <h2>Designed for real operational work.</h2>
+            <ul class="dash-list">
+              <li>Complete lifecycle control from creation to restoration.</li>
+              <li>Multi-layer public delivery for branded landing pages and technical views.</li>
+              <li>DID and verifiable-credential style trust patterns where required.</li>
+              <li>Standards-aware architecture aligned with European DPP standardisation direction.</li>
+              <li>Workflow management for reviewers, approvers, and release checkpoints.</li>
+            </ul>
+          </div>
+          <div class="reveal delay-1 template-visual">
+            <img src="assets/architecture-diagram.png" alt="Architecture diagram showing ClarosDPP inputs, services, storage, and outputs" class="architecture-diagram template-visual-img" />
+          </div>
         </div>
       </div>
     </div>
@@ -353,7 +1171,7 @@
     <div class="container">
       <div class="reveal">
         <h2 class="section-title" id="platform-title">A fully compliant platform <span class="hl">in action</span></h2>
-        <p class="section-lead">
+        <p class="section-lead platform-section-lead">
           The current platform already shows the operating muscle behind the promise: passport workspaces, public delivery,
           ingestion controls, analytics, workflow, and audit visibility.
         </p>
@@ -467,6 +1285,67 @@
     </div>
   </section>
 
+  <!-- Battery -->
+  <section class="bcs-strip" id="battery-passport" aria-labelledby="battery-title">
+    <div class="bcs-inner">
+      <div class="reveal">
+        <div class="bcs-headline" id="battery-title">Battery Digital Product <span class="text-teal">Passport</span></div>
+        <p class="bcs-body">
+          The first hard DPP deadline is already fixed. From <strong>18 February 2027</strong>, relevant industrial batteries
+          and EV batteries placed on the EU market will need a compliant battery passport under Regulation (EU) 2023/1542.
+          ClarosDPP is built to operationalise that work now rather than treat it as a last-minute formatting exercise.
+        </p>
+        <p class="bcs-body">
+          Battery passport delivery is where governance matters most: carbon footprint declarations, recycled content evidence,
+          chemistry, due diligence, and lifecycle records all need to stay connected and reviewable.
+        </p>
+        <div class="bcs-tags">
+          <span class="bcs-tag">Carbon footprint</span>
+          <span class="bcs-tag">Recycled content</span>
+          <span class="bcs-tag">Battery chemistry</span>
+          <span class="bcs-tag">Due diligence</span>
+          <span class="bcs-tag">QR data carrier</span>
+          <span class="bcs-tag">Versioned release</span>
+        </div>
+        <a href="contact.html" class="btn btn-primary">Start Battery Readiness →</a>
+      </div>
+
+      <div class="reveal reveal-d2 bcs-visual">
+        <div class="bcs-passport-card">
+          <div class="bcs-pc-top">
+            <div>
+              <div class="bcs-pc-type">EU Battery Regulation · Digital passport</div>
+              <div class="bcs-pc-name">Industrial Li-NMC Module 85 kWh</div>
+            </div>
+            <div class="bcs-glow-badge">GOING LIVE</div>
+          </div>
+          <div class="bcs-pc-fields">
+            <div class="bcs-pc-field"><span>Battery chemistry</span><span>Lithium NMC 811</span></div>
+            <div class="bcs-pc-field"><span>Rated capacity</span><span>85 kWh · 3.7 V nominal</span></div>
+            <div class="bcs-pc-field"><span>Carbon footprint</span><span class="bcs-val-teal">72.4 kg CO₂e / kWh</span></div>
+            <div class="bcs-pc-field"><span>Recycled cobalt</span><span class="bcs-val-green">18.4% mapped</span></div>
+            <div class="bcs-pc-field"><span>Cycle life</span><span>3,200 charge cycles</span></div>
+            <div class="bcs-pc-field"><span>Manufacturer</span><span>DE certified entity</span></div>
+          </div>
+          <div class="bcs-pc-footer">
+            <div class="bcs-pc-status"><span class="bcs-status-dot"></span>Platform ready</div>
+            <div class="bcs-pc-qr">
+              <div class="bcs-qr-b"></div><div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div><div class="bcs-qr-b"></div>
+              <div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div>
+              <div></div><div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div><div></div>
+              <div class="bcs-qr-b"></div><div></div><div class="bcs-qr-b"></div><div class="bcs-qr-b"></div><div class="bcs-qr-b"></div>
+              <div class="bcs-qr-b"></div><div class="bcs-qr-b"></div><div></div><div></div><div class="bcs-qr-b"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bcs-deadline-badge">
+          <div class="bcs-dl-label">Mandatory from</div>
+          <div class="bcs-dl-date">18 Feb 2027</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Architecture diagram modal -->
   <div class="arch-modal" id="arch-modal" aria-hidden="true" role="dialog" aria-label="Architecture diagram enlarged view">
     <div class="arch-modal-backdrop" id="arch-modal-backdrop"></div>
@@ -487,7 +1366,7 @@
     </div>
   </div>
 
-  <script src="shared.js?v=20260423"></script>
+  <script src="shared.js?v=20260528"></script>
   <script>
     (function () {
       const trigger = document.getElementById('arch-diagram-trigger');
@@ -524,12 +1403,12 @@
         document.body.classList.remove('modal-open');
       }
 
-      trigger.addEventListener('click', openModal);
-      backdrop.addEventListener('click', closeModal);
-      closeBtn.addEventListener('click', closeModal);
-      zoomInBtn.addEventListener('click', function () { setZoom(scale + 0.25); });
-      zoomOutBtn.addEventListener('click', function () { setZoom(scale - 0.25); });
-      resetBtn.addEventListener('click', function () { setZoom(1); });
+      if (trigger) trigger.addEventListener('click', openModal);
+      if (backdrop) backdrop.addEventListener('click', closeModal);
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (zoomInBtn) zoomInBtn.addEventListener('click', function () { setZoom(scale + 0.25); });
+      if (zoomOutBtn) zoomOutBtn.addEventListener('click', function () { setZoom(scale - 0.25); });
+      if (resetBtn) resetBtn.addEventListener('click', function () { setZoom(1); });
 
       document.addEventListener('keydown', function (e) {
         if (!modal.classList.contains('arch-modal--open')) return;

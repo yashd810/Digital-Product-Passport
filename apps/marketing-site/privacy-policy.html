@@ -17,13 +17,297 @@
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800;9..40,900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    :root {
+      --teal: #0db5b0;
+      --teal-dark: #0a8b85;
+      --dark-text: #071727;
+      --gray-text: #2d4563;
+      --light-bg: rgba(255, 255, 255, 0.95);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      line-height: 1.6;
+      color: var(--gray-text);
+      background:
+        linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(13,181,176,0.04) 1px, transparent 1px),
+        radial-gradient(circle at 12% 18%, rgba(13,181,176,0.12), transparent 28%),
+        radial-gradient(circle at 84% 28%, rgba(8,145,178,0.1), transparent 30%),
+        linear-gradient(180deg, #f8fbfe 0%, #eef5fa 55%, #f5f8fb 100%);
+      background-size: 64px 64px, 64px 64px, auto, auto, auto;
+      min-height: 100vh;
+    }
+
+    .legal-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      min-height: 100vh;
+      position: relative;
+      width: min(100%, 1200px);
+      margin: 0 auto;
+      padding: 0 var(--layout-x);
+    }
+
+    .legal-intro {
+      background: transparent;
+      padding: var(--hero-pad-y) 0 2rem;
+      position: relative;
+    }
+
+    .legal-intro .section-title {
+      font-family: var(--sans);
+      font-size: clamp(1.95rem, 3.5vw, 3.1rem);
+      font-weight: 700;
+      letter-spacing: -0.7px;
+      color: var(--dark-text);
+      line-height: 1.15;
+      margin: 0 0 1rem;
+      max-width: 800px;
+    }
+
+    .legal-intro > p {
+      color: var(--gray-text);
+      font-size: 1.08rem;
+      line-height: 1.8;
+      max-width: 800px;
+      margin-bottom: 0;
+      font-weight: 500;
+    }
+
+    .legal-meta {
+      margin-top: 2.5rem;
+      padding: 2rem;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid rgba(23, 48, 74, 0.1);
+      box-shadow: 0 18px 44px rgba(17, 44, 72, 0.08);
+      backdrop-filter: blur(10px);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .legal-meta strong {
+      display: block;
+      color: var(--teal);
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .legal-meta p {
+      margin: 0;
+      color: var(--gray-text);
+      font-size: 0.95rem;
+    }
+
+    .legal-meta p:last-child {
+      margin-bottom: 0;
+    }
+
+    .legal-content {
+      background: rgba(255, 255, 255, 0.74);
+      padding: clamp(2rem, 6vw, 3.5rem);
+      border-radius: 24px;
+      border: 1px solid rgba(23, 48, 74, 0.1);
+      box-shadow: 0 20px 60px rgba(17, 44, 72, 0.09);
+      margin: 0 0 var(--section-gap);
+      opacity: 1 !important;
+    }
+
+    .legal-content h2 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin: 2rem 0 0.85rem;
+      padding-left: 0;
+      position: relative;
+      letter-spacing: normal;
+    }
+
+    .legal-content h2::before {
+      display: none;
+    }
+
+    .legal-content h3 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin: 1.2rem 0 0.6rem;
+      letter-spacing: normal;
+    }
+
+    .legal-content p {
+      margin-bottom: 1.2rem;
+      color: var(--gray-text);
+      font-size: 0.95rem;
+      line-height: 1.8;
+    }
+
+    .legal-content p:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .legal-content ul,
+    .legal-content ol {
+      margin-left: 1.5rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .legal-content li {
+      margin-bottom: 0.8rem;
+      color: var(--gray-text);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      position: relative;
+      padding-left: 1rem;
+      list-style: none;
+    }
+
+    .legal-content li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--teal);
+      font-weight: bold;
+    }
+
+    .legal-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.9rem;
+    }
+
+    .legal-content table th {
+      background: rgba(13, 181, 176, 0.1);
+      padding: 0.8rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--dark-text);
+      border-bottom: 2px solid var(--teal);
+    }
+
+    .legal-content table td {
+      padding: 0.8rem;
+      border-bottom: 1px solid rgba(13, 181, 176, 0.1);
+      color: var(--gray-text);
+    }
+
+    .legal-content table tr:nth-child(even) {
+      background: rgba(13, 181, 176, 0.03);
+    }
+
+    .legal-callout {
+      background: linear-gradient(135deg, rgba(13, 181, 176, 0.08) 0%, rgba(13, 181, 176, 0.04) 100%);
+      border-left: 4px solid var(--teal);
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin: 1.5rem 0;
+      border-top: 1px solid rgba(13, 181, 176, 0.12);
+      border-right: 1px solid rgba(13, 181, 176, 0.12);
+      border-bottom: 1px solid rgba(13, 181, 176, 0.12);
+    }
+
+    .legal-callout p {
+      margin: 0;
+      color: var(--dark-text);
+      font-weight: 500;
+    }
+
+    .legal-callout strong {
+      color: var(--teal);
+    }
+
+    /* Cookie Policy styling */
+    .cookie-policy h2 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin: 2rem 0 1rem;
+      padding-left: 0;
+      position: relative;
+      letter-spacing: normal;
+    }
+
+    .cookie-policy h2::before {
+      display: none;
+    }
+
+    .cookie-policy h3 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin: 1.2rem 0 0.6rem;
+      letter-spacing: normal;
+    }
+
+    .cookie-policy h4 {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--dark-text);
+      margin: 0.8rem 0 0.4rem;
+    }
+
+    @media (max-width: 768px) {
+      .legal-layout {
+        padding: 0 1rem;
+      }
+
+      .legal-intro {
+        padding-top: 3rem;
+      }
+
+      .legal-intro .section-title {
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+      }
+
+      .legal-meta {
+        grid-template-columns: 1fr;
+        margin-top: 1.5rem;
+        padding: 1.2rem;
+      }
+
+      .legal-content {
+        padding: 1.5rem;
+        margin: 0 0 2rem;
+        border-radius: 16px;
+      }
+
+      .legal-content h2 {
+        font-size: 1.125rem;
+        margin: 1.5rem 0 0.8rem;
+      }
+
+      .legal-content h3 {
+        font-size: 0.95rem;
+      }
+    }
+  </style>
 </head>
 <body class="privacy-page legal-page">
   <div class="legal-layout">
     <div class="legal-intro">
-      <h1>Privacy Policy</h1>
+      <h2 class="section-title">Privacy Policy</h2>
       <p>How we collect, use, and protect your personal data</p>
       <div class="legal-meta">
         <div>
@@ -350,6 +634,6 @@
     </article>
   </div>
 
-  <script src="shared.js?v=20260504"></script>
+  <script src="shared.js?v=20260528"></script>
 </body>
 </html>

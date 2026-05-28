@@ -47,7 +47,6 @@
       <a href="index.html"        data-page="index">Home</a>
       <a href="product.html"      data-page="product">Product</a>
       <a href="services.html"     data-page="services">Services</a>
-      <a href="timeline.html"     data-page="timeline">Regulation Timeline</a>
       <a href="about.html"        data-page="about">About</a>
       <a href="contact.html"      data-page="contact" class="nav-cta">Get in Touch</a>
       <a href="${APP_LOGIN_URL}"  class="nav-customer" aria-label="Sign in to your ClarosDPP account">Already a Customer?</a>
@@ -63,7 +62,6 @@
     <a href="index.html"        data-page="index">Home</a>
     <a href="product.html"      data-page="product">Product</a>
     <a href="services.html"     data-page="services">Services</a>
-    <a href="timeline.html"     data-page="timeline">Regulation Timeline</a>
     <a href="about.html"        data-page="about">About</a>
     <a href="contact.html"      data-page="contact" class="nav-cta">Get in Touch</a>
     <a href="${APP_LOGIN_URL}"  class="nav-customer">Already a Customer? →</a>
@@ -98,7 +96,6 @@
             <li><a href="index.html">DPP Overview</a></li>
             <li><a href="product.html">Product Platform</a></li>
             <li><a href="services.html">Compliance Governance</a></li>
-            <li><a href="timeline.html">Regulation Timeline</a></li>
             <li><a href="sample-passport.html">Sample Passport</a></li>
           </ul>
         </div>
@@ -106,12 +103,10 @@
         <div class="footer-col">
           <h5>Regulations</h5>
           <ul>
-            <li><a href="timeline.html#direct-regulations">ESPR Overview</a></li>
-            <li><a href="timeline.html#direct-regulations">EU Battery Regulation</a></li>
-            <li><a href="timeline.html#direct-regulations">Construction Products Regulation</a></li>
-            <li><a href="timeline.html#direct-regulations">Detergents Product Passport</a></li>
-            <li><a href="timeline.html#direct-regulations">Toy Safety DPP Track</a></li>
-            <li><a href="timeline.html">Full Timeline</a></li>
+            <li><a href="product.html#battery-passport">EU Battery Regulation</a></li>
+            <li><a href="services.html#compliance">DPP Compliance</a></li>
+            <li><a href="services.html#beyond-espr">Sector DPPs</a></li>
+            <li><a href="index.html#journey">DPP Journey</a></li>
           </ul>
         </div>
 
