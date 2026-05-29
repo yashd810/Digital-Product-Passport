@@ -3293,11 +3293,11 @@ footer {
     }
 
     body.privacy-page .legal-content {
-      background: rgba(255, 255, 255, 0.74);
+      background: transparent !important;
       padding: clamp(2rem, 6vw, 3.5rem);
-      border-radius: 24px;
-      border: 1px solid rgba(23, 48, 74, 0.1);
-      box-shadow: 0 20px 60px rgba(17, 44, 72, 0.09);
+      border: none !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
       margin: 0 0 var(--section-gap);
       opacity: 1 !important;
     }
@@ -3509,9 +3509,9 @@ footer {
       margin-top: 2.5rem;
       padding: 2rem;
       border-radius: 20px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(13, 181, 176, 0.2);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid rgba(23, 48, 74, 0.1);
+      box-shadow: 0 18px 44px rgba(17, 44, 72, 0.08);
       backdrop-filter: blur(10px);
     }
 
@@ -3527,7 +3527,7 @@ footer {
 
     body.terms-page .legal-meta p {
       font-size: 0.95rem;
-      color: #2d4563;
+      color: #50697f;
       margin: 0;
       line-height: 1.6;
       font-weight: 500;
