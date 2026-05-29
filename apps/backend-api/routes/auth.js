@@ -22,6 +22,7 @@ module.exports = function registerAuthRoutes(app, {
   sendOtpEmail,
   createTransporter,
   brandedEmail,
+  renderInfoTable,
   logAudit,
   authRateLimit,
   otpRateLimit,
@@ -577,13 +578,13 @@ module.exports = function registerAuthRoutes(app, {
         subject: `${inviterName} invited you to join ${companyName} on Digital Product Passport`,
         html: brandedEmail({ preheader: `You have been invited to join ${companyName}`, bodyHtml: `
           <p><strong>${inviterName}</strong> has invited you to join <strong>${companyName}</strong>.</p>
-          <div class="info-box">
-            <div class="info-row"><span class="info-label">Your Email</span><span class="info-value">${inviteeEmail}</span></div>
-            <div class="info-row"><span class="info-label">Company</span><span class="info-value">${companyName}</span></div>
-            <div class="info-row"><span class="info-label">Role</span><span class="info-value">${finalRole}</span></div>
-          </div>
-          <div style="background:rgba(245,183,50,0.12);border:1px solid rgba(245,183,50,0.4);border-radius:6px;padding:10px 14px;margin:16px 0;font-size:13px;color:#f5c842">
-            ⏰ This invitation expires in <strong style="color:#fde68a">48 hours</strong> and can only be used <strong style="color:#fde68a">once</strong>.
+          ${renderInfoTable([
+            { label: "Your Email", value: inviteeEmail },
+            { label: "Company", value: companyName },
+            { label: "Role", value: finalRole },
+          ])}
+          <div style="background:#fff9e8;border:1px solid #efd38f;border-radius:8px;padding:12px 14px;margin:16px 0;font-size:13px;color:#7a5a00;line-height:1.6">
+            ⏰ This invitation expires in <strong style="color:#5e4300">48 hours</strong> and can only be used <strong style="color:#5e4300">once</strong>.
           </div>
           <div class="cta-wrap"><a href="${registerUrl}" class="cta-btn">Accept Invitation →</a></div>` }),
       });

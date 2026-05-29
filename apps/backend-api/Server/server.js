@@ -35,7 +35,7 @@ const createStorageService     = require("../src/infrastructure/storage/create-s
 const createOauthService       = require("../src/infrastructure/oauth/create-oauth-service");
 const createPasswordService    = require("../src/infrastructure/security/create-password-service");
 const logger                   = require("../src/infrastructure/logging/logger");
-const { createTransporter, brandedEmail, sendOtpEmail } = require("../src/infrastructure/email/email-service");
+const { createTransporter, brandedEmail, sendOtpEmail, renderInfoTable } = require("../src/infrastructure/email/email-service");
 const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("../src/infrastructure/security/security-service");
 const createAuthMiddleware     = require("../middleware/auth");
 const { createRateLimiters, startRateLimitMaintenance } = require("../middleware/rate-limit");
@@ -568,6 +568,7 @@ registerAppRoutes(app, {
   sendOtpEmail,
   createTransporter,
   brandedEmail,
+  renderInfoTable,
   oauthService,
   backupProviderService,
   requireAssetManagementKey,
@@ -676,6 +677,7 @@ registerSupportRoutes(app, {
   publicReadRateLimit,
   createTransporter,
   brandedEmail,
+  renderInfoTable,
 });
 
 startup.then(() => {

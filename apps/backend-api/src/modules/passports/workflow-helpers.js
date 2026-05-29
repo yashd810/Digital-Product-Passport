@@ -7,6 +7,7 @@ function createWorkflowHelpers({
   logger,
   createTransporter,
   brandedEmail,
+  renderInfoTable,
   getTable,
   normalizePassportRow,
   normalizeReleaseStatus,
@@ -140,12 +141,12 @@ function createWorkflowHelpers({
               bodyHtml: `
                 <p>Hi <strong>${reviewerName}</strong>,</p>
                 <p><strong>${submitterName}</strong> has submitted a passport for your review.</p>
-                <div class="info-box">
-                  <div class="info-row"><span class="info-label">Internal Alias ID</span><span class="info-value">${passport.internalAliasId}</span></div>
-                  ${passport.modelName ? `<div class="info-row"><span class="info-label">Model</span><span class="info-value">${passport.modelName}</span></div>` : ""}
-                  <div class="info-row"><span class="info-label">Version</span><span class="info-value">v${passport.versionNumber}</span></div>
-                  <div class="info-row"><span class="info-label">Type</span><span class="info-value">${passportType}</span></div>
-                </div>
+                ${renderInfoTable([
+                  { label: "Internal Alias ID", value: passport.internalAliasId },
+                  passport.modelName ? { label: "Model", value: passport.modelName } : null,
+                  { label: "Version", value: `v${passport.versionNumber}` },
+                  { label: "Type", value: passportType },
+                ])}
                 <div class="cta-wrap"><a href="${appUrl}${companyDashboardWorkflowPath}" class="cta-btn">🔍 Review Now →</a></div>`,
             }),
           });

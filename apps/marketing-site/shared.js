@@ -101,22 +101,18 @@
         </div>
 
         <div class="footer-col">
-          <h5>Regulations</h5>
-          <ul>
-            <li><a href="product.html#battery-passport">EU Battery Regulation</a></li>
-            <li><a href="services.html#compliance">DPP Compliance</a></li>
-            <li><a href="services.html#beyond-espr">Sector DPPs</a></li>
-            <li><a href="index.html#journey">DPP Journey</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-col">
           <h5>Company</h5>
           <ul>
             <li><a href="about.html">About ClarosDPP</a></li>
             <li><a href="contact.html">Contact Us</a></li>
-            <li><a href="product.html">Request a Demo</a></li>
-            <li><a href="services.html">Get a Quote</a></li>
+            <li><a href="contact.html">Request a Demo</a></li>
+            <li><a href="contact.html">Get a Quote</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5>Legal</h5>
+          <ul>
             <li><a href="privacy-policy.html">Privacy Policy</a></li>
             <li><a href="terms-of-service.html">Terms of Service</a></li>
           </ul>
@@ -124,7 +120,7 @@
       </div>
       <div class="footer-bottom">
         <p>© 2025 ClarosDPP. All rights reserved. Registered in the European Union.</p>
-        <p>hello@claros-dpp.online &nbsp;|&nbsp; +xx xxxx xxxx</p>
+        <p>digitalproductpass@gmail.com &nbsp;|&nbsp; +xx xxxx xxxx</p>
       </div>
     </div>
   </footer>`;

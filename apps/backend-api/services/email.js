@@ -15,6 +15,40 @@ const EMAIL_STYLES_PATH = process.env.EMAIL_STYLES_PATH
   || path.join(__dirname, "..", "..", "frontend-app", "src", "assets", "styles", "email-styles.css");
 const emailStyles = fs.readFileSync(EMAIL_STYLES_PATH, "utf8");
 
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "\"": "&quot;",
+  "'": "&#39;",
+}[char]));
+
+const renderInfoTable = (rows = []) => {
+  const content = rows
+    .map((row) => ({
+      label: String(row?.label ?? "").trim(),
+      value: String(row?.value ?? "").trim(),
+    }))
+    .filter((row) => row.label && row.value);
+
+  if (!content.length) return "";
+
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:collapse;margin:18px 0;border:1px solid #dbe7e5;border-radius:10px;overflow:hidden">
+      <tbody>
+        ${content.map((row, index) => {
+          const isLast = index === content.length - 1;
+          const borderStyle = isLast ? "border-bottom:none;" : "border-bottom:1px solid #e8eeed;";
+          return `
+            <tr>
+              <td style="padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#0f8a85;background:#f6fbfa;${borderStyle}width:36%;white-space:nowrap;vertical-align:top">${escapeHtml(row.label)}</td>
+              <td style="padding:12px 14px;font-size:13px;color:#102124;font-weight:500;${borderStyle}vertical-align:top;word-break:break-word">${escapeHtml(row.value)}</td>
+            </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
+};
+
 const createTransporter = () => nodemailer.createTransport({
   host:   process.env.EMAIL_HOST   || "smtp.sendgrid.net",
   port:   parseInt(process.env.EMAIL_PORT || "587"),
@@ -51,7 +85,7 @@ const sendOtpEmail = async (user, otp) => {
         <p>Hello ${user.firstName || "there"},</p>
         <p>Your one-time verification code is:</p>
         <div style="text-align:center;margin:28px 0">
-          <span style="font-size:38px;font-weight:900;letter-spacing:14px;color:#1C3738;font-family:monospace;background:#F4FFF8;padding:14px 20px;border-radius:10px;border:2px solid #d0e4e0;display:inline-block">${otp}</span>
+          <span style="font-size:38px;font-weight:900;letter-spacing:14px;color:#102124;font-family:monospace;background:#f6fbfa;padding:14px 20px;border-radius:10px;border:2px solid #d6e8e6;display:inline-block">${otp}</span>
         </div>
         <p>This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p>
         <p style="font-size:13px;color:#8BAAAD">If you did not attempt to log in, you can safely ignore this email.</p>
@@ -60,4 +94,4 @@ const sendOtpEmail = async (user, otp) => {
   });
 };
 
-module.exports = { createTransporter, brandedEmail, sendOtpEmail };
+module.exports = { createTransporter, brandedEmail, sendOtpEmail, renderInfoTable };

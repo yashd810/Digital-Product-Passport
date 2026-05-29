@@ -1,5 +1,15 @@
 "use strict";
 
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "\"": "&quot;",
+  "'": "&#39;",
+}[char]));
+
+const normalizeHeaderText = (value) => String(value ?? "").replace(/[\r\n]+/g, " ").trim();
+
 function registerSupportRoutes(app, deps) {
   const {
     express,
@@ -15,6 +25,7 @@ function registerSupportRoutes(app, deps) {
     publicReadRateLimit,
     createTransporter,
     brandedEmail,
+    renderInfoTable,
   } = deps;
 
   if (storageService.isLocal) {
@@ -169,30 +180,68 @@ function registerSupportRoutes(app, deps) {
         return res.status(400).json({ error: "Invalid email address" });
       }
 
-      const adminEmail = process.env.ADMIN_EMAIL;
-      if (!adminEmail) {
-        logger.warn("ADMIN_EMAIL not configured - contact form submission not forwarded");
-        return res.json({ ok: true });
-      }
+      const safeFirstName = escapeHtml(String(firstName).trim());
+      const safeLastName = escapeHtml(String(lastName).trim());
+      const safeEmail = escapeHtml(String(email).trim());
+      const safeCompany = company ? escapeHtml(String(company).trim()) : "";
+      const safeSector = sector ? escapeHtml(String(sector).trim()) : "";
+      const safeServiceInterest = serviceInterest ? escapeHtml(String(serviceInterest).trim()) : "";
+      const safeDeadline = deadline ? escapeHtml(String(deadline).trim()) : "";
+      const safeHowFound = howFound ? escapeHtml(String(howFound).trim()) : "";
+      const safeMessage = escapeHtml(String(message).trim());
+      const fromAddress = process.env.EMAIL_FROM || process.env.EMAIL_USER || "noreply@dpp-system.com";
 
       const transporter = createTransporter();
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (adminEmail) {
+        try {
+          await transporter.sendMail({
+            from: `"ClarosDPP Contact" <${fromAddress}>`,
+            to: adminEmail,
+            replyTo: email,
+            subject: `New Contact Form Submission — ${normalizeHeaderText(firstName)} ${normalizeHeaderText(lastName)}`,
+            html: brandedEmail({
+              preheader: "New contact form submission",
+              bodyHtml: `
+              ${renderInfoTable([
+                { label: "Name", value: `${safeFirstName} ${safeLastName}` },
+                { label: "Email", value: safeEmail },
+                safeCompany ? { label: "Company", value: safeCompany } : null,
+                safeSector ? { label: "Sector", value: safeSector } : null,
+                safeServiceInterest ? { label: "Service Interest", value: safeServiceInterest } : null,
+                safeDeadline ? { label: "Compliance Deadline", value: safeDeadline } : null,
+                safeHowFound ? { label: "How Found", value: safeHowFound } : null,
+              ])}
+              <p><strong>Message:</strong></p>
+              <p style="white-space:pre-wrap">${safeMessage}</p>
+            `,
+            }),
+          });
+        } catch (adminMailError) {
+          logger.error({ err: adminMailError }, "[Contact] Failed to send admin notification");
+        }
+      } else {
+        logger.warn("ADMIN_EMAIL not configured - contact form submission not forwarded");
+      }
+
       await transporter.sendMail({
-        from: `"ClarosDPP Contact" <${process.env.EMAIL_FROM}>`,
-        to: adminEmail,
-        replyTo: email,
-        subject: `New Contact Form Submission — ${firstName} ${lastName}`,
+        from: `"ClarosDPP Contact" <${fromAddress}>`,
+        to: email,
+        replyTo: adminEmail || fromAddress,
+        subject: "We received your message — ClarosDPP",
         html: brandedEmail({
-          heading: "New Contact Form Submission",
-          body: `
-          <p><strong>Name:</strong> ${firstName} ${lastName}</p>
-          <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
-          ${company ? `<p><strong>Company:</strong> ${company}</p>` : ""}
-          ${sector ? `<p><strong>Sector:</strong> ${sector}</p>` : ""}
-          ${serviceInterest ? `<p><strong>Service Interest:</strong> ${serviceInterest}</p>` : ""}
-          ${deadline ? `<p><strong>Compliance Deadline:</strong> ${deadline}</p>` : ""}
-          ${howFound ? `<p><strong>How Found:</strong> ${howFound}</p>` : ""}
-          <p><strong>Message:</strong></p>
-          <p style="white-space:pre-wrap">${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+          preheader: "Thanks for contacting ClarosDPP",
+          bodyHtml: `
+          <p>Hello ${safeFirstName},</p>
+          <p>Thanks for reaching out. We received your message and will review it shortly.</p>
+          ${renderInfoTable([
+            { label: "Name", value: `${safeFirstName} ${safeLastName}` },
+            { label: "Email", value: safeEmail },
+            safeCompany ? { label: "Company", value: safeCompany } : null,
+            safeSector ? { label: "Sector", value: safeSector } : null,
+          ])}
+          <p>If you need to add anything, just reply to this email and we’ll pick it up.</p>
+          <p style="white-space:pre-wrap"><strong>Your message:</strong><br>${safeMessage}</p>
         `,
         }),
       });

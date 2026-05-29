@@ -58,6 +58,7 @@ function registerAppRoutes(app, deps) {
     createNotification: deps.createNotification,
     complianceService: deps.complianceService,
     archivePassportSnapshot: deps.archivePassportSnapshot,
+    renderInfoTable: deps.renderInfoTable,
   });
 
   registerAuthRoutes(app, {
@@ -79,6 +80,7 @@ function registerAppRoutes(app, deps) {
     sendOtpEmail: deps.sendOtpEmail,
     createTransporter: deps.createTransporter,
     brandedEmail: deps.brandedEmail,
+    renderInfoTable: deps.renderInfoTable,
     logAudit: deps.logAudit,
     authRateLimit: deps.authRateLimit,
     otpRateLimit: deps.otpRateLimit,
@@ -116,6 +118,7 @@ function registerAppRoutes(app, deps) {
     IN_REVISION_STATUSES_SQL: deps.IN_REVISION_STATUSES_SQL,
     createTransporter: deps.createTransporter,
     brandedEmail: deps.brandedEmail,
+    renderInfoTable: deps.renderInfoTable,
     storageService: deps.storageService,
   });
 

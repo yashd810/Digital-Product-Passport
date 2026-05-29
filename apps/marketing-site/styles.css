@@ -494,7 +494,6 @@ section + section {
 .legal-callout,
 .contact-detail,
 .contact-page .form-card,
-.sample-passport-card,
 .pf-pillar,
 .pf-track,
 .hero-panel {
@@ -676,6 +675,7 @@ section + section {
   font-weight: 800;
 }
 .contact-page .form-card {
+  background: rgba(255,255,255,0.66);
   border-color: rgba(23,48,74,0.1);
   box-shadow: 0 18px 44px rgba(17,44,72,0.08);
 }
@@ -687,14 +687,12 @@ section + section {
 .contact-page .form-group .hint,
 .form-privacy-note { color: #607a90; }
 .contact-page .form-group input,
-.contact-page .form-group select,
 .contact-page .form-group textarea {
   background: rgba(255,255,255,0.92);
   border-color: rgba(23,48,74,0.12);
   color: #10243a;
 }
 .contact-page .form-group input.is-invalid,
-.contact-page .form-group select.is-invalid,
 .contact-page .form-group textarea.is-invalid {
   border-color: var(--red);
   box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
@@ -1045,7 +1043,6 @@ footer {
   font-size: 0.78rem; font-weight: 600; color: var(--lgray); letter-spacing: 0.3px;
 }
 .form-group input,
-.form-group select,
 .form-group textarea {
   background: rgba(255,255,255,0.8); border: 1px solid var(--card-bdr);
   border-radius: 10px; padding: 0.7rem 1rem;
@@ -1053,27 +1050,22 @@ footer {
   transition: border-color 0.2s, background 0.2s;
 }
 .form-group input:focus,
-.form-group select:focus,
 .form-group textarea:focus {
   border-color: var(--teal); background: rgba(13,181,176,0.06);
 }
 .form-group input::placeholder,
 .form-group textarea::placeholder { color: var(--gray); }
-.form-group select { appearance: none; cursor: pointer; }
-.form-group select option { background: var(--navy2); }
 .form-group textarea { resize: vertical; min-height: 115px; }
 .form-group .hint { font-size: 15px; color: var(--gray); margin-top: 0.2rem; }
 [data-theme="light"] .form-group label {
   color: #385269;
 }
 [data-theme="light"] .form-group input,
-[data-theme="light"] .form-group select,
 [data-theme="light"] .form-group textarea {
   background: #ffffff;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
 }
 [data-theme="light"] .form-group input:focus,
-[data-theme="light"] .form-group select:focus,
 [data-theme="light"] .form-group textarea:focus {
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(13,181,176,0.12);
@@ -1111,7 +1103,7 @@ footer {
   .dpp-explainer,
   .detail-grid {
     grid-template-columns: 1fr !important;
-    gap: 2rem !important;
+    gap: 3rem !important;
   }
   .cta-strip {
     align-items: stretch;
@@ -1248,7 +1240,7 @@ footer {
       width: 100%;
       display: grid;
       grid-template-columns: 1.22fr 0.78fr;
-      gap: 3.25rem;
+      gap: 3rem;
       align-items: flex-start;
     }
     body.home-page .hero .section-title {
@@ -1292,7 +1284,7 @@ footer {
       border: 1px solid rgba(16,36,58,0.08);
       border-radius: 24px;
       padding: 1.5rem;
-      box-shadow: 0 24px 64px rgba(16,36,58,0.12);
+      box-shadow: none;
       animation: floatPassport 6s ease-in-out infinite;
     }
     @keyframes floatPassport {
@@ -1406,8 +1398,11 @@ footer {
     body.home-page #work-modes .work-mode-grid {
       display: grid;
       grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-      gap: 2rem;
+      gap: 4rem;
       align-items: center;
+    }
+    body.home-page #work-modes .work-mode-copy {
+      margin-top: 1.5rem;
     }
     body.home-page #work-modes .work-mode-title {
       max-width: 880px;
@@ -1521,9 +1516,9 @@ footer {
       min-height: 210px;
       padding: 1.55rem 1.6rem 1.4rem;
       border-radius: 28px;
-      background: rgba(255,255,255,0.9);
+      background: var(--card-bg);
       border: 1px solid rgba(16,36,58,0.08);
-      box-shadow: 0 22px 60px rgba(16,36,58,0.08);
+      box-shadow: none;
     }
     body.home-page .dpp-content-icon {
       width: 46px;
@@ -1795,69 +1790,6 @@ footer {
 
 /* product.html */
 
-    body.product-page .sample-passport-card {
-      width: min(100%, 400px);
-      background: var(--card-bg);
-      border: 1px solid rgba(16,36,58,0.08);
-      border-radius: 22px;
-      padding: 1.25rem;
-      box-shadow: 0 16px 40px rgba(16,36,58,0.08);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-    }
-    body.product-page .sample-passport-card h3 {
-      font-family: var(--sans);
-      font-size: 1.35rem;
-      font-weight: 700;
-      line-height: 1.2;
-      color: var(--white);
-      margin: 0 0 0.65rem;
-    }
-    body.product-page .sample-passport-card p {
-      color: var(--lgray);
-      font-size: 0.88rem;
-      line-height: 1.8;
-      margin: 0 0 1rem;
-      text-align: justify;
-      text-justify: inter-word;
-      text-align-last: left;
-    }
-    body.product-page .sample-qr-link {
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
-      padding: 1rem;
-      background: #ffffff;
-      border-radius: 18px;
-      margin: 0 0 1rem;
-      align-self: center;
-    }
-    body.product-page .sample-qr-image {
-      width: 180px;
-      height: 180px;
-      object-fit: contain;
-    }
-    body.product-page .sample-passport-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-      justify-content: center;
-    }
-    body.product-page .sample-passport-tag {
-      padding: 0.25rem 0.7rem;
-      border-radius: 999px;
-      background: rgba(13,181,176,0.1);
-      border: 1px solid rgba(13,181,176,0.18);
-      color: var(--teal);
-      font-size: 0.72rem;
-      font-weight: 700;
-    }
-    body.product-page .sample-passport-card .btn {
-      align-self: center;
-    }
     body.product-page.page-body {
       background:
         linear-gradient(rgba(13,181,176,0.04) 1px, transparent 1px),
@@ -1931,27 +1863,6 @@ footer {
     }
     body.product-page #core-features, body.product-page #architecture, body.product-page #platform-in-action {
       padding: calc(var(--section-pad-y) * 0.5) 0;
-    }
-    body.product-page .sample-passport-card {
-      width: 100%;
-      max-width: none;
-      align-self: start;
-      margin-top: 2rem;
-      background: rgba(255,255,255,0.82);
-      border: 1px solid rgba(16,36,58,0.08);
-    }
-    body.product-page .sample-passport-card h3 {
-      color: #10243a;
-    }
-    body.product-page .sample-passport-card p {
-      color: #50697f;
-    }
-    body.product-page .sample-passport-card .btn {
-      width: 100%;
-      justify-content: center;
-    }
-    body.product-page .sample-qr-link {
-      margin: 0 0 1rem;
     }
     body.product-page .pf-pillars {
       display: grid;
@@ -2143,7 +2054,7 @@ footer {
       border-radius: 50px;
     }
     body.product-page .bcs-passport-card {
-      background: rgba(255,255,255,0.5);
+      background: var(--card-bg);
       border: 1px solid rgba(16,36,58,0.08);
       border-radius: 20px;
       padding: 1.6rem;
@@ -2336,7 +2247,7 @@ footer {
       margin-top: 3rem;
     }
     body.product-page .ps-card {
-      background: rgba(255,255,255,0.5);
+      background: var(--card-bg);
       border: 1px solid rgba(16,36,58,0.08);
       border-radius: 14px;
       overflow: hidden;
@@ -2535,7 +2446,7 @@ footer {
       body.product-page .intro-grid, body.product-page .pf-pillars, body.product-page .pf-tracks, body.product-page .bcs-inner, body.product-page .platform-screens {
         grid-template-columns: 1fr;
       }
-      body.product-page .sample-passport-card {
+      body.product-page .product-qr-card {
         width: 100%;
         max-width: 100%;
         margin-top: 0;
@@ -2555,7 +2466,7 @@ footer {
       body.product-page .intro-actions, body.product-page .intro-points, body.product-page .sample-passport-meta {
         width: 100%;
       }
-      body.product-page .intro-actions .btn, body.product-page .sample-passport-card .btn {
+      body.product-page .intro-actions .btn, body.product-page .product-qr-card .btn {
         width: 100%;
       }
       body.product-page .pf-pillars, body.product-page .pf-mini-grid, body.product-page .ps-stat-row {
@@ -3100,7 +3011,9 @@ footer {
       overflow: hidden;
       border-radius: 24px;
       padding: 1.2rem 1.25rem;
-      background: rgba(255,255,255,0.5);
+      background: rgba(255,255,255,0.82);
+      border: 1px solid rgba(23,48,74,0.08);
+      box-shadow: 0 12px 28px rgba(17,44,72,0.06);
     }
 
     body.about-page .faq-item summary {
@@ -3239,8 +3152,9 @@ footer {
       margin-top: 1.75rem;
       padding: 1.25rem;
       border-radius: 18px;
-      background: rgba(255,255,255,0.45);
-      border: 1px solid rgba(23,48,74,0.08);
+      background: var(--card-bg);
+      border: 1px solid var(--card-bdr);
+      box-shadow: 0 10px 28px rgba(17,44,72,0.06);
     }
     body.contact-page .contact-faq-title {
       margin: 0 0 0.35rem;
@@ -3250,9 +3164,14 @@ footer {
     }
 
     body.contact-page .faq-item {
-      border-bottom: 1px solid var(--divider); padding: 1.2rem 0; cursor: pointer;
+      margin-top: 0.75rem;
+      padding: 1rem 1.1rem;
+      border: 1px solid var(--card-bdr);
+      border-radius: 18px;
+      background: var(--card-bg);
+      cursor: pointer;
     }
-    body.contact-page .faq-item:last-child { border-bottom: none; }
+    body.contact-page .faq-item:first-of-type { margin-top: 0.5rem; }
     body.contact-page .faq-q {
       display: flex; justify-content: space-between; align-items: center;
       color: #10243a;
@@ -3270,26 +3189,8 @@ footer {
       opacity: 0 !important;
       pointer-events: none !important;
     }
-    body.contact-page .contact-page .form-card {
-      background: rgba(255,255,255,0.66);
-      border-color: rgba(23,48,74,0.1);
-      box-shadow: 0 18px 44px rgba(17,44,72,0.08);
-    }
-    body.contact-page .contact-page .form-section-title {
-      color: #10243a;
-      border-bottom-color: rgba(23,48,74,0.1);
-    }
-    body.contact-page .contact-page .form-group label, body.contact-page .contact-page .form-group .hint, body.contact-page .form-privacy-note {
-      color: #607a90;
-    }
-    body.contact-page .contact-page .form-group input, body.contact-page .contact-page .form-group select, body.contact-page .contact-page .form-group textarea {
-      background: rgba(255,255,255,0.92);
-      border-color: rgba(23,48,74,0.12);
-      color: #10243a;
-    }
-    body.contact-page .contact-page .form-group input.is-invalid, body.contact-page .contact-page .form-group select.is-invalid, body.contact-page .contact-page .form-group textarea.is-invalid {
-      border-color: var(--red);
-      box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
+    body.contact-page.page-body {
+      padding-top: calc(80px + 4rem);
     }
     body.contact-page .form-privacy-note {
       margin: 0.9rem 0 0;
@@ -3300,7 +3201,8 @@ footer {
 
 /* privacy-policy.html */
 
-    body.privacy-page * {
+    body.privacy-page .legal-layout,
+    body.privacy-page .legal-layout * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
@@ -3755,11 +3657,6 @@ footer {
       color: #10243a;
     }
 
-    body.sample-page .sample-page {
-      color: #10243a;
-      min-height: 100vh;
-    }
-
     body.sample-page .sample-hero {
       padding: var(--hero-pad-y) 0 calc(var(--section-pad-y) * 0.5);
     }
@@ -3942,7 +3839,7 @@ footer {
       overflow: hidden;
       border-radius: 26px;
       padding: 18px;
-      background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+      background: var(--card-bg);
     }
 
     body.sample-page .sample-side-card h3 {
@@ -3964,7 +3861,7 @@ footer {
       width: min(100%, 190px);
       margin: 0 auto 1rem;
       border-radius: 22px;
-      background: #fff;
+      background: var(--card-bg);
       padding: 0.45rem;
       border: 1px solid rgba(23,48,74,0.08);
     }
@@ -4158,7 +4055,7 @@ footer {
 
     body.sample-page .passport-portal {
       --bg: #f5f8fb;
-      --surface: #ffffff;
+      --surface: var(--card-bg);
       --surface-soft: #eef5f8;
       --navy: #10243a;
       --navy-2: #183553;
@@ -4382,7 +4279,7 @@ footer {
     }
 
     body.sample-page .passport-portal .hero-card {
-      background: rgba(255, 255, 255, 0.78);
+      background: var(--card-bg);
       border: 1px solid rgba(23, 48, 74, 0.1);
       border-radius: 19px;
       padding: 17px 18px;
@@ -4407,7 +4304,7 @@ footer {
     }
 
     body.sample-page .passport-portal .side-panel {
-      background: rgba(255, 255, 255, 0.72);
+      background: var(--card-bg);
       border: 1px solid rgba(23, 48, 74, 0.1);
       border-radius: 30px;
       padding: 18px;
@@ -4471,7 +4368,7 @@ footer {
       width: 132px;
       height: 132px;
       border-radius: 20px;
-      background: #fff;
+      background: var(--card-bg);
       padding: 12px;
       box-shadow: var(--shadow-soft);
       display: grid;
@@ -4593,7 +4490,7 @@ footer {
 
     body.sample-page .passport-portal .mini {
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--card-bg);
       border-radius: 16px;
       padding: 12px;
     }
@@ -4673,7 +4570,7 @@ footer {
 
     body.sample-page .passport-portal .verification-card {
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--card-bg);
       border-radius: 16px;
       padding: 12px;
     }
@@ -4729,7 +4626,7 @@ footer {
       flex-direction: column;
       gap: 10px;
       align-items: stretch;
-      background: #fff;
+      background: var(--card-bg);
       border: 1px solid var(--line);
       border-radius: 16px;
       padding: 14px;
@@ -4791,7 +4688,7 @@ footer {
       grid-template-columns: 120px 1fr;
       gap: 16px;
       align-items: start;
-      background: #fff;
+      background: var(--card-bg);
       border: 1px solid var(--line);
       border-radius: 20px;
       padding: 16px;
@@ -4824,7 +4721,7 @@ footer {
     body.sample-page .passport-portal .header-field, body.sample-page .passport-portal .trust-card {
       padding: 14px 15px;
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--card-bg);
       border-radius: 16px;
       overflow-wrap: anywhere;
     }
@@ -4995,7 +4892,7 @@ footer {
       width: 100%;
       border-collapse: collapse;
       min-width: 360px;
-      background: #fff;
+      background: var(--card-bg);
     }
 
     body.sample-page .passport-portal .inline-table th, body.sample-page .passport-portal .inline-table td {
@@ -5048,7 +4945,7 @@ footer {
       object-fit: contain;
       border-radius: 12px;
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--card-bg);
       padding: 4px;
       transition: transform 0.16s ease, box-shadow 0.16s ease;
     }
@@ -5063,7 +4960,7 @@ footer {
     body.sample-page .passport-portal .field-dynamic-block, body.sample-page .passport-portal .field-chart-panel {
       border: 1px solid var(--line);
       border-radius: 16px;
-      background: #fff;
+      background: var(--card-bg);
       padding: 12px;
     }
 
@@ -5698,7 +5595,7 @@ footer {
     body.sample-page .access-key-bar-text strong { font-size: 13px; color: #8a5d00; }
     body.sample-page .access-key-bar-hint { font-size: 11px; color: #9a7200; line-height: 1.4; }
     body.sample-page .access-key-bar-code {
-      background: #fff;
+      background: var(--card-bg);
       border: 1px solid rgba(240,165,0,0.3);
       border-radius: 8px;
       padding: 5px 10px;
@@ -5747,7 +5644,7 @@ footer {
     }
 
     body.sample-page .viewer-variant-minimal .viewer-header, body.sample-page .viewer-variant-minimal .viewer-footer {
-      background: #ffffff;
+      background: var(--card-bg);
       color: #0b1826;
     }
 
@@ -6883,7 +6780,7 @@ footer {
     }
 
     body.sample-page [data-theme="light"] .cp-highlight-card, body.sample-page [data-theme="light"] .cp-section, body.sample-page [data-theme="light"] .field-table-display {
-      background: #ffffff;
+      background: var(--card-bg);
       border-color: rgba(23,48,74,0.12);
       box-shadow: 0 16px 34px rgba(17,44,72,0.08);
     }
@@ -6905,7 +6802,7 @@ footer {
     }
 
     body.sample-page [data-theme="light"] .cp-intro-text {
-      background: #ffffff;
+      background: var(--card-bg);
       border-color: rgba(23,48,74,0.08);
       color: #456177;
     }
@@ -6920,7 +6817,7 @@ footer {
     }
 
     body.sample-page [data-theme="light"] .intro-upload-card {
-      background: #ffffff;
+      background: var(--card-bg);
       border-color: rgba(23, 48, 74, 0.12);
       box-shadow: 0 16px 34px rgba(17, 44, 72, 0.08);
     }
@@ -7024,7 +6921,7 @@ footer {
     }
 
     body.sample-page .pv-hero, body.sample-page .pv-header-panel, body.sample-page .pv-section-card, body.sample-page .pv-tab-rail, body.sample-page .cp-hero-panel, body.sample-page .cp-highlight-panel, body.sample-page .cp-panel-card, body.sample-page .cp-stat-card {
-      background: #ffffff;
+      background: var(--card-bg);
       border: 1px solid rgba(23, 48, 74, 0.12);
       box-shadow: 0 18px 36px rgba(17, 44, 72, 0.08);
     }
@@ -8493,7 +8390,7 @@ footer {
 
     body.sample-page .pv-history-close {
       border: 1px solid rgba(23, 48, 74, 0.12);
-      background: #ffffff;
+      background: var(--card-bg);
       color: #17304a;
       border-radius: 12px;
       width: 42px;
@@ -8525,7 +8422,7 @@ footer {
     }
 
     body.sample-page .pv-history-card {
-      background: #ffffff;
+      background: var(--card-bg);
       border: 1px solid rgba(23, 48, 74, 0.1);
       border-radius: 22px;
       padding: 20px 22px;
@@ -8586,7 +8483,7 @@ footer {
       padding: 0 14px;
       border-radius: 12px;
       border: 1px solid rgba(23, 48, 74, 0.12);
-      background: #ffffff;
+      background: var(--card-bg);
       color: #17304a;
       font-size: 12px;
       font-weight: 800;
@@ -8811,12 +8708,6 @@ body.product-page .product-intro .intro-grid {
   grid-template-columns: minmax(0, 1.22fr) minmax(0, 0.78fr);
 }
 
-body.product-page .product-intro .sample-passport-card {
-  width: 100%;
-  max-width: none;
-  justify-self: stretch;
-}
-
 @media (max-width: 980px) {
   body.product-page .product-intro .intro-grid {
     grid-template-columns: 1fr;
@@ -8913,4 +8804,83 @@ body.home-page .image-modal > img {
   background: transparent !important;
   box-shadow: none !important;
   transition: none !important;
+}
+
+/* product.html: QR promo card */
+body.product-page .product-qr-card {
+  width: min(100%, 400px);
+  background: rgba(255,255,255,0.3);
+  border: 1px solid rgba(16,36,58,0.08);
+  border-radius: 22px;
+  padding: 1.25rem;
+  box-shadow: 0 16px 40px rgba(16,36,58,0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+body.product-page .product-qr-card h3 {
+  font-family: var(--sans);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--white);
+  margin: 0 0 0.65rem;
+}
+
+body.product-page .product-qr-link {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(255,255,255,0.3);
+  border-radius: 18px;
+  margin: 0 0 1rem;
+  align-self: center;
+}
+
+body.product-page .product-qr-image {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+
+body.product-page .product-qr-card .sample-passport-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  justify-content: center;
+}
+
+body.product-page .product-qr-card .sample-passport-tag {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(13,181,176,0.1);
+  border: 1px solid rgba(13,181,176,0.18);
+  color: var(--teal);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+body.product-page .product-qr-card .btn {
+  align-self: center;
+  width: 100%;
+  justify-content: center;
+}
+
+body.product-page .product-intro .intro-grid > .product-qr-card {
+  width: 100%;
+  max-width: none;
+  justify-self: stretch;
+  align-self: start;
+  margin-top: 2rem;
+}
+
+/* Global no-shadow override: remove all elevation across the site. */
+*, *::before, *::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
 }

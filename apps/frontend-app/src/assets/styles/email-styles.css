@@ -1,7 +1,6 @@
 /* ─── EMAIL TEMPLATE STYLES ──────────────────────────────────────────────────
    Shared CSS for all transactional emails sent by the application.
-   Loaded at runtime by Backend/server.js and
-   injected into the <style> block of each HTML email.
+   The palette is intentionally light so every mail feels crisp and readable.
 
    Sections:
      1. Base
@@ -16,47 +15,48 @@
 body {
   margin: 0;
   padding: 0;
-  background: #07131f;
+  background: #eef3f4;
   font-family: Arial, Helvetica, sans-serif;
+  color: #1f2933;
 }
 
-a { color: #57d8d0; }
+a { color: #0f8a85; }
 
 /* Shared header */
 .hdr {
-  background: linear-gradient(135deg, #0e2234 0%, #07131f 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f5faf9 100%);
   padding: 30px 40px;
   text-align: center;
-  border-bottom: 1px solid rgba(13, 181, 176, .2);
+  border-bottom: 1px solid #d7e4e2;
 }
 
 .hdr-title {
-  color: #f0f6fa;
+  color: #102124;
   font-size: 21px;
   font-weight: 700;
   margin: 0;
 }
 
 .hdr-sub {
-  color: rgba(240, 246, 250, .55);
+  color: #61727a;
   font-size: 13px;
   margin: 6px 0 0;
 }
 
 /* Shared body */
 .body {
-  background: #102132;
+  background: #ffffff;
   padding: 32px 40px;
 }
 
 .body p {
   font-size: 14px;
-  color: #b8ccd9;
+  color: #30424a;
   line-height: 1.75;
   margin: 0 0 16px;
 }
 
-.body strong { color: #ffffff; }
+.body strong { color: #102124; }
 
 
 /* ─── 2. DPP APP EMAILS (server.js — brandedEmail) ──────────────────────── */
@@ -67,14 +67,15 @@ a { color: #57d8d0; }
   margin: 36px auto;
   border-radius: 18px;
   overflow: hidden;
-  border: 1px solid rgba(13, 181, 176, .2);
-  box-shadow: 0 16px 50px rgba(0, 0, 0, .45);
+  border: 1px solid #d7e4e2;
+  background: #ffffff;
+  box-shadow: 0 14px 42px rgba(16, 33, 36, .08);
 }
 
 /* Header overrides for branded layout */
 .wrapper .hdr {
   padding: 34px 40px;
-  border-bottom-color: rgba(13, 181, 176, .18);
+  border-bottom-color: #d7e4e2;
 }
 
 .hdr-logo {
@@ -84,8 +85,8 @@ a { color: #57d8d0; }
 
 /* Info box (invitation / review emails) */
 .info-box {
-  background: rgba(13, 181, 176, .07);
-  border: 1px solid rgba(13, 181, 176, .18);
+  background: #f6fbfa;
+  border: 1px solid #d6e8e6;
   border-radius: 12px;
   padding: 18px 22px;
   margin: 20px 0;
@@ -95,14 +96,14 @@ a { color: #57d8d0; }
   display: flex;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  border-bottom: 1px solid #e5eceb;
   font-size: 13px;
 }
 
 .info-row:last-child { border-bottom: none; }
 
 .info-label {
-  color: #5ee8e2;
+  color: #0f8a85;
   font-weight: 700;
   text-transform: uppercase;
   font-size: 11px;
@@ -110,7 +111,7 @@ a { color: #57d8d0; }
 }
 
 .info-value {
-  color: #f0f6fa;
+  color: #102124;
   font-weight: 600;
 }
 
@@ -122,28 +123,28 @@ a { color: #57d8d0; }
 
 .cta-btn {
   display: inline-block;
-  background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
-  color: #06131d !important;
+  background: linear-gradient(135deg, #12b8ad 0%, #0f8a85 100%);
+  color: #ffffff !important;
   text-decoration: none;
   padding: 14px 36px;
   border-radius: 999px;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: .3px;
-  box-shadow: 0 10px 24px rgba(13, 181, 176, .25);
+  box-shadow: 0 10px 24px rgba(15, 138, 133, .18);
 }
 
 /* Footer */
 .footer {
-  background: #07131f;
+  background: #f6fbfa;
   padding: 20px 40px;
   text-align: center;
-  border-top: 1px solid rgba(255, 255, 255, .06);
+  border-top: 1px solid #d7e4e2;
 }
 
 .footer p {
   font-size: 12px;
-  color: #7e97aa;
+  color: #61727a;
   margin: 4px 0;
 }
 
@@ -156,8 +157,9 @@ a { color: #57d8d0; }
   margin: 32px auto;
   border-radius: 18px;
   overflow: hidden;
-  border: 1px solid rgba(13, 181, 176, .2);
-  box-shadow: 0 12px 42px rgba(0, 0, 0, .5);
+  border: 1px solid #d7e4e2;
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgba(16, 33, 36, .07);
 }
 
 /* Header tag (e.g. "ClarosDPP" eyebrow label) */
@@ -166,7 +168,7 @@ a { color: #57d8d0; }
   font-weight: 700;
   letter-spacing: 2.5px;
   text-transform: uppercase;
-  color: #0db5b0;
+  color: #0f8a85;
   margin-bottom: 7px;
 }
 
@@ -175,7 +177,7 @@ a { color: #57d8d0; }
   width: 100%;
   border-collapse: collapse;
   margin: 18px 0;
-  border: 1px solid rgba(13, 181, 176, .15);
+  border: 1px solid #dbe7e5;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -183,24 +185,24 @@ a { color: #57d8d0; }
 .tbl td {
   padding: 10px 14px;
   font-size: 13px;
-  border-bottom: 1px solid rgba(255, 255, 255, .05);
+  border-bottom: 1px solid #e8eeed;
 }
 
 .tbl tr:last-child td { border-bottom: none; }
 
 .tlbl {
-  color: #0db5b0;
+  color: #0f8a85;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .7px;
   font-size: 11px;
   width: 36%;
   white-space: nowrap;
-  background: rgba(13, 181, 176, .06);
+  background: #f6fbfa;
 }
 
 .tval {
-  color: #f0f6fa;
+  color: #102124;
   font-weight: 500;
 }
 
@@ -210,17 +212,17 @@ a { color: #57d8d0; }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  color: #0db5b0;
+  color: #0f8a85;
   margin-bottom: 8px;
 }
 
 .msg-box {
-  background: rgba(13, 181, 176, .07);
-  border: 1px solid rgba(13, 181, 176, .2);
+  background: #f6fbfa;
+  border: 1px solid #d6e8e6;
   border-radius: 10px;
   padding: 16px;
   font-size: 13px;
-  color: #b8ccd9;
+  color: #30424a;
   line-height: 1.8;
   white-space: pre-wrap;
   word-break: break-word;
@@ -234,19 +236,19 @@ a { color: #57d8d0; }
 
 .cta a {
   display: inline-block;
-  background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
-  color: #06131d !important;
+  background: linear-gradient(135deg, #12b8ad 0%, #0f8a85 100%);
+  color: #ffffff !important;
   text-decoration: none;
   padding: 13px 30px;
   border-radius: 50px;
   font-size: 14px;
   font-weight: 700;
-  box-shadow: 0 10px 24px rgba(13, 181, 176, .22);
+  box-shadow: 0 10px 24px rgba(15, 138, 133, .16);
 }
 
 /* Confirmation email — next-steps list */
 .body h2 {
-  color: #f0f6fa;
+  color: #102124;
   font-size: 17px;
   font-weight: 700;
   margin: 0 0 14px;
@@ -259,9 +261,9 @@ a { color: #57d8d0; }
 
 .steps li {
   font-size: 13px;
-  color: #b8ccd9;
+  color: #30424a;
   padding: 9px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, .05);
+  border-bottom: 1px solid #e8eeed;
   list-style: none;
   display: flex;
   align-items: flex-start;
@@ -271,7 +273,7 @@ a { color: #57d8d0; }
 .steps li:last-child { border-bottom: none; }
 
 .tick {
-  color: #0db5b0;
+  color: #0f8a85;
   font-weight: 700;
   flex-shrink: 0;
   margin-top: 1px;
@@ -279,14 +281,14 @@ a { color: #57d8d0; }
 
 /* Shared footer for contact emails */
 .foot {
-  background: #07131f;
+  background: #f6fbfa;
   padding: 16px 40px;
   text-align: center;
-  border-top: 1px solid rgba(255, 255, 255, .06);
+  border-top: 1px solid #d7e4e2;
 }
 
 .foot p {
   font-size: 11px;
-  color: #7a94a8;
+  color: #61727a;
   margin: 3px 0;
 }

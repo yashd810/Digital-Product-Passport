@@ -11,6 +11,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     logAudit,
     createTransporter,
     brandedEmail,
+    renderInfoTable,
   } = deps;
 
   function buildSuperAdminResponse(row = {}) {
@@ -83,10 +84,10 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
           subject: `${inviterName} invited you to become a Super Admin on Digital Product Passport`,
           html: brandedEmail({ preheader: "You have been invited as a Super Admin", bodyHtml: `
             <p><strong>${inviterName}</strong> has invited you to join <strong>Digital Product Passport</strong> as a <strong>Super Admin</strong>.</p>
-            <div class="info-box">
-              <div class="info-row"><span class="info-label">Access level</span><span class="info-value">Super Admin</span></div>
-              <div class="info-row"><span class="info-label">Invitation expires</span><span class="info-value">${expiresAt.toLocaleString()}</span></div>
-            </div>
+            ${renderInfoTable([
+              { label: "Access level", value: "Super Admin" },
+              { label: "Invitation expires", value: expiresAt.toLocaleString() },
+            ])}
             <div class="cta-wrap"><a href="${registerUrl}" class="cta-btn">Complete Registration →</a></div>
           ` })
         });
