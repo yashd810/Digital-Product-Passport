@@ -340,20 +340,20 @@ module.exports = function registerMutationRoutes(app, deps) {
 
       const upsert = await pool.query(
         `INSERT INTO dpp_registry_registrations (
-           passport_dpp_id, company_id, product_identifier, dpp_id, registry_name, status, registration_payload, registered_by
+           "passportDppId", "companyId", "productIdentifier", "dppId", "registryName", status, "registrationPayload", "registeredBy"
          )
          VALUES ($1, $2, $3, $4, $5, 'registered', $6::jsonb, $7)
-         ON CONFLICT (registry_name, dpp_id)
+         ON CONFLICT ("registryName", "dppId")
          DO UPDATE SET
-           product_identifier = EXCLUDED.product_identifier,
+           "productIdentifier" = EXCLUDED."productIdentifier",
            status = 'registered',
-           registration_payload = EXCLUDED.registration_payload,
-           registered_by = EXCLUDED.registered_by,
-           updated_at = NOW()
-         RETURNING id, passport_dpp_id, company_id, product_identifier, dpp_id, registry_name, status, registered_at, updated_at`,
+           "registrationPayload" = EXCLUDED."registrationPayload",
+           "registeredBy" = EXCLUDED."registeredBy",
+           "updatedAt" = NOW()
+         RETURNING id, "passportDppId", "companyId", "productIdentifier", "dppId", "registryName", status, "registeredAt", "updatedAt"`,
         [
           result.passport.dppId,
-          result.passport.company_id,
+          result.passport.companyId,
           canonicalPayload.uniqueProductIdentifier || productIdentifier,
           canonicalPayload.digitalProductPassportId,
           registryName,

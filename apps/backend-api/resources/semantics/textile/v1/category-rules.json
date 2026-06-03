@@ -1,0 +1,30 @@
+{
+  "productCategories": [
+    "apparel",
+    "home_textile",
+    "technical_textile"
+  ],
+  "requirementsByFieldKey": {
+    "productModelIdentifier": {
+      "requirements": {
+        "apparel": "mandatory",
+        "home_textile": "mandatory",
+        "technical_textile": "mandatory"
+      }
+    },
+    "fiberComposition": {
+      "requirements": {
+        "apparel": "mandatory",
+        "home_textile": "mandatory",
+        "technical_textile": "mandatory"
+      }
+    },
+    "restrictedSubstancesDisclosure": {
+      "requirements": {
+        "apparel": "conditional",
+        "home_textile": "conditional",
+        "technical_textile": "mandatory"
+      }
+    }
+  }
+}

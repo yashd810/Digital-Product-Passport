@@ -46,10 +46,10 @@ module.exports = function createAssetService({
   async function getCompanyDppPolicy(companyId) {
     const result = await pool.query(
       `SELECT c.id,
-              COALESCE(p.default_granularity, 'item') AS default_granularity,
-              COALESCE(p.allow_granularity_override, false) AS allow_granularity_override,
-              COALESCE(p.mint_model_dids, true) AS mint_model_dids,
-              COALESCE(p.mint_item_dids, true) AS mint_item_dids
+              COALESCE(p.default_granularity, 'item') AS "defaultGranularity",
+              COALESCE(p.allow_granularity_override, false) AS "allowGranularityOverride",
+              COALESCE(p.mint_model_dids, true) AS "mintModelDids",
+              COALESCE(p.mint_item_dids, true) AS "mintItemDids"
        FROM companies c
        LEFT JOIN company_dpp_policies p ON p.company_id = c.id
        WHERE c.id = $1
@@ -60,7 +60,7 @@ module.exports = function createAssetService({
   }
 
   function resolveGranularityForCreate(companyPolicy, requestedGranularity) {
-    const fallbackGranularity = String(companyPolicy?.default_granularity || "item").trim().toLowerCase();
+    const fallbackGranularity = String(companyPolicy?.defaultGranularity || "item").trim().toLowerCase();
     const normalizedRequested = requestedGranularity === undefined || requestedGranularity === null || requestedGranularity === ""
       ? null
       : String(requestedGranularity).trim().toLowerCase();
@@ -857,7 +857,7 @@ module.exports = function createAssetService({
         if (dynamicEntries.length) {
           for (const [fieldKey, value] of dynamicEntries) {
             await pool.query(
-              `INSERT INTO passport_dynamic_values ("passportDppId", field_key, value, "updatedAt")
+              `INSERT INTO passport_dynamic_values ("passportDppId", "fieldKey", value, "updatedAt")
                VALUES ($1, $2, $3, NOW())`,
               [matchedGuid, fieldKey, toDynamicStoredValue(value)]
             );

@@ -294,7 +294,7 @@ function AdminCompanies() {
         mint_facility_dids: !!data.mint_facility_dids,
         vc_issuance_enabled: !!data.vc_issuance_enabled,
         jsonld_export_enabled: !!data.jsonld_export_enabled,
-        claros_battery_dictionary_enabled: !!data.claros_battery_dictionary_enabled,
+        semantic_dictionary_enabled: !!data.semantic_dictionary_enabled,
       });
     } catch (e) {
       setPolicyError(e.message || "Failed to load company DPP policy");
@@ -702,7 +702,7 @@ function AdminCompanies() {
                   ["mint_facility_dids", "Mint facility DIDs"],
                   ["vc_issuance_enabled", "Enable VC issuance"],
                   ["jsonld_export_enabled", "Enable JSON-LD export"],
-                  ["claros_battery_dictionary_enabled", "Enable Claros battery dictionary"],
+                  ["semantic_dictionary_enabled", "Enable semantic dictionaries"],
                 ].map(([field, label]) => (
                   <label key={field} className="checkbox-label" style={{ marginBottom: 10 }}>
                     <input

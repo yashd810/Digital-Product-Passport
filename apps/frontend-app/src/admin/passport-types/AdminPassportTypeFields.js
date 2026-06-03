@@ -7,16 +7,13 @@ import {
   UPDATE_AUTHORITY_LABELS,
   normalizeSystemPassportHeader,
 } from "./builderHelpers";
+import { formatSemanticModelLabel } from "./semanticTermCatalog";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-function getSemanticModelLabel(modelKey) {
-  if (modelKey === "generic_dpp_v1") return "Generic DPP";
-  if (modelKey === "claros_battery_dictionary_v1") return "Claros Battery Dictionary";
-  return modelKey || "No semantic model";
-}
+const getSemanticModelLabel = formatSemanticModelLabel;
 
 function AdminPassportTypeFields() {
   const navigate = useNavigate();

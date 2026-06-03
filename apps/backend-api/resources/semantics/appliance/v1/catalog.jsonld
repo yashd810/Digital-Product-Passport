@@ -1,0 +1,18 @@
+{
+  "@context": {
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "dcterms": "http://purl.org/dc/terms/",
+    "skos": "http://www.w3.org/2004/02/skos/core#"
+  },
+  "@id": "https://www.claros-dpp.online/dictionary/appliance/v1/catalog.jsonld",
+  "@type": "dcat:Catalog",
+  "dcterms:title": "Claros Appliance Dictionary",
+  "dcterms:description": "Reference appliance semantic model for modular Digital Product Passport implementations.",
+  "dcat:dataset": [
+    {
+      "@id": "https://www.claros-dpp.online/dictionary/appliance/v1/terms",
+      "@type": "dcat:Dataset",
+      "dcterms:title": "Appliance dictionary terms"
+    }
+  ]
+}

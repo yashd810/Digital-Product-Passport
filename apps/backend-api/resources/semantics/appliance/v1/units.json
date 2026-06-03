@@ -1,0 +1,12 @@
+[
+  {
+    "key": "kwh_per_year",
+    "label": "Kilowatt hour per year",
+    "symbol": "kWh/year"
+  },
+  {
+    "key": "score",
+    "label": "Score",
+    "symbol": "score"
+  }
+]

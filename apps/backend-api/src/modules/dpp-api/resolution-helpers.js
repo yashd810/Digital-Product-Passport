@@ -59,10 +59,10 @@ function createResolutionHelpers({
   }
 
   function buildRegistrationId(registration) {
-    if (!registration?.registry_name || registration?.id === undefined || registration?.id === null) {
+    if (!registration?.registryName || registration?.id === undefined || registration?.id === null) {
       return null;
     }
-    return `${registration.registry_name}:${registration.id}`;
+    return `${registration.registryName}:${registration.id}`;
   }
 
   function setDppMergePatchHeaders(res) {
@@ -292,7 +292,7 @@ function createResolutionHelpers({
     if (!Number.isFinite(companyId)) return null;
     const candidates = productIdentifierService?.buildLookupCandidates?.({
       companyId,
-      passportType: "battery",
+      passportType: "passport",
       internalAliasId: parsed.internalAliasId,
       granularity: parsed.granularity || "item"
     }) || [parsed.internalAliasId];

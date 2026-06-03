@@ -2,8 +2,11 @@
 
 const {
   BATTERY_DICTIONARY_MODEL_KEY,
-  shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
 } = require("./battery-dictionary-targeting");
+const {
+  DEFAULT_GENERIC_COMPLIANCE_PROFILE,
+  getComplianceProfileForPassportType,
+} = require("../src/passport-modules");
 const { getPassportFieldValue } = require("../src/shared/passports/passport-helpers");
 
 const VALID_ACCESS_LEVELS = new Set([
@@ -58,50 +61,11 @@ const VALID_UPDATE_AUTHORITIES = new Set([
   "system",
 ]);
 
-const BATTERY_PASS_PASSPORT_TYPE = "battery";
-const BATTERY_SEMANTIC_MODEL_KEY = BATTERY_DICTIONARY_MODEL_KEY;
 const APPLICABLE_REQUIREMENT_LEVELS = new Set([
   "mandatory_battreg",
   "mandatory_espr_jtc24",
   "voluntary",
 ]);
-
-const CATEGORY_ALIASES = new Map([
-  ["ev", "EV"],
-  ["electricvehicle", "EV"],
-  ["electric_vehicle", "EV"],
-  ["electric vehicle", "EV"],
-  ["lmt", "LMT"],
-  ["lightmeansoftransport", "LMT"],
-  ["light_means_of_transport", "LMT"],
-  ["light means of transport", "LMT"],
-  ["industrial", "Industrial"],
-  ["stationary", "Stationary"],
-  ["stationarystorage", "Stationary"],
-  ["stationary_storage", "Stationary"],
-  ["stationary storage", "Stationary"],
-]);
-
-const PROFILE_CATALOG = {
-  generic_dpp_v1: {
-    key: "generic_dpp_v1",
-    displayName: "Generic DPP Profile v1",
-    requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds"],
-    requireCompanyOperatorIdentifier: true,
-    requireCarrierPolicy: false,
-    requireFacilityAtGranularities: [],
-    defaultCarrierPolicyKey: "web_public_entry_v1",
-  },
-  battery_dpp_v1: {
-    key: "battery_dpp_v1",
-    displayName: "Battery DPP Profile v1",
-    requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds", "carrierPolicyKey"],
-    requireCompanyOperatorIdentifier: true,
-    requireCarrierPolicy: true,
-    requireFacilityAtGranularities: ["batch", "item"],
-    defaultCarrierPolicyKey: "battery_qr_public_entry_v1",
-  },
-};
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -123,6 +87,60 @@ function flattenSchemaFields(typeDef) {
       sectionLabel: section.label || null,
     }))
   );
+}
+
+function normalizePassportTypeDefinition(typeDef) {
+  if (!typeDef) return null;
+  const fieldsJson = typeDef.fieldsJson || typeDef.fields_json || {};
+  return {
+    ...typeDef,
+    typeName: typeDef.typeName || typeDef.type_name || null,
+    displayName: typeDef.displayName || typeDef.display_name || null,
+    productCategory: typeDef.productCategory || typeDef.product_category || null,
+    semanticModelKey: typeDef.semanticModelKey || typeDef.semantic_model_key || null,
+    complianceProfile: typeDef.complianceProfile || typeDef.compliance_profile || fieldsJson.complianceProfile || null,
+    fieldsJson,
+  };
+}
+
+function normalizeCompanyGovernance(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    companyName: row.companyName || row.company_name || null,
+    didSlug: row.didSlug || row.did_slug || null,
+    economicOperatorIdentifier: row.economicOperatorIdentifier || row.economic_operator_identifier || null,
+    economicOperatorIdentifierScheme: row.economicOperatorIdentifierScheme || row.economic_operator_identifier_scheme || null,
+  };
+}
+
+function normalizeProfile(profile = null) {
+  const baseProfile = {
+    ...DEFAULT_GENERIC_COMPLIANCE_PROFILE,
+    ...(profile || {}),
+  };
+  return {
+    ...baseProfile,
+    contentSpecificationIds: Array.isArray(baseProfile.contentSpecificationIds)
+      ? baseProfile.contentSpecificationIds
+      : [],
+    requiredPassportFields: Array.isArray(baseProfile.requiredPassportFields)
+      ? baseProfile.requiredPassportFields
+      : [],
+    requireFacilityAtGranularities: Array.isArray(baseProfile.requireFacilityAtGranularities)
+      ? baseProfile.requireFacilityAtGranularities
+      : [],
+    managedSemanticFieldKeys: Array.isArray(baseProfile.managedSemanticFieldKeys)
+      ? baseProfile.managedSemanticFieldKeys
+      : [],
+  };
+}
+
+function resolveProfileSemanticModelKey(typeDef, profile) {
+  const profileSemanticModelKey = Array.isArray(profile?.contentSpecificationIds)
+    ? normalizeText(profile.contentSpecificationIds[0])
+    : "";
+  return profileSemanticModelKey || normalizeText(typeDef?.semanticModelKey) || null;
 }
 
 function parseTableValue(value) {
@@ -390,12 +408,6 @@ function dedupeIssues(issues = []) {
   });
 }
 
-function normalizeBatteryCategory(value) {
-  const normalized = normalizeLookupKey(value);
-  if (!normalized) return null;
-  return CATEGORY_ALIASES.get(normalized) || null;
-}
-
 function createIssue({ severity = "error", code, message, key = null, label = null, expectedType = null, section = null }) {
   return {
     severity,
@@ -409,7 +421,7 @@ function createIssue({ severity = "error", code, message, key = null, label = nu
 }
 
 function isMandatoryRequirementLevel(level) {
-  return level === "mandatory_battreg" || level === "mandatory_espr_jtc24";
+  return /^mandatory(?:_|$)/.test(normalizeText(level).toLowerCase());
 }
 
 const MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS = {
@@ -438,12 +450,70 @@ const MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS = {
     canonicalPayload?.facilityId || passport?.facilityId || passport?.facilityIdentifier || null,
 };
 
-module.exports = function createComplianceService({ pool, batteryDictionaryService, buildCanonicalPassportPayload = null }) {
-  const manifest = batteryDictionaryService.getManifest();
-  const categoryRules = batteryDictionaryService.getCategoryRules ? batteryDictionaryService.getCategoryRules() : null;
-  const supportedBatteryCategories = Array.isArray(manifest?.batteryCategoryScope)
-    ? manifest.batteryCategoryScope
-    : ["EV", "LMT", "Industrial", "Stationary"];
+module.exports = function createComplianceService({
+  pool,
+  batteryDictionaryService,
+  semanticModelRegistry = null,
+  buildCanonicalPassportPayload = null,
+}) {
+  const batteryCategoryRules = batteryDictionaryService?.getCategoryRules ? batteryDictionaryService.getCategoryRules() : null;
+
+  function isBatterySemanticModel(modelKey) {
+    return normalizeText(modelKey) === BATTERY_DICTIONARY_MODEL_KEY;
+  }
+
+  function getModelCategoryRules(modelKey) {
+    if (semanticModelRegistry?.getCategoryRules) {
+      const rules = semanticModelRegistry.getCategoryRules(modelKey);
+      if (rules) return rules;
+    }
+    if (isBatterySemanticModel(modelKey)) return batteryCategoryRules;
+    return null;
+  }
+
+  function getSemanticTermByIri(modelKey, iri) {
+    if (!iri) return null;
+    if (semanticModelRegistry?.getTermByIri) {
+      const term = semanticModelRegistry.getTermByIri(modelKey, iri);
+      if (term) return term;
+    }
+    if (isBatterySemanticModel(modelKey) && batteryDictionaryService?.getTermByIri) {
+      return batteryDictionaryService.getTermByIri(iri);
+    }
+    return null;
+  }
+
+  function getSemanticTermByFieldKey(modelKey, fieldKey) {
+    if (!fieldKey) return null;
+    if (semanticModelRegistry?.getTermByFieldKey) {
+      const term = semanticModelRegistry.getTermByFieldKey(modelKey, fieldKey);
+      if (term) return term;
+    }
+    if (isBatterySemanticModel(modelKey) && batteryDictionaryService?.getTermByFieldKey) {
+      return batteryDictionaryService.getTermByFieldKey(fieldKey);
+    }
+    return null;
+  }
+
+  function getSemanticTermForField(field, semanticModelKey) {
+    if (field?.semanticId) {
+      const termByIri = getSemanticTermByIri(semanticModelKey, field.semanticId);
+      if (termByIri) return termByIri;
+    }
+    return getSemanticTermByFieldKey(semanticModelKey, field?.key) || null;
+  }
+
+  function getCategoryRequirementForSemanticKey(modelKey, fieldKey, category) {
+    if (!fieldKey || !category) return null;
+    if (semanticModelRegistry?.getCategoryRequirementForField) {
+      const requirement = semanticModelRegistry.getCategoryRequirementForField(modelKey, fieldKey, category);
+      if (requirement) return requirement;
+    }
+    if (isBatterySemanticModel(modelKey) && batteryDictionaryService?.getCategoryRequirementForField) {
+      return batteryDictionaryService.getCategoryRequirementForField(fieldKey, category);
+    }
+    return null;
+  }
 
   async function loadPassportTypeDefinition(passportType) {
     const result = await pool.query(
@@ -453,11 +523,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
        LIMIT 1`,
       [passportType]
     );
-    return result.rows[0] || null;
-  }
-
-  function isBatteryPassport(typeDef, passportType = null) {
-    return shouldTargetBatteryDictionary({ passportType, typeDef });
+    return normalizePassportTypeDefinition(result.rows[0] || null);
   }
 
   async function loadCompanyGovernance(companyId) {
@@ -473,39 +539,39 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
        LIMIT 1`,
       [companyId]
     ).catch(() => ({ rows: [] }));
-    return result.rows[0] || null;
+    return normalizeCompanyGovernance(result.rows[0] || null);
   }
 
   function resolveProfileMetadata({ passportType = null, typeDef = null, granularity = null } = {}) {
-    const batteryProfile = PROFILE_CATALOG.battery_dpp_v1;
-    const genericProfile = PROFILE_CATALOG.generic_dpp_v1;
-    const profile = isBatteryPassport(typeDef, passportType) ? batteryProfile : genericProfile;
+    const normalizedTypeDef = normalizePassportTypeDefinition(typeDef);
+    const profileLookupKey = passportType || normalizedTypeDef?.typeName || "";
+    const profile = normalizeProfile(
+      normalizedTypeDef?.complianceProfile
+      || getComplianceProfileForPassportType(profileLookupKey, normalizedTypeDef)
+    );
+    const contentSpecificationIds = Array.isArray(profile.contentSpecificationIds) && profile.contentSpecificationIds.length
+      ? profile.contentSpecificationIds
+      : [normalizedTypeDef?.semanticModelKey || DEFAULT_GENERIC_COMPLIANCE_PROFILE.key];
     return {
       ...profile,
       granularity: String(granularity || "item").trim().toLowerCase() || "item",
-      contentSpecificationIds: isBatteryPassport(typeDef, passportType)
-        ? [BATTERY_SEMANTIC_MODEL_KEY]
-        : [typeDef?.semanticModelKey || "generic_dpp_v1"],
+      contentSpecificationIds,
     };
   }
 
-  function findSemanticTermForField(field) {
-    if (field?.semanticId && typeof batteryDictionaryService.getTermByIri === "function") {
-      const termByIri = batteryDictionaryService.getTermByIri(field.semanticId);
-      if (termByIri) return termByIri;
-    }
-    if (field?.key) {
-      const termByField = batteryDictionaryService.getTermByFieldKey(field.key);
-      if (termByField) return termByField;
-    }
-    return null;
-  }
-
-  function getCategoryApplicabilityForField(fieldKey, normalizedCategory) {
+  function getCategoryApplicabilityForField(field, normalizedCategory, semanticModelKey) {
     if (!normalizedCategory) return null;
-    const requirementLevel = batteryDictionaryService.getCategoryRequirementForField
-      ? batteryDictionaryService.getCategoryRequirementForField(fieldKey, normalizedCategory)
-      : null;
+    const candidateFieldKeys = new Set([field?.key]);
+    const term = getSemanticTermForField(field, semanticModelKey);
+    for (const appFieldKey of (term?.appFieldKeys || [])) {
+      if (appFieldKey) candidateFieldKeys.add(appFieldKey);
+    }
+
+    let requirementLevel = null;
+    for (const fieldKey of candidateFieldKeys) {
+      requirementLevel = getCategoryRequirementForSemanticKey(semanticModelKey, fieldKey, normalizedCategory);
+      if (requirementLevel) break;
+    }
     if (!requirementLevel) return null;
     return {
       requirementLevel,
@@ -516,6 +582,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
 
   function buildCompleteness(fields, passport, options = {}) {
     const normalizedCategory = options.normalizedCategory || null;
+    const semanticModelKey = options.semanticModelKey || null;
     const missingFields = [];
     let filledFields = 0;
     let applicableFields = 0;
@@ -523,7 +590,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     const ignoredFieldDetails = [];
 
     for (const field of fields) {
-      const applicability = getCategoryApplicabilityForField(field.key, normalizedCategory);
+      const applicability = getCategoryApplicabilityForField(field, normalizedCategory, semanticModelKey);
       const isApplicable = applicability ? applicability.applicable : true;
       const requirementLevel = applicability?.requirementLevel || null;
       const isMandatory = applicability ? applicability.mandatory : true;
@@ -673,7 +740,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
 
   function validateAudienceLayerCoverage(fields, profile) {
     const issues = [];
-    if (profile?.key !== PROFILE_CATALOG.battery_dpp_v1.key) return issues;
+    if (!profile?.requirePublicAccessLayer) return issues;
 
     const hasPublicAudience = fields.some((field) => {
       const access = Array.isArray(field?.access) ? field.access : [];
@@ -683,7 +750,7 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     if (!hasPublicAudience) {
       issues.push(createIssue({
         code: "PUBLIC_ACCESS_LAYER_MISSING",
-        message: "Battery DPP profiles must expose at least one publicly accessible field layer before release.",
+        message: `Compliance profile "${profile.displayName || profile.key}" must expose at least one publicly accessible field layer before release.`,
       }));
     }
 
@@ -769,15 +836,16 @@ module.exports = function createComplianceService({ pool, batteryDictionaryServi
     return normalized;
   }
 
-function validateSemanticData(fields, passport) {
+function validateSemanticData(fields, passport, { semanticModelKey = null, profile = null } = {}) {
   const issues = [];
+  const enforceSemanticMapping = Boolean(profile?.enforceSemanticMapping);
 
   for (const field of fields) {
-    const term = findSemanticTermForField(field);
-    if (field.__isBatteryPassport && !term) {
+    const term = getSemanticTermForField(field, semanticModelKey);
+    if (enforceSemanticMapping && !term) {
       issues.push(createIssue({
         code: "SEMANTIC_TERM_NOT_FOUND",
-        message: `Field "${field.label || field.key}" is not mapped to a dictionary term in terms.json.`,
+        message: `Field "${field.label || field.key}" is not mapped to a term in semantic model "${semanticModelKey || "unknown"}".`,
         key: field.key,
         label: field.label || field.key,
         section: field.sectionLabel || field.sectionKey || null,
@@ -865,10 +933,11 @@ function validateSemanticData(fields, passport) {
 
   function buildRequiredFieldIssues(completeness, options = {}) {
     const normalizedCategory = options.normalizedCategory || null;
+    const categoryLabel = options.categoryLabel || "category";
     return (completeness?.missingMandatoryFields || []).map((field) => createIssue({
       code: field.requirementLevel ? "CATEGORY_REQUIRED_FIELD_MISSING" : "REQUIRED_FIELD_MISSING",
       message: field.requirementLevel && normalizedCategory
-        ? `Field "${field.label || field.key}" is required for battery category "${normalizedCategory}" before release.`
+        ? `Field "${field.label || field.key}" is required for ${categoryLabel} "${normalizedCategory}" before release.`
         : `Field "${field.label || field.key}" is required before release.`,
       key: field.key,
       label: field.label || field.key,
@@ -883,26 +952,31 @@ function validateSemanticData(fields, passport) {
     company,
     profile,
     normalizedCategory,
+    semanticModelKey,
   }) {
     const managedFields = [];
     const issues = [];
 
-    if (!buildCanonicalPassportPayload || profile?.key !== PROFILE_CATALOG.battery_dpp_v1.key) {
+    if (!buildCanonicalPassportPayload || !profile?.managedSemanticFieldKeys?.length) {
       return { managedFields, issues };
     }
 
     const schemaFieldKeys = new Set(fields.map((field) => field.key).filter(Boolean));
     const canonicalPayload = buildCanonicalPassportPayload(passport || {}, typeDef, { company });
 
-    for (const [fieldKey, resolveValue] of Object.entries(MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS)) {
+    for (const fieldKey of profile.managedSemanticFieldKeys) {
+      const resolveValue = MANAGED_BATTERY_SEMANTIC_FIELD_RESOLVERS[fieldKey];
+      if (!resolveValue) continue;
       if (schemaFieldKeys.has(fieldKey)) continue;
 
-      const applicability = getCategoryApplicabilityForField(fieldKey, normalizedCategory);
+      const term = getSemanticTermByFieldKey(semanticModelKey, fieldKey);
+      const syntheticField = {
+        key: fieldKey,
+        semanticId: term?.iri || term?.termIri || null,
+      };
+      const applicability = getCategoryApplicabilityForField(syntheticField, normalizedCategory, semanticModelKey);
       if (applicability && !applicability.applicable) continue;
 
-      const term = batteryDictionaryService.getTermByFieldKey
-        ? batteryDictionaryService.getTermByFieldKey(fieldKey)
-        : null;
       const label = term?.label || fieldKey;
       const value = resolveValue({ canonicalPayload, company, passport: passport || {} });
       const mandatory = applicability ? applicability.mandatory : false;
@@ -942,18 +1016,79 @@ function validateSemanticData(fields, passport) {
     return { managedFields, issues };
   }
 
-  function evaluateBatteryCategory(fields, passport, completeness) {
-    const categoryField = fields.find((field) => field.key === "batteryCategory")
-      || fields.find((field) => normalizeLookupKey(field.label) === "battery category");
+  function getCategoryPolicyFieldKeys(categoryPolicy = {}) {
+    const keys = new Set([
+      categoryPolicy.fieldKey,
+      ...(Array.isArray(categoryPolicy.fieldKeys) ? categoryPolicy.fieldKeys : []),
+    ]);
+    return [...keys].map(normalizeText).filter(Boolean);
+  }
 
-    const rawCategory = categoryField ? passport?.[categoryField.key] : null;
-    const normalizedCategory = normalizeBatteryCategory(rawCategory);
+  function getCategoryPolicyLabels(categoryPolicy = {}) {
+    const labels = new Set([
+      categoryPolicy.label,
+      categoryPolicy.fieldLabel,
+      ...(Array.isArray(categoryPolicy.fieldLabels) ? categoryPolicy.fieldLabels : []),
+    ]);
+    return [...labels].map(normalizeLookupKey).filter(Boolean);
+  }
+
+  function findCategoryField(fields = [], categoryPolicy = {}) {
+    const fieldKeys = new Set(getCategoryPolicyFieldKeys(categoryPolicy));
+    const fieldLabels = new Set(getCategoryPolicyLabels(categoryPolicy));
+    return fields.find((field) => fieldKeys.has(field.key))
+      || fields.find((field) => fieldLabels.has(normalizeLookupKey(field.label)))
+      || null;
+  }
+
+  function buildCategoryAliasMap(categoryPolicy = {}) {
+    const aliases = categoryPolicy.aliases || {};
+    if (aliases instanceof Map) {
+      return new Map([...aliases.entries()].map(([alias, value]) => [normalizeLookupKey(alias), value]));
+    }
+    return new Map(Object.entries(aliases).map(([alias, value]) => [normalizeLookupKey(alias), value]));
+  }
+
+  function getSupportedCategories(semanticModelKey, categoryPolicy = {}) {
+    const categoryRules = getModelCategoryRules(semanticModelKey);
+    if (Array.isArray(categoryRules?.categories) && categoryRules.categories.length) return categoryRules.categories;
+    if (Array.isArray(categoryPolicy.supportedCategories)) return categoryPolicy.supportedCategories;
+    return [];
+  }
+
+  function normalizeCategoryValue(value, categoryPolicy = {}, supportedCategories = []) {
+    const raw = normalizeText(value);
+    const normalized = normalizeLookupKey(raw);
+    if (!normalized) return null;
+
+    const aliases = buildCategoryAliasMap(categoryPolicy);
+    if (aliases.has(normalized)) return aliases.get(normalized);
+
+    const supportedCategory = supportedCategories.find((category) => normalizeLookupKey(category) === normalized);
+    if (supportedCategory) return supportedCategory;
+    return supportedCategories.length ? null : raw;
+  }
+
+  function buildUnsupportedCategoryMessage(rawCategory, categoryLabel, supportedCategories) {
+    const supportedText = supportedCategories.length
+      ? ` Supported values: ${supportedCategories.join(", ")}.`
+      : "";
+    return `${categoryLabel} "${rawCategory}" is not supported by the selected category policy.${supportedText}`;
+  }
+
+  function evaluateCategoryPolicy(fields, passport, completeness, { semanticModelKey = null, categoryPolicy = {} } = {}) {
+    const categoryRules = getModelCategoryRules(semanticModelKey);
+    const supportedCategories = getSupportedCategories(semanticModelKey, categoryPolicy);
+    const categoryField = findCategoryField(fields, categoryPolicy);
+    const rawCategory = categoryField ? getPassportFieldValue(passport, categoryField.key) : null;
+    const categoryLabel = categoryPolicy.label || categoryField?.label || "category";
+    const normalizedCategory = normalizeCategoryValue(rawCategory, categoryPolicy, supportedCategories);
     const issues = [];
 
     if (categoryField && hasMeaningfulValue(categoryField, rawCategory) && !normalizedCategory) {
       issues.push(createIssue({
-        code: "BATTERY_CATEGORY_UNSUPPORTED",
-        message: `Battery category "${rawCategory}" is not one of the supported categories: ${supportedBatteryCategories.join(", ")}.`,
+        code: categoryPolicy.unsupportedCode || "CATEGORY_UNSUPPORTED",
+        message: buildUnsupportedCategoryMessage(rawCategory, categoryLabel, supportedCategories),
         key: categoryField.key,
         label: categoryField.label || categoryField.key,
         section: categoryField.sectionLabel || categoryField.sectionKey || null,
@@ -962,7 +1097,7 @@ function validateSemanticData(fields, passport) {
     const ruleCoverage = normalizedCategory
       ? fields
         .map((field) => {
-          const applicability = getCategoryApplicabilityForField(field.key, normalizedCategory);
+          const applicability = getCategoryApplicabilityForField(field, normalizedCategory, semanticModelKey);
           if (!applicability) return null;
           return {
             key: field.key,
@@ -979,7 +1114,10 @@ function validateSemanticData(fields, passport) {
     return {
       raw: rawCategory || null,
       normalized: normalizedCategory,
-      supported: supportedBatteryCategories,
+      supported: supportedCategories,
+      policyKind: categoryPolicy.kind || null,
+      productKind: categoryPolicy.productKind || null,
+      fieldKey: categoryField?.key || null,
       sourceWorkbook: categoryRules?.sourceWorkbook || null,
       sheetName: categoryRules?.sheetName || null,
       mandatoryFieldCount: completeness.applicableFields.filter((field) => field.mandatory).length,
@@ -993,14 +1131,17 @@ function validateSemanticData(fields, passport) {
   }
 
   async function evaluatePassport(passport, passportType = null, providedTypeDef = null) {
-    const resolvedTypeDef = providedTypeDef || await loadPassportTypeDefinition(passportType || passport?.passportType || "");
+    const basePassport = passport || {};
+    const requestedPassportType = passportType || basePassport.passportType || basePassport.passport_type || "";
+    const resolvedTypeDef = normalizePassportTypeDefinition(providedTypeDef)
+      || await loadPassportTypeDefinition(requestedPassportType);
     if (!resolvedTypeDef) {
       const issue = createIssue({
         code: "PASSPORT_TYPE_NOT_FOUND",
-        message: `Passport type "${passportType || passport?.passportType || ""}" could not be resolved for compliance validation.`,
+        message: `Passport type "${requestedPassportType}" could not be resolved for compliance validation.`,
       });
       return {
-        passportType: passportType || passport?.passportType || null,
+        passportType: requestedPassportType || null,
         semanticModelKey: null,
         isBatteryPassport: false,
         completeness: { totalFields: 0, filledFields: 0, missingFields: [], percentage: 0 },
@@ -1012,7 +1153,7 @@ function validateSemanticData(fields, passport) {
         requiredFieldIssues: [],
         managedSemanticFields: [],
         managedSemanticIssues: [],
-        category: { raw: null, normalized: null, supported: supportedBatteryCategories, focusFields: [], missingFocusFields: [], issues: [] },
+        category: { raw: null, normalized: null, supported: [], focusFields: [], missingFocusFields: [], issues: [] },
         blockingIssues: [issue],
         directReleaseAllowed: false,
         workflowReleaseAllowed: false,
@@ -1020,35 +1161,46 @@ function validateSemanticData(fields, passport) {
       };
     }
 
-    const batteryPassport = isBatteryPassport(resolvedTypeDef, passportType || passport?.passportType);
-    const fields = flattenSchemaFields(resolvedTypeDef).map((field) => ({
-      ...field,
-      __isBatteryPassport: batteryPassport,
-    }));
-    const basePassport = passport || {};
-    const normalizedCategory = batteryPassport
-      ? normalizeBatteryCategory(basePassport.batteryCategory)
-      : null;
+    const resolvedPassportType = requestedPassportType || resolvedTypeDef.typeName;
     const profile = resolveProfileMetadata({
-      passportType: passportType || basePassport.passportType,
+      passportType: resolvedPassportType,
       typeDef: resolvedTypeDef,
       granularity: basePassport.granularity,
     });
-    const company = await loadCompanyGovernance(basePassport.companyId);
+    const semanticModelKey = resolveProfileSemanticModelKey(resolvedTypeDef, profile);
+    const fields = flattenSchemaFields(resolvedTypeDef).map((field) => ({
+      ...field,
+      __semanticModelKey: semanticModelKey,
+      __complianceProfileKey: profile.key,
+    }));
+    const categoryPolicy = profile.categoryPolicy || null;
+    const hasSemanticCategoryPolicy = categoryPolicy?.kind === "semanticCategory";
+    const categoryField = hasSemanticCategoryPolicy ? findCategoryField(fields, categoryPolicy) : null;
+    const normalizedCategory = hasSemanticCategoryPolicy
+      ? normalizeCategoryValue(
+        categoryField ? getPassportFieldValue(basePassport, categoryField.key) : null,
+        categoryPolicy,
+        getSupportedCategories(semanticModelKey, categoryPolicy)
+      )
+      : null;
+    const company = await loadCompanyGovernance(basePassport.companyId || basePassport.company_id);
     const normalizedPassport = applyManagedGovernanceDefaults(basePassport, profile, company);
-    const completeness = buildCompleteness(fields, normalizedPassport, { normalizedCategory });
+    const completeness = buildCompleteness(fields, normalizedPassport, { normalizedCategory, semanticModelKey });
     const accessIssues = validateAccess(fields);
     const governanceIssues = validateFieldGovernance(fields);
     const audienceLayerIssues = validateAudienceLayerCoverage(fields, profile);
-    const semanticIssues = validateSemanticData(fields, normalizedPassport);
-    const batteryCategory = batteryPassport
-      ? evaluateBatteryCategory(fields, normalizedPassport, completeness)
+    const semanticIssues = validateSemanticData(fields, normalizedPassport, { semanticModelKey, profile });
+    const category = hasSemanticCategoryPolicy
+      ? evaluateCategoryPolicy(fields, normalizedPassport, completeness, { semanticModelKey, categoryPolicy })
       : {
           raw: null,
           normalized: null,
-          supported: supportedBatteryCategories,
-          sourceWorkbook: categoryRules?.sourceWorkbook || null,
-          sheetName: categoryRules?.sheetName || null,
+          supported: [],
+          policyKind: categoryPolicy?.kind || null,
+          productKind: categoryPolicy?.productKind || null,
+          fieldKey: null,
+          sourceWorkbook: null,
+          sheetName: null,
           mandatoryFieldCount: 0,
           voluntaryFieldCount: 0,
           missingMandatoryFields: [],
@@ -1059,7 +1211,10 @@ function validateSemanticData(fields, passport) {
         };
 
     const profileIssues = validateProfileGovernance({ passport: normalizedPassport, profile, company });
-    const requiredFieldIssues = buildRequiredFieldIssues(completeness, { normalizedCategory });
+    const requiredFieldIssues = buildRequiredFieldIssues(completeness, {
+      normalizedCategory,
+      categoryLabel: categoryPolicy?.label || "category",
+    });
     const managedSemantic = evaluateManagedSemanticFields({
       fields,
       passport: normalizedPassport,
@@ -1067,6 +1222,7 @@ function validateSemanticData(fields, passport) {
       company,
       profile,
       normalizedCategory,
+      semanticModelKey,
     });
     const blockingIssues = dedupeIssues([
       ...audienceLayerIssues,
@@ -1074,7 +1230,7 @@ function validateSemanticData(fields, passport) {
       ...requiredFieldIssues,
       ...profileIssues,
       ...managedSemantic.issues,
-      ...batteryCategory.issues,
+      ...category.issues,
     ]);
     const workflowReleaseAllowed = blockingIssues.length === 0;
     const directReleaseAllowed = workflowReleaseAllowed && completeness.missingFields.length === 0;
@@ -1089,8 +1245,9 @@ function validateSemanticData(fields, passport) {
         economicOperatorIdentifierScheme: company.economicOperatorIdentifierScheme || null,
       } : null,
       passportType: resolvedTypeDef.typeName || null,
-      semanticModelKey: resolvedTypeDef.semanticModelKey || null,
-      isBatteryPassport: batteryPassport,
+      semanticModelKey,
+      isBatteryPassport: categoryPolicy?.productKind === "battery",
+      categoryPolicyKind: categoryPolicy?.kind || null,
       completeness,
       accessIssues,
       governanceIssues,
@@ -1100,7 +1257,7 @@ function validateSemanticData(fields, passport) {
       requiredFieldIssues,
       managedSemanticFields: managedSemantic.managedFields,
       managedSemanticIssues: managedSemantic.issues,
-      category: batteryCategory,
+      category,
       blockingIssues,
       directReleaseAllowed,
       workflowReleaseAllowed,
@@ -1111,7 +1268,6 @@ function validateSemanticData(fields, passport) {
   return {
     loadPassportTypeDefinition,
     evaluatePassport,
-    isBatteryPassport,
     resolveProfileMetadata,
   };
 };

@@ -29,9 +29,9 @@ function normalizeCompanySlugValue(didService, value) {
 
 function normalizePassportNamespace(didService, value) {
   try {
-    return didService?.normalizePassportTypeSegment?.(value || "battery") || "battery";
+    return didService?.normalizePassportTypeSegment?.(value || "passport") || "passport";
   } catch {
-    return "battery";
+    return "passport";
   }
 }
 
@@ -60,7 +60,7 @@ function buildCanonicalIdentityBundle({
   );
   const subjectNamespace = normalizePassportNamespace(
     didService,
-    company?.didSlug || resolvedCompanyName || passportType || passport?.passportType || "battery"
+    company?.didSlug || resolvedCompanyName || passportType || passport?.passportType || "passport"
   );
 
   let companyDid = null;
@@ -101,7 +101,7 @@ function buildCanonicalIdentityBundle({
         companyId: passport.companyId ?? company?.id ?? null,
         companySlug,
         companyName: resolvedCompanyName,
-        passportType: passportType || passport?.passportType || "battery",
+        passportType: passportType || passport?.passportType || "passport",
         rawProductId: businessIdentifier,
         granularity: resolvedGranularity,
       }) || null;

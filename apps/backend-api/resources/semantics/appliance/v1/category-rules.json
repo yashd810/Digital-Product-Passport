@@ -1,0 +1,33 @@
+{
+  "categoryFieldKey": "applianceCategory",
+  "supportedCategories": ["Major Appliance", "Small Appliance", "HVAC", "Consumer Electronics"],
+  "requirementsByFieldKey": {
+    "energyRating": {
+      "defaultRequirement": "recommended",
+      "requirements": {
+        "Major Appliance": "required",
+        "Small Appliance": "recommended",
+        "HVAC": "required",
+        "Consumer Electronics": "optional"
+      }
+    },
+    "powerConsumption": {
+      "defaultRequirement": "recommended",
+      "requirements": {
+        "Major Appliance": "required",
+        "Small Appliance": "recommended",
+        "HVAC": "required",
+        "Consumer Electronics": "recommended"
+      }
+    },
+    "repairabilityScore": {
+      "defaultRequirement": "recommended",
+      "requirements": {
+        "Major Appliance": "required",
+        "Small Appliance": "recommended",
+        "HVAC": "recommended",
+        "Consumer Electronics": "recommended"
+      }
+    }
+  }
+}

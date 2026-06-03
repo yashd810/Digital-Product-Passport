@@ -8,7 +8,7 @@ const SYSTEM_PASSPORT_COLUMN_MAPPINGS = [
   { appKey: "internalAliasId", storageKey: "internalAliasId", definition: "VARCHAR(255) NOT NULL" },
   { appKey: "uniqueProductIdentifier", storageKey: "uniqueProductIdentifier", definition: "TEXT" },
   { appKey: "productImage", storageKey: "productImage", definition: "TEXT" },
-  { appKey: "complianceProfileKey", storageKey: "complianceProfileKey", definition: "VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1'" },
+  { appKey: "complianceProfileKey", storageKey: "complianceProfileKey", definition: "VARCHAR(120) NOT NULL DEFAULT 'genericDppV1'" },
   { appKey: "contentSpecificationIds", storageKey: "contentSpecificationIds", definition: "TEXT" },
   { appKey: "carrierPolicyKey", storageKey: "carrierPolicyKey", definition: "VARCHAR(120)" },
   { appKey: "carrierAuthenticity", storageKey: "carrierAuthenticity", definition: "JSONB" },

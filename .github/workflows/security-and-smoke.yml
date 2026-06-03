@@ -21,9 +21,25 @@ jobs:
           cache: npm
           cache-dependency-path: apps/backend-api/package-lock.json
       - run: npm ci
-      - run: find Server routes services middleware db helpers tests -name '*.js' -print0 | xargs -0 -n1 node --check
+      - run: npm run check:syntax
+      - run: npm run check:style
+      - run: npm run check:boundaries
       - run: npm test
       - run: npm audit --audit-level=high
+
+  repository-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check committed diff whitespace
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}...HEAD"
+          else
+            git diff-tree --check --no-commit-id --root -r HEAD
+          fi
 
   backend-smoke:
     runs-on: ubuntu-latest

@@ -149,10 +149,10 @@ module.exports = function registerElementRoutes(app, deps) {
       if (!editable?.passport) {
         return res.status(404).json({ error: "Editable passport not found. Create or revise a draft before updating elements." });
       }
-      if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(editable.passport.company_id)) {
+      if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      if (!isEditablePassportStatus(editable.passport.release_status)) {
+      if (!isEditablePassportStatus(editable.passport.releaseStatus)) {
         return res.status(409).json({ error: "Passport is not editable" });
       }
       const parsedPayload = parseElementUpdatePayload({

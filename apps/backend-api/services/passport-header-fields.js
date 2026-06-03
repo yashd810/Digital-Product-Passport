@@ -1,7 +1,7 @@
 "use strict";
 
 const DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION = {
-  key: "passport_header",
+  key: "passportHeader",
   label: "Passport Header",
 };
 

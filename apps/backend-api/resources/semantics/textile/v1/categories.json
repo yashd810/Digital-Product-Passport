@@ -1,0 +1,22 @@
+[
+  {
+    "key": "product-identification",
+    "label": "Product Identification",
+    "description": "Core identifiers and commercial product description fields."
+  },
+  {
+    "key": "material-composition",
+    "label": "Material Composition",
+    "description": "Fiber, recycled content, and material weight declarations."
+  },
+  {
+    "key": "manufacturing-and-care",
+    "label": "Manufacturing and Care",
+    "description": "Origin, processing, care, and durability information."
+  },
+  {
+    "key": "restricted-substances",
+    "label": "Restricted Substances",
+    "description": "Chemical and restricted substance disclosures."
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "key": "none",
+    "display": "n.a.",
+    "label": "No unit"
+  },
+  {
+    "key": "percent",
+    "display": "%",
+    "label": "Percent"
+  },
+  {
+    "key": "gsm",
+    "display": "g/m2",
+    "label": "Grams per square metre"
+  },
+  {
+    "key": "score-1-5",
+    "display": "1-5",
+    "label": "Score from 1 to 5"
+  }
+]

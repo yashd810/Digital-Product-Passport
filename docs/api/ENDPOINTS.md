@@ -1242,36 +1242,36 @@ GET /did/facility/:facilityStableId/did.json
 
 ---
 
-### Get Battery Model DID
+### Get Product Model DID
 
 **Request**
 ```
-GET /did/battery/model/:stableId/did.json
+GET /did/:passportType/model/:stableId/did.json
 ```
 
-**Response** (200 OK): DID document for battery model
+**Response** (200 OK): DID document for product model
 
 ---
 
-### Get Battery Batch DID
+### Get Product Batch DID
 
 **Request**
 ```
-GET /did/battery/batch/:stableId/did.json
+GET /did/:passportType/batch/:stableId/did.json
 ```
 
-**Response** (200 OK): DID document for battery batch
+**Response** (200 OK): DID document for product batch
 
 ---
 
-### Get Battery Item DID
+### Get Product Item DID
 
 **Request**
 ```
-GET /did/battery/item/:stableId/did.json
+GET /did/:passportType/item/:stableId/did.json
 ```
 
-**Response** (200 OK): DID document for individual battery item
+**Response** (200 OK): DID document for individual product item
 
 ---
 
@@ -1488,7 +1488,8 @@ See **[admin-endpoints.md](admin-endpoints.md)**
 - POST `/api/admin/product-categories`
 - DELETE `/api/admin/product-categories/:id`
 
-**Passport Types (7):**
+**Passport Types (8):**
+- GET `/api/admin/passport-type-modules`
 - GET `/api/admin/passport-types`
 - GET `/api/passport-types/:typeName`
 - POST `/api/admin/passport-types`
@@ -1583,9 +1584,9 @@ See **[did-resolution.md](did-resolution.md)**
 - GET `/did/company/:companySlug/did.json` - Company DID
 - GET `/did/dpp/:granularity/:stableId/did.json` - Passport DID
 - GET `/did/facility/:facilityStableId/did.json` - Facility DID
-- GET `/did/battery/model/:stableId/did.json` - Battery model DID
-- GET `/did/battery/batch/:stableId/did.json` - Battery batch DID
-- GET `/did/battery/item/:stableId/did.json` - Battery item DID
+- GET `/did/:passportType/model/:stableId/did.json` - Product model DID
+- GET `/did/:passportType/batch/:stableId/did.json` - Product batch DID
+- GET `/did/:passportType/item/:stableId/did.json` - Product item DID
 
 ### System & Data (7 endpoints)
 

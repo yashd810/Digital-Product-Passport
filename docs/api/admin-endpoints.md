@@ -126,6 +126,39 @@ Delete an product category. Requires password confirmation. Category must not be
 
 ## Passport Types
 
+### List Registered Passport Type Modules
+
+**GET** `/api/admin/passport-type-modules`
+
+Returns versioned passport modules registered in backend code, including whether each module has already been seeded into `passport_types`. Super admin only.
+
+**Parameters:** None
+
+**Response (200 OK):**
+```json
+[
+  {
+    "moduleKey": "appliance:v1",
+    "typeName": "appliancePassportV1",
+    "displayName": "Appliance Passport v1",
+    "productCategory": "Appliance",
+    "productIcon": "AP",
+    "semanticModelKey": "claros_appliance_dictionary_v1",
+    "complianceProfileKey": "applianceDppV1",
+    "sectionCount": 3,
+    "fieldCount": 8,
+    "seeded": false,
+    "seededPassportTypeId": null,
+    "seedCommand": "npm run seed:passport-types -- --module=appliance:v1"
+  }
+]
+```
+
+**Error Codes:**
+- `500` - Failed to fetch passport type modules
+
+---
+
 ### List All Passport Types
 
 **GET** `/api/admin/passport-types`

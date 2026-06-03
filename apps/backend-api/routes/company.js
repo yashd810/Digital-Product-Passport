@@ -7,6 +7,17 @@ const {
   mapCompanyFacilityRow,
   mapPassportTemplateFieldRow,
 } = require("../src/shared/passports/passport-helpers");
+const {
+  createComplianceManagedFieldHelpers,
+} = require("../src/modules/passports/compliance-managed-fields");
+const {
+  IMPORT_MANAGED_FIELD_KEYS,
+  buildManagedImportErrorMessage,
+  getInvalidImportFieldKeys,
+  getManagedImportFieldKeys,
+  isManagedImportFieldLabel,
+  resolveCsvImportField,
+} = require("../src/modules/passports/import-field-guardrails");
 
 module.exports = function registerCompanyRoutes(app, {
   pool,
@@ -19,6 +30,7 @@ module.exports = function registerCompanyRoutes(app, {
   getPassportFieldValue,
   getPassportTypeSchema,
   normalizePassportRequestBody,
+  extractExplicitFacilityId,
   normalizeInternalAliasIdValue,
   normalizeReleaseStatus,
   isEditablePassportStatus,
@@ -29,7 +41,7 @@ module.exports = function registerCompanyRoutes(app, {
   logAudit,
   EDITABLE_RELEASE_STATUSES_SQL,
   SYSTEM_PASSPORT_FIELDS,
-  buildBatteryPassJsonExport,
+  buildSemanticPassportJsonExport,
   buildExpandedPassportPayload,
   productIdentifierService,
   complianceService,
@@ -67,6 +79,13 @@ module.exports = function registerCompanyRoutes(app, {
     return `Schema governance fields (${keys.join(", ")}) cannot be imported as passport row data. Configure access, confidentiality, and updateAuthority on the passport type in admin instead.`;
   }
 
+  function createImportExcludedFieldSet(extraFields = []) {
+    return new Set([
+      ...IMPORT_MANAGED_FIELD_KEYS,
+      ...extraFields,
+    ]);
+  }
+
   function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, internalAliasId, granularity = "item" }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
@@ -80,11 +99,6 @@ module.exports = function registerCompanyRoutes(app, {
       internalAliasId: normalized.internalAliasIdInput || null,
       uniqueProductIdentifier: normalized.productIdentifierDid || null
     };
-  }
-
-  function serializeProfileDefaultValue(value) {
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return value ?? null;
   }
 
   function mapTemplateRow(row = {}) {
@@ -114,27 +128,19 @@ module.exports = function registerCompanyRoutes(app, {
     };
   }
 
-  async function loadCompanyComplianceIdentity(companyId) {
-    const result = await pool.query(
-      `SELECT economic_operator_identifier AS "economicOperatorIdentifier"
-       FROM companies
-       WHERE id = $1
-       LIMIT 1`,
-      [companyId]
-    );
-    return result.rows[0] || null;
-  }
+  const complianceManagedFieldHelpers = createComplianceManagedFieldHelpers({
+    pool,
+    complianceService,
+    extractExplicitFacilityId,
+  });
 
   async function buildComplianceManagedFields({ companyId, passportType }) {
-    const profile = complianceService.resolveProfileMetadata({ passportType, granularity: "item" });
-    const companyIdentity = await loadCompanyComplianceIdentity(companyId);
-    return {
-      complianceProfileKey: profile.key,
-      contentSpecificationIds: serializeProfileDefaultValue(profile.contentSpecificationIds),
-      carrierPolicyKey: profile.defaultCarrierPolicyKey || null,
-      economicOperatorId: companyIdentity?.economicOperatorIdentifier || null,
-      facilityId: null
-    };
+    return complianceManagedFieldHelpers.buildComplianceManagedFields({
+      companyId,
+      passportType,
+      granularity: "item",
+      allowDefaultFacility: false,
+    });
   }
 
   // ─── COMPANY PROFILE ─────────────────────────────────────────────────────
@@ -536,7 +542,7 @@ module.exports = function registerCompanyRoutes(app, {
             granularity: row.granularity || "model",
           }
         ));
-        return res.json(buildBatteryPassJsonExport(exportRows, tmpl.passportType, {
+        return res.json(buildSemanticPassportJsonExport(exportRows, tmpl.passportType, {
           semanticModelKey: typeRes.rows[0]?.semanticModelKey || null,
           productCategory: typeRes.rows[0]?.productCategory || null
         }));
@@ -583,8 +589,6 @@ module.exports = function registerCompanyRoutes(app, {
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
       const resolvedPassportType = typeSchema.typeName;
 
-      const allFields = typeSchema.schemaFields;
-
       const parseRow = (line) => {
         line = line.replace(/\r$/, "");
         const cells = [];let cur = "";let inQ = false;
@@ -614,14 +618,26 @@ module.exports = function registerCompanyRoutes(app, {
           governanceFields: governanceRowLabels,
         });
       }
+      const managedRowLabels = [...new Set(
+        fieldRows
+          .map((row) => String(row[0] || "").trim())
+          .filter(Boolean)
+          .filter((label) => {
+            const field = resolveCsvImportField(label, typeSchema);
+            return isManagedImportFieldLabel(label) ||
+              Boolean(field?.key && getManagedImportFieldKeys({ [field.key]: true }).length > 0);
+          })
+      )];
+      if (managedRowLabels.length) {
+        return res.status(400).json({
+          error: buildManagedImportErrorMessage(managedRowLabels),
+          managedFields: managedRowLabels,
+        });
+      }
 
       const tableName = getTable(resolvedPassportType);
       const userId = req.user.userId;
-      const excluded = new Set([
-        "id", "dppId", "companyId", "createdBy", "createdAt", "passportType",
-        "versionNumber", "releaseStatus", "deletedAt", "qrCode",
-        "createdByEmail", "firstName", "lastName", "updatedBy", "updatedAt",
-      ]);
+      const excluded = createImportExcludedFieldSet(["dppId"]);
 
       let created = 0,updated = 0,skipped = 0,failed = 0;
       const details = [];
@@ -631,15 +647,9 @@ module.exports = function registerCompanyRoutes(app, {
         fieldRows.forEach((row) => {
           const rawLabel = (row[0] || "").trim();
           if (!rawLabel) return;
-          const normalized = rawLabel.toLowerCase();
           const value = (row[colIdx] || "").trim();
 
-          const field =
-          allFields.find((f) => f.label?.trim().toLowerCase() === normalized) ||
-          allFields.find((f) => f.key?.toLowerCase() === normalized) || (
-          normalized === "modelname" ? { key: "modelName" } : null) || (
-          normalized === "internalaliasid" ? { key: "internalAliasId" } : null) || (
-          normalized === "dppid" ? { key: "dppId" } : null);
+          const field = resolveCsvImportField(rawLabel, typeSchema);
 
           if (field && value) {
             passport[field.key] = field.type === "boolean" ?
@@ -807,11 +817,7 @@ module.exports = function registerCompanyRoutes(app, {
       const resolvedPassportType = typeSchema.typeName;
       const tableName = getTable(resolvedPassportType);
       const userId = req.user.userId;
-      const excluded = new Set([
-        "id", "companyId", "createdBy", "createdAt", "passportType",
-        "versionNumber", "releaseStatus", "deletedAt", "qrCode",
-        "createdByEmail", "firstName", "lastName", "updatedBy", "updatedAt",
-      ]);
+      const excluded = createImportExcludedFieldSet();
 
       let created = 0,updated = 0,skipped = 0,failed = 0;
       const details = [];
@@ -821,10 +827,8 @@ module.exports = function registerCompanyRoutes(app, {
         const { dppId: incomingGuid, modelName, internalAliasId, ...fields } = normalizeBulkPassportRecord(normalizedItem);
         const normalizedProductId = normalizeInternalAliasIdValue(internalAliasId);
         const governanceFieldKeys = Object.keys(fields).filter((key) => isSchemaGovernanceKey(key, typeSchema));
-        const invalidFieldKeys = Object.keys(fields).filter((key) =>
-        !SYSTEM_PASSPORT_FIELDS.has(key) &&
-        !typeSchema.allowedKeys.has(key)
-        );
+        const managedFieldKeys = getManagedImportFieldKeys(fields);
+        const invalidFieldKeys = getInvalidImportFieldKeys(fields, typeSchema);
         try {
           if (governanceFieldKeys.length) {
             details.push({
@@ -832,6 +836,16 @@ module.exports = function registerCompanyRoutes(app, {
               internalAliasId: normalizedProductId || undefined,
               status: "failed",
               error: buildGovernanceImportErrorMessage(governanceFieldKeys)
+            });
+            failed++;
+            continue;
+          }
+          if (managedFieldKeys.length) {
+            details.push({
+              dppId: incomingGuid || undefined,
+              internalAliasId: normalizedProductId || undefined,
+              status: "failed",
+              error: buildManagedImportErrorMessage(managedFieldKeys)
             });
             failed++;
             continue;

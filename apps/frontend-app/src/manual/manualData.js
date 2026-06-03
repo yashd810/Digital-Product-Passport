@@ -41,8 +41,8 @@ export const CORE_DATABASE_TABLES = [
       },
       {
         name: "company_dpp_policies",
-        purpose: "Per-company DPP issuance policy used by standards APIs, DID minting, VC issuance, JSON-LD exports, and battery dictionary behavior.",
-        columns: ["id", "company_id", "default_granularity", "allow_granularity_override", "mint_model_dids", "mint_item_dids", "mint_facility_dids", "vc_issuance_enabled", "jsonld_export_enabled", "claros_battery_dictionary_enabled", "created_at", "updated_at"],
+        purpose: "Per-company DPP issuance policy used by standards APIs, DID minting, VC issuance, JSON-LD exports, and semantic dictionary access.",
+        columns: ["id", "company_id", "default_granularity", "allow_granularity_override", "mint_model_dids", "mint_item_dids", "mint_facility_dids", "vc_issuance_enabled", "jsonld_export_enabled", "semantic_dictionary_enabled", "created_at", "updated_at"],
       },
       {
         name: "company_facilities",
@@ -397,11 +397,11 @@ export const BACKEND_API_FAMILIES = [
     ],
   },
   {
-    name: "Battery dictionary",
-    route: "/api/dictionary/battery/v1/* and /dictionary/battery/v1/*",
+    name: "Semantic dictionaries",
+    route: "/api/dictionary/:family/:version/* and /dictionary/:family/:version/*",
     details: [
-      "Serves the Claros battery dictionary context, manifest, categories, units, field maps, category rules, and term details.",
-      "Feeds the public, user-dashboard, and admin-dashboard dictionary browser plus semantic export guidance for battery passport fields.",
+      "Serves registered dictionary contexts, manifests, categories, units, field maps, category rules, and term details.",
+      "Feeds the public, user-dashboard, and admin-dashboard dictionary browser plus semantic export guidance for each passport type's selected model.",
       "Also exposes static JSON-LD/context aliases without requiring login.",
     ],
   },
@@ -421,7 +421,7 @@ export const BACKEND_OPERATION_FLOWS = [
     title: "Company onboarding flow",
     steps: [
       "Super admin creates a company from the Companies page.",
-      "Super admin sets the company's DPP policy: default granularity, whether overrides are allowed, DID minting flags, VC issuance, JSON-LD export, and battery dictionary behavior.",
+      "Super admin sets the company's DPP policy: default granularity, whether overrides are allowed, DID minting flags, VC issuance, JSON-LD export, and semantic dictionary access.",
       "Super admin grants passport-type access for that company.",
       "Company branding and repository assets are configured from Company Profile, while company API keys, user sessions, and optional bearer tokens are handled from Security.",
       "The company's economic-operator identifier and managed facilities are configured before standards/DID-heavy integrations rely on them.",
@@ -535,7 +535,7 @@ export const SECURITY_KEY_TABLE = {
       "Device API key",
       "Passport row > Device Integration metadata, then issue or regenerate once when needed",
       "x-device-key header",
-      "POST /api/passports/:dppId/dynamic-values for live measurements such as temperature, mass, or battery data",
+      "POST /api/passports/:dppId/dynamic-values for live measurements such as temperature, mass, or product-specific sensor data",
       "Listing all passports, editing normal passport fields, or calling company admin endpoints",
     ],
     [
@@ -690,8 +690,8 @@ export const PUBLIC_AND_LIVE_API_TABLE = {
     ["Verify signature", "GET /api/passports/:dppId/signature", "No auth", "Optional query param: version", "Signature status and, when available, the stored Verifiable Credential payload."],
     ["Get current signing key", "GET /api/signing-key", "No auth", "No body", "The active public signing key metadata."],
     ["Get DID document", "GET /.well-known/did.json", "No auth", "No body", "A DID document that helps outside verifiers validate released passport signatures."],
-    ["Resolve DID", "GET /resolve?did=did:web:...", "No auth", "Accept header decides browser redirect or DID document redirect", "Universal resolver for platform, company, battery model/batch/item, DPP, and facility DIDs."],
-    ["DID documents", "GET /did/company/:slug/did.json, /did/battery/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities through canonical slug and stable-ID routes."],
+    ["Resolve DID", "GET /resolve?did=did:web:...", "No auth", "Accept header decides browser redirect or DID document redirect", "Universal resolver for platform, company, product subject, DPP, and facility DIDs."],
+    ["DID documents", "GET /did/company/:slug/did.json, /did/:passportType/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities through canonical slug and stable-ID routes."],
     ["DPP JSON-LD context", "GET /contexts/dpp/v1", "No auth", "No body", "JSON-LD context for DPP linked-data payloads."],
     ["Record scan", "POST /api/passports/:dppId/scan", "No auth", "Optional scan metadata", "Stores public scan event telemetry."],
     ["Read scan stats", "GET /api/passports/:dppId/scan-stats", "No auth", "No body", "Returns aggregate scan information."],
@@ -733,15 +733,15 @@ export const GOVERNANCE_SECURITY_API_TABLE = {
 };
 
 export const DICTIONARY_API_TABLE = {
-  title: "Battery dictionary browser and semantic API",
+  title: "Semantic dictionary browser and API",
   columns: ["Action", "Endpoint or route", "Authentication", "What it gives you", "Where it is used"],
   rows: [
-    ["Open dictionary in user dashboard", "/dashboard/:companySlug/dictionary/battery/v1", "Signed-in dashboard session", "Searchable browser for categories, terms, units, IRIs, field keys, access rights, and regulation references", "Company users checking Battery Pass field meanings and JSON-LD identifiers."],
-    ["Open dictionary in admin dashboard", "/admin/dictionary/battery/v1", "Super-admin session", "The same dictionary browser inside the admin shell", "Super admins designing battery passport types and checking semantic mappings."],
-    ["Public dictionary browser", "/dictionary/battery/v1", "No login", "Public term browser and term detail pages", "External implementers and verifiers."],
-    ["JSON-LD context", "GET /dictionary/battery/v1/context.jsonld or /api/dictionary/battery/v1/context.jsonld", "No login", "Canonical JSON-LD context", "Battery JSON-LD exports and linked-data verification."],
-    ["Manifest and rules", "GET /api/dictionary/battery/v1/manifest, /category-rules, /categories, /units, /field-map", "No login", "Dictionary metadata, applicability rules, field map, unit definitions, and category lists", "Builder validation, export guidance, and documentation."],
-    ["Term JSON", "GET /api/dictionary/battery/v1/terms or /terms/:slug", "No login", "All terms, filtered terms, or one term detail record", "Dictionary search and direct term references."],
+    ["Open dictionary in user dashboard", "/dashboard/:companySlug/dictionary/:family/:version", "Signed-in dashboard session", "Searchable browser for categories, terms, units, IRIs, field keys, access rights, and regulation references", "Company users checking field meanings and JSON-LD identifiers for passport types they can access."],
+    ["Open dictionary in admin dashboard", "/admin/dictionary/:family/:version", "Super-admin session", "The same dictionary browser inside the admin shell", "Super admins designing passport types and checking semantic mappings."],
+    ["Public dictionary browser", "/dictionary/:family/:version", "No login", "Public term browser and term detail pages", "External implementers and verifiers."],
+    ["JSON-LD context", "GET /dictionary/:family/:version/context.jsonld or /api/dictionary/:family/:version/context.jsonld", "No login", "Canonical JSON-LD context", "Semantic exports and linked-data verification."],
+    ["Manifest and rules", "GET /api/dictionary/:family/:version/manifest, /category-rules, /categories, /units, /field-map", "No login", "Dictionary metadata, applicability rules, field map, unit definitions, and category lists", "Builder validation, export guidance, and documentation."],
+    ["Term JSON", "GET /api/dictionary/:family/:version/terms or /terms/:slug", "No login", "All terms, filtered terms, or one term detail record", "Dictionary search and direct term references."],
   ],
 };
 

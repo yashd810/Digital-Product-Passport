@@ -1,0 +1,22 @@
+[
+  {
+    "key": "product-identification",
+    "label": "Product Identification",
+    "description": "Identity, model, category, and manufacturer attributes."
+  },
+  {
+    "key": "performance",
+    "label": "Performance",
+    "description": "Energy and operating performance attributes."
+  },
+  {
+    "key": "repair-and-service",
+    "label": "Repair And Service",
+    "description": "Repairability and serviceability attributes."
+  },
+  {
+    "key": "compliance",
+    "label": "Compliance",
+    "description": "Compliance declarations and regulated evidence attributes."
+  }
+]

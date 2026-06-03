@@ -80,9 +80,9 @@ function getPassportFieldValue(passport, key) {
 }
 
 export function getPassportSerialNumber(passport) {
-  const value = getPassportFieldValue(passport || {}, "batterySerialNumber")
+  const value = getPassportFieldValue(passport || {}, "productSerialNumber")
     ?? getPassportFieldValue(passport || {}, "serialNumber")
-    ?? getPassportFieldValue(passport || {}, "productSerialNumber");
+    ?? getPassportFieldValue(passport || {}, "batterySerialNumber");
   return value == null ? "" : String(value).trim();
 }
 

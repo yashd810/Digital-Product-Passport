@@ -219,7 +219,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Use the Export button in the list header to open the bulk export modal.",
             "Choose whether to export Selected passports, All released passports across all filtered pages, or only the current page.",
-            "Choose CSV when the next step is spreadsheet work, or JSON-LD when another system or re-import pipeline needs structured Battery Pass data.",
+            "Choose CSV when the next step is spreadsheet work, or JSON-LD when another system or re-import pipeline needs structured semantic passport data.",
             "Use filters first if you want the 'All (All Pages)' scope to represent a very specific subset.",
           ],
         },
@@ -249,7 +249,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Revise creates the next editable version for an already released passport.",
             "Clone creates a new passport based on the current record so teams do not need to re-enter repeated information.",
             "Compare versions opens the diff view so changes between releases are obvious before sign-off.",
-            "Export JSON-LD generates the passport with Battery Pass semantic IDs and contexts for interoperable exchange.",
+            "Export JSON-LD generates the passport with the selected semantic model's IDs and contexts for interoperable exchange.",
           ],
         },
         {
@@ -458,23 +458,23 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
     },
     {
-      id: "battery-dictionary",
+      id: "semantic-dictionary",
       icon: "🔖",
       category: "Dictionary",
-      audience: "Company users working with battery passports or JSON-LD exports",
-      title: "Use the Battery Dictionary to check terms, units, access rights, and semantic IDs",
-      summary: "The dashboard includes a Battery Dictionary browser for Battery Pass style work. Use it to search terms, open detail pages, check canonical IRIs, see expected units and data formats, and understand which application field keys map to each dictionary element.",
+      audience: "Company users working with semantic passport types or JSON-LD exports",
+      title: "Use semantic dictionaries to check terms, units, access rights, and semantic IDs",
+      summary: "The dashboard includes a dictionary browser for each semantic model available through the company's passport-type access. Use it to search terms, open detail pages, check canonical IRIs, see expected units and data formats, and understand which application field keys map to each dictionary element.",
       facts: [
-        { label: "Dashboard route", value: dashboardPath("dictionary/battery/v1") },
-        { label: "Public route", value: "/dictionary/battery/v1" },
+        { label: "Dashboard route", value: dashboardPath("dictionary/:family/:version") },
+        { label: "Public route", value: "/dictionary/:family/:version" },
         { label: "Term detail", value: "Each term has a slug page plus a raw JSON endpoint" },
-        { label: "Best use", value: "Validate field meaning before exporting JSON-LD or discussing Battery Pass data with partners" },
+        { label: "Best use", value: "Validate field meaning before exporting JSON-LD or discussing semantic passport data with partners" },
       ],
       journeys: [
         {
           title: "Find the right term before exporting",
           items: [
-            "Open Battery Dictionary from the dashboard sidebar.",
+            "Open the dictionary available for the passport type from the dashboard sidebar.",
             "Search by label, definition, slug, or known application field key.",
             "Open the term detail page to confirm data format, JSON type, XSD type, unit, access rights, static/dynamic status, internal key, element ID, and regulation references.",
             "Use the dictionary reference URL when another system needs the canonical linked-data identifier.",
@@ -483,18 +483,18 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Use it with passport authoring",
           items: [
-            "For battery passport fields, compare form field names with dictionary field keys so exports keep consistent semantics.",
-            "Check unit expectations before bulk imports or Asset Management updates so numeric battery values do not drift from the dictionary.",
+            "Compare form field names with dictionary field keys so exports keep consistent semantics.",
+            "Check unit expectations before bulk imports or Asset Management updates so numeric values do not drift from the dictionary.",
             "Use public dictionary links when external partners need term definitions without dashboard access.",
           ],
         },
       ],
       links: [
-        { label: "Open Battery Dictionary", route: dashboardPath("dictionary/battery/v1"), description: "Search terms, categories, units, and semantic identifiers." },
+        { label: "Open available dictionaries", route: dashboardPath("dictionary"), description: "Search the dictionaries exposed by the passport types your company can access." },
       ],
       table: DICTIONARY_API_TABLE,
       tips: [
-        "When a battery JSON-LD export looks surprising, check the term's field keys and expected unit first. The dictionary is the shared vocabulary behind those exports.",
+        "When a JSON-LD export looks surprising, check the selected dictionary's term field keys and expected unit first. The dictionary is the shared vocabulary behind those exports.",
       ],
     },
     {
@@ -609,7 +609,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "The platform DID lives at `/.well-known/did.json`.",
             "Company DID documents use `/did/company/:slug/did.json`.",
-            "Product subject DID documents use `/did/battery/model/:stableId/did.json`, `/did/battery/batch/:stableId/did.json`, or `/did/battery/item/:stableId/did.json`.",
+            "Product subject DID documents use `/did/:passportType/model/:stableId/did.json`, `/did/:passportType/batch/:stableId/did.json`, or `/did/:passportType/item/:stableId/did.json`.",
             "DPP record DID documents use `/did/dpp/:granularity/:stableId/did.json`, and facility DID documents use `/did/facility/:stableId/did.json`.",
             "The universal `/resolve?did=...` endpoint redirects browsers to the public passport where possible and API clients to the DID document URL.",
           ],
@@ -922,7 +922,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Use QR label export for packaging or physical tagging workflows.",
             "Use data-carrier verification evidence when QR print quality, placement, durability, or scan checks need to be recorded.",
-            "Use JSON-LD export when another system needs structured Battery Pass content.",
+            "Use JSON-LD export when another system needs structured semantic passport content.",
             "Use CSV exports when teams need spreadsheet-based reporting or downstream batch handling.",
           ],
         },

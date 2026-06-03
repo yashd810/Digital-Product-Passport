@@ -10,12 +10,12 @@ import { appendUnitToDisplayValue, formatFieldLabelWithUnit, formatIsoDate, rend
 
 const API = import.meta.env.VITE_API_URL || "";
 
-const BATTERY_ICON = (
+const PASSPORT_ICON = (
   <svg viewBox="0 0 64 64" aria-hidden="true">
-    <rect x="12" y="20" width="40" height="24" rx="8" fill="currentColor" opacity="0.18" />
-    <rect x="16" y="18" width="34" height="28" rx="8" fill="none" stroke="currentColor" strokeWidth="4" />
-    <rect x="50" y="27" width="4" height="10" rx="2" fill="currentColor" />
-    <path d="M32 23 24 35h7l-3 10 12-16h-8l4-6Z" fill="currentColor" />
+    <rect x="14" y="8" width="36" height="48" rx="8" fill="none" stroke="currentColor" strokeWidth="4" />
+    <path d="M24 22h16M24 32h16M24 42h10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    <circle cx="43" cy="44" r="7" fill="currentColor" opacity="0.18" />
+    <path d="m40 44 2 2 5-5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -590,6 +590,8 @@ export default function PublicPassportPortal({
 }) {
   const [activePage, setActivePage] = useState("overview");
   const [previewImage, setPreviewImage] = useState(null);
+  const passportDisplayName = typeDef?.displayName ||
+    String(passport?.passportType || "Digital product passport").replace(/_/g, " ");
   const sections = (typeDef?.fieldsJson?.sections || typeDef?.sections || []).map((section) => ({
     ...section,
     fields: (section.fields || []).filter((field) => !isViewerHiddenField(field)),
@@ -653,10 +655,10 @@ export default function PublicPassportPortal({
       <nav className="nav" aria-label="Passport sections">
         <div className="nav-inner">
           <a className="brand" href="#portal-top" aria-label="Back to passport top">
-            <div className="logo">{BATTERY_ICON}</div>
+            <div className="logo">{PASSPORT_ICON}</div>
             <div>
-              <strong>Battery Passport Portal</strong>
-              <span>Public DPP · battery viewer</span>
+              <strong>{passportDisplayName}</strong>
+              <span>Public digital product passport</span>
             </div>
           </a>
           <div className="nav-links" role="tablist" aria-label="Viewer pages">
@@ -680,7 +682,7 @@ export default function PublicPassportPortal({
       <header className="hero" id="portal-top">
         <div className="hero-main">
           <div>
-            <div className="kicker">{typeDef?.displayName || passport?.passportType || "Battery product passport"}</div>
+            <div className="kicker">{passportDisplayName}</div>
             <h1>{displayModelName}</h1>
             {(isPreviewMode || isInactiveView || isObsolete || unlockedPassport) && (
               <div className="hero-badge-row">
@@ -872,7 +874,7 @@ export default function PublicPassportPortal({
         </section>
 
         <section className={`page${activePage === "data" ? " active" : ""}`} id="data" role="tabpanel" hidden={activePage !== "data"}>
-          <h2 className="data-title">Battery data by category</h2>
+          <h2 className="data-title">Passport data by section</h2>
           <div className="category-stack">
             {sections.map((section, sectionIndex) => (
               <details key={section.key || sectionIndex} className="category" open={sectionIndex === 0}>
@@ -965,7 +967,7 @@ export default function PublicPassportPortal({
 
       <footer className="footer">
         <div className="footer-inner">
-          <span>{companyData?.companyName || "ClarosDPP"} · Category-specific battery passport</span>
+          <span>{companyData?.companyName || "ClarosDPP"} · Category-specific product passport</span>
           <span>Public passport viewer</span>
         </div>
       </footer>

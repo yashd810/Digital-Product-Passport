@@ -92,7 +92,7 @@ When changing API behavior:
 | --- | --- |
 | Backend | `cd apps/backend-api && npm run test` |
 | Frontend | `cd apps/frontend-app && npm run test` |
-| Frontend accessibility/contrast | `cd apps/frontend-app && npm run test:a11y && npm run test:contrast` |
+| Frontend contrast | `cd apps/frontend-app && npm run test:contrast` |
 | Public viewer build | `cd apps/public-passport-viewer && npm run build` |
 
 For narrow docs-only changes, a link/path check is usually enough. For code changes, run the closest affected test or build.

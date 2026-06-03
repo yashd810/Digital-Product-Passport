@@ -110,7 +110,7 @@ function Landing({ token, user, onLogout }) {
               { icon: "🔐", title: "Secure Authentication",   desc: "JWT-secured access with role-based permissions across your organization." },
               { icon: "🏢", title: "Multi-Tenant",            desc: "Complete data isolation — each company's passports stay private and secure." },
               { icon: "📊", title: "Real-Time Analytics",     desc: "Company and system-wide analytics dashboards for full visibility." },
-              { icon: "🪪", title: "Custom Passport Types",   desc: "Battery, Textile, Steel, Toys, Construction — or build your own schema." },
+              { icon: "🪪", title: "Custom Passport Types",   desc: "Define stable schemas for any regulated product category." },
               { icon: "📋", title: "Audit Logging",           desc: "Complete change history with user attribution and timestamps." },
               { icon: "🔄", title: "Version Control",         desc: "Draft → Release → Revise workflow for controlled passport updates." },
             ].map(f => (

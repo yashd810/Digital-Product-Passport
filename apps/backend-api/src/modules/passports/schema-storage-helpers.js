@@ -59,7 +59,7 @@ function createSchemaStorageHelpers({
       const normalized = normalizePassportRow(row);
       return {
         ...normalized,
-        is_editable: isEditablePassportStatus(normalized.release_status),
+        is_editable: isEditablePassportStatus(normalized.releaseStatus),
       };
     });
   }
@@ -224,7 +224,7 @@ function createSchemaStorageHelpers({
         "modelName"     VARCHAR(255),
         "internalAliasId"     VARCHAR(255) NOT NULL,
         "uniqueProductIdentifier" TEXT,
-        "complianceProfileKey" VARCHAR(120) NOT NULL DEFAULT 'generic_dpp_v1',
+        "complianceProfileKey" VARCHAR(120) NOT NULL DEFAULT 'genericDppV1',
         "contentSpecificationIds" TEXT,
         "carrierPolicyKey" VARCHAR(120),
         "carrierAuthenticity" JSONB,
@@ -357,14 +357,14 @@ function createSchemaStorageHelpers({
             if (apply) {
               const archiveResult = await pool.query(
                 `UPDATE passport_archives
-                 SET row_data = jsonb_set(
-                   row_data - $2,
+                 SET "rowData" = jsonb_set(
+                   "rowData" - $2,
                    ARRAY[$3],
-                   COALESCE(row_data -> $3, row_data -> $2),
+                   COALESCE("rowData" -> $3, "rowData" -> $2),
                    true
                  )
-                 WHERE passport_type = $1
-                   AND row_data ? $2`,
+                 WHERE "passportType" = $1
+                   AND "rowData" ? $2`,
                 [typeRow.typeName, legacyKey, exactKey]
               );
               affectedRows = archiveResult.rowCount || 0;

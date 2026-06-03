@@ -15,6 +15,9 @@ const { createResolutionHelpers } = require("../src/modules/dpp-api/resolution-h
 const registerElementRoutes = require("../src/modules/dpp-api/register-element-routes");
 const registerMutationRoutes = require("../src/modules/dpp-api/register-mutation-routes");
 const registerPublicReadRoutes = require("../src/modules/dpp-api/register-public-read-routes");
+const {
+  createComplianceManagedFieldHelpers,
+} = require("../src/modules/passports/compliance-managed-fields");
 
 // ─── DPP API ROUTES ───────────────────────────────────────────────────────────
 // All DID paths use companyId + internalAliasId — never the record ID.
@@ -162,61 +165,34 @@ module.exports = function registerDppApiRoutes(app, {
     next();
   });
 
-  async function loadCompanyComplianceIdentity(companyId) {
-    const result = await pool.query(
-      `SELECT economic_operator_identifier AS "economicOperatorIdentifier",
-              economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
-       FROM companies
-       WHERE id = $1
-       LIMIT 1`,
-      [companyId]
-    ).catch(() => ({ rows: [] }));
-    return result.rows[0] || null;
-  }
+  const complianceManagedFieldHelpers = createComplianceManagedFieldHelpers({
+    pool,
+    complianceService,
+    extractExplicitFacilityId,
+  });
+  const {
+    serializeProfileDefaultValue,
+  } = complianceManagedFieldHelpers;
 
   async function resolveManagedFacilityId({ companyId, requestedFields = {} }) {
-    const candidateFacilityId = extractExplicitFacilityId(requestedFields);
-    if (!candidateFacilityId) return null;
-
-    const facilityRes = await pool.query(
-      `SELECT facility_identifier
-       FROM company_facilities
-       WHERE company_id = $1
-         AND facility_identifier = $2
-         AND is_active = true
-       LIMIT 1`,
-      [companyId, candidateFacilityId]
-    ).catch(() => ({ rows: [] }));
-    if (!facilityRes.rows.length) {
-      const error = new Error(`Unknown or inactive facility identifier "${candidateFacilityId}"`);
-      error.statusCode = 400;
-      throw error;
-    }
-    return candidateFacilityId;
-  }
-
-  function serializeProfileDefaultValue(value) {
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return value ?? null;
+    return complianceManagedFieldHelpers.resolveManagedFacilityId({
+      companyId,
+      requestedFields,
+      allowDefaultFacility: false,
+      validateExplicitFacility: true,
+    });
   }
 
   async function buildStandardsCreateFields({ companyId, passportType, granularity, requestedFields = {} }) {
-    const profile = complianceService?.resolveProfileMetadata?.({ passportType, granularity }) || {
-      key: "generic_dpp_v1",
-      contentSpecificationIds: [],
-      defaultCarrierPolicyKey: null
-    };
-    const companyIdentity = await loadCompanyComplianceIdentity(companyId);
-    const resolvedFacilityId = await resolveManagedFacilityId({ companyId, requestedFields });
-    return {
-      complianceProfileKey: requestedFields.complianceProfileKey || profile.key,
-      contentSpecificationIds: serializeProfileDefaultValue(
-        requestedFields.contentSpecificationIds || profile.contentSpecificationIds || []
-      ),
-      carrierPolicyKey: requestedFields.carrierPolicyKey || profile.defaultCarrierPolicyKey || null,
-      economicOperatorId: requestedFields.economicOperatorId || companyIdentity?.economicOperatorIdentifier || null,
-      facilityId: resolvedFacilityId
-    };
+    return complianceManagedFieldHelpers.buildComplianceManagedFields({
+      companyId,
+      passportType,
+      granularity,
+      requestedFields,
+      allowDefaultFacility: false,
+      validateExplicitFacility: true,
+      allowProfileOverride: false,
+    });
   }
 
   async function replicatePassportToBackup({
@@ -434,6 +410,7 @@ module.exports = function registerDppApiRoutes(app, {
     normalizePassportRow,
     getCompanyNameMap,
     dbLookupByCompanyAndProduct,
+    dbLookupByInternalAliasIdOnly,
     getAppUrl,
     didService,
     dppIdentity,

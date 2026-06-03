@@ -12,10 +12,23 @@
     "check:style": "node scripts/check-js-style.js",
     "lint": "npm run check:syntax && npm run check:style && npm run check:boundaries",
     "format:check": "npm run check:style",
+    "test:semantics": "node --test tests/semantic-model-registry.node.test.js",
+    "test:passport-modules": "node --test tests/passport-type-modules.node.test.js",
+    "test:passport-seed": "node --test tests/seed-passport-types.node.test.js",
+    "test:semantic-export": "node --test tests/semantic-passport-export.node.test.js",
+    "test:did-service-generic": "node --test tests/did-service-generic.node.test.js",
+    "test:compliance-profiles": "node --test tests/compliance-profiles.node.test.js",
+    "test:compliance-managed-fields": "node --test tests/compliance-managed-fields.node.test.js",
+    "test:canonical-serializer": "node --test tests/canonical-passport-serializer.node.test.js",
+    "test:dpp-patch-managed-fields": "node --test tests/dpp-patch-managed-fields.node.test.js",
+    "test:passport-update-managed-fields": "node --test tests/passport-update-managed-fields.node.test.js",
+    "test:passport-bulk-patch-guardrails": "node --test tests/passport-bulk-patch-guardrails.node.test.js",
+    "test:passport-import-field-guardrails": "node --test tests/passport-import-field-guardrails.node.test.js",
+    "bootstrap:passport-modules": "node scripts/bootstrap-passport-modules.js",
+    "seed:passport-types": "node scripts/seed-passport-types.js",
     "repair:passport-storage": "node scripts/check-passport-storage.js --repair",
-    "repair:battery-fields": "node scripts/repair-battery-field-keys.js",
     "dev": "nodemon Server/server.js",
-    "test": "jest --runInBand",
+    "test": "node --test tests/*.node.test.js",
     "generate:battery-dictionary": "node ../../scripts/generate-battery-dictionary.js"
   },
   "keywords": [],
@@ -40,8 +53,6 @@
     "uuid": "^11.1.1"
   },
   "devDependencies": {
-    "jest": "^30.2.0",
-    "nodemon": "^3.1.14",
-    "supertest": "^7.1.1"
+    "nodemon": "^3.1.14"
   }
 }

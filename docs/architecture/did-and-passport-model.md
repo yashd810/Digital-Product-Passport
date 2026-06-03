@@ -1,6 +1,6 @@
 # DID And Passport Model
 
-Last updated: 2026-05-05
+Last updated: 2026-06-03
 
 ## Table of Contents
 
@@ -8,6 +8,7 @@ Last updated: 2026-05-05
 - [DID Structure](#did-structure)
 - [DID Resolution](#did-resolution)
 - [Passport Structure](#passport-structure)
+- [Passport Type Modules And Semantics](#passport-type-modules-and-semantics)
 - [Passport Signatures](#passport-signatures)
 - [Public URL Mapping](#public-url-mapping)
 - [Implementation Details](#implementation-details)
@@ -19,7 +20,7 @@ Last updated: 2026-05-05
 
 Decentralized Identifiers (DIDs) are self-managed identities used in the DPP system to uniquely identify:
 - **Organizations** (companies)
-- **Products** (batteries, items being tracked)
+- **Product subjects** (models, batches, or items for any passport type)
 - **Digital Product Passports** (DPP instances)
 
 All DIDs use the `did:web` scheme, resolving through HTTPS to standard DID documents containing public keys and metadata.
@@ -34,7 +35,7 @@ All DIDs use the `did:web` scheme, resolving through HTTPS to standard DID docum
 ### Hierarchical Format
 
 ```
-did:web:<domain>:did:<category>:<subcategory>:<stable-id>
+did:web:<domain>:did:<namespace>:<level>:<stable-id>
 ```
 
 ### DID Types
@@ -62,17 +63,18 @@ did:web:www.claros-dpp.online:did:company:acme-energy
 
 #### 2. Product Subject DID
 
-Identifies a specific product or product model.
+Identifies a specific product model, batch, or item. The DID namespace is derived from the passport type, not from a hardcoded product category.
 
 ```
-did:web:www.claros-dpp.online:did:battery:model:MODEL-2026-5000
-did:web:www.claros-dpp.online:did:battery:item:BAT-SERIAL-12345
+did:web:www.claros-dpp.online:did:battery-passport-v1:model:MODEL-2026-5000
+did:web:www.claros-dpp.online:did:textile-passport-v1:item:STYLE-12345
+did:web:www.claros-dpp.online:did:appliance-passport-v1:item:ITEM-2026-001
 ```
 
 **Components:**
-- `battery` - Product category (battery, material, item, etc.)
-- `model` or `item` - Product level (model vs instance)
-- `MODEL-2026-5000` or `BAT-SERIAL-12345` - Stable product identifier
+- `battery-passport-v1`, `textile-passport-v1`, `appliance-passport-v1`, etc. - Passport type namespace
+- `model`, `batch`, or `item` - Product subject level
+- `MODEL-2026-5000`, `STYLE-12345`, `ITEM-2026-001`, etc. - Stable product identifier
 
 **Data:**
 - Product specifications (type, manufacturer, certifications)
@@ -87,12 +89,12 @@ Identifies a specific passport instance.
 
 ```
 did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc
-did:web:www.claros-dpp.online:did:dpp:battery:f8e9d7c6-5b4a-3c2d-1e0f-aabbccddeeff
+did:web:www.claros-dpp.online:did:dpp:batch:f8e9d7c6-5b4a-3c2d-1e0f-aabbccddeeff
 ```
 
 **Components:**
 - `dpp` - Document category
-- `item` or `battery` - Granularity level (usually product category)
+- `model`, `batch`, or `item` - DPP granularity level
 - `72b99c83-952c-4179-96f6-54a513d39dbc` - UUID (stable for the passport)
 
 **Data:**
@@ -101,7 +103,7 @@ did:web:www.claros-dpp.online:did:dpp:battery:f8e9d7c6-5b4a-3c2d-1e0f-aabbccddee
 - Issuer public key and signature algorithm
 - Timestamp of issuance
 
-**Stored in:** Type-specific passport tables (e.g., `passports_battery`) with `dpp_id` column
+**Stored in:** Type-specific passport tables (`<typeName>_passports`) with `dpp_id` and DID-related columns
 
 ## DID Resolution
 
@@ -127,10 +129,13 @@ GET /.well-known/did.json
 GET /did/company/<company-slug>/did.json
   → Returns specific company DID document
 
-GET /did/product/<category>/model/<model-id>/did.json
+GET /did/<passportType>/model/<stable-id>/did.json
   → Returns product model DID document
 
-GET /did/product/<category>/item/<item-id>/did.json
+GET /did/<passportType>/batch/<stable-id>/did.json
+  → Returns product batch DID document
+
+GET /did/<passportType>/item/<stable-id>/did.json
   → Returns product item DID document
 
 GET /did/dpp/<granularity>/<uuid>/did.json
@@ -190,7 +195,7 @@ Passport Instance (UUID-based, stored in type table)
   │  ├─ dpp_id (UUID)
   │  ├─ dpp_did (did:web:...)
   │  ├─ company_id (issuer)
-  │  ├─ product_type (battery, material, etc.)
+  │  ├─ passport_type (typeName such as batteryPassportV1, textilePassportV1, appliancePassportV1)
   │  ├─ public_path (canonical URL)
   │  └─ status (draft, released, archived, revoked)
   │
@@ -227,6 +232,101 @@ Passport UUID: 72b99c83-952c-4179-96f6-54a513d39dbc
 
 **Version tracking:** current versions live on the dynamic passport table, with released/archive snapshots in `passport_archives` and public visibility flags in `passport_history_visibility`.
 
+## Passport Type Modules And Semantics
+
+Passport types are versioned code modules, not runtime-only form definitions. This keeps each product category stable while still allowing new regulations and semantic models to be added without mutating old passports.
+
+### Module Discovery
+
+Backend modules live in:
+
+```
+apps/backend-api/src/passport-modules/
+```
+
+Every `.js` file in that directory except `index.js` is auto-discovered. Adding a future product category should normally mean adding a new module file, for example:
+
+```
+apps/backend-api/src/passport-modules/medical-device-v1.js
+apps/backend-api/src/passport-modules/appliance-v3.js
+apps/backend-api/src/passport-modules/construction-product-v1.js
+```
+
+Each module declares:
+- `moduleKey` - stable module identifier, for example `appliance:v1`
+- `typeName` - stable passport type/table namespace, for example `appliancePassportV1`
+- `productCategory` and `productIcon` - grouping metadata for admin and company dashboards
+- `semanticModelKey` - selected dictionary model, or `null` for non-semantic types
+- `complianceProfile` - profile-owned fields, carrier policy, category policy, and semantic enforcement
+- `sections` - author-facing schema fields
+
+Breaking schema or semantic changes should create a new module/typeName instead of modifying the old module. Old passports then continue resolving with their original schema and semantic model.
+
+### Semantic Models And Dictionaries
+
+Semantic model resources live in:
+
+```
+apps/backend-api/resources/semantics/<family>/<version>/
+```
+
+A registered model can include:
+- `manifest.json`
+- `terms.json`
+- `field-map.json`
+- `context.jsonld`
+- `category-rules.json`
+- optional `categories.json`, `units.json`, and `catalog.jsonld`
+
+Dictionary routes are generic:
+
+```
+GET /dictionary/:family/:version/manifest.json
+GET /dictionary/:family/:version/context.jsonld
+GET /dictionary/:family/:version/terms
+GET /api/semantic-models/:semanticModelKey/terms
+```
+
+Company dashboard dictionary visibility is derived from company access to passport types. If a company has access to two passport types with two different semantic models, it can see both dictionaries. If it has no access to a semantic model, that dictionary should not be shown in the company dashboard.
+
+### Compliance Profiles And Category Policies
+
+Compliance behavior is module/profile-driven. The core compliance engine does not infer behavior from product names like "battery" or "textile".
+
+A profile can declare a generic semantic category policy:
+
+```js
+categoryPolicy: {
+  kind: "semanticCategory",
+  productKind: "medical_device",
+  label: "device class",
+  fieldKey: "deviceClass",
+  supportedCategories: ["Class I", "Class IIa", "Class IIb", "Class III"],
+  aliases: {
+    "class 1": "Class I",
+    "class i": "Class I"
+  }
+}
+```
+
+If the selected semantic model also provides `category-rules.json`, completeness and canonical export can apply category-specific requirement levels without product-specific code.
+
+### Seeding And Access
+
+After adding module files, seed them with:
+
+```bash
+npm run bootstrap:passport-modules
+npm run seed:passport-types -- --module=appliance:v1 --company-id=7
+```
+
+The seed process:
+- creates or updates `passport_types`
+- creates the product category if needed
+- stores the normalized module schema and compliance profile in `fieldsJson`
+- optionally reconciles the passport storage table
+- optionally grants company access
+
 ## Passport Signatures
 
 ### Canonical JSON Canonicalization (JCS)
@@ -242,12 +342,12 @@ Passports are signed using JSON Canonicalization Scheme (RFC 8785) to ensure det
 
 Original (unordered):
 ```json
-{"name": "Battery Pack", "capacity": 50, "type": "LFP"}
+{"name": "Product Model", "mass": 50, "type": "example"}
 ```
 
 Canonical (sorted, no spaces):
 ```
-{"capacity":50,"name":"Battery Pack","type":"LFP"}
+{"mass":50,"name":"Product Model","type":"example"}
 ```
 
 ### Signature Algorithms
@@ -294,7 +394,7 @@ https://www.claros-dpp.online/p/<uuid>  (short form)
 **Examples:**
 
 ```
-https://www.claros-dpp.online/dpp/acme-energy/battery-pack-5000/BAT-2026-001
+https://www.claros-dpp.online/dpp/acme-industries/product-model-5000/ITEM-2026-001
 https://www.claros-dpp.online/p/72b99c83-952c-4179-96f6-54a513d39dbc
 ```
 
@@ -305,10 +405,10 @@ The system resolves public URLs back to DIDs:
 **Function:** `resolvePublicPathToSubjects(...)`
 
 ```
-https://www.claros-dpp.online/dpp/acme-energy/battery-pack-5000/BAT-2026-001
+https://www.claros-dpp.online/dpp/acme-industries/product-model-5000/ITEM-2026-001
   ↓
-lookup in database → company_id (acme-energy)
-lookup in database → product_identifier (BAT-2026-001)
+lookup in database → company_id (acme-industries)
+lookup in database → product_identifier (ITEM-2026-001)
 lookup in database → passport_uuid (72b99c83...)
 construct → did:web:www.claros-dpp.online:did:dpp:item:72b99c83-952c-4179-96f6-54a513d39dbc
 ```
@@ -391,7 +491,7 @@ DID generation behavior is configurable per company via `company_dpp_policies`:
 
 ### Complete Resolution Flow
 
-**Scenario:** User scans QR code on battery pack
+**Scenario:** User scans QR code on a physical product
 
 ```
 1. QR decodes to: https://www.claros-dpp.online/p/72b99c83-952c-4179-96f6-54a513d39dbc
@@ -401,9 +501,9 @@ DID generation behavior is configurable per company via `company_dpp_policies`:
 3. Backend resolves:
    → Lookup passport by UUID
    → Extract company_id, public_path
-   → Redirect to: /dpp/acme-energy/battery-pack-5000/BAT-2026-001
+   → Redirect to: /dpp/acme-industries/product-model-5000/ITEM-2026-001
 
-4. Browser requests: GET /dpp/acme-energy/battery-pack-5000/BAT-2026-001
+4. Browser requests: GET /dpp/acme-industries/product-model-5000/ITEM-2026-001
 
 5. Backend returns:
    → HTML/JSON passport content

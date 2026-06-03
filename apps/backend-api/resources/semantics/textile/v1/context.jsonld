@@ -1,0 +1,42 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "dpp": "https://schema.digitalproductpassport.eu/ns/dpp#",
+    "clarosTextile": "https://www.claros-dpp.online/dictionary/textile/v1/terms/",
+    "clarosTextileClass": "https://www.claros-dpp.online/dictionary/textile/v1/classes/",
+    "TextileProductPassport": "clarosTextileClass:TextileProductPassport",
+    "productModelIdentifier": {
+      "@id": "clarosTextile:product-model-identifier",
+      "@type": "xsd:string"
+    },
+    "fiberComposition": {
+      "@id": "clarosTextile:fiber-composition",
+      "@type": "xsd:string"
+    },
+    "recycledContentPercentage": {
+      "@id": "clarosTextile:recycled-content-percentage",
+      "@type": "xsd:decimal"
+    },
+    "fabricWeight": {
+      "@id": "clarosTextile:fabric-weight",
+      "@type": "xsd:decimal"
+    },
+    "countryOfOrigin": {
+      "@id": "clarosTextile:country-of-origin",
+      "@type": "xsd:string"
+    },
+    "careInstructions": {
+      "@id": "clarosTextile:care-instructions",
+      "@type": "xsd:string"
+    },
+    "durabilityScore": {
+      "@id": "clarosTextile:durability-score",
+      "@type": "xsd:integer"
+    },
+    "restrictedSubstancesDisclosure": {
+      "@id": "clarosTextile:restricted-substances-disclosure",
+      "@type": "xsd:string"
+    }
+  }
+}

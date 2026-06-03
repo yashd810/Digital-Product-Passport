@@ -1,0 +1,26 @@
+{
+  "@context": {
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "dct": "http://purl.org/dc/terms/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
+  },
+  "@type": "dcat:Catalog",
+  "@id": "https://www.claros-dpp.online/dictionary/textile/v1/catalog.jsonld",
+  "dct:title": "Claros Textile Dictionary",
+  "dct:description": "Versioned semantic dictionary artifacts for textile Digital Product Passports.",
+  "dcat:dataset": [
+    {
+      "@id": "https://www.claros-dpp.online/dictionary/textile/v1/terms",
+      "@type": "dcat:Dataset",
+      "dct:title": "Claros Textile Dictionary Terms",
+      "dct:identifier": "claros_textile_dictionary_v1",
+      "dcat:distribution": [
+        {
+          "@type": "dcat:Distribution",
+          "dcat:accessURL": "https://www.claros-dpp.online/dictionary/textile/v1/terms",
+          "dct:format": "application/json"
+        }
+      ]
+    }
+  ]
+}

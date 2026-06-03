@@ -16,12 +16,18 @@ function formatPassportTypeLabel(passportType) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function buildSemanticModelDictionarySubpath(model) {
+  if (!model?.family || !model?.version) return null;
+  return `dictionary/${encodeURIComponent(model.family)}/${encodeURIComponent(model.version)}`;
+}
+
 function DashboardLayout({ user, companyId, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { companySlug: routeCompanySlug } = useParams();
   const { t, lang, setLang } = useI18n();
   const [passportTypes, setPassportTypes] = useState([]);
+  const [semanticModels, setSemanticModels] = useState([]);
   const [currentTheme,  setCurrentTheme]  = useState(() => getStoredTheme(user?.id));
   const [msgUnread, setMsgUnread] = useState(0);
   const [openingAssetManagement, setOpeningAssetManagement] = useState(false);
@@ -35,14 +41,22 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
   useEffect(() => {
     if (!companyId) { navigate("/login"); return; }
-    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`,
-      { headers: authHeaders() })
-      .then(r => r.json())
-      .then(data => {
-        // Ensure data is an array; handle API errors gracefully
-        setPassportTypes(Array.isArray(data) ? data : []);
+    Promise.all([
+      fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+        .then(r => r.json())
+        .catch(() => []),
+      fetchWithAuth(`${API}/api/companies/${companyId}/semantic-models`, { headers: authHeaders() })
+        .then(r => r.json())
+        .catch(() => []),
+    ])
+      .then(([passportTypeData, semanticModelData]) => {
+        setPassportTypes(Array.isArray(passportTypeData) ? passportTypeData : []);
+        setSemanticModels(Array.isArray(semanticModelData) ? semanticModelData : []);
       })
-      .catch(() => setPassportTypes([]));
+      .catch(() => {
+        setPassportTypes([]);
+        setSemanticModels([]);
+      });
   }, [companyId]);
 
   useEffect(() => {
@@ -282,10 +296,18 @@ function DashboardLayout({ user, companyId, onLogout }) {
               <NavLink to={dashboardPath("manual")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📘 Manual
               </NavLink>
-              <NavLink to={dashboardPath("dictionary/battery/v1")}
-                className={() => `sidebar-link${isDashboardSectionActive("dictionary") ? " active" : ""}`}>
-                🔖 Battery Dictionary
-              </NavLink>
+              {semanticModels
+                .map((model) => ({ model, subpath: buildSemanticModelDictionarySubpath(model) }))
+                .filter(({ subpath }) => subpath)
+                .map(({ model, subpath }) => (
+                  <NavLink
+                    key={model.semanticModelKey || subpath}
+                    to={dashboardPath(subpath)}
+                    className={() => `sidebar-link${isDashboardSectionActive("dictionary") ? " active" : ""}`}
+                  >
+                    🔖 {model.name || model.semanticModelKey || "Dictionary"}
+                  </NavLink>
+                ))}
             </nav>
           </aside>
 

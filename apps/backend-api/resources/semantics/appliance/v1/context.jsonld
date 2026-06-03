@@ -1,0 +1,20 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "appliance": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/",
+    "productModelIdentifier": "appliance:product-model-identifier",
+    "applianceCategory": "appliance:appliance-category",
+    "manufacturerName": "appliance:manufacturer-name",
+    "energyRating": "appliance:energy-rating",
+    "powerConsumption": {
+      "@id": "appliance:power-consumption",
+      "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+    },
+    "repairabilityScore": {
+      "@id": "appliance:repairability-score",
+      "@type": "http://www.w3.org/2001/XMLSchema#decimal"
+    },
+    "sparePartsAvailability": "appliance:spare-parts-availability",
+    "complianceDeclaration": "appliance:compliance-declaration"
+  }
+}

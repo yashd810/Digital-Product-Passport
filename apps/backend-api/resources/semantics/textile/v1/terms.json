@@ -1,0 +1,338 @@
+[
+  {
+    "id": 1,
+    "number": 1,
+    "specRef": "TEX-001",
+    "slug": "product-model-identifier",
+    "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/product-model-identifier",
+    "termIri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/product-model-identifier",
+    "label": "Product Model Identifier",
+    "attributeName": "Product Model Identifier",
+    "definition": "Identifies the textile product model or style that the passport describes.",
+    "shortDefinition": "Textile product model or style identifier.",
+    "category": "product-identification",
+    "categoryLabel": "Product Identification",
+    "internalKey": "productModelIdentifier",
+    "internal_key": "productModelIdentifier",
+    "elementId": "productModelIdentifier",
+    "element_id": "productModelIdentifier",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/TextileProductPassport",
+      "curie": "clarosTextileClass:TextileProductPassport",
+      "label": "Textile Product Passport"
+    },
+    "range": {
+      "iri": "http://www.w3.org/2001/XMLSchema#string",
+      "curie": "xsd:string",
+      "label": "String"
+    },
+    "unit": "none",
+    "unitDisplay": "n.a.",
+    "accessRights": "public",
+    "staticOrDynamic": "static",
+    "updateRequirement": "on_change",
+    "granularityLevel": "model",
+    "appFieldKeys": [
+      "productModelIdentifier"
+    ]
+  },
+  {
+    "id": 2,
+    "number": 2,
+    "specRef": "TEX-002",
+    "slug": "fiber-composition",
+    "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/fiber-composition",
+    "termIri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/fiber-composition",
+    "label": "Fiber Composition",
+    "attributeName": "Fiber Composition",
+    "definition": "Declares the textile fiber composition, including primary and secondary fibers where applicable.",
+    "shortDefinition": "Declared textile fiber composition.",
+    "category": "material-composition",
+    "categoryLabel": "Material Composition",
+    "internalKey": "fiberComposition",
+    "internal_key": "fiberComposition",
+    "elementId": "fiberComposition",
+    "element_id": "fiberComposition",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/MaterialComposition",
+      "curie": "clarosTextileClass:MaterialComposition",
+      "label": "Material Composition"
+    },
+    "range": {
+      "iri": "http://www.w3.org/2001/XMLSchema#string",
+      "curie": "xsd:string",
+      "label": "String"
+    },
+    "unit": "none",
+    "unitDisplay": "n.a.",
+    "accessRights": "public",
+    "staticOrDynamic": "static",
+    "updateRequirement": "on_change",
+    "granularityLevel": "model",
+    "appFieldKeys": [
+      "fiberComposition"
+    ]
+  },
+  {
+    "id": 3,
+    "number": 3,
+    "specRef": "TEX-003",
+    "slug": "recycled-content-percentage",
+    "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/recycled-content-percentage",
+    "termIri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/recycled-content-percentage",
+    "label": "Recycled Content Percentage",
+    "attributeName": "Recycled Content Percentage",
+    "definition": "Percentage of recycled material content in the textile product or declared textile component.",
+    "shortDefinition": "Share of recycled material content.",
+    "category": "material-composition",
+    "categoryLabel": "Material Composition",
+    "internalKey": "recycledContentPercentage",
+    "internal_key": "recycledContentPercentage",
+    "elementId": "recycledContentPercentage",
+    "element_id": "recycledContentPercentage",
+    "dataType": {
+      "format": "Decimal",
+      "jsonType": "number",
+      "xsdType": "xsd:decimal"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/MaterialComposition",
+      "curie": "clarosTextileClass:MaterialComposition",
+      "label": "Material Composition"
+    },
+    "range": {
+      "iri": "http://www.w3.org/2001/XMLSchema#decimal",
+      "curie": "xsd:decimal",
+      "label": "Decimal"
+    },
+    "unit": "percent",
+    "unitDisplay": "%",
+    "accessRights": "public",
+    "staticOrDynamic": "static",
+    "updateRequirement": "on_change",
+    "granularityLevel": "model",
+    "appFieldKeys": [
+      "recycledContentPercentage"
+    ]
+  },
+  {
+    "id": 4,
+    "number": 4,
+    "specRef": "TEX-004",
+    "slug": "fabric-weight",
+    "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/fabric-weight",
+    "termIri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/fabric-weight",
+    "label": "Fabric Weight",
+    "attributeName": "Fabric Weight",
+    "definition": "Mass per unit area of the textile fabric.",
+    "shortDefinition": "Fabric mass per unit area.",
+    "category": "material-composition",
+    "categoryLabel": "Material Composition",
+    "internalKey": "fabricWeight",
+    "internal_key": "fabricWeight",
+    "elementId": "fabricWeight",
+    "element_id": "fabricWeight",
+    "dataType": {
+      "format": "Decimal",
+      "jsonType": "number",
+      "xsdType": "xsd:decimal"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/MaterialComposition",
+      "curie": "clarosTextileClass:MaterialComposition",
+      "label": "Material Composition"
+    },
+    "range": {
+      "iri": "http://www.w3.org/2001/XMLSchema#decimal",
+      "curie": "xsd:decimal",
+      "label": "Decimal"
+    },
+    "unit": "gsm",
+    "unitDisplay": "g/m2",
+    "accessRights": "public",
+    "staticOrDynamic": "static",
+    "updateRequirement": "on_change",
+    "granularityLevel": "model",
+    "appFieldKeys": [
+      "fabricWeight"
+    ]
+  },
+  {
+    "id": 5,
+    "number": 5,
+    "specRef": "TEX-005",
+    "slug": "country-of-origin",
+    "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/country-of-origin",
+    "termIri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/country-of-origin",
+    "label": "Country of Origin",
+    "attributeName": "Country of Origin",
+    "definition": "Country where the textile product or primary manufacturing stage originated.",
+    "shortDefinition": "Declared textile country of origin.",
+    "category": "manufacturing-and-care",
+    "categoryLabel": "Manufacturing and Care",
+    "internalKey": "countryOfOrigin",
+    "internal_key": "countryOfOrigin",
+    "elementId": "countryOfOrigin",
+    "element_id": "countryOfOrigin",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/ManufacturingAndCare",
+      "curie": "clarosTextileClass:ManufacturingAndCare",
+      "label": "Manufacturing and Care"
+    },
+    "range": {
+      "iri": "http://www.w3.org/2001/XMLSchema#string",
+      "curie": "xsd:string",
+      "label": "String"
+    },
+    "unit": "none",
+    "unitDisplay": "n.a.",
+    "accessRights": "public",
+    "staticOrDynamic": "static",
+    "updateRequirement": "on_change",
+    "granularityLevel": "model",
+    "appFieldKeys": [
+      "countryOfOrigin"
+    ]
+  },
+  {
+    "id": 6,
+    "number": 6,
+    "specRef": "TEX-006",
+    "slug": "care-instructions",
+    "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/care-instructions",
+    "termIri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/care-instructions",
+    "label": "Care Instructions",
+    "attributeName": "Care Instructions",
+    "definition": "Human-readable care instructions for washing, drying, ironing, and special handling.",
+    "shortDefinition": "Textile care instructions.",
+    "category": "manufacturing-and-care",
+    "categoryLabel": "Manufacturing and Care",
+    "internalKey": "careInstructions",
+    "internal_key": "careInstructions",
+    "elementId": "careInstructions",
+    "element_id": "careInstructions",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/ManufacturingAndCare",
+      "curie": "clarosTextileClass:ManufacturingAndCare",
+      "label": "Manufacturing and Care"
+    },
+    "range": {
+      "iri": "http://www.w3.org/2001/XMLSchema#string",
+      "curie": "xsd:string",
+      "label": "String"
+    },
+    "unit": "none",
+    "unitDisplay": "n.a.",
+    "accessRights": "public",
+    "staticOrDynamic": "static",
+    "updateRequirement": "on_change",
+    "granularityLevel": "model",
+    "appFieldKeys": [
+      "careInstructions"
+    ]
+  },
+  {
+    "id": 7,
+    "number": 7,
+    "specRef": "TEX-007",
+    "slug": "durability-score",
+    "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/durability-score",
+    "termIri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/durability-score",
+    "label": "Durability Score",
+    "attributeName": "Durability Score",
+    "definition": "A controlled durability score or class for the textile product.",
+    "shortDefinition": "Textile durability score.",
+    "category": "manufacturing-and-care",
+    "categoryLabel": "Manufacturing and Care",
+    "internalKey": "durabilityScore",
+    "internal_key": "durabilityScore",
+    "elementId": "durabilityScore",
+    "element_id": "durabilityScore",
+    "dataType": {
+      "format": "Integer",
+      "jsonType": "integer",
+      "xsdType": "xsd:integer"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/ManufacturingAndCare",
+      "curie": "clarosTextileClass:ManufacturingAndCare",
+      "label": "Manufacturing and Care"
+    },
+    "range": {
+      "iri": "http://www.w3.org/2001/XMLSchema#integer",
+      "curie": "xsd:integer",
+      "label": "Integer"
+    },
+    "unit": "score-1-5",
+    "unitDisplay": "1-5",
+    "accessRights": "public",
+    "staticOrDynamic": "static",
+    "updateRequirement": "on_change",
+    "granularityLevel": "model",
+    "appFieldKeys": [
+      "durabilityScore"
+    ]
+  },
+  {
+    "id": 8,
+    "number": 8,
+    "specRef": "TEX-008",
+    "slug": "restricted-substances-disclosure",
+    "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/restricted-substances-disclosure",
+    "termIri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/restricted-substances-disclosure",
+    "label": "Restricted Substances Disclosure",
+    "attributeName": "Restricted Substances Disclosure",
+    "definition": "Disclosure statement for restricted substances, chemical compliance, or related declarations.",
+    "shortDefinition": "Restricted substance disclosure statement.",
+    "category": "restricted-substances",
+    "categoryLabel": "Restricted Substances",
+    "internalKey": "restrictedSubstancesDisclosure",
+    "internal_key": "restrictedSubstancesDisclosure",
+    "elementId": "restrictedSubstancesDisclosure",
+    "element_id": "restrictedSubstancesDisclosure",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/RestrictedSubstances",
+      "curie": "clarosTextileClass:RestrictedSubstances",
+      "label": "Restricted Substances"
+    },
+    "range": {
+      "iri": "http://www.w3.org/2001/XMLSchema#string",
+      "curie": "xsd:string",
+      "label": "String"
+    },
+    "unit": "none",
+    "unitDisplay": "n.a.",
+    "accessRights": "restricted",
+    "staticOrDynamic": "static",
+    "updateRequirement": "on_change",
+    "granularityLevel": "model",
+    "appFieldKeys": [
+      "restrictedSubstancesDisclosure"
+    ]
+  }
+]

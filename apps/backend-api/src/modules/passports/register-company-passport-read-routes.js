@@ -14,7 +14,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
     normalizeInternalAliasIdValue,
     getPassportTypeSchema,
     fetchCompanyPassportRecord,
-    buildBatteryPassJsonExport,
+    buildSemanticPassportJsonExport,
     buildExpandedPassportPayload,
     complianceService,
     productIdentifierService,
@@ -172,11 +172,11 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       if (statusFilter === "all") {
         statusSql = "";
       } else if (statusFilter === "released") {
-        statusSql = " AND release_status = 'released'";
+        statusSql = ' AND "releaseStatus" = \'released\'';
       } else if (statusFilter === "in_revision") {
-        statusSql = ` AND release_status IN ${IN_REVISION_STATUSES_SQL}`;
+        statusSql = ` AND "releaseStatus" IN ${IN_REVISION_STATUSES_SQL}`;
       } else {
-        statusSql = ` AND release_status IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
+        statusSql = ` AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
       }
 
       const passportResult = await pool.query(
@@ -203,7 +203,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
               }
             ))
           : rows;
-        return res.json(buildBatteryPassJsonExport(exportRows, passportType, {
+        return res.json(buildSemanticPassportJsonExport(exportRows, passportType, {
           semanticModelKey: typeResult.rows[0]?.semanticModelKey || null,
           productCategory: typeResult.rows[0]?.productCategory || null,
         }));
@@ -262,7 +262,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       query = `
         SELECT
           sub.*,
-          COALESCE(phv.is_public, sub."releaseStatus" IN ('released', 'obsolete')) AS "isPublic",
+          COALESCE(phv."isPublic", sub."releaseStatus" IN ('released', 'obsolete')) AS "isPublic",
           public_version."versionNumber" AS "publicVersionNumber"
         FROM (${query}) sub
         LEFT JOIN passport_history_visibility phv
@@ -276,9 +276,9 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
            AND phv_public."versionNumber" = pa_public."versionNumber"
           WHERE pa_public."lineageId" = sub."lineageId"
             AND pa_public."companyId" = sub."companyId"
-            AND ${ARCHIVED_HISTORY_FILTER_SQL.replaceAll("snapshot_reason", "pa_public.snapshot_reason")}
+            AND ${ARCHIVED_HISTORY_FILTER_SQL.replaceAll("\"snapshotReason\"", "pa_public.\"snapshotReason\"")}
             AND pa_public."releaseStatus" IN ('released', 'obsolete')
-            AND COALESCE(phv_public.is_public, true) = true
+            AND COALESCE(phv_public."isPublic", true) = true
           ORDER BY pa_public."versionNumber" DESC, pa_public."archivedAt" DESC
           LIMIT 1
         ) public_version ON true

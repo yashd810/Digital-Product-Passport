@@ -253,18 +253,18 @@ module.exports = function createAccessRightsService({ pool }) {
     if (!passportDppId || !userId) return [];
     const result = await pool.query(
       `SELECT pag.audience,
-              pag.element_id_path AS "elementIdPath",
-              pag.company_id AS "companyId",
-              pag.granted_by AS "grantedBy",
+              pag."elementIdPath" AS "elementIdPath",
+              pag."companyId" AS "companyId",
+              pag."grantedBy" AS "grantedBy",
               grantor.role AS "grantorRole",
-              grantor.company_id AS "grantorCompanyId",
-              COALESCE(grantor.is_active, false) AS "grantorIsActive"
+              grantor."companyId" AS "grantorCompanyId",
+              COALESCE(grantor."isActive", false) AS "grantorIsActive"
        FROM passport_access_grants pag
-       LEFT JOIN users grantor ON grantor.id = pag.granted_by
-       WHERE pag.passport_dpp_id = $1
-         AND pag.grantee_user_id = $2
-         AND pag.is_active = true
-         AND (pag.expires_at IS NULL OR pag.expires_at > NOW())`,
+       LEFT JOIN users grantor ON grantor.id = pag."grantedBy"
+       WHERE pag."passportDppId" = $1
+         AND pag."granteeUserId" = $2
+         AND pag."isActive" = true
+         AND (pag."expiresAt" IS NULL OR pag."expiresAt" > NOW())`,
       [passportDppId, userId]
     ).catch(() => ({ rows: [] }));
 

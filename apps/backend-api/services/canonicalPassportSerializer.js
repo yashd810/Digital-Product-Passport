@@ -1,41 +1,21 @@
 "use strict";
 
-const batteryDictionaryFieldMap = require("../resources/semantics/battery/v1/field-map.json");
-const batteryDictionaryTerms = require("../resources/semantics/battery/v1/terms.json");
-const batteryCategoryRules = require("../resources/semantics/battery/v1/category-rules.json");
 const { buildCarrierAuthenticityResponseFields } = require("../helpers/carrier-authenticity");
+const createSemanticModelRegistry = require("../src/infrastructure/semantics/create-semantic-model-registry");
 const { buildCanonicalIdentityBundle } = require("../src/shared/identifiers/canonical-identity-bundle");
 const { getPassportFieldValue } = require("../src/shared/passports/passport-helpers");
-const {
-  BATTERY_DICTIONARY_MODEL_KEY,
-  shouldUseBatteryDictionary: shouldTargetBatteryDictionary,
-} = require("./battery-dictionary-targeting");
 const { getSystemPassportHeader } = require("./passport-header-fields");
 
-function createCanonicalPassportSerializer({ didService, productIdentifierService = null }) {
+function createCanonicalPassportSerializer({
+  didService,
+  productIdentifierService = null,
+  semanticModelRegistry = createSemanticModelRegistry(),
+}) {
   const APPLICABLE_REQUIREMENT_LEVELS = new Set([
     "mandatory_battreg",
     "mandatory_espr_jtc24",
     "voluntary",
   ]);
-  const CATEGORY_ALIASES = new Map([
-    ["ev", "EV"],
-    ["electricvehicle", "EV"],
-    ["electric_vehicle", "EV"],
-    ["electric vehicle", "EV"],
-    ["lmt", "LMT"],
-    ["lightmeansoftransport", "LMT"],
-    ["light_means_of_transport", "LMT"],
-    ["light means of transport", "LMT"],
-    ["industrial", "Industrial"],
-    ["stationary", "Stationary"],
-    ["stationarystorage", "Stationary"],
-    ["stationary_storage", "Stationary"],
-    ["stationary storage", "Stationary"],
-  ]);
-  const SUPPORTED_BATTERY_CATEGORIES = Array.isArray(batteryCategoryRules?.categories)
-    ? batteryCategoryRules.categories
-    : ["EV", "LMT", "Industrial", "Stationary"];
   const HEADER_FIELD_ALIASES = {
     granularity: new Set(["granularity"]),
     dppSchemaVersion: new Set(["dppSchemaVersion"]),
@@ -44,6 +24,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     facilityId: new Set(["facilityId"]),
     contentSpecificationIds: new Set(["contentSpecificationIds"]),
   };
+  const semanticLookupCache = new Map();
 
   function toIsoTimestamp(value) {
     if (!value) return null;
@@ -171,8 +152,49 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     return rawValue;
   }
 
+  function readTypeValue(typeDef, camelKey, snakeKey = null) {
+    if (!typeDef || typeof typeDef !== "object") return null;
+    if (typeDef[camelKey] !== undefined) return typeDef[camelKey];
+    if (snakeKey && typeDef[snakeKey] !== undefined) return typeDef[snakeKey];
+    return null;
+  }
+
+  function getFieldsJson(typeDef) {
+    return readTypeValue(typeDef, "fieldsJson", "fields_json") || {};
+  }
+
+  function getProductCategory(typeDef, options = {}) {
+    return options.productCategory || readTypeValue(typeDef, "productCategory", "product_category") || null;
+  }
+
+  function getSemanticModelKey(typeDef, options = {}) {
+    return normalizeText(
+      options.semanticModelKey
+      || readTypeValue(typeDef, "semanticModelKey", "semantic_model_key")
+      || getFieldsJson(typeDef)?.semanticModelKey
+      || ""
+    );
+  }
+
+  function getTypeName(typeDef) {
+    return readTypeValue(typeDef, "typeName", "type_name") || "";
+  }
+
+  function getSemanticModelByKey(modelKey) {
+    const key = normalizeText(modelKey);
+    if (!key) return null;
+    return semanticModelRegistry?.getModel?.(key) || null;
+  }
+
+  function resolveSemanticModel(typeDef, passportType = null, options = {}) {
+    const semanticModelKey = getSemanticModelKey(typeDef, options);
+    const explicitModel = getSemanticModelByKey(semanticModelKey);
+    if (explicitModel) return explicitModel;
+    return null;
+  }
+
   function getSchemaFieldDefinitions(typeDef) {
-    return (typeDef?.fieldsJson?.sections || [])
+    return (getFieldsJson(typeDef).sections || [])
       .flatMap((section) => section.fields || [])
       .filter((field) => field?.key);
   }
@@ -197,51 +219,66 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       || typeof value === "boolean";
   }
 
-  const semanticIdByAlias = (() => {
-    const map = new Map();
-    for (const [fieldKey, iri] of Object.entries(batteryDictionaryFieldMap || {})) {
-      if (fieldKey && iri) map.set(String(fieldKey), iri);
-    }
-    for (const term of batteryDictionaryTerms || []) {
-      const semanticId = term?.iri || term?.termIri || null;
-      if (!semanticId) continue;
-      const aliases = new Set([
-        term.slug,
-        term.internalKey,
-        term.elementId,
-      ]);
-      for (const fieldKey of (term.appFieldKeys || [])) {
-        aliases.add(fieldKey);
-      }
-      for (const alias of aliases) {
-        if (alias) map.set(String(alias), semanticId);
-      }
-    }
-    return map;
-  })();
+  function getTermSemanticId(term) {
+    return term?.iri || term?.termIri || null;
+  }
 
-  const semanticTermByAlias = (() => {
-    const map = new Map();
-    for (const term of batteryDictionaryTerms || []) {
-      const aliases = new Set([
-        term.slug,
-        term.internalKey,
-        term.elementId,
-      ]);
-      for (const fieldKey of (term.appFieldKeys || [])) {
-        aliases.add(fieldKey);
-      }
-      for (const alias of aliases) {
-        if (alias) map.set(String(alias), term);
+  function getTermAliases(term) {
+    const aliases = new Set([
+      term?.slug,
+      term?.internalKey,
+      term?.internal_key,
+      term?.elementId,
+      term?.element_id,
+    ]);
+    for (const fieldKey of (term?.appFieldKeys || [])) aliases.add(fieldKey);
+    return [...aliases].filter(Boolean).map(String);
+  }
+
+  function getSemanticLookup(semanticModel) {
+    if (!semanticModel?.semanticModelKey) {
+      return {
+        semanticIdByAlias: new Map(),
+        semanticTermByAlias: new Map(),
+        semanticTermByIri: new Map(),
+      };
+    }
+
+    const cacheKey = semanticModel.semanticModelKey;
+    if (semanticLookupCache.has(cacheKey)) return semanticLookupCache.get(cacheKey);
+
+    const semanticIdByAlias = new Map();
+    const semanticTermByAlias = new Map();
+    const semanticTermByIri = new Map();
+    const fieldMap = semanticModel.fieldMap || semanticModelRegistry?.getFieldMap?.(cacheKey) || {};
+    const terms = semanticModel.terms || semanticModelRegistry?.getTerms?.(cacheKey) || [];
+
+    for (const [fieldKey, iri] of Object.entries(fieldMap || {})) {
+      if (fieldKey && iri) semanticIdByAlias.set(String(fieldKey), iri);
+    }
+    for (const term of terms || []) {
+      const semanticId = getTermSemanticId(term);
+      if (semanticId) semanticTermByIri.set(String(semanticId), term);
+      for (const alias of getTermAliases(term)) {
+        if (semanticId) semanticIdByAlias.set(alias, semanticId);
+        semanticTermByAlias.set(alias, term);
       }
     }
-    return map;
-  })();
 
-  function resolveDictionaryReference(fieldDef, elementIdPath = null) {
+    const lookup = {
+      semanticIdByAlias,
+      semanticTermByAlias,
+      semanticTermByIri,
+    };
+    semanticLookupCache.set(cacheKey, lookup);
+    return lookup;
+  }
+
+  function resolveDictionaryReference(fieldDef, elementIdPath = null, semanticModel = null) {
     const explicitReference = fieldDef?.semanticId || null;
     if (explicitReference) return explicitReference;
 
+    const { semanticIdByAlias } = getSemanticLookup(semanticModel);
     const candidates = [
       fieldDef?.key,
       fieldDef?.elementId,
@@ -256,12 +293,12 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     return null;
   }
 
-  function resolveSemanticTerm(fieldDef, elementIdPath = null) {
+  function resolveSemanticTerm(fieldDef, elementIdPath = null, semanticModel = null) {
+    const { semanticTermByAlias, semanticTermByIri } = getSemanticLookup(semanticModel);
     const explicitReference = fieldDef?.semanticId || null;
     if (explicitReference) {
-      const byReference = batteryDictionaryTerms.find((term) =>
-        term?.iri === explicitReference || term?.termIri === explicitReference
-      );
+      const byReference = semanticTermByIri.get(String(explicitReference))
+        || semanticModelRegistry?.getTermByIri?.(semanticModel?.semanticModelKey, explicitReference);
       if (byReference) return byReference;
     }
 
@@ -363,23 +400,78 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(text);
   }
 
-  function normalizeBatteryCategory(value) {
-    const normalized = normalizeLookupKey(value);
-    if (!normalized) return null;
-    return CATEGORY_ALIASES.get(normalized) || null;
-  }
-
-  function isBatteryDictionaryPassport(typeDef, passportType = null) {
-    return shouldTargetBatteryDictionary({ passportType, typeDef });
-  }
-
   function isMandatoryRequirementLevel(level) {
     return level === "mandatory_battreg" || level === "mandatory_espr_jtc24";
   }
 
-  function getCategoryRequirementForField(fieldKey, normalizedCategory) {
+  function getCategoryRules(semanticModel) {
+    if (!semanticModel?.semanticModelKey) return null;
+    return semanticModel.categoryRules || semanticModelRegistry?.getCategoryRules?.(semanticModel.semanticModelKey) || null;
+  }
+
+  function getCategoryPolicy(typeDef) {
+    return readTypeValue(typeDef, "complianceProfile", "compliance_profile")?.categoryPolicy
+      || getFieldsJson(typeDef)?.complianceProfile?.categoryPolicy
+      || null;
+  }
+
+  function getCategoryPolicyFieldKeys(categoryPolicy = {}) {
+    const keys = new Set([
+      categoryPolicy.fieldKey,
+      ...(Array.isArray(categoryPolicy.fieldKeys) ? categoryPolicy.fieldKeys : []),
+    ]);
+    return [...keys].map(normalizeText).filter(Boolean);
+  }
+
+  function getCategoryPolicyLabels(categoryPolicy = {}) {
+    const labels = new Set([
+      categoryPolicy.label,
+      categoryPolicy.fieldLabel,
+      ...(Array.isArray(categoryPolicy.fieldLabels) ? categoryPolicy.fieldLabels : []),
+    ]);
+    return [...labels].map(normalizeLookupKey).filter(Boolean);
+  }
+
+  function findCategoryField(typeDef, categoryPolicy = {}) {
+    const fieldKeys = new Set(getCategoryPolicyFieldKeys(categoryPolicy));
+    const fieldLabels = new Set(getCategoryPolicyLabels(categoryPolicy));
+    return getSchemaFieldDefinitions(typeDef).find((field) => fieldKeys.has(field.key))
+      || getSchemaFieldDefinitions(typeDef).find((field) => fieldLabels.has(normalizeLookupKey(field.label)))
+      || null;
+  }
+
+  function buildCategoryAliasMap(categoryPolicy = {}) {
+    const aliases = categoryPolicy.aliases || {};
+    if (aliases instanceof Map) {
+      return new Map([...aliases.entries()].map(([alias, value]) => [normalizeLookupKey(alias), value]));
+    }
+    return new Map(Object.entries(aliases).map(([alias, value]) => [normalizeLookupKey(alias), value]));
+  }
+
+  function getSupportedCategories(semanticModel, categoryPolicy = {}) {
+    const rules = getCategoryRules(semanticModel);
+    if (Array.isArray(rules?.categories) && rules.categories.length) return rules.categories;
+    if (Array.isArray(categoryPolicy.supportedCategories)) return categoryPolicy.supportedCategories;
+    return [];
+  }
+
+  function normalizeCategoryValue(value, categoryPolicy = {}, supportedCategories = []) {
+    const raw = normalizeText(value);
+    const normalized = normalizeLookupKey(raw);
+    if (!normalized) return null;
+
+    const aliases = buildCategoryAliasMap(categoryPolicy);
+    if (aliases.has(normalized)) return aliases.get(normalized);
+
+    const supportedCategory = supportedCategories.find((category) => normalizeLookupKey(category) === normalized);
+    if (supportedCategory) return supportedCategory;
+    return supportedCategories.length ? null : raw;
+  }
+
+  function getCategoryRequirementForField(semanticModel, fieldKey, normalizedCategory) {
     if (!fieldKey || !normalizedCategory) return null;
-    const requirementLevel = batteryCategoryRules?.requirementsByFieldKey?.[String(fieldKey)]?.requirements?.[normalizedCategory] || null;
+    const categoryRules = getCategoryRules(semanticModel);
+    const requirementLevel = categoryRules?.requirementsByFieldKey?.[String(fieldKey)]?.requirements?.[normalizedCategory] || null;
     if (!requirementLevel) return null;
     return {
       requirementLevel,
@@ -388,20 +480,19 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     };
   }
 
-  function findPassportCategoryField(typeDef) {
-    return getSchemaFieldDefinitions(typeDef).find((field) =>
-      field?.key === "battery_category"
-      || field?.semanticId === "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-category"
-      || normalizeLookupKey(field?.label) === "battery category"
-    ) || null;
-  }
-
-  function resolveNormalizedBatteryCategory(passport, typeDef) {
-    const categoryField = findPassportCategoryField(typeDef);
-    const rawCategory = categoryField?.key ? passport?.[categoryField.key] : passport?.battery_category;
+  function resolveCategoryInfo(passport, typeDef, semanticModel) {
+    const categoryPolicy = getCategoryPolicy(typeDef);
+    if (categoryPolicy?.kind !== "semanticCategory") return { raw: null, normalized: null };
+    const categoryField = findCategoryField(typeDef, categoryPolicy);
+    const rawCategory = categoryField?.key ? getPassportFieldValue(passport, categoryField.key) : null;
+    const supportedCategories = getSupportedCategories(semanticModel, categoryPolicy);
     return {
       raw: rawCategory || null,
-      normalized: normalizeBatteryCategory(rawCategory),
+      normalized: normalizeCategoryValue(rawCategory, categoryPolicy, supportedCategories),
+      label: categoryPolicy.label || categoryField?.label || "category",
+      policyKind: categoryPolicy.kind || null,
+      productKind: categoryPolicy.productKind || null,
+      supported: supportedCategories,
     };
   }
 
@@ -470,7 +561,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
         key,
         code,
         message,
-        dictionaryReference: resolveDictionaryReference(fieldDef, key),
+        dictionaryReference: resolveDictionaryReference(fieldDef, key, options.semanticModel),
         ...extras,
       });
     };
@@ -561,7 +652,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     if (multiLanguageIssues.length) {
       issues.push(...multiLanguageIssues.map((issue) => ({
         ...issue,
-        dictionaryReference: resolveDictionaryReference(fieldDef, key),
+        dictionaryReference: resolveDictionaryReference(fieldDef, key, options.semanticModel),
       })));
     }
 
@@ -604,12 +695,15 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       ...(semanticTerm?.appFieldKeys || []),
     ].filter(Boolean));
 
-    if (
-      normalizedKeyCandidates.has("battery_category")
-      || normalizeLookupKey(fieldDef?.label) === "battery category"
-      || semanticTerm?.slug === "battery-category"
-    ) {
-      SUPPORTED_BATTERY_CATEGORIES.forEach((entry) => values.add(entry));
+    const categoryPolicy = options.categoryPolicy || null;
+    const categoryFieldKeys = new Set(getCategoryPolicyFieldKeys(categoryPolicy || {}));
+    const categoryFieldLabels = new Set(getCategoryPolicyLabels(categoryPolicy || {}));
+    const isCategoryField = categoryPolicy?.kind === "semanticCategory" && (
+      [...normalizedKeyCandidates].some((key) => categoryFieldKeys.has(key))
+      || categoryFieldLabels.has(normalizeLookupKey(fieldDef?.label))
+    );
+    if (isCategoryField) {
+      getSupportedCategories(options.semanticModel, categoryPolicy).forEach((entry) => values.add(entry));
     }
 
     return [...values];
@@ -682,7 +776,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
         key,
         code,
         message,
-        dictionaryReference: resolveDictionaryReference(fieldDef, key),
+        dictionaryReference: resolveDictionaryReference(fieldDef, key, options.semanticModel),
         ...extras,
       });
     };
@@ -717,7 +811,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       }
     }
 
-    const explicitAllowedValues = resolveAllowedValues(fieldDef);
+    const explicitAllowedValues = resolveAllowedValues(fieldDef, null, options);
     if (explicitAllowedValues.length) {
       const invalidValues = extractDisallowedValues(value, explicitAllowedValues);
       if (invalidValues.length) {
@@ -732,7 +826,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const multiLanguageIssues = buildLanguageTagValidationIssues(value, fieldDef, key);
     issues.push(...multiLanguageIssues.map((issue) => ({
       ...issue,
-      dictionaryReference: resolveDictionaryReference(fieldDef, key),
+      dictionaryReference: resolveDictionaryReference(fieldDef, key, options.semanticModel),
     })));
 
     if (expectedUnit && expectedUnit !== "none" && isPlainObject(value) && value.unit && normalizeText(value.unit).toLowerCase() !== expectedUnit) {
@@ -852,25 +946,28 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     return "SingleValuedDataElement";
   }
 
-  function buildNestedElements(value) {
+  function buildNestedElements(value, semanticModel = null) {
     if (Array.isArray(value)) {
       return value.map((item, index) => buildExpandedDataElement({
         elementIdPath: String(index),
         value: item,
+        semanticModel,
       }));
     }
     if (isPlainObject(value)) {
       return Object.entries(value).map(([childKey, childValue]) => buildExpandedDataElement({
         elementIdPath: childKey,
         value: childValue,
+        semanticModel,
       }));
     }
     return [];
   }
 
-  function buildExpandedDataElement({ typeDef = null, elementIdPath, value, fieldDef = null } = {}) {
+  function buildExpandedDataElement({ typeDef = null, elementIdPath, value, fieldDef = null, semanticModel = null } = {}) {
     const resolvedFieldDef = fieldDef || findSchemaFieldDefinition(typeDef, elementIdPath);
-    const semanticTerm = resolveSemanticTerm(resolvedFieldDef, elementIdPath);
+    const resolvedSemanticModel = semanticModel || resolveSemanticModel(typeDef, getTypeName(typeDef));
+    const semanticTerm = resolveSemanticTerm(resolvedFieldDef, elementIdPath, resolvedSemanticModel);
     const resolvedElementId = resolvedFieldDef?.elementId
       || resolvedFieldDef?.key
       || elementIdPath
@@ -878,10 +975,10 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     return {
       elementId: resolvedElementId,
       objectType: inferObjectType(resolvedFieldDef, value),
-      dictionaryReference: resolveDictionaryReference(resolvedFieldDef, elementIdPath),
+      dictionaryReference: resolveDictionaryReference(resolvedFieldDef, elementIdPath, resolvedSemanticModel),
       valueDataType: inferValueDataType(resolvedFieldDef, value, semanticTerm),
       value,
-      elements: buildNestedElements(value),
+      elements: buildNestedElements(value, resolvedSemanticModel),
     };
   }
 
@@ -914,7 +1011,8 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
   function buildCanonicalPassportPayload(passport, typeDef, options = {}) {
     const company = options.company || null;
     const companyName = String(options.companyName || "").trim();
-    const passportType = String(passport?.passportType || typeDef?.typeName || options.passportType || "battery").trim().toLowerCase() || "battery";
+    const passportType = String(passport?.passportType || getTypeName(typeDef) || options.passportType || "passport").trim().toLowerCase() || "passport";
+    const semanticModel = resolveSemanticModel(typeDef, passportType, options);
     const canonicalIdentity = buildCanonicalIdentityBundle({
       passport,
       company,
@@ -930,26 +1028,23 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     const dppDid = canonicalIdentity.dppDid || null;
     const derivedProductIdentifierDid = canonicalIdentity.uniqueProductIdentifier || null;
 
-    const schemaFields = (typeDef?.fieldsJson?.sections || [])
-      .flatMap((section) => section.fields || [])
-      .filter((field) => field?.key);
+    const schemaFields = getSchemaFieldDefinitions(typeDef);
 
     const fields = {};
     const validationIssues = [];
-    const categoryInfo = isBatteryDictionaryPassport(typeDef, passportType)
-      ? resolveNormalizedBatteryCategory(passport, typeDef)
-      : { raw: null, normalized: null };
+    const categoryPolicy = getCategoryPolicy(typeDef);
+    const categoryInfo = resolveCategoryInfo(passport, typeDef, semanticModel);
     for (const fieldDef of schemaFields) {
-      const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key);
+      const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key, semanticModel);
       const categoryRequirement = categoryInfo.normalized
-        ? getCategoryRequirementForField(fieldDef.key, categoryInfo.normalized)
+        ? getCategoryRequirementForField(semanticModel, fieldDef.key, categoryInfo.normalized)
         : null;
-      if (isBatteryDictionaryPassport(typeDef, passportType) && !semanticTerm) {
+      if (semanticModel && !semanticTerm) {
         validationIssues.push({
           key: fieldDef.key,
           code: "SEMANTIC_TERM_NOT_FOUND",
-          message: `Field "${fieldDef.key}" is not mapped to a dictionary term in terms.json.`,
-          dictionaryReference: resolveDictionaryReference(fieldDef, fieldDef.key),
+          message: `Field "${fieldDef.key}" is not mapped to a term in semantic model "${semanticModel.semanticModelKey}".`,
+          dictionaryReference: resolveDictionaryReference(fieldDef, fieldDef.key, semanticModel),
         });
         continue;
       }
@@ -961,11 +1056,11 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
             ? "CATEGORY_REQUIRED_FIELD_MISSING"
             : "REQUIRED_FIELD_MISSING",
           message: categoryRequirement?.mandatory
-            ? `Field "${fieldDef.key}" is mandatory for battery category "${categoryInfo.normalized}" but is missing from the export.`
+            ? `Field "${fieldDef.key}" is mandatory for ${categoryInfo.label || "category"} "${categoryInfo.normalized}" but is missing from the export.`
             : `Field "${fieldDef.key}" is required but is missing from the export.`,
-          dictionaryReference: resolveDictionaryReference(fieldDef, fieldDef.key),
+          dictionaryReference: resolveDictionaryReference(fieldDef, fieldDef.key, semanticModel),
           ...(categoryRequirement?.requirementLevel ? { requirementLevel: categoryRequirement.requirementLevel } : {}),
-          ...(categoryInfo.normalized ? { batteryCategory: categoryInfo.normalized } : {}),
+          ...(categoryInfo.normalized ? { category: categoryInfo.normalized } : {}),
         });
       }
       const typedValue = coerceValueToSemanticType(
@@ -975,10 +1070,14 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
       if (typedValue === null) continue;
       const issues = [
         ...buildSemanticValidationIssues(typedValue, semanticTerm, fieldDef, fieldDef.key, {
-          batteryCategory: categoryInfo.normalized,
+          category: categoryInfo.normalized,
+          categoryPolicy,
+          semanticModel,
         }),
         ...buildSchemaValidationIssues(typedValue, fieldDef, fieldDef.key, {
           skipTypeValidation: Boolean(semanticTerm),
+          categoryPolicy,
+          semanticModel,
         }),
       ];
       if (issues.length) {
@@ -1050,10 +1149,12 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
     if (extensions?.claros) {
       extensions.claros.validation = summarizeValidationIssues(validationIssues);
       if (categoryInfo.raw || categoryInfo.normalized) {
-        extensions.claros.validation.batteryCategory = {
+        extensions.claros.validation.category = {
           raw: categoryInfo.raw,
           normalized: categoryInfo.normalized,
-          supported: SUPPORTED_BATTERY_CATEGORIES,
+          supported: categoryInfo.supported || [],
+          policyKind: categoryInfo.policyKind || null,
+          productKind: categoryInfo.productKind || null,
         };
       }
       if (validationIssues.length) {
@@ -1084,6 +1185,8 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
   }
 
   function buildExpandedPassportPayload(passport, typeDef, options = {}) {
+    const passportType = String(passport?.passportType || getTypeName(typeDef) || options.passportType || "passport").trim().toLowerCase() || "passport";
+    const semanticModel = resolveSemanticModel(typeDef, passportType, options);
     const canonicalPayload = buildCanonicalPassportPayload(passport, typeDef, options);
     const elements = getSchemaFieldDefinitions(typeDef)
       .map((fieldDef) => ({
@@ -1091,7 +1194,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
         value: (() => {
           const rawValue = getPassportFieldValue(passport, fieldDef.key);
           if (isBlankValue(rawValue)) return undefined;
-          const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key);
+          const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key, semanticModel);
           const typedValue = coerceValueToSemanticType(
             coerceTypedFieldValue(fieldDef, rawValue),
             semanticTerm
@@ -1105,6 +1208,7 @@ function createCanonicalPassportSerializer({ didService, productIdentifierServic
         elementIdPath: fieldDef.key,
         value,
         fieldDef,
+        semanticModel,
       }));
 
     const { fields, ...headerPayload } = canonicalPayload;

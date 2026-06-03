@@ -41,9 +41,10 @@ const createAuthMiddleware     = require("../middleware/auth");
 const { createRateLimiters, startRateLimitMaintenance } = require("../middleware/rate-limit");
 const createAssetService       = require("../src/infrastructure/assets/create-asset-service");
 const createPassportService    = require("../src/infrastructure/passports/create-passport-service");
-const { buildBatteryPassJsonExport, buildPassportJsonLdContext } = require("../src/shared/passports/battery-pass-export");
+const createSemanticPassportExportService = require("../services/semantic-passport-export");
 const createPassportRepresentationService = require("../src/infrastructure/passports/create-passport-representation-service");
 const dppIdentity                         = require("../src/shared/identifiers/dpp-identity-service");
+const createSemanticModelRegistry         = require("../src/infrastructure/semantics/create-semantic-model-registry");
 const createBatteryDictionaryService      = require("../src/infrastructure/dictionary/create-battery-dictionary-service");
 const createComplianceService             = require("../src/infrastructure/compliance/create-compliance-service");
 const createAccessRightsService           = require("../src/infrastructure/security/create-access-rights-service");
@@ -385,7 +386,12 @@ const didService = createDidService({
   apiOrigin: process.env.SERVER_URL || `http://localhost:${PORT}`,
 });
 const productIdentifierService = createProductIdentifierService({ didService, pool });
-const canonicalPassportSerializer = createCanonicalPassportSerializer({ didService, productIdentifierService });
+const semanticModelRegistry = createSemanticModelRegistry();
+const canonicalPassportSerializer = createCanonicalPassportSerializer({
+  didService,
+  productIdentifierService,
+  semanticModelRegistry,
+});
 const {
   buildCanonicalPassportPayload,
   buildExpandedPassportPayload,
@@ -408,9 +414,18 @@ const { buildOperationalDppPayload } = createPassportRepresentationService({
   buildCanonicalPassportPayload,
 });
 
-// ─── BATTERY DICTIONARY SERVICE ──────────────────────────────────────────────
+// ─── SEMANTICS + COMPLIANCE SERVICES ─────────────────────────────────────────
+const {
+  buildSemanticPassportJsonExport,
+  buildPassportJsonLdContext,
+} = createSemanticPassportExportService({ semanticModelRegistry });
 const batteryDictionaryService = createBatteryDictionaryService();
-const complianceService = createComplianceService({ pool, batteryDictionaryService, buildCanonicalPassportPayload });
+const complianceService = createComplianceService({
+  pool,
+  batteryDictionaryService,
+  semanticModelRegistry,
+  buildCanonicalPassportPayload,
+});
 const accessRightsService = createAccessRightsService({ pool });
 const backupProviderService = createBackupProviderService({
   pool,
@@ -480,8 +495,13 @@ process.on("unhandledRejection", (reason) => logger.error({ err: reason }, "[Unh
 
 async function verifySchemaReady() {
   await pool.query(`
-    SELECT pr.dpp_id
+    SELECT pr."dppId", pr."companyId", pr."passportType"
     FROM passport_registry pr
+    LIMIT 1
+  `);
+  await pool.query(`
+    SELECT legal_name, customer_trust_level, verification_status
+    FROM companies
     LIMIT 1
   `);
   await pool.query(`
@@ -600,6 +620,8 @@ registerAppRoutes(app, {
   extractExplicitFacilityId,
   getWritablePassportColumns,
   getStoredPassportValues,
+  quoteSqlIdentifier,
+  joinQuotedSqlIdentifiers,
   toStoredPassportValue,
   coerceBulkFieldValue,
   buildCurrentPublicPassportPath,
@@ -630,7 +652,7 @@ registerAppRoutes(app, {
   submitPassportToWorkflow,
   signPassport,
   signPortableDataConstruct: signingService.signPortableDataConstruct,
-  buildBatteryPassJsonExport,
+  buildSemanticPassportJsonExport,
   storageService,
   complianceService,
   accessRightsService,
@@ -649,6 +671,7 @@ registerAppRoutes(app, {
   buildExpandedDataElement,
   dppIdentity,
   batteryDictionaryService,
+  semanticModelRegistry,
   generateAssetLaunchToken,
   isPathInsideBase,
   normalizePassportTypeSchema,

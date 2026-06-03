@@ -40,9 +40,19 @@ const SYSTEM_PASSPORT_FIELDS = new Set([
 
 const EDITABLE_PASSPORT_STATUSES = new Set(["draft", IN_REVISION_STATUS]);
 
+const toStorageSlug = (typeName) =>
+  String(typeName || "")
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+
 const getTable = (typeName) => {
   if (!typeName) throw new Error("typeName is required for table lookup");
-  const safe = String(typeName).replace(/[^a-z0-9_]/g, "_");
+  const safe = toStorageSlug(typeName);
+  if (!safe) throw new Error("typeName must contain at least one alphanumeric character");
   return `${safe}_passports`;
 };
 
@@ -132,7 +142,7 @@ const normalizePassportRow = (row, schema) => {
   const dppId = row.dppId ?? null;
   const companyId = row.companyId ?? null;
   const schemaFields = extractSchemaFields(schema);
-  
+
   // Deserialize JSONB fields
   let rowData = { ...row };
 
@@ -167,7 +177,7 @@ const normalizePassportRow = (row, schema) => {
       }
     }
   }
-  
+
   const normalized = rewriteRepositoryLinksDeep({
     ...rowData,
     dppId,
@@ -440,7 +450,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
         const companySlug = didService.normalizeCompanySlug(company.companyName || company.didSlug || `company-${company.id}`);
         const facilityStableId = inferFacilityStableId(passport);
 
-        const subjectNamespace = didService.normalizePassportTypeSegment(company.companyName || company.didSlug || "battery");
+        const subjectNamespace = didService.normalizePassportTypeSegment(company.companyName || company.didSlug || "passport");
         return {
           passportDppId: passport.dppId,
           passportType: registryRow.passportType,

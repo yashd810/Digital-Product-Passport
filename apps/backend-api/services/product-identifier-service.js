@@ -47,7 +47,7 @@ function createProductIdentifierService({ didService, pool = null }) {
     companyId,
     companySlug = null,
     companyName = null,
-    passportType = "battery",
+    passportType = "passport",
     rawProductId,
     granularity = "item",
   }) {
@@ -60,7 +60,7 @@ function createProductIdentifierService({ didService, pool = null }) {
       ? didService.normalizePassportTypeSegment(companySlug)
       : companyName
         ? didService.normalizePassportTypeSegment(companyName)
-        : didService.normalizePassportTypeSegment(passportType || "battery");
+        : didService.normalizePassportTypeSegment(passportType || "passport");
     const normalizedGranularity = normalizeGranularity(granularity);
 
     if (normalizedGranularity === "model") {
@@ -76,7 +76,7 @@ function createProductIdentifierService({ didService, pool = null }) {
     companyId,
     companySlug = null,
     companyName = null,
-    passportType = "battery",
+    passportType = "passport",
     rawProductId,
     canonicalProductIdSource = null,
     uniqueProductIdentifier = null,
@@ -106,7 +106,7 @@ function createProductIdentifierService({ didService, pool = null }) {
 
   function buildLookupCandidates({
     companyId = null,
-    passportType = "battery",
+    passportType = "passport",
     internalAliasId,
     granularity = "item",
   }) {

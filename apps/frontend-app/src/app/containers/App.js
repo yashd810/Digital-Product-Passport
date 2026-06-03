@@ -41,7 +41,7 @@ const CreateHub = lazy(() => import("../../user/dashboard/create/CreateHub"));
 const ArchivedPassports = lazy(() => import("../../user/dashboard/archived/ArchivedPassportsPage"));
 
 const AdminLayout = lazy(() => import("../../admin/layout/AdminLayout"));
-const BatteryDictionaryBrowserPage = lazy(() => import("../../shared/dictionary/BatteryDictionaryBrowserPage"));
+const DictionaryBrowserPage = lazy(() => import("../../shared/dictionary/DictionaryBrowserPage"));
 const AdminAnalytics = lazy(() => import("../../admin/pages/AdminAnalytics"));
 const AdminCompanies = lazy(() => import("../../admin/pages/AdminCompanies"));
 const AdminInvite = lazy(() => import("../../admin/pages/AdminInvite"));
@@ -177,9 +177,9 @@ function App() {
           <Route path="repository/symbols" element={<CompanyRepository user={user} companyId={companyId} activeTab="symbols" />} />
           <Route path="archived"        element={<ArchivedPassports user={user} companyId={companyId} />} />
           <Route path="manual"          element={<ManualCenter mode="user" user={user} companyId={companyId} />} />
-          <Route path="dictionary/battery/v1" element={<BatteryDictionaryBrowserPage />} />
-          <Route path="dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
-          <Route path="dictionary/battery/v1/*" element={<BatteryDictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version" element={<DictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />
         </Route>
 
         {/* Admin */}
@@ -203,9 +203,9 @@ function App() {
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
           <Route path="analytics/:companySlug"        element={<AdminCompanyAnalytics />} />
           <Route path="company/:companyId/profile"   element={<CompanyProfile user={user} />} />
-          <Route path="dictionary/battery/v1"        element={<BatteryDictionaryBrowserPage />} />
-          <Route path="dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
-          <Route path="dictionary/battery/v1/*"      element={<BatteryDictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version" element={<DictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />
         </Route>
 
         {/* Create / Edit */}
@@ -220,10 +220,9 @@ function App() {
           </ProtectedRoute>
         } />
 
-        {/* Battery Dictionary — public, accessible from both admin and user layouts */}
-        <Route path="/dictionary/battery/v1" element={<BatteryDictionaryBrowserPage />} />
-        <Route path="/dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
-        <Route path="/dictionary/battery/v1/*" element={<BatteryDictionaryBrowserPage />} />
+        <Route path="/dictionary/:family/:version" element={<DictionaryBrowserPage />} />
+        <Route path="/dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
+        <Route path="/dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

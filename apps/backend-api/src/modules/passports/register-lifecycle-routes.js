@@ -253,7 +253,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         compliance,
         verification: buildVerificationSummary(compliance),
       });
-    } catch {
+    } catch (error) {
+      logger.error({ err: error, dppId: req.params?.dppId, companyId: req.params?.companyId }, "Release passport error");
       res.status(500).json({ error: "Failed to release passport" });
     }
   });
@@ -301,8 +302,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const insertRes = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`, allVals);
 
       const sourceRegistry = await pool.query(
-        `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
-                device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
+        `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
+                "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
          FROM passport_registry
          WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
@@ -314,12 +315,12 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         lineageId: src.lineageId,
         companyId,
         passportType,
-        accessKeyHash: sourceKeys.access_key_hash || null,
-        accessKeyPrefix: sourceKeys.access_key_prefix || null,
-        accessKeyLastRotatedAt: sourceKeys.access_key_last_rotated_at || null,
-        deviceApiKeyHash: sourceKeys.device_api_key_hash || null,
-        deviceApiKeyPrefix: sourceKeys.device_api_key_prefix || null,
-        deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null,
+        accessKeyHash: sourceKeys.accessKeyHash || null,
+        accessKeyPrefix: sourceKeys.accessKeyPrefix || null,
+        accessKeyLastRotatedAt: sourceKeys.accessKeyLastRotatedAt || null,
+        deviceApiKeyHash: sourceKeys.deviceApiKeyHash || null,
+        deviceApiKeyPrefix: sourceKeys.deviceApiKeyPrefix || null,
+        deviceKeyLastRotatedAt: sourceKeys.deviceKeyLastRotatedAt || null,
       });
 
       await archivePassportSnapshot({
@@ -330,8 +331,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         snapshotReason: "after_revise_create",
       });
 
-      await logAudit(companyId, userId, "REVISE", tableName, newGuid, { version_number: src.version_number }, { version_number: newVersion });
-      res.json({ success: true, dppId: newGuid, newVersion, release_status: IN_REVISION_STATUS });
+      await logAudit(companyId, userId, "REVISE", tableName, newGuid, { versionNumber: src.versionNumber }, { versionNumber: newVersion });
+      res.json({ success: true, dppId: newGuid, newVersion, releaseStatus: IN_REVISION_STATUS });
     } catch {
       res.status(500).json({ error: "Failed to revise passport" });
     }
@@ -419,8 +420,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const insertRes = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`, allVals);
 
       const sourceRegistry = await pool.query(
-        `SELECT access_key_hash, access_key_prefix, access_key_last_rotated_at,
-                device_api_key_hash, device_api_key_prefix, device_key_last_rotated_at
+        `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
+                "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
          FROM passport_registry
          WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
@@ -432,12 +433,12 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         lineageId: src.lineageId,
         companyId,
         passportType,
-        accessKeyHash: sourceKeys.access_key_hash || null,
-        accessKeyPrefix: sourceKeys.access_key_prefix || null,
-        accessKeyLastRotatedAt: sourceKeys.access_key_last_rotated_at || null,
-        deviceApiKeyHash: sourceKeys.device_api_key_hash || null,
-        deviceApiKeyPrefix: sourceKeys.device_api_key_prefix || null,
-        deviceKeyLastRotatedAt: sourceKeys.device_key_last_rotated_at || null,
+        accessKeyHash: sourceKeys.accessKeyHash || null,
+        accessKeyPrefix: sourceKeys.accessKeyPrefix || null,
+        accessKeyLastRotatedAt: sourceKeys.accessKeyLastRotatedAt || null,
+        deviceApiKeyHash: sourceKeys.deviceApiKeyHash || null,
+        deviceApiKeyPrefix: sourceKeys.deviceApiKeyPrefix || null,
+        deviceKeyLastRotatedAt: sourceKeys.deviceKeyLastRotatedAt || null,
       });
 
       const lineageLink = await productIdentifierService.recordGranularityTransition({
@@ -542,7 +543,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       const tableName = getTable(passportType);
       const lineageContext = await getPassportLineageContext({ dppId, passportType, companyId });
-      if (!lineageContext?.lineage_id) return res.status(404).json({ error: "Passport not found" });
+      if (!lineageContext?.lineageId) return res.status(404).json({ error: "Passport not found" });
 
       const rows = await pool.query(
         `SELECT * FROM ${tableName} WHERE "lineageId" = $1 AND "companyId" = $2 AND "deletedAt" IS NULL`,
