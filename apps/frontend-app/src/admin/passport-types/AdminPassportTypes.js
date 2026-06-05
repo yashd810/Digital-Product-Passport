@@ -30,7 +30,6 @@ const getSemanticModelLabel = formatSemanticModelLabel;
 function AdminPassportTypes() {
   const navigate = useNavigate();
   const [types,      setTypes]      = useState([]);
-  const [moduleTemplates, setModuleTemplates] = useState([]);
   const [productCategories,  setProductCategories]  = useState([]);
   const [draftType,  setDraftType]  = useState(null);
   const [loading,    setLoading]    = useState(true);
@@ -69,7 +68,6 @@ function AdminPassportTypes() {
   const [deleteCategoryError, setDeleteCategoryError] = useState("");
   const [deletingCategory, setDeletingCategory] = useState(false);
   const [discardingDraft, setDiscardingDraft] = useState(false);
-  const [seedGuideModule, setSeedGuideModule] = useState(null);
 
   const handleDeleteType = async (e) => {
     e.preventDefault();
@@ -105,16 +103,14 @@ function AdminPassportTypes() {
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
-      const [typesRes, umbRes, draftRes, modulesRes] = await Promise.all([
+      const [typesRes, umbRes, draftRes] = await Promise.all([
         fetchWithAuth(`${API}/api/admin/passport-types`,       { headers: authHeaders() }),
         fetchWithAuth(`${API}/api/admin/product-categories`,  { headers: authHeaders() }),
         fetchWithAuth(`${API}/api/admin/passport-type-draft`,  { headers: authHeaders() }),
-        fetchWithAuth(`${API}/api/admin/passport-type-modules`, { headers: authHeaders() }),
       ]);
       if (!typesRes.ok) throw new Error("Failed to fetch passport types");
       setTypes(await typesRes.json());
       if (umbRes.ok) setProductCategories(await umbRes.json());
-      if (modulesRes.ok) setModuleTemplates(await modulesRes.json());
       if (draftRes.ok) {
         const row = await draftRes.json();
         setDraftType(row?.draft_json ? { savedAt: row.updatedAt, ...row.draft_json } : null);
@@ -218,15 +214,6 @@ function AdminPassportTypes() {
     }
   };
 
-  const handleCopySeedCommand = async (command) => {
-    try {
-      await navigator.clipboard.writeText(`cd apps/backend-api && ${command}`);
-      showMsg("Seed command copied.");
-    } catch {
-      showMsg(`Seed from backend directory: ${command}`);
-    }
-  };
-
   // Group types by product category
   const grouped = types.reduce((acc, t) => {
     const key = t.productCategory;
@@ -243,8 +230,6 @@ function AdminPassportTypes() {
     draftType,
   });
   const groupedEntries = Object.entries(grouped);
-  const unseededModules = moduleTemplates.filter((moduleTemplate) => !moduleTemplate.seeded);
-  const seededModuleCount = moduleTemplates.length - unseededModules.length;
 
   if (draftType && !grouped[draftGroupKey]) {
     groupedEntries.unshift([draftGroupKey || "Draft", { icon: draftGroupIcon, types: [] }]);
@@ -349,65 +334,6 @@ function AdminPassportTypes() {
             );
           })}
         </div>
-      </div>
-
-      {/* ── Passport Types grouped by product category ── */}
-      <div className="apt-moduleTemplates-panel">
-        <div className="apt-moduleTemplates-header">
-          <div>
-            <h3 className="apt-moduleTemplates-title">Registered Code Modules</h3>
-            <p className="apt-moduleTemplates-hint">
-              Hardcoded passport modules available in the backend registry. Seed a module when you want to make it available as a passport type.
-            </p>
-          </div>
-          <span className="apt-moduleTemplates-count">
-            {seededModuleCount}/{moduleTemplates.length} seeded
-          </span>
-        </div>
-
-        {moduleTemplates.length === 0 ? (
-          <div className="apt-moduleTemplates-empty">No passport modules are registered in code.</div>
-        ) : (
-          <div className="apt-moduleTemplates-grid">
-            {moduleTemplates.map((moduleTemplate) => (
-              <div
-                key={moduleTemplate.moduleKey}
-                className={`apt-moduleTemplate-card ${moduleTemplate.seeded ? "apt-moduleTemplate-card-seeded" : ""}`}
-              >
-                <div className="apt-moduleTemplate-topline">
-                  <span className="apt-moduleTemplate-icon">{moduleTemplate.productIcon || "PT"}</span>
-                  <span className={`apt-badge ${moduleTemplate.seeded ? "apt-badge-active" : "apt-badge-draft"}`}>
-                    {moduleTemplate.seeded ? "Seeded" : "Ready to seed"}
-                  </span>
-                </div>
-                <div className="apt-moduleTemplate-name">{moduleTemplate.displayName}</div>
-                <code className="apt-card-type-name">{moduleTemplate.moduleKey}</code>
-                <div className="apt-moduleTemplate-meta">
-                  <span>{moduleTemplate.productCategory}</span>
-                  <span>{moduleTemplate.fieldCount || 0} fields</span>
-                  <span>{getSemanticModelLabel(moduleTemplate.semanticModelKey)}</span>
-                </div>
-                <div className="apt-moduleTemplate-command-row">
-                  <code className="apt-moduleTemplate-command">{moduleTemplate.seedCommand}</code>
-                  <button
-                    type="button"
-                    className="apt-view-fields-btn"
-                    onClick={() => handleCopySeedCommand(moduleTemplate.seedCommand)}
-                  >
-                    Copy
-                  </button>
-                  <button
-                    type="button"
-                    className="apt-add-productCategory-btn apt-moduleTemplate-guide-btn"
-                    onClick={() => setSeedGuideModule(moduleTemplate)}
-                  >
-                    Guide
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {groupedEntries.length === 0 ? (
@@ -534,62 +460,6 @@ function AdminPassportTypes() {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {seedGuideModule && (
-        <div className="apt-modal-overlay" onClick={() => setSeedGuideModule(null)}>
-          <div className="apt-modal apt-seed-guide-modal" onClick={e => e.stopPropagation()}>
-            <h3 className="apt-modal-title">Seed Passport Module</h3>
-            <p className="apt-modal-warning">
-              <strong>{seedGuideModule.displayName}</strong> is defined in code as <code>{seedGuideModule.moduleKey}</code>.
-              Seeding creates or updates the database passport type, reconciles storage, and can grant company access.
-            </p>
-            <div className="apt-seed-guide-grid">
-              <div>
-                <span className="apt-seed-guide-label">Module</span>
-                <code>{seedGuideModule.moduleKey}</code>
-              </div>
-              <div>
-                <span className="apt-seed-guide-label">Type name</span>
-                <code>{seedGuideModule.typeName}</code>
-              </div>
-              <div>
-                <span className="apt-seed-guide-label">Semantic model</span>
-                <code>{seedGuideModule.semanticModelKey || "none"}</code>
-              </div>
-              <div>
-                <span className="apt-seed-guide-label">Status</span>
-                <strong>{seedGuideModule.seeded ? "Already seeded" : "Ready to seed"}</strong>
-              </div>
-            </div>
-            <div className="apt-seed-guide-commands">
-              <div>
-                <span className="apt-seed-guide-label">Seed only this module</span>
-                <code>cd apps/backend-api && {seedGuideModule.seedCommand}</code>
-              </div>
-              <div>
-                <span className="apt-seed-guide-label">Seed and grant one company access</span>
-                <code>cd apps/backend-api && {seedGuideModule.seedCommand} --company-id=&lt;companyId&gt;</code>
-              </div>
-              <div>
-                <span className="apt-seed-guide-label">Seed and grant all active companies</span>
-                <code>cd apps/backend-api && {seedGuideModule.seedCommand} --grant-all-active-companies</code>
-              </div>
-            </div>
-            <div className="apt-modal-actions">
-              <button type="button" className="cancel-btn" onClick={() => setSeedGuideModule(null)}>
-                Close
-              </button>
-              <button
-                type="button"
-                className="apt-modal-confirm-btn"
-                onClick={() => handleCopySeedCommand(seedGuideModule.seedCommand)}
-              >
-                Copy Basic Seed Command
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

@@ -6,7 +6,6 @@ const helmet = require("helmet");
 
 function configureHttp(app, {
   allowedOriginSet,
-  assetManagementDir,
   cspConnectSrc,
   globalSymbolsDir,
   isPlainRecord,
@@ -92,16 +91,6 @@ function configureHttp(app, {
   });
 
   app.use("/uploads/symbols", express.static(globalSymbolsDir));
-  app.use("/asset-management", (req, res, next) => {
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Content-Security-Policy", [
-      "default-src 'self'", "script-src 'self'", "script-src-attr 'none'", "style-src 'self'", "style-src-attr 'none'",
-      "img-src 'self' data:", "font-src 'self' data:", "connect-src 'self'",
-      "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'",
-    ].join("; "));
-    next();
-  }, express.static(assetManagementDir));
-
   return { port };
 }
 

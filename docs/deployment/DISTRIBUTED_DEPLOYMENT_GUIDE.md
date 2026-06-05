@@ -39,7 +39,6 @@
         │  prod.frontend.yml):           │
         │ ✓ frontend-app:3000            │
         │ ✓ public-passport-viewer:3004  │
-        │ ✓ asset-management:3003        │
         │ ✓ marketing-site:8080          │
         └────────────────┬───────────────┘
                          │

@@ -38,6 +38,7 @@ const MessagingPage = lazy(() => import("../../user/dashboard/notifications/Mess
 const TemplatesPage = lazy(() => import("../../user/dashboard/templates/TemplatesPage"));
 const ManualCenter = lazy(() => import("../../manual/ManualCenterPage"));
 const CreateHub = lazy(() => import("../../user/dashboard/create/CreateHub"));
+const PassportDataManagement = lazy(() => import("../../user/dashboard/passport-data/PassportDataManagementPage"));
 const ArchivedPassports = lazy(() => import("../../user/dashboard/archived/ArchivedPassportsPage"));
 
 const AdminLayout = lazy(() => import("../../admin/layout/AdminLayout"));
@@ -48,6 +49,7 @@ const AdminInvite = lazy(() => import("../../admin/pages/AdminInvite"));
 const CompanyAccess = lazy(() => import("../../admin/pages/CompanyAccess"));
 const AdminCompanyAnalytics = lazy(() => import("../../admin/pages/AdminCompanyAnalytics"));
 const AdminPassportTypes = lazy(() => import("../../admin/passport-types/AdminPassportTypes"));
+const AdminPassportModules = lazy(() => import("../../admin/passport-modules/AdminPassportModules"));
 const AdminCreatePassportType = lazy(() => import("../../admin/passport-types/AdminCreatePassportTypePage"));
 const AdminPassportTypeFields = lazy(() => import("../../admin/passport-types/AdminPassportTypeFields"));
 const AdminSecurity = lazy(() => import("../../admin/pages/AdminSecurity"));
@@ -163,6 +165,7 @@ function App() {
           <Route path="templates/new"   element={<TemplatesPage user={user} companyId={companyId} view="create" />} />
           <Route path="templates/:templateId/edit" element={<TemplateEditRoute user={user} companyId={companyId} />} />
           <Route path="create"          element={<CreateHub user={user} companyId={companyId} />} />
+          <Route path="passport-data"   element={<PassportDataManagement user={user} companyId={companyId} />} />
           <Route path="audit-logs"      element={<AuditLogs companyId={companyId} />} />
           <Route path="workflow"          element={<Navigate to="workflow/inprogress" replace />} />
           <Route path="workflow/inprogress" element={<WorkflowDashboard user={user} companyId={companyId} activeTab="inprogress" />} />
@@ -192,6 +195,7 @@ function App() {
           <Route path="analytics"                    element={<AdminAnalytics />} />
           <Route path="companies"                    element={<AdminCompanies />} />
           <Route path="passport-types"               element={<AdminPassportTypes />} />
+          <Route path="passport-modules"             element={<AdminPassportModules />} />
           <Route path="passport-types/new"           element={<AdminCreatePassportType />} />
           <Route path="passport-types/:typeName/edit"   element={<AdminCreatePassportType />} />
           <Route path="passport-types/:typeName/fields" element={<AdminPassportTypeFields />} />

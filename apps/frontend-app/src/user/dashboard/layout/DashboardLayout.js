@@ -30,7 +30,6 @@ function DashboardLayout({ user, companyId, onLogout }) {
   const [semanticModels, setSemanticModels] = useState([]);
   const [currentTheme,  setCurrentTheme]  = useState(() => getStoredTheme(user?.id));
   const [msgUnread, setMsgUnread] = useState(0);
-  const [openingAssetManagement, setOpeningAssetManagement] = useState(false);
 
   useEffect(() => {
     // Apply stored theme on mount
@@ -100,27 +99,6 @@ function DashboardLayout({ user, companyId, onLogout }) {
     { code: "de", label: "DE" },
   ];
   const roleLabel = (user?.role || "editor").replace(/_/g, " ");
-  const handleOpenAssetManagement = async () => {
-    if (!companyId || openingAssetManagement) return;
-    try {
-      setOpeningAssetManagement(true);
-      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/asset-management/launch`, {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Failed to open Asset Management");
-      const assetUrl = data.assetUrl?.startsWith("http")
-        ? data.assetUrl
-        : `${API}${data.assetUrl}`;
-      window.open(assetUrl, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      window.alert(error.message || "Failed to open Asset Management");
-    } finally {
-      setOpeningAssetManagement(false);
-    }
-  };
-
   // Group passport types by product category if available
   const groupedTypes = passportTypes.reduce((acc, pt) => {
     const productCategory = pt.productCategory || pt.displayName || formatPassportTypeLabel(pt.typeName);
@@ -193,18 +171,11 @@ function DashboardLayout({ user, companyId, onLogout }) {
                   + Create Passport
                 </NavLink>
               )}
-              {isEditor && user?.assetManagementEnabled && (
-                <button
-                  type="button"
-                  className="sidebar-link sidebar-asset-btn"
-                  onClick={handleOpenAssetManagement}
-                  disabled={openingAssetManagement}
-                >
-                  {openingAssetManagement ? "Opening Asset Platform..." : "↗ Asset Management"}
-                </button>
-              )}
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Start Here</p>
+              <NavLink to={dashboardPath("passport-data")} className={({isActive})=>`sidebar-link sidebar-data-btn${isActive?" active":""}`}>
+                Passport Data Management
+              </NavLink>
               <NavLink to={dashboardPath("overview")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
               </NavLink>

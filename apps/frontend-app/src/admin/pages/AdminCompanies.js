@@ -48,7 +48,6 @@ function AdminCompanies() {
   const [createdCompany, setCreatedCompany] = useState(null);
   const [isLoading,      setIsLoading]      = useState(false);
   const [isDeletingId,   setIsDeletingId]   = useState(null);
-  const [isTogglingAssetId, setIsTogglingAssetId] = useState(null);
   const [error,          setError]          = useState("");
   const [successMsg,     setSuccessMsg]     = useState("");
   const [deleteTarget,   setDeleteTarget]   = useState(null);
@@ -64,7 +63,6 @@ function AdminCompanies() {
   const [showFilters,    setShowFilters]    = useState(false);
   const [openKebabId,    setOpenKebabId]    = useState(null);
   const [kebabPos,       setKebabPos]       = useState({ top: 0, left: 0 });
-  const [assetConfirm,   setAssetConfirm]   = useState(null); // company to confirm asset toggle
   const [editTarget,     setEditTarget]     = useState(null);
   const [editForm,       setEditForm]       = useState(INITIAL_COMPANY_FORM);
   const [editError,      setEditError]      = useState("");
@@ -92,7 +90,6 @@ function AdminCompanies() {
 	    { key: "legalName", type: "string", getValue: (company) => company.legalName || "" },
 	    { key: "customerTrustLevel", type: "string", getValue: (company) => company.customerTrustLevel || "" },
 	    { key: "grantedTypeNames", type: "string", getValue: (company) => (company.grantedTypeNames || []).join(" ") },
-	    { key: "assetManagementEnabled", type: "string", getValue: (company) => company.assetManagementEnabled ? "enabled" : "disabled" },
 	    { key: "createdAt", type: "date", getValue: (company) => company.createdAt },
 	  ]), []);
 
@@ -247,32 +244,6 @@ function AdminCompanies() {
       setDeleteError(e.message || "Failed to delete company");
     } finally {
       setIsDeletingId(null);
-    }
-  };
-
-  const handleToggleAssetManagement = async (company) => {
-    try {
-      setError("");
-      setSuccessMsg("");
-      setIsTogglingAssetId(company.id);
-      const nextEnabled = !company.assetManagementEnabled;
-      const r = await fetchWithAuth(`${API}/api/admin/companies/${company.id}/asset-management`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ enabled: nextEnabled }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || "Failed to update Asset Management access");
-      setSuccessMsg(
-        nextEnabled
-          ? `Asset Management enabled for ${company.companyName}`
-          : `Asset Management revoked for ${company.companyName}`
-      );
-      await fetchCompanies();
-    } catch (e) {
-      setError(e.message || "Failed to update Asset Management access");
-    } finally {
-      setIsTogglingAssetId(null);
     }
   };
 
@@ -474,7 +445,6 @@ function AdminCompanies() {
 	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("legalName")}>Legal Identity{sortIndicator(sortConfig, "legalName") && ` ${sortIndicator(sortConfig, "legalName")}`}</button></th>
 	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("customerTrustLevel")}>Trust{sortIndicator(sortConfig, "customerTrustLevel") && ` ${sortIndicator(sortConfig, "customerTrustLevel")}`}</button></th>
 	              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("grantedTypeNames")}>Access{sortIndicator(sortConfig, "grantedTypeNames") && ` ${sortIndicator(sortConfig, "grantedTypeNames")}`}</button></th>
-              <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("assetManagementEnabled")}>Asset Platform{sortIndicator(sortConfig, "assetManagementEnabled") && ` ${sortIndicator(sortConfig, "assetManagementEnabled")}`}</button></th>
               <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("createdAt")}>Created{sortIndicator(sortConfig, "createdAt") && ` ${sortIndicator(sortConfig, "createdAt")}`}</button></th>
               <th>Actions</th>
             </tr>
@@ -484,7 +454,6 @@ function AdminCompanies() {
 	              <th><input className="table-filter-input" value={columnFilters.legalName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, legalName: e.target.value }))} placeholder="Filter" /></th>
 	              <th><input className="table-filter-input" value={columnFilters.customerTrustLevel || ""} onChange={e => setColumnFilters(prev => ({ ...prev, customerTrustLevel: e.target.value }))} placeholder="Filter" /></th>
 	              <th><input className="table-filter-input" value={columnFilters.grantedTypeNames || ""} onChange={e => setColumnFilters(prev => ({ ...prev, grantedTypeNames: e.target.value }))} placeholder="Filter" /></th>
-              <th><input className="table-filter-input" value={columnFilters.assetManagementEnabled || ""} onChange={e => setColumnFilters(prev => ({ ...prev, assetManagementEnabled: e.target.value }))} placeholder="Filter" /></th>
               <th><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={e => setColumnFilters(prev => ({ ...prev, createdAt: e.target.value }))} placeholder="Filter" /></th>
               <th></th>
             </tr>}
@@ -516,29 +485,17 @@ function AdminCompanies() {
                     )}
                   </div>
                 </td>
-                <td>
-                  <span className={`company-access-pill ${company.assetManagementEnabled ? "asset-pill-enabled" : "asset-pill-disabled"}`}>
-                    {company.assetManagementEnabled ? "Enabled" : "Disabled"}
-                  </span>
-                </td>
                 <td className="date-cell">{new Date(company.createdAt).toLocaleDateString()}</td>
                 <td className="actions-cell">
                   <button
                     className="kebab-menu-btn"
                     onClick={(e) => openKebab(e, company.id)}
-                    disabled={isTogglingAssetId === company.id || isDeletingId === company.id}
+                    disabled={isDeletingId === company.id}
                   >
                     ⋮
                   </button>
                   {openKebabId === company.id && (
                     <CompanyKebabMenu pos={kebabPos} onClose={() => setOpenKebabId(null)}>
-                      <button
-                        className="menu-item"
-                        onClick={() => { setOpenKebabId(null); setAssetConfirm(company); }}
-                        disabled={isTogglingAssetId === company.id}
-                      >
-                        {company.assetManagementEnabled ? "⛔ Revoke Asset" : "💼 Enable Asset"}
-                      </button>
                       <button
                         className="menu-item"
                         onClick={() => { setOpenKebabId(null); navigate(`/admin/company/${company.id}/access`); }}
@@ -624,47 +581,6 @@ function AdminCompanies() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {assetConfirm && (
-        <div className="apt-modal-overlay" onClick={() => !isTogglingAssetId && setAssetConfirm(null)}>
-          <div className="apt-modal companies-delete-modal" onClick={(e) => e.stopPropagation()}>
-            <h3 className="apt-modal-title">
-              {assetConfirm.assetManagementEnabled ? "Revoke Asset Management" : "Enable Asset Management"}
-            </h3>
-            <p className="apt-modal-warning" style={{ background: assetConfirm.assetManagementEnabled ? undefined : "rgba(13,181,176,0.08)", borderColor: assetConfirm.assetManagementEnabled ? undefined : "rgba(13,181,176,0.28)", color: assetConfirm.assetManagementEnabled ? undefined : "var(--text-primary)" }}>
-              {assetConfirm.assetManagementEnabled
-                ? <>This will revoke Asset Management access for <strong>{assetConfirm.companyName}</strong>. Their existing asset data will be preserved but they will no longer be able to use the Asset platform.</>
-                : <>This will enable Asset Management for <strong>{assetConfirm.companyName}</strong>. They will gain access to the Asset platform immediately.</>}
-            </p>
-            <div className="apt-modal-actions">
-              <button
-                type="button"
-                className="cancel-btn"
-                onClick={() => setAssetConfirm(null)}
-                disabled={!!isTogglingAssetId}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={assetConfirm.assetManagementEnabled ? "apt-modal-delete-btn" : "apt-modal-confirm-btn"}
-                disabled={!!isTogglingAssetId}
-                onClick={async () => {
-                  const company = assetConfirm;
-                  setAssetConfirm(null);
-                  await handleToggleAssetManagement(company);
-                }}
-              >
-                {isTogglingAssetId
-                  ? "Updating…"
-                  : assetConfirm.assetManagementEnabled
-                    ? "Revoke Access"
-                    : "Enable Access"}
-              </button>
-            </div>
           </div>
         </div>
       )}

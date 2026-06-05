@@ -46,15 +46,17 @@ cd apps/public-passport-viewer && npm run start
 3. Put business logic in `apps/backend-api/services/` or helpers when it is reused or complex.
 4. Keep database schema changes idempotent in `apps/backend-api/db/init.js`.
 5. Update [API docs](../api/ENDPOINTS.md) or a feature-specific API doc.
-6. Add Jest/Supertest coverage when auth, persistence, permissions, or release/public behavior changes.
+6. Add Node test-runner backend coverage when auth, persistence, permissions, or release/public behavior changes. Use frontend Vitest/React Testing Library coverage for UI behavior.
 
 ## Add Or Change Passport Type Fields
 
-1. Admin UI changes usually start in `apps/frontend-app/src/admin/passport-types/`.
+1. Stable production product categories usually start as versioned backend modules in `apps/backend-api/src/passport-modules/`.
 2. User create/edit behavior usually starts in `apps/frontend-app/src/passports/`.
-3. Server normalization usually starts in `apps/backend-api/helpers/passport-helpers.js`.
-4. Storage model changes usually touch `apps/backend-api/db/init.js` and docs in `docs/api/passport-type-storage-model.md`.
-5. Verify import/export behavior if the field is used by CSV/JSON imports, battery dictionary exports, or public representations.
+3. Admin UI changes usually start in `apps/frontend-app/src/admin/passport-types/`.
+4. Server normalization usually starts in `apps/backend-api/src/shared/passports/passport-helpers.js`.
+5. Storage model changes usually touch the passport module, `apps/backend-api/db/init.js`, and docs in `docs/api/passport-type-storage-model.md`.
+6. Verify import/export behavior if the field is used by CSV/JSON imports, semantic dictionary exports, JSON-LD, or public representations.
+7. For breaking semantic/regulatory changes, add a new module/typeName rather than mutating an existing production module.
 
 ## Passport Lifecycle
 

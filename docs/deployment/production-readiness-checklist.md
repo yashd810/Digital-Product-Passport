@@ -148,7 +148,7 @@ STORAGE_S3_FORCE_PATH_STYLE=true
 - ✅ **Network Connectivity**: All services communicating
 
 ### Documentation
-- ✅ **DATABASE_AND_STORAGE_ARCHITECTURE.md**: Complete architecture documentation
+- ✅ **database-and-storage-architecture.md**: Complete architecture documentation
 - ✅ **Stale documentation removed**: All references to local-storage and MinIO cleaned up
 - ✅ **Configuration documented**: All environment variables explained
 
@@ -263,7 +263,7 @@ Once complete: Application will be fully production-ready with:
 
 ## 📞 Support & References
 
-- [Full Architecture Documentation](DATABASE_AND_STORAGE_ARCHITECTURE.md)
-- [Security Configuration](docs/security/)
-- [Deployment Guides](docs/deployment/)
+- [Full Architecture Documentation](../architecture/database-and-storage-architecture.md)
+- [Security Configuration](../security/)
+- [Deployment Guides](./)
 - [OCI Console](https://cloud.oracle.com)

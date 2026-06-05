@@ -150,27 +150,28 @@ Complete reference guide to system architecture, design patterns, and technical 
 
 ---
 
-### Battery Dictionary Design
+### Semantic Dictionary Design
 
-**Purpose:** Battery semantic model and dictionary data management
+**Purpose:** Versioned semantic model and dictionary data management
 
 **What you'll find:**
-- Dictionary generation process
+- Battery dictionary generation process as one concrete semantic resource example
 - JSON artifacts (manifest, terms, categories, units, field-map)
 - Governance and authority model
 - Versioning and traceability
-- API endpoints for dictionary data
+- Generic API endpoints for dictionary data
 - Configuration and generation commands
 
 **Best for:**
-- Understanding battery product domain
+- Understanding semantic resource structure for any product domain
 - Building dictionary management features
 - Semantic validation implementation
 - Product category modeling
 - Data standardization
 
 **Related:**
-- [../api/battery-dictionary.md](../api/battery-dictionary.md) - API endpoints
+- [../api/battery-dictionary.md](../api/battery-dictionary.md) - Battery dictionary resource example
+- [../development/add-passport-category.md](../development/add-passport-category.md) - Adding future passport modules and semantic resources
 - [OAIS Archive Mapping](#oais-archive-mapping) - Archive model
 - [current-state-audit.md](#current-state-audit) - Configuration
 

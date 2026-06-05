@@ -1,6 +1,6 @@
 # Database Documentation Index
 
-Last reviewed: 2026-05-07
+Last reviewed: 2026-06-04
 
 This index points to the current database documentation for Claros DPP. The active schema is company-scoped and passport-type driven; it is no longer the old workspace/passport-version schema.
 
@@ -9,7 +9,7 @@ This index points to the current database documentation for Claros DPP. The acti
 | Topic | File | Focus |
 |-------|------|-------|
 | Current schema | [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | Tables, relationships, dynamic passport tables, maintenance notes |
-| Passport type storage | [passport-type-storage-model.md](../api/passport-type-storage-model.md) | How `passport_types.fields_json` creates passport-specific tables |
+| Passport type storage | [passport-type-storage-model.md](../api/passport-type-storage-model.md) | How module-seeded `passport_types.fieldsJson` creates passport-specific tables |
 | Company DPP policy | [company-granularity-policy.md](../admin/company-granularity-policy.md) | `company_dpp_policies` and granularity controls |
 | Repository storage | [repository-endpoints.md](../api/repository-endpoints.md) | Company repository and symbol storage behavior |
 | Backup continuity | [backup-continuity-policy.md](../security/backup-continuity-policy.md) | Backup-provider and public handover records |

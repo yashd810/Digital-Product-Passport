@@ -45,5 +45,5 @@ Topics covered:
 
 - [DATABASE_SCHEMA.md](../database/DATABASE_SCHEMA.md) - Database schema and field mappings
 - [ENDPOINTS.md](../api/ENDPOINTS.md) - API endpoint reference
-- [battery-dictionary.md](../api/battery-dictionary.md) - Battery dictionary and field definitions
+- [battery-dictionary.md](../api/battery-dictionary.md) - Battery v1 semantic dictionary resource example
 - [DEVELOPMENT.md](../development/DEVELOPMENT.md) - Development practices

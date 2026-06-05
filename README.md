@@ -1,6 +1,6 @@
 # Claros Digital Product Passport
 
-Claros DPP is a multi-app Digital Product Passport platform for creating, managing, releasing, verifying, and publicly sharing product passports. The repository is organized as a small service stack: a React dashboard, an Express/PostgreSQL API, a public passport viewer, a static marketing site, an asset-management surface, Docker infrastructure, and one centralized documentation tree.
+Claros DPP is a multi-app Digital Product Passport platform for creating, managing, releasing, verifying, and publicly sharing product passports. The repository is organized as a small service stack: a React dashboard, an Express/PostgreSQL API, a public passport viewer, a static marketing site, Docker infrastructure, and one centralized documentation tree.
 
 ## Quick Start
 
@@ -15,7 +15,6 @@ Local services:
 | Dashboard app | http://localhost:3000 | `apps/frontend-app` |
 | Backend API | http://localhost:3001 | `apps/backend-api` |
 | Public viewer | http://localhost:3004 | `apps/public-passport-viewer` |
-| Asset management | http://localhost:3003 | `apps/asset-management` |
 | Marketing site | http://localhost:8080 | `apps/marketing-site` |
 | PostgreSQL | localhost:5432 | `docker/docker-compose.yml` |
 
@@ -27,11 +26,9 @@ Detailed setup lives in [docs/guides/GETTING_STARTED.md](./docs/guides/GETTING_S
 .
 ├── apps/
 │   ├── backend-api/              # Express API, database bootstrap, routes, services
-│   ├── frontend-app/             # React/Vite authenticated dashboard
+│   ├── frontend-app/             # React/Vite authenticated dashboard, including Passport Data Management
 │   ├── public-passport-viewer/   # React/Vite public passport viewer shell
-│   ├── marketing-site/           # Static website served by Nginx
-│   └── asset-management/         # Static asset-management UI served by Nginx
-├── config/                       # Environment templates and shared configuration
+│   └── marketing-site/           # Static website served by Nginx
 ├── data/                         # Source datasets used by scripts and imports
 ├── docker/                       # Local and production compose files
 ├── docs/                         # Centralized developer and product documentation
@@ -51,6 +48,8 @@ Start with [docs/README.md](./docs/README.md). The most useful developer entry p
 - [Workflows](./docs/development/WORKFLOWS.md)
 - [Database Schema](./docs/database/DATABASE_SCHEMA.md)
 - [API Endpoints](./docs/api/ENDPOINTS.md)
+- [Production Readiness Checklist](./docs/deployment/production-readiness-checklist.md)
+- [S3 Setup Guide](./docs/infrastructure/s3-setup-guide.md)
 
 ## Stack
 

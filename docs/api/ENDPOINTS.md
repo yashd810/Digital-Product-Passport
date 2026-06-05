@@ -1000,7 +1000,7 @@ GET /api/v1/dppsByProductId/:productId
   {
     "dppId": "dpp-uuid-1",
     "productId": "PROD-001",
-    "type": "battery-passport",
+    "type": "batteryPassportV1",
     "version": 1,
     "releaseStatus": "released",
     "data": {...}
@@ -1593,10 +1593,10 @@ See **[did-resolution.md](did-resolution.md)**
 - GET `/api/health` - Health check
 - GET `/resolve?did=...` - DID resolution
 - GET `/contexts/dpp/v1` - JSON-LD context
-- GET `/dictionary/battery/v1/manifest.json` - Battery dictionary manifest
-- GET `/dictionary/battery/v1/context.jsonld` - Battery context
-- GET `/dictionary/battery/v1/terms` - Battery terms
-- GET `/api/dictionary/battery/v1/field-map` - Battery field mapping
+- GET `/dictionary/:family/:version/manifest.json` - Semantic dictionary manifest
+- GET `/dictionary/:family/:version/context.jsonld` - Semantic JSON-LD context
+- GET `/dictionary/:family/:version/terms` - Semantic dictionary terms
+- GET `/api/dictionary/:family/:version/field-map` - Semantic field mapping
 
 ---
 

@@ -27,7 +27,7 @@ This index provides quick navigation to administration documentation for the Cla
 
 ## Admin Documentation Overview
 
-The Claros DPP administration documentation provides comprehensive reference for system administrators and super admin users managing company-level policies, granularity settings, and DID (Decentralized Identifier) minting configuration.
+The Claros DPP administration documentation provides reference for system administrators and super admin users managing company-level policies, granularity settings, DID minting configuration, passport module/type access, and semantic dictionary availability.
 
 ### Key Administration Areas
 
@@ -37,21 +37,27 @@ The Claros DPP administration documentation provides comprehensive reference for
    - DID minting flags (model, item, facility)
    - VC issuance enablement
    - JSON-LD export capabilities
-   - Claros battery dictionary access
+   - Semantic dictionary access
 
-2. **Granularity Management**
+2. **Passport Module And Type Access**
+   - Code-defined passport modules are the preferred source for stable production product categories.
+   - Seeding writes module definitions into `passport_types` and creates/reconciles runtime tables.
+   - Company access grants decide which passport types appear in each tenant dashboard.
+   - Dictionary visibility is derived from granted passport types and their `semanticModelKey`.
+
+3. **Granularity Management**
    - Model-level granularity (highest level)
    - Batch-level granularity
    - Item-level granularity (default)
    - Override authorization
 
-3. **DID Configuration**
+4. **DID Configuration**
    - Model DID minting
    - Item DID minting
    - Facility DID minting
    - DID lifecycle management
 
-4. **API Administration**
+5. **API Administration**
    - Company policy retrieval (GET)
    - Policy updates (PUT)
    - Super admin authorization
@@ -83,7 +89,7 @@ The Claros DPP administration documentation provides comprehensive reference for
 - `mint_facility_dids` - Enable facility-level DID creation
 - `vc_issuance_enabled` - Enable VC generation
 - `jsonld_export_enabled` - Enable JSON-LD export
-- `claros_battery_dictionary_enabled` - Provide battery dictionary access
+- `semantic_dictionary_enabled` - Enable semantic dictionary browsing for granted passport types
 
 **API Endpoints Documented:**
 - GET /api/admin/companies/{company_id}/dpp-policy
@@ -123,7 +129,7 @@ The Claros DPP administration documentation provides comprehensive reference for
 - mint_facility_dids: false
 - vc_issuance_enabled: true
 - jsonld_export_enabled: true
-- claros_battery_dictionary_enabled: true
+- semantic_dictionary_enabled: true
 
 ### Granularity Levels
 
@@ -147,7 +153,7 @@ The Claros DPP administration documentation provides comprehensive reference for
 |------|---------|---------|
 | vc_issuance_enabled | true | Generate Verifiable Credentials |
 | jsonld_export_enabled | true | Enable JSON-LD format export |
-| claros_battery_dictionary_enabled | true | Access to battery field definitions |
+| semantic_dictionary_enabled | true | Access to semantic dictionaries used by granted passport types |
 
 ---
 

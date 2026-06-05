@@ -49,16 +49,6 @@ services:
     depends_on:
       - postgres
 
-  asset-management:
-    build:
-      context: ..
-      dockerfile: apps/asset-management/Dockerfile
-    ports:
-      - "${ASSET_MANAGEMENT_PORT:-3003}:8080"
-    restart: unless-stopped
-    depends_on:
-      - backend-api
-
   marketing-site:
     build:
       context: ..

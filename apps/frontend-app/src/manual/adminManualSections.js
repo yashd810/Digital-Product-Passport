@@ -27,7 +27,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
     : "";
   const firstCompanyAnalyticsRoute = firstCompanyAnalyticsSlug ? `/admin/analytics/${firstCompanyAnalyticsSlug}` : "";
   const firstCompanyProfileRoute = firstCompany ? `/admin/company/${firstCompany.id}/profile` : "";
-  const firstTypeFieldsRoute = firstType ? `/admin/passport-types/${encodeURIComponent(firstType.type_name)}/fields` : "";
+  const firstTypeFieldsRoute = firstType ? `/admin/passport-types/${encodeURIComponent(firstType.typeName || firstType.type_name)}/fields` : "";
 
   return [
     {
@@ -245,10 +245,12 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Types",
       audience: "Super admins publishing the catalog",
       title: "Manage product categories and the published passport-type catalog",
-      summary: "Passport Types is the central catalog workspace. It starts with product categories, then groups every passport type under that visual structure so companies see a clean navigation tree once access is granted.",
+      summary: "Passport Types is the central catalog workspace. Product categories provide the visual grouping, while versioned code modules and admin-created custom types provide the actual passport definitions that companies can receive through access grants.",
       facts: [
         { label: "Category features", value: "Create category, choose icon, and delete when no longer needed" },
-        { label: "Type actions", value: "View fields, edit metadata, clone, activate/deactivate, and delete" },
+        { label: "Type actions", value: "Preview registered modules, view fields, edit metadata, clone, activate/deactivate, and delete" },
+        { label: "Production pattern", value: "Stable product lines should be added as versioned backend passport modules, then seeded into passport_types" },
+        { label: "Custom pattern", value: "The admin builder remains available for custom/internal types and controlled schema experiments" },
         { label: "Catalog grouping", value: "Types are displayed underneath productCategory product categories" },
         { label: "Live example type", value: getPassportTypeLabel(firstType) || "First available type" },
       ],
@@ -262,8 +264,18 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           ],
         },
         {
+          title: "Use modules for stable product categories",
+          items: [
+            "Add production product families as files under `apps/backend-api/src/passport-modules/`, for example appliance, textile, or a future medical-device module.",
+            "Keep each module versioned with a stable moduleKey, typeName, semanticModelKey, complianceProfile, sections, and fields.",
+            "Seed modules with `npm run seed:passport-types` or `npm run bootstrap:passport-modules` so the database catalog and runtime tables match the code definition.",
+            "Create a new module/version for breaking regulatory or semantic changes instead of mutating an old production type that already has passports.",
+          ],
+        },
+        {
           title: "Operate the type list",
           items: [
+            "Use the registered modules preview to confirm which backend module files exist and whether they have already been seeded.",
             "Use view fields to inspect the published field schema without opening the full builder.",
             "Use edit metadata when labels, icons, or high-level definition details need changing without a complete rebuild.",
             "Clone type when a new type should inherit most of an existing design but diverge safely afterward.",
@@ -284,7 +296,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         ),
       ],
       warnings: [
-        "Treat deletion as a last resort. Clone-plus-deactivate is usually safer when a design should evolve without losing the old structure.",
+        "Treat deletion as a last resort. For production product lines, module-version-plus-deactivate is usually safer when a design should evolve without losing the old structure.",
       ],
     },
     {
@@ -293,9 +305,10 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Types",
       audience: "Super admins designing schemas",
       title: "Design passport types with the builder and field modeler",
-      summary: "The passport-type builder is where the product's authoring experience is defined. Every section, field type, translation, access level, table column, semantic model, dictionary mapping, and dynamic-data flag shown to company users comes from decisions made here.",
+      summary: "The passport-type builder is where custom type schemas and schema experiments are designed. For production product categories, the same concepts should usually be captured in versioned backend passport modules so schema, semantic model, and compliance behavior can be reviewed and shipped as code.",
       facts: [
         { label: "Builder outputs", value: "Sections, fields, translations, field access, composition flags, semantic mapping, and dynamic settings" },
+        { label: "Module outputs", value: "moduleKey, typeName, display metadata, semanticModelKey, complianceProfile, sections, and fields" },
         { label: "Input helpers", value: "Draft save/resume, clone workflows, and CSV import for builder definitions" },
         { label: "Field-level access", value: "Public, Notified Bodies, Market Surveillance, EU Commission, and Legitimate Interest" },
         { label: "Special field flags", value: "Composition, semantic IDs, dictionary mapping, dynamic field behavior, and field table configuration" },
@@ -333,6 +346,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "Save drafts while the schema is still in progress so you are not forced to publish incomplete work.",
             "Clone an existing type when you want a safe starting point with similar field structure.",
             "Use CSV import into the builder if the first draft already exists in spreadsheet form or was prepared offline.",
+            "Once a custom design is ready to become a reusable product category, promote it into a backend passport module and seed that module so future changes are controlled through code review.",
           ],
         },
       ],
@@ -350,6 +364,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       ],
       tips: [
         "If you are unsure about a new design, clone the closest existing type first and iterate from a familiar structure rather than building cold.",
+        "For regulated production categories, prefer a new module version over heavy in-place edits. It keeps old passports readable while letting new passports use the new semantics.",
       ],
     },
     {
@@ -358,7 +373,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Types",
       audience: "Super admins designing passport schemas and semantic exports",
       title: "Use semantic dictionaries when designing passport types",
-      summary: "The admin shell includes the same dictionary browser as the user dashboard, but the admin use case is schema design. It helps you choose the right semantic model, inspect canonical term IRIs, verify units and access-right expectations, and avoid stale field mappings before companies start authoring passports.",
+      summary: "The admin shell includes the same dictionary browser as the user dashboard, but the admin use case is schema and module design. It helps you choose the right semantic model, inspect canonical term IRIs, verify units and access-right expectations, and avoid stale field mappings before companies start authoring passports.",
       facts: [
         { label: "Admin route", value: "/admin/dictionary/:family/:version" },
         { label: "Semantic model", value: "Each passport type selects the dictionary model it needs" },
@@ -369,10 +384,11 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Validate schema mappings before publishing",
           items: [
-            "Open the matching semantic dictionary while designing or editing a passport type.",
+            "Open the matching semantic dictionary while designing a backend module or editing a custom passport type.",
             "Search by term label, definition, slug, app field key, or semantic identifier.",
             "Confirm the expected data type, unit, access rights, static/dynamic behavior, element ID, and regulation references.",
             "Map builder fields to dictionary terms intentionally so JSON-LD export uses the correct canonical identifiers.",
+            "Remember that company dashboard visibility is derived from company access to passport types that use the semantic model. A company with two granted types using two models can see both dictionaries; unrelated dictionaries stay hidden.",
           ],
         },
         {

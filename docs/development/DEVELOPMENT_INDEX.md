@@ -227,7 +227,7 @@ Database and utility automation scripts for bulk operations and administrative t
 3. Register route in App.js
 4. Add protected layout wrapper
 5. Implement API calls using shared helpers
-6. Write tests with Jest/React Testing Library
+6. Write tests with Vitest/React Testing Library
 7. Update documentation in docs/api/ if new endpoints needed
 
 **Related:** [DEVELOPMENT.md - Frontend](DEVELOPMENT.md#frontend), [ENDPOINTS.md](../api/ENDPOINTS.md)
@@ -397,8 +397,8 @@ For new product categories, prefer [Add A Passport Category](add-passport-catego
 
 ### Testing Patterns
 
-- **Backend:** Jest with Supertest for HTTP testing
-- **Frontend:** React Testing Library for component testing
+- **Backend:** Node test runner for service, route, and persistence coverage
+- **Frontend:** Vitest with React Testing Library for component testing
 - **a11y:** axe accessibility checks
 - **Coverage:** Test auth, permissions, and main workflows
 

@@ -1,10 +1,10 @@
 # Asset Management API Endpoints
 
-Asset Management APIs enable bulk passport creation, updates, and synchronization from external ERP/inventory systems.
+Asset Management APIs enable bulk passport updates and synchronization from external ERP/inventory systems.
 
 **Base URL:** `http://localhost:3001`  
-**Authentication:** Asset management key (API key) in `X-Asset-Management-Key` header  
-**Authorization:** Requires asset editor role (`requireAssetEditor`)
+**Authentication:** Asset launch token in `x-asset-platform-token`; optional shared secret in `x-asset-key` when enabled  
+**Authorization:** Launch requires normal dashboard session plus editor/company-admin access
 
 ---
 
@@ -12,10 +12,11 @@ Asset Management APIs enable bulk passport creation, updates, and synchronizatio
 
 All Asset Management endpoints require:
 
-1. **Asset Management Key** - Special API key in `X-Asset-Management-Key` header
-2. **Company Scope** - Assets are scoped to a specific company
+1. **Asset launch token** - Created when a dashboard editor launches Asset Management
+2. **Optional shared secret** - `x-asset-key` when the backend is configured to require it
+3. **Company Scope** - Assets are scoped to the launching company
 3. **Rate Limiting** - Aggressive rate limiting on write operations
-4. **Roles** - Certain endpoints require `asset_editor` role
+4. **Roles** - Launch requires editor or company-admin access
 
 ---
 
@@ -27,7 +28,7 @@ All Asset Management endpoints require:
 
 Get company configuration, available passport types, and system presets for asset management. This should be called first to understand what passport types are available and how to structure asset payloads.
 
-**Parameters:** None (company determined from asset management key)
+**Parameters:** None (company determined from the launch token)
 
 **Response (200 OK):**
 ```json
@@ -37,35 +38,35 @@ Get company configuration, available passport types, and system presets for asse
     "name": "Acme Corp",
     "slug": "acme-corp"
   },
-  "passport_types": [
+  "passportTypes": [
     {
       "id": "uuid",
-      "type_name": "battery-passport",
-      "display_name": "Battery Digital Product Passport",
-      "product_category": "Batteries",
-      "product_icon": "🔋",
-      "fields_json": {
+      "typeName": "batteryPassportV1",
+      "displayName": "Battery Passport v1",
+      "productCategory": "Battery",
+      "productIcon": "BT",
+      "fieldsJson": {
         "sections": [...]
       }
     }
   ],
-  "erp_presets": {
+  "erpPresets": {
     "sap": {...},
     "oracle": {...}
   },
   "security": {
-    "asset_key_required": true,
-    "company_scoped": true
+    "assetKeyRequired": true,
+    "companyScoped": true
   },
   "assumptions": {
-    "editable_statuses": ["draft", "in_revision"],
-    "dynamic_pushes_do_not_create_release_history": true
+    "editableStatuses": ["draft", "in_revision"],
+    "dynamicPushesDoNotCreateReleaseHistory": true
   }
 }
 ```
 
 **Error Codes:**
-- `401` - Invalid or missing asset management key
+- `401` - Invalid or missing asset launch token or required asset key
 - `500` - Failed to load bootstrap data
 
 ---
@@ -79,14 +80,14 @@ Get company configuration, available passport types, and system presets for asse
 Get all passports of a specific type for the company. Returns only editable fields and asset-relevant metadata.
 
 **Query Parameters:**
-- `passportType` (string, required) - Type name (e.g., "battery-passport")
+- `passportType` (string, required) - Type name (e.g., "batteryPassportV1")
 
 **Response (200 OK):**
 ```json
 {
-  "company_id": "uuid",
-  "passportType": "battery-passport",
-  "display_name": "Battery Digital Product Passport",
+  "companyId": "uuid",
+  "passportType": "batteryPassportV1",
+  "displayName": "Battery Passport v1",
   "fields": [
     "modelNumber",
     "productId",
@@ -176,7 +177,7 @@ Generate passport JSON preview without pushing to database. Used to validate and
 **Request Body:**
 ```json
 {
-  "passportType": "battery-passport",
+  "passportType": "batteryPassportV1",
   "records": [
     {
       "product_id": "BAT-2024-001",
@@ -196,7 +197,7 @@ Generate passport JSON preview without pushing to database. Used to validate and
 ```json
 {
   "generated_payload": {
-    "passportType": "battery-passport",
+    "passportType": "batteryPassportV1",
     "records": [
       {
         "product_id": "BAT-2024-001",
@@ -232,7 +233,7 @@ Create or update passports with asset data. This is the main endpoint for bulk p
 **Request Body:**
 ```json
 {
-  "passportType": "battery-passport",
+  "passportType": "batteryPassportV1",
   "records": [
     {
       "product_id": "BAT-2024-001",
@@ -267,7 +268,7 @@ Create or update passports with asset data. This is the main endpoint for bulk p
   "run": {
     "id": "uuid",
     "company_id": "uuid",
-    "passportType": "battery-passport",
+    "passportType": "batteryPassportV1",
     "trigger_type": "manual",
     "source_kind": "manual",
     "status": "success",
@@ -322,7 +323,7 @@ List all recurring or scheduled asset management jobs for the company.
     {
       "id": 1,
       "company_id": "uuid",
-      "passportType": "battery-passport",
+      "passportType": "batteryPassportV1",
       "name": "Daily Battery Sync",
       "source_kind": "api",
       "source_config": {
@@ -351,7 +352,7 @@ Create a new recurring or one-time asset management job.
 **Request Body:**
 ```json
 {
-  "passportType": "battery-passport",
+  "passportType": "batteryPassportV1",
   "name": "Daily Battery Sync",
   "sourceKind": "api",
   "sourceConfig": {
@@ -387,7 +388,7 @@ Create a new recurring or one-time asset management job.
   "job": {
     "id": 1,
     "company_id": "uuid",
-    "passportType": "battery-passport",
+    "passportType": "batteryPassportV1",
     "name": "Daily Battery Sync",
     "source_kind": "api",
     "source_config": {...},
@@ -484,7 +485,7 @@ Get execution history of all asset management jobs and pushes.
       "id": "uuid",
       "job_id": 1,
       "company_id": "uuid",
-      "passportType": "battery-passport",
+      "passportType": "batteryPassportV1",
       "trigger_type": "scheduled",
       "source_kind": "api",
       "status": "success",

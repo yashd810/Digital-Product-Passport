@@ -16,9 +16,9 @@ The dashboard is a React 18/Vite single-page app for authenticated users and sup
 
 - User auth screens: login, registration, OAuth callback, password reset.
 - Company dashboard: overview, passports, create/edit forms, workflow, repository, templates, team, audit logs, notifications, messages, profile, security.
-- Super-admin dashboard: companies, passport types, analytics, admin invites, symbols, security/admin management.
+- Super-admin dashboard: companies, passport modules, passport types, semantic dictionaries, analytics, admin invites, symbols, security/admin management.
 - Shared public passport rendering for both dashboard preview routes and the standalone public viewer.
-- Battery dictionary browser and in-app manuals.
+- Generic semantic dictionary browser and in-app manuals.
 
 ## Important Files
 
@@ -31,6 +31,7 @@ The dashboard is a React 18/Vite single-page app for authenticated users and sup
 | `src/auth/` | Auth screens |
 | `src/user/dashboard/` | Authenticated company dashboard |
 | `src/admin/` | Super-admin dashboard |
+| `src/admin/passport-types/` | Product category, passport module, passport type, and builder UI |
 | `src/passports/` | Passport create/edit/history utilities |
 | `src/passport-viewer/` | Consumer and technical passport views |
 | `src/shared/` | Shared API, dictionary, table, and utility modules |

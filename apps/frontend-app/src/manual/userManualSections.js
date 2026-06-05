@@ -467,6 +467,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       facts: [
         { label: "Dashboard route", value: dashboardPath("dictionary/:family/:version") },
         { label: "Public route", value: "/dictionary/:family/:version" },
+        { label: "Visibility rule", value: "Your dashboard shows dictionaries only for semantic models used by passport types your company can access" },
         { label: "Term detail", value: "Each term has a slug page plus a raw JSON endpoint" },
         { label: "Best use", value: "Validate field meaning before exporting JSON-LD or discussing semantic passport data with partners" },
       ],
@@ -475,6 +476,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Find the right term before exporting",
           items: [
             "Open the dictionary available for the passport type from the dashboard sidebar.",
+            "If your company has access to multiple passport types with different semantic models, each matching dictionary can appear separately.",
             "Search by label, definition, slug, or known application field key.",
             "Open the term detail page to confirm data format, JSON type, XSD type, unit, access rights, static/dynamic status, internal key, element ID, and regulation references.",
             "Use the dictionary reference URL when another system needs the canonical linked-data identifier.",

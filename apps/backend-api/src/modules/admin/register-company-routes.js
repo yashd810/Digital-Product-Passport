@@ -265,45 +265,6 @@ module.exports = function registerCompanyRoutes(app, deps) {
     }
   });
 
-  app.patch("/api/admin/companies/:companyId/asset-management", authenticateToken, isSuperAdmin, async (req, res) => {
-    try {
-      const { companyId } = req.params;
-      const { enabled } = req.body || {};
-      if (typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be true or false" });
-
-      const updated = await pool.query(
-        `UPDATE companies
-         SET asset_management_enabled = $1,
-             asset_management_revoked_at = CASE WHEN $1 THEN NULL ELSE NOW() END,
-             updated_at = NOW()
-         WHERE id = $2
-         RETURNING id, company_name, asset_management_enabled, asset_management_revoked_at`,
-        [enabled, companyId]
-      );
-      if (!updated.rows.length) return res.status(404).json({ error: "Company not found" });
-
-      await logAudit(
-        null, req.user.userId,
-        enabled ? "ENABLE_ASSET_MANAGEMENT" : "REVOKE_ASSET_MANAGEMENT",
-        "companies", companyId, null, { asset_management_enabled: enabled }
-      );
-
-      if (!enabled) {
-        await pool.query(
-          `UPDATE asset_management_jobs
-           SET is_active = false, next_run_at = NULL, updated_at = NOW()
-           WHERE company_id = $1`,
-          [companyId]
-        );
-      }
-
-      res.json({ success: true, company: mapCompanyRow(updated.rows[0]) });
-    } catch (error) {
-      logger.error("Asset management toggle error:", error.message);
-      res.status(500).json({ error: "Failed to update Asset Management access" });
-    }
-  });
-
   app.get("/api/admin/companies/:id/dpp-policy", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const companyId = parseInt(req.params.id, 10);

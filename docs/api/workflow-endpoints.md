@@ -49,7 +49,7 @@ Submit a passport to the review/approval workflow. Passport must pass compliance
 **Request Body:**
 ```json
 {
-  "passportType": "battery-passport",
+  "passportType": "batteryPassportV1",
   "reviewerId": "user-id-1",
   "approverId": "user-id-2"
 }
@@ -99,7 +99,7 @@ Reviewer or approver takes action on a passport in workflow.
 **Request Body:**
 ```json
 {
-  "passportType": "battery-passport",
+  "passportType": "batteryPassportV1",
   "comment": "Looks good, approved for release"
 }
 ```
@@ -206,7 +206,7 @@ Get all workflows for current user in a company.
     {
       "id": "uuid",
       "passport_dpp_id": "uuid",
-      "passportType": "battery-passport",
+      "passportType": "batteryPassportV1",
       "company_id": "uuid",
       "submitted_by": "user-id",
       "submitted_at": "2025-05-05T10:30:00Z",
@@ -260,7 +260,7 @@ Get all passports awaiting current user's review or approval across all companie
     {
       "id": "uuid",
       "passport_dpp_id": "uuid",
-      "passportType": "battery-passport",
+      "passportType": "batteryPassportV1",
       "company_id": "uuid",
       "submitted_by": "user-id",
       "submitted_at": "2025-05-05T10:30:00Z",
@@ -361,4 +361,3 @@ All workflow endpoints return consistent error responses:
 | `404` | Not Found - Passport or workflow not found |
 | `422` | Unprocessable Entity - Compliance validation failed |
 | `500` | Server Error - Internal server error |
-

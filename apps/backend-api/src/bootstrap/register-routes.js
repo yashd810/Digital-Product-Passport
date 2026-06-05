@@ -1,6 +1,5 @@
 "use strict";
 
-const registerAssetManagementLaunchRoutes = require("../../routes/asset-management-launch");
 const registerRepositoryRoutes = require("../../routes/repository");
 const registerNotificationRoutes = require("../../routes/notifications");
 const registerMessagingRoutes = require("../../routes/messaging");
@@ -16,15 +15,6 @@ const registerDppApiRoutes = require("../../routes/dpp-api");
 const registerDictionaryRoutes = require("../../routes/dictionary");
 
 function registerAppRoutes(app, deps) {
-  registerAssetManagementLaunchRoutes(app, {
-    authenticateToken: deps.authenticateToken,
-    checkCompanyAccess: deps.checkCompanyAccess,
-    requireEditor: deps.requireEditor,
-    assertAssetManagementEnabled: deps.assertAssetManagementEnabled,
-    generateAssetLaunchToken: deps.generateAssetLaunchToken,
-    ASSET_SHARED_SECRET: deps.ASSET_SHARED_SECRET,
-  });
-
   registerRepositoryRoutes(app, {
     pool: deps.pool,
     fs: deps.fs,
@@ -124,9 +114,9 @@ function registerAppRoutes(app, deps) {
 
   registerAssetManagementApiRoutes(app, {
     pool: deps.pool,
-    requireAssetManagementKey: deps.requireAssetManagementKey,
-    authenticateAssetPlatform: deps.authenticateAssetPlatform,
-    requireAssetEditor: deps.requireAssetEditor,
+    authenticateToken: deps.authenticateToken,
+    checkCompanyAccess: deps.checkCompanyAccess,
+    requireEditor: deps.requireEditor,
     publicReadRateLimit: deps.publicReadRateLimit,
     assetWriteRateLimit: deps.assetWriteRateLimit,
     assetSourceFetchRateLimit: deps.assetSourceFetchRateLimit,

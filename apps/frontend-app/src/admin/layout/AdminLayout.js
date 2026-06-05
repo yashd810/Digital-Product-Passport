@@ -1,20 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { applyTheme, getStoredTheme } from "../../app/providers/ThemeContext";
-import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
-
-const API = import.meta.env.VITE_API_URL || "";
-
-function buildDictionaryPath(model) {
-  if (!model?.family || !model?.version) return null;
-  return `/admin/dictionary/${encodeURIComponent(model.family)}/${encodeURIComponent(model.version)}`;
-}
 
 function AdminLayout({ user, onLogout }) {
   const navigate = useNavigate();
   const [currentTheme, setCurrentTheme] = useState(() => getStoredTheme(user?.id));
-  const [semanticModels, setSemanticModels] = useState([]);
   const displayName = user?.firstName
     ? `${user.firstName} ${user?.lastName || ""}`.trim()
     : user?.email;
@@ -24,13 +15,6 @@ function AdminLayout({ user, onLogout }) {
     setCurrentTheme(stored);
     applyTheme(stored);
   }, [user?.id]);
-
-  useEffect(() => {
-    fetchWithAuth(`${API}/api/semantic-models`)
-      .then((response) => response.ok ? response.json() : [])
-      .then((data) => setSemanticModels(Array.isArray(data) ? data : []))
-      .catch(() => setSemanticModels([]));
-  }, []);
 
   const handleLogout = async () => {
     await onLogout?.();
@@ -78,6 +62,10 @@ function AdminLayout({ user, onLogout }) {
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           📋 Passport Types
         </NavLink>
+        <NavLink to="/admin/passport-modules"
+          className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
+          🧩 Passport Modules
+        </NavLink>
         <NavLink to="/admin/admin-management"
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           👑 Admin Management
@@ -90,18 +78,6 @@ function AdminLayout({ user, onLogout }) {
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           📘 Manual
         </NavLink>
-        {semanticModels
-          .map((model) => ({ model, path: buildDictionaryPath(model) }))
-          .filter(({ path }) => path)
-          .map(({ model, path }) => (
-            <NavLink
-              key={model.semanticModelKey || path}
-              to={path}
-              className={({ isActive }) => `tab${isActive ? " active" : ""}`}
-            >
-              🔖 {model.name || model.semanticModelKey || "Dictionary"}
-            </NavLink>
-          ))}
       </nav>
 
       {/* ── Child page ── */}

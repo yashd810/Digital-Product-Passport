@@ -75,7 +75,6 @@ const {
 // ─── DIRECTORIES ─────────────────────────────────────────────────────────────
 const RUNTIME_PATHS = deriveRuntimePaths(__dirname);
 const {
-  assetManagementDir: ASSET_MANAGEMENT_DIR,
   localStorageDir: LOCAL_STORAGE_DIR,
   filesBaseDir: FILES_BASE_DIR,
   repoBaseDir: REPO_BASE_DIR,
@@ -94,7 +93,6 @@ const { isProduction: IS_PRODUCTION, runSchemaMigrations: RUN_SCHEMA_MIGRATIONS,
 assertRequiredProductionEnvironment({ isProduction: IS_PRODUCTION, logger });
 configureHttp(app, {
   allowedOriginSet,
-  assetManagementDir: ASSET_MANAGEMENT_DIR,
   cspConnectSrc,
   globalSymbolsDir: GLOBAL_SYMBOLS_DIR,
   isPlainRecord,
@@ -119,14 +117,12 @@ pool.on("error", (err) => {
 // ─── SECRETS + AUTH CONSTANTS ────────────────────────────────────────────────
 const JWT_SECRET             = process.env.JWT_SECRET || "change-me-in-production";
 const JWT_EXPIRY             = "7d";
-const ASSET_LAUNCH_TOKEN_EXPIRY = process.env.ASSET_LAUNCH_TOKEN_EXPIRY || "2h";
 const PEPPER                 = process.env.PEPPER_V1  || "change-this-pepper-in-production";
 const CURRENT_PEPPER_VERSION = 1;
 const SESSION_COOKIE_NAME    = process.env.SESSION_COOKIE_NAME || "dpp_session";
 const COOKIE_SECURE          = IS_PRODUCTION ? process.env.COOKIE_SECURE !== "false" : process.env.COOKIE_SECURE === "true";
 const COOKIE_SAME_SITE       = process.env.COOKIE_SAME_SITE || (IS_PRODUCTION ? "None" : "lax");
 const COOKIE_DOMAIN          = process.env.COOKIE_DOMAIN || "";
-const ASSET_SHARED_SECRET    = process.env.ASSET_MANAGEMENT_SHARED_SECRET || "";
 const ASSET_SOURCE_ALLOWED_HOSTS = new Set(
   String(process.env.ASSET_SOURCE_ALLOWED_HOSTS || "")
     .split(",").map(v => v.trim().toLowerCase()).filter(Boolean)
@@ -143,27 +139,27 @@ const ASSET_ERP_PRESETS = [
   {
     key: "generic_rest", label: "Generic REST",
     description: "Generic JSON API returning an array or records path.",
-    sourceConfig: { method: "GET", recordPath: "data.items", fieldMap: { dppId: "dppId", internal_alias_id: "internal_alias_id", model_name: "model_name" } },
+    sourceConfig: { method: "GET", recordPath: "data.items", fieldMap: { dppId: "dppId", internal_alias_id: "internalAliasId", model_name: "modelName" } },
   },
   {
     key: "sap_s4hana_material", label: "SAP S/4HANA Material Feed",
     description: "Typical material master style mapping for SAP integrations.",
-    sourceConfig: { method: "GET", recordPath: "d.results", fieldMap: { Material: "internal_alias_id", ProductUUID: "dppId", ProductDescription: "model_name", Plant: "facility" } },
+    sourceConfig: { method: "GET", recordPath: "d.results", fieldMap: { Material: "internalAliasId", ProductUUID: "dppId", ProductDescription: "modelName", Plant: "facility" } },
   },
   {
     key: "microsoft_bc_items", label: "Business Central Items",
     description: "Business Central item sync using OData-style responses.",
-    sourceConfig: { method: "GET", recordPath: "value", fieldMap: { id: "dppId", number: "internal_alias_id", displayName: "model_name", inventoryPostingGroup: "category" } },
+    sourceConfig: { method: "GET", recordPath: "value", fieldMap: { id: "dppId", number: "internalAliasId", displayName: "modelName", inventoryPostingGroup: "category" } },
   },
   {
     key: "netsuite_restlet", label: "NetSuite Restlet",
     description: "NetSuite restlet payload with items array.",
-    sourceConfig: { method: "POST", recordPath: "items", fieldMap: { internalId: "dppId", itemId: "internal_alias_id", displayName: "model_name", location: "facility" } },
+    sourceConfig: { method: "POST", recordPath: "items", fieldMap: { internalId: "dppId", itemId: "internalAliasId", displayName: "modelName", location: "facility" } },
   },
   {
     key: "siemens_teamcenter_items", label: "Siemens Teamcenter Items",
     description: "Teamcenter item feed with product ID matching and optional GUID mapping.",
-    sourceConfig: { method: "GET", recordPath: "items", fieldMap: { item_id: "internal_alias_id", uid: "dppId", object_name: "model_name" } },
+    sourceConfig: { method: "GET", recordPath: "items", fieldMap: { item_id: "internalAliasId", uid: "dppId", object_name: "modelName" } },
   },
 ];
 
@@ -266,25 +262,6 @@ const {
 } = createRateLimiters(pool);
 startRateLimitMaintenance(pool);
 
-// ─── ASSET MANAGEMENT AUTH MIDDLEWARE ────────────────────────────────────────
-const requireAssetManagementKey = (req, res, next) => {
-  if (!ASSET_SHARED_SECRET) {
-    logger.error("[asset-management] ASSET_MANAGEMENT_SHARED_SECRET is not configured");
-    return res.status(503).json({ error: "Asset management integration is unavailable" });
-  }
-  const submitted = String(req.headers["x-asset-key"] || "");
-  if (!submitted) return res.status(401).json({ error: "x-asset-key header required" });
-  const expectedBuf = Buffer.from(String(ASSET_SHARED_SECRET));
-  const submittedBuf = Buffer.from(submitted);
-  if (expectedBuf.length !== submittedBuf.length || !crypto.timingSafeEqual(expectedBuf, submittedBuf)) {
-    return res.status(403).json({ error: "Invalid asset key" });
-  }
-  next();
-};
-
-const generateAssetLaunchToken = ({ companyId, userId, role }) =>
-  jwt.sign({ scope: "asset_management", companyId, userId, role }, JWT_SECRET, { expiresIn: ASSET_LAUNCH_TOKEN_EXPIRY });
-
 async function getCompanyAssetSettings(companyId) {
   const result = await pool.query(
     `SELECT id, company_name, is_active, asset_management_enabled, asset_management_revoked_at
@@ -297,17 +274,8 @@ async function getCompanyAssetSettings(companyId) {
 async function assertAssetManagementEnabled(companyId) {
   const company = await getCompanyAssetSettings(companyId);
   if (!company) { const e = new Error("Company not found"); e.statusCode = 404; throw e; }
-  if (!company.asset_management_enabled) { const e = new Error("Asset Management is not enabled for this company"); e.statusCode = 403; throw e; }
+  if (company.is_active === false) { const e = new Error("Company is inactive"); e.statusCode = 403; throw e; }
   return company;
-}
-
-async function getCurrentAssetSessionUser(userId) {
-  if (!userId) return null;
-  const result = await pool.query(
-    'SELECT id, "companyId" AS "companyId", role, "isActive" AS "isActive" FROM users WHERE id = $1',
-    [userId]
-  );
-  return result.rows[0] || null;
 }
 
 async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
@@ -333,37 +301,6 @@ async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
   const schemaFields = sections.flatMap(s => s.fields || []);
   return { typeName: result.rows[0].typeName, displayName: result.rows[0].displayName, schemaFields, allowedKeys: new Set(schemaFields.map(f => f.key).filter(Boolean)) };
 }
-
-const authenticateAssetPlatform = async (req, res, next) => {
-  try {
-    const token = String(req.headers["x-asset-platform-token"] || "");
-    if (!token) return res.status(401).json({ error: "x-asset-platform-token header required" });
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded?.scope !== "asset_management" || !decoded.companyId || !decoded.userId) {
-      return res.status(403).json({ error: "Invalid asset platform token" });
-    }
-    await assertAssetManagementEnabled(decoded.companyId);
-    const currentUser = await getCurrentAssetSessionUser(decoded.userId);
-    if (!currentUser || !currentUser.isActive) return res.status(403).json({ error: "Asset platform user is no longer active" });
-    if (currentUser.role !== "super_admin" && String(currentUser.companyId) !== String(decoded.companyId)) {
-      return res.status(403).json({ error: "Asset platform session no longer matches this company" });
-    }
-    if (currentUser.role === "viewer") return res.status(403).json({ error: "Viewers do not have permission to access Asset Management." });
-    req.assetContext = { companyId: String(decoded.companyId), userId: currentUser.id, role: currentUser.role };
-    next();
-  } catch (error) {
-    if (error.name === "TokenExpiredError") return res.status(401).json({ error: "Asset platform session expired. Open it again from the dashboard." });
-    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
-    return res.status(403).json({ error: "Invalid asset platform token" });
-  }
-};
-
-const requireAssetEditor = (req, res, next) => {
-  if (!req.assetContext?.userId || req.assetContext.role === "viewer") {
-    return res.status(403).json({ error: "Editor access is required for Asset Management." });
-  }
-  next();
-};
 
 // ─── FILE STORAGE ────────────────────────────────────────────────────────────
 const upload = multer({
@@ -545,7 +482,6 @@ registerAppRoutes(app, {
   JWT_SECRET,
   PASSWORD_MIN_LENGTH,
   SESSION_COOKIE_NAME,
-  ASSET_SHARED_SECRET,
   ASSET_ERP_PRESETS,
   ASSET_MATCH_FIELDS,
   GLOBAL_SYMBOLS_DIR,
@@ -591,9 +527,6 @@ registerAppRoutes(app, {
   renderInfoTable,
   oauthService,
   backupProviderService,
-  requireAssetManagementKey,
-  authenticateAssetPlatform,
-  requireAssetEditor,
   assertAssetManagementEnabled,
   assertCompanyAssetPassportTypeAccess,
   getLatestCompanyPassports,
@@ -672,7 +605,6 @@ registerAppRoutes(app, {
   dppIdentity,
   batteryDictionaryService,
   semanticModelRegistry,
-  generateAssetLaunchToken,
   isPathInsideBase,
   normalizePassportTypeSchema,
   getTypeSchemaVersion,

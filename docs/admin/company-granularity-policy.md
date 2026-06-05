@@ -1,6 +1,6 @@
 # Company Granularity Policy
 
-**Last updated**: 2026-05-05  
+**Last updated**: 2026-06-04  
 **Status**: Complete and verified against codebase  
 **Database Schema Version**: 47 tables
 
@@ -28,7 +28,7 @@
 - Whether creators can override the default granularity
 - DID (Decentralized Identifier) minting flags for model, item, and facility levels
 - VC (Verifiable Credential) issuance and JSON-LD export enablement
-- Claros battery dictionary availability flag
+- Semantic dictionary availability flag. Actual company dashboard dictionary visibility is further narrowed by the passport types granted to the company and each type's `semanticModelKey`.
 
 ## Database Table: company_dpp_policies
 
@@ -42,7 +42,7 @@ Columns:
 - `mint_facility_dids` (BOOLEAN, default: false)
 - `vc_issuance_enabled` (BOOLEAN, default: true)
 - `jsonld_export_enabled` (BOOLEAN, default: true)
-- `claros_battery_dictionary_enabled` (BOOLEAN, default: true)
+- `semantic_dictionary_enabled` (BOOLEAN, default: true)
 - `created_at` (TIMESTAMPTZ, default: NOW())
 - `updated_at` (TIMESTAMPTZ, default: NOW())
 
@@ -66,7 +66,7 @@ Authorization: Bearer <token>
   "mint_facility_dids": false,
   "vc_issuance_enabled": true,
   "jsonld_export_enabled": true,
-  "claros_battery_dictionary_enabled": true,
+  "semantic_dictionary_enabled": true,
   "created_at": "2026-04-15T10:30:00Z",
   "updated_at": "2026-05-04T14:22:15Z"
 }
@@ -91,7 +91,7 @@ Authorization: Bearer <token>
   "mint_facility_dids": false,
   "vc_issuance_enabled": true,
   "jsonld_export_enabled": true,
-  "claros_battery_dictionary_enabled": true
+  "semantic_dictionary_enabled": true
 }
 ```
 
@@ -109,7 +109,7 @@ Authorization: Bearer <token>
     "mint_facility_dids": false,
     "vc_issuance_enabled": true,
     "jsonld_export_enabled": true,
-    "claros_battery_dictionary_enabled": true,
+    "semantic_dictionary_enabled": true,
     "created_at": "2026-04-15T10:30:00Z",
     "updated_at": "2026-05-04T14:22:15Z"
   }
@@ -150,7 +150,7 @@ Authorization: Bearer <token>
 - `mint_facility_dids` - Enable DID minting for facility-level identifiers
 - `vc_issuance_enabled` - Enable Verifiable Credential issuance for passports
 - `jsonld_export_enabled` - Enable JSON-LD format export
-- `claros_battery_dictionary_enabled` - Enable Claros battery dictionary availability
+- `semantic_dictionary_enabled` - Enable semantic dictionary access. The dashboard only shows dictionaries for semantic models used by passport types the company can access.
 
 All boolean fields must be actual boolean values (true/false), not strings.
 
@@ -177,7 +177,7 @@ When creating new passports:
 - Passport creation enforces the company's granularity policy before insert
 - Cannot override granularity if `allow_granularity_override` = false
 - Granularity value must be one of: 'model', 'batch', 'item'
-- Validation occurs in `passports.js` route handler
+- Validation occurs in the passport lifecycle route layer using module/profile-aware helpers.
 
 ---
 

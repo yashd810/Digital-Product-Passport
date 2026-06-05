@@ -1,6 +1,6 @@
 # Database Schema - Claros DPP
 
-Last reviewed: 2026-05-07
+Last reviewed: 2026-06-04
 
 This document describes the current PostgreSQL schema created by [init.js](../../apps/backend-api/db/init.js). The app no longer uses the old workspace/passport-version schema. Data is scoped by company, dynamic passport tables are created per passport type, and shared passport metadata is anchored through `passport_registry`.
 
@@ -76,14 +76,14 @@ user_identities
 users
 ```
 
-The app also creates one data table per active passport type. For example, a `battery` passport type uses a generated passport table whose name is resolved through the backend table-name helper. These typed tables hold the operational row data for each passport.
+The app also creates one data table per active passport type. For example, the seeded `appliancePassportV1` type uses a generated table such as `appliance_passport_v1_passports`, resolved through the backend table-name helper. These typed tables hold the operational row data for each passport.
 
 ## Core Company And User Tables
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
 | `companies` | Company tenant records and public DID branding identity. | `id`, `company_name`, `is_active`, `asset_management_enabled`, `did_slug`, `economic_operator_identifier`, `branding_json` |
-| `company_dpp_policies` | Current company-level DPP policy. | `company_id`, `default_granularity`, `allow_granularity_override`, `mint_model_dids`, `mint_item_dids`, `mint_facility_dids`, `vc_issuance_enabled`, `jsonld_export_enabled`, `claros_battery_dictionary_enabled` |
+| `company_dpp_policies` | Current company-level DPP policy. | `company_id`, `default_granularity`, `allow_granularity_override`, `mint_model_dids`, `mint_item_dids`, `mint_facility_dids`, `vc_issuance_enabled`, `jsonld_export_enabled`, `semantic_dictionary_enabled` |
 | `users` | Login accounts, profile data, company role, 2FA flags, and session versioning. | `id`, `email`, `password_hash`, `company_id`, `role`, `is_active`, `otp_code_hash`, `two_factor_enabled`, `session_version`, profile fields |
 | `user_identities` | SSO identity links for users. | `user_id`, `provider_key`, `provider_subject`, `raw_profile`, `last_login_at` |
 | `invite_tokens` | Company invitations. | `token`, `email`, `company_id`, `invited_by`, `role_to_assign`, `used`, `expires_at` |
@@ -99,9 +99,9 @@ Important notes:
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `passport_types` | Admin-defined passport type schemas. | `type_name`, `display_name`, `product_category`, `semantic_model_key`, `fields_json`, `is_active`, `created_by` |
+| `passport_types` | Seeded module-backed and admin-created passport type schemas. | `typeName`, `displayName`, `productCategory`, `semanticModelKey`, `fieldsJson`, `isActive`, `createdBy` |
 | `passport_type_drafts` | One draft schema per super-admin user. | `user_id`, `draft_json` |
-| `passport_type_schema_events` | Audit trail for schema changes. | `passport_type_id`, `type_name`, `table_name`, `schema_version`, `event_type`, `change_summary` |
+| `passport_type_schema_events` | Audit trail for module seeding and schema changes. | `passportTypeId`, `typeName`, `tableName`, `schemaVersion`, `eventType`, `changeSummary` |
 | `product_categories` | Managed passport type categories. | `name`, `icon` |
 | `company_passport_access` | Company access grants for passport types. | `company_id`, `passport_type_id`, `access_revoked` |
 
@@ -111,9 +111,9 @@ Dynamic passport tables store the actual passport rows for each passport type. T
 id
 dppId
 lineageId
-company_id
+companyId
 passportType
-product_id
+internalAliasId
 uniqueProductIdentifier
 granularity
 modelName
@@ -125,22 +125,24 @@ carrierPolicyKey
 carrierAuthenticity
 economicOperatorId
 facilityId
-created_by
-updated_by
-released_at
-deleted_at
-created_at
-updated_at
+createdBy
+updatedBy
+releasedAt
+deletedAt
+createdAt
+updatedAt
 ```
 
-Each dynamic table also includes the fields defined in `passport_types.fields_json`.
+Each dynamic table also includes the fields defined in `passport_types.fieldsJson`.
+
+For production product categories, the preferred source is a versioned backend module under `apps/backend-api/src/passport-modules/`. Seeding writes the module definition into `passport_types`, reconciles runtime tables, and can optionally grant company access. Breaking schema or semantic changes should create a new module/typeName instead of rewriting old passport semantics.
 
 ## Passport Registry And Identity
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `passport_registry` | Stable registry for every DPP identifier. | `dppId`, `lineageId`, `company_id`, `passportType`, hashed access/device keys, key prefixes, rotation timestamps |
-| `dpp_subject_registry` | Issued DID records for company/product/DPP subjects. | `company_id`, `passport_dpp_id`, `product_id`, `uniqueProductIdentifier`, `granularity`, `product_did`, `dpp_did`, `company_did` |
+| `passport_registry` | Stable registry for every DPP identifier. | `dppId`, `lineageId`, `companyId`, `passportType`, hashed access/device keys, key prefixes, rotation timestamps |
+| `dpp_subject_registry` | Issued DID records for company/product/DPP subjects. | `companyId`, `passportDppId`, `internalAliasId`, `uniqueProductIdentifier`, `granularity`, `productDid`, `dppDid`, `companyDid` |
 | `dpp_registry_registrations` | External/local registry registration records. | `passport_dpp_id`, `company_id`, `product_identifier`, `dppId`, `registry_name`, `status`, `registration_payload` |
 | `product_identifier_lineage` | Linked successor records when identifier granularity changes. | `lineageId`, previous/replacement passport IDs, identifiers, granularities, `transition_reason` |
 
@@ -150,7 +152,7 @@ Each dynamic table also includes the fields defined in `passport_types.fields_js
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `passport_archives` | Immutable snapshots for archived/revision/history states. | `dppId`, `lineageId`, `company_id`, `passportType`, `versionNumber`, `row_data`, `snapshot_reason` |
+| `passport_archives` | Immutable snapshots for archived/revision/history states. | `dppId`, `lineageId`, `companyId`, `passportType`, `versionNumber`, `rowData`, `snapshotReason` |
 | `passport_history_visibility` | Public/private visibility of version history rows. | `passport_dpp_id`, `versionNumber`, `is_public`, `updated_by` |
 | `passport_edit_sessions` | Active edit locks/sessions. | `passport_dpp_id`, `company_id`, `passportType`, `user_id`, `last_activity_at` |
 | `passport_revision_batches` | Bulk revision batch headers. | `company_id`, `passportType`, `scope_type`, `changes_json`, counts, workflow targets |
@@ -165,7 +167,7 @@ Release status is stored on the dynamic passport row. History and archive record
 | `api_keys` | Company-scoped API keys for `/api/v1`. | `company_id`, `name`, `key_hash`, `key_prefix`, `key_salt`, `hash_algorithm`, `scopes`, `expires_at`, `is_active` |
 | `user_access_audiences` | User-level audience grants. | `user_id`, `company_id`, `audience`, `granted_by`, `expires_at`, `is_active` |
 | `passport_access_grants` | Element/passport audience grants. | `passport_dpp_id`, `company_id`, `audience`, `element_id_path`, `grantee_user_id`, `expires_at`, `is_active` |
-| `passport_signatures` | Released passport signatures. | `passport_dpp_id`, `versionNumber`, `data_hash`, `signature`, `algorithm`, `signing_key_id`, `vc_json` |
+| `passport_signatures` | Released passport signatures. | `passportDppId`, `versionNumber`, `dataHash`, `signature`, `algorithm`, `signingKeyId`, `vcJson` |
 | `passport_signing_keys` | Public signing keys by key ID. | `key_id`, `public_key`, `algorithm`, `algorithm_version` |
 | `passport_scan_events` | Public scan analytics. | `passport_dpp_id`, `viewer_user_id`, `user_agent`, `referrer`, `scanned_at` |
 | `passport_security_events` | Passport security and carrier-verification events. | `passport_dpp_id`, `company_id`, `event_type`, `severity`, `source`, `details` |
@@ -231,10 +233,10 @@ Find active passports for a company and type:
 
 ```sql
 SELECT *
-FROM battery_passports
-WHERE company_id = $1
-  AND deleted_at IS NULL
-ORDER BY updated_at DESC;
+FROM appliance_passport_v1_passports
+WHERE "companyId" = $1
+  AND "deletedAt" IS NULL
+ORDER BY "updatedAt" DESC;
 ```
 
 Find the stable registry row for a passport:
@@ -251,7 +253,7 @@ Find all passport history snapshots:
 SELECT *
 FROM passport_archives
 WHERE dppId = $1
-ORDER BY versionNumber DESC, archived_at DESC;
+ORDER BY "versionNumber" DESC, "archivedAt" DESC;
 ```
 
 Find active access grants for a passport:
