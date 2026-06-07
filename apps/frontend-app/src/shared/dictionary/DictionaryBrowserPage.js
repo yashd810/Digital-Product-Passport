@@ -31,8 +31,8 @@ function formatDataType(term) {
 function TermCard({ term, unitsByKey, termHref }) {
   const unitObj = unitsByKey.get(term.unit);
   const unitDisplay = term.unitDisplay || unitObj?.display || (term.unit === "none" ? "n.a." : term.unit || "n.a.");
-  const domainDisplay = term.domain?.curie || term.semanticBinding?.domain?.curie || term.domain?.label || "";
-  const rangeDisplay = term.range?.curie || term.semanticBinding?.range?.curie || term.range?.label || "";
+  const domainDisplay = term.domain?.curie || term.domain?.label || "";
+  const rangeDisplay = term.range?.curie || term.range?.label || "";
   const dataTypeDisplay = formatDataType(term);
 
   return (
@@ -103,8 +103,8 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath, ap
   const categoryLabel = categories.find((category) => category.key === term.category)?.label || term.categoryLabel || term.category;
   const unitDisplay = term.unitDisplay || unitsByKey.get(term.unit)?.display || (term.unit === "none" ? "n.a." : term.unit || "n.a.");
   const dataTypeDisplay = formatDataType(term);
-  const domainDisplay = term.domain?.curie || term.semanticBinding?.domain?.curie || term.domain?.label || "";
-  const rangeDisplay = term.range?.curie || term.semanticBinding?.range?.curie || term.range?.label || "";
+  const domainDisplay = term.domain?.curie || term.domain?.label || "";
+  const rangeDisplay = term.range?.curie || term.range?.label || "";
 
   return (
     <>
@@ -132,7 +132,6 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath, ap
 
           <div className="dictionary-detail-grid">
             <DetailRow label="Category" value={categoryLabel} />
-            <DetailRow label="Subcategory" value={term.subcategory} />
             <DetailRow label="Data type" value={dataTypeDisplay} />
             <DetailRow label="Data format" value={term.dataType?.format} />
             <DetailRow label="JSON type" value={term.dataType?.jsonType} />
@@ -140,52 +139,19 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath, ap
             <DetailRow label="Domain" value={domainDisplay} mono />
             <DetailRow label="Range" value={rangeDisplay} mono />
             <DetailRow label="Unit" value={unitDisplay} />
-            <DetailRow label="Access rights" value={term.accessRights} />
-            <DetailRow label="Static vs dynamic" value={term.staticOrDynamic} />
-            <DetailRow label="Update requirement" value={term.updateRequirement} />
-            <DetailRow label="Granularity" value={term.granularityLevel} />
-            <DetailRow label="DIN/DKE chapter" value={term.dinDkeSpec99100Chapter} />
-            <DetailRow label="Workbook row" value={term.sourceWorkbookRow} />
             <DetailRow label="Internal key" value={term.internalKey} mono />
-            <DetailRow label="Element ID" value={term.elementId} mono />
           </div>
 
           <div className="dictionary-detail-section">
             <h2>Applicability requirements</h2>
-            {term.categoryRequirements || term.batteryCategoryRequirements ? (
+            {term.categoryRequirements ? (
               <div className="dictionary-detail-pill-row">
-                {Object.entries(term.categoryRequirements || term.batteryCategoryRequirements).map(([category, requirement]) => (
+                {Object.entries(term.categoryRequirements).map(([category, requirement]) => (
                   <span key={category} className="dictionary-field-pill">{category}: {requirement || "not applicable"}</span>
                 ))}
               </div>
             ) : (
               <p className="dictionary-detail-empty">No applicability requirements are attached to this term yet.</p>
-            )}
-          </div>
-
-          <div className="dictionary-detail-section">
-            <h2>Component granularity</h2>
-            {term.componentGranularity ? (
-              <div className="dictionary-detail-pill-row">
-                {Object.entries(term.componentGranularity).map(([component, requirement]) => (
-                  <span key={component} className="dictionary-field-pill">{component}: {requirement || "not applicable"}</span>
-                ))}
-              </div>
-            ) : (
-              <p className="dictionary-detail-empty">No component granularity is attached to this term yet.</p>
-            )}
-          </div>
-
-          <div className="dictionary-detail-section">
-            <h2>Regulation references</h2>
-            {term.regulationReferences?.length ? (
-              <div className="dictionary-detail-pill-row">
-                {term.regulationReferences.map((reference) => (
-                  <span key={reference} className="dictionary-field-pill">{reference}</span>
-                ))}
-              </div>
-            ) : (
-              <p className="dictionary-detail-empty">No regulation references are attached to this term yet.</p>
             )}
           </div>
 
@@ -221,11 +187,8 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath, ap
           </div>
 
           <div className="dictionary-side-card dictionary-side-card-plain">
-            <h2>Governance and traceability</h2>
-            <p>
-              {manifest?.authority?.derivationNotice
-                || "This dictionary is a Claros-maintained derived implementation vocabulary."}
-            </p>
+            <h2>Dictionary artifacts</h2>
+            <p>Use these JSON artifacts for validation, field mappings, and semantic exports.</p>
             <div className="dictionary-footer-links">
               <a href={manifest?.categoryRulesUrl || `${apiPath}/category-rules`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
                 Applicability rules
@@ -403,23 +366,8 @@ export default function DictionaryBrowserPage() {
           </div>
 
           <div className="dictionary-side-card dictionary-side-card-plain">
-            <h2>Authority</h2>
-            <p>{manifest?.authority?.officialStatus || "implementation-vocabulary"}</p>
-            <p>
-              Source: {manifest?.authority?.normativeSource?.title || "Published source material"}
-              {manifest?.authority?.normativeSource?.version ? ` v${manifest.authority.normativeSource.version}` : ""}
-            </p>
-          </div>
-
-          <div className="dictionary-side-card dictionary-side-card-plain">
-            <h2>Governance</h2>
-            <p>Steward: {manifest?.governance?.steward?.name || manifest?.publisher?.name || "Claros DPP"}</p>
-            <p>{manifest?.governance?.changeControl || "Versioned static artifacts with repository-based change control."}</p>
-          </div>
-
-          <div className="dictionary-side-card dictionary-side-card-plain">
-            <h2>Regulatory traceability</h2>
-            <p>{manifest?.regulatoryTraceability?.traceabilityMethod || "Term-level source and regulation metadata are published with the dictionary artifacts."}</p>
+            <h2>Dictionary artifacts</h2>
+            <p>Open the generated artifacts behind this semantic model.</p>
             <div className="dictionary-footer-links">
               <a href={manifest?.categoryRulesUrl || `${apiPath}/category-rules`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
                 Applicability rules

@@ -2,21 +2,89 @@
   {
     "key": "product-identification",
     "label": "Product Identification",
-    "description": "Identity, model, category, and manufacturer attributes."
+    "description": "Identity, model, category, and manufacturer attributes.",
+    "termCount": 3,
+    "terms": [
+      {
+        "number": 1,
+        "slug": "product-model-identifier",
+        "internalKey": "productModelIdentifier",
+        "label": "Product Model Identifier",
+        "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/product-model-identifier"
+      },
+      {
+        "number": 2,
+        "slug": "appliance-category",
+        "internalKey": "applianceCategory",
+        "label": "Appliance Category",
+        "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/appliance-category"
+      },
+      {
+        "number": 3,
+        "slug": "manufacturer-name",
+        "internalKey": "manufacturerName",
+        "label": "Manufacturer Name",
+        "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/manufacturer-name"
+      }
+    ]
   },
   {
     "key": "performance",
     "label": "Performance",
-    "description": "Energy and operating performance attributes."
+    "description": "Energy and operating performance attributes.",
+    "termCount": 2,
+    "terms": [
+      {
+        "number": 4,
+        "slug": "energy-rating",
+        "internalKey": "energyRating",
+        "label": "Energy Rating",
+        "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/energy-rating"
+      },
+      {
+        "number": 5,
+        "slug": "power-consumption",
+        "internalKey": "powerConsumption",
+        "label": "Power Consumption",
+        "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/power-consumption"
+      }
+    ]
   },
   {
     "key": "repair-and-service",
     "label": "Repair And Service",
-    "description": "Repairability and serviceability attributes."
+    "description": "Repairability and serviceability attributes.",
+    "termCount": 2,
+    "terms": [
+      {
+        "number": 6,
+        "slug": "repairability-score",
+        "internalKey": "repairabilityScore",
+        "label": "Repairability Score",
+        "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/repairability-score"
+      },
+      {
+        "number": 7,
+        "slug": "spare-parts-availability",
+        "internalKey": "sparePartsAvailability",
+        "label": "Spare Parts Availability",
+        "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/spare-parts-availability"
+      }
+    ]
   },
   {
     "key": "compliance",
     "label": "Compliance",
-    "description": "Compliance declarations and regulated evidence attributes."
+    "description": "Compliance declarations and regulated evidence attributes.",
+    "termCount": 1,
+    "terms": [
+      {
+        "number": 8,
+        "slug": "compliance-declaration",
+        "internalKey": "complianceDeclaration",
+        "label": "Compliance Declaration",
+        "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/compliance-declaration"
+      }
+    ]
   }
 ]

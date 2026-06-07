@@ -1,120 +1,59 @@
 "use strict";
 
-const path = require("path");
-const fs   = require("fs");
+const createSemanticModelRegistry = require("./semantic-model-registry");
 
-const DICT_DIR = path.join(__dirname, "../resources/semantics/battery/v1");
+const BATTERY_FAMILY = "battery";
+const BATTERY_VERSION = "v1";
+const FALLBACK_BATTERY_MODEL_KEY = "claros_battery_dictionary_v1";
 
-function loadJson(filename) {
-  const fullPath = path.join(DICT_DIR, filename);
-  return JSON.parse(fs.readFileSync(fullPath, "utf8"));
-}
+module.exports = function createBatteryDictionaryService({ semanticModelRegistry = null } = {}) {
+  const registry = semanticModelRegistry || createSemanticModelRegistry();
 
-module.exports = function createBatteryDictionaryService() {
-  const manifest        = loadJson("manifest.json");
-  const terms           = loadJson("terms.json");
-  const categories      = loadJson("categories.json");
-  const units           = loadJson("units.json");
-  const fieldMap        = loadJson("field-map.json");
-  const context         = loadJson("context.jsonld");
-  const dcatCatalog     = loadJson("catalog.jsonld");
-  const categoryRules   = loadJson("category-rules.json");
-
-  // Index terms by slug and by field key for fast lookup
-  const termsBySlug = {};
-  const termsByFieldKey = {};
-  const termsByIri = {};
-  for (const term of terms) {
-    termsBySlug[term.slug] = term;
-    if (term.iri) termsByIri[term.iri] = term;
-    if (term.termIri) termsByIri[term.termIri] = term;
-    for (const key of (term.appFieldKeys || [])) {
-      termsByFieldKey[key] = term;
-    }
+  function getBatteryModel() {
+    return registry.getModelByPath?.(BATTERY_FAMILY, BATTERY_VERSION)
+      || registry.getModel?.(FALLBACK_BATTERY_MODEL_KEY)
+      || null;
   }
 
-  const unitsByKey = {};
-  for (const unit of units) {
-    unitsByKey[unit.key] = unit;
+  function getBatteryModelKey() {
+    return getBatteryModel()?.semanticModelKey || FALLBACK_BATTERY_MODEL_KEY;
   }
 
-  function getManifest() { return manifest; }
-  function getTerms() { return terms; }
-  function getCategories() { return categories; }
-  function getUnits() { return units; }
-  function getFieldMap() { return fieldMap; }
-  function getContext() { return context; }
-  function getDcatCatalog() { return dcatCatalog; }
-  function getCategoryRules() { return categoryRules; }
+  function getManifest() { return getBatteryModel()?.manifest || null; }
+  function getTerms() { return registry.getTerms?.(getBatteryModelKey()) || []; }
+  function getCategories() { return registry.getCategories?.(getBatteryModelKey()) || []; }
+  function getUnits() { return registry.getUnits?.(getBatteryModelKey()) || []; }
+  function getFieldMap() { return registry.getFieldMap?.(getBatteryModelKey()) || {}; }
+  function getContext() { return registry.getContext?.(getBatteryModelKey()) || null; }
+  function getDcatCatalog() { return registry.getDcatCatalog?.(getBatteryModelKey()) || null; }
+  function getCategoryRules() { return registry.getCategoryRules?.(getBatteryModelKey()) || null; }
 
   function getTermBySlug(slug) {
-    return termsBySlug[String(slug || "")] || null;
+    return registry.getTermBySlug?.(getBatteryModelKey(), slug) || null;
   }
 
   function getTermsByCategory(categoryKey) {
-    return terms.filter(t => t.category === categoryKey);
+    return getTerms().filter((term) => term.category === categoryKey);
   }
 
-  // Returns the Claros term IRI for a given app field key, or null
   function resolveFieldKey(fieldKey) {
-    return fieldMap[String(fieldKey || "")] || null;
+    return registry.resolveFieldKey?.(getBatteryModelKey(), fieldKey) || null;
   }
 
-  // Returns the term object for a given app field key, or null
   function getTermByFieldKey(fieldKey) {
-    return termsByFieldKey[String(fieldKey || "")] || null;
+    return registry.getTermByFieldKey?.(getBatteryModelKey(), fieldKey) || null;
   }
 
   function getTermByIri(iri) {
-    return termsByIri[String(iri || "")] || null;
+    return registry.getTermByIri?.(getBatteryModelKey(), iri) || null;
   }
 
   function getCategoryRequirementForField(fieldKey, category) {
-    const requirements = categoryRules?.requirementsByFieldKey?.[String(fieldKey || "")]?.requirements || null;
-    if (!requirements) return null;
-    return requirements[String(category || "")] || null;
+    return registry.getCategoryRequirementForField?.(getBatteryModelKey(), fieldKey, category) || null;
   }
 
-  // Build a JSON-LD context array for a passport type that uses the Claros battery dictionary
   function buildJsonLdContext(typeDef) {
-    const clarosContextUrl = manifest.contextUrl || "https://www.claros-dpp.online/dictionary/battery/v1/context.jsonld";
-
-    // Base DPP context inline object
-    const dppContext = {
-      "@version": 1.1,
-      dpp: "https://schema.digitalproductpassport.eu/ns/dpp#",
-      DigitalProductPassport: "dpp:DigitalProductPassport",
-      dppId: "dpp:dppId",
-      passportType: "dpp:passportType",
-      semanticModel: "dpp:semanticModel",
-      modelName: "dpp:modelName",
-      internalAliasId: "dpp:internalAliasId",
-      releaseStatus: "dpp:releaseStatus",
-      versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
-      createdAt: { "@id": "dpp:createdAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
-      updatedAt: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
-    };
-
-    const contexts = [dppContext, clarosContextUrl];
-
-    // Add per-field inline mappings for any field not already in the context
-    if (typeDef?.fieldsJson?.sections) {
-      const inlineOverrides = {};
-      for (const section of typeDef.fieldsJson.sections) {
-        for (const field of (section.fields || [])) {
-          if (!field?.key) continue;
-          const termIri = resolveFieldKey(field.key) || field.semanticId;
-          if (termIri && !context?.["@context"]?.[field.key]) {
-            inlineOverrides[field.key] = { "@id": termIri };
-          }
-        }
-      }
-      if (Object.keys(inlineOverrides).length > 0) {
-        contexts.push(inlineOverrides);
-      }
-    }
-
-    return contexts;
+    return registry.buildJsonLdContext?.(typeDef, getBatteryModelKey()) || [];
   }
 
   return {

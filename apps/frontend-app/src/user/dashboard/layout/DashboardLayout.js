@@ -29,7 +29,6 @@ function DashboardLayout({ user, companyId, onLogout }) {
   const [passportTypes, setPassportTypes] = useState([]);
   const [semanticModels, setSemanticModels] = useState([]);
   const [currentTheme,  setCurrentTheme]  = useState(() => getStoredTheme(user?.id));
-  const [msgUnread, setMsgUnread] = useState(0);
 
   useEffect(() => {
     // Apply stored theme on mount
@@ -57,18 +56,6 @@ function DashboardLayout({ user, companyId, onLogout }) {
         setSemanticModels([]);
       });
   }, [companyId]);
-
-  useEffect(() => {
-    const fetchMsgUnread = () => {
-      fetchWithAuth(`${API}/api/messaging/unread`, { headers: authHeaders() })
-        .then(r => r.ok ? r.json() : { count: 0 })
-        .then(d => setMsgUnread(typeof d?.count === "number" ? d.count : 0))
-        .catch(() => setMsgUnread(0));
-    };
-    fetchMsgUnread();
-    const iv = setInterval(fetchMsgUnread, 15000);
-    return () => clearInterval(iv);
-  }, []);
 
   const handleLogout = async () => {
     await onLogout?.();
@@ -173,9 +160,11 @@ function DashboardLayout({ user, companyId, onLogout }) {
               )}
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Start Here</p>
-              <NavLink to={dashboardPath("passport-data")} className={({isActive})=>`sidebar-link sidebar-data-btn${isActive?" active":""}`}>
-                Passport Data Management
-              </NavLink>
+              {user?.assetManagementEnabled && (
+                <NavLink to={dashboardPath("passport-data")} className={({isActive})=>`sidebar-link sidebar-data-btn${isActive?" active":""}`}>
+                  Passport Data Management
+                </NavLink>
+              )}
               <NavLink to={dashboardPath("overview")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
               </NavLink>
@@ -226,18 +215,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 ⚙️ {t("workflow")}
               </NavLink>
               <NavLink to={dashboardPath("notifications")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🔔 Notifications
-              </NavLink>
-              <NavLink to={dashboardPath("messages")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  💬 Messages
-                  {msgUnread > 0 && (
-                    <span style={{
-                      background: "var(--mint)", color: "#0b1826", fontSize: 10,
-                      fontWeight: 700, borderRadius: 10, padding: "1px 6px", minWidth: 16, textAlign: "center"
-                    }}>{msgUnread}</span>
-                  )}
-                </span>
+                🔔 Notifications & Messages
               </NavLink>
 
               <NavLink to={dashboardPath("archived")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>

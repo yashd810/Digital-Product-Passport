@@ -101,13 +101,13 @@ function registerSupportRoutes(app, deps) {
 
       const row = await pool.query(
         `SELECT id,
-                public_id AS "publicId",
-                is_public AS "isPublic",
-                mime_type AS "mimeType",
-                file_path AS "filePath",
-                storage_key AS "storageKey"
+                "publicId",
+                "isPublic",
+                "mimeType",
+                "filePath",
+                "storageKey"
          FROM passport_attachments
-         WHERE public_id = $1`,
+         WHERE "publicId" = $1`,
         [publicId]
       );
       if (!row.rows.length) return res.status(404).json({ error: "File not found" });

@@ -66,6 +66,10 @@ function AdminLayout({ user, onLogout }) {
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           🧩 Passport Modules
         </NavLink>
+        <NavLink to="/admin/dictionary"
+          className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
+          🔖 Dictionaries
+        </NavLink>
         <NavLink to="/admin/admin-management"
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           👑 Admin Management

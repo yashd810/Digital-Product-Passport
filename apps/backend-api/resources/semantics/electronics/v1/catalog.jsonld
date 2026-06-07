@@ -9,13 +9,13 @@
     "skos": "http://www.w3.org/2004/02/skos/core#",
     "vcard": "http://www.w3.org/2006/vcard/ns#",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
-    "clarosTextile": "https://www.claros-dpp.online/dictionary/textile/v1/terms/",
-    "clarosTextileClass": "https://www.claros-dpp.online/dictionary/textile/v1/classes/"
+    "clarosElectronics": "https://www.claros-dpp.online/dictionary/electronics/v1/terms/",
+    "clarosElectronicsClass": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/"
   },
-  "@id": "https://www.claros-dpp.online/dictionary/textile/v1/catalog",
+  "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/catalog",
   "@type": "dcat:Catalog",
-  "dcterms:title": "Claros Textile Dictionary Catalog",
-  "dcterms:description": "DCAT-AP-aligned metadata catalog for the Claros Textile Dictionary and its machine-readable distributions.",
+  "dcterms:title": "Claros Electronics Dictionary Catalog",
+  "dcterms:description": "DCAT-AP-aligned metadata catalog for the Claros Electronics Dictionary and its machine-readable distributions.",
   "dcterms:publisher": {
     "@id": "https://www.claros-dpp.online",
     "@type": "foaf:Organization",
@@ -23,7 +23,7 @@
   },
   "dcterms:language": "en",
   "dcterms:modified": {
-    "@value": "2026-06-02T00:00:00.000Z",
+    "@value": "2026-06-05T18:58:07.945Z",
     "@type": "xsd:dateTime"
   },
   "dcterms:conformsTo": [
@@ -37,16 +37,16 @@
     }
   ],
   "dcat:themeTaxonomy": {
-    "@id": "https://www.claros-dpp.online/dictionary/textile/v1/category-scheme",
+    "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/category-scheme",
     "@type": "skos:ConceptScheme",
-    "dcterms:title": "Textile passport attribute categories"
+    "dcterms:title": "Electronics passport attribute categories"
   },
   "dcat:dataset": {
-    "@id": "https://www.claros-dpp.online/dictionary/textile/v1/dataset",
+    "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/dataset",
     "@type": "dcat:Dataset",
-    "dcterms:identifier": "claros_textile_dictionary_v1",
-    "dcterms:title": "Claros Textile Dictionary",
-    "dcterms:description": "Internal textile passport dictionary for modular Digital Product Passport implementations.",
+    "dcterms:identifier": "claros_electronics_dictionary_v1",
+    "dcterms:title": "Claros Electronics Dictionary",
+    "dcterms:description": "Internal electronics passport dictionary used for Digital Product Passport implementations.",
     "dcterms:publisher": {
       "@id": "https://www.claros-dpp.online",
       "@type": "foaf:Organization",
@@ -54,11 +54,11 @@
     },
     "dcterms:language": "en",
     "dcterms:issued": {
-      "@value": "2026-06-02T00:00:00.000Z",
+      "@value": "2026-06-05T18:58:07.945Z",
       "@type": "xsd:dateTime"
     },
     "dcterms:modified": {
-      "@value": "2026-06-02T00:00:00.000Z",
+      "@value": "2026-06-05T18:58:07.945Z",
       "@type": "xsd:dateTime"
     },
     "dcterms:conformsTo": [
@@ -69,11 +69,11 @@
         "@id": "https://semiceu.github.io/DCAT-AP/releases/3.0.1/"
       },
       {
-        "@id": "https://www.claros-dpp.online/dictionary/textile/v1/context.jsonld"
+        "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/context.jsonld"
       }
     ],
     "dcat:keyword": [
-      "textile passport",
+      "electronics passport",
       "digital product passport",
       "semantic dictionary",
       "DCAT-AP"
@@ -81,13 +81,10 @@
     "dcat:theme": [
       {
         "@id": "http://publications.europa.eu/resource/authority/data-theme/TECH"
-      },
-      {
-        "@id": "http://publications.europa.eu/resource/authority/data-theme/ENVI"
       }
     ],
     "dcat:landingPage": {
-      "@id": "https://www.claros-dpp.online/dictionary/textile/v1"
+      "@id": "https://www.claros-dpp.online/dictionary/electronics/v1"
     },
     "dcat:contactPoint": {
       "@type": "vcard:Organization",
@@ -98,53 +95,53 @@
     },
     "dcat:distribution": [
       {
-        "@id": "https://www.claros-dpp.online/dictionary/textile/v1/distributions/terms-json",
+        "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/distributions/terms-json",
         "@type": "dcat:Distribution",
-        "dcterms:title": "Textile dictionary terms JSON",
+        "dcterms:title": "Electronics dictionary terms JSON",
         "dcat:accessURL": {
-          "@id": "https://www.claros-dpp.online/api/dictionary/textile/v1/terms"
+          "@id": "https://www.claros-dpp.online/api/dictionary/electronics/v1/terms"
         },
         "dcat:downloadURL": {
-          "@id": "https://www.claros-dpp.online/api/dictionary/textile/v1/terms"
+          "@id": "https://www.claros-dpp.online/api/dictionary/electronics/v1/terms"
         },
         "dcat:mediaType": "application/json",
         "dcterms:format": "JSON"
       },
       {
-        "@id": "https://www.claros-dpp.online/dictionary/textile/v1/distributions/context-jsonld",
+        "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/distributions/context-jsonld",
         "@type": "dcat:Distribution",
-        "dcterms:title": "Textile dictionary JSON-LD context",
+        "dcterms:title": "Electronics dictionary JSON-LD context",
         "dcat:accessURL": {
-          "@id": "https://www.claros-dpp.online/dictionary/textile/v1/context.jsonld"
+          "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/context.jsonld"
         },
         "dcat:downloadURL": {
-          "@id": "https://www.claros-dpp.online/dictionary/textile/v1/context.jsonld"
+          "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/context.jsonld"
         },
         "dcat:mediaType": "application/ld+json",
         "dcterms:format": "JSON-LD"
       },
       {
-        "@id": "https://www.claros-dpp.online/dictionary/textile/v1/distributions/category-rules-json",
+        "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/distributions/category-rules-json",
         "@type": "dcat:Distribution",
-        "dcterms:title": "Textile category applicability rules",
+        "dcterms:title": "Electronics category applicability rules",
         "dcat:accessURL": {
-          "@id": "https://www.claros-dpp.online/api/dictionary/textile/v1/category-rules"
+          "@id": "https://www.claros-dpp.online/api/dictionary/electronics/v1/category-rules"
         },
         "dcat:downloadURL": {
-          "@id": "https://www.claros-dpp.online/api/dictionary/textile/v1/category-rules"
+          "@id": "https://www.claros-dpp.online/api/dictionary/electronics/v1/category-rules"
         },
         "dcat:mediaType": "application/json",
         "dcterms:format": "JSON"
       },
       {
-        "@id": "https://www.claros-dpp.online/dictionary/textile/v1/distributions/field-map-json",
+        "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/distributions/field-map-json",
         "@type": "dcat:Distribution",
         "dcterms:title": "Application field to semantic term map",
         "dcat:accessURL": {
-          "@id": "https://www.claros-dpp.online/api/dictionary/textile/v1/field-map"
+          "@id": "https://www.claros-dpp.online/api/dictionary/electronics/v1/field-map"
         },
         "dcat:downloadURL": {
-          "@id": "https://www.claros-dpp.online/api/dictionary/textile/v1/field-map"
+          "@id": "https://www.claros-dpp.online/api/dictionary/electronics/v1/field-map"
         },
         "dcat:mediaType": "application/json",
         "dcterms:format": "JSON"
@@ -152,27 +149,27 @@
     ]
   },
   "dcat:service": {
-    "@id": "https://www.claros-dpp.online/dictionary/textile/v1/service",
+    "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/service",
     "@type": "dcat:DataService",
-    "dcterms:title": "Claros Textile Dictionary API",
+    "dcterms:title": "Claros Electronics Dictionary API",
     "dcat:endpointURL": {
-      "@id": "https://www.claros-dpp.online/api/dictionary/textile/v1"
+      "@id": "https://www.claros-dpp.online/api/dictionary/electronics/v1"
     },
     "dcat:servesDataset": {
-      "@id": "https://www.claros-dpp.online/dictionary/textile/v1/dataset"
+      "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/dataset"
     }
   },
   "dcat:record": {
-    "@id": "https://www.claros-dpp.online/dictionary/textile/v1/records/dataset",
+    "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/records/dataset",
     "@type": "dcat:CatalogRecord",
-    "dcterms:title": "Catalog record for the Claros Textile Dictionary",
+    "dcterms:title": "Catalog record for the Claros Electronics Dictionary",
     "dcterms:modified": {
-      "@value": "2026-06-02T00:00:00.000Z",
+      "@value": "2026-06-05T18:58:07.945Z",
       "@type": "xsd:dateTime"
     },
     "foaf:primaryTopic": {
-      "@id": "https://www.claros-dpp.online/dictionary/textile/v1/dataset"
+      "@id": "https://www.claros-dpp.online/dictionary/electronics/v1/dataset"
     }
   },
-  "termCount": 8
+  "termCount": 3
 }

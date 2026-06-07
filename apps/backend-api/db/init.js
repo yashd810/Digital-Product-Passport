@@ -14,6 +14,71 @@ function quoteDbIdentifier(value) {
   return `"${identifier.replace(/"/g, "\"\"")}"`;
 }
 
+function quoteSqlLiteral(value) {
+  return `'${String(value || "").replace(/'/g, "''")}'`;
+}
+
+async function ensureTableColumns(db, tableName, columnDefinitions) {
+  const columns = columnDefinitions
+    .map((columnDefinition) => String(columnDefinition || "").trim())
+    .filter(Boolean);
+  if (!columns.length) return;
+
+  await db.query(`
+    ALTER TABLE ${quoteDbIdentifier(tableName)}
+      ${columns.map((columnDefinition) => `ADD COLUMN IF NOT EXISTS ${columnDefinition}`).join(",\n      ")}
+  `);
+}
+
+async function dropTableColumns(db, tableName, columnNames) {
+  const columns = columnNames
+    .map((columnName) => String(columnName || "").trim())
+    .filter(Boolean);
+  if (!columns.length) return;
+
+  await db.query(`
+    ALTER TABLE ${quoteDbIdentifier(tableName)}
+      ${columns.map((columnName) => `DROP COLUMN IF EXISTS ${quoteDbIdentifier(columnName)}`).join(",\n      ")}
+  `);
+}
+
+async function renameLegacyColumns(db, tableName, renamePairs, { mergeDuplicates = false } = {}) {
+  const steps = renamePairs.map(([legacyName, currentName]) => {
+    const legacyIdentifier = quoteDbIdentifier(legacyName);
+    const currentIdentifier = quoteDbIdentifier(currentName);
+    const legacyLiteral = quoteSqlLiteral(legacyName);
+    const currentLiteral = quoteSqlLiteral(currentName);
+    const tableLiteral = quoteSqlLiteral(tableName);
+
+    if (mergeDuplicates) {
+      return `
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = ${tableLiteral} AND column_name = ${legacyLiteral})
+        AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = ${tableLiteral} AND column_name = ${currentLiteral}) THEN
+        UPDATE ${quoteDbIdentifier(tableName)}
+        SET ${currentIdentifier} = COALESCE(${currentIdentifier}, ${legacyIdentifier});
+        ALTER TABLE ${quoteDbIdentifier(tableName)} DROP COLUMN ${legacyIdentifier} CASCADE;
+      ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = ${tableLiteral} AND column_name = ${legacyLiteral})
+        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = ${tableLiteral} AND column_name = ${currentLiteral}) THEN
+        ALTER TABLE ${quoteDbIdentifier(tableName)} RENAME COLUMN ${legacyIdentifier} TO ${currentIdentifier};
+      END IF;`;
+    }
+
+    return `
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = ${tableLiteral} AND column_name = ${legacyLiteral})
+        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = ${tableLiteral} AND column_name = ${currentLiteral}) THEN
+        ALTER TABLE ${quoteDbIdentifier(tableName)} RENAME COLUMN ${legacyIdentifier} TO ${currentIdentifier};
+      END IF;`;
+  });
+
+  if (!steps.length) return;
+  await db.query(`
+    DO $$
+    BEGIN
+      ${steps.join("\n")}
+    END $$;
+  `);
+}
+
 function toDidSlug(value, fallback = "company") {
   const normalized = String(value || "")
     .normalize("NFKD")
@@ -77,6 +142,20 @@ async function addPassportRegistryForeignKey(pool, {
   nullable = false,
   onDelete = "CASCADE",
 }) {
+  const columnExists = await pool.query(
+    `SELECT 1
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = $1
+       AND column_name = $2
+     LIMIT 1`,
+    [tableName, columnName]
+  );
+  if (!columnExists.rows.length) {
+    logger.warn({ tableName, columnName, constraintName }, "Skipping passport registry foreign key because child column is missing");
+    return;
+  }
+
   const quotedTableName = quoteDbIdentifier(tableName);
   const quotedColumnName = quoteDbIdentifier(columnName);
   await pool.query(`
@@ -156,48 +235,24 @@ async function initDb(pool, {
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS asset_management_enabled BOOLEAN NOT NULL DEFAULT false
-  `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS asset_management_revoked_at TIMESTAMPTZ
-  `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS did_slug VARCHAR(160)
-  `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS economic_operator_identifier TEXT
-  `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS economic_operator_identifier_scheme VARCHAR(80)
-  `);
-  await pool.query(`
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS legal_name TEXT;
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS country TEXT;
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_registration_number TEXT;
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS vat_number TEXT;
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS website_domain TEXT;
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS customer_trust_level TEXT DEFAULT 'BASIC';
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'unverified';
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS authorized_contact_name TEXT;
-    ALTER TABLE companies ADD COLUMN IF NOT EXISTS authorized_contact_email TEXT;
-  `);
+  await ensureTableColumns(pool, "companies", [
+    "asset_management_enabled BOOLEAN NOT NULL DEFAULT false",
+    "asset_management_revoked_at TIMESTAMPTZ",
+    "did_slug VARCHAR(160)",
+    "economic_operator_identifier TEXT",
+    "economic_operator_identifier_scheme VARCHAR(80)",
+    "legal_name TEXT",
+    "country TEXT",
+    "company_registration_number TEXT",
+    "vat_number TEXT",
+    "website_domain TEXT",
+    "customer_trust_level TEXT DEFAULT 'BASIC'",
+    "verification_status TEXT DEFAULT 'unverified'",
+    "authorized_contact_name TEXT",
+    "authorized_contact_email TEXT",
+  ]);
   await runMigration(pool, "2026-06-03.company-identity-columns", async (db) => {
     await db.query(`
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS legal_name TEXT;
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS country TEXT;
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_registration_number TEXT;
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS vat_number TEXT;
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS website_domain TEXT;
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS customer_trust_level TEXT DEFAULT 'BASIC';
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_status TEXT DEFAULT 'unverified';
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS authorized_contact_name TEXT;
-      ALTER TABLE companies ADD COLUMN IF NOT EXISTS authorized_contact_email TEXT;
       UPDATE companies
       SET customer_trust_level = COALESCE(customer_trust_level, 'BASIC'),
           verification_status = COALESCE(verification_status, 'unverified');
@@ -254,18 +309,13 @@ async function initDb(pool, {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  await pool.query(`
-    ALTER TABLE company_dpp_policies
-    ADD COLUMN IF NOT EXISTS semantic_dictionary_enabled BOOLEAN NOT NULL DEFAULT true
-  `);
-  await pool.query(`
-    ALTER TABLE company_dpp_policies
-    DROP COLUMN IF EXISTS claros_battery_dictionary_enabled
-  `);
-  await pool.query(`
-    ALTER TABLE company_dpp_policies
-    DROP COLUMN IF EXISTS legacy_semantic_compatibility
-  `);
+  await ensureTableColumns(pool, "company_dpp_policies", [
+    "semantic_dictionary_enabled BOOLEAN NOT NULL DEFAULT true",
+  ]);
+  await dropTableColumns(pool, "company_dpp_policies", [
+    "claros_battery_dictionary_enabled",
+    "legacy_semantic_compatibility",
+  ]);
   await pool.query(`
     ALTER TABLE companies
     DROP COLUMN IF EXISTS dpp_granularity,
@@ -501,22 +551,12 @@ async function initDb(pool, {
 	    CREATE INDEX IF NOT EXISTS idx_passport_backup_replications_status
 	      ON passport_backup_replications(replication_status, updated_at DESC)
 	  `);
-	  await pool.query(`
-	    ALTER TABLE passport_backup_replications
-	    ADD COLUMN IF NOT EXISTS verification_status VARCHAR(40) NOT NULL DEFAULT 'pending'
-	  `);
-	  await pool.query(`
-	    ALTER TABLE passport_backup_replications
-	    ADD COLUMN IF NOT EXISTS verification_error_message TEXT
-	  `);
-	  await pool.query(`
-	    ALTER TABLE passport_backup_replications
-	    ADD COLUMN IF NOT EXISTS verified_payload_hash VARCHAR(64)
-	  `);
-	  await pool.query(`
-	    ALTER TABLE passport_backup_replications
-	    ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ
-	  `);
+  await ensureTableColumns(pool, "passport_backup_replications", [
+    "verification_status VARCHAR(40) NOT NULL DEFAULT 'pending'",
+    "verification_error_message TEXT",
+    "verified_payload_hash VARCHAR(64)",
+    "last_verified_at TIMESTAMPTZ",
+  ]);
 	  await pool.query(`
 	    CREATE TABLE IF NOT EXISTS passport_registry (
       "dppId"                     TEXT        PRIMARY KEY,
@@ -603,6 +643,21 @@ async function initDb(pool, {
       END IF;
     END $$;
   `);
+  await renameLegacyColumns(pool, "passport_registry", [
+    ["dpp_id", "dppId"],
+    ["lineage_id", "lineageId"],
+    ["company_id", "companyId"],
+    ["passport_type", "passportType"],
+    ["access_key", "accessKey"],
+    ["access_key_hash", "accessKeyHash"],
+    ["access_key_prefix", "accessKeyPrefix"],
+    ["access_key_last_rotated_at", "accessKeyLastRotatedAt"],
+    ["device_api_key", "deviceApiKey"],
+    ["device_api_key_hash", "deviceApiKeyHash"],
+    ["device_api_key_prefix", "deviceApiKeyPrefix"],
+    ["device_key_last_rotated_at", "deviceKeyLastRotatedAt"],
+    ["created_at", "createdAt"],
+  ], { mergeDuplicates: true });
 	  await pool.query(`
 	    CREATE INDEX IF NOT EXISTS idx_passport_registry_company
 	      ON passport_registry("companyId")
@@ -642,116 +697,32 @@ async function initDb(pool, {
       "updatedAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  const userColumnRenames = [
+    ["password_hash", "passwordHash"],
+    ["first_name", "firstName"],
+    ["last_name", "lastName"],
+    ["company_id", "companyId"],
+    ["is_active", "isActive"],
+    ["otp_code", "otpCode"],
+    ["otp_code_hash", "otpCodeHash"],
+    ["otp_expires_at", "otpExpiresAt"],
+    ["two_factor_enabled", "twoFactorEnabled"],
+    ["session_version", "sessionVersion"],
+    ["pepper_version", "pepperVersion"],
+    ["avatar_url", "avatarUrl"],
+    ["job_title", "jobTitle"],
+    ["preferred_language", "preferredLanguage"],
+    ["default_reviewer_id", "defaultReviewerId"],
+    ["default_approver_id", "defaultApproverId"],
+    ["auth_source", "authSource"],
+    ["sso_only", "ssoOnly"],
+    ["last_login_at", "lastLoginAt"],
+    ["created_at", "createdAt"],
+    ["updated_at", "updatedAt"],
+  ];
+  await renameLegacyColumns(pool, "users", userColumnRenames);
   await runMigration(pool, "2026-06-03.users-camelcase-columns", async (db) => {
-    await db.query(`
-      DO $$
-      BEGIN
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password_hash')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='passwordHash') THEN
-          ALTER TABLE users RENAME COLUMN password_hash TO "passwordHash";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='first_name')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='firstName') THEN
-          ALTER TABLE users RENAME COLUMN first_name TO "firstName";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='last_name')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='lastName') THEN
-          ALTER TABLE users RENAME COLUMN last_name TO "lastName";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='company_id')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='companyId') THEN
-          ALTER TABLE users RENAME COLUMN company_id TO "companyId";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='is_active')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='isActive') THEN
-          ALTER TABLE users RENAME COLUMN is_active TO "isActive";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='otp_code')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='otpCode') THEN
-          ALTER TABLE users RENAME COLUMN otp_code TO "otpCode";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='otp_code_hash')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='otpCodeHash') THEN
-          ALTER TABLE users RENAME COLUMN otp_code_hash TO "otpCodeHash";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='otp_expires_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='otpExpiresAt') THEN
-          ALTER TABLE users RENAME COLUMN otp_expires_at TO "otpExpiresAt";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='two_factor_enabled')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='twoFactorEnabled') THEN
-          ALTER TABLE users RENAME COLUMN two_factor_enabled TO "twoFactorEnabled";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='session_version')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='sessionVersion') THEN
-          ALTER TABLE users RENAME COLUMN session_version TO "sessionVersion";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='pepper_version')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='pepperVersion') THEN
-          ALTER TABLE users RENAME COLUMN pepper_version TO "pepperVersion";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='avatar_url')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='avatarUrl') THEN
-          ALTER TABLE users RENAME COLUMN avatar_url TO "avatarUrl";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='job_title')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='jobTitle') THEN
-          ALTER TABLE users RENAME COLUMN job_title TO "jobTitle";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='preferred_language')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='preferredLanguage') THEN
-          ALTER TABLE users RENAME COLUMN preferred_language TO "preferredLanguage";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='default_reviewer_id')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='defaultReviewerId') THEN
-          ALTER TABLE users RENAME COLUMN default_reviewer_id TO "defaultReviewerId";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='default_approver_id')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='defaultApproverId') THEN
-          ALTER TABLE users RENAME COLUMN default_approver_id TO "defaultApproverId";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='auth_source')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='authSource') THEN
-          ALTER TABLE users RENAME COLUMN auth_source TO "authSource";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='sso_only')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='ssoOnly') THEN
-          ALTER TABLE users RENAME COLUMN sso_only TO "ssoOnly";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='last_login_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='lastLoginAt') THEN
-          ALTER TABLE users RENAME COLUMN last_login_at TO "lastLoginAt";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='created_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='createdAt') THEN
-          ALTER TABLE users RENAME COLUMN created_at TO "createdAt";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='updated_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='updatedAt') THEN
-          ALTER TABLE users RENAME COLUMN updated_at TO "updatedAt";
-        END IF;
-      END $$;
-    `);
+    await renameLegacyColumns(db, "users", userColumnRenames);
   });
 
 	  await pool.query(`
@@ -809,10 +780,22 @@ async function initDb(pool, {
 	      WHERE handover_status = 'active'
 	  `);
 
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "otpCodeHash" TEXT
-  `);
+  await ensureTableColumns(pool, "users", [
+    "\"otpCodeHash\" TEXT",
+    "\"twoFactorEnabled\" BOOLEAN NOT NULL DEFAULT false",
+    "\"sessionVersion\" INTEGER NOT NULL DEFAULT 1",
+    "\"pepperVersion\" INTEGER NOT NULL DEFAULT 1",
+    "\"avatarUrl\" TEXT",
+    "phone VARCHAR(50)",
+    "\"jobTitle\" VARCHAR(120)",
+    "bio TEXT",
+    "\"preferredLanguage\" VARCHAR(12) DEFAULT 'en'",
+    "\"defaultReviewerId\" INTEGER REFERENCES users(id) ON DELETE SET NULL",
+    "\"defaultApproverId\" INTEGER REFERENCES users(id) ON DELETE SET NULL",
+    "\"authSource\" VARCHAR(100) NOT NULL DEFAULT 'local'",
+    "\"ssoOnly\" BOOLEAN NOT NULL DEFAULT false",
+    "\"lastLoginAt\" TIMESTAMPTZ",
+  ]);
   await runMigration(pool, "2026-04-27.backfill-otp-code-hash", async (db) => {
     const otpRows = await db.query(`
       SELECT id, "otpCode"
@@ -836,55 +819,6 @@ async function initDb(pool, {
     }
   });
 
-  /* Add missing columns to existing users table (for migrations) */
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "twoFactorEnabled" BOOLEAN NOT NULL DEFAULT false
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "sessionVersion" INTEGER NOT NULL DEFAULT 1
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "pepperVersion" INTEGER NOT NULL DEFAULT 1
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS phone VARCHAR(50)
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "jobTitle" VARCHAR(120)
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS bio TEXT
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "preferredLanguage" VARCHAR(12) DEFAULT 'en'
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "defaultReviewerId" INTEGER REFERENCES users(id) ON DELETE SET NULL
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "defaultApproverId" INTEGER REFERENCES users(id) ON DELETE SET NULL
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "authSource" VARCHAR(100) NOT NULL DEFAULT 'local'
-  `);
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS "ssoOnly" BOOLEAN NOT NULL DEFAULT false
-  `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_identities (
       id               SERIAL PRIMARY KEY,
@@ -951,61 +885,21 @@ async function initDb(pool, {
       "updatedAt"       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  const passportTypeColumnRenames = [
+    ["type_name", "typeName"],
+    ["display_name", "displayName"],
+    ["product_category", "productCategory"],
+    ["product_icon", "productIcon"],
+    ["semantic_model_key", "semanticModelKey"],
+    ["fields_json", "fieldsJson"],
+    ["is_active", "isActive"],
+    ["created_by", "createdBy"],
+    ["created_at", "createdAt"],
+    ["updated_at", "updatedAt"],
+  ];
+  await renameLegacyColumns(pool, "passport_types", passportTypeColumnRenames);
   await runMigration(pool, "2026-06-03.passport-types-camelcase-columns", async (db) => {
-    await db.query(`
-      DO $$
-      BEGIN
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='type_name')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='typeName') THEN
-          ALTER TABLE passport_types RENAME COLUMN type_name TO "typeName";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='display_name')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='displayName') THEN
-          ALTER TABLE passport_types RENAME COLUMN display_name TO "displayName";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='product_category')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='productCategory') THEN
-          ALTER TABLE passport_types RENAME COLUMN product_category TO "productCategory";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='product_icon')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='productIcon') THEN
-          ALTER TABLE passport_types RENAME COLUMN product_icon TO "productIcon";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='semantic_model_key')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='semanticModelKey') THEN
-          ALTER TABLE passport_types RENAME COLUMN semantic_model_key TO "semanticModelKey";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='fields_json')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='fieldsJson') THEN
-          ALTER TABLE passport_types RENAME COLUMN fields_json TO "fieldsJson";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='is_active')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='isActive') THEN
-          ALTER TABLE passport_types RENAME COLUMN is_active TO "isActive";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='created_by')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='createdBy') THEN
-          ALTER TABLE passport_types RENAME COLUMN created_by TO "createdBy";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='created_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='createdAt') THEN
-          ALTER TABLE passport_types RENAME COLUMN created_at TO "createdAt";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='updated_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_types' AND column_name='updatedAt') THEN
-          ALTER TABLE passport_types RENAME COLUMN updated_at TO "updatedAt";
-        END IF;
-      END $$;
-    `);
+    await renameLegacyColumns(db, "passport_types", passportTypeColumnRenames);
   });
   await pool.query(`
     UPDATE passport_types
@@ -1033,51 +927,19 @@ async function initDb(pool, {
       "createdAt"        TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  const passportTypeSchemaEventColumnRenames = [
+    ["passport_type_id", "passportTypeId"],
+    ["type_name", "typeName"],
+    ["table_name", "tableName"],
+    ["schema_version", "schemaVersion"],
+    ["event_type", "eventType"],
+    ["change_summary", "changeSummary"],
+    ["created_by", "createdBy"],
+    ["created_at", "createdAt"],
+  ];
+  await renameLegacyColumns(pool, "passport_type_schema_events", passportTypeSchemaEventColumnRenames);
   await runMigration(pool, "2026-06-03.passport-type-schema-events-camelcase-columns", async (db) => {
-    await db.query(`
-      DO $$
-      BEGIN
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='passport_type_id')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='passportTypeId') THEN
-          ALTER TABLE passport_type_schema_events RENAME COLUMN passport_type_id TO "passportTypeId";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='type_name')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='typeName') THEN
-          ALTER TABLE passport_type_schema_events RENAME COLUMN type_name TO "typeName";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='table_name')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='tableName') THEN
-          ALTER TABLE passport_type_schema_events RENAME COLUMN table_name TO "tableName";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='schema_version')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='schemaVersion') THEN
-          ALTER TABLE passport_type_schema_events RENAME COLUMN schema_version TO "schemaVersion";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='event_type')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='eventType') THEN
-          ALTER TABLE passport_type_schema_events RENAME COLUMN event_type TO "eventType";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='change_summary')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='changeSummary') THEN
-          ALTER TABLE passport_type_schema_events RENAME COLUMN change_summary TO "changeSummary";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='created_by')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='createdBy') THEN
-          ALTER TABLE passport_type_schema_events RENAME COLUMN created_by TO "createdBy";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='created_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='passport_type_schema_events' AND column_name='createdAt') THEN
-          ALTER TABLE passport_type_schema_events RENAME COLUMN created_at TO "createdAt";
-        END IF;
-      END $$;
-    `);
+    await renameLegacyColumns(db, "passport_type_schema_events", passportTypeSchemaEventColumnRenames);
   });
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_type_schema_events_type
@@ -1106,26 +968,13 @@ async function initDb(pool, {
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  await pool.query(`
-    ALTER TABLE audit_logs
-    ADD COLUMN IF NOT EXISTS actor_identifier TEXT
-  `);
-  await pool.query(`
-    ALTER TABLE audit_logs
-    ADD COLUMN IF NOT EXISTS audience VARCHAR(80)
-  `);
-  await pool.query(`
-    ALTER TABLE audit_logs
-    ADD COLUMN IF NOT EXISTS previous_event_hash VARCHAR(64)
-  `);
-  await pool.query(`
-    ALTER TABLE audit_logs
-    ADD COLUMN IF NOT EXISTS event_hash VARCHAR(64)
-  `);
-  await pool.query(`
-    ALTER TABLE audit_logs
-    ADD COLUMN IF NOT EXISTS hash_version SMALLINT NOT NULL DEFAULT 2
-  `);
+  await ensureTableColumns(pool, "audit_logs", [
+    "actor_identifier TEXT",
+    "audience VARCHAR(80)",
+    "previous_event_hash VARCHAR(64)",
+    "event_hash VARCHAR(64)",
+    "hash_version SMALLINT NOT NULL DEFAULT 2",
+  ]);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_audit_logs_company_created
       ON audit_logs(company_id, created_at DESC, id DESC)
@@ -1356,45 +1205,20 @@ async function initDb(pool, {
     CREATE INDEX IF NOT EXISTS idx_product_identifier_lineage_replacement_identifier
       ON product_identifier_lineage("replacementIdentifier")
   `);
+  await ensureTableColumns(pool, "passport_registry", [
+    "\"accessKeyHash\" VARCHAR(64)",
+    "\"accessKeyPrefix\" VARCHAR(24)",
+    "\"accessKeyLastRotatedAt\" TIMESTAMPTZ",
+    "\"deviceApiKeyHash\" VARCHAR(64)",
+    "\"deviceApiKeyPrefix\" VARCHAR(24)",
+    "\"deviceKeyLastRotatedAt\" TIMESTAMPTZ",
+  ]).catch(() => {});
   await pool.query(`
     ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS "accessKeyHash" VARCHAR(64)
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS "accessKeyPrefix" VARCHAR(24)
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS "accessKeyLastRotatedAt" TIMESTAMPTZ
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS "deviceApiKeyHash" VARCHAR(64)
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS "deviceApiKeyPrefix" VARCHAR(24)
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ADD COLUMN IF NOT EXISTS "deviceKeyLastRotatedAt" TIMESTAMPTZ
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ALTER COLUMN access_key DROP NOT NULL
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ALTER COLUMN device_api_key DROP NOT NULL
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ALTER COLUMN access_key DROP DEFAULT
-  `).catch(() => {});
-  await pool.query(`
-    ALTER TABLE passport_registry
-    ALTER COLUMN device_api_key DROP DEFAULT
+      ALTER COLUMN "accessKey" DROP NOT NULL,
+      ALTER COLUMN "deviceApiKey" DROP NOT NULL,
+      ALTER COLUMN "accessKey" DROP DEFAULT,
+      ALTER COLUMN "deviceApiKey" DROP DEFAULT
   `).catch(() => {});
   await pool.query('CREATE INDEX IF NOT EXISTS idx_passport_types_product_category ON passport_types("productCategory")');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_passport_types_active ON passport_types("isActive")');
@@ -1468,22 +1292,17 @@ async function initDb(pool, {
     CREATE INDEX IF NOT EXISTS idx_company_facilities_company
       ON company_facilities(company_id, is_active, updated_at DESC)
   `);
-  await pool.query(`
-    ALTER TABLE company_repository
-    ADD COLUMN IF NOT EXISTS storage_key TEXT
-  `);
-  await pool.query(`
-    ALTER TABLE company_repository
-    ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(50)
-  `);
+  await ensureTableColumns(pool, "company_repository", [
+    "storage_key TEXT",
+    "storage_provider VARCHAR(50)",
+  ]);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_repo_company_parent
       ON company_repository(company_id, parent_id)
   `);
-  await pool.query(`
-    ALTER TABLE company_repository
-    ADD COLUMN IF NOT EXISTS repository_scope VARCHAR(20) NOT NULL DEFAULT 'files'
-  `);
+  await ensureTableColumns(pool, "company_repository", [
+    "repository_scope VARCHAR(20) NOT NULL DEFAULT 'files'",
+  ]);
   await pool.query(`
     UPDATE company_repository
     SET repository_scope = CASE
@@ -1511,14 +1330,10 @@ async function initDb(pool, {
       is_active  BOOLEAN      NOT NULL DEFAULT true
     )
   `);
-  await pool.query(`
-    ALTER TABLE symbols
-    ADD COLUMN IF NOT EXISTS storage_key TEXT
-  `);
-  await pool.query(`
-    ALTER TABLE symbols
-    ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(50)
-  `);
+  await ensureTableColumns(pool, "symbols", [
+    "storage_key TEXT",
+    "storage_provider VARCHAR(50)",
+  ]);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_symbols_category ON symbols(category)`);
 
   // Private API keys (company-scoped, for programmatic read access via /api/v1/)
@@ -1542,38 +1357,16 @@ async function initDb(pool, {
       is_active    BOOLEAN      NOT NULL DEFAULT true
     )
   `);
-  await pool.query(`
-    ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS key_prefix VARCHAR(16)
-  `);
-  await pool.query(`
-    ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS scopes TEXT[] NOT NULL DEFAULT ARRAY['dpp:read']::text[]
-  `);
-  await pool.query(`
-    ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ
-  `);
-  await pool.query(`
-    ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS key_salt VARCHAR(64)
-  `);
-  await pool.query(`
-    ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'hmac_sha256'
-  `);
-  await pool.query(`
-    ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS operator_type VARCHAR(80) NOT NULL DEFAULT 'economic_operator'
-  `);
-  await pool.query(`
-    ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS access_mode VARCHAR(16) NOT NULL DEFAULT 'read'
-  `);
-  await pool.query(`
-    ALTER TABLE api_keys
-    ADD COLUMN IF NOT EXISTS max_confidentiality VARCHAR(32) NOT NULL DEFAULT 'regulated'
-  `);
+  await ensureTableColumns(pool, "api_keys", [
+    "key_prefix VARCHAR(16)",
+    "scopes TEXT[] NOT NULL DEFAULT ARRAY['dpp:read']::text[]",
+    "expires_at TIMESTAMPTZ",
+    "key_salt VARCHAR(64)",
+    "hash_algorithm VARCHAR(32) NOT NULL DEFAULT 'hmac_sha256'",
+    "operator_type VARCHAR(80) NOT NULL DEFAULT 'economic_operator'",
+    "access_mode VARCHAR(16) NOT NULL DEFAULT 'read'",
+    "max_confidentiality VARCHAR(32) NOT NULL DEFAULT 'regulated'",
+  ]);
   
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_company ON api_keys(company_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_api_keys_hash    ON api_keys(key_hash)`);
@@ -1789,18 +1582,11 @@ async function initDb(pool, {
   `);
 
   // Company-managed branding for public passport viewer and consumer pages
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS company_logo TEXT
-  `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS introduction_text TEXT
-  `);
-  await pool.query(`
-    ALTER TABLE companies
-    ADD COLUMN IF NOT EXISTS branding_json JSONB NOT NULL DEFAULT '{}'::jsonb
-  `);
+  await ensureTableColumns(pool, "companies", [
+    "company_logo TEXT",
+    "introduction_text TEXT",
+    "branding_json JSONB NOT NULL DEFAULT '{}'::jsonb",
+  ]);
 
   // Dynamic field values — time-series: every push appends a new row, nothing is ever overwritten
 	  await pool.query(`
@@ -1812,25 +1598,11 @@ async function initDb(pool, {
 	      "updatedAt"   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 	    )
 	  `);
-  await pool.query(`
-    DO $$
-    BEGIN
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_dynamic_values' AND column_name = 'passport_dpp_id')
-        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_dynamic_values' AND column_name = 'passportDppId') THEN
-        ALTER TABLE passport_dynamic_values RENAME COLUMN passport_dpp_id TO "passportDppId";
-      END IF;
-
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_dynamic_values' AND column_name = 'field_key')
-        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_dynamic_values' AND column_name = 'fieldKey') THEN
-        ALTER TABLE passport_dynamic_values RENAME COLUMN field_key TO "fieldKey";
-      END IF;
-
-      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_dynamic_values' AND column_name = 'updated_at')
-        AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_dynamic_values' AND column_name = 'updatedAt') THEN
-        ALTER TABLE passport_dynamic_values RENAME COLUMN updated_at TO "updatedAt";
-      END IF;
-    END $$;
-  `);
+  await renameLegacyColumns(pool, "passport_dynamic_values", [
+    ["passport_dpp_id", "passportDppId"],
+    ["field_key", "fieldKey"],
+    ["updated_at", "updatedAt"],
+  ]);
 	  await pool.query(`
 	    CREATE INDEX IF NOT EXISTS idx_dv_passport ON passport_dynamic_values("passportDppId")
   `);
@@ -1903,46 +1675,18 @@ async function initDb(pool, {
       UNIQUE ("passportDppId", "versionNumber")
     )
   `);
+  const passportSignatureColumnRenames = [
+    ["passport_dpp_id", "passportDppId"],
+    ["version_number", "versionNumber"],
+    ["data_hash", "dataHash"],
+    ["signing_key_id", "signingKeyId"],
+    ["released_at", "releasedAt"],
+    ["signed_at", "signedAt"],
+    ["vc_json", "vcJson"],
+  ];
+  await renameLegacyColumns(pool, "passport_signatures", passportSignatureColumnRenames);
   await runMigration(pool, "2026-06-03.passport-signatures-camelcase-columns", async (db) => {
-    await db.query(`
-      DO $$
-      BEGIN
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'passport_dpp_id')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'passportDppId') THEN
-          ALTER TABLE passport_signatures RENAME COLUMN passport_dpp_id TO "passportDppId";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'version_number')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'versionNumber') THEN
-          ALTER TABLE passport_signatures RENAME COLUMN version_number TO "versionNumber";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'data_hash')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'dataHash') THEN
-          ALTER TABLE passport_signatures RENAME COLUMN data_hash TO "dataHash";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'signing_key_id')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'signingKeyId') THEN
-          ALTER TABLE passport_signatures RENAME COLUMN signing_key_id TO "signingKeyId";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'released_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'releasedAt') THEN
-          ALTER TABLE passport_signatures RENAME COLUMN released_at TO "releasedAt";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'signed_at')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'signedAt') THEN
-          ALTER TABLE passport_signatures RENAME COLUMN signed_at TO "signedAt";
-        END IF;
-
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'vc_json')
-          AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'passport_signatures' AND column_name = 'vcJson') THEN
-          ALTER TABLE passport_signatures RENAME COLUMN vc_json TO "vcJson";
-        END IF;
-      END $$;
-    `);
+    await renameLegacyColumns(db, "passport_signatures", passportSignatureColumnRenames);
   });
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dpp_release_records (
@@ -1973,10 +1717,9 @@ async function initDb(pool, {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  await pool.query(`
-    ALTER TABLE passport_signing_keys
-    ADD COLUMN IF NOT EXISTS algorithm_version VARCHAR(20) NOT NULL DEFAULT 'ES256'
-  `);
+  await ensureTableColumns(pool, "passport_signing_keys", [
+    "algorithm_version VARCHAR(20) NOT NULL DEFAULT 'ES256'",
+  ]);
 
   // One in-progress draft per super-admin user
   await pool.query(`
@@ -2651,27 +2394,27 @@ async function initDb(pool, {
       
       if (tableExists.rows.length > 0) {
         await db.query(
-          `ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${constraintName}`
+          `ALTER TABLE ${quoteDbIdentifier(tableName)} DROP CONSTRAINT IF EXISTS ${quoteDbIdentifier(constraintName)}`
         ).catch(() => {});
       }
     }
 
     const sharedTables = [
-      ["dpp_registry_registrations", ["passport_dpp_id"]],
+      ["dpp_registry_registrations", ["passportDppId", "passport_dpp_id"]],
       ["passport_backup_replications", ["passport_dpp_id", "lineage_id"]],
       ["backup_public_handovers", ["passport_dpp_id", "lineage_id"]],
-      ["passport_registry", ["dpp_id", "lineage_id"]],
-      ["passport_access_grants", ["passport_dpp_id"]],
-      ["passport_scan_events", ["passport_dpp_id"]],
-      ["passport_security_events", ["passport_dpp_id"]],
-      ["passport_dynamic_values", ["passport_dpp_id"]],
-      ["passport_signatures", ["passport_dpp_id"]],
-      ["passport_edit_sessions", ["passport_dpp_id"]],
-      ["notifications", ["passport_dpp_id"]],
-      ["passport_revision_batch_items", ["passport_dpp_id"]],
-      ["passport_history_visibility", ["passport_dpp_id"]],
-      ["passport_archives", ["dpp_id", "lineage_id"]],
-      ["passport_attachments", ["passport_dpp_id"]],
+      ["passport_registry", ["dppId", "lineageId", "dpp_id", "lineage_id"]],
+      ["passport_access_grants", ["passportDppId", "passport_dpp_id"]],
+      ["passport_scan_events", ["passportDppId", "passport_dpp_id"]],
+      ["passport_security_events", ["passportDppId", "passport_dpp_id"]],
+      ["passport_dynamic_values", ["passportDppId", "passport_dpp_id"]],
+      ["passport_signatures", ["passportDppId", "passport_dpp_id"]],
+      ["passport_edit_sessions", ["passportDppId", "passport_dpp_id"]],
+      ["notifications", ["passportDppId", "passport_dpp_id"]],
+      ["passport_revision_batch_items", ["passportDppId", "passport_dpp_id"]],
+      ["passport_history_visibility", ["passportDppId", "passport_dpp_id"]],
+      ["passport_archives", ["dppId", "lineageId", "dpp_id", "lineage_id"]],
+      ["passport_attachments", ["passportDppId", "passport_dpp_id"]],
     ];
 
     for (const [tableName, columns] of sharedTables) {
@@ -2684,10 +2427,10 @@ async function initDb(pool, {
       if (tableExists.rows.length > 0) {
         for (const columnName of columns) {
           await db.query(
-            `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} DROP DEFAULT`
+            `ALTER TABLE ${quoteDbIdentifier(tableName)} ALTER COLUMN ${quoteDbIdentifier(columnName)} DROP DEFAULT`
           ).catch(() => {});
           await db.query(
-            `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE TEXT USING ${columnName}::text`
+            `ALTER TABLE ${quoteDbIdentifier(tableName)} ALTER COLUMN ${quoteDbIdentifier(columnName)} TYPE TEXT USING ${quoteDbIdentifier(columnName)}::text`
           ).catch(() => {});
         }
       }
@@ -2703,12 +2446,12 @@ async function initDb(pool, {
       ).catch(() => ({ rows: [] }));
       
       if (tableExists.rows.length > 0) {
-        for (const columnName of ["dpp_id", "lineage_id"]) {
+        for (const columnName of ["dppId", "lineageId", "dpp_id", "lineage_id"]) {
           await db.query(
-            `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} DROP DEFAULT`
+            `ALTER TABLE ${quoteDbIdentifier(tableName)} ALTER COLUMN ${quoteDbIdentifier(columnName)} DROP DEFAULT`
           ).catch(() => {});
           await db.query(
-            `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} TYPE TEXT USING ${columnName}::text`
+            `ALTER TABLE ${quoteDbIdentifier(tableName)} ALTER COLUMN ${quoteDbIdentifier(columnName)} TYPE TEXT USING ${quoteDbIdentifier(columnName)}::text`
           ).catch(() => {});
         }
       }
@@ -2716,14 +2459,24 @@ async function initDb(pool, {
 
     await db.query(`
       UPDATE passport_registry
+      SET "lineageId" = "dppId"
+      WHERE "lineageId" IS NULL OR TRIM("lineageId") = ''
+    `).catch(() => {});
+    await db.query(`
+      UPDATE passport_registry
       SET lineage_id = dpp_id
       WHERE lineage_id IS NULL OR TRIM(lineage_id) = ''
-    `);
+    `).catch(() => {});
+    await db.query(`
+      UPDATE passport_archives
+      SET "lineageId" = "dppId"
+      WHERE "lineageId" IS NULL OR TRIM("lineageId") = ''
+    `).catch(() => {});
     await db.query(`
       UPDATE passport_archives
       SET lineage_id = dpp_id
       WHERE lineage_id IS NULL OR TRIM(lineage_id) = ''
-    `);
+    `).catch(() => {});
   });
 
   // ── Templates tables ─────────────────────────────────────────────────────
@@ -2867,6 +2620,20 @@ async function initDb(pool, {
       "createdAt"   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `).catch(e => logger.error("passport_attachments init error:", e.message));
+  await renameLegacyColumns(pool, "passport_attachments", [
+    ["public_id", "publicId"],
+    ["company_id", "companyId"],
+    ["passport_dpp_id", "passportDppId"],
+    ["field_key", "fieldKey"],
+    ["file_path", "filePath"],
+    ["storage_key", "storageKey"],
+    ["storage_provider", "storageProvider"],
+    ["file_url", "fileUrl"],
+    ["mime_type", "mimeType"],
+    ["size_bytes", "sizeBytes"],
+    ["is_public", "isPublic"],
+    ["created_at", "createdAt"],
+  ], { mergeDuplicates: true }).catch(e => logger.error("passport_attachments column repair error:", e.message));
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_passport_attachments_guid
       ON passport_attachments("passportDppId")
@@ -2916,8 +2683,8 @@ async function initDb(pool, {
   const passportRegistryReferences = [
     ["dpp_subject_registry", "passportDppId", "dpp_subject_registry_passport_dpp_id_fkey", false],
     ["dpp_registry_registrations", "passportDppId", "dpp_registry_registrations_passport_dpp_id_fkey", false],
-    ["passport_backup_replications", "passportDppId", "passport_backup_replications_passport_dpp_id_fkey", false],
-    ["backup_public_handovers", "passportDppId", "backup_public_handovers_passport_dpp_id_fkey", false],
+    ["passport_backup_replications", "passport_dpp_id", "passport_backup_replications_passport_dpp_id_fkey", false],
+    ["backup_public_handovers", "passport_dpp_id", "backup_public_handovers_passport_dpp_id_fkey", false],
     ["passport_access_grants", "passportDppId", "passport_access_grants_passport_dpp_id_fkey", false],
     ["passport_scan_events", "passportDppId", "passport_scan_events_passport_dpp_id_fkey", false],
     ["passport_security_events", "passportDppId", "passport_security_events_passport_dpp_id_fkey", false],

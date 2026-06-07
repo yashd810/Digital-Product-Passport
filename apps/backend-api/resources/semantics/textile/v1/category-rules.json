@@ -1,29 +1,96 @@
 {
-  "productCategories": [
+  "sourceWorkbook": "Internal textile working profile v1.0",
+  "sheetName": "Textile working profile",
+  "categories": [
     "apparel",
     "home_textile",
     "technical_textile"
   ],
+  "legend": {
+    "mandatory_battreg": "x",
+    "mandatory_espr_jtc24": "(x)",
+    "voluntary": "o",
+    "not_applicable": ""
+  },
   "requirementsByFieldKey": {
     "productModelIdentifier": {
+      "termNumber": 1,
+      "termLabel": "Product Model Identifier",
+      "sourceAttribute": "Product Model Identifier",
       "requirements": {
-        "apparel": "mandatory",
-        "home_textile": "mandatory",
-        "technical_textile": "mandatory"
+        "apparel": "mandatory_espr_jtc24",
+        "home_textile": "mandatory_espr_jtc24",
+        "technical_textile": "mandatory_espr_jtc24"
       }
     },
     "fiberComposition": {
+      "termNumber": 2,
+      "termLabel": "Fiber Composition",
+      "sourceAttribute": "Fiber Composition",
       "requirements": {
-        "apparel": "mandatory",
-        "home_textile": "mandatory",
-        "technical_textile": "mandatory"
+        "apparel": "mandatory_espr_jtc24",
+        "home_textile": "mandatory_espr_jtc24",
+        "technical_textile": "mandatory_espr_jtc24"
+      }
+    },
+    "recycledContentPercentage": {
+      "termNumber": 3,
+      "termLabel": "Recycled Content Percentage",
+      "sourceAttribute": "Recycled Content Percentage",
+      "requirements": {
+        "apparel": "mandatory_espr_jtc24",
+        "home_textile": "mandatory_espr_jtc24",
+        "technical_textile": "mandatory_espr_jtc24"
+      }
+    },
+    "fabricWeight": {
+      "termNumber": 4,
+      "termLabel": "Fabric Weight",
+      "sourceAttribute": "Fabric Weight",
+      "requirements": {
+        "apparel": "mandatory_espr_jtc24",
+        "home_textile": "mandatory_espr_jtc24",
+        "technical_textile": "mandatory_espr_jtc24"
+      }
+    },
+    "countryOfOrigin": {
+      "termNumber": 5,
+      "termLabel": "Country of Origin",
+      "sourceAttribute": "Country of Origin",
+      "requirements": {
+        "apparel": "mandatory_espr_jtc24",
+        "home_textile": "mandatory_espr_jtc24",
+        "technical_textile": "mandatory_espr_jtc24"
+      }
+    },
+    "careInstructions": {
+      "termNumber": 6,
+      "termLabel": "Care Instructions",
+      "sourceAttribute": "Care Instructions",
+      "requirements": {
+        "apparel": "mandatory_espr_jtc24",
+        "home_textile": "mandatory_espr_jtc24",
+        "technical_textile": "mandatory_espr_jtc24"
+      }
+    },
+    "durabilityScore": {
+      "termNumber": 7,
+      "termLabel": "Durability Score",
+      "sourceAttribute": "Durability Score",
+      "requirements": {
+        "apparel": "mandatory_espr_jtc24",
+        "home_textile": "mandatory_espr_jtc24",
+        "technical_textile": "mandatory_espr_jtc24"
       }
     },
     "restrictedSubstancesDisclosure": {
+      "termNumber": 8,
+      "termLabel": "Restricted Substances Disclosure",
+      "sourceAttribute": "Restricted Substances Disclosure",
       "requirements": {
-        "apparel": "conditional",
-        "home_textile": "conditional",
-        "technical_textile": "mandatory"
+        "apparel": "mandatory_espr_jtc24",
+        "home_textile": "mandatory_espr_jtc24",
+        "technical_textile": "mandatory_espr_jtc24"
       }
     }
   }

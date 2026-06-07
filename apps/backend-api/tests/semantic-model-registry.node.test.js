@@ -171,6 +171,136 @@ test("semantic registry loads a new product dictionary without battery-specific 
   }
 });
 
+test("semantic registry expands compact term sources", () => {
+  const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "semantic-models-"));
+  const modelDir = path.join(resourcesDir, "appliance", "v4");
+  fs.mkdirSync(modelDir, { recursive: true });
+
+  writeJson(path.join(modelDir, "manifest.json"), {
+    semanticModelKey: "claros_appliance_dictionary_v4",
+    name: "Claros Appliance Dictionary",
+    version: "1.0.0",
+    termsUrl: "https://example.test/dictionary/appliance/v4/terms",
+  });
+  writeJson(path.join(modelDir, "categories.json"), [
+    { key: "performance", label: "Performance" },
+  ]);
+  writeJson(path.join(modelDir, "units.json"), [
+    { key: "kwh_per_year", label: "Kilowatt hour per year", symbol: "kWh/year" },
+  ]);
+  writeJson(path.join(modelDir, "terms.json"), [
+    {
+      number: 1,
+      id: 1,
+      specRef: "APP-001",
+      slug: "energy-rating",
+      iri: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
+      termIri: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
+      label: "Energy rating",
+      attributeName: "Energy rating",
+      definition: "Energy performance rating for the product.",
+      shortDefinition: "Energy rating.",
+      sourceShortDefinition: "Source energy rating.",
+      category: "performance",
+      categoryLabel: "Performance",
+      sourceCategory: "Performance",
+      subcategory: "legacy-subcategory",
+      sourceSubcategory: "Legacy Subcategory",
+      internal_key: "energyRating",
+      elementId: "energyRating",
+      element_id: "energyRating",
+      dataType: "string",
+      rdfType: ["rdf:Property", "owl:DatatypeProperty", "skos:Concept"],
+      domainClassKey: "Performance",
+      semanticBinding: {
+        rdfProperty: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
+        domain: {
+          iri: "https://example.test/dictionary/appliance/v4/classes/Performance",
+          curie: "exampleClass:Performance",
+          label: "Performance",
+          broaderClass: {
+            iri: "https://example.test/dictionary/appliance/v4/classes/DigitalProductPassport",
+            curie: "exampleClass:DigitalProductPassport",
+            label: "Digital Product Passport",
+          },
+        },
+        range: {
+          iri: "http://www.w3.org/2001/XMLSchema#string",
+          curie: "xsd:string",
+          label: "String",
+          jsonType: "string",
+        },
+      },
+      conformsTo: ["https://www.w3.org/TR/vocab-dcat-3/"],
+      unit: "none",
+      unitDisplay: "n.a.",
+    },
+    {
+      number: 2,
+      specRef: "APP-002",
+      slug: "power-consumption",
+      label: "Power consumption",
+      definition: "Declared annual power consumption.",
+      category: "performance",
+      internalKey: "powerConsumption",
+      dataType: "decimal",
+      unit: "kwh_per_year",
+    },
+  ]);
+  writeJson(path.join(modelDir, "field-map.json"), {
+    energyRating: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
+    powerConsumption: "https://example.test/dictionary/appliance/v4/terms/power-consumption",
+  });
+  writeJson(path.join(modelDir, "context.jsonld"), {
+    "@context": {
+      energyRating: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
+      powerConsumption: {
+        "@id": "https://example.test/dictionary/appliance/v4/terms/power-consumption",
+        "@type": "http://www.w3.org/2001/XMLSchema#decimal",
+      },
+    },
+  });
+
+  try {
+    const registry = createSemanticModelRegistry({ resourcesDir });
+    const energyRating = registry.getTermByFieldKey("claros_appliance_dictionary_v4", "energyRating");
+    const powerConsumption = registry.getTermByFieldKey("claros_appliance_dictionary_v4", "powerConsumption");
+
+    assert.equal(energyRating.iri, "https://example.test/dictionary/appliance/v4/terms/energy-rating");
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "termIri"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "id"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "attributeName"), false);
+    assert.equal(energyRating.internalKey, "energyRating");
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "internal_key"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "elementId"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "element_id"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "shortDefinition"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "sourceShortDefinition"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "subcategory"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "sourceSubcategory"), false);
+    assert.equal(energyRating.domain.curie, "exampleClass:Performance");
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating.domain, "broaderClass"), false);
+    assert.equal(energyRating.range.curie, "xsd:string");
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "semanticBinding"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "sourceCategory"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "domainClassKey"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "rdfType"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "conformsTo"), false);
+    assert.deepEqual(energyRating.appFieldKeys, ["energyRating"]);
+    assert.deepEqual(energyRating.dataType, { format: "String", jsonType: "string", xsdType: "xsd:string" });
+    assert.equal(energyRating.unitDisplay, "n.a.");
+    assert.equal(energyRating.categoryLabel, "Performance");
+
+    assert.equal(powerConsumption.iri, "https://example.test/dictionary/appliance/v4/terms/power-consumption");
+    assert.deepEqual(powerConsumption.dataType, { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" });
+    assert.equal(powerConsumption.range.iri, "http://www.w3.org/2001/XMLSchema#decimal");
+    assert.equal(powerConsumption.range.curie, "xsd:decimal");
+    assert.equal(powerConsumption.unitDisplay, "kWh/year");
+  } finally {
+    fs.rmSync(resourcesDir, { recursive: true, force: true });
+  }
+});
+
 test("dictionary routes serve registered models and canonical artifacts", async () => {
   const app = createDictionaryApp();
 

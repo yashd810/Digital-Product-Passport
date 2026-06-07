@@ -357,12 +357,23 @@ module.exports = function createBackupProviderService({
 
   async function loadPassportAttachments({ companyId, passportDppId }) {
     const result = await pool.query(
-      `SELECT id, public_id, company_id, passport_dpp_id, field_key, file_path, storage_key, storage_provider,
-              file_url, mime_type, size_bytes, is_public, created_at
+      `SELECT id,
+              "publicId" AS public_id,
+              "companyId" AS company_id,
+              "passportDppId" AS passport_dpp_id,
+              "fieldKey" AS field_key,
+              "filePath" AS file_path,
+              "storageKey" AS storage_key,
+              "storageProvider" AS storage_provider,
+              "fileUrl" AS file_url,
+              "mimeType" AS mime_type,
+              "sizeBytes" AS size_bytes,
+              "isPublic" AS is_public,
+              "createdAt" AS created_at
        FROM passport_attachments
-       WHERE company_id = $1
-         AND passport_dpp_id = $2
-       ORDER BY created_at DESC, id DESC`,
+       WHERE "companyId" = $1
+         AND "passportDppId" = $2
+       ORDER BY "createdAt" DESC, id DESC`,
       [companyId, passportDppId]
     ).catch(() => ({ rows: [] }));
     return result.rows;

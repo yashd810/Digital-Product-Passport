@@ -34,7 +34,6 @@ const WorkflowDashboard = lazy(() => import("../../user/dashboard/workflow/Workf
 const PublicPassportRedirectPage = lazy(() => import("../../passport-viewer/containers/PublicPassportRedirectPage"));
 const CSVImportGuide = lazy(() => import("../../user/dashboard/csv/CSVImportGuide"));
 const NotificationsPage = lazy(() => import("../../user/dashboard/notifications/NotificationsPage"));
-const MessagingPage = lazy(() => import("../../user/dashboard/notifications/MessagingPage"));
 const TemplatesPage = lazy(() => import("../../user/dashboard/templates/TemplatesPage"));
 const ManualCenter = lazy(() => import("../../manual/ManualCenterPage"));
 const CreateHub = lazy(() => import("../../user/dashboard/create/CreateHub"));
@@ -160,12 +159,12 @@ function App() {
           <Route path="passports/:dppId/diff" element={<VersionDiff companyId={companyId} />} />
           <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="notifications"   element={<NotificationsPage user={user} />} />
-          <Route path="messages"        element={<MessagingPage user={user} />} />
+          <Route path="messages"        element={<NotificationsPage user={user} initialTab="messages" />} />
           <Route path="templates"       element={<TemplatesPage user={user} companyId={companyId} view="list" />} />
           <Route path="templates/new"   element={<TemplatesPage user={user} companyId={companyId} view="create" />} />
           <Route path="templates/:templateId/edit" element={<TemplateEditRoute user={user} companyId={companyId} />} />
           <Route path="create"          element={<CreateHub user={user} companyId={companyId} />} />
-          <Route path="passport-data"   element={<PassportDataManagement user={user} companyId={companyId} />} />
+          <Route path="passport-data"   element={user?.assetManagementEnabled ? <PassportDataManagement user={user} companyId={companyId} /> : <Navigate to={buildUserDashboardHomePath({ user, companyId })} replace />} />
           <Route path="audit-logs"      element={<AuditLogs companyId={companyId} />} />
           <Route path="workflow"          element={<Navigate to="workflow/inprogress" replace />} />
           <Route path="workflow/inprogress" element={<WorkflowDashboard user={user} companyId={companyId} activeTab="inprogress" />} />
@@ -207,6 +206,7 @@ function App() {
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
           <Route path="analytics/:companySlug"        element={<AdminCompanyAnalytics />} />
           <Route path="company/:companyId/profile"   element={<CompanyProfile user={user} />} />
+          <Route path="dictionary" element={<Navigate to="dictionary/battery/v1" replace />} />
           <Route path="dictionary/:family/:version" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />

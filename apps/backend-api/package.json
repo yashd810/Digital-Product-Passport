@@ -28,8 +28,7 @@
     "seed:passport-types": "node scripts/seed-passport-types.js",
     "repair:passport-storage": "node scripts/check-passport-storage.js --repair",
     "dev": "nodemon Server/server.js",
-    "test": "node --test tests/*.node.test.js",
-    "generate:battery-dictionary": "node ../../scripts/generate-battery-dictionary.js"
+    "test": "node --test tests/*.node.test.js"
   },
   "keywords": [],
   "author": "",

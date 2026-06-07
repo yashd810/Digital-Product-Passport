@@ -1,0 +1,59 @@
+[
+  {
+    "specRef": "ELE-001",
+    "slug": "product-model-identifier",
+    "label": "Product Model Identifier",
+    "definition": "Identifies the electronics product model that the passport describes.",
+    "category": "product-identification",
+    "internalKey": "productModelIdentifier",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/ProductIdentification",
+      "curie": "clarosElectronicsClass:ProductIdentification",
+      "label": "Product Identification"
+    },
+    "unit": "none"
+  },
+  {
+    "specRef": "ELE-002",
+    "slug": "manufacturer-name",
+    "label": "Manufacturer Name",
+    "definition": "Name of the manufacturer responsible for placing the product on the market.",
+    "category": "product-identification",
+    "internalKey": "manufacturerName",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/ProductIdentification",
+      "curie": "clarosElectronicsClass:ProductIdentification",
+      "label": "Product Identification"
+    },
+    "unit": "none"
+  },
+  {
+    "specRef": "ELE-003",
+    "slug": "rated-power",
+    "label": "Rated Power",
+    "definition": "Declared rated power for the electronics product.",
+    "category": "technical-characteristics",
+    "internalKey": "ratedPower",
+    "dataType": {
+      "format": "Decimal",
+      "jsonType": "number",
+      "xsdType": "xsd:decimal"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/TechnicalCharacteristics",
+      "curie": "clarosElectronicsClass:TechnicalCharacteristics",
+      "label": "Technical Characteristics"
+    },
+    "unit": "watt"
+  }
+]

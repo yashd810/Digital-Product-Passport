@@ -227,9 +227,6 @@ function createCanonicalPassportSerializer({
     const aliases = new Set([
       term?.slug,
       term?.internalKey,
-      term?.internal_key,
-      term?.elementId,
-      term?.element_id,
     ]);
     for (const fieldKey of (term?.appFieldKeys || [])) aliases.add(fieldKey);
     return [...aliases].filter(Boolean).map(String);

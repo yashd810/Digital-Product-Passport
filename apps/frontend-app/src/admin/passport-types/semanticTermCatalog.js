@@ -94,9 +94,6 @@ function resolveTermKey(term = {}) {
   return (
     term.appFieldKeys?.[0]
     || term.internalKey
-    || term.internal_key
-    || term.elementId
-    || term.element_id
     || semanticInternalKey(term.label || term.attributeName || term.slug)
   );
 }
@@ -114,10 +111,7 @@ export function normalizeSemanticTermCatalog(terms = []) {
         term.attributeName,
         term.sourceAttributeName,
         term.internalKey,
-        term.internal_key,
-        term.elementId,
-        term.element_id,
-        semanticHumanize(term.internalKey || term.internal_key),
+        semanticHumanize(term.internalKey),
         term.slug,
         semanticHumanize(term.slug),
       ]);

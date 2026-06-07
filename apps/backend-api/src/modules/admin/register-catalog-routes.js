@@ -437,9 +437,9 @@ module.exports = function registerCatalogRoutes(app, deps) {
     storage: multer.memoryStorage(),
     limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-      const allowed = [".svg", ".png", ".jpg", ".jpeg", ".webp"];
+      const allowed = [".png", ".jpg", ".jpeg", ".webp"];
       if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
-      else cb(new Error("Only SVG, PNG, JPG, WebP files are allowed"));
+      else cb(new Error("Only PNG, JPG, and WebP files are allowed"));
     }
   });
 

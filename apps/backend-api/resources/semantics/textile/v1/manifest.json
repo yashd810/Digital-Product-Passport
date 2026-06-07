@@ -3,31 +3,29 @@
   "name": "Claros Textile Dictionary",
   "version": "1.0.0",
   "description": "Internal textile passport dictionary for modular Digital Product Passport implementations.",
-  "authority": {
-    "modelClass": "internal-derived-dictionary",
-    "officialStatus": "implementation-vocabulary",
-    "stewardingOrganization": "Claros DPP",
-    "normativeSource": {
-      "title": "Textile product passport working profile",
-      "version": "1.0",
-      "artifactType": "internal-profile",
-      "sourceAuthority": "Claros DPP"
-    },
-    "derivationNotice": "This dictionary is curated by Claros DPP for implementation use and should be replaced or versioned when an official textile semantic model is adopted."
-  },
   "versioning": {
     "dictionaryVersion": "1.0.0",
-    "semanticModelKey": "claros_textile_dictionary_v1",
-    "sourceVersion": "Internal textile working profile v1.0",
-    "generatedAt": "2026-06-02T00:00:00.000Z",
     "compatibilityPolicy": "IRIs under /dictionary/textile/v1 remain stable for non-breaking revisions. Breaking semantic changes require a new version path and semantic model key."
   },
+  "productCategoryScope": [
+    "apparel",
+    "home_textile",
+    "technical_textile"
+  ],
+  "publisher": {
+    "name": "Claros DPP",
+    "url": "https://www.claros-dpp.online"
+  },
+  "issuerDid": "did:web:www.claros-dpp.online",
+  "baseIri": "https://www.claros-dpp.online/dictionary/textile/v1",
   "contextUrl": "https://www.claros-dpp.online/dictionary/textile/v1/context.jsonld",
-  "termsUrl": "https://www.claros-dpp.online/dictionary/textile/v1/terms",
+  "termsUrl": "https://www.claros-dpp.online/api/dictionary/textile/v1/terms",
+  "unitsUrl": "https://www.claros-dpp.online/api/dictionary/textile/v1/units",
+  "categoriesUrl": "https://www.claros-dpp.online/api/dictionary/textile/v1/categories",
+  "categoryRulesUrl": "https://www.claros-dpp.online/api/dictionary/textile/v1/category-rules",
+  "fieldMapUrl": "https://www.claros-dpp.online/api/dictionary/textile/v1/field-map",
+  "catalogUrl": "https://www.claros-dpp.online/dictionary/textile/v1/catalog.jsonld",
   "interoperabilityProfile": {
-    "targetFramework": "Interoperable Europe semantic interoperability",
-    "dcatVersion": "DCAT 3",
-    "catalogUrl": "https://www.claros-dpp.online/dictionary/textile/v1/catalog.jsonld",
-    "termModel": "Each dictionary term is represented as a dereferenceable RDF property and SKOS concept with explicit data type, category, and application field mapping metadata."
+    "catalogUrl": "https://www.claros-dpp.online/dictionary/textile/v1/catalog.jsonld"
   }
 }

@@ -313,7 +313,7 @@ const repoUpload = multer({
 });
 const repoSymbolUpload = multer({
   storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (_, file, cb) => { const allowed = [".svg",".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(new Error("Only SVG, PNG, JPG, WebP files are allowed")); },
+  fileFilter: (_, file, cb) => { const allowed = [".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(new Error("Only PNG, JPG, and WebP files are allowed")); },
 });
 
 // ─── DID + CANONICAL SERIALIZATION SERVICES ─────────────────────────────────
@@ -356,7 +356,7 @@ const {
   buildSemanticPassportJsonExport,
   buildPassportJsonLdContext,
 } = createSemanticPassportExportService({ semanticModelRegistry });
-const batteryDictionaryService = createBatteryDictionaryService();
+const batteryDictionaryService = createBatteryDictionaryService({ semanticModelRegistry });
 const complianceService = createComplianceService({
   pool,
   batteryDictionaryService,
@@ -428,7 +428,6 @@ const isPathInsideBase = (targetPath, baseDir) => {
 };
 
 // ─── STARTUP ─────────────────────────────────────────────────────────────────
-process.on("unhandledRejection", (reason) => logger.error({ err: reason }, "[Unhandled Rejection]"));
 
 async function verifySchemaReady() {
   await pool.query(`

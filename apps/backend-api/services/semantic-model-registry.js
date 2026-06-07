@@ -5,6 +5,18 @@ const path = require("path");
 
 const DEFAULT_RESOURCES_DIR = path.join(__dirname, "../resources/semantics");
 
+const DATA_TYPE_PRESETS = {
+  string: { format: "String", jsonType: "string", xsdType: "xsd:string" },
+  decimal: { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" },
+  number: { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" },
+  integer: { format: "Integer", jsonType: "integer", xsdType: "xsd:integer" },
+  boolean: { format: "Boolean", jsonType: "boolean", xsdType: "xsd:boolean" },
+  date: { format: "Date", jsonType: "string", xsdType: "xsd:date" },
+  datetime: { format: "DateTime", jsonType: "string", xsdType: "xsd:dateTime" },
+  uri: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
+  url: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
+};
+
 function loadJsonIfExists(filePath, fallback) {
   if (!fs.existsSync(filePath)) return fallback;
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -16,6 +28,166 @@ function normalizeKey(value) {
 
 function normalizePathSegment(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function compactObject(value) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) =>
+      entryValue !== undefined
+      && (!Array.isArray(entryValue) || entryValue.length > 0)
+    )
+  );
+}
+
+function normalizeDataType(dataType) {
+  if (!dataType) return null;
+  if (typeof dataType === "string") {
+    const preset = DATA_TYPE_PRESETS[normalizePathSegment(dataType)];
+    return preset ? { ...preset } : { format: dataType, jsonType: "string", xsdType: "xsd:string" };
+  }
+  if (isPlainObject(dataType)) return { ...dataType };
+  return dataType;
+}
+
+function createLookupByKey(items = []) {
+  const lookup = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item?.key) lookup.set(String(item.key), item);
+  }
+  return lookup;
+}
+
+function trimTrailingSlash(value) {
+  return String(value || "").replace(/\/+$/g, "");
+}
+
+function canonicalTermsBaseUrl(manifest, basePath) {
+  const baseIri = trimTrailingSlash(manifest?.baseIri);
+  if (baseIri) return `${baseIri}/terms`;
+
+  const termsUrl = trimTrailingSlash(manifest?.termsUrl);
+  if (termsUrl) return termsUrl.replace("/api/dictionary/", "/dictionary/");
+
+  return `${basePath}/terms`;
+}
+
+function xsdIriFromCurie(value) {
+  const type = String(value || "").trim();
+  if (!type) return null;
+  if (/^https?:\/\//i.test(type)) return type;
+  if (type.startsWith("xsd:")) return `http://www.w3.org/2001/XMLSchema#${type.slice(4)}`;
+  return null;
+}
+
+function rangeFromDataType(dataType) {
+  if (!isPlainObject(dataType)) return null;
+  return compactObject({
+    iri: xsdIriFromCurie(dataType.xsdType) || undefined,
+    curie: dataType.xsdType || undefined,
+    label: dataType.format || dataType.jsonType || undefined,
+    jsonType: dataType.jsonType || undefined,
+    items: dataType.items || undefined,
+  });
+}
+
+function normalizeTermsSource(termsSource, { manifest, basePath, categories, units } = {}) {
+  const sourceTerms = Array.isArray(termsSource) ? termsSource : [];
+  const categoriesByKey = createLookupByKey(categories);
+  const unitsByKey = createLookupByKey(units);
+  const termsBaseUrl = canonicalTermsBaseUrl(manifest, basePath);
+
+  return sourceTerms.map((rawTerm, index) => {
+    const term = { ...(rawTerm || {}) };
+    const slug = term.slug ? String(term.slug) : "";
+    const currentAppFieldKeys = Array.isArray(term.appFieldKeys) ? term.appFieldKeys.filter(Boolean).map(String) : [];
+    const internalKey = term.internalKey
+      || term.internal_key
+      || term.elementId
+      || term.element_id
+      || term.fieldKey
+      || currentAppFieldKeys[0];
+    const appFieldKeys = currentAppFieldKeys.length
+      ? currentAppFieldKeys
+      : internalKey
+        ? [String(internalKey)]
+        : [];
+    const number = term.number ?? term.id ?? index + 1;
+    const iri = term.iri
+      || term.termIri
+      || term.semanticBinding?.rdfProperty
+      || (slug && termsBaseUrl ? `${termsBaseUrl}/${slug}` : null);
+    const label = term.label || term.attributeName;
+    const categoryLabel = term.categoryLabel || categoriesByKey.get(String(term.category || ""))?.label;
+    const rawDomain = term.domain || term.semanticBinding?.domain;
+    const domain = isPlainObject(rawDomain) ? { ...rawDomain } : rawDomain;
+    if (isPlainObject(domain)) {
+      delete domain.broaderClass;
+    }
+    const dataType = normalizeDataType(term.dataType);
+    const range = term.range || term.semanticBinding?.range || rangeFromDataType(dataType);
+    const unit = term.unit || "none";
+    const unitRecord = unitsByKey.get(String(unit));
+    const unitDisplay = term.unitDisplay !== undefined
+      ? term.unitDisplay
+      : unit === "none"
+        ? "n.a."
+        : unitRecord?.display || unitRecord?.symbol || unitRecord?.label || unit;
+    delete term.id;
+    delete term.termIri;
+    delete term.attributeName;
+    delete term.sourceAttributeName;
+    delete term.internal_key;
+    delete term.elementId;
+    delete term.element_id;
+    delete term.accessRights;
+    delete term.staticOrDynamic;
+    delete term.updateRequirement;
+    delete term.granularityLevel;
+    delete term.regulatoryRequirement;
+    delete term.dinSpecRecommendation;
+    delete term.sourceRegulationReference;
+    delete term.regulationReferences;
+    delete term.dinDkeSpec99100Chapter;
+    delete term.batteryCategoryRequirements;
+    delete term.componentGranularity;
+    delete term.sourceWorkbookRow;
+    delete term.shortDefinition;
+    delete term.sourceShortDefinition;
+    delete term.subcategory;
+    delete term.sourceSubcategory;
+    delete term.categoryLabel;
+    delete term.sourceCategory;
+    delete term.domainClassKey;
+    delete term.rdfType;
+    delete term.range;
+    delete term.unitDisplay;
+    delete term.semanticBinding;
+    delete term.conformsTo;
+
+    return compactObject({
+      ...term,
+      number,
+      specRef: term.specRef,
+      slug,
+      iri,
+      label,
+      definition: term.definition,
+      category: term.category,
+      categoryLabel,
+      internalKey,
+      dataType,
+      unit,
+      unitDisplay,
+      appFieldKeys,
+      domain,
+      range,
+      categoryRequirements: term.categoryRequirements,
+    });
+  });
 }
 
 function modelSortValue(model) {
@@ -31,7 +203,8 @@ function indexTerms(terms = []) {
     if (term?.slug) termsBySlug.set(String(term.slug), term);
     if (term?.iri) termsByIri.set(String(term.iri), term);
     if (term?.termIri) termsByIri.set(String(term.termIri), term);
-    for (const fieldKey of (term?.appFieldKeys || [])) {
+    const fieldKeys = new Set([term?.internalKey, ...(term?.appFieldKeys || [])]);
+    for (const fieldKey of fieldKeys) {
       if (fieldKey) termsByFieldKey.set(String(fieldKey), term);
     }
   }
@@ -69,16 +242,17 @@ function buildModel({ resourcesDir, family, version }) {
   );
   if (!semanticModelKey) return null;
 
-  const terms = loadJsonIfExists(path.join(modelDir, "terms.json"), []);
+  const basePath = `/dictionary/${family}/${version}`;
+  const apiPath = `/api/dictionary/${family}/${version}`;
+  const termsSource = loadJsonIfExists(path.join(modelDir, "terms.json"), []);
   const categories = loadJsonIfExists(path.join(modelDir, "categories.json"), []);
   const units = loadJsonIfExists(path.join(modelDir, "units.json"), []);
+  const terms = normalizeTermsSource(termsSource, { manifest, basePath, categories, units });
   const fieldMap = loadJsonIfExists(path.join(modelDir, "field-map.json"), {});
   const context = loadJsonIfExists(path.join(modelDir, "context.jsonld"), {});
   const dcatCatalog = loadJsonIfExists(path.join(modelDir, "catalog.jsonld"), null);
   const categoryRules = loadJsonIfExists(path.join(modelDir, "category-rules.json"), null);
   const indexes = indexTerms(terms);
-  const basePath = `/dictionary/${family}/${version}`;
-  const apiPath = `/api/dictionary/${family}/${version}`;
 
   return {
     semanticModelKey,
