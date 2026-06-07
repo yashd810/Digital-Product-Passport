@@ -196,21 +196,21 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const material = createAccessKeyMaterial();
       const updated = await pool.query(
         `UPDATE passport_registry
-         SET access_key = NULL,
-             access_key_hash = $1,
-             access_key_prefix = $2,
-             access_key_last_rotated_at = NOW()
-         WHERE dpp_id = $3 AND company_id = $4
-         RETURNING access_key_prefix, access_key_last_rotated_at`,
+         SET "accessKey" = NULL,
+             "accessKeyHash" = $1,
+             "accessKeyPrefix" = $2,
+             "accessKeyLastRotatedAt" = NOW()
+         WHERE "dppId" = $3 AND "companyId" = $4
+         RETURNING "accessKeyPrefix", "accessKeyLastRotatedAt"`,
         [material.hash, material.prefix, dppId, companyId]
       );
       if (!updated.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passport_registry", dppId, null, { key_prefix: material.prefix });
+      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passport_registry", dppId, null, { keyPrefix: material.prefix });
       res.json({
         accessKey: material.rawKey,
-        keyPrefix: updated.rows[0].access_key_prefix,
-        lastRotatedAt: updated.rows[0].access_key_last_rotated_at,
+        keyPrefix: updated.rows[0].accessKeyPrefix,
+        lastRotatedAt: updated.rows[0].accessKeyLastRotatedAt,
       });
     } catch {
       res.status(500).json({ error: "Failed to rotate access key" });

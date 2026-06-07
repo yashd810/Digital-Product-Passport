@@ -3,6 +3,19 @@
 const crypto = require("crypto");
 const { buildDashboardPath } = require("../src/shared/navigation/dashboard-paths");
 
+const SAFE_ID_TOKEN_ALGORITHMS = new Set([
+  "RS256",
+  "RS384",
+  "RS512",
+  "ES256",
+  "ES384",
+  "ES512",
+  "PS256",
+  "PS384",
+  "PS512",
+]);
+const DEFAULT_ID_TOKEN_ALGORITHMS = ["RS256"];
+
 function parseJsonEnv(name, fallback) {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -17,6 +30,14 @@ function normalizeArray(value, fallback = []) {
   if (Array.isArray(value)) return value.filter(Boolean).map((item) => String(item).trim()).filter(Boolean);
   if (typeof value === "string") return value.split(",").map((item) => item.trim()).filter(Boolean);
   return fallback;
+}
+
+function safeIdTokenAlgorithms(values, fallback = DEFAULT_ID_TOKEN_ALGORITHMS) {
+  const normalized = normalizeArray(values, fallback)
+    .map((alg) => alg.toUpperCase())
+    .filter((alg) => SAFE_ID_TOKEN_ALGORITHMS.has(alg));
+  if (normalized.length) return normalized;
+  return fallback.length ? [...DEFAULT_ID_TOKEN_ALGORITHMS] : [];
 }
 
 function sha256Base64Url(value) {
@@ -48,6 +69,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
         allowCreateUser: provider.allowCreateUser !== false,
         ssoOnly: provider.ssoOnly === true,
         allowedEmailDomains: normalizeArray(provider.allowedEmailDomains),
+        idTokenAlgorithms: safeIdTokenAlgorithms(provider.idTokenAlgorithms || provider.allowedIdTokenAlgorithms, []),
       })).filter((provider) => provider.key && provider.clientId && provider.clientSecret && (provider.discoveryUrl || provider.issuer))
     : [];
 
@@ -120,12 +142,22 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     if (!tokenSet.id_token) throw new Error("Provider did not return an ID token");
     const decoded = jwt.decode(tokenSet.id_token, { complete: true });
     if (!decoded?.header?.kid) throw new Error("ID token header is missing kid");
+    const metadataAlgorithms = safeIdTokenAlgorithms(metadata?.id_token_signing_alg_values_supported, []);
+    const allowedAlgorithms = provider.idTokenAlgorithms.length
+      ? provider.idTokenAlgorithms
+      : metadataAlgorithms.length
+        ? metadataAlgorithms
+        : DEFAULT_ID_TOKEN_ALGORITHMS;
+    const tokenAlgorithm = String(decoded.header.alg || "").toUpperCase();
+    if (!allowedAlgorithms.includes(tokenAlgorithm)) {
+      throw new Error("ID token uses an unsupported signing algorithm");
+    }
     const jwks = await getJwks(provider, metadata);
     const jwk = (jwks.keys || []).find((item) => item.kid === decoded.header.kid);
     if (!jwk) throw new Error("Unable to find matching signing key for ID token");
     const keyObject = crypto.createPublicKey({ key: jwk, format: "jwk" });
     const claims = jwt.verify(tokenSet.id_token, keyObject, {
-      algorithms: [decoded.header.alg],
+      algorithms: allowedAlgorithms,
       audience: provider.clientId,
       issuer: metadata.issuer || provider.issuer,
     });
@@ -191,7 +223,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       );
       if (existingUser.rows.length) {
         user = existingUser.rows[0];
-        if (!user.is_active) throw new Error("Your account is inactive");
+        if (!user.isActive) throw new Error("Your account is inactive");
       }
     }
 

@@ -34,20 +34,21 @@ const WorkflowDashboard = lazy(() => import("../../user/dashboard/workflow/Workf
 const PublicPassportRedirectPage = lazy(() => import("../../passport-viewer/containers/PublicPassportRedirectPage"));
 const CSVImportGuide = lazy(() => import("../../user/dashboard/csv/CSVImportGuide"));
 const NotificationsPage = lazy(() => import("../../user/dashboard/notifications/NotificationsPage"));
-const MessagingPage = lazy(() => import("../../user/dashboard/notifications/MessagingPage"));
 const TemplatesPage = lazy(() => import("../../user/dashboard/templates/TemplatesPage"));
 const ManualCenter = lazy(() => import("../../manual/ManualCenterPage"));
 const CreateHub = lazy(() => import("../../user/dashboard/create/CreateHub"));
+const PassportDataManagement = lazy(() => import("../../user/dashboard/passport-data/PassportDataManagementPage"));
 const ArchivedPassports = lazy(() => import("../../user/dashboard/archived/ArchivedPassportsPage"));
 
 const AdminLayout = lazy(() => import("../../admin/layout/AdminLayout"));
-const BatteryDictionaryBrowserPage = lazy(() => import("../../shared/dictionary/BatteryDictionaryBrowserPage"));
+const DictionaryBrowserPage = lazy(() => import("../../shared/dictionary/DictionaryBrowserPage"));
 const AdminAnalytics = lazy(() => import("../../admin/pages/AdminAnalytics"));
 const AdminCompanies = lazy(() => import("../../admin/pages/AdminCompanies"));
 const AdminInvite = lazy(() => import("../../admin/pages/AdminInvite"));
 const CompanyAccess = lazy(() => import("../../admin/pages/CompanyAccess"));
 const AdminCompanyAnalytics = lazy(() => import("../../admin/pages/AdminCompanyAnalytics"));
 const AdminPassportTypes = lazy(() => import("../../admin/passport-types/AdminPassportTypes"));
+const AdminPassportModules = lazy(() => import("../../admin/passport-modules/AdminPassportModules"));
 const AdminCreatePassportType = lazy(() => import("../../admin/passport-types/AdminCreatePassportTypePage"));
 const AdminPassportTypeFields = lazy(() => import("../../admin/passport-types/AdminPassportTypeFields"));
 const AdminSecurity = lazy(() => import("../../admin/pages/AdminSecurity"));
@@ -158,11 +159,12 @@ function App() {
           <Route path="passports/:dppId/diff" element={<VersionDiff companyId={companyId} />} />
           <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="notifications"   element={<NotificationsPage user={user} />} />
-          <Route path="messages"        element={<MessagingPage user={user} />} />
+          <Route path="messages"        element={<NotificationsPage user={user} initialTab="messages" />} />
           <Route path="templates"       element={<TemplatesPage user={user} companyId={companyId} view="list" />} />
           <Route path="templates/new"   element={<TemplatesPage user={user} companyId={companyId} view="create" />} />
           <Route path="templates/:templateId/edit" element={<TemplateEditRoute user={user} companyId={companyId} />} />
           <Route path="create"          element={<CreateHub user={user} companyId={companyId} />} />
+          <Route path="passport-data"   element={user?.assetManagementEnabled ? <PassportDataManagement user={user} companyId={companyId} /> : <Navigate to={buildUserDashboardHomePath({ user, companyId })} replace />} />
           <Route path="audit-logs"      element={<AuditLogs companyId={companyId} />} />
           <Route path="workflow"          element={<Navigate to="workflow/inprogress" replace />} />
           <Route path="workflow/inprogress" element={<WorkflowDashboard user={user} companyId={companyId} activeTab="inprogress" />} />
@@ -177,9 +179,9 @@ function App() {
           <Route path="repository/symbols" element={<CompanyRepository user={user} companyId={companyId} activeTab="symbols" />} />
           <Route path="archived"        element={<ArchivedPassports user={user} companyId={companyId} />} />
           <Route path="manual"          element={<ManualCenter mode="user" user={user} companyId={companyId} />} />
-          <Route path="dictionary/battery/v1" element={<BatteryDictionaryBrowserPage />} />
-          <Route path="dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
-          <Route path="dictionary/battery/v1/*" element={<BatteryDictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version" element={<DictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />
         </Route>
 
         {/* Admin */}
@@ -192,6 +194,7 @@ function App() {
           <Route path="analytics"                    element={<AdminAnalytics />} />
           <Route path="companies"                    element={<AdminCompanies />} />
           <Route path="passport-types"               element={<AdminPassportTypes />} />
+          <Route path="passport-modules"             element={<AdminPassportModules />} />
           <Route path="passport-types/new"           element={<AdminCreatePassportType />} />
           <Route path="passport-types/:typeName/edit"   element={<AdminCreatePassportType />} />
           <Route path="passport-types/:typeName/fields" element={<AdminPassportTypeFields />} />
@@ -203,9 +206,10 @@ function App() {
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
           <Route path="analytics/:companySlug"        element={<AdminCompanyAnalytics />} />
           <Route path="company/:companyId/profile"   element={<CompanyProfile user={user} />} />
-          <Route path="dictionary/battery/v1"        element={<BatteryDictionaryBrowserPage />} />
-          <Route path="dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
-          <Route path="dictionary/battery/v1/*"      element={<BatteryDictionaryBrowserPage />} />
+          <Route path="dictionary" element={<Navigate to="dictionary/battery/v1" replace />} />
+          <Route path="dictionary/:family/:version" element={<DictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
+          <Route path="dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />
         </Route>
 
         {/* Create / Edit */}
@@ -220,10 +224,9 @@ function App() {
           </ProtectedRoute>
         } />
 
-        {/* Battery Dictionary — public, accessible from both admin and user layouts */}
-        <Route path="/dictionary/battery/v1" element={<BatteryDictionaryBrowserPage />} />
-        <Route path="/dictionary/battery/v1/terms/:slug" element={<BatteryDictionaryBrowserPage />} />
-        <Route path="/dictionary/battery/v1/*" element={<BatteryDictionaryBrowserPage />} />
+        <Route path="/dictionary/:family/:version" element={<DictionaryBrowserPage />} />
+        <Route path="/dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
+        <Route path="/dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import { buildProductCategoryOptions } from "./builderHelpers";
+import { formatSemanticModelLabel } from "./semanticTermCatalog";
 import "../styles/AdminDashboard.css";
 
 function TypeKebabMenu({ pos, onClose, children }) {
@@ -23,11 +25,7 @@ const API = import.meta.env.VITE_API_URL || "";
 
 const ICON_PRESETS = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🔋","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
 
-function getSemanticModelLabel(modelKey) {
-  if (modelKey === "generic_dpp_v1") return "Generic DPP";
-  if (modelKey === "claros_battery_dictionary_v1") return "Claros Battery Dictionary";
-  return modelKey || "No semantic model";
-}
+const getSemanticModelLabel = formatSemanticModelLabel;
 
 function AdminPassportTypes() {
   const navigate = useNavigate();
@@ -226,6 +224,11 @@ function AdminPassportTypes() {
 
   const draftGroupKey = draftType?.productCategory?.trim() || "";
   const draftGroupIcon = draftType?.productIcon || "📋";
+  const visibleProductCategories = buildProductCategoryOptions({
+    savedCategories: productCategories,
+    passportTypes: types,
+    draftType,
+  });
   const groupedEntries = Object.entries(grouped);
 
   if (draftType && !grouped[draftGroupKey]) {
@@ -276,7 +279,7 @@ function AdminPassportTypes() {
                 type="text"
                 value={newCatName}
                 onChange={e => setNewCatName(e.target.value)}
-                placeholder="Category name, e.g. Battery Passport"
+                placeholder="Category name, e.g. Appliance"
                 className="apt-productCategory-name-input"
                 autoFocus
               />
@@ -302,18 +305,19 @@ function AdminPassportTypes() {
         )}
 
         <div className="apt-productCategory-chips">
-          {productCategories.length === 0 && (
-            <span className="apt-productCategory-empty">No product categories yet. Add one above.</span>
+          {visibleProductCategories.length === 0 && (
+            <span className="apt-productCategory-empty">No product categories yet. Create a passport type or add one above.</span>
           )}
-          {productCategories.map(umb => {
+          {visibleProductCategories.map(umb => {
             const inUse = !!grouped[umb.name];
+            const canDelete = umb.managed && !inUse;
             return (
               <div key={umb.id} className={`apt-productCategory-chip ${inUse ? "apt-productCategory-chip-used" : ""}`}>
                 <span className="apt-productCategory-chip-icon">{umb.icon}</span>
                 <span className="apt-productCategory-chip-name">{umb.name}</span>
                 {inUse
                   ? <span className="apt-productCategory-chip-count">{grouped[umb.name].types.length} type{grouped[umb.name].types.length !== 1 ? "s" : ""}</span>
-                  : (
+                  : canDelete ? (
                     <>
                       <button className="apt-productCategory-chip-delete" onClick={() => handleDeleteProductCategory(umb)} title="Delete">✕</button>
                       <button
@@ -324,7 +328,7 @@ function AdminPassportTypes() {
                         Delete
                       </button>
                     </>
-                  )
+                  ) : <span className="apt-productCategory-chip-count">Derived</span>
                 }
               </div>
             );
@@ -332,7 +336,6 @@ function AdminPassportTypes() {
         </div>
       </div>
 
-      {/* ── Passport Types grouped by product category ── */}
       {groupedEntries.length === 0 ? (
         <div className="apt-empty">
           <div className="apt-empty-icon">📋</div>

@@ -1,0 +1,16 @@
+[
+  {
+    "key": "none",
+    "display": "n.a.",
+    "description": "No unit applicable; the attribute is dimensionless or textual.",
+    "xsdType": "xsd:string",
+    "jsonType": "string"
+  },
+  {
+    "key": "watt",
+    "display": "W",
+    "description": "Watt unit used by this dictionary.",
+    "xsdType": "xsd:decimal",
+    "jsonType": "number"
+  }
+]

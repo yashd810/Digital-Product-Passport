@@ -73,8 +73,8 @@ function normalizeFacilityStableId(value) {
 }
 
 function normalizePassportTypeSegment(passportType) {
-  const candidate = slugify(passportType || "battery");
-  return candidate || "battery";
+  const candidate = slugify(passportType || "passport");
+  return candidate || "passport";
 }
 
 function normalizeGranularity(granularity) {

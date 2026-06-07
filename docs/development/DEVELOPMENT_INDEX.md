@@ -23,6 +23,7 @@ This index provides quick navigation and comprehensive reference for all Claros 
 |-------|------|---------|-----------|
 | [Coding Conventions](#development-guidelines) | DEVELOPMENT.md | Guidelines and best practices | Low |
 | [Workflow Examples](#developer-workflows) | WORKFLOWS.md | Feature-specific change paths | Medium |
+| [Add Passport Category](add-passport-category.md) | add-passport-category.md | Add a versioned passport module and semantic dictionary | Medium |
 | [Scripts Reference](#scripts-directory) | scripts.md | Deployment and utility scripts | Low |
 | [Database Automation](#utility-scripts) | utility-scripts.md | Database operations | Low |
 
@@ -226,7 +227,7 @@ Database and utility automation scripts for bulk operations and administrative t
 3. Register route in App.js
 4. Add protected layout wrapper
 5. Implement API calls using shared helpers
-6. Write tests with Jest/React Testing Library
+6. Write tests with Vitest/React Testing Library
 7. Update documentation in docs/api/ if new endpoints needed
 
 **Related:** [DEVELOPMENT.md - Frontend](DEVELOPMENT.md#frontend), [ENDPOINTS.md](../api/ENDPOINTS.md)
@@ -243,7 +244,7 @@ Database and utility automation scripts for bulk operations and administrative t
 3. Reuse shared middleware and authentication
 4. Implement business logic in services/ if complex
 5. Add database schema changes to db/init.js (idempotent)
-6. Write Jest/Supertest tests for auth, permissions, and behavior
+6. Write Node test route/service coverage for auth, permissions, and behavior
 7. Document endpoint in ENDPOINTS.md
 8. Update frontend to call new endpoint
 
@@ -254,6 +255,8 @@ Database and utility automation scripts for bulk operations and administrative t
 ### Scenario 4: Modify Passport Type Fields
 
 **Goal:** Add or change fields in the passport data model
+
+For new product categories, prefer [Add A Passport Category](add-passport-category.md). Existing passport types should only receive additive, compatible changes.
 
 **Steps:**
 1. Read [WORKFLOWS.md - Add Or Change Passport Type Fields](WORKFLOWS.md#add-or-change-passport-type-fields)
@@ -394,8 +397,8 @@ Database and utility automation scripts for bulk operations and administrative t
 
 ### Testing Patterns
 
-- **Backend:** Jest with Supertest for HTTP testing
-- **Frontend:** React Testing Library for component testing
+- **Backend:** Node test runner for service, route, and persistence coverage
+- **Frontend:** Vitest with React Testing Library for component testing
 - **a11y:** axe accessibility checks
 - **Coverage:** Test auth, permissions, and main workflows
 

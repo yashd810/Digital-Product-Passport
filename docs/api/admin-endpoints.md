@@ -126,11 +126,44 @@ Delete an product category. Requires password confirmation. Category must not be
 
 ## Passport Types
 
+### List Registered Passport Type Modules
+
+**GET** `/api/admin/passport-type-modules`
+
+Returns versioned passport modules registered in backend code, including whether each module has already been seeded into `passport_types`. Super admin only.
+
+**Parameters:** None
+
+**Response (200 OK):**
+```json
+[
+  {
+    "moduleKey": "appliance:v1",
+    "typeName": "appliancePassportV1",
+    "displayName": "Appliance Passport v1",
+    "productCategory": "Appliance",
+    "productIcon": "AP",
+    "semanticModelKey": "claros_appliance_dictionary_v1",
+    "complianceProfileKey": "applianceDppV1",
+    "sectionCount": 3,
+    "fieldCount": 8,
+    "seeded": false,
+    "seededPassportTypeId": null,
+    "seedCommand": "npm run seed:passport-types -- --module=appliance:v1"
+  }
+]
+```
+
+**Error Codes:**
+- `500` - Failed to fetch passport type modules
+
+---
+
 ### List All Passport Types
 
 **GET** `/api/admin/passport-types`
 
-Returns all passport types (both active and inactive). Super admin only.
+Returns all passport types, including module-seeded and admin-created custom types. Super admin only.
 
 **Parameters:** None
 
@@ -139,15 +172,15 @@ Returns all passport types (both active and inactive). Super admin only.
 [
   {
     "id": "uuid",
-    "type_name": "battery-passport",
-    "display_name": "Battery Digital Product Passport",
-    "product_category": "Batteries",
-    "product_icon": "🔋",
-    "semantic_model_key": "battery",
-    "fields_json": {...},
-    "is_active": true,
-    "created_at": "2025-05-05T10:30:00Z",
-    "created_by_email": "admin@company.com"
+    "typeName": "batteryPassportV1",
+    "displayName": "Battery Passport v1",
+    "productCategory": "Battery",
+    "productIcon": "BT",
+    "semanticModelKey": "claros_battery_dictionary_v1",
+    "fieldsJson": {...},
+    "isActive": true,
+    "createdAt": "2026-06-04T10:30:00Z",
+    "createdByEmail": "admin@company.com"
   }
 ]
 ```
@@ -164,18 +197,18 @@ Returns all passport types (both active and inactive). Super admin only.
 Get a single passport type definition by type name. **No authentication required** (public endpoint).
 
 **Parameters:**
-- `typeName` (path parameter, required) - Passport type name (e.g., "battery-passport")
+- `typeName` (path parameter, required) - Passport type name (e.g., "batteryPassportV1")
 
 **Response (200 OK):**
 ```json
 {
   "id": "uuid",
-  "type_name": "battery-passport",
-  "display_name": "Battery Digital Product Passport",
-  "product_category": "Batteries",
-  "product_icon": "🔋",
-  "semantic_model_key": "battery",
-  "fields_json": {
+  "typeName": "batteryPassportV1",
+  "displayName": "Battery Passport v1",
+  "productCategory": "Battery",
+  "productIcon": "BT",
+  "semanticModelKey": "claros_battery_dictionary_v1",
+  "fieldsJson": {
     "sections": [
       {
         "id": "section-1",
@@ -184,8 +217,8 @@ Get a single passport type definition by type name. **No authentication required
       }
     ]
   },
-  "is_active": true,
-  "created_at": "2025-05-05T10:30:00Z"
+  "isActive": true,
+  "createdAt": "2026-06-04T10:30:00Z"
 }
 ```
 
@@ -198,17 +231,17 @@ Get a single passport type definition by type name. **No authentication required
 
 **POST** `/api/admin/passport-types`
 
-Create a new passport type definition with field schema.
+Create a new custom passport type definition with field schema. For stable regulated product categories, prefer adding a versioned backend passport module and seeding it instead of hand-creating the type through this endpoint.
 
 **Request Body:**
 ```json
 {
-  "type_name": "battery-passport",
-  "display_name": "Battery Digital Product Passport",
-  "product_category": "Batteries",
-  "product_icon": "🔋",
-  "semantic_model_key": "battery",
-  "fields_json": {
+  "typeName": "customApplianceServicePassportV1",
+  "displayName": "Custom Appliance Service Passport v1",
+  "productCategory": "Appliance",
+  "productIcon": "AP",
+  "semanticModelKey": "claros_appliance_dictionary_v1",
+  "fieldsJson": {
     "sections": [
       {
         "id": "section-1",
@@ -220,7 +253,7 @@ Create a new passport type definition with field schema.
             "label": "Model Number",
             "type": "text",
             "required": true,
-            "semantic_id": "dpp:modelNumber"
+            "semanticId": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/product-model-identifier"
           }
         ]
       }
@@ -230,26 +263,26 @@ Create a new passport type definition with field schema.
 ```
 
 **Parameters:**
-- `type_name` (string, required) - Unique identifier for passport type
-- `display_name` (string, required) - Human-readable name
-- `product_category` (string, required) - Category for organization
-- `product_icon` (string, optional) - Emoji icon
-- `semantic_model_key` (string, required) - Semantic model identifier
-- `fields_json` (object, required) - Schema defining passport fields
+- `typeName` (string, required) - Unique camelCase identifier for the passport type
+- `displayName` (string, required) - Human-readable name
+- `productCategory` (string, required) - Category for organization
+- `productIcon` (string, optional) - Short icon/label
+- `semanticModelKey` (string, optional) - Registered semantic model identifier
+- `fieldsJson` (object, required) - Schema defining passport fields
 
 **Response (201 Created):**
 ```json
 {
   "id": "uuid",
-  "type_name": "battery-passport",
-  "display_name": "Battery Digital Product Passport",
-  "product_category": "Batteries",
-  "product_icon": "🔋",
-  "semantic_model_key": "battery",
-  "fields_json": {...},
-  "is_active": true,
-  "created_at": "2025-05-05T10:30:00Z",
-  "created_by": "user-id"
+  "typeName": "customApplianceServicePassportV1",
+  "displayName": "Custom Appliance Service Passport v1",
+  "productCategory": "Appliance",
+  "productIcon": "AP",
+  "semanticModelKey": "claros_appliance_dictionary_v1",
+  "fieldsJson": {...},
+  "isActive": true,
+  "createdAt": "2026-06-04T10:30:00Z",
+  "createdBy": "user-id"
 }
 ```
 
@@ -271,8 +304,8 @@ Update an existing passport type definition.
 **Request Body:**
 ```json
 {
-  "display_name": "Updated Display Name",
-  "fields_json": {...}
+  "displayName": "Updated Display Name",
+  "fieldsJson": {...}
 }
 ```
 
@@ -280,8 +313,8 @@ Update an existing passport type definition.
 ```json
 {
   "id": "uuid",
-  "type_name": "battery-passport",
-  "display_name": "Updated Display Name",
+  "typeName": "customApplianceServicePassportV1",
+  "displayName": "Updated Display Name",
   ...
 }
 ```
@@ -328,8 +361,8 @@ Mark a passport type as active (available for use).
 ```json
 {
   "id": "uuid",
-  "type_name": "battery-passport",
-  "is_active": true,
+  "typeName": "batteryPassportV1",
+  "isActive": true,
   ...
 }
 ```
@@ -353,8 +386,8 @@ Mark a passport type as inactive (unavailable for new passports).
 ```json
 {
   "id": "uuid",
-  "type_name": "battery-passport",
-  "is_active": false,
+  "typeName": "batteryPassportV1",
+  "isActive": false,
   ...
 }
 ```
@@ -379,9 +412,9 @@ Get the current draft of a passport type schema.
 ```json
 {
   "id": "uuid",
-  "type_name": "battery-passport",
-  "fields_json": {...},
-  "created_at": "2025-05-05T10:30:00Z"
+  "typeName": "customApplianceServicePassportV1",
+  "fieldsJson": {...},
+  "createdAt": "2026-06-04T10:30:00Z"
 }
 ```
 
@@ -396,8 +429,8 @@ Save a new version of passport type schema as draft.
 **Request Body:**
 ```json
 {
-  "type_name": "battery-passport",
-  "fields_json": {...}
+  "typeName": "customApplianceServicePassportV1",
+  "fieldsJson": {...}
 }
 ```
 
@@ -405,9 +438,9 @@ Save a new version of passport type schema as draft.
 ```json
 {
   "id": "uuid",
-  "type_name": "battery-passport",
-  "fields_json": {...},
-  "created_at": "2025-05-05T10:30:00Z"
+  "typeName": "customApplianceServicePassportV1",
+  "fieldsJson": {...},
+  "createdAt": "2026-06-04T10:30:00Z"
 }
 ```
 

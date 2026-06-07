@@ -6,7 +6,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "users",
         purpose: "Primary user directory for company users and super admins, including session revocation and SSO state.",
-        columns: ["id", "email", "password_hash", "first_name", "last_name", "company_id", "role", "is_active", "otp_code", "otp_code_hash", "otp_expires_at", "session_version", "auth_source", "sso_only", "last_login_at", "pepper_version", "two_factor_enabled", "avatar_url", "phone", "job_title", "bio", "preferred_language", "default_reviewer_id", "default_approver_id", "created_at", "updated_at"],
+        columns: ["id", "email", "passwordHash", "firstName", "lastName", "companyId", "role", "isActive", "otpCode", "otpCodeHash", "otpExpiresAt", "sessionVersion", "authSource", "ssoOnly", "lastLoginAt", "pepperVersion", "twoFactorEnabled", "avatarUrl", "phone", "jobTitle", "bio", "preferredLanguage", "defaultReviewerId", "defaultApproverId", "createdAt", "updatedAt"],
       },
       {
         name: "user_identities",
@@ -37,12 +37,12 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "companies",
         purpose: "Tenant master record, Asset Management switch, DID slug, and economic-operator identity.",
-        columns: ["id", "company_name", "is_active", "asset_management_enabled", "asset_management_revoked_at", "did_slug", "economic_operator_identifier", "economicOperatorIdentifierScheme", "created_at", "updated_at"],
+        columns: ["id", "company_name", "is_active", "asset_management_enabled", "asset_management_revoked_at", "did_slug", "economic_operator_identifier", "economic_operator_identifier_scheme", "created_at", "updated_at"],
       },
       {
         name: "company_dpp_policies",
-        purpose: "Per-company DPP issuance policy used by standards APIs, DID minting, VC issuance, JSON-LD exports, and battery dictionary behavior.",
-        columns: ["id", "company_id", "default_granularity", "allow_granularity_override", "mint_model_dids", "mint_item_dids", "mint_facility_dids", "vc_issuance_enabled", "jsonld_export_enabled", "claros_battery_dictionary_enabled", "created_at", "updated_at"],
+        purpose: "Per-company DPP issuance policy used by standards APIs, DID minting, VC issuance, JSON-LD exports, and semantic dictionary access.",
+        columns: ["id", "company_id", "default_granularity", "allow_granularity_override", "mint_model_dids", "mint_item_dids", "mint_facility_dids", "vc_issuance_enabled", "jsonld_export_enabled", "semantic_dictionary_enabled", "created_at", "updated_at"],
       },
       {
         name: "company_facilities",
@@ -56,13 +56,13 @@ export const CORE_DATABASE_TABLES = [
       },
       {
         name: "passport_types",
-        purpose: "Published passport type definitions, semantic model selection, governance metadata, and field schemas.",
-        columns: ["id", "type_name", "display_name", "product_category", "product_icon", "semantic_model_key", "fields_json", "is_active", "created_by", "created_at", "updated_at"],
+        purpose: "Published passport type definitions from code modules or admin-created custom types, including semantic model selection, governance metadata, compliance profile, and field schemas.",
+        columns: ["id", "typeName", "displayName", "productCategory", "productIcon", "semanticModelKey", "fieldsJson", "isActive", "createdBy", "createdAt", "updatedAt"],
       },
       {
         name: "passport_type_schema_events",
-        purpose: "Append-only-style history for schema/table changes made by the passport type builder.",
-        columns: ["id", "passport_type_id", "type_name", "table_name", "schema_version", "event_type", "change_summary", "created_by", "created_at"],
+        purpose: "Append-only-style history for schema/table changes made by module seeding or the passport type builder.",
+        columns: ["id", "passportTypeId", "typeName", "tableName", "schemaVersion", "eventType", "changeSummary", "createdBy", "createdAt"],
       },
       {
         name: "passport_type_drafts",
@@ -83,12 +83,12 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_registry",
         purpose: "Maps every passport DPP ID to its company, type, public access key, and device API key.",
-        columns: ["dppId", "lineageId", "company_id", "passportType", "access_key", "access_key_hash", "access_key_prefix", "access_key_last_rotated_at", "device_api_key", "device_api_key_hash", "device_api_key_prefix", "device_key_last_rotated_at", "created_at"],
+        columns: ["dppId", "lineageId", "companyId", "passportType", "accessKey", "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt", "deviceApiKey", "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt", "createdAt"],
       },
       {
         name: "dpp_subject_registry",
         purpose: "Subject DID registry connecting local product IDs to product DIDs, DPP DIDs, company DIDs, and granularity.",
-        columns: ["id", "company_id", "passport_dpp_id", "internalAliasId", "uniqueProductIdentifier", "granularity", "product_did", "dpp_did", "company_did", "created_at", "updated_at"],
+        columns: ["id", "companyId", "passportDppId", "internalAliasId", "uniqueProductIdentifier", "granularity", "productDid", "dppDid", "companyDid", "createdAt", "updatedAt"],
       },
       {
         name: "dpp_registry_registrations",
@@ -108,12 +108,12 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_dynamic_values",
         purpose: "Latest dynamic field values pushed by devices or saved manually.",
-        columns: ["id", "passport_dpp_id", "field_key", "value", "updated_at"],
+        columns: ["id", "passportDppId", "fieldKey", "value", "updatedAt"],
       },
       {
         name: "passport_archives",
         purpose: "Stores full passport row data when a passport is archived. Each version is stored as a separate row with the complete row_data JSONB. Unarchiving restores the soft-deleted rows in the passport table and removes the archive entries.",
-        columns: ["id", "dppId", "lineageId", "company_id", "passportType", "versionNumber", "modelName", "internalAliasId", "uniqueProductIdentifier", "releaseStatus", "row_data", "actor_identifier", "snapshot_reason", "archived_by", "archived_at"],
+        columns: ["id", "dppId", "lineageId", "companyId", "passportType", "versionNumber", "modelName", "internalAliasId", "uniqueProductIdentifier", "releaseStatus", "rowData", "actorIdentifier", "snapshotReason", "archivedBy", "archivedAt"],
       },
     ],
   },
@@ -129,7 +129,7 @@ export const CORE_DATABASE_TABLES = [
       {
         name: "passport_signatures",
         purpose: "Signature record created when a passport version is released.",
-        columns: ["id", "passport_dpp_id", "versionNumber", "data_hash", "signature", "algorithm", "signing_key_id", "released_at", "signed_at", "vc_json"],
+        columns: ["id", "passportDppId", "versionNumber", "dataHash", "signature", "algorithm", "signingKeyId", "releasedAt", "signedAt", "vcJson"],
       },
       {
         name: "passport_scan_events",
@@ -307,8 +307,8 @@ export const BACKEND_API_FAMILIES = [
     name: "Super admin setup",
     route: "/api/admin/*",
     details: [
-      "Creates and lists companies, passport types, product categories, company analytics, and super admins.",
-      "Stores draft passport-type builder state and exposes activate, deactivate, clone, metadata edit, and delete actions.",
+      "Creates and lists companies, registered passport modules, seeded/custom passport types, product categories, company analytics, and super admins.",
+      "Stores draft passport-type builder state and exposes module preview, activate, deactivate, clone, metadata edit, and delete actions.",
       "Also handles company type grants and the company-level Asset Management enable or disable toggle.",
     ],
   },
@@ -397,11 +397,11 @@ export const BACKEND_API_FAMILIES = [
     ],
   },
   {
-    name: "Battery dictionary",
-    route: "/api/dictionary/battery/v1/* and /dictionary/battery/v1/*",
+    name: "Semantic dictionaries",
+    route: "/api/dictionary/:family/:version/* and /dictionary/:family/:version/*",
     details: [
-      "Serves the Claros battery dictionary context, manifest, categories, units, field maps, category rules, and term details.",
-      "Feeds the public, user-dashboard, and admin-dashboard dictionary browser plus semantic export guidance for battery passport fields.",
+      "Serves registered dictionary contexts, manifests, categories, units, field maps, category rules, and term details.",
+      "Feeds the public, user-dashboard, and admin-dashboard dictionary browser plus semantic export guidance for each passport type's selected model.",
       "Also exposes static JSON-LD/context aliases without requiring login.",
     ],
   },
@@ -421,7 +421,7 @@ export const BACKEND_OPERATION_FLOWS = [
     title: "Company onboarding flow",
     steps: [
       "Super admin creates a company from the Companies page.",
-      "Super admin sets the company's DPP policy: default granularity, whether overrides are allowed, DID minting flags, VC issuance, JSON-LD export, and battery dictionary behavior.",
+      "Super admin sets the company's DPP policy: default granularity, whether overrides are allowed, DID minting flags, VC issuance, JSON-LD export, and semantic dictionary access.",
       "Super admin grants passport-type access for that company.",
       "Company branding and repository assets are configured from Company Profile, while company API keys, user sessions, and optional bearer tokens are handled from Security.",
       "The company's economic-operator identifier and managed facilities are configured before standards/DID-heavy integrations rely on them.",
@@ -535,7 +535,7 @@ export const SECURITY_KEY_TABLE = {
       "Device API key",
       "Passport row > Device Integration metadata, then issue or regenerate once when needed",
       "x-device-key header",
-      "POST /api/passports/:dppId/dynamic-values for live measurements such as temperature, mass, or battery data",
+      "POST /api/passports/:dppId/dynamic-values for live measurements such as temperature, mass, or product-specific sensor data",
       "Listing all passports, editing normal passport fields, or calling company admin endpoints",
     ],
     [
@@ -690,8 +690,8 @@ export const PUBLIC_AND_LIVE_API_TABLE = {
     ["Verify signature", "GET /api/passports/:dppId/signature", "No auth", "Optional query param: version", "Signature status and, when available, the stored Verifiable Credential payload."],
     ["Get current signing key", "GET /api/signing-key", "No auth", "No body", "The active public signing key metadata."],
     ["Get DID document", "GET /.well-known/did.json", "No auth", "No body", "A DID document that helps outside verifiers validate released passport signatures."],
-    ["Resolve DID", "GET /resolve?did=did:web:...", "No auth", "Accept header decides browser redirect or DID document redirect", "Universal resolver for platform, company, battery model/batch/item, DPP, and facility DIDs."],
-    ["DID documents", "GET /did/company/:slug/did.json, /did/battery/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities through canonical slug and stable-ID routes."],
+    ["Resolve DID", "GET /resolve?did=did:web:...", "No auth", "Accept header decides browser redirect or DID document redirect", "Universal resolver for platform, company, product subject, DPP, and facility DIDs."],
+    ["DID documents", "GET /did/company/:slug/did.json, /did/:passportType/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json", "No auth", "No body", "DID documents for companies, product subjects, DPP records, and facilities through canonical slug and stable-ID routes."],
     ["DPP JSON-LD context", "GET /contexts/dpp/v1", "No auth", "No body", "JSON-LD context for DPP linked-data payloads."],
     ["Record scan", "POST /api/passports/:dppId/scan", "No auth", "Optional scan metadata", "Stores public scan event telemetry."],
     ["Read scan stats", "GET /api/passports/:dppId/scan-stats", "No auth", "No body", "Returns aggregate scan information."],
@@ -733,15 +733,15 @@ export const GOVERNANCE_SECURITY_API_TABLE = {
 };
 
 export const DICTIONARY_API_TABLE = {
-  title: "Battery dictionary browser and semantic API",
+  title: "Semantic dictionary browser and API",
   columns: ["Action", "Endpoint or route", "Authentication", "What it gives you", "Where it is used"],
   rows: [
-    ["Open dictionary in user dashboard", "/dashboard/:companySlug/dictionary/battery/v1", "Signed-in dashboard session", "Searchable browser for categories, terms, units, IRIs, field keys, access rights, and regulation references", "Company users checking Battery Pass field meanings and JSON-LD identifiers."],
-    ["Open dictionary in admin dashboard", "/admin/dictionary/battery/v1", "Super-admin session", "The same dictionary browser inside the admin shell", "Super admins designing battery passport types and checking semantic mappings."],
-    ["Public dictionary browser", "/dictionary/battery/v1", "No login", "Public term browser and term detail pages", "External implementers and verifiers."],
-    ["JSON-LD context", "GET /dictionary/battery/v1/context.jsonld or /api/dictionary/battery/v1/context.jsonld", "No login", "Canonical JSON-LD context", "Battery JSON-LD exports and linked-data verification."],
-    ["Manifest and rules", "GET /api/dictionary/battery/v1/manifest, /category-rules, /categories, /units, /field-map", "No login", "Dictionary metadata, applicability rules, field map, unit definitions, and category lists", "Builder validation, export guidance, and documentation."],
-    ["Term JSON", "GET /api/dictionary/battery/v1/terms or /terms/:slug", "No login", "All terms, filtered terms, or one term detail record", "Dictionary search and direct term references."],
+    ["Open dictionary in user dashboard", "/dashboard/:companySlug/dictionary/:family/:version", "Signed-in dashboard session", "Searchable browser for categories, terms, units, IRIs, field keys, access rights, and regulation references", "Company users checking field meanings and JSON-LD identifiers for passport types they can access."],
+    ["Open dictionary in admin dashboard", "/admin/dictionary/:family/:version", "Super-admin session", "The same dictionary browser inside the admin shell, with module/type context where available", "Super admins designing passport modules, custom types, and semantic mappings."],
+    ["Public dictionary browser", "/dictionary/:family/:version", "No login", "Public term browser and term detail pages", "External implementers and verifiers."],
+    ["JSON-LD context", "GET /dictionary/:family/:version/context.jsonld or /api/dictionary/:family/:version/context.jsonld", "No login", "Canonical JSON-LD context", "Semantic exports and linked-data verification."],
+    ["Manifest and rules", "GET /api/dictionary/:family/:version/manifest, /category-rules, /categories, /units, /field-map", "No login", "Dictionary metadata, applicability rules, field map, unit definitions, and category lists", "Builder validation, export guidance, and documentation."],
+    ["Term JSON", "GET /api/dictionary/:family/:version/terms or /terms/:slug", "No login", "All terms, filtered terms, or one term detail record", "Dictionary search and direct term references."],
   ],
 };
 
@@ -770,15 +770,16 @@ export const ADMIN_PLATFORM_API_TABLE = {
     ["List categories", "GET /api/admin/product-categories", "Session cookie or bearer token and super-admin role", "No body", "Reads the current productCategory product categories."],
     ["Create a category", "POST /api/admin/product-categories", "Session cookie or bearer token and super-admin role", "{ name, icon }", "Adds a new product category for the catalog tree."],
     ["Delete a category", "DELETE /api/admin/product-categories/:id", "Session cookie or bearer token and super-admin role", "{ password }", "Deletes a category if no passport type is still using it."],
-    ["List passport types", "GET /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "No body", "Shows the published type catalog and metadata."],
-    ["Create a passport type", "POST /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "Type metadata plus fields_json schema", "Creates a new type and its runtime table."],
-    ["Update a passport type", "PATCH /api/admin/passport-types/:id", "Session cookie or bearer token and super-admin role", "Updated metadata and or fields_json", "Changes an existing type definition."],
+    ["List registered passport modules", "GET /api/admin/passport-type-modules", "Session cookie or bearer token and super-admin role", "No body", "Shows code-defined modules, selected semantic models, seeded status, and seed commands."],
+    ["List passport types", "GET /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "No body", "Shows the seeded/module-backed and custom type catalog with metadata."],
+    ["Create a passport type", "POST /api/admin/passport-types", "Session cookie or bearer token and super-admin role", "Type metadata plus fieldsJson schema", "Creates a custom type and its runtime table. Stable production product lines should normally come from code modules and seeding."],
+    ["Update a passport type", "PATCH /api/admin/passport-types/:id", "Session cookie or bearer token and super-admin role", "Updated metadata and or fieldsJson", "Changes an existing custom type definition or editable metadata."],
     ["Activate or deactivate a type", "PATCH /api/admin/passport-types/:id/activate or /deactivate", "Session cookie or bearer token and super-admin role", "No body", "Turns company-side usage on or off."],
     ["Delete a passport type", "DELETE /api/admin/passport-types/:typeId", "Session cookie or bearer token and super-admin role", "No body", "Removes an obsolete type definition."],
     ["Save or read builder draft", "GET, PUT, DELETE /api/admin/passport-type-draft", "Session cookie or bearer token and super-admin role", "Draft JSON body for PUT", "Stores unfinished builder work separately from published types."],
     ["Create and list companies", "POST /api/admin/companies and GET /api/admin/companies", "Session cookie or bearer token and super-admin role", "{ companyName } for POST", "Creates tenants and reads the current tenant list."],
     ["Delete a company", "DELETE /api/admin/companies/:companyId", "Session cookie or bearer token and super-admin role", "Confirmation handled by UI", "Removes a tenant and backend-owned tenant data through the cleanup path."],
-    ["Read or update company DPP policy", "GET, PUT, PATCH /api/admin/companies/:id/dpp-policy", "Session cookie or bearer token and super-admin role", "Granularity, DID minting, VC, JSON-LD, and dictionary flags", "Controls standards/DID issuance behavior for that company."],
+    ["Read or update company DPP policy", "GET, PUT, PATCH /api/admin/companies/:id/dpp-policy", "Session cookie or bearer token and super-admin role", "Granularity, DID minting, VC, JSON-LD, and semantic dictionary flags", "Controls standards/DID issuance behavior for that company."],
     ["Enable or disable Asset Management for a company", "PATCH /api/admin/companies/:companyId/asset-management", "Session cookie or bearer token and super-admin role", "{ enabled: true or false }", "Turns the company's Asset Management access on or off."],
     ["Grant or revoke company type access", "POST /api/admin/company-access and DELETE /api/admin/company-access/:companyId/:typeId", "Session cookie or bearer token and super-admin role", "{ companyId, passportTypeId } for POST", "Controls which companies can use which passport types."],
     ["Manage global symbols", "GET /api/symbols, GET /api/symbols/categories, POST /api/admin/symbols, DELETE /api/admin/symbols/:id", "Session cookie or bearer token; create/delete require super-admin role", "Multipart file for POST", "Manages global reusable symbols visible to form authors."],

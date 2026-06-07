@@ -34,6 +34,10 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function normalizeNamespace(value) {
+  return slugify(value || "passport") || "passport";
+}
+
 // ─── VALIDATION ───────────────────────────────────────────────────────────────
 
 function assertId(value, name) {
@@ -62,50 +66,52 @@ function companyDid(companyId) {
 }
 
 /**
- * Product model DID.
- * did:web:www.claros-dpp.online:did:battery:model:<companyId>:<encodedProductId>
+ * Generic product subject DID.
+ * did:web:www.claros-dpp.online:did:<passportType>:<model|batch|item>:<stableId>
  */
-function productModelDid(companyId, internalAliasId) {
-  assertId(companyId, "companyId");
-  assertId(internalAliasId, "internalAliasId");
-  const encodedProductId = encodeURIComponent(String(internalAliasId));
-  return `did:web:${getDomain()}:did:battery:model:${companyId}:${encodedProductId}`;
+function productSubjectDid(passportType, level, stableId) {
+  assertId(level, "level");
+  assertId(stableId, "stableId");
+  const normalizedLevel = String(level || "").trim().toLowerCase();
+  if (!["model", "batch", "item"].includes(normalizedLevel)) {
+    throw new Error("[dpp-identity] level must be one of: model, batch, item");
+  }
+  const encodedStableId = encodeURIComponent(String(stableId));
+  return `did:web:${getDomain()}:did:${normalizeNamespace(passportType)}:${normalizedLevel}:${encodedStableId}`;
+}
+
+/**
+ * Product model DID.
+ */
+function productModelDid(passportType, stableId) {
+  return productSubjectDid(passportType, "model", stableId);
 }
 
 /**
  * Product item DID.
- * did:web:www.claros-dpp.online:did:battery:item:<companyId>:<encodedProductId>
  */
-function productItemDid(companyId, internalAliasId) {
-  assertId(companyId, "companyId");
-  assertId(internalAliasId, "internalAliasId");
-  const encodedProductId = encodeURIComponent(String(internalAliasId));
-  return `did:web:${getDomain()}:did:battery:item:${companyId}:${encodedProductId}`;
+function productItemDid(passportType, stableId) {
+  return productSubjectDid(passportType, "item", stableId);
 }
 
 /**
  * Product batch DID.
- * did:web:www.claros-dpp.online:did:battery:batch:<companyId>:<encodedProductId>
  */
-function productBatchDid(companyId, internalAliasId) {
-  assertId(companyId, "companyId");
-  assertId(internalAliasId, "internalAliasId");
-  const encodedProductId = encodeURIComponent(String(internalAliasId));
-  return `did:web:${getDomain()}:did:battery:batch:${companyId}:${encodedProductId}`;
+function productBatchDid(passportType, stableId) {
+  return productSubjectDid(passportType, "batch", stableId);
 }
 
 /**
  * DPP record DID.
- * did:web:www.claros-dpp.online:did:dpp:<granularity>:<companyId>:<encodedProductId>
+ * did:web:www.claros-dpp.online:did:dpp:<granularity>:<stableId>
  *
  * @param {string} granularity - 'model', 'item', or 'batch'
  */
-function dppDid(granularity, companyId, internalAliasId) {
+function dppDid(granularity, stableId) {
   assertId(granularity, "granularity");
-  assertId(companyId, "companyId");
-  assertId(internalAliasId, "internalAliasId");
-  const encodedProductId = encodeURIComponent(String(internalAliasId));
-  return `did:web:${getDomain()}:did:dpp:${granularity}:${companyId}:${encodedProductId}`;
+  assertId(stableId, "stableId");
+  const encodedStableId = encodeURIComponent(String(stableId));
+  return `did:web:${getDomain()}:did:dpp:${granularity}:${encodedStableId}`;
 }
 
 /**
@@ -127,10 +133,10 @@ function facilityDid(facilityId) {
  * Recognised shapes:
  *   did:web:<domain>                                         → { type: 'platform' }
  *   did:web:<domain>:did:company:<companyId>                 → { type: 'company', companyId }
- *   did:web:<domain>:did:battery:model:<cId>:<pId>           → { type: 'battery', level: 'model', companyId, internalAliasId }
- *   did:web:<domain>:did:battery:batch:<cId>:<pId>           → { type: 'battery', level: 'batch', companyId, internalAliasId }
- *   did:web:<domain>:did:battery:item:<cId>:<pId>            → { type: 'battery', level: 'item',  companyId, internalAliasId }
- *   did:web:<domain>:did:dpp:<granularity>:<cId>:<pId>       → { type: 'dpp', granularity, companyId, internalAliasId }
+ *   did:web:<domain>:did:<passportType>:model:<stableId>     → { type: 'product', level: 'model', passportType, stableId }
+ *   did:web:<domain>:did:<passportType>:batch:<stableId>     → { type: 'product', level: 'batch', passportType, stableId }
+ *   did:web:<domain>:did:<passportType>:item:<stableId>      → { type: 'product', level: 'item',  passportType, stableId }
+ *   did:web:<domain>:did:dpp:<granularity>:<stableId>        → { type: 'dpp', granularity, stableId }
  *   did:web:<domain>:did:facility:<facilityId>               → { type: 'facility', facilityId }
  */
 function parseDid(did) {
@@ -169,27 +175,13 @@ function parseDid(did) {
     };
   }
 
-  // Battery model/batch/item: did:web:<domain>:did:battery:<level>:<companyId>:<encodedProductId>
-  if (ns === "battery" && rest.length === 5) {
-    const level = rest[2];
-    if (level !== "model" && level !== "batch" && level !== "item") return null;
-    return {
-      type: "battery",
-      domain,
-      level,
-      companyId: rest[3],
-      internalAliasId: decodeURIComponent(rest[4]),
-    };
-  }
-
-  // DPP: did:web:<domain>:did:dpp:<granularity>:<companyId>:<encodedProductId>
-  if (ns === "dpp" && rest.length === 5) {
+  // DPP: did:web:<domain>:did:dpp:<granularity>:<stableId>
+  if (ns === "dpp" && rest.length === 4) {
     return {
       type: "dpp",
       domain,
       granularity: rest[2],
-      companyId: rest[3],
-      internalAliasId: decodeURIComponent(rest[4]),
+      stableId: decodeURIComponent(rest[3]),
     };
   }
 
@@ -199,6 +191,19 @@ function parseDid(did) {
       type: "facility",
       domain,
       facilityId: decodeURIComponent(rest[2]),
+    };
+  }
+
+  // Generic product subject: did:web:<domain>:did:<passportType>:<level>:<stableId>
+  if (rest.length === 4) {
+    const level = rest[2];
+    if (level !== "model" && level !== "batch" && level !== "item") return null;
+    return {
+      type: "product",
+      domain,
+      passportType: normalizeNamespace(ns),
+      level,
+      stableId: decodeURIComponent(rest[3]),
     };
   }
 
@@ -216,11 +221,11 @@ function parseDid(did) {
  *   did:web:www.claros-dpp.online:did:company:5
  *     → https://www.claros-dpp.online/did/company/5/did.json
  *
- *   did:web:www.claros-dpp.online:did:battery:batch:5:ACME-001
- *     → https://www.claros-dpp.online/did/battery/batch/5/ACME-001/did.json
+ *   did:web:www.claros-dpp.online:did:textile-passport-v1:batch:STYLE-001
+ *     → https://www.claros-dpp.online/did/textile-passport-v1/batch/STYLE-001/did.json
  *
- *   did:web:www.claros-dpp.online:did:dpp:model:5:ACME-001
- *     → https://www.claros-dpp.online/did/dpp/model/5/ACME-001/did.json
+ *   did:web:www.claros-dpp.online:did:dpp:model:STYLE-001
+ *     → https://www.claros-dpp.online/did/dpp/model/STYLE-001/did.json
  *
  *   did:web:www.claros-dpp.online:did:facility:PLANT-A
  *     → https://www.claros-dpp.online/did/facility/PLANT-A/did.json
@@ -239,14 +244,14 @@ function didToDocumentUrl(did) {
     return `${base}/did/company/${parsed.companyId}/did.json`;
   }
 
-  if (parsed.type === "battery") {
-    const encodedPid = encodeURIComponent(parsed.internalAliasId);
-    return `${base}/did/battery/${parsed.level}/${parsed.companyId}/${encodedPid}/did.json`;
+  if (parsed.type === "product") {
+    const encodedStableId = encodeURIComponent(parsed.stableId);
+    return `${base}/did/${parsed.passportType}/${parsed.level}/${encodedStableId}/did.json`;
   }
 
   if (parsed.type === "dpp") {
-    const encodedPid = encodeURIComponent(parsed.internalAliasId);
-    return `${base}/did/dpp/${parsed.granularity}/${parsed.companyId}/${encodedPid}/did.json`;
+    const encodedStableId = encodeURIComponent(parsed.stableId);
+    return `${base}/did/dpp/${parsed.granularity}/${encodedStableId}/did.json`;
   }
 
   if (parsed.type === "facility") {
@@ -287,8 +292,10 @@ function buildCanonicalPublicUrl(passport, companyName) {
 module.exports = {
   getDomain,
   slugify,
+  normalizeNamespace,
   platformDid,
   companyDid,
+  productSubjectDid,
   productModelDid,
   productItemDid,
   productBatchDid,

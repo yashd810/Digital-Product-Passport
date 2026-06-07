@@ -21,10 +21,12 @@ The backend is a Node.js/Express API backed by PostgreSQL. It is the trust bound
 | `db/init.js` | Idempotent database schema setup and migrations |
 | `routes/` | Feature-specific HTTP routes |
 | `services/` | Business logic and infrastructure services |
-| `helpers/passport-helpers.js` | Passport normalization, status, field, identifier, and asset helpers |
+| `src/passport-modules/` | Versioned code-defined passport modules such as `battery:v1`, `textile:v1`, and future product categories |
+| `resources/semantics/` | Versioned semantic model resources: manifests, contexts, field maps, category rules, units, and terms |
+| `src/shared/passports/passport-helpers.js` | Passport normalization, status, field, identifier, and asset helpers |
 | `middleware/auth.js` | Session/JWT auth helpers and company access checks |
 | `middleware/rate-limit.js` | Rate limiter setup |
-| `tests/` | Jest/Supertest test suites |
+| `tests/` | Node test-runner backend suites |
 
 ## Route Modules
 
@@ -36,7 +38,8 @@ High-traffic feature areas:
 - `routes/passports.js` for company passport CRUD, release/revise/archive, access grants, QR/data-carrier, audit, backup, dynamic values, and API keys.
 - `routes/passport-public.js` for public reads, signatures, DIDs, unlocks, and context routes.
 - `routes/dpp-api.js` for `/api/v1` DPP and DID resolver behavior.
-- `routes/admin.js` for super-admin companies, passport types, symbols, analytics, and access management.
+- `routes/admin.js` for super-admin companies, passport modules, passport types, symbols, analytics, and access management.
+- `routes/dictionary.js` for generic semantic dictionary resources under `/dictionary/:family/:version/*`.
 
 ## Commands
 
@@ -46,6 +49,8 @@ npm run start
 npm run dev
 npm run test
 npm run db:migrate
+npm run seed:passport-types
+npm run bootstrap:passport-modules
 npm run check:passport-storage
 ```
 

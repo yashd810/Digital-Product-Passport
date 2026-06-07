@@ -1,0 +1,30 @@
+[
+  {
+    "key": "gsm",
+    "display": "g/m2",
+    "description": "Grams per square metre unit used by this dictionary.",
+    "xsdType": "xsd:decimal",
+    "jsonType": "number"
+  },
+  {
+    "key": "none",
+    "display": "n.a.",
+    "description": "No unit unit used by this dictionary.",
+    "xsdType": "xsd:string",
+    "jsonType": "string"
+  },
+  {
+    "key": "percent",
+    "display": "%",
+    "description": "Percent unit used by this dictionary.",
+    "xsdType": "xsd:decimal",
+    "jsonType": "number"
+  },
+  {
+    "key": "score-1-5",
+    "display": "1-5",
+    "description": "Score from 1 to 5 unit used by this dictionary.",
+    "xsdType": "xsd:integer",
+    "jsonType": "integer"
+  }
+]

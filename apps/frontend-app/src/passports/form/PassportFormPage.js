@@ -1369,7 +1369,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
               <div className="pf-managed-hint">
                 {activeFacilities.length
                   ? "Enter a passport-specific facility identifier, or pick from the company’s active facility suggestions if helpful."
-                  : "Enter the facility identifier for this passport. Batch and item battery passports require a facility before release."}
+                  : "Enter the facility identifier for this passport. Passport-type compliance rules decide whether a facility is required before release."}
               </div>
             </div>
           </div>

@@ -1,0 +1,32 @@
+{
+  "semanticModelKey": "claros_appliance_dictionary_v1",
+  "name": "Claros Appliance Dictionary",
+  "version": "1.0.0",
+  "description": "Internal appliance passport dictionary used as a reference pattern for future modular Digital Product Passport categories.",
+  "versioning": {
+    "dictionaryVersion": "1.0.0",
+    "compatibilityPolicy": "IRIs under /dictionary/appliance/v1 remain stable for non-breaking revisions. Breaking semantic changes require a new version path and semantic model key."
+  },
+  "productCategoryScope": [
+    "Major Appliance",
+    "Small Appliance",
+    "HVAC",
+    "Consumer Electronics"
+  ],
+  "publisher": {
+    "name": "Claros DPP",
+    "url": "https://www.claros-dpp.online"
+  },
+  "issuerDid": "did:web:www.claros-dpp.online",
+  "baseIri": "https://www.claros-dpp.online/dictionary/appliance/v1",
+  "contextUrl": "https://www.claros-dpp.online/dictionary/appliance/v1/context.jsonld",
+  "termsUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/terms",
+  "unitsUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/units",
+  "categoriesUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/categories",
+  "categoryRulesUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/category-rules",
+  "fieldMapUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/field-map",
+  "catalogUrl": "https://www.claros-dpp.online/dictionary/appliance/v1/catalog.jsonld",
+  "interoperabilityProfile": {
+    "catalogUrl": "https://www.claros-dpp.online/dictionary/appliance/v1/catalog.jsonld"
+  }
+}

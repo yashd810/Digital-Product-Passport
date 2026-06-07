@@ -458,24 +458,24 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       for (const dppId of dppIds) {
         try {
           const contextRes = await pool.query(
-            `SELECT lineage_id, passport_type
+            `SELECT "lineageId", "passportType"
              FROM passport_archives
-             WHERE (dpp_id = $1 OR lineage_id = $1)
-               AND company_id = $2
+             WHERE ("dppId" = $1 OR "lineageId" = $1)
+               AND "companyId" = $2
                AND ${ARCHIVED_HISTORY_FILTER_SQL}
-             ORDER BY version_number DESC LIMIT 1`,
+             ORDER BY "versionNumber" DESC LIMIT 1`,
             [dppId, companyId]
           );
           if (!contextRes.rows.length) {
             skipped += 1;
             continue;
           }
-          const lineageId = contextRes.rows[0].lineage_id;
+          const lineageId = contextRes.rows[0].lineageId;
           const archiveRows = await pool.query(
             `SELECT *
              FROM passport_archives
-             WHERE lineage_id = $1
-               AND company_id = $2
+             WHERE "lineageId" = $1
+               AND "companyId" = $2
                AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
             [lineageId, companyId]
           );
@@ -483,13 +483,13 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             skipped += 1;
             continue;
           }
-          const passportType = archiveRows.rows[0].passport_type;
+          const passportType = archiveRows.rows[0].passportType;
           const tableName = getTable(passportType);
-          await pool.query(`UPDATE ${tableName} SET deleted_at = NULL WHERE lineage_id = $1 AND company_id = $2`, [lineageId, companyId]);
+          await pool.query(`UPDATE ${tableName} SET "deletedAt" = NULL WHERE "lineageId" = $1 AND "companyId" = $2`, [lineageId, companyId]);
           await pool.query(
             `DELETE FROM passport_archives
-             WHERE lineage_id = $1
-               AND company_id = $2
+             WHERE "lineageId" = $1
+               AND "companyId" = $2
                AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
             [lineageId, companyId]
           );

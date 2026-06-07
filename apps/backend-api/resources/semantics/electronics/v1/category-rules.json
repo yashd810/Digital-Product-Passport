@@ -1,0 +1,43 @@
+{
+  "sourceWorkbook": "Electronics working profile v1",
+  "sheetName": "Electronics working profile",
+  "categories": [
+    "Consumer Electronics",
+    "Industrial Electronics"
+  ],
+  "legend": {
+    "mandatory_battreg": "x",
+    "mandatory_espr_jtc24": "(x)",
+    "voluntary": "o",
+    "not_applicable": ""
+  },
+  "requirementsByFieldKey": {
+    "productModelIdentifier": {
+      "termNumber": 1,
+      "termLabel": "Product Model Identifier",
+      "sourceAttribute": "Product Model Identifier",
+      "requirements": {
+        "Consumer Electronics": "mandatory_espr_jtc24",
+        "Industrial Electronics": "mandatory_espr_jtc24"
+      }
+    },
+    "manufacturerName": {
+      "termNumber": 2,
+      "termLabel": "Manufacturer Name",
+      "sourceAttribute": "Manufacturer Name",
+      "requirements": {
+        "Consumer Electronics": "mandatory_espr_jtc24",
+        "Industrial Electronics": "mandatory_espr_jtc24"
+      }
+    },
+    "ratedPower": {
+      "termNumber": 3,
+      "termLabel": "Rated Power",
+      "sourceAttribute": "Rated Power",
+      "requirements": {
+        "Consumer Electronics": "voluntary",
+        "Industrial Electronics": "voluntary"
+      }
+    }
+  }
+}

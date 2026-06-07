@@ -21,7 +21,6 @@ Defined in `docker/docker-compose.yml`.
 | --- | --- | --- | --- |
 | `frontend-app` | `apps/frontend-app` | `npm run start -- --host 0.0.0.0 --port 3000` | 3000 |
 | `backend-api` | `apps/backend-api` | `node Server/server.js` | 3001 |
-| `asset-management` | `apps/asset-management` | Nginx static server | 3003 |
 | `public-passport-viewer` | `apps/public-passport-viewer` | `npm run start -- --host 0.0.0.0 --port 3004` | 3004 |
 | `marketing-site` | `apps/marketing-site` | Nginx static server | 8080 |
 | `postgres` | Docker image | PostgreSQL 18 Alpine | 5432 |
@@ -31,16 +30,15 @@ Defined in `docker/docker-compose.yml`.
 | Module | Main responsibility |
 | --- | --- |
 | `routes/auth.js` | Register, login, OTP, logout, SSO, password reset, invitations, user profile, team user management |
-| `routes/admin.js` | Super-admin analytics, companies, passport types, symbols, company access, admin invites |
+| `routes/admin.js` | Super-admin analytics, companies, registered passport modules, passport types, symbols, company access, admin invites |
 | `routes/company.js` | Company profile, facilities, templates, CSV/JSON imports |
 | `routes/passports.js` | Company passport CRUD, bulk operations, release/revise/archive, API keys, audit logs, access grants, QR/data-carrier checks, dynamic values, backup policies |
 | `routes/passport-public.js` | Public passport reads, canonical exports, signatures, DID documents, unlocks, context |
 | `routes/dpp-api.js` | Standards-oriented `/api/v1` DPP endpoints and DID resolver variants |
-| `routes/dictionary.js` | Battery dictionary context, manifest, categories, units, field maps, terms |
+| `routes/dictionary.js` | Generic semantic dictionary context, manifest, catalog, categories, units, field maps, category rules, terms, and term details |
 | `routes/workflow.js` | Review submission, workflow actions, backlog/history/dashboard views |
 | `routes/repository.js` | Company repository folders, files, symbols, copy/move/delete |
-| `routes/asset-management-api.js` | Asset-management bootstrap, passport source fetch, preview, push, jobs, runs |
-| `routes/asset-management-launch.js` | Asset-management launch/session entry |
+| `routes/asset-management-api.js` | Passport Data Management bootstrap, passport source fetch, preview, push, jobs, runs |
 | `routes/messaging.js` | Conversations and messages |
 | `routes/notifications.js` | User notifications |
 | `routes/health.js` | Health checks |
@@ -50,13 +48,16 @@ Defined in `docker/docker-compose.yml`.
 | Service | Purpose |
 | --- | --- |
 | `passport-service.js` | Passport persistence, normalization, versioning helpers |
+| `semantic-model-registry.js` | Loads registered semantic model resources from `resources/semantics` |
+| `semantic-passport-export.js` | Builds semantic/JSON-LD passport representations using the passport type's selected semantic model |
+| `compliance-service.js` | Applies module/profile-driven completeness and regulatory checks |
 | `dpp-identity-service.js` and `product-identifier-service.js` | Stable DPP/product identifier rules |
 | `did-service.js` | DID document generation and resolution support |
 | `signing-service.js` and `json-canonicalization.js` | Canonical payloads and signatures |
 | `passport-representation-service.js` | Public/export representations |
-| `battery-dictionary-service.js` | Battery dictionary data and term lookup |
+| `battery-dictionary-service.js` | Battery-specific compatibility adapter over semantic resource data |
 | `storage-service.js` | Local/object storage abstraction |
-| `asset-management.js` | Asset-management job/source behavior |
+| `asset-management.js` | Passport Data Management job/source behavior |
 | `access-rights-service.js` | Access grants and delegated roles |
 | `backup-provider-service.js` | Backup provider and handover workflows |
 | `security-service.js` and `password-service.js` | Password, OTP, key material, security checks |
@@ -98,7 +99,7 @@ frontend-app (3000)
   │  ├─ PostgreSQL (5432)
   │  └─ object-storage (9000)
   ├─ public-passport-viewer (shared components)
-  └─ dictionary data (from backend)
+  └─ semantic dictionary data (from backend)
 ```
 
 ### Backend API Dependencies
@@ -122,12 +123,12 @@ public-passport-viewer (3004)
   └─ frontend-app (3000) - shared viewer components
 ```
 
-### Asset Management Dependencies
+### Passport Data Management Dependencies
 
 ```
-asset-management (3003)
+frontend-app /passport-data
   ├─ backend-api (3001) - source data & job submission
-  └─ PostgreSQL (5432) - job state tracking
+  └─ PostgreSQL (5432) - job state tracking through backend-api
 ```
 
 ### Marketing Site
@@ -141,8 +142,8 @@ marketing-site (8080)
 
 ### Frontend to Backend
 
-- All `/api/*` and `/api/v1/*` requests use **Bearer token authentication** via `Authorization` header
-- Requests require valid JWT token from `routes/auth.js`
+- Dashboard `/api/*` requests normally use the browser session cookie. Bearer tokens are optional for scripts and tests.
+- Company API keys, device keys, and passport access keys are separate credentials for narrower use cases.
 - Rate limiting applied via `middleware/rate-limit.js`
 - CORS configured in `Server/server.js`
 
@@ -150,7 +151,7 @@ marketing-site (8080)
 
 - Direct PostgreSQL connections using connection pooling
 - Migrations handled in `db/init.js` on startup
-- Schema defined across 47 tables (see [passport-type-storage-model.md](../api/passport-type-storage-model.md))
+- Schema defined in `db/init.js`, with fixed platform tables plus generated `<type>_passports` runtime tables (see [Database Schema](../database/DATABASE_SCHEMA.md))
 
 ### Backend to Storage
 
@@ -163,7 +164,7 @@ marketing-site (8080)
 - **passport-service** called by routes for CRUD operations
 - **did-service** called by passport and public routes for identifier generation
 - **signing-service** called for canonical representations and signatures
-- **battery-dictionary-service** called by dictionary routes
+- **semantic-model-registry** and dictionary services called by dictionary routes
 - **access-rights-service** called by all routes for permission checks
 - **security-service** called for password hashing and OTP validation
 

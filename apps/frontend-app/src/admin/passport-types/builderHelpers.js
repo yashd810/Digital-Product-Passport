@@ -78,7 +78,7 @@ export const FIELD_TYPES = [
 ];
 
 export const DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION = {
-  key: "passport_header",
+  key: "passportHeader",
   label: "Passport Header",
 };
 
@@ -127,12 +127,72 @@ export function normalizeSystemPassportHeader(input = {}) {
 
 export const ICON_PRESETS = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🔋","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
 
+export function normalizeProductCategoryName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+export function buildProductCategoryOptions({
+  savedCategories = [],
+  passportTypes = [],
+  draftType = null,
+} = {}) {
+  const byName = new Map();
+  const addCategory = ({ name, icon = "📋", id = null, source = "derived", managed = false } = {}) => {
+    const normalizedName = normalizeProductCategoryName(name);
+    if (!normalizedName) return;
+    const existing = byName.get(normalizedName);
+    if (!existing) {
+      byName.set(normalizedName, {
+        id: id || normalizedName,
+        name: normalizedName,
+        icon: icon || "📋",
+        managed,
+        source,
+      });
+      return;
+    }
+    if (!existing.managed && managed) {
+      byName.set(normalizedName, {
+        ...existing,
+        id: id || existing.id,
+        icon: icon || existing.icon,
+        managed: true,
+        source,
+      });
+    }
+  };
+
+  for (const category of Array.isArray(savedCategories) ? savedCategories : []) {
+    addCategory({
+      id: category.id,
+      name: category.name,
+      icon: category.icon,
+      source: "catalog",
+      managed: true,
+    });
+  }
+
+  for (const type of Array.isArray(passportTypes) ? passportTypes : []) {
+    addCategory({
+      name: type.productCategory,
+      icon: type.productIcon,
+      source: "passport_type",
+    });
+  }
+
+  if (draftType) {
+    addCategory({
+      name: draftType.productCategory,
+      icon: draftType.productIcon,
+      source: "draft",
+    });
+  }
+
+  return [...byName.values()].sort((left, right) => left.name.localeCompare(right.name));
+}
+
 export const toSlug = (str) =>
-  str.trim().toLowerCase()
-    .replace(/[^a-z0-9\s]+/g, "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .join("_");
+  toFieldKey(str);
 
 export const toFieldKey = (str) => {
   const parts = String(str || "")

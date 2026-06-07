@@ -96,6 +96,13 @@ const CONSUMER_BASE = {
 };
 
 export const CONSUMER_PAGE_THEMES = {
+  passport: {
+    ...CONSUMER_BASE,
+    icon: "🪪",
+    headline: "Digital Product Passport",
+    tagline: "Verified product identity, compliance data, and lifecycle transparency.",
+    heroPattern: "passport",
+  },
   battery: {
     ...CONSUMER_BASE,
     icon: "⚡",
@@ -175,7 +182,8 @@ export function setStoredTheme(userId, themeKey) {
 }
 
 export const getConsumerTheme = (passportType, branding) => {
-  const base = CONSUMER_PAGE_THEMES[passportType] || CONSUMER_PAGE_THEMES.battery;
+  const themeKey = String(passportType || "passport").trim().toLowerCase();
+  const base = CONSUMER_PAGE_THEMES[themeKey] || CONSUMER_PAGE_THEMES.passport;
   const b = normalizeCompanyBranding(branding);
   return {
     ...base,

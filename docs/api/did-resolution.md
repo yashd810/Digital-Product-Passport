@@ -12,7 +12,7 @@ Primary endpoints:
 - `GET /.well-known/did.json`
 - `GET /did/company/:companySlug/did.json`
 - `GET /did/facility/:facilityStableId/did.json`
-- `GET /did/battery/batch/:stableId/did.json`
+- `GET /did/:passportType/:level/:stableId/did.json`
 - `GET /did/dpp/:granularity/:stableId/did.json`
 
 Example request:

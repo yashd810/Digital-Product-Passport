@@ -1,0 +1,10 @@
+{
+  "productModelIdentifier": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/product-model-identifier",
+  "applianceCategory": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/appliance-category",
+  "manufacturerName": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/manufacturer-name",
+  "energyRating": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/energy-rating",
+  "powerConsumption": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/power-consumption",
+  "repairabilityScore": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/repairability-score",
+  "sparePartsAvailability": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/spare-parts-availability",
+  "complianceDeclaration": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/compliance-declaration"
+}

@@ -264,7 +264,7 @@ function createPassportQueryRepository({
     const archiveRes = await pool.query(
       `SELECT pa."rowData",
               pa."versionNumber",
-              phv.is_public AS "isPublic"
+              phv."isPublic" AS "isPublic"
        FROM passport_archives pa
        LEFT JOIN passport_history_visibility phv
          ON phv."passportDppId" = pa."dppId"
@@ -292,7 +292,7 @@ function createPassportQueryRepository({
   async function resolveReleasedPassportByInternalAliasId(internalAliasId, {
     versionNumber = null,
     companyId = null,
-    passportType = "battery",
+    passportType = "passport",
     granularity = "item",
     strictProductId = false,
   } = {}) {
@@ -379,7 +379,7 @@ function createPassportQueryRepository({
         `SELECT pa."productIdentifierDid",
                 pa."versionNumber",
                 pa."rowData",
-                phv.is_public AS "isPublic"
+                phv."isPublic" AS "isPublic"
          FROM passport_archives pa
          LEFT JOIN passport_history_visibility phv
            ON phv."passportDppId" = pa."dppId"
@@ -450,7 +450,7 @@ function createPassportQueryRepository({
       if (liveRes.rows.length) {
         const passport = { ...normalizePassportRow(liveRes.rows[0]), passportType };
         const visibilityRes = await pool.query(
-          `SELECT is_public AS "isPublic"
+          `SELECT "isPublic"
            FROM passport_history_visibility
            WHERE "passportDppId" = $1 AND "versionNumber" = $2
            LIMIT 1`,
@@ -464,7 +464,7 @@ function createPassportQueryRepository({
 
       const archiveRes = await pool.query(
         `SELECT pa."rowData",
-                phv.is_public AS "isPublic"
+                phv."isPublic" AS "isPublic"
          FROM passport_archives pa
          LEFT JOIN passport_history_visibility phv
            ON phv."passportDppId" = pa."dppId"
@@ -486,7 +486,7 @@ function createPassportQueryRepository({
       }
       const passport = { ...normalizePassportRow(rowData), passportType, archived: true };
       const visibilityRes = await pool.query(
-        `SELECT is_public AS "isPublic"
+        `SELECT "isPublic"
          FROM passport_history_visibility
          WHERE "passportDppId" = $1 AND "versionNumber" = $2
          LIMIT 1`,

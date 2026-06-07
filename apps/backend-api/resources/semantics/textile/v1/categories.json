@@ -1,0 +1,90 @@
+[
+  {
+    "key": "product-identification",
+    "label": "Product Identification",
+    "description": "Core identifiers and commercial product description fields.",
+    "termCount": 1,
+    "terms": [
+      {
+        "number": 1,
+        "slug": "product-model-identifier",
+        "internalKey": "productModelIdentifier",
+        "label": "Product Model Identifier",
+        "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/product-model-identifier"
+      }
+    ]
+  },
+  {
+    "key": "material-composition",
+    "label": "Material Composition",
+    "description": "Fiber, recycled content, and material weight declarations.",
+    "termCount": 3,
+    "terms": [
+      {
+        "number": 2,
+        "slug": "fiber-composition",
+        "internalKey": "fiberComposition",
+        "label": "Fiber Composition",
+        "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/fiber-composition"
+      },
+      {
+        "number": 3,
+        "slug": "recycled-content-percentage",
+        "internalKey": "recycledContentPercentage",
+        "label": "Recycled Content Percentage",
+        "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/recycled-content-percentage"
+      },
+      {
+        "number": 4,
+        "slug": "fabric-weight",
+        "internalKey": "fabricWeight",
+        "label": "Fabric Weight",
+        "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/fabric-weight"
+      }
+    ]
+  },
+  {
+    "key": "manufacturing-and-care",
+    "label": "Manufacturing and Care",
+    "description": "Origin, processing, care, and durability information.",
+    "termCount": 3,
+    "terms": [
+      {
+        "number": 5,
+        "slug": "country-of-origin",
+        "internalKey": "countryOfOrigin",
+        "label": "Country of Origin",
+        "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/country-of-origin"
+      },
+      {
+        "number": 6,
+        "slug": "care-instructions",
+        "internalKey": "careInstructions",
+        "label": "Care Instructions",
+        "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/care-instructions"
+      },
+      {
+        "number": 7,
+        "slug": "durability-score",
+        "internalKey": "durabilityScore",
+        "label": "Durability Score",
+        "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/durability-score"
+      }
+    ]
+  },
+  {
+    "key": "restricted-substances",
+    "label": "Restricted Substances",
+    "description": "Chemical and restricted substance disclosures.",
+    "termCount": 1,
+    "terms": [
+      {
+        "number": 8,
+        "slug": "restricted-substances-disclosure",
+        "internalKey": "restrictedSubstancesDisclosure",
+        "label": "Restricted Substances Disclosure",
+        "iri": "https://www.claros-dpp.online/dictionary/textile/v1/terms/restricted-substances-disclosure"
+      }
+    ]
+  }
+]

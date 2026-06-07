@@ -1,3 +1,7 @@
+const {
+  createComplianceManagedFieldHelpers,
+} = require("./compliance-managed-fields");
+
 function createComplianceHelpers({
   pool,
   complianceService,
@@ -54,14 +58,14 @@ function createComplianceHelpers({
   async function getCompanyDppPolicy(companyId) {
     const result = await pool.query(
       `SELECT c.id,
-              COALESCE(p.default_granularity, 'item') AS default_granularity,
-              COALESCE(p.allow_granularity_override, false) AS allow_granularity_override,
-              COALESCE(p.mint_model_dids, true) AS mint_model_dids,
-              COALESCE(p.mint_item_dids, true) AS mint_item_dids,
-              COALESCE(p.mint_facility_dids, false) AS mint_facility_dids,
-              COALESCE(p.vc_issuance_enabled, true) AS vc_issuance_enabled,
-              COALESCE(p.jsonld_export_enabled, true) AS jsonld_export_enabled,
-              COALESCE(p.claros_battery_dictionary_enabled, true) AS claros_battery_dictionary_enabled
+              COALESCE(p.default_granularity, 'item') AS "defaultGranularity",
+              COALESCE(p.allow_granularity_override, false) AS "allowGranularityOverride",
+              COALESCE(p.mint_model_dids, true) AS "mintModelDids",
+              COALESCE(p.mint_item_dids, true) AS "mintItemDids",
+              COALESCE(p.mint_facility_dids, false) AS "mintFacilityDids",
+              COALESCE(p.vc_issuance_enabled, true) AS "vcIssuanceEnabled",
+              COALESCE(p.jsonld_export_enabled, true) AS "jsonldExportEnabled",
+              COALESCE(p.semantic_dictionary_enabled, true) AS "semanticDictionaryEnabled"
        FROM companies c
        LEFT JOIN company_dpp_policies p ON p.company_id = c.id
        WHERE c.id = $1
@@ -71,88 +75,13 @@ function createComplianceHelpers({
     return result.rows[0] || null;
   }
 
-  async function loadCompanyComplianceIdentity(companyId) {
-    const result = await pool.query(
-      `SELECT economic_operator_identifier, economic_operator_identifier_scheme
-       FROM companies
-       WHERE id = $1
-       LIMIT 1`,
-      [companyId]
-    );
-    return result.rows[0] || null;
-  }
-
-  async function resolveManagedFacilityId({ companyId, requestedFields = {} }) {
-    const candidateFacilityId = extractExplicitFacilityId(requestedFields);
-    if (!candidateFacilityId) {
-      const defaultFacilityRes = await pool.query(
-        `SELECT facility_identifier
-         FROM company_facilities
-         WHERE company_id = $1
-           AND is_active = true
-         ORDER BY updated_at DESC, id DESC`,
-        [companyId]
-      );
-      if (defaultFacilityRes.rows.length === 1) {
-        return defaultFacilityRes.rows[0].facility_identifier || null;
-      }
-      return null;
-    }
-    return candidateFacilityId;
-  }
-
-  function hasOwnValue(source, key) {
-    return Boolean(source) && Object.prototype.hasOwnProperty.call(source, key);
-  }
-
-  function hasExplicitFacilityOverride(source = {}) {
-    return (
-      hasOwnValue(source, "facilityId")
-      || hasOwnValue(source, "facilityIdentifier")
-      || hasOwnValue(source, "manufacturingFacilityId")
-      || hasOwnValue(source, "manufacturingFacilityIdentifier")
-      || hasOwnValue(source, "manufacturingFacility")
-    );
-  }
-
-  function serializeProfileDefaultValue(value) {
-    if (Array.isArray(value)) return JSON.stringify(value);
-    return value ?? null;
-  }
-
-  async function buildComplianceManagedFields({
-    companyId,
-    passportType,
-    granularity,
-    requestedFields = {},
-    facilitySource = requestedFields,
-    existingFields = null,
-  }) {
-    const profile = complianceService.resolveProfileMetadata({ passportType, granularity });
-    const companyIdentity = await loadCompanyComplianceIdentity(companyId);
-    let resolvedFacilityId = null;
-    if (hasExplicitFacilityOverride(facilitySource)) {
-      resolvedFacilityId = await resolveManagedFacilityId({ companyId, requestedFields: facilitySource });
-    } else {
-      resolvedFacilityId = extractExplicitFacilityId(existingFields);
-      if (!resolvedFacilityId) {
-        resolvedFacilityId = await resolveManagedFacilityId({ companyId, requestedFields: facilitySource });
-      }
-    }
-    return {
-      complianceProfileKey: profile.key,
-      contentSpecificationIds: serializeProfileDefaultValue(
-        requestedFields.contentSpecificationIds || profile.contentSpecificationIds
-      ),
-      carrierPolicyKey: requestedFields.carrierPolicyKey || profile.defaultCarrierPolicyKey || null,
-      economicOperatorId: requestedFields.economicOperatorId || companyIdentity?.economicOperatorIdentifier || null,
-      economicOperatorIdentifierScheme:
-        requestedFields.economicOperatorIdentifierScheme
-        || companyIdentity?.economicOperatorIdentifierScheme
-        || null,
-      facilityId: resolvedFacilityId,
-    };
-  }
+  const {
+    buildComplianceManagedFields,
+  } = createComplianceManagedFieldHelpers({
+    pool,
+    complianceService,
+    extractExplicitFacilityId,
+  });
 
   async function loadCompanySerializationContext(companyId) {
     const result = await pool.query(

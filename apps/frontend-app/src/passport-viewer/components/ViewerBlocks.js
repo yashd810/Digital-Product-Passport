@@ -358,8 +358,8 @@ export function PassportIntro({
   if (!passport) return null;
   const activityState = getPassportActivityState(passport);
   const manufacturingDate = passport.manufacturingDate || "—";
-  const uniqueBatteryIdentifier = passport.uniqueBatteryIdentifier || passport.uniqueProductIdentifier || "—";
-  const batteryMass = passport.batteryMass || "—";
+  const uniqueProductIdentifier = passport.uniqueProductIdentifier || passport.uniqueBatteryIdentifier || "—";
+  const productMass = passport.productMass || passport.mass || passport.batteryMass || "—";
   const serialNumber =
     passport.batterySerialNumber ||
     passport.productSerialNumber ||
@@ -377,15 +377,15 @@ export function PassportIntro({
         ? <img src={carbonFootprintRaw} alt="Carbon Footprint Label" className="pv-hero-stat-symbol" />
         : carbonFootprintRaw)
     : "—";
-  const batteryChemistry = passport.batteryChemistry || "—";
+  const productComposition = passport.productComposition || passport.materialComposition || passport.batteryChemistry || "—";
   const summaryStats = [
     { label: "Digital Passport ID", value: passport.dppId || "—" },
     { label: "Manufacturing Date", value: manufacturingDate },
-    { label: "Unique Battery Identifier", value: uniqueBatteryIdentifier },
+    { label: "Unique Product Identifier", value: uniqueProductIdentifier },
     { label: "Serial Number", value: serialNumber },
     { label: "Carbon Footprint Label and Performance Class", value: carbonFootprintLabelAndClass },
-    { label: "Battery Chemistry", value: batteryChemistry },
-    { label: "Battery Mass", value: batteryMass },
+    { label: "Product Composition", value: productComposition },
+    { label: "Product Mass", value: productMass },
     { label: "Manufacturer Information", value: manufacturerInfo },
   ];
 

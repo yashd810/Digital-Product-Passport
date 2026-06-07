@@ -1,12 +1,13 @@
 # Passport Representations
 
-Last updated: 2026-05-05  
+Last updated: 2026-06-03
 Status: Verified - content negotiation accurately documented
 
 Code/files:
 - `apps/backend-api/routes/passport-public.js`
 - `apps/backend-api/services/canonicalPassportSerializer.js`
-- `apps/backend-api/services/battery-pass-export.js`
+- `apps/backend-api/services/semantic-passport-export.js`
+- `apps/backend-api/services/semantic-model-registry.js`
 - `apps/backend-api/services/signing-service.js`
 
 Supported representations:
@@ -33,23 +34,23 @@ Content negotiation matrix:
 
 Example request:
 ```http
-GET /api/v1/dppsByProductId/BAT-2026-001?representation=full
+GET /api/v1/dppsByProductId/ITEM-2026-001?representation=full
 ```
 
 Example response:
 ```json
 {
   "digitalProductPassportId": "dpp_72b99c83-952c-4179-96f6-54a513d39dbc",
-  "uniqueProductIdentifier": "did:web:www.claros-dpp.online:did:battery:item:c5-bat-2026-001-abcdef123456",
-  "localProductId": "BAT-2026-001",
+    "uniqueProductIdentifier": "did:web:www.claros-dpp.online:did:appliance-passport-v1:item:item-2026-001-abcdef123456",
+  "localProductId": "ITEM-2026-001",
   "granularity": "Item",
   "elements": [
     {
-      "elementId": "batteryMass",
+      "elementId": "energyRating",
       "objectType": "SingleValuedDataElement",
-      "dictionaryReference": "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-mass",
-      "valueDataType": "Decimal",
-      "value": 450,
+      "dictionaryReference": "https://www.claros-dpp.online/dictionary/appliance/v3/terms/energy-rating",
+      "valueDataType": "String",
+      "value": "A",
       "elements": []
     }
   ]
@@ -59,7 +60,7 @@ Example response:
 Configuration requirements:
 - `SERVER_URL`
 - `APP_URL`
-- battery dictionary artifacts present for JSON-LD export
+- registered semantic model resources present for JSON-LD export when a passport type declares `semanticModelKey`
 
 Representation notes:
 - Canonical JSON preserves numeric, boolean, object, and array typing.
@@ -67,6 +68,7 @@ Representation notes:
 - `localProductId` is the company/business-scoped product serial previously exposed as `product_id`.
 - `representation=full` is the standards-facing query option for the prEN 18223-style `elements[]` export on `/api/v1/dppsByProductId/:productId`.
 - Public page responses now include `linked_data` pointers used to emit hidden JSON-LD metadata on the consumer page.
+- JSON-LD export uses the semantic model selected by the passport type. The exporter does not infer a dictionary from product category names.
 
 Patch semantics:
 - `PATCH /api/v1/dpps/:dppId` supports partial whole-passport updates.

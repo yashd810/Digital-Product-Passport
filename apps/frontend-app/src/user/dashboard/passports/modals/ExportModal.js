@@ -6,7 +6,7 @@ import {
   buildSchemaFieldAliasMap,
   extractFieldValuesFromElements,
 } from "../../../../shared/passports/schemaKeyUtils";
-import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
+import { buildPassportJsonLdExport } from "../../../../shared/utils/semanticPassportExport";
 
 const API = import.meta.env.VITE_API_URL || "";
 
@@ -135,10 +135,11 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
 
   const exportTypeToJsonLd = async (type, list) => {
     const data = await loadTypeSchema(type);
-    const semanticModelKey = data.semanticModelKey || allPassportTypes.find((item) => item.typeName === type)?.semanticModelKey || "";
-    const productCategory = data.productCategory || allPassportTypes.find((item) => item.typeName === type)?.productCategory || "";
+    const typeSummary = allPassportTypes.find((item) => item.typeName === type) || {};
+    const semanticModelKey = data.semanticModelKey || typeSummary.semanticModelKey || "";
+    const semanticModel = data.semanticModel || typeSummary.semanticModel || null;
     const output = await Promise.all(list.map((passport) => loadFullPassportPayload(type, passport)));
-    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, productCategory });
+    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, semanticModel });
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

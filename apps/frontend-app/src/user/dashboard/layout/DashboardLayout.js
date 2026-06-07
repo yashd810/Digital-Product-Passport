@@ -16,15 +16,19 @@ function formatPassportTypeLabel(passportType) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function buildSemanticModelDictionarySubpath(model) {
+  if (!model?.family || !model?.version) return null;
+  return `dictionary/${encodeURIComponent(model.family)}/${encodeURIComponent(model.version)}`;
+}
+
 function DashboardLayout({ user, companyId, onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { companySlug: routeCompanySlug } = useParams();
   const { t, lang, setLang } = useI18n();
   const [passportTypes, setPassportTypes] = useState([]);
+  const [semanticModels, setSemanticModels] = useState([]);
   const [currentTheme,  setCurrentTheme]  = useState(() => getStoredTheme(user?.id));
-  const [msgUnread, setMsgUnread] = useState(0);
-  const [openingAssetManagement, setOpeningAssetManagement] = useState(false);
 
   useEffect(() => {
     // Apply stored theme on mount
@@ -35,27 +39,23 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
   useEffect(() => {
     if (!companyId) { navigate("/login"); return; }
-    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`,
-      { headers: authHeaders() })
-      .then(r => r.json())
-      .then(data => {
-        // Ensure data is an array; handle API errors gracefully
-        setPassportTypes(Array.isArray(data) ? data : []);
+    Promise.all([
+      fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+        .then(r => r.json())
+        .catch(() => []),
+      fetchWithAuth(`${API}/api/companies/${companyId}/semantic-models`, { headers: authHeaders() })
+        .then(r => r.json())
+        .catch(() => []),
+    ])
+      .then(([passportTypeData, semanticModelData]) => {
+        setPassportTypes(Array.isArray(passportTypeData) ? passportTypeData : []);
+        setSemanticModels(Array.isArray(semanticModelData) ? semanticModelData : []);
       })
-      .catch(() => setPassportTypes([]));
+      .catch(() => {
+        setPassportTypes([]);
+        setSemanticModels([]);
+      });
   }, [companyId]);
-
-  useEffect(() => {
-    const fetchMsgUnread = () => {
-      fetchWithAuth(`${API}/api/messaging/unread`, { headers: authHeaders() })
-        .then(r => r.ok ? r.json() : { count: 0 })
-        .then(d => setMsgUnread(typeof d?.count === "number" ? d.count : 0))
-        .catch(() => setMsgUnread(0));
-    };
-    fetchMsgUnread();
-    const iv = setInterval(fetchMsgUnread, 15000);
-    return () => clearInterval(iv);
-  }, []);
 
   const handleLogout = async () => {
     await onLogout?.();
@@ -86,27 +86,6 @@ function DashboardLayout({ user, companyId, onLogout }) {
     { code: "de", label: "DE" },
   ];
   const roleLabel = (user?.role || "editor").replace(/_/g, " ");
-  const handleOpenAssetManagement = async () => {
-    if (!companyId || openingAssetManagement) return;
-    try {
-      setOpeningAssetManagement(true);
-      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/asset-management/launch`, {
-        method: "POST",
-        headers: authHeaders({ "Content-Type": "application/json" }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Failed to open Asset Management");
-      const assetUrl = data.assetUrl?.startsWith("http")
-        ? data.assetUrl
-        : `${API}${data.assetUrl}`;
-      window.open(assetUrl, "_blank", "noopener,noreferrer");
-    } catch (error) {
-      window.alert(error.message || "Failed to open Asset Management");
-    } finally {
-      setOpeningAssetManagement(false);
-    }
-  };
-
   // Group passport types by product category if available
   const groupedTypes = passportTypes.reduce((acc, pt) => {
     const productCategory = pt.productCategory || pt.displayName || formatPassportTypeLabel(pt.typeName);
@@ -179,18 +158,13 @@ function DashboardLayout({ user, companyId, onLogout }) {
                   + Create Passport
                 </NavLink>
               )}
-              {isEditor && user?.assetManagementEnabled && (
-                <button
-                  type="button"
-                  className="sidebar-link sidebar-asset-btn"
-                  onClick={handleOpenAssetManagement}
-                  disabled={openingAssetManagement}
-                >
-                  {openingAssetManagement ? "Opening Asset Platform..." : "↗ Asset Management"}
-                </button>
-              )}
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Start Here</p>
+              {user?.assetManagementEnabled && (
+                <NavLink to={dashboardPath("passport-data")} className={({isActive})=>`sidebar-link sidebar-data-btn${isActive?" active":""}`}>
+                  Passport Data Management
+                </NavLink>
+              )}
               <NavLink to={dashboardPath("overview")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
               </NavLink>
@@ -241,18 +215,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 ⚙️ {t("workflow")}
               </NavLink>
               <NavLink to={dashboardPath("notifications")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🔔 Notifications
-              </NavLink>
-              <NavLink to={dashboardPath("messages")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  💬 Messages
-                  {msgUnread > 0 && (
-                    <span style={{
-                      background: "var(--mint)", color: "#0b1826", fontSize: 10,
-                      fontWeight: 700, borderRadius: 10, padding: "1px 6px", minWidth: 16, textAlign: "center"
-                    }}>{msgUnread}</span>
-                  )}
-                </span>
+                🔔 Notifications & Messages
               </NavLink>
 
               <NavLink to={dashboardPath("archived")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
@@ -282,10 +245,18 @@ function DashboardLayout({ user, companyId, onLogout }) {
               <NavLink to={dashboardPath("manual")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📘 Manual
               </NavLink>
-              <NavLink to={dashboardPath("dictionary/battery/v1")}
-                className={() => `sidebar-link${isDashboardSectionActive("dictionary") ? " active" : ""}`}>
-                🔖 Battery Dictionary
-              </NavLink>
+              {semanticModels
+                .map((model) => ({ model, subpath: buildSemanticModelDictionarySubpath(model) }))
+                .filter(({ subpath }) => subpath)
+                .map(({ model, subpath }) => (
+                  <NavLink
+                    key={model.semanticModelKey || subpath}
+                    to={dashboardPath(subpath)}
+                    className={() => `sidebar-link${isDashboardSectionActive("dictionary") ? " active" : ""}`}
+                  >
+                    🔖 {model.name || model.semanticModelKey || "Dictionary"}
+                  </NavLink>
+                ))}
             </nav>
           </aside>
 

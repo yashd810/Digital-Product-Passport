@@ -31,7 +31,7 @@ export function TypeIdentityCard({
             type="text"
             value={displayName}
             onChange={e => { setDisplayName(e.target.value); setError(""); setInvalidFields([]); }}
-            placeholder="e.g. EV Battery Passport"
+            placeholder="e.g. Product Passport v1"
             className={`acpt-input${hasInvalid("displayName") ? " acpt-input-error" : ""}`}
             required
           />
@@ -40,33 +40,29 @@ export function TypeIdentityCard({
 
         <div className="acpt-field-group acpt-span2">
           <label>Product Category *</label>
-          {productCategoryOptions.length === 0 ? (
-            <div className="acpt-hint acpt-hint-error">
-              No product categories yet.{" "}
-              <a href="/admin/passport-types" className="acpt-hint-link">
-                Go back and add one first.
-              </a>
-            </div>
-          ) : (
-            <select
-              value={productCategory}
-              onChange={e => {
-                const selected = productCategoryOptions.find(o => o.name === e.target.value);
-                setProductCategory(e.target.value);
-                setError("");
-                setInvalidFields([]);
-                if (selected) setProductIcon(selected.icon);
-              }}
-              className={`acpt-input${hasInvalid("productCategory") ? " acpt-input-error" : ""}`}
-              required
-            >
-              <option value="">— Select a category —</option>
-              {productCategoryOptions.map(o => (
-                <option key={o.id} value={o.name}>{o.icon} {o.name}</option>
-              ))}
-            </select>
-          )}
-          <span className="acpt-hint">Group label for analytics and sidebar hierarchy. Manage categories in the Passport Types page.</span>
+          <input
+            type="text"
+            value={productCategory}
+            onChange={e => {
+              const selected = productCategoryOptions.find(o => o.name === e.target.value);
+              setProductCategory(e.target.value);
+              setError("");
+              setInvalidFields([]);
+              if (selected) setProductIcon(selected.icon);
+            }}
+            list="passport-product-category-options"
+            placeholder="e.g. Appliance"
+            className={`acpt-input${hasInvalid("productCategory") ? " acpt-input-error" : ""}`}
+            required
+          />
+          <datalist id="passport-product-category-options">
+            {productCategoryOptions.map(o => (
+              <option key={o.id || o.name} value={o.name}>{o.icon} {o.name}</option>
+            ))}
+          </datalist>
+          <span className="acpt-hint">
+            Type a new product category or choose an existing one. New categories are saved when the passport type is created.
+          </span>
         </div>
 
         <div className="acpt-field-group">
@@ -91,20 +87,20 @@ export function TypeIdentityCard({
         </div>
 
         <div className="acpt-field-group">
-          <label>Internal Type Name (slug) *</label>
+          <label>Internal Type Name *</label>
           <input
             type="text"
             value={typeName}
-            onChange={e => { if (!editMode) { setTypeName(e.target.value.toLowerCase()); setTypeNameManual(true); } }}
-            placeholder="e.g. ev_battery"
+            onChange={e => { if (!editMode) { setTypeName(e.target.value); setTypeNameManual(true); } }}
+            placeholder="e.g. productPassportV1"
             readOnly={editMode}
-            className={`acpt-input acpt-mono${editMode ? " acpt-input-locked" : ""}${(!editMode && (!/^[a-z][a-z0-9_]{1,29}$/.test(typeName) && typeName)) || hasInvalid("typeName") ? " acpt-input-error" : ""}`}
-            pattern={editMode ? undefined : "^[a-z][a-z0-9_]{1,29}$"}
+            className={`acpt-input acpt-mono${editMode ? " acpt-input-locked" : ""}${(!editMode && (!/^[a-z][A-Za-z0-9]{1,99}$/.test(typeName) && typeName)) || hasInvalid("typeName") ? " acpt-input-error" : ""}`}
+            pattern={editMode ? undefined : "^[a-z][A-Za-z0-9]{1,99}$"}
           />
           <span className="acpt-hint">
             {editMode
-              ? "Type name is locked — it maps to database tables and cannot change."
-              : "Used in database table names. Auto-generated from display name. Must be 2–30 chars: lowercase letters, numbers, underscores."}
+              ? "Type name is locked because it is a stable API identifier."
+              : "Stable API identifier. Use camelCase, 2-100 chars, starting with a lowercase letter. Database table names are derived safely in storage."}
           </span>
           {!editMode && (
             <div className="acpt-table-preview">

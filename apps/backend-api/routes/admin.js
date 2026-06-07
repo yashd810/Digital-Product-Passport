@@ -18,7 +18,7 @@ const COMPANY_POLICY_DEFAULTS = {
   mint_facility_dids: false,
   vc_issuance_enabled: true,
   jsonld_export_enabled: true,
-  claros_battery_dictionary_enabled: true
+  semantic_dictionary_enabled: true
 };
 
 const COMPANY_POLICY_BOOL_FIELDS = [
@@ -28,12 +28,12 @@ const COMPANY_POLICY_BOOL_FIELDS = [
 "mint_facility_dids",
 "vc_issuance_enabled",
 "jsonld_export_enabled",
-"claros_battery_dictionary_enabled"];
+"semantic_dictionary_enabled"];
 
 const COMPANY_TRUST_LEVELS = new Set(["BASIC", "VERIFIED_BUSINESS", "ENTERPRISE"]);
 
 const ARCHIVED_HISTORY_REASON_SQL = `('before_archive_delete','before_bulk_archive_delete','before_delete','before_bulk_delete')`;
-const ARCHIVED_HISTORY_FILTER_SQL = `(snapshot_reason IN ${ARCHIVED_HISTORY_REASON_SQL})`;
+const ARCHIVED_HISTORY_FILTER_SQL = `("snapshotReason" IN ${ARCHIVED_HISTORY_REASON_SQL})`;
 
 
 const RESERVED_PASSPORT_FIELD_KEYS = [
@@ -201,8 +201,8 @@ module.exports = function registerAdminRoutes(app, {
       if (!section.key || !section.label || !Array.isArray(section.fields)) {
         return "Each section must have key, label, and fields array";
       }
-      if (!/^[a-z][a-z0-9_]{0,199}$/.test(section.key)) {
-        return `Invalid section key: ${section.key}`;
+      if (!/^[a-z][A-Za-z0-9]{0,199}$/.test(section.key)) {
+        return `Invalid section key: ${section.key}. Section keys must be camelCase, start with a lowercase letter, and contain only letters and numbers.`;
       }
       for (const field of section.fields) {
         if (!field.key || !field.label || !field.type) {
@@ -333,7 +333,7 @@ module.exports = function registerAdminRoutes(app, {
          mint_facility_dids,
          vc_issuance_enabled,
          jsonld_export_enabled,
-         claros_battery_dictionary_enabled
+         semantic_dictionary_enabled
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (company_id) DO NOTHING`,
@@ -346,7 +346,7 @@ module.exports = function registerAdminRoutes(app, {
       COMPANY_POLICY_DEFAULTS.mint_facility_dids,
       COMPANY_POLICY_DEFAULTS.vc_issuance_enabled,
       COMPANY_POLICY_DEFAULTS.jsonld_export_enabled,
-      COMPANY_POLICY_DEFAULTS.claros_battery_dictionary_enabled]
+      COMPANY_POLICY_DEFAULTS.semantic_dictionary_enabled]
 
     );
   }

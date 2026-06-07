@@ -13,6 +13,7 @@ function updateDppUseCase(deps) {
     logAudit,
     findExistingPassportByInternalAliasId,
     productIdentifierService,
+    complianceService,
     SYSTEM_PASSPORT_FIELDS,
     getWritablePassportColumns,
     toStoredPassportValue,
@@ -32,6 +33,19 @@ function updateDppUseCase(deps) {
     MERGE_PATCH_CONTENT_TYPE,
     usesConfiguredGlobalProductIdentifierScheme,
   } = deps;
+
+  function resolveProfileOwnedPatchFields({ editable, granularity }) {
+    const passportType = editable.passport.passportType || editable.passport.passport_type || editable.typeDef?.typeName || editable.typeDef?.type_name;
+    const profile = complianceService.resolveProfileMetadata({
+      passportType,
+      typeDef: editable.typeDef,
+      granularity,
+    });
+    return {
+      complianceProfileKey: profile.key,
+      contentSpecificationIds: serializeProfileDefaultValue(profile.contentSpecificationIds),
+    };
+  }
 
   return async function updateDpp({ req, res }) {
     setDppMergePatchHeaders(res);
@@ -124,8 +138,12 @@ function updateDppUseCase(deps) {
       updateData.granularity = nextGranularity;
     }
     if (modelName !== undefined) updateData.modelName = modelName ?? null;
-    if (complianceProfileKey !== undefined) updateData.complianceProfileKey = complianceProfileKey || null;
-    if (contentSpecificationIds !== undefined) updateData.contentSpecificationIds = serializeProfileDefaultValue(contentSpecificationIds);
+    if (complianceProfileKey !== undefined || contentSpecificationIds !== undefined) {
+      Object.assign(updateData, resolveProfileOwnedPatchFields({
+        editable,
+        granularity: nextGranularity,
+      }));
+    }
     if (carrierPolicyKey !== undefined) updateData.carrierPolicyKey = carrierPolicyKey || null;
 
     const carrierAuthenticityMutation = extractCarrierAuthenticityMutation({

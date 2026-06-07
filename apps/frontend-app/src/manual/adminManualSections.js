@@ -27,7 +27,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
     : "";
   const firstCompanyAnalyticsRoute = firstCompanyAnalyticsSlug ? `/admin/analytics/${firstCompanyAnalyticsSlug}` : "";
   const firstCompanyProfileRoute = firstCompany ? `/admin/company/${firstCompany.id}/profile` : "";
-  const firstTypeFieldsRoute = firstType ? `/admin/passport-types/${encodeURIComponent(firstType.type_name)}/fields` : "";
+  const firstTypeFieldsRoute = firstType ? `/admin/passport-types/${encodeURIComponent(firstType.typeName || firstType.type_name)}/fields` : "";
 
   return [
     {
@@ -89,7 +89,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Company actions", value: "Access, DPP Policy, Asset Management, Branding, Invite, and Delete" },
         { label: "Creation outcome", value: "A new tenant record that can then receive passport-type access and user invites" },
-        { label: "DPP policy", value: "Default granularity, override permission, DID minting, VC issuance, JSON-LD export, and battery dictionary flags" },
+        { label: "DPP policy", value: "Default granularity, override permission, DID minting, VC issuance, JSON-LD export, and semantic dictionary access" },
         { label: "Delete protection", value: "Deletion requires confirmation and is designed as an intentional super-admin action" },
         { label: "Current example company", value: getCompanyLabel(firstCompany) || "First available company" },
       ],
@@ -138,12 +138,12 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Companies",
       audience: "Super admins configuring standards, DID, VC, and operator behavior",
       title: "Configure DPP policy, operator identity, granularity, and facility behavior",
-      summary: "The current platform has a standards-oriented identity layer. A company is not just a tenant name: it can have a DID slug, economic-operator identifier, operator identifier scheme, DPP granularity policy, DID minting switches, VC issuance control, JSON-LD export control, battery dictionary control, and managed facilities.",
+      summary: "The current platform has a standards-oriented identity layer. A company is not just a tenant name: it can have a DID slug, economic-operator identifier, operator identifier scheme, DPP granularity policy, DID minting switches, VC issuance control, JSON-LD export control, semantic dictionary access, and managed facilities.",
       facts: [
         { label: "Policy endpoint", value: "GET, PUT, PATCH /api/admin/companies/:id/dpp-policy" },
         { label: "Compliance identity endpoint", value: "GET/POST /api/companies/:companyId/compliance-identity" },
         { label: "Facility endpoint", value: "POST /api/companies/:companyId/facilities" },
-        { label: "DID surfaces", value: "/.well-known/did.json, /did/company/:slug/did.json, /did/battery/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json, and /resolve?did=..." },
+        { label: "DID surfaces", value: "/.well-known/did.json, /did/company/:slug/did.json, /did/:passportType/:level/:stableId/did.json, /did/dpp/:granularity/:stableId/did.json, /did/facility/:stableId/did.json, and /resolve?did=..." },
       ],
       journeys: [
         {
@@ -152,7 +152,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "Choose default granularity: item, batch, or model. This affects standards-oriented DPP creation and identifier generation.",
             "Enable granularity override only for companies that understand when a passport should intentionally move between model, batch, and item levels.",
             "Use the DID minting flags to control whether model, item, and facility DIDs should be issued for that tenant.",
-            "Keep VC issuance and JSON-LD export enabled for tenants that need verification, linked data, or Battery Pass interoperability.",
+            "Keep VC issuance and JSON-LD export enabled for tenants that need verification, linked data, or standards-oriented interoperability.",
           ],
         },
         {
@@ -245,10 +245,12 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Types",
       audience: "Super admins publishing the catalog",
       title: "Manage product categories and the published passport-type catalog",
-      summary: "Passport Types is the central catalog workspace. It starts with product categories, then groups every passport type under that visual structure so companies see a clean navigation tree once access is granted.",
+      summary: "Passport Types is the central catalog workspace. Product categories provide the visual grouping, while versioned code modules and admin-created custom types provide the actual passport definitions that companies can receive through access grants.",
       facts: [
         { label: "Category features", value: "Create category, choose icon, and delete when no longer needed" },
-        { label: "Type actions", value: "View fields, edit metadata, clone, activate/deactivate, and delete" },
+        { label: "Type actions", value: "Preview registered modules, view fields, edit metadata, clone, activate/deactivate, and delete" },
+        { label: "Production pattern", value: "Stable product lines should be added as versioned backend passport modules, then seeded into passport_types" },
+        { label: "Custom pattern", value: "The admin builder remains available for custom/internal types and controlled schema experiments" },
         { label: "Catalog grouping", value: "Types are displayed underneath productCategory product categories" },
         { label: "Live example type", value: getPassportTypeLabel(firstType) || "First available type" },
       ],
@@ -262,8 +264,18 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           ],
         },
         {
+          title: "Use modules for stable product categories",
+          items: [
+            "Add production product families as files under `apps/backend-api/src/passport-modules/`, for example appliance, textile, or a future medical-device module.",
+            "Keep each module versioned with a stable moduleKey, typeName, semanticModelKey, complianceProfile, sections, and fields.",
+            "Seed modules with `npm run seed:passport-types` or `npm run bootstrap:passport-modules` so the database catalog and runtime tables match the code definition.",
+            "Create a new module/version for breaking regulatory or semantic changes instead of mutating an old production type that already has passports.",
+          ],
+        },
+        {
           title: "Operate the type list",
           items: [
+            "Use the registered modules preview to confirm which backend module files exist and whether they have already been seeded.",
             "Use view fields to inspect the published field schema without opening the full builder.",
             "Use edit metadata when labels, icons, or high-level definition details need changing without a complete rebuild.",
             "Clone type when a new type should inherit most of an existing design but diverge safely afterward.",
@@ -284,7 +296,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         ),
       ],
       warnings: [
-        "Treat deletion as a last resort. Clone-plus-deactivate is usually safer when a design should evolve without losing the old structure.",
+        "Treat deletion as a last resort. For production product lines, module-version-plus-deactivate is usually safer when a design should evolve without losing the old structure.",
       ],
     },
     {
@@ -293,12 +305,13 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Types",
       audience: "Super admins designing schemas",
       title: "Design passport types with the builder and field modeler",
-      summary: "The passport-type builder is where the product's authoring experience is defined. Every section, field type, translation, access level, table column, semantic model, Battery Dictionary mapping, and dynamic-data flag shown to company users comes from decisions made here.",
+      summary: "The passport-type builder is where custom type schemas and schema experiments are designed. For production product categories, the same concepts should usually be captured in versioned backend passport modules so schema, semantic model, and compliance behavior can be reviewed and shipped as code.",
       facts: [
-        { label: "Builder outputs", value: "Sections, fields, translations, field access, composition flags, Battery Pass mapping, and dynamic settings" },
+        { label: "Builder outputs", value: "Sections, fields, translations, field access, composition flags, semantic mapping, and dynamic settings" },
+        { label: "Module outputs", value: "moduleKey, typeName, display metadata, semanticModelKey, complianceProfile, sections, and fields" },
         { label: "Input helpers", value: "Draft save/resume, clone workflows, and CSV import for builder definitions" },
         { label: "Field-level access", value: "Public, Notified Bodies, Market Surveillance, EU Commission, and Legitimate Interest" },
-        { label: "Special field flags", value: "Composition, semantic IDs, Battery Dictionary mapping, dynamic field behavior, and field table configuration" },
+        { label: "Special field flags", value: "Composition, semantic IDs, dictionary mapping, dynamic field behavior, and field table configuration" },
       ],
       journeys: [
         {
@@ -315,8 +328,8 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "Use text and textarea for normal authored content, boolean for toggles, date and URL for typed values, table for multi-column structured rows, file for repository-backed PDFs, and symbol for image-based selections.",
             "Use the dynamic flag for values that will update later from devices or manual overrides.",
             "Use composition when a field should contribute to composition visuals in the public viewer.",
-            "For battery passport types, the semantic model is locked to `claros_battery_dictionary_v1` and fields should be mapped to the correct Claros Battery Dictionary term.",
-            "For non-battery types, semantic mapping remains optional and should be used when exports or partner integrations need stable linked-data identifiers.",
+            "Choose the semantic model that belongs to the passport type, then map fields to the correct dictionary terms.",
+            "Use semantic mapping whenever exports or partner integrations need stable linked-data identifiers.",
           ],
         },
         {
@@ -333,6 +346,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "Save drafts while the schema is still in progress so you are not forced to publish incomplete work.",
             "Clone an existing type when you want a safe starting point with similar field structure.",
             "Use CSV import into the builder if the first draft already exists in spreadsheet form or was prepared offline.",
+            "Once a custom design is ready to become a reusable product category, promote it into a backend passport module and seed that module so future changes are controlled through code review.",
           ],
         },
       ],
@@ -350,42 +364,44 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       ],
       tips: [
         "If you are unsure about a new design, clone the closest existing type first and iterate from a familiar structure rather than building cold.",
+        "For regulated production categories, prefer a new module version over heavy in-place edits. It keeps old passports readable while letting new passports use the new semantics.",
       ],
     },
     {
-      id: "admin-battery-dictionary",
+      id: "admin-semantic-dictionary",
       icon: "🔖",
       category: "Types",
-      audience: "Super admins designing battery passport schemas and semantic exports",
-      title: "Use the Battery Dictionary when designing battery passport types",
-      summary: "The admin shell includes the same Battery Dictionary browser as the user dashboard, but the admin use case is schema design. It helps you choose the right semantic model, inspect canonical term IRIs, verify units and access-right expectations, and avoid stale field mappings before companies start authoring passports.",
+      audience: "Super admins designing passport schemas and semantic exports",
+      title: "Use semantic dictionaries when designing passport types",
+      summary: "The admin shell includes the same dictionary browser as the user dashboard, but the admin use case is schema and module design. It helps you choose the right semantic model, inspect canonical term IRIs, verify units and access-right expectations, and avoid stale field mappings before companies start authoring passports.",
       facts: [
-        { label: "Admin route", value: "/admin/dictionary/battery/v1" },
-        { label: "Semantic model", value: "Battery product categories are locked to claros_battery_dictionary_v1" },
+        { label: "Admin route", value: "/admin/dictionary/:family/:version" },
+        { label: "Semantic model", value: "Each passport type selects the dictionary model it needs" },
         { label: "Dictionary APIs", value: "Manifest, context, categories, units, field-map, category-rules, terms, and term details" },
-        { label: "Public availability", value: "The dictionary is also available at /dictionary/battery/v1 without dashboard login" },
+        { label: "Public availability", value: "Registered dictionaries are also available at /dictionary/:family/:version without dashboard login" },
       ],
       journeys: [
         {
           title: "Validate schema mappings before publishing",
           items: [
-            "Open the Battery Dictionary while designing or editing a battery passport type.",
+            "Open the matching semantic dictionary while designing a backend module or editing a custom passport type.",
             "Search by term label, definition, slug, app field key, or semantic identifier.",
             "Confirm the expected data type, unit, access rights, static/dynamic behavior, element ID, and regulation references.",
             "Map builder fields to dictionary terms intentionally so JSON-LD export uses the correct canonical identifiers.",
+            "Remember that company dashboard visibility is derived from company access to passport types that use the semantic model. A company with two granted types using two models can see both dictionaries; unrelated dictionaries stay hidden.",
           ],
         },
         {
           title: "Use dictionary governance endpoints correctly",
           items: [
-            "Use the manifest and category-rules endpoints to understand which dictionary pieces apply to battery categories.",
+            "Use the manifest and category-rules endpoints to understand which dictionary pieces apply to the selected product category.",
             "Use the field-map endpoint when checking how app field keys connect to dictionary terms.",
-            "Use the JSON-LD context URL when explaining exported Battery Pass payloads to technical partners.",
+            "Use the JSON-LD context URL when explaining exported semantic passport payloads to technical partners.",
           ],
         },
       ],
       links: [
-        { label: "Open Admin Dictionary", route: "/admin/dictionary/battery/v1", description: "Inspect terms, units, IRIs, and category rules." },
+        { label: "Open dictionary browser", route: "/admin/dictionary", description: "Inspect the dictionary models exposed by active passport type access and semantic resources." },
         { label: "Open Type Builder", route: "/admin/passport-types/new", description: "Apply dictionary mappings while designing a type." },
       ],
       table: DICTIONARY_API_TABLE,

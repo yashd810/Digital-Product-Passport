@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
-import { buildPassportJsonLdExport } from "../../../shared/utils/batterySemanticExport";
+import { buildPassportJsonLdExport } from "../../../shared/utils/semanticPassportExport";
 import { formatPassportStatus, isPublishedPassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode";
@@ -189,7 +189,7 @@ function ArchivedPassports({ user, companyId }) {
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
         const semanticModelKey = typeData.semanticModelKey || "";
-        const productCategory = typeData.productCategory || "";
+        const semanticModel = typeData.semanticModel || null;
 
         const exported = [];
         for (const passport of passportsForType) {
@@ -210,7 +210,7 @@ function ArchivedPassports({ user, companyId }) {
 
         if (!exported.length) continue;
 
-        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, productCategory });
+        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, semanticModel });
         const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);

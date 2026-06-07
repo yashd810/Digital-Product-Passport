@@ -137,7 +137,7 @@ Strategic plan for migrating the frontend from React to Vue, including current s
 3. Test keyboard navigation through all forms
 4. Use screen reader to test dashboard flows
 5. Check color contrast with CI reports
-6. Run `npm run test:a11y` and `npm run test:contrast` locally
+6. Run `npm run test` and `npm run test:contrast` locally
 
 **Related:** [DEVELOPMENT.md](../development/DEVELOPMENT.md#testing)
 

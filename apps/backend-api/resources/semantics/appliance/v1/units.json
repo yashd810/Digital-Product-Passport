@@ -1,0 +1,23 @@
+[
+  {
+    "key": "kwh_per_year",
+    "display": "kWh/year",
+    "description": "Kilowatt hour per year unit used by this dictionary.",
+    "xsdType": "xsd:decimal",
+    "jsonType": "number"
+  },
+  {
+    "key": "none",
+    "display": "n.a.",
+    "description": "No unit applicable; the attribute is dimensionless or textual.",
+    "xsdType": "xsd:string",
+    "jsonType": "string"
+  },
+  {
+    "key": "score",
+    "display": "score",
+    "description": "Score unit used by this dictionary.",
+    "xsdType": "xsd:decimal",
+    "jsonType": "number"
+  }
+]

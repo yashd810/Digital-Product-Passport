@@ -49,7 +49,6 @@ services:
       DB_PORT: 5432
       SERVER_URL: "${SERVER_URL:-http://localhost:3001}"
       APP_URL: "${APP_URL:-http://localhost:3000}"
-      ASSET_MANAGEMENT_URL: "${ASSET_MANAGEMENT_URL:-http://localhost:3003}"
       LOCAL_STORAGE_DIR: /data
       FILES_DIR: /data/passport-files
       REPO_DIR: /data/repository-files
@@ -63,18 +62,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-
-  asset-management:
-    image: nginx:1.27-alpine
-    ports:
-      - "${ASSET_MANAGEMENT_PORT:-3003}:8080"
-    environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://backend-api:3001}"
-    volumes:
-      - ../apps/asset-management:/usr/share/nginx/html:ro
-      - ../infra/docker/asset-management/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
-    depends_on:
-      - backend-api
 
   marketing-site:
     image: nginx:1.27-alpine

@@ -62,6 +62,14 @@ function AdminLayout({ user, onLogout }) {
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           📋 Passport Types
         </NavLink>
+        <NavLink to="/admin/passport-modules"
+          className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
+          🧩 Passport Modules
+        </NavLink>
+        <NavLink to="/admin/dictionary"
+          className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
+          🔖 Dictionaries
+        </NavLink>
         <NavLink to="/admin/admin-management"
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           👑 Admin Management
@@ -73,10 +81,6 @@ function AdminLayout({ user, onLogout }) {
         <NavLink to="/admin/manual"
           className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
           📘 Manual
-        </NavLink>
-        <NavLink to="/admin/dictionary/battery/v1"
-          className={({ isActive }) => `tab${isActive ? " active" : ""}`}>
-          🔖 Battery Dictionary
         </NavLink>
       </nav>
 

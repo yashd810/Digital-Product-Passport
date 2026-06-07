@@ -10,7 +10,6 @@ This repository is organized as a multi-app DPP platform. The goal is for code f
   - [Frontend App](#appsfrontend-app)
   - [Public Passport Viewer](#appspublic-passport-viewer)
   - [Marketing Site](#appsmarketing-site)
-  - [Asset Management](#appsasset-management)
 - [Documentation Layout](#documentation-layout)
 - [Runtime Containers](#runtime-containers)
 - [Where To Make Changes](#where-to-make-changes)
@@ -21,16 +20,14 @@ This repository is organized as a multi-app DPP platform. The goal is for code f
 ```text
 .
 ├── apps/                         # Runnable applications
-│   ├── backend-api/              # Express API, route modules, services, database bootstrap
-│   ├── frontend-app/             # React/Vite authenticated dashboard
+│   ├── backend-api/              # Express API, passport modules, semantic resources, services, database bootstrap
+│   ├── frontend-app/             # React/Vite authenticated dashboard, including Passport Data Management
 │   ├── public-passport-viewer/   # React/Vite public viewer shell
-│   ├── marketing-site/           # Static marketing/legal site
-│   └── asset-management/         # Static asset-management UI
-├── config/                       # Shared environment templates/config files
+│   └── marketing-site/           # Static marketing/legal site
 ├── data/                         # Source datasets and input files
 ├── docker/                       # Docker Compose definitions
 ├── docs/                         # Centralized Markdown documentation
-├── infra/                        # Caddy, Nginx, OCI, semantic resources, templates
+├── infra/                        # Caddy, Nginx, OCI, templates
 ├── scripts/                      # Automation and maintenance scripts
 ├── storage/                      # Local development file storage
 └── README.md                     # Repository entry point
@@ -46,12 +43,14 @@ Express API and backend business logic.
 apps/backend-api/
 ├── Server/server.js              # App bootstrap, middleware, route registration
 ├── db/init.js                    # Idempotent PostgreSQL schema setup/migrations
-├── helpers/                      # Passport normalization and request helpers
+├── resources/semantics/          # Versioned semantic dictionaries and JSON-LD resources
+├── src/passport-modules/         # Versioned code-defined passport type modules
+├── src/shared/                   # Shared backend helpers, including passport helpers
+├── src/infrastructure/           # Infrastructure helpers such as identifier quoting
 ├── middleware/                   # Auth and rate limit middleware
 ├── routes/                       # Feature route modules
 ├── services/                     # Business logic and infrastructure services
-├── shared/                       # Shared backend resources
-├── tests/                        # Jest/Supertest tests
+├── tests/                        # Node test-runner suites
 ├── scripts/                      # Backend-specific maintenance scripts
 ├── Dockerfile
 └── package.json
@@ -91,10 +90,6 @@ Standalone React/Vite viewer shell for public passport routes. It aliases shared
 
 Static HTML/CSS/JS website with legal pages and public product/service pages. It is served through Nginx in Docker.
 
-### `apps/asset-management`
-
-Static UI for asset-management operations. Backend actions are exposed by `apps/backend-api/routes/asset-management-api.js`.
-
 ## Documentation Layout
 
 The current documentation index is [docs/README.md](../README.md). New developer-facing docs should go into a topic folder:
@@ -115,7 +110,6 @@ The local stack is defined in `docker/docker-compose.yml`:
 | --- | --- | --- |
 | `frontend-app` | `apps/frontend-app` | 3000 |
 | `backend-api` | `apps/backend-api` | 3001 |
-| `asset-management` | `apps/asset-management` | 3003 |
 | `public-passport-viewer` | `apps/public-passport-viewer` | 3004 |
 | `marketing-site` | `apps/marketing-site` | 8080 |
 | `postgres` | Docker image | 5432 |
@@ -125,7 +119,8 @@ The local stack is defined in `docker/docker-compose.yml`:
 | Change | Start here |
 | --- | --- |
 | New API endpoint | `apps/backend-api/routes/`, then service code in `apps/backend-api/services/` |
-| New passport field behavior | `apps/backend-api/helpers/passport-helpers.js`, `apps/frontend-app/src/passports/`, admin passport type builder |
+| New stable product category/passport type | `apps/backend-api/src/passport-modules/`, `apps/backend-api/resources/semantics/`, then `npm run seed:passport-types` |
+| New passport field behavior | `apps/backend-api/src/shared/passports/passport-helpers.js`, the relevant passport module, `apps/frontend-app/src/passports/`, admin passport type builder |
 | Dashboard page | `apps/frontend-app/src/user/` or `apps/frontend-app/src/admin/` |
 | Public passport rendering | `apps/frontend-app/src/passport-viewer/` |
 | Auth/session behavior | `apps/backend-api/routes/auth.js`, `apps/backend-api/middleware/auth.js`, `apps/frontend-app/src/app/hooks/useSessionAuth.js` |

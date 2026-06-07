@@ -105,15 +105,16 @@ module.exports = function createPassportRepresentationService({
     if (businessIdentifier) {
       productDid = productIdentifierService?.buildCanonicalProductDid?.({
         companyId: passport.companyId,
-        passportType: passport.passportType || typeDef?.typeName || "battery",
+        passportType: passport.passportType || typeDef?.typeName || "passport",
         rawProductId: businessIdentifier,
         granularity: resolvedGranularity,
       }) || null;
     }
 
-    if (dppIdentity && passport.internalAliasId) {
+    const stableDppId = passport.lineageId || passport.dppId || passport.internalAliasId;
+    if (dppIdentity && stableDppId) {
       try {
-        dppDidValue = dppIdentity.dppDid(resolvedGranularity, passport.companyId, passport.internalAliasId);
+        dppDidValue = dppIdentity.dppDid(resolvedGranularity, stableDppId);
         publicUrl   = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       } catch {
         // internalAliasId may be malformed; leave DIDs null

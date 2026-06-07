@@ -1,6 +1,6 @@
 # Company Extended Endpoints
 
-Comprehensive documentation for company management endpoints including compliance identity, facilities, import/export operations, and asset management launch.
+Comprehensive documentation for company management endpoints including compliance identity, facilities, and import/export operations.
 
 ## Table of Contents
 
@@ -8,7 +8,6 @@ Comprehensive documentation for company management endpoints including complianc
 - [Facility Management](#facility-management)
 - [Template Export](#template-export)
 - [Bulk Import Operations](#bulk-import-operations)
-- [Asset Management Launch](#asset-management-launch)
 
 ---
 
@@ -490,70 +489,6 @@ Content-Type: application/json
 | 403 | Forbidden | Insufficient permissions or no company access |
 | 404 | Not Found | Passport type not found |
 | 500 | Internal Error | Import processing failed |
-
----
-
-## Asset Management Launch
-
-Initialize Asset Management platform for bulk operations and ERP integration.
-
-### POST /api/companies/:companyId/asset-management/launch
-
-Generate launch token and URL for Asset Management platform session.
-
-**Authentication**: Required (Bearer token)  
-**Authorization**: Company editor role required  
-**Rate Limit**: Standard
-
-**Request**
-
-```http
-POST /api/companies/123/asset-management/launch
-Authorization: Bearer <token>
-```
-
-**Response** (200 OK)
-
-```json
-{
-  "launchToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "company": {
-    "id": "123",
-    "company_name": "Acme Corporation"
-  },
-  "assetUrl": "https://asset-management.example.com/asset-management#launchToken=eyJ...&assetKey=SHARED_SECRET"
-}
-```
-
-**Response Fields**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `launchToken` | string | Temporary JWT token for Asset Management session |
-| `company.id` | string | Company ID |
-| `company.company_name` | string | Company display name |
-| `assetUrl` | string | Complete URL with launch parameters for Asset Management platform |
-
-**Error Responses**
-
-| Code | Error | Description |
-|------|-------|-------------|
-| 401 | Unauthorized | Missing or invalid authentication token |
-| 403 | Forbidden | Insufficient permissions or no company access |
-| 404 | Not Found | Company not found or asset management not enabled |
-| 500 | Internal Error | Failed to generate launch token |
-
-**Security**:
-- Launch token has limited lifetime
-- Asset Management URL includes optional shared secret
-- Token tied to specific company and user
-- Session restricted to authenticated user's company
-
-**Features**:
-- One-click access to Asset Management platform
-- No need for separate credentials
-- Automatic company context propagation
-- Session management integrated with main system
 
 ---
 

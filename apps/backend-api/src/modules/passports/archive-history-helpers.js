@@ -158,7 +158,7 @@ function createArchiveHistoryHelpers({
     const versionDppIds = versions.map((row) => row.dppId).filter(Boolean);
     const visibilityRes = versionDppIds.length
       ? await pool.query(
-          `SELECT "passportDppId", "versionNumber", is_public AS "isPublic"
+          `SELECT "passportDppId", "versionNumber", "isPublic"
            FROM passport_history_visibility
            WHERE "passportDppId" = ANY($1::text[])`,
           [versionDppIds]

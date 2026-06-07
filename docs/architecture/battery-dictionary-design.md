@@ -1,17 +1,18 @@
 # Battery Dictionary Design
 
-Last updated: 2026-05-05
+Last updated: 2026-06-04
 
 Code/files:
 - `scripts/generate-battery-dictionary.js`
 - `apps/backend-api/services/battery-dictionary-service.js`
+- `apps/backend-api/services/semantic-model-registry.js`
 - `apps/backend-api/routes/dictionary.js`
 - `apps/backend-api/resources/semantics/battery/v1/`
 
 Design summary:
 - The battery dictionary is generated into stable JSON artifacts: `manifest.json`, `terms.json`, `categories.json`, `units.json`, `field-map.json`, `category-rules.json`, `context.jsonld`, and `catalog.jsonld`.
-- Backend routes serve those artifacts directly.
-- Frontend battery browsing reads the generated term list from `battery-dictionary-terms.generated.json`.
+- Backend routes serve those artifacts through the generic `/dictionary/:family/:version/*` and `/api/dictionary/:family/:version/*` dictionary surface.
+- Frontend dictionary browsing resolves available semantic models from company passport-type access and then reads terms through the generic dictionary APIs.
 - The manifest is the canonical place for governance, source authority, versioning, and regulatory traceability metadata for the Claros battery semantic model.
 - `catalog.jsonld` publishes a DCAT/DCAT-AP-compatible catalog view of the dictionary with `dcat:Catalog`, `dcat:Dataset`, `dcat:Distribution`, and `dcat:DataService` metadata.
 - `context.jsonld` uses a protected JSON-LD 1.1 context with `id`/`type` aliases and battery-passport class mappings, following the same convention as the DBP v0.2 reference vocabulary.
@@ -48,4 +49,5 @@ Configuration requirements:
 - To regenerate, run `node scripts/generate-battery-dictionary.js`.
 
 Migration notes:
-- `company_dpp_policies.claros_battery_dictionary_enabled` is now available for per-company rollout control.
+- `company_dpp_policies.semantic_dictionary_enabled` controls company-level dictionary access. The dashboard then narrows visible dictionaries to semantic models used by passport types granted to that company.
+- Battery v1 is one semantic model resource; future product categories should add their own `resources/semantics/<family>/<version>/` folder and link it from a versioned passport module.

@@ -11,9 +11,6 @@ function initEnvironment(serverDir) {
 
 function deriveRuntimePaths(serverDir) {
   const appRootDir = path.resolve(serverDir, "../../..");
-  const assetManagementDir = path.resolve(
-    process.env.ASSET_MANAGEMENT_DIR || path.join(appRootDir, "apps", "asset-management")
-  );
   const localStorageDir = path.resolve(
     process.env.LOCAL_STORAGE_DIR || path.join(appRootDir, "storage", "local-storage")
   );
@@ -30,7 +27,6 @@ function deriveRuntimePaths(serverDir) {
 
   return {
     appRootDir,
-    assetManagementDir,
     localStorageDir,
     filesBaseDir,
     repoBaseDir,
@@ -125,7 +121,6 @@ function deriveRuntimeFlags(port) {
 
   const defaultAllowedOrigins = isProduction ? [] : [
     "http://localhost:3000", "http://127.0.0.1:3000",
-    "http://localhost:3003", "http://127.0.0.1:3003",
     "http://localhost:3004", "http://127.0.0.1:3004",
     "http://localhost:8000", "http://127.0.0.1:8000",
     "http://localhost:8001", "http://127.0.0.1:8001",

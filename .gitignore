@@ -35,3 +35,6 @@ npm-debug.log*
 .vscode/
 .idea/
 .claude/
+
+# Local-only passport module generator
+local-tools/passport-module-generator/

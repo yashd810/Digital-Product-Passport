@@ -1,0 +1,106 @@
+{
+  "sourceWorkbook": "Internal appliance working profile v1.0",
+  "sheetName": "Appliance working profile",
+  "categories": [
+    "Major Appliance",
+    "Small Appliance",
+    "HVAC",
+    "Consumer Electronics"
+  ],
+  "legend": {
+    "mandatory_battreg": "x",
+    "mandatory_espr_jtc24": "(x)",
+    "voluntary": "o",
+    "not_applicable": ""
+  },
+  "requirementsByFieldKey": {
+    "productModelIdentifier": {
+      "termNumber": 1,
+      "termLabel": "Product Model Identifier",
+      "sourceAttribute": "Product Model Identifier",
+      "requirements": {
+        "Major Appliance": "mandatory_espr_jtc24",
+        "Small Appliance": "mandatory_espr_jtc24",
+        "HVAC": "mandatory_espr_jtc24",
+        "Consumer Electronics": "mandatory_espr_jtc24"
+      }
+    },
+    "applianceCategory": {
+      "termNumber": 2,
+      "termLabel": "Appliance Category",
+      "sourceAttribute": "Appliance Category",
+      "requirements": {
+        "Major Appliance": "mandatory_espr_jtc24",
+        "Small Appliance": "mandatory_espr_jtc24",
+        "HVAC": "mandatory_espr_jtc24",
+        "Consumer Electronics": "mandatory_espr_jtc24"
+      }
+    },
+    "manufacturerName": {
+      "termNumber": 3,
+      "termLabel": "Manufacturer Name",
+      "sourceAttribute": "Manufacturer Name",
+      "requirements": {
+        "Major Appliance": "mandatory_espr_jtc24",
+        "Small Appliance": "mandatory_espr_jtc24",
+        "HVAC": "mandatory_espr_jtc24",
+        "Consumer Electronics": "mandatory_espr_jtc24"
+      }
+    },
+    "energyRating": {
+      "termNumber": 4,
+      "termLabel": "Energy Rating",
+      "sourceAttribute": "Energy Rating",
+      "requirements": {
+        "Major Appliance": "mandatory_espr_jtc24",
+        "Small Appliance": "voluntary",
+        "HVAC": "mandatory_espr_jtc24",
+        "Consumer Electronics": "voluntary"
+      }
+    },
+    "powerConsumption": {
+      "termNumber": 5,
+      "termLabel": "Power Consumption",
+      "sourceAttribute": "Power Consumption",
+      "requirements": {
+        "Major Appliance": "mandatory_espr_jtc24",
+        "Small Appliance": "voluntary",
+        "HVAC": "mandatory_espr_jtc24",
+        "Consumer Electronics": "voluntary"
+      }
+    },
+    "repairabilityScore": {
+      "termNumber": 6,
+      "termLabel": "Repairability Score",
+      "sourceAttribute": "Repairability Score",
+      "requirements": {
+        "Major Appliance": "mandatory_espr_jtc24",
+        "Small Appliance": "voluntary",
+        "HVAC": "voluntary",
+        "Consumer Electronics": "voluntary"
+      }
+    },
+    "sparePartsAvailability": {
+      "termNumber": 7,
+      "termLabel": "Spare Parts Availability",
+      "sourceAttribute": "Spare Parts Availability",
+      "requirements": {
+        "Major Appliance": "mandatory_espr_jtc24",
+        "Small Appliance": "mandatory_espr_jtc24",
+        "HVAC": "mandatory_espr_jtc24",
+        "Consumer Electronics": "mandatory_espr_jtc24"
+      }
+    },
+    "complianceDeclaration": {
+      "termNumber": 8,
+      "termLabel": "Compliance Declaration",
+      "sourceAttribute": "Compliance Declaration",
+      "requirements": {
+        "Major Appliance": "mandatory_espr_jtc24",
+        "Small Appliance": "mandatory_espr_jtc24",
+        "HVAC": "mandatory_espr_jtc24",
+        "Consumer Electronics": "mandatory_espr_jtc24"
+      }
+    }
+  }
+}

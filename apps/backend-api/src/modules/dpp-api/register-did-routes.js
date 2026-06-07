@@ -10,7 +10,7 @@ module.exports = function registerDidRoutes(app, deps) {
     getTable,
     normalizePassportRow,
     getCompanyNameMap,
-    dbLookupByCompanyAndProduct,
+    dbLookupByInternalAliasIdOnly,
     getAppUrl,
     didService,
     dppIdentity,
@@ -89,10 +89,11 @@ module.exports = function registerDidRoutes(app, deps) {
         return res.redirect(307, docUrl);
       }
 
-      if (parsed.type === "battery") {
+      if (parsed.type === "product") {
         if (wantsBrowser) {
-          const companyId = parseInt(parsed.companyId, 10);
-          const result = await dbLookupByCompanyAndProduct(companyId, parsed.internalAliasId).catch(() => null);
+          const result = typeof dbLookupByInternalAliasIdOnly === "function"
+            ? await dbLookupByInternalAliasIdOnly(parsed.stableId).catch(() => null)
+            : null;
           if (result) {
             const publicUrl = dppIdentity.buildCanonicalPublicUrl(result.passport, result.companyName);
             return res.redirect(307, publicUrl);
@@ -105,8 +106,9 @@ module.exports = function registerDidRoutes(app, deps) {
 
       if (parsed.type === "dpp") {
         if (wantsBrowser) {
-          const companyId = parseInt(parsed.companyId, 10);
-          const result = await dbLookupByCompanyAndProduct(companyId, parsed.internalAliasId).catch(() => null);
+          const result = typeof dbLookupByInternalAliasIdOnly === "function"
+            ? await dbLookupByInternalAliasIdOnly(parsed.stableId).catch(() => null)
+            : null;
           if (result) {
             const publicUrl = dppIdentity.buildCanonicalPublicUrl(result.passport, result.companyName);
             return res.redirect(307, publicUrl);
@@ -154,7 +156,7 @@ module.exports = function registerDidRoutes(app, deps) {
       const tableName = getTable(passportType);
 
       const r = await pool.query(
-        `SELECT "dppId", "internalAliasId", "modelName", "companyId" FROM ${tableName}
+        `SELECT "dppId", "lineageId", "internalAliasId", "modelName", "companyId" FROM ${tableName}
          WHERE "dppId" = $1 AND "deletedAt" IS NULL
          LIMIT 1`,
         [dppId]
@@ -170,8 +172,8 @@ module.exports = function registerDidRoutes(app, deps) {
       const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
       const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
       const productDid = businessIdentifier ? (passport.productIdentifierDid || passport.uniqueProductIdentifier || null) : null;
-      const pDppDid = passport.internalAliasId ?
-        dppIdentity.dppDid("model", companyId, passport.internalAliasId) :
+      const pDppDid = (passport.lineageId || passport.dppId || passport.internalAliasId) ?
+        dppIdentity.dppDid("model", passport.lineageId || passport.dppId || passport.internalAliasId) :
         null;
 
       res.json({

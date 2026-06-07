@@ -138,10 +138,10 @@ case "$DEPLOY_TARGET" in
     RECREATE_SERVICES=(backend-api)
     ;;
   frontend)
-    RECREATE_SERVICES=(frontend-app public-passport-viewer asset-management marketing-site)
+    RECREATE_SERVICES=(frontend-app public-passport-viewer marketing-site)
     ;;
   all)
-    RECREATE_SERVICES=(backend-api frontend-app public-passport-viewer asset-management marketing-site)
+    RECREATE_SERVICES=(backend-api frontend-app public-passport-viewer marketing-site)
     ;;
 esac
 
@@ -160,9 +160,6 @@ wait_for_service_http() {
     public-passport-viewer)
       wait_for_http "http://127.0.0.1:${PUBLIC_VIEWER_PORT:-3004}/" "Viewer HTTP" 30 2 >/tmp/dpp-viewer-health.txt
       ;;
-    asset-management)
-      wait_for_http "http://127.0.0.1:${ASSET_MANAGEMENT_PORT:-3003}/" "Asset management HTTP" 30 2 >/tmp/dpp-asset-health.txt
-      ;;
     marketing-site)
       wait_for_http "http://127.0.0.1:${MARKETING_PORT:-8080}/" "Marketing HTTP" 30 2 >/tmp/dpp-marketing-health.txt
       ;;
@@ -170,7 +167,7 @@ wait_for_service_http() {
 }
 
 deploy_frontend_sequentially() {
-  local services=(frontend-app public-passport-viewer asset-management marketing-site)
+  local services=(frontend-app public-passport-viewer marketing-site)
   local service
   for service in "${services[@]}"; do
     echo "Building service sequentially: $service"
@@ -278,11 +275,9 @@ fi
   if [ "$DEPLOY_TARGET" = "frontend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
     wait_for_container_health "frontend-app" "Frontend app" 50 2
     wait_for_container_health "public-passport-viewer" "Public viewer" 50 2
-    wait_for_container_health "asset-management" "Asset management" 50 2
     wait_for_container_health "marketing-site" "Marketing site" 50 2
     wait_for_service_http "frontend-app"
     wait_for_service_http "public-passport-viewer"
-    wait_for_service_http "asset-management"
     wait_for_service_http "marketing-site"
   fi
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import MessagingPage from "./MessagingPage";
 import "../../../assets/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -59,12 +60,17 @@ function StatusPill({ status }) {
   return <span className={`nwf-pill ${s.cls}`}>{s.label}</span>;
 }
 
-export default function NotificationsPage({ user }) {
+export default function NotificationsPage({ user, initialTab = "notifications" }) {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(initialTab === "messages" ? "messages" : "notifications");
   const [notifs,   setNotifs]   = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [filter,   setFilter]   = useState("all");
+
+  useEffect(() => {
+    setActiveTab(initialTab === "messages" ? "messages" : "notifications");
+  }, [initialTab]);
 
   useEffect(() => {
     (async () => {
@@ -107,7 +113,7 @@ export default function NotificationsPage({ user }) {
       <div className="nwf-header-row">
         <button className="csv-back-btn" onClick={() => navigate(-1)}>← Back</button>
         <div className="nwf-header-right">
-          {unreadCount > 0 && (
+          {activeTab === "notifications" && unreadCount > 0 && (
             <button className="nwf-mark-all-btn" onClick={markAllRead}>
               Mark all as read
             </button>
@@ -115,8 +121,30 @@ export default function NotificationsPage({ user }) {
         </div>
       </div>
 
-      <h2 className="nwf-title">🔔 Notifications &amp; Workflow History</h2>
-      <p className="nwf-subtitle">All notifications with full reviewer, approver and comment details.</p>
+      <h2 className="nwf-title">Updates</h2>
+      <p className="nwf-subtitle">Notifications, workflow activity, and team messages in one place.</p>
+
+      <div className="nwf-filters">
+        <button
+          type="button"
+          className={`nwf-filter-btn${activeTab === "notifications" ? " active" : ""}`}
+          onClick={() => setActiveTab("notifications")}
+        >
+          Notifications{unreadCount ? ` (${unreadCount})` : ""}
+        </button>
+        <button
+          type="button"
+          className={`nwf-filter-btn${activeTab === "messages" ? " active" : ""}`}
+          onClick={() => setActiveTab("messages")}
+        >
+          Messages
+        </button>
+      </div>
+
+      {activeTab === "messages" ? (
+        <MessagingPage user={user} />
+      ) : (
+        <>
 
       <div className="nwf-filters">
         {["all", "unread", "workflow"].map(f => (
@@ -259,6 +287,8 @@ export default function NotificationsPage({ user }) {
             );
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   );

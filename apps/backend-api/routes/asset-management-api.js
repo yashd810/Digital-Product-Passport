@@ -4,9 +4,9 @@ const logger = require("../src/infrastructure/logging/logger");
 
 module.exports = function registerAssetManagementApiRoutes(app, {
   pool,
-  requireAssetManagementKey,
-  authenticateAssetPlatform,
-  requireAssetEditor,
+  authenticateToken,
+  checkCompanyAccess,
+  requireEditor,
   publicReadRateLimit,
   assetWriteRateLimit,
   assetSourceFetchRateLimit,
@@ -26,15 +26,18 @@ module.exports = function registerAssetManagementApiRoutes(app, {
   recordAssetRun,
   resolveAssetJobNextRunAt,
 }) {
-  // Apply auth middleware to all /api/asset-management routes
-  app.use("/api/asset-management", (req, res, next) => {
+  const routeBase = "/api/companies/:companyId/passport-data-management";
+  const getCompanyId = (req) => Number.parseInt(req.params.companyId, 10);
+  const getUserId = (req) => req.user?.userId || req.user?.id || null;
+
+  app.use(routeBase, (req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
-  }, requireAssetManagementKey, authenticateAssetPlatform);
+  }, authenticateToken, checkCompanyAccess);
 
-  app.get("/api/asset-management/bootstrap", publicReadRateLimit, async (req, res) => {
+  app.get(`${routeBase}/bootstrap`, publicReadRateLimit, async (req, res) => {
     try {
-      const companyId = Number.parseInt(req.assetContext.companyId, 10);
+      const companyId = getCompanyId(req);
       const company = await assertAssetManagementEnabled(companyId);
 
       const types = await pool.query(
@@ -53,7 +56,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         passportTypes: types.rows,
         erpPresets: ASSET_ERP_PRESETS,
         security: {
-          assetKeyRequired: true,
+          assetKeyRequired: false,
           companyScoped: true,
         },
         assumptions: {
@@ -62,14 +65,14 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         },
       });
     } catch (error) {
-      logger.error("Asset bootstrap error:", error.message);
-      res.status(500).json({ error: "Failed to load Asset Management bootstrap data" });
+      logger.error("Passport data bootstrap error:", error.message);
+      res.status(500).json({ error: "Failed to load Passport Data Management bootstrap data" });
     }
   });
 
-  app.get("/api/asset-management/passports", publicReadRateLimit, async (req, res) => {
+  app.get(`${routeBase}/passports`, publicReadRateLimit, async (req, res) => {
     try {
-      const companyId = Number.parseInt(req.assetContext.companyId, 10);
+      const companyId = getCompanyId(req);
       const requestedType = String(req.query.passportType || "").trim();
       if (!requestedType) {
         return res.status(400).json({ error: "passportType query param is required" });
@@ -116,42 +119,42 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         },
       });
     } catch (error) {
-      logger.error("Asset passport load error:", error.message);
-      res.status(500).json({ error: "Failed to load passports for Asset Management" });
+      logger.error("Passport data load error:", error.message);
+      res.status(500).json({ error: "Failed to load passports for Passport Data Management" });
     }
   });
 
-  app.post("/api/asset-management/source/fetch", assetSourceFetchRateLimit, requireAssetEditor, async (req, res) => {
+  app.post(`${routeBase}/source/fetch`, assetSourceFetchRateLimit, requireEditor, async (req, res) => {
     try {
       const sourceConfig = isPlainObject(req.body?.sourceConfig) ? req.body.sourceConfig : {};
       const fetched = await fetchAssetSourceRecords(sourceConfig);
       res.json(fetched);
     } catch (error) {
-      logger.error("Asset source fetch error:", error.message);
+      logger.error("Passport data source fetch error:", error.message);
       res.status(400).json({ error: error.message || "Failed to fetch ERP/API records" });
     }
   });
 
-  app.post("/api/asset-management/preview", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
+  app.post(`${routeBase}/preview`, assetWriteRateLimit, requireEditor, async (req, res) => {
     try {
       const normalizedBody = normalizePassportRequestBody(req.body || {});
       const payload = await prepareAssetPayload({
-        companyId: Number.parseInt(req.assetContext.companyId, 10),
+        companyId: getCompanyId(req),
         passportType: normalizedBody.passportType,
         records: normalizedBody.records,
         options: normalizedBody.options,
       });
       res.json(payload);
     } catch (error) {
-      logger.error("Asset preview error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to generate asset JSON" });
+      logger.error("Passport data preview error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to generate Passport Data Management preview" });
     }
   });
 
-  app.post("/api/asset-management/push", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
+  app.post(`${routeBase}/push`, assetWriteRateLimit, requireEditor, async (req, res) => {
     try {
       const normalizedBody = normalizePassportRequestBody(req.body || {});
-      const companyId = Number.parseInt(req.assetContext.companyId, 10);
+      const companyId = getCompanyId(req);
 
       let preview;
       if (normalizedBody.generatedPayload?.passportType) {
@@ -168,7 +171,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const pushResult = await executeAssetPush({
         companyId,
         generatedPayload: preview.generatedPayload,
-        userId: req.assetContext.userId,
+        userId: getUserId(req),
       });
       const status = pushResult.summary.failed
         ? (pushResult.summary.passportsCreated || pushResult.summary.passportsUpdated || pushResult.summary.dynamicFieldsPushed ? "partial" : "failed")
@@ -191,14 +194,14 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         generatedPayload: preview.generatedPayload,
       });
     } catch (error) {
-      logger.error("Asset push error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to push asset payload" });
+      logger.error("Passport data push error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to apply passport data changes" });
     }
   });
 
-  app.get("/api/asset-management/jobs", publicReadRateLimit, async (req, res) => {
+  app.get(`${routeBase}/jobs`, publicReadRateLimit, async (req, res) => {
     try {
-      const companyId = Number.parseInt(req.assetContext.companyId, 10);
+      const companyId = getCompanyId(req);
       const jobs = await pool.query(
         `SELECT * FROM asset_management_jobs WHERE company_id = $1
          ORDER BY updated_at DESC, created_at DESC LIMIT 50`,
@@ -206,15 +209,15 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       );
       res.json({ jobs: jobs.rows });
     } catch (error) {
-      logger.error("Asset jobs load error:", error.message);
-      res.status(500).json({ error: "Failed to load asset jobs" });
+      logger.error("Passport data jobs load error:", error.message);
+      res.status(500).json({ error: "Failed to load Passport Data Management jobs" });
     }
   });
 
-  app.post("/api/asset-management/jobs", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
+  app.post(`${routeBase}/jobs`, assetWriteRateLimit, requireEditor, async (req, res) => {
     try {
       const normalizedBody = normalizePassportRequestBody(req.body || {});
-      const companyId = Number.parseInt(req.assetContext.companyId, 10);
+      const companyId = getCompanyId(req);
       const passportType = String(normalizedBody.passportType || "").trim();
       const name = String(normalizedBody.name || "").trim();
       const sourceKind = String(normalizedBody.sourceKind || "manual").trim().toLowerCase();
@@ -258,15 +261,15 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       res.status(201).json({ job: inserted.rows[0] });
     } catch (error) {
-      logger.error("Asset job create error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to save asset job" });
+      logger.error("Passport data job create error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to save Passport Data Management job" });
     }
   });
 
-  app.patch("/api/asset-management/jobs/:jobId", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
+  app.patch(`${routeBase}/jobs/:jobId`, assetWriteRateLimit, requireEditor, async (req, res) => {
     try {
       const jobId = Number.parseInt(req.params.jobId, 10);
-      const companyId = Number.parseInt(req.assetContext.companyId, 10);
+      const companyId = getCompanyId(req);
       if (!Number.isFinite(jobId)) return res.status(400).json({ error: "jobId must be numeric" });
 
       const existing = await pool.query(
@@ -328,15 +331,15 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       res.json({ job: updated.rows[0] });
     } catch (error) {
-      logger.error("Asset job update error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to update asset job" });
+      logger.error("Passport data job update error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to update Passport Data Management job" });
     }
   });
 
-  app.post("/api/asset-management/jobs/:jobId/run", assetWriteRateLimit, requireAssetEditor, async (req, res) => {
+  app.post(`${routeBase}/jobs/:jobId/run`, assetWriteRateLimit, requireEditor, async (req, res) => {
     try {
       const jobId = Number.parseInt(req.params.jobId, 10);
-      const companyId = Number.parseInt(req.assetContext.companyId, 10);
+      const companyId = getCompanyId(req);
       if (!Number.isFinite(jobId)) return res.status(400).json({ error: "jobId must be numeric" });
 
       const job = await pool.query(
@@ -344,21 +347,21 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       );
       if (!job.rows.length) return res.status(404).json({ error: "Asset job not found" });
 
-      const result = await runAssetManagementJob(job.rows[0], "manual_job_run", req.assetContext.userId);
+      const result = await runAssetManagementJob(job.rows[0], "manual_job_run", getUserId(req));
       if (result.error) {
         return res.status(400).json({ error: result.error.message, run: result.run });
       }
 
       res.json(result);
     } catch (error) {
-      logger.error("Asset job run error:", error.message);
-      res.status(400).json({ error: error.message || "Failed to run asset job" });
+      logger.error("Passport data job run error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to run Passport Data Management job" });
     }
   });
 
-  app.get("/api/asset-management/runs", publicReadRateLimit, async (req, res) => {
+  app.get(`${routeBase}/runs`, publicReadRateLimit, async (req, res) => {
     try {
-      const companyId = Number.parseInt(req.assetContext.companyId, 10);
+      const companyId = getCompanyId(req);
       const limit = Math.min(Number.parseInt(req.query.limit, 10) || 25, 100);
 
       const runs = await pool.query(
@@ -368,8 +371,8 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       res.json({ runs: runs.rows });
     } catch (error) {
-      logger.error("Asset run load error:", error.message);
-      res.status(500).json({ error: "Failed to load asset run history" });
+      logger.error("Passport data run load error:", error.message);
+      res.status(500).json({ error: "Failed to load Passport Data Management run history" });
     }
   });
 };

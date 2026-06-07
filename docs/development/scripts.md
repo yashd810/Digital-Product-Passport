@@ -57,6 +57,39 @@ This is the only supported host-side production deploy path.
 
 ## Utility Scripts
 
+### `apps/backend-api/scripts/bootstrap-passport-modules.js`
+
+Runs the database migration and then seeds registered passport type module files.
+Use this after a fresh database reset or when deploying new module files.
+
+```bash
+cd apps/backend-api
+npm run bootstrap:passport-modules
+```
+
+Useful options:
+
+```bash
+# Preview selected modules without mutating the database
+npm run bootstrap:passport-modules -- --dry-run
+
+# Seed one module after migrations have already run
+npm run bootstrap:passport-modules -- --seed-only --module=appliance:v1
+
+# Seed all modules and grant access to every active company
+npm run bootstrap:passport-modules -- --grant-all-active-companies
+```
+
+### `apps/backend-api/scripts/seed-passport-types.js`
+
+Seeds registered passport modules without running the DB migration first.
+
+```bash
+cd apps/backend-api
+npm run seed:passport-types -- --module=battery:v1
+npm run seed:passport-types -- --module=appliance:v1 --company-id=7
+```
+
 ### `scripts/utils/bulk-update-fetch.js`
 
 Bulk data operation helper for development and admin tasks.

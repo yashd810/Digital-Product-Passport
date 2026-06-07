@@ -43,7 +43,7 @@ Get current user's notifications.
     "title": "✅ BAT-01 reviewed and released!",
     "message": null,
     "passport_dpp_id": "uuid",
-    "related_url": "/passports/battery-passport/view/BAT-01",
+    "related_url": "/passports/batteryPassportV1/view/BAT-01",
     "read": false,
     "created_at": "2025-05-05T10:30:00Z"
   },
@@ -240,4 +240,3 @@ All notification endpoints return consistent error responses:
 | Code | Meaning |
 |------|---------|
 | `500` | Server Error - Failed to process notification request |
-

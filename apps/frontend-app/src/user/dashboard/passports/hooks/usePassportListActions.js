@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { buildComplianceErrorMessage } from "../../../../shared/utils/complianceErrors";
-import { buildPassportJsonLdExport } from "../../../../shared/utils/batterySemanticExport";
+import { buildPassportJsonLdExport } from "../../../../shared/utils/semanticPassportExport";
 import {
   isEditablePassportStatus,
   isReleasedPassportStatus,
@@ -286,7 +286,7 @@ export function usePassportListActions({
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
         const semanticModelKey = typeData.semanticModelKey || "";
-        const productCategory = typeData.productCategory || "";
+        const semanticModel = typeData.semanticModel || null;
 
         const exported = [];
         for (const passport of passportsForType) {
@@ -309,7 +309,7 @@ export function usePassportListActions({
           continue;
         }
 
-        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, productCategory });
+        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, semanticModel });
         const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);

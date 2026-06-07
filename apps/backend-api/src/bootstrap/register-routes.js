@@ -1,6 +1,5 @@
 "use strict";
 
-const registerAssetManagementLaunchRoutes = require("../../routes/asset-management-launch");
 const registerRepositoryRoutes = require("../../routes/repository");
 const registerNotificationRoutes = require("../../routes/notifications");
 const registerMessagingRoutes = require("../../routes/messaging");
@@ -16,15 +15,6 @@ const registerDppApiRoutes = require("../../routes/dpp-api");
 const registerDictionaryRoutes = require("../../routes/dictionary");
 
 function registerAppRoutes(app, deps) {
-  registerAssetManagementLaunchRoutes(app, {
-    authenticateToken: deps.authenticateToken,
-    checkCompanyAccess: deps.checkCompanyAccess,
-    requireEditor: deps.requireEditor,
-    assertAssetManagementEnabled: deps.assertAssetManagementEnabled,
-    generateAssetLaunchToken: deps.generateAssetLaunchToken,
-    ASSET_SHARED_SECRET: deps.ASSET_SHARED_SECRET,
-  });
-
   registerRepositoryRoutes(app, {
     pool: deps.pool,
     fs: deps.fs,
@@ -124,9 +114,9 @@ function registerAppRoutes(app, deps) {
 
   registerAssetManagementApiRoutes(app, {
     pool: deps.pool,
-    requireAssetManagementKey: deps.requireAssetManagementKey,
-    authenticateAssetPlatform: deps.authenticateAssetPlatform,
-    requireAssetEditor: deps.requireAssetEditor,
+    authenticateToken: deps.authenticateToken,
+    checkCompanyAccess: deps.checkCompanyAccess,
+    requireEditor: deps.requireEditor,
     publicReadRateLimit: deps.publicReadRateLimit,
     assetWriteRateLimit: deps.assetWriteRateLimit,
     assetSourceFetchRateLimit: deps.assetSourceFetchRateLimit,
@@ -184,6 +174,8 @@ function registerAppRoutes(app, deps) {
     extractExplicitFacilityId: deps.extractExplicitFacilityId,
     getWritablePassportColumns: deps.getWritablePassportColumns,
     getStoredPassportValues: deps.getStoredPassportValues,
+    quoteSqlIdentifier: deps.quoteSqlIdentifier,
+    joinQuotedSqlIdentifiers: deps.joinQuotedSqlIdentifiers,
     toStoredPassportValue: deps.toStoredPassportValue,
     coerceBulkFieldValue: deps.coerceBulkFieldValue,
     buildCurrentPublicPassportPath: deps.buildCurrentPublicPassportPath,
@@ -214,7 +206,7 @@ function registerAppRoutes(app, deps) {
     submitPassportToWorkflow: deps.submitPassportToWorkflow,
     signPassport: deps.signPassport,
     signPortableDataConstruct: deps.signPortableDataConstruct,
-    buildBatteryPassJsonExport: deps.buildBatteryPassJsonExport,
+    buildSemanticPassportJsonExport: deps.buildSemanticPassportJsonExport,
     storageService: deps.storageService,
     complianceService: deps.complianceService,
     accessRightsService: deps.accessRightsService,
@@ -244,13 +236,14 @@ function registerAppRoutes(app, deps) {
     verifyPassportSignature: deps.verifyPassportSignature,
     logAudit: deps.logAudit,
     buildJsonLdContext: deps.buildJsonLdContext,
-    buildBatteryPassJsonExport: deps.buildBatteryPassJsonExport,
+    buildSemanticPassportJsonExport: deps.buildSemanticPassportJsonExport,
     buildCanonicalPassportPayload: deps.buildCanonicalPassportPayload,
     buildExpandedPassportPayload: deps.buildExpandedPassportPayload,
     backupProviderService: deps.backupProviderService,
     signingService: deps.signingService,
     didService: deps.didService,
     productIdentifierService: deps.productIdentifierService,
+    semanticModelRegistry: deps.semanticModelRegistry,
   });
 
   registerCompanyRoutes(app, {
@@ -274,7 +267,7 @@ function registerAppRoutes(app, deps) {
     logAudit: deps.logAudit,
     EDITABLE_RELEASE_STATUSES_SQL: deps.EDITABLE_RELEASE_STATUSES_SQL,
     SYSTEM_PASSPORT_FIELDS: deps.SYSTEM_PASSPORT_FIELDS,
-    buildBatteryPassJsonExport: deps.buildBatteryPassJsonExport,
+    buildSemanticPassportJsonExport: deps.buildSemanticPassportJsonExport,
     buildExpandedPassportPayload: deps.buildExpandedPassportPayload,
     productIdentifierService: deps.productIdentifierService,
     complianceService: deps.complianceService,
@@ -318,8 +311,11 @@ function registerAppRoutes(app, deps) {
   });
 
   registerDictionaryRoutes(app, {
+    pool: deps.pool,
     publicReadRateLimit: deps.publicReadRateLimit,
-    batteryDictionaryService: deps.batteryDictionaryService,
+    authenticateToken: deps.authenticateToken,
+    checkCompanyAccess: deps.checkCompanyAccess,
+    semanticModelRegistry: deps.semanticModelRegistry,
   });
 
   registerHealthRoutes(app, {

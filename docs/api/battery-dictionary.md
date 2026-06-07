@@ -1,11 +1,15 @@
-# Battery Dictionary API
+# Battery Semantic Dictionary API
 
-Last updated: 2026-05-05  
-Status: Verified - all endpoints correct
+Last updated: 2026-06-04  
+Status: Battery v1 semantic resource example in the generic dictionary system
 
 Code/files:
 - `apps/backend-api/routes/dictionary.js`
 - `apps/backend-api/services/battery-dictionary-service.js`
+- `apps/backend-api/services/semantic-model-registry.js`
+- `apps/backend-api/resources/semantics/battery/v1/`
+
+The platform now serves dictionaries generically as `/dictionary/:family/:version/*` and `/api/dictionary/:family/:version/*`. Battery v1 is one registered semantic model. Future product categories should add their own resource folder under `apps/backend-api/resources/semantics/<family>/<version>/` and connect it from a passport module through `semanticModelKey`.
 
 Endpoints:
 - `GET /dictionary/battery/v1/manifest.json`
@@ -75,6 +79,8 @@ Traceability artifacts:
 
 Configuration requirements:
 - Generated battery dictionary files present under `apps/backend-api/resources/semantics/battery/v1/`
+- Company dashboard visibility requires `company_dpp_policies.semantic_dictionary_enabled = true` and company access to at least one passport type whose `semanticModelKey` points to this dictionary.
 
 Migration notes:
-- Dictionary generation is automated through `scripts/generate-battery-dictionary.js`.
+- Battery dictionary generation is automated through `scripts/generate-battery-dictionary.js`.
+- Breaking semantic changes should be released as a new semantic resource version and a new passport module/typeName, not by mutating old passport semantics.

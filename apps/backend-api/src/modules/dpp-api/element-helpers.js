@@ -293,15 +293,16 @@ function createElementHelpers({
     const derivedProductIdentifier = businessIdentifier ?
       productIdentifierService?.buildCanonicalProductDid?.({
         companyId: passport.companyId,
-        passportType: passport.passportType || typeDef?.typeName || "battery",
+        passportType: passport.passportType || typeDef?.typeName || "passport",
         rawProductId: businessIdentifier,
         granularity
       }) || null :
       null;
     let dppId = null;
     try {
-      if (passport?.companyId && passport?.internalAliasId) {
-        dppId = dppIdentity.dppDid(granularity, passport.companyId, passport.internalAliasId);
+      const stableDppId = passport?.lineageId || passport?.dppId || passport?.internalAliasId;
+      if (stableDppId) {
+        dppId = dppIdentity.dppDid(granularity, stableDppId);
       }
     } catch {}
 

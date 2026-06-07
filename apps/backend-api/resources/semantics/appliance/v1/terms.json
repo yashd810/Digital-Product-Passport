@@ -1,0 +1,154 @@
+[
+  {
+    "specRef": "APP-001",
+    "slug": "product-model-identifier",
+    "label": "Product Model Identifier",
+    "definition": "Identifies the appliance product model that the passport describes.",
+    "category": "product-identification",
+    "internalKey": "productModelIdentifier",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/ProductIdentification",
+      "curie": "clarosApplianceClass:ProductIdentification",
+      "label": "Product Identification"
+    },
+    "unit": "none"
+  },
+  {
+    "specRef": "APP-002",
+    "slug": "appliance-category",
+    "label": "Appliance Category",
+    "definition": "Classifies the appliance product category used for requirement and reporting policies.",
+    "category": "product-identification",
+    "internalKey": "applianceCategory",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/ProductIdentification",
+      "curie": "clarosApplianceClass:ProductIdentification",
+      "label": "Product Identification"
+    },
+    "unit": "none"
+  },
+  {
+    "specRef": "APP-003",
+    "slug": "manufacturer-name",
+    "label": "Manufacturer Name",
+    "definition": "Name of the manufacturer responsible for placing the appliance on the market.",
+    "category": "product-identification",
+    "internalKey": "manufacturerName",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/ProductIdentification",
+      "curie": "clarosApplianceClass:ProductIdentification",
+      "label": "Product Identification"
+    },
+    "unit": "none"
+  },
+  {
+    "specRef": "APP-004",
+    "slug": "energy-rating",
+    "label": "Energy Rating",
+    "definition": "Declared energy performance rating for the appliance.",
+    "category": "performance",
+    "internalKey": "energyRating",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/Performance",
+      "curie": "clarosApplianceClass:Performance",
+      "label": "Performance"
+    },
+    "unit": "none"
+  },
+  {
+    "specRef": "APP-005",
+    "slug": "power-consumption",
+    "label": "Power Consumption",
+    "definition": "Declared annual or standardized power consumption for the appliance.",
+    "category": "performance",
+    "internalKey": "powerConsumption",
+    "dataType": {
+      "format": "Decimal",
+      "jsonType": "number",
+      "xsdType": "xsd:decimal"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/Performance",
+      "curie": "clarosApplianceClass:Performance",
+      "label": "Performance"
+    },
+    "unit": "kwh_per_year"
+  },
+  {
+    "specRef": "APP-006",
+    "slug": "repairability-score",
+    "label": "Repairability Score",
+    "definition": "Declared repairability score for the appliance using the selected scoring method.",
+    "category": "repair-and-service",
+    "internalKey": "repairabilityScore",
+    "dataType": {
+      "format": "Decimal",
+      "jsonType": "number",
+      "xsdType": "xsd:decimal"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/RepairAndService",
+      "curie": "clarosApplianceClass:RepairAndService",
+      "label": "Repair And Service"
+    },
+    "unit": "score"
+  },
+  {
+    "specRef": "APP-007",
+    "slug": "spare-parts-availability",
+    "label": "Spare Parts Availability",
+    "definition": "Describes spare parts availability commitments, duration, and channels.",
+    "category": "repair-and-service",
+    "internalKey": "sparePartsAvailability",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/RepairAndService",
+      "curie": "clarosApplianceClass:RepairAndService",
+      "label": "Repair And Service"
+    },
+    "unit": "none"
+  },
+  {
+    "specRef": "APP-008",
+    "slug": "compliance-declaration",
+    "label": "Compliance Declaration",
+    "definition": "Manufacturer or economic-operator declaration for applicable appliance compliance obligations.",
+    "category": "compliance",
+    "internalKey": "complianceDeclaration",
+    "dataType": {
+      "format": "String",
+      "jsonType": "string",
+      "xsdType": "xsd:string"
+    },
+    "domain": {
+      "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/Compliance",
+      "curie": "clarosApplianceClass:Compliance",
+      "label": "Compliance"
+    },
+    "unit": "none"
+  }
+]

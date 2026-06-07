@@ -28,22 +28,22 @@ module.exports = function registerCompanyRoutes(app, deps) {
     return {
       id: row.id ?? null,
       country: row.country ?? null,
-      companyName: row.companyName ?? null,
-      legalName: row.legalName ?? null,
-      companyRegistrationNumber: row.companyRegistrationNumber ?? null,
-      vatNumber: row.vatNumber ?? null,
-      websiteDomain: row.websiteDomain ?? null,
-      customerTrustLevel: row.customerTrustLevel ?? null,
-      verificationStatus: row.verificationStatus ?? null,
-      authorizedContactName: row.authorizedContactName ?? null,
-      authorizedContactEmail: row.authorizedContactEmail ?? null,
-      isActive: row.isActive ?? null,
-      assetManagementEnabled: row.assetManagementEnabled ?? null,
-      assetManagementRevokedAt: row.assetManagementRevokedAt ?? null,
+      companyName: row.companyName ?? row.company_name ?? null,
+      legalName: row.legalName ?? row.legal_name ?? null,
+      companyRegistrationNumber: row.companyRegistrationNumber ?? row.company_registration_number ?? null,
+      vatNumber: row.vatNumber ?? row.vat_number ?? null,
+      websiteDomain: row.websiteDomain ?? row.website_domain ?? null,
+      customerTrustLevel: row.customerTrustLevel ?? row.customer_trust_level ?? null,
+      verificationStatus: row.verificationStatus ?? row.verification_status ?? null,
+      authorizedContactName: row.authorizedContactName ?? row.authorized_contact_name ?? null,
+      authorizedContactEmail: row.authorizedContactEmail ?? row.authorized_contact_email ?? null,
+      isActive: row.isActive ?? row.is_active ?? null,
+      assetManagementEnabled: row.assetManagementEnabled ?? row.asset_management_enabled ?? null,
+      assetManagementRevokedAt: row.assetManagementRevokedAt ?? row.asset_management_revoked_at ?? null,
       grantedTypeNames: row.grantedTypeNames ?? [],
       grantedTypes: row.grantedTypes ?? [],
-      createdAt: row.createdAt ?? null,
-      updatedAt: row.updatedAt ?? null,
+      createdAt: row.createdAt ?? row.created_at ?? null,
+      updatedAt: row.updatedAt ?? row.updated_at ?? null,
     };
   }
 
@@ -262,45 +262,6 @@ module.exports = function registerCompanyRoutes(app, deps) {
       res.json(result.rows.map(mapCompanyRow));
     } catch {
       res.status(500).json({ error: "Failed to fetch companies" });
-    }
-  });
-
-  app.patch("/api/admin/companies/:companyId/asset-management", authenticateToken, isSuperAdmin, async (req, res) => {
-    try {
-      const { companyId } = req.params;
-      const { enabled } = req.body || {};
-      if (typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be true or false" });
-
-      const updated = await pool.query(
-        `UPDATE companies
-         SET asset_management_enabled = $1,
-             asset_management_revoked_at = CASE WHEN $1 THEN NULL ELSE NOW() END,
-             updated_at = NOW()
-         WHERE id = $2
-         RETURNING id, company_name, asset_management_enabled, asset_management_revoked_at`,
-        [enabled, companyId]
-      );
-      if (!updated.rows.length) return res.status(404).json({ error: "Company not found" });
-
-      await logAudit(
-        null, req.user.userId,
-        enabled ? "ENABLE_ASSET_MANAGEMENT" : "REVOKE_ASSET_MANAGEMENT",
-        "companies", companyId, null, { asset_management_enabled: enabled }
-      );
-
-      if (!enabled) {
-        await pool.query(
-          `UPDATE asset_management_jobs
-           SET is_active = false, next_run_at = NULL, updated_at = NOW()
-           WHERE company_id = $1`,
-          [companyId]
-        );
-      }
-
-      res.json({ success: true, company: mapCompanyRow(updated.rows[0]) });
-    } catch (error) {
-      logger.error("Asset management toggle error:", error.message);
-      res.status(500).json({ error: "Failed to update Asset Management access" });
     }
   });
 

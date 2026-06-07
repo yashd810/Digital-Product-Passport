@@ -103,7 +103,7 @@ module.exports = function registerPassportRoutes(app, {
   // signing service
   signPassport,
   signPortableDataConstruct,
-  buildBatteryPassJsonExport,
+  buildSemanticPassportJsonExport,
   storageService,
   complianceService,
   accessRightsService,
@@ -120,7 +120,7 @@ module.exports = function registerPassportRoutes(app, {
   });
 
   const ARCHIVED_HISTORY_REASON_SQL = `('before_archive_delete','before_bulk_archive_delete','before_delete','before_bulk_delete')`;
-  const ARCHIVED_HISTORY_FILTER_SQL = `(snapshot_reason IN ${ARCHIVED_HISTORY_REASON_SQL})`;
+  const ARCHIVED_HISTORY_FILTER_SQL = `("snapshotReason" IN ${ARCHIVED_HISTORY_REASON_SQL})`;
   const {
     buildApiKeyFieldWriteDecision,
     buildApiKeyHashRecord,
@@ -266,7 +266,7 @@ module.exports = function registerPassportRoutes(app, {
     normalizeInternalAliasIdValue,
     getPassportTypeSchema,
     fetchCompanyPassportRecord,
-    buildBatteryPassJsonExport,
+    buildSemanticPassportJsonExport,
     buildExpandedPassportPayload,
     complianceService,
     productIdentifierService,

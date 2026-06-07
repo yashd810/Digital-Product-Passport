@@ -2,6 +2,7 @@
 
 const path = require("path");
 const logger = require("../../infrastructure/logging/logger");
+const { getPassportTypeModules } = require("../../passport-modules");
 
 module.exports = function registerCatalogRoutes(app, deps) {
   const {
@@ -39,6 +40,29 @@ module.exports = function registerCatalogRoutes(app, deps) {
     createdByEmail: row.createdByEmail ?? null,
   });
 
+  const mapPassportTypeModule = (definition = {}, seededByTypeName = new Map()) => {
+    const seededType = seededByTypeName.get(definition.typeName) || null;
+    const sections = definition.fieldsJson?.sections || [];
+    return {
+      moduleKey: definition.moduleKey,
+      typeName: definition.typeName,
+      displayName: definition.displayName,
+      productCategory: definition.productCategory,
+      productIcon: definition.productIcon,
+      semanticModelKey: definition.semanticModelKey,
+      complianceProfileKey: definition.complianceProfile?.key || null,
+      complianceProfile: definition.complianceProfile || null,
+      lifecycle: definition.lifecycle || null,
+      fieldsJson: definition.fieldsJson || null,
+      sectionCount: sections.length,
+      fieldCount: sections.reduce((count, section) => count + (section.fields?.length || 0), 0),
+      seeded: Boolean(seededType),
+      seededPassportTypeId: seededType?.id || null,
+      seededIsActive: seededType?.isActive ?? null,
+      seedCommand: `npm run seed:passport-types -- --module=${definition.moduleKey}`,
+    };
+  };
+
   app.get("/api/admin/product-categories", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const result = await pool.query("SELECT * FROM product_categories ORDER BY name");
@@ -46,6 +70,26 @@ module.exports = function registerCatalogRoutes(app, deps) {
     } catch (error) {
       logger.error("List productCategories error:", error.message);
       res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  app.get("/api/admin/passport-type-modules", authenticateToken, isSuperAdmin, async (_req, res) => {
+    try {
+      const registeredTypes = await pool.query(`
+        SELECT id,
+               "typeName" AS "typeName",
+               "isActive" AS "isActive"
+          FROM passport_types
+      `);
+      const seededByTypeName = new Map(
+        registeredTypes.rows.map((row) => [row.typeName, row])
+      );
+      res.json(getPassportTypeModules().map((definition) =>
+        mapPassportTypeModule(definition, seededByTypeName)
+      ));
+    } catch (error) {
+      logger.error("List passport type modules error:", error.message);
+      res.status(500).json({ error: "Failed to fetch passport type modules" });
     }
   });
 
@@ -247,7 +291,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
       await pool.query("DELETE FROM passport_types WHERE id = $1", [typeId]);
 
       const tableName = getTable(typeName);
-      if (!/^passport_type_[a-z0-9_]+$/.test(tableName)) {
+      if (!/^[a-z][a-z0-9_]*_passports$/.test(tableName)) {
         throw new Error(`Refusing to drop table with unexpected name: ${tableName}`);
       }
       await pool.query(`DROP TABLE IF EXISTS "${tableName}"`);
@@ -270,9 +314,9 @@ module.exports = function registerCatalogRoutes(app, deps) {
         return res.status(400).json({ error: "typeName, displayName, productCategory, and sections are required" });
       }
 
-      if (!/^[a-z][a-z0-9_]{1,99}$/.test(typeName)) {
+      if (!/^[a-z][A-Za-z0-9]{1,99}$/.test(typeName)) {
         return res.status(400).json({
-          error: "typeName must be lowercase letters/numbers/underscores, 2-100 chars, start with a letter"
+          error: "typeName must be camelCase letters/numbers, 2-100 chars, start with a lowercase letter"
         });
       }
 
@@ -393,9 +437,9 @@ module.exports = function registerCatalogRoutes(app, deps) {
     storage: multer.memoryStorage(),
     limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-      const allowed = [".svg", ".png", ".jpg", ".jpeg", ".webp"];
+      const allowed = [".png", ".jpg", ".jpeg", ".webp"];
       if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
-      else cb(new Error("Only SVG, PNG, JPG, WebP files are allowed"));
+      else cb(new Error("Only PNG, JPG, and WebP files are allowed"));
     }
   });
 

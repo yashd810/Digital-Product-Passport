@@ -7,10 +7,9 @@ Service-specific documentation lives here so application folders stay focused on
 | App | Doc | Source | Purpose |
 | --- | --- | --- | --- |
 | Backend API | [backend-api.md](./backend-api.md) | `apps/backend-api` | Express.js REST API with PostgreSQL persistence |
-| Frontend dashboard | [frontend-app.md](./frontend-app.md) | `apps/frontend-app` | React 18 authenticated dashboard application |
+| Frontend dashboard | [frontend-app.md](./frontend-app.md) | `apps/frontend-app` | React 18 authenticated dashboard application, including Passport Data Management |
 | Public passport viewer | [public-passport-viewer.md](./public-passport-viewer.md) | `apps/public-passport-viewer` | React 18 public passport viewer shell |
 | Marketing site | [marketing-site.md](./marketing-site.md) | `apps/marketing-site` | Static HTML/CSS/JS marketing and legal pages |
-| Asset management | See [Service Map](../architecture/SERVICES.md) | `apps/asset-management` | Static UI for asset management operations |
 
 ## Quick Links
 

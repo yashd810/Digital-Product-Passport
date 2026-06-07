@@ -170,7 +170,7 @@ const createRateLimiters = (pool) => {
       key: (req) => `asset-write:${req.ip}:${req.assetContext?.companyId || ""}:${req.assetContext?.userId || ""}:${req.path}`,
       limit: envInt("RATE_LIMIT_ASSET_WRITE_MAX", 90),
       windowMs: envInt("RATE_LIMIT_ASSET_WRITE_WINDOW_MS", 60 * 1000),
-      message: "Too many Asset Management requests. Please slow down and try again shortly."
+      message: "Too many Passport Data Management requests. Please slow down and try again shortly."
     }),
 
     assetSourceFetchRateLimit: rateLimit({

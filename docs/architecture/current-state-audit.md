@@ -158,11 +158,10 @@ ENABLE_ACCESS_REVOCATION=true
 - `passports.js` - 40+ passport CRUD endpoints ✅
 - `passport-public.js` - 8+ public read endpoints ✅
 - `dpp-api.js` - 15+ standards-oriented endpoints ✅
-- `dictionary.js` - 7 battery dictionary endpoints ✅
+- `dictionary.js` - generic semantic dictionary endpoints for `/dictionary/:family/:version/*` ✅
 - `workflow.js` - 5 approval workflow endpoints ✅
 - `repository.js` - 10 file management endpoints ✅
 - `asset-management-api.js` - 10+ bulk operation endpoints ✅
-- `asset-management-launch.js` - 3+ session endpoints ✅
 - `messaging.js` - 6 conversation endpoints ✅
 - `notifications.js` - 4 notification endpoints ✅
 - `health.js` - 2 health check endpoints ✅
@@ -276,7 +275,7 @@ See [Security Architecture](../security/access-revocation-process.md) for more d
 - `company_dpp_policies` table added for per-company feature control
 - `passport_signing_keys.algorithm_version` tracks signature algorithm
 - Type tables now include `granularity` column for policy-based issuance
-- Battery dictionary versioning implemented independently
+- Semantic dictionary resources are versioned independently and linked to passport modules by `semanticModelKey`
 
 ### Backward Compatibility
 

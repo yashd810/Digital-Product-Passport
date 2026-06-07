@@ -1,0 +1,39 @@
+[
+  {
+    "key": "product-identification",
+    "label": "Product Identification",
+    "description": "Product Identification attributes.",
+    "termCount": 2,
+    "terms": [
+      {
+        "number": 1,
+        "slug": "product-model-identifier",
+        "internalKey": "productModelIdentifier",
+        "label": "Product Model Identifier",
+        "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/terms/product-model-identifier"
+      },
+      {
+        "number": 2,
+        "slug": "manufacturer-name",
+        "internalKey": "manufacturerName",
+        "label": "Manufacturer Name",
+        "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/terms/manufacturer-name"
+      }
+    ]
+  },
+  {
+    "key": "technical-characteristics",
+    "label": "Technical Characteristics",
+    "description": "Technical Characteristics attributes.",
+    "termCount": 1,
+    "terms": [
+      {
+        "number": 3,
+        "slug": "rated-power",
+        "internalKey": "ratedPower",
+        "label": "Rated Power",
+        "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/terms/rated-power"
+      }
+    ]
+  }
+]

@@ -73,8 +73,8 @@ module.exports = function registerUserAccessRoutes(app, deps) {
       if (typeRes.rows.length) {
         const tableName = getTable(typeRes.rows[0].typeName);
         await pool.query(
-          `UPDATE ${tableName} SET release_status = 'released', updated_at = NOW()
-           WHERE company_id = $1 AND release_status IN ('draft', 'in_review')`,
+          `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
+           WHERE "companyId" = $1 AND "releaseStatus" IN ('draft', 'in_revision')`,
           [companyId]
         );
       }

@@ -1,10 +1,62 @@
 "use strict";
 
+function defaultMiddleware(_req, _res, next) {
+  next();
+}
+
+function isSafeModelKey(value) {
+  return /^[A-Za-z0-9_.:-]{1,160}$/.test(String(value || ""));
+}
+
+function isSafePathSegment(value) {
+  return /^[A-Za-z0-9_-]{1,80}$/.test(String(value || ""));
+}
+
+function filterTerms(terms, { category, search } = {}) {
+  let results = Array.isArray(terms) ? terms : [];
+
+  if (category) {
+    results = results.filter((term) => term?.category === category);
+  }
+
+  if (search) {
+    const q = String(search).toLowerCase();
+    results = results.filter((term) =>
+      String(term?.label || "").toLowerCase().includes(q)
+      || String(term?.definition || "").toLowerCase().includes(q)
+      || String(term?.slug || "").toLowerCase().includes(q)
+      || (term?.appFieldKeys || []).some((key) => String(key).toLowerCase().includes(q))
+    );
+  }
+
+  return results;
+}
+
+function unknownSemanticModelSummary(modelKey, rows = []) {
+  return {
+    semanticModelKey: modelKey,
+    key: modelKey,
+    name: modelKey,
+    description: "",
+    registered: false,
+    passportTypes: rows.map((row) => ({
+      typeName: row.typeName,
+      displayName: row.displayName,
+      productCategory: row.productCategory,
+    })).filter((row) => row.typeName),
+  };
+}
+
 module.exports = function registerDictionaryRoutes(app, {
-  publicReadRateLimit,
-  batteryDictionaryService,
+  pool = null,
+  publicReadRateLimit = defaultMiddleware,
+  authenticateToken = defaultMiddleware,
+  checkCompanyAccess = defaultMiddleware,
+  semanticModelRegistry,
 }) {
-  const svc = batteryDictionaryService;
+  if (!semanticModelRegistry) {
+    throw new Error("semanticModelRegistry is required for dictionary routes");
+  }
 
   const setCache = (res, contentType = "application/json") => {
     res.setHeader("Content-Type", contentType);
@@ -22,73 +74,157 @@ module.exports = function registerDictionaryRoutes(app, {
     res.send(`${JSON.stringify(payload, null, 2)}\n`);
   };
 
-  // ─── JSON-LD CONTEXT (served at canonical dictionary URL) ─────────────────
-  app.get(["/dictionary/battery/v1/context.jsonld", "/api/dictionary/battery/v1/context.jsonld"], publicReadRateLimit, (_req, res) => {
-    sendPrettyJson(res, svc.getContext(), "application/ld+json");
-  });
-
-  // ─── DCAT/DCAT-AP CATALOG ────────────────────────────────────────────────
-  app.get(["/dictionary/battery/v1/catalog.jsonld", "/api/dictionary/battery/v1/catalog.jsonld"], publicReadRateLimit, (_req, res) => {
-    sendPrettyJson(res, svc.getDcatCatalog(), "application/ld+json");
-  });
-
-  // ─── MANIFEST ─────────────────────────────────────────────────────────────
-  app.get(["/api/dictionary/battery/v1/manifest", "/dictionary/battery/v1/manifest.json"],
-    publicReadRateLimit, (_req, res) => {
-      sendPrettyJson(res, svc.getManifest());
-    });
-
-  // ─── CATEGORIES ───────────────────────────────────────────────────────────
-  app.get(["/api/dictionary/battery/v1/categories", "/dictionary/battery/v1/categories"], publicReadRateLimit, (_req, res) => {
-    sendPrettyJson(res, svc.getCategories());
-  });
-
-  // ─── UNITS ────────────────────────────────────────────────────────────────
-  app.get(["/api/dictionary/battery/v1/units", "/dictionary/battery/v1/units"], publicReadRateLimit, (_req, res) => {
-    sendPrettyJson(res, svc.getUnits());
-  });
-
-  // ─── FIELD MAP ────────────────────────────────────────────────────────────
-  app.get(["/api/dictionary/battery/v1/field-map", "/dictionary/battery/v1/field-map"], publicReadRateLimit, (_req, res) => {
-    sendPrettyJson(res, svc.getFieldMap());
-  });
-
-  // ─── CATEGORY RULES / APPLICABILITY ──────────────────────────────────────
-  app.get(["/api/dictionary/battery/v1/category-rules", "/dictionary/battery/v1/category-rules.json"],
-    publicReadRateLimit, (_req, res) => {
-      sendPrettyJson(res, svc.getCategoryRules());
-    });
-
-  // ─── TERMS (all, or filtered by category) ────────────────────────────────
-  app.get(["/api/dictionary/battery/v1/terms", "/dictionary/battery/v1/terms"], publicReadRateLimit, (req, res) => {
-    const { category, search } = req.query;
-    let results = svc.getTerms();
-
-    if (category) {
-      results = results.filter(t => t.category === category);
+  const getModelByKey = (req, res) => {
+    const modelKey = String(req.params.modelKey || "").trim();
+    if (!isSafeModelKey(modelKey)) {
+      sendPrettyError(res, 400, { error: "Invalid semantic model key" });
+      return null;
     }
-
-    if (search) {
-      const q = String(search).toLowerCase();
-      results = results.filter(t =>
-        t.label.toLowerCase().includes(q) ||
-        t.definition.toLowerCase().includes(q) ||
-        t.slug.includes(q) ||
-        (t.appFieldKeys || []).some(k => k.includes(q))
-      );
+    const model = semanticModelRegistry.getModel(modelKey);
+    if (!model) {
+      sendPrettyError(res, 404, { error: "Semantic model not found" });
+      return null;
     }
+    return model;
+  };
 
-    sendPrettyJson(res, results);
-  });
+  const getModelByPath = (req, res) => {
+    const family = String(req.params.family || "").trim();
+    const version = String(req.params.version || "").trim();
+    if (!isSafePathSegment(family) || !isSafePathSegment(version)) {
+      sendPrettyError(res, 400, { error: "Invalid dictionary path" });
+      return null;
+    }
+    const model = semanticModelRegistry.getModelByPath(family, version);
+    if (!model) {
+      sendPrettyError(res, 404, { error: "Dictionary not found" });
+      return null;
+    }
+    return model;
+  };
 
-  // ─── SINGLE TERM ──────────────────────────────────────────────────────────
-  app.get(["/api/dictionary/battery/v1/terms/:slug", "/dictionary/battery/v1/terms/:slug"], publicReadRateLimit, (req, res) => {
+  const sendArtifact = (req, res, model, artifact) => {
+    if (!model) return null;
+    if (artifact === "manifest") return sendPrettyJson(res, model.manifest);
+    if (artifact === "context") return sendPrettyJson(res, model.context, "application/ld+json");
+    if (artifact === "catalog") {
+      if (!model.dcatCatalog) return sendPrettyError(res, 404, { error: "Catalog not found" });
+      return sendPrettyJson(res, model.dcatCatalog, "application/ld+json");
+    }
+    if (artifact === "categories") return sendPrettyJson(res, model.categories);
+    if (artifact === "units") return sendPrettyJson(res, model.units);
+    if (artifact === "field-map") return sendPrettyJson(res, model.fieldMap);
+    if (artifact === "category-rules") {
+      if (!model.categoryRules) return sendPrettyError(res, 404, { error: "Category rules not found" });
+      return sendPrettyJson(res, model.categoryRules);
+    }
+    if (artifact === "terms") return sendPrettyJson(res, filterTerms(model.terms, req.query));
+    return sendPrettyError(res, 404, { error: "Dictionary artifact not found" });
+  };
+
+  const sendTerm = (req, res, model) => {
+    if (!model) return null;
     const slug = String(req.params.slug || "").trim().toLowerCase();
     if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
       return sendPrettyError(res, 400, { error: "Invalid slug" });
     }
-    const term = svc.getTermBySlug(slug);
+    const term = semanticModelRegistry.getTermBySlug(model.semanticModelKey, slug);
     if (!term) return sendPrettyError(res, 404, { error: "Term not found" });
-    sendPrettyJson(res, term);
+    return sendPrettyJson(res, term);
+  };
+
+  app.get("/api/semantic-models", publicReadRateLimit, (_req, res) => {
+    sendPrettyJson(res, semanticModelRegistry.listModels());
+  });
+
+  app.get("/api/semantic-models/:modelKey", publicReadRateLimit, (req, res) => {
+    const model = getModelByKey(req, res);
+    if (!model) return null;
+    return sendPrettyJson(res, {
+      ...semanticModelRegistry.summarizeModel(model),
+      manifest: model.manifest,
+    });
+  });
+
+  for (const [suffix, artifact] of [
+    ["manifest", "manifest"],
+    ["context.jsonld", "context"],
+    ["catalog.jsonld", "catalog"],
+    ["categories", "categories"],
+    ["units", "units"],
+    ["field-map", "field-map"],
+    ["category-rules", "category-rules"],
+    ["terms", "terms"],
+  ]) {
+    app.get(`/api/semantic-models/:modelKey/${suffix}`, publicReadRateLimit, (req, res) => {
+      sendArtifact(req, res, getModelByKey(req, res), artifact);
+    });
+  }
+
+  app.get("/api/semantic-models/:modelKey/terms/:slug", publicReadRateLimit, (req, res) => {
+    sendTerm(req, res, getModelByKey(req, res));
+  });
+
+  for (const [paths, artifact] of [
+    [["/api/dictionary/:family/:version/context.jsonld", "/dictionary/:family/:version/context.jsonld"], "context"],
+    [["/api/dictionary/:family/:version/catalog.jsonld", "/dictionary/:family/:version/catalog.jsonld"], "catalog"],
+    [["/api/dictionary/:family/:version/manifest", "/dictionary/:family/:version/manifest.json"], "manifest"],
+    [["/api/dictionary/:family/:version/categories", "/dictionary/:family/:version/categories"], "categories"],
+    [["/api/dictionary/:family/:version/units", "/dictionary/:family/:version/units"], "units"],
+    [["/api/dictionary/:family/:version/field-map", "/dictionary/:family/:version/field-map"], "field-map"],
+    [["/api/dictionary/:family/:version/category-rules", "/dictionary/:family/:version/category-rules.json"], "category-rules"],
+    [["/api/dictionary/:family/:version/terms", "/dictionary/:family/:version/terms"], "terms"],
+  ]) {
+    app.get(paths, publicReadRateLimit, (req, res) => {
+      sendArtifact(req, res, getModelByPath(req, res), artifact);
+    });
+  }
+
+  app.get(["/api/dictionary/:family/:version/terms/:slug", "/dictionary/:family/:version/terms/:slug"], publicReadRateLimit, (req, res) => {
+    sendTerm(req, res, getModelByPath(req, res));
+  });
+
+  app.get("/api/companies/:companyId/semantic-models", authenticateToken, checkCompanyAccess, async (req, res) => {
+    if (!pool) return res.status(503).json({ error: "Database is unavailable" });
+    try {
+      const result = await pool.query(
+        `SELECT pt."semanticModelKey" AS "semanticModelKey",
+                pt."typeName" AS "typeName",
+                pt."displayName" AS "displayName",
+                pt."productCategory" AS "productCategory"
+           FROM passport_types pt
+           JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
+          WHERE cpa.company_id = $1
+            AND cpa.access_revoked = FALSE
+            AND COALESCE(pt."semanticModelKey", '') <> ''
+          ORDER BY pt."semanticModelKey", pt."displayName"`,
+        [req.params.companyId]
+      );
+
+      const rowsByModelKey = new Map();
+      for (const row of result.rows || []) {
+        const modelKey = String(row.semanticModelKey || "").trim();
+        if (!modelKey) continue;
+        if (!rowsByModelKey.has(modelKey)) rowsByModelKey.set(modelKey, []);
+        rowsByModelKey.get(modelKey).push(row);
+      }
+
+      const models = [...rowsByModelKey.entries()].map(([modelKey, rows]) => {
+        const model = semanticModelRegistry.getModel(modelKey);
+        if (!model) return unknownSemanticModelSummary(modelKey, rows);
+        return {
+          ...semanticModelRegistry.summarizeModel(model),
+          passportTypes: rows.map((row) => ({
+            typeName: row.typeName,
+            displayName: row.displayName,
+            productCategory: row.productCategory,
+          })),
+        };
+      });
+
+      res.json(models);
+    } catch {
+      res.status(500).json({ error: "Failed to fetch semantic models" });
+    }
   });
 };

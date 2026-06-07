@@ -1,7 +1,7 @@
 # Passport Type And Storage Model
 
-Last updated: 2026-05-05  
-Status: Verified - storage model structure correct (47 tables total)
+Last updated: 2026-06-04  
+Status: Current storage model after passport module refactor
 
 This document summarizes how passport type definitions and passport records are stored.
 
@@ -10,17 +10,12 @@ This document summarizes how passport type definitions and passport records are 
 The passport storage model is hybrid:
 
 - passport type definitions live in `passport_types`
-- each passport type gets one live relational table named `<type_name>_passports`
+- stable production type definitions should come from versioned backend modules under `apps/backend-api/src/passport-modules/`
+- each passport type gets one live relational table derived from its camelCase `typeName`, for example `appliancePassportV1` -> `appliance_passport_v1_passports`
 - shared support tables handle registry, archives, files, signatures, access control, scans, backups, and lifecycle evidence
 - JSONB is used for type schemas, snapshots, audits, evidence, and backup envelopes, but live passport records are not stored as one giant JSON blob
 
-Local development database observation on 2026-05-03:
-
-- `passport_types`: `0`
-- dynamic `*_passports` live tables: `0`
-- fixed passport-related/support tables: `24`
-
-Those counts describe the local running database at the time of inspection. Production or seeded environments may differ.
+Fresh seeded development installs currently include module-backed examples such as `batteryPassportV1`, `textilePassportV1`, and `appliancePassportV1`. Production or local environments may differ depending on seeded modules and tenant grants.
 
 ## Passport Type Definitions
 
@@ -28,14 +23,14 @@ Passport types are stored in `passport_types`.
 
 Important columns:
 
-- `type_name`: machine name, for example `battery`
-- `display_name`: user-facing label
-- `product_category`: grouping/category
-- `semantic_model_key`: optional semantic model mapping key
-- `fields_json JSONB`: type schema containing sections and fields
-- `is_active`: whether the type is available
+- `typeName`: camelCase machine name, for example `batteryPassportV1`
+- `displayName`: user-facing label
+- `productCategory`: grouping/category
+- `semanticModelKey`: optional registered semantic model mapping key
+- `fieldsJson JSONB`: type schema containing module metadata, compliance profile, sections, and fields
+- `isActive`: whether the type is available
 
-The type schema is stored as JSONB in `fields_json`, including an explicit `schemaVersion`:
+The type schema is stored as JSONB in `fieldsJson`, including an explicit `schemaVersion`:
 
 ```json
 {
@@ -64,9 +59,9 @@ Relevant code:
 
 ## Dynamic Live Passport Tables
 
-When a passport type is created, the backend creates a live table for that type.
+When a passport type is seeded or created, the backend creates a live table for that type.
 
-The table name is derived from `type_name`:
+The table name is derived from `typeName`:
 
 ```text
 <safe_type_name>_passports
@@ -75,7 +70,8 @@ The table name is derived from `type_name`:
 Examples:
 
 ```text
-battery -> battery_passports
+batteryPassportV1 -> battery_passport_v1_passports
+appliancePassportV1 -> appliance_passport_v1_passports
 ```
 
 The helper replaces unsafe characters with underscores before appending `_passports`.
@@ -85,9 +81,9 @@ Each live passport table has shared system columns, including:
 - `id`
 - `dppId`
 - `lineageId`
-- `company_id`
+- `companyId`
 - `modelName`
-- `product_id`
+- `internalAliasId`
 - `uniqueProductIdentifier`
 - `complianceProfileKey`
 - `contentSpecificationIds`
@@ -99,13 +95,13 @@ Each live passport table has shared system columns, including:
 - `releaseStatus`
 - `versionNumber`
 - `qr_code`
-- `created_by`
-- `updated_by`
-- `created_at`
-- `updated_at`
-- `deleted_at`
+- `createdBy`
+- `updatedBy`
+- `createdAt`
+- `updatedAt`
+- `deletedAt`
 
-Custom fields from `passport_types.fields_json.sections[].fields[]` become real columns on the dynamic table:
+Custom fields from `passport_types.fieldsJson.sections[].fields[]` become real columns on the dynamic table:
 
 - `boolean` fields become `BOOLEAN DEFAULT false`
 - structured fields such as `table`, or fields marked with `storageType: "jsonb"`, become `JSONB`
@@ -139,7 +135,7 @@ Allowed:
 
 - adding a new field
 - changing labels or section placement
-- changing display metadata such as `display_name`, `product_category`, or `semantic_model_key`
+- changing display metadata such as `displayName`, `productCategory`, or `semanticModelKey`
 
 Blocked:
 
@@ -148,7 +144,7 @@ Blocked:
 
 Blocked changes return `PASSPORT_TYPE_SCHEMA_CHANGE_REQUIRES_NEW_VERSION`. In that case, create a new passport type version and migrate intentionally rather than mutating historical storage shape in place.
 
-Each section update increments `fields_json.schemaVersion`. The live table is reconciled after the type update so newly added fields are added as columns.
+Each section update increments `fieldsJson.schemaVersion`. The live table is reconciled after the type update so newly added fields are added as columns.
 
 Dynamic table creation/reconciliation is tracked in `passport_type_schema_events`.
 
@@ -160,26 +156,26 @@ Important columns:
 
 - `dppId`
 - `lineageId`
-- `company_id`
+- `companyId`
 - `passportType`
 - `versionNumber`
 - `modelName`
-- `product_id`
+- `internalAliasId`
 - `uniqueProductIdentifier`
 - `releaseStatus`
-- `row_data JSONB`
-- `archived_by`
-- `archived_at`
+- `rowData JSONB`
+- `archivedBy`
+- `archivedAt`
 
-`row_data` is a JSONB snapshot of the passport row at archive time. This is intentionally blob-like because archived records need to preserve historical row shape even if the live type schema changes later.
+`rowData` is a JSONB snapshot of the passport row at archive time. This is intentionally blob-like because archived records need to preserve historical row shape even if the live type schema changes later.
 
 ## JSONB Usage
 
 The system uses JSONB in several places:
 
-- `passport_types.fields_json`: type schema/configuration
+- `passport_types.fieldsJson`: type schema/configuration
 - dynamic live passport tables: `carrierAuthenticity`
-- `passport_archives.row_data`: archived row snapshot
+- `passport_archives.rowData`: archived row snapshot
 - `passport_backup_replications.payload_json`: backup envelope snapshot
 - `backup_public_handovers.public_row_data`: public handover snapshot
 - `passport_type_drafts.draft_json`: type-builder draft state
@@ -243,7 +239,7 @@ cd apps/backend-api
 npm run check:passport-storage
 ```
 
-The check compares every `passport_types.fields_json` definition against the actual `<type>_passports` table and reports:
+The check compares every `passport_types.fieldsJson` definition against the actual `<type>_passports` table and reports:
 
 - missing live tables
 - missing custom columns
@@ -270,9 +266,9 @@ SELECT COUNT(*) FROM passport_types;
 List passport types:
 
 ```sql
-SELECT type_name, display_name, is_active
+SELECT "typeName", "displayName", "isActive"
 FROM passport_types
-ORDER BY type_name;
+ORDER BY "typeName";
 ```
 
 Count dynamic passport tables:

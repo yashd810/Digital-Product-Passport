@@ -5,7 +5,15 @@ const { createValidationMiddleware } = require("../../shared/validation/request-
 const { quoteSqlIdentifier } = require("../../shared/passports/passport-helpers");
 const { updateEditablePassportUseCase } = require("./application/update-passport");
 
-module.exports = function registerUpdateRoutes(app, deps) {
+const BULK_PATCH_BUILT_IN_EDITABLE_FIELDS = new Set(["internalAliasId", "modelName"]);
+
+function getInvalidBulkPatchFieldKeys(fields = {}, typeSchema, builtInCols = BULK_PATCH_BUILT_IN_EDITABLE_FIELDS) {
+  return Object.keys(fields || {}).filter((key) =>
+    !typeSchema?.allowedKeys?.has?.(key) && !builtInCols.has(key)
+  );
+}
+
+function registerUpdateRoutes(app, deps) {
   const {
     pool,
     logger,
@@ -38,7 +46,6 @@ module.exports = function registerUpdateRoutes(app, deps) {
     buildCarrierAuthenticityStorageValue,
     getCompanyNameMap,
     buildComplianceManagedFields,
-    SYSTEM_PASSPORT_FIELDS,
   } = deps;
 
   const updateEditablePassport = updateEditablePassportUseCase(deps);
@@ -264,10 +271,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
             continue;
           }
 
-          const builtInCols = new Set(["internalAliasId", "modelName"]);
-          const invalidKeys = Object.keys(fields).filter((key) =>
-            !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key) && !builtInCols.has(key)
-          );
+          const invalidKeys = getInvalidBulkPatchFieldKeys(fields, typeSchema);
           if (invalidKeys.length) {
             details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "failed", error: `Unknown field(s): ${invalidKeys.join(", ")}` });
             failed += 1;
@@ -394,4 +398,7 @@ module.exports = function registerUpdateRoutes(app, deps) {
       return handleRouteError(res, error, "Bulk update failed");
     }
   });
-};
+}
+
+module.exports = registerUpdateRoutes;
+module.exports.getInvalidBulkPatchFieldKeys = getInvalidBulkPatchFieldKeys;
