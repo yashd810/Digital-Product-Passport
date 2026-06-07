@@ -543,6 +543,31 @@ async function initDb(pool, {
 	      UNIQUE (backup_provider_key, passport_dpp_id, version_number, snapshot_scope)
 	    )
 	  `);
+  await renameLegacyColumns(pool, "passport_backup_replications", [
+    ["backupProviderId", "backup_provider_id"],
+    ["backupProviderKey", "backup_provider_key"],
+    ["passportDppId", "passport_dpp_id"],
+    ["lineageId", "lineage_id"],
+    ["companyId", "company_id"],
+    ["passportType", "passport_type"],
+    ["versionNumber", "version_number"],
+    ["dppId", "dpp_id"],
+    ["snapshotScope", "snapshot_scope"],
+    ["replicationStatus", "replication_status"],
+    ["storageProvider", "storage_provider"],
+    ["storageKey", "storage_key"],
+    ["publicUrl", "public_url"],
+    ["payloadHash", "payload_hash"],
+    ["payloadJson", "payload_json"],
+    ["errorMessage", "error_message"],
+    ["verificationStatus", "verification_status"],
+    ["verificationErrorMessage", "verification_error_message"],
+    ["verifiedPayloadHash", "verified_payload_hash"],
+    ["lastVerifiedAt", "last_verified_at"],
+    ["replicatedAt", "replicated_at"],
+    ["createdAt", "created_at"],
+    ["updatedAt", "updated_at"],
+  ], { mergeDuplicates: true });
 	  await pool.query(`
 	    CREATE INDEX IF NOT EXISTS idx_passport_backup_replications_passport
 	      ON passport_backup_replications(company_id, passport_dpp_id, version_number DESC)
@@ -752,6 +777,29 @@ async function initDb(pool, {
 	      updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	    )
 	  `);
+  await renameLegacyColumns(pool, "backup_public_handovers", [
+    ["companyId", "company_id"],
+    ["passportDppId", "passport_dpp_id"],
+    ["lineageId", "lineage_id"],
+    ["passportType", "passport_type"],
+    ["internalAliasId", "internal_alias_id"],
+    ["versionNumber", "version_number"],
+    ["backupProviderId", "backup_provider_id"],
+    ["backupProviderKey", "backup_provider_key"],
+    ["sourceReplicationId", "source_replication_id"],
+    ["storageKey", "storage_key"],
+    ["publicUrl", "public_url"],
+    ["publicCompanyName", "public_company_name"],
+    ["publicRowData", "public_row_data"],
+    ["handoverStatus", "handover_status"],
+    ["verificationStatus", "verification_status"],
+    ["activatedBy", "activated_by"],
+    ["deactivatedBy", "deactivated_by"],
+    ["activatedAt", "activated_at"],
+    ["deactivatedAt", "deactivated_at"],
+    ["createdAt", "created_at"],
+    ["updatedAt", "updated_at"],
+  ], { mergeDuplicates: true });
   await pool.query(`
     DO $$
     BEGIN
