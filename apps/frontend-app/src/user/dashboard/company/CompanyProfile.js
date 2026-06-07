@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import CompanyLogoUpload from "./CompanyLogoUpload";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
-import "../../../assets/styles/Dashboard.css";
+import "../../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 

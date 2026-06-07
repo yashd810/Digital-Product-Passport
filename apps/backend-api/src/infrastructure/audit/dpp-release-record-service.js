@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/dpp-release-record-service");
+module.exports = require("../../services/dpp-release-record-service");

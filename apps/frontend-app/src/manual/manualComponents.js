@@ -76,6 +76,18 @@ export function ManualSection({ section }) {
         </div>
       </div>
 
+      {section.simpleGuide?.items?.length ? (
+        <div className="manual-callout manual-callout-plain">
+          <strong>{section.simpleGuide.title || "In simple words"}</strong>
+          {section.simpleGuide.intro ? <p className="manual-callout-copy">{section.simpleGuide.intro}</p> : null}
+          <ul className="manual-list">
+            {section.simpleGuide.items.map((item) => (
+              <li key={`${section.id}-${item}`}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {section.facts?.length ? (
         <div className="manual-facts-grid">
           {section.facts.map((fact) => (

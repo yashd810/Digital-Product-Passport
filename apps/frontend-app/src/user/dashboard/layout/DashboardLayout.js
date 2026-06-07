@@ -5,7 +5,7 @@ import { applyTheme, getStoredTheme } from "../../../app/providers/ThemeContext"
 import { useI18n } from "../../../app/providers/i18n";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath, resolveDashboardCompanySlug } from "../utils/dashboardRoutes";
-import "../../../assets/styles/Dashboard.css";
+import "../../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 

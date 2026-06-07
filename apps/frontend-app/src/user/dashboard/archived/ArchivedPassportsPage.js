@@ -6,7 +6,7 @@ import { formatPassportStatus, isPublishedPassportStatus, normalizePassportStatu
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode";
 import { getPassportSerialNumberForType } from "../passports/utils/passportListHelpers";
-import "../../../assets/styles/Dashboard.css";
+import "../../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 

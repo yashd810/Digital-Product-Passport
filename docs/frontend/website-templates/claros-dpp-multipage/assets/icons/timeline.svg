@@ -1,6 +1,0 @@
-<svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="timeline icon">
-  <rect x="4" y="4" width="64" height="64" rx="20" fill="#EAF6F4"/>
-  <g stroke="#0F766E" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 18v40"/><path d="M18 22h30l-5 8 5 8H18"/><circle cx="18" cy="18" r="5" fill="#0F766E" stroke="none"/><circle cx="18" cy="38" r="5" fill="#0F766E" stroke="none"/><circle cx="18" cy="58" r="5" fill="#0F766E" stroke="none"/><path d="M25 38h28"/><path d="M25 58h18"/>
-  </g>
-</svg>

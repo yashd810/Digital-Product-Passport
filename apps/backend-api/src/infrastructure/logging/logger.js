@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/logger");
+module.exports = require("../../services/logger");

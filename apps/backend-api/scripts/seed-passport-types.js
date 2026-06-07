@@ -61,7 +61,7 @@ function createPool() {
 }
 
 function createStorageService(pool) {
-  const createPassportService = require("../services/passport-service");
+  const createPassportService = require("../src/services/passport-service");
   const {
     IN_REVISION_STATUS,
     SYSTEM_PASSPORT_FIELDS,

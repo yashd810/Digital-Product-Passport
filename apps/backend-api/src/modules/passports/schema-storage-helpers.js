@@ -1,7 +1,7 @@
 "use strict";
 
 const nodeCrypto = require("crypto");
-const { normalizeSystemPassportHeader } = require("../../../services/passport-header-fields");
+const { normalizeSystemPassportHeader } = require("../../shared/identifiers/passport-header-fields");
 
 function createSchemaStorageHelpers({
   pool,

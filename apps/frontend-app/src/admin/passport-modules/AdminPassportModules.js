@@ -104,43 +104,56 @@ function AdminPassportModules() {
         {moduleTemplates.length === 0 ? (
           <div className="apt-moduleTemplates-empty">No passport modules are registered in code.</div>
         ) : (
-          <div className="apt-moduleTemplates-grid">
+          <div className="apt-cards apt-moduleTemplates-grid">
             {moduleTemplates.map((moduleTemplate) => {
               const dictionaryModel = semanticModelByKey.get(moduleTemplate.semanticModelKey);
               const dictionaryPath = buildDictionaryPath(dictionaryModel);
               return (
                 <div
                   key={moduleTemplate.moduleKey}
-                  className={`apt-moduleTemplate-card ${moduleTemplate.seeded ? "apt-moduleTemplate-card-seeded" : ""}`}
+                  className={`apt-card apt-moduleTemplate-card ${moduleTemplate.seeded ? "" : "apt-card-inactive"}`}
                 >
-                  <div className="apt-moduleTemplate-topline">
-                    <span className="apt-moduleTemplate-icon">{moduleTemplate.productIcon || "PT"}</span>
-                    <span className={`apt-badge ${moduleTemplate.seeded ? "apt-badge-active" : "apt-badge-draft"}`}>
-                      {moduleTemplate.seeded ? "Seeded" : "Ready to seed"}
+                  <div className="apt-card-header">
+                    <div>
+                      <div className="apt-card-display-name">{moduleTemplate.displayName}</div>
+                      <code className="apt-card-type-name">{moduleTemplate.moduleKey}</code>
+                    </div>
+                    <div className="admin-inline-stack">
+                      <span className={`apt-badge ${moduleTemplate.seeded ? "apt-badge-active" : "apt-badge-draft"}`}>
+                        {moduleTemplate.seeded ? "Seeded" : "Ready to seed"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="apt-card-meta">
+                    <span className="apt-card-meta-primary">
+                      {moduleTemplate.fieldCount || 0} fields in the registered module
+                    </span>
+                    <span className="apt-card-meta-secondary">
+                      Product category: {moduleTemplate.productCategory || "Uncategorized"}
+                    </span>
+                    <span className="apt-card-meta-secondary">
+                      Semantic model: {getSemanticModelLabel(moduleTemplate.semanticModelKey)}
+                    </span>
+                    <span className="apt-card-meta-secondary">
+                      Runtime type: {moduleTemplate.typeName || "Created when the module is seeded"}
                     </span>
                   </div>
-                  <div className="apt-moduleTemplate-name">{moduleTemplate.displayName}</div>
-                  <code className="apt-card-type-name">{moduleTemplate.moduleKey}</code>
-                  <div className="apt-moduleTemplate-meta">
-                    <span>{moduleTemplate.productCategory}</span>
-                    <span>{moduleTemplate.fieldCount || 0} fields</span>
-                    <span>{getSemanticModelLabel(moduleTemplate.semanticModelKey)}</span>
-                  </div>
-                  <div className="apt-moduleTemplate-command-row">
-                    <code className="apt-moduleTemplate-command">{moduleTemplate.seedCommand}</code>
+
+                  <div className="apt-card-actions apt-moduleTemplate-actions">
                     <button
                       type="button"
                       className="apt-view-fields-btn"
                       onClick={() => handleCopySeedCommand(moduleTemplate.seedCommand)}
                     >
-                      Copy
+                      Copy Seed
                     </button>
                     <button
                       type="button"
-                      className="apt-add-productCategory-btn apt-moduleTemplate-guide-btn"
+                      className="apt-view-fields-btn"
                       onClick={() => setSeedGuideModule(moduleTemplate)}
                     >
-                      Guide
+                      Open Guide
                     </button>
                     {dictionaryPath && (
                       <button
@@ -151,6 +164,10 @@ function AdminPassportModules() {
                         Dictionary
                       </button>
                     )}
+                  </div>
+
+                  <div className="apt-immutable-note apt-moduleTemplate-command-note">
+                    <code className="apt-moduleTemplate-command">{moduleTemplate.seedCommand}</code>
                   </div>
                 </div>
               );

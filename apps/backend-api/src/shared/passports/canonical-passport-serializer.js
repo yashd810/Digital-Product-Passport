@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/canonicalPassportSerializer");
+module.exports = require("../../services/canonicalPassportSerializer");

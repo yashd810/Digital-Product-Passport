@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/access-rights-service");
+module.exports = require("../../services/access-rights-service");

@@ -34,6 +34,16 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       audience: "All company users",
       title: "Navigate the workspace with confidence",
       summary: "Use the left sidebar as your home base. The dashboard groups work into analytics, passports, collaboration, settings, and audit tools so you can move from creation to release without leaving the workspace.",
+      simpleGuide: {
+        title: "In simple words",
+        intro: "If you are new, use the dashboard in this order instead of trying to learn everything at once:",
+        items: [
+          "Start on Overview to see what needs attention today.",
+          "Go to Passports when you want to create, edit, release, or export product records.",
+          "Use Notifications and Messages when you need to respond to people or workflow events.",
+          "Open profile, company, repository, or security pages only when you need account or company setup work.",
+        ],
+      },
       facts: [
         { label: "Best first stop", value: "Overview for activity, totals, and analytics snapshots" },
         { label: "Role-aware access", value: user?.role === "viewer" ? "You are currently read-only for passport content." : `${prettifyName(user?.role)} users can work directly in passport flows.` },
@@ -91,6 +101,16 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       audience: "Editors and company admins",
       title: "Create passports from one hub",
       summary: "All passport creation starts from a single hub: the Create Passport page, reachable with the green button at the top of the sidebar. Pick a type, pick a method, and the hub guides you the rest of the way for single records, template-driven work, and bulk import/update flows.",
+      simpleGuide: {
+        title: "Quick way to choose",
+        intro: "Most teams can pick the right path with one simple question:",
+        items: [
+          "Creating one passport by hand? Use Fill the form.",
+          "Reusing the same model often? Use Create from template.",
+          "Need many drafts first? Use Bulk create.",
+          "Already have the data in a file? Use CSV or JSON import.",
+        ],
+      },
       facts: [
         { label: "Entry point", value: "The green '+ Create Passport' button at the top of the sidebar, or /dashboard/create directly." },
         { label: "Step 1", value: "Select the passport type you want to create for." },
@@ -198,6 +218,16 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       audience: "Editors and company admins",
       title: "Manage records, versions, exports, and release status",
       summary: "Passport lists are more than simple tables. They are operational workbenches for filtering, comparing, exporting, printing labels, pushing device data, and moving records through draft, workflow, release, and revision cycles.",
+      simpleGuide: {
+        title: "Simple lifecycle view",
+        intro: "A passport normally moves through a small set of stages:",
+        items: [
+          "Draft means the record is still being prepared.",
+          "Workflow means it is waiting for review or approval.",
+          "Released means it is the live version people should rely on.",
+          "In Revision means a newer editable version is being prepared after release.",
+        ],
+      },
       facts: [
         { label: "List tools", value: "Search, sort, per-column filters, pagination, selection mode, pinned records, and completeness bars" },
         { label: "Row actions", value: "Edit, Release, Revise, Clone, CSV update, Compare versions, Device Integration, JSON-LD export, Copy link, Delete" },
@@ -357,6 +387,16 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       audience: "Editors, reviewers, approvers, and company admins",
       title: "Run release approvals through workflow instead of side channels",
       summary: "Workflow turns release into a visible, trackable process. It lets teams assign a reviewer, assign an approver, capture comments, keep backlog queues clean, and maintain history without relying on email chains or external trackers.",
+      simpleGuide: {
+        title: "Simple workflow view",
+        intro: "Use workflow when a passport should be checked before it becomes the live version.",
+        items: [
+          "Submit the passport when another person should review it.",
+          "Approve it when the record is ready to go live.",
+          "Reject it with comments when the author needs to fix something.",
+          "Check History later if you need to understand who approved what.",
+        ],
+      },
       facts: [
         { label: "Tabs", value: "In Progress, My Backlog, and History" },
         { label: "Release options", value: "Direct release, reviewer only, approver only, or reviewer plus approver" },
@@ -418,6 +458,16 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       audience: "Editors and company admins",
       title: "Store files and symbols once, then reuse them everywhere",
       summary: "The repository and symbol library turn repeated attachments into reusable company assets. This keeps forms cleaner, reduces duplicate uploads, and makes file and symbol fields much easier to maintain across many passports.",
+      simpleGuide: {
+        title: "What belongs here",
+        intro: "Use the repository as your shared company library.",
+        items: [
+          "Put PDFs and reference files here when multiple passports may need them.",
+          "Put symbols here when authors should reuse the same approved icons or visual marks.",
+          "Keep names and folders clear so teammates can find assets without asking around.",
+          "If a file will only be used once, it may not need to become a shared repository asset.",
+        ],
+      },
       facts: [
         { label: "Repository tabs", value: "Files and Symbols" },
         { label: "File support", value: "Folders, PDF uploads, rename, delete, breadcrumbs, preview/open, and download" },
@@ -464,6 +514,16 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       audience: "Company users working with semantic passport types or JSON-LD exports",
       title: "Use semantic dictionaries to check terms, units, access rights, and semantic IDs",
       summary: "The dashboard includes a dictionary browser for each semantic model available through the company's passport-type access. Use it to search terms, open detail pages, check canonical IRIs, see expected units and data formats, and understand which application field keys map to each dictionary element.",
+      simpleGuide: {
+        title: "What the dictionary is for",
+        intro: "Think of the dictionary as the official meaning behind passport fields.",
+        items: [
+          "Use it when a field label is understandable but the exact meaning is still unclear.",
+          "Use it before imports or JSON-LD exports when units or term mapping matter.",
+          "Use it with external partners when they need the official term or identifier.",
+          "If an export looks strange, check the dictionary before assuming the data is wrong.",
+        ],
+      },
       facts: [
         { label: "Dashboard route", value: dashboardPath("dictionary/:family/:version") },
         { label: "Public route", value: "/dictionary/:family/:version" },
@@ -506,6 +566,16 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       audience: "Company admins primarily, with session and optional bearer-token access available to logged-in users",
       title: "Understand security, tokens, API keys, and who should use each one",
       summary: "The product uses several different credentials because each one has a different purpose. Keeping them separate is part of the security model: browser sessions are for the dashboard, optional bearer tokens are for controlled testing or scripts, company API keys are for read-only external integrations, device keys are for live sensor pushes, passport access keys are for restricted public fields, delegated audience grants are for controlled-data users, and Asset Management has its own launch credentials.",
+      simpleGuide: {
+        title: "Which credential should I use?",
+        intro: "Most users only need one of these most of the time:",
+        items: [
+          "Use your normal browser login for everyday dashboard work.",
+          "Use a bearer token only when you are testing protected APIs or running scripts.",
+          "Use company API keys for outside systems that should read company passport data.",
+          "Use passport access keys only when restricted public fields must be unlocked intentionally.",
+        ],
+      },
       facts: [
         { label: "Company branding", value: "Managed in Company Profile with public viewer, introduction, and single consumer-route presentation controls" },
         { label: "Browser session", value: "Created by login and sent automatically by the dashboard through cookie credentials" },

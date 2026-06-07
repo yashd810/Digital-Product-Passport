@@ -5,7 +5,7 @@ import { openAnalyticsPrintReport, renderClusteredBarChartSvg, renderPieChartSvg
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { STATUS_COLORS } from "../../shared/utils/statusColors";
 import "../styles/AdminDashboard.css";
-import "../../assets/styles/Dashboard.css";
+import "../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 const slugify = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

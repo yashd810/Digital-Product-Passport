@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { formatPassportStatus } from "../utils/passportStatus";
-import "../../assets/styles/Dashboard.css";
+import "../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 

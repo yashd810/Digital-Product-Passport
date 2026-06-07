@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const dppIdentity = require("../services/dpp-identity-service");
+const dppIdentity = require("../src/services/dpp-identity-service");
 
 test("dpp identity service generates generic product subject DID paths", () => {
   process.env.APP_URL = "https://api.example.test";

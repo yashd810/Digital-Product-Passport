@@ -5,7 +5,7 @@ Claros DPP is a multi-app Digital Product Passport platform for creating, managi
 ## Quick Start
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml up -d --build
 ```
 
 Local services:
@@ -18,7 +18,7 @@ Local services:
 | Marketing site | http://localhost:8080 | `apps/marketing-site` |
 | PostgreSQL | localhost:5432 | `docker/docker-compose.yml` |
 
-Detailed setup lives in [docs/guides/GETTING_STARTED.md](./docs/guides/GETTING_STARTED.md).
+Detailed setup lives in [docs/guides/getting-started.md](./docs/guides/getting-started.md).
 
 ## Repository Map
 
@@ -34,22 +34,23 @@ Detailed setup lives in [docs/guides/GETTING_STARTED.md](./docs/guides/GETTING_S
 ├── docs/                         # Centralized developer and product documentation
 ├── infra/                        # Nginx, Caddy, OCI, semantic resources, templates
 ├── scripts/                      # Deployment, generation, migration, and utility scripts
-└── storage/                      # Local development file storage volumes
+└── .docker-data/                 # Local Docker-backed database and file storage
 ```
 
 ## Documentation
 
 Start with [docs/README.md](./docs/README.md). The most useful developer entry points are:
 
-- [Architecture](./docs/architecture/ARCHITECTURE.md)
-- [Project Structure](./docs/architecture/PROJECT_STRUCTURE.md)
-- [Service Map](./docs/architecture/SERVICES.md)
-- [Data Flow](./docs/architecture/DATA_FLOW.md)
-- [Workflows](./docs/development/WORKFLOWS.md)
-- [Database Schema](./docs/database/DATABASE_SCHEMA.md)
-- [API Endpoints](./docs/api/ENDPOINTS.md)
-- [Production Readiness Checklist](./docs/deployment/production-readiness-checklist.md)
-- [S3 Setup Guide](./docs/infrastructure/s3-setup-guide.md)
+- [Getting Started](./docs/guides/getting-started.md)
+- [System Overview](./docs/architecture/system-overview.md)
+- [Repository Layout](./docs/architecture/repository-layout.md)
+- [Runtime Wiring](./docs/architecture/runtime-wiring.md)
+- [Backend API](./docs/apps/backend-api.md)
+- [Frontend Dashboard](./docs/apps/frontend-dashboard.md)
+- [Database And Storage](./docs/database/schema-and-storage.md)
+- [API Surface](./docs/api/api-surface.md)
+- [Local And Production Deployment](./docs/deployment/local-and-production.md)
+- [Scripts And Tools](./docs/development/scripts-and-tools.md)
 
 ## Stack
 
@@ -61,7 +62,7 @@ Start with [docs/README.md](./docs/README.md). The most useful developer entry p
 | Auth | Cookie session plus JWT/API-key support for selected flows |
 | Storage | PostgreSQL plus local/object storage abstractions |
 | Containers | Docker Compose, Nginx, Caddy in production |
-| Tests | Vitest for frontend, Jest/Supertest for backend |
+| Tests | Vitest for frontend, Node's built-in test runner for backend |
 
 ## Common Commands
 
@@ -85,4 +86,4 @@ npm run test
 
 ## How The System Fits Together
 
-Users work in the dashboard to manage companies, passport types, product passports, repository files, workflows, and access controls. The dashboard calls the backend API with session credentials. The backend validates authentication and company access, runs business logic in service modules, stores relational data in PostgreSQL, and stores uploaded files through the storage service. Released passports are exposed through public routes used by both the dashboard preview pages and the standalone public viewer.
+Users work in the dashboard to manage companies, passport types, product passports, repository files, workflows, and access controls. The dashboard calls the backend API with session credentials. The backend validates authentication and company access, runs business logic in modules and services, stores relational data in PostgreSQL, and stores uploaded files through the storage service. Released passports are exposed through public routes used by both the dashboard preview pages and the standalone public viewer.

@@ -1,4 +1,4 @@
-@import "../../assets/styles/DashboardShared.css";
+@import "../../shared/styles/DashboardShared.css";
 
 /* ============================================
    ADMIN DASHBOARD STYLES — theme aware
@@ -1253,14 +1253,12 @@
 }
 
 .apt-moduleTemplates-panel {
-  background:
-    linear-gradient(135deg, rgba(20, 184, 166, 0.08), rgba(245, 158, 11, 0.08)),
-    var(--bg-card);
-  border: 1px solid rgba(20, 184, 166, 0.24);
-  border-radius: 18px;
-  padding: 22px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   margin-bottom: 28px;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  box-shadow: none;
 }
 
 .apt-moduleTemplates-header {
@@ -1302,29 +1300,12 @@
 }
 
 .apt-moduleTemplates-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 14px;
+  gap: 16px;
+  padding: 0;
 }
 
 .apt-moduleTemplate-card {
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  padding: 16px;
-}
-
-.apt-moduleTemplate-card-seeded {
-  border-color: rgba(34, 197, 94, 0.34);
-  background: rgba(240, 253, 244, 0.76);
-}
-
-.apt-moduleTemplate-topline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  min-width: 0;
 }
 
 .apt-moduleTemplate-icon {
@@ -1332,58 +1313,30 @@
   align-items: center;
   justify-content: center;
   min-width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--heading-display);
-  font-size: 12px;
-  font-weight: 900;
-  padding: 0 8px;
 }
 
-.apt-moduleTemplate-name {
-  color: var(--heading-display);
-  font-weight: 800;
-  margin-bottom: 6px;
-}
-
-.apt-moduleTemplate-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.apt-moduleTemplate-meta span {
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.06);
-  padding: 5px 8px;
-}
-
-.apt-moduleTemplate-command-row {
+.apt-moduleTemplate-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .apt-moduleTemplate-command {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: inline-flex;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--heading-display);
   font-size: 11px;
   padding: 8px 9px;
 }
 
-.apt-moduleTemplate-guide-btn {
-  padding: 6px 10px;
-  font-size: 12px;
+.apt-moduleTemplate-command-note {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
 .apt-seed-guide-modal {
@@ -1436,17 +1389,24 @@
 
 /* ── Field Viewer ────────────────────────────────────────── */
 .apt-view-fields-btn {
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
   cursor: pointer;
-  color: #374151;
-  transition: background 0.15s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
-.apt-view-fields-btn:hover { background: #e5e7eb; }
+
+.apt-view-fields-btn:hover {
+  background: rgba(13,181,176,0.12);
+  color: var(--accent);
+  border-color: rgba(13,181,176,0.28);
+  transform: translateY(-1px);
+}
 
 .apt-fields-viewer {
   border-top: 1px solid #e5e7eb;
@@ -6393,4 +6353,56 @@
   .acpt-save-draft-btn {
     flex: 1 1 180px;
   }
+}
+
+/* ── Passport modules dark-mode contrast tuning ─────────────────────────── */
+.apt-badge-active {
+  background: rgba(13, 181, 176, 0.14);
+  color: #a8f6f2;
+  border: 1px solid rgba(13, 181, 176, 0.28);
+}
+
+.apt-moduleTemplates-count {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(13, 181, 176, 0.22);
+  color: var(--text-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.apt-seed-guide-grid > div,
+.apt-seed-guide-commands > div {
+  border-color: rgba(184, 204, 217, 0.16);
+}
+
+.apt-moduleTemplate-command,
+.apt-seed-guide-grid code,
+.apt-seed-guide-commands code {
+  color: var(--text-primary);
+}
+
+.apt-moduleTemplate-command,
+.apt-seed-guide-grid code,
+.apt-seed-guide-commands code {
+  background: rgba(4, 14, 24, 0.88);
+  border: 1px solid rgba(184, 204, 217, 0.16);
+}
+
+[data-theme="light"] .apt-badge-active {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+[data-theme="light"] .apt-moduleTemplates-count {
+  background: rgba(13, 181, 176, 0.08);
+  color: #17304a;
+}
+
+[data-theme="light"] .apt-moduleTemplate-command,
+[data-theme="light"] .apt-seed-guide-grid > div,
+[data-theme="light"] .apt-seed-guide-commands > div,
+[data-theme="light"] .apt-seed-guide-grid code,
+[data-theme="light"] .apt-seed-guide-commands code {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(148, 163, 184, 0.2);
 }

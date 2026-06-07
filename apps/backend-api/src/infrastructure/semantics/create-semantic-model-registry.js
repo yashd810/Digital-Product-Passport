@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/semantic-model-registry");
+module.exports = require("../../services/semantic-model-registry");

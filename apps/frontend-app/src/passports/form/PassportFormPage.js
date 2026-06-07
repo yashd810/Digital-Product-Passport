@@ -16,7 +16,7 @@ import { formatFieldLabelWithUnit, getFieldUnitLabel } from "../../passport-view
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
 import RepositoryPicker from "./components/RepositoryPicker";
 import SymbolRepositoryPicker from "./components/SymbolRepositoryPicker";
-import "../../assets/styles/CreatePass.css";
+import "../../shared/styles/CreatePass.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 const EDIT_SESSION_TIMEOUT_MS = 12 * 60 * 60 * 1000;

@@ -7,12 +7,12 @@ require("dotenv").config({
 
 const crypto = require("crypto");
 const { Pool } = require("pg");
-const createDidService = require("../services/did-service");
-const createProductIdentifierService = require("../services/product-identifier-service");
-const createCanonicalPassportSerializer = require("../services/canonicalPassportSerializer");
-const createSigningService = require("../services/signing-service");
+const createDidService = require("../src/services/did-service");
+const createProductIdentifierService = require("../src/services/product-identifier-service");
+const createCanonicalPassportSerializer = require("../src/services/canonicalPassportSerializer");
+const createSigningService = require("../src/services/signing-service");
 const canonicalizeJson = require("../src/shared/passports/json-canonicalization");
-const logger = require("../services/logger");
+const logger = require("../src/services/logger");
 const {
   getTable,
   normalizePassportRow,

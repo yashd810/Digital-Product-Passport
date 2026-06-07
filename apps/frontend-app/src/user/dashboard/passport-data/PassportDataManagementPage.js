@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
-import "../../../assets/styles/Dashboard.css";
+import "../../../shared/styles/Dashboard.css";
 import "./PassportDataManagement.css";
 
 const API = import.meta.env.VITE_API_URL || "";

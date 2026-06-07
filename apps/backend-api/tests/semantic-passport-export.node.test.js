@@ -6,7 +6,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const createSemanticModelRegistry = require("../src/infrastructure/semantics/create-semantic-model-registry");
-const createSemanticPassportExportService = require("../services/semantic-passport-export");
+const createSemanticPassportExportService = require("../src/services/semantic-passport-export");
 
 function createExportService() {
   return createSemanticPassportExportService({

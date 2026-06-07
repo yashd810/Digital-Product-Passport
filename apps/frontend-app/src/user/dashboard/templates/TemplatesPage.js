@@ -5,8 +5,8 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
-import "../../../assets/styles/Dashboard.css";
-import "../../../assets/styles/CreatePass.css";
+import "../../../shared/styles/Dashboard.css";
+import "../../../shared/styles/CreatePass.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 

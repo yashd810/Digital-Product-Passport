@@ -246,7 +246,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 12px;
   min-width: 0;
   flex-wrap: wrap;
@@ -256,9 +256,12 @@
   margin: 0;
   font-size: 16px;
   color: var(--text-primary);
+  flex: 1 1 180px;
+  min-width: 0;
 }
 
 .manual-card-title-row code {
+  display: block;
   font-size: 11px;
   color: var(--accent);
   background: rgba(13,181,176,0.12);
@@ -361,7 +364,7 @@
 }
 
 .manual-facts-grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
 }
 
 .manual-fact-card,
@@ -394,8 +397,12 @@
 }
 
 .manual-fact-card strong {
+  display: block;
   font-size: 15px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 .manual-journey-grid,
@@ -403,7 +410,7 @@
 .manual-endpoint-grid,
 .manual-flow-grid,
 .manual-link-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 }
 
 .manual-journey-card p,
@@ -484,6 +491,15 @@
   margin-top: 14px;
 }
 
+.manual-preview-actions code {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.5;
+}
+
 .manual-inline-link {
   text-decoration: none;
 }
@@ -540,8 +556,14 @@
 }
 
 .manual-link-card code {
+  display: block;
   color: var(--accent);
   font-size: 12px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.5;
 }
 
 .manual-catalog-stack {
@@ -580,8 +602,12 @@
 }
 
 .manual-endpoint-card code {
+  display: block;
+  width: 100%;
   white-space: normal;
   overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 .manual-callout {
@@ -595,6 +621,18 @@
   display: block;
   margin-bottom: 10px;
   font-size: 15px;
+}
+
+.manual-callout-copy {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.manual-callout-plain {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(13,181,176,0.18);
 }
 
 .manual-callout-info {

@@ -6,7 +6,7 @@ import { PassportListRow } from "../components/PassportListRow";
 import { usePassportListActions } from "../hooks/usePassportListActions";
 import { usePassportListState } from "../hooks/usePassportListState";
 import { calcCompleteness } from "../utils/passportListHelpers";
-import "../../../../assets/styles/Dashboard.css";
+import "../../../../shared/styles/Dashboard.css";
 
 function PassportList({ user, companyId, filterByUser }) {
   const navigate = useNavigate();

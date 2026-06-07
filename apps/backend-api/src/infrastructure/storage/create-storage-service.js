@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/storage-service");
+module.exports = require("../../services/storage-service");

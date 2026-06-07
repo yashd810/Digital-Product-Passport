@@ -6,11 +6,11 @@ require("dotenv").config({
 });
 
 const { Pool } = require("pg");
-const { initDb } = require("../db/init");
-const createDidService = require("../services/did-service");
-const createPassportService = require("../services/passport-service");
-const createProductIdentifierService = require("../services/product-identifier-service");
-const logger = require("../services/logger");
+const { initDb } = require("../src/db/init");
+const createDidService = require("../src/services/did-service");
+const createPassportService = require("../src/services/passport-service");
+const createProductIdentifierService = require("../src/services/product-identifier-service");
+const logger = require("../src/services/logger");
 const {
   IN_REVISION_STATUS,
   SYSTEM_PASSPORT_FIELDS,

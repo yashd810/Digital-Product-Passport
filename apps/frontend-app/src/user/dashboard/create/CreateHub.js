@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
-import "../../../assets/styles/Dashboard.css";
+import "../../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 

@@ -5,8 +5,6 @@ const path = require("path");
 
 const projectRoot = path.resolve(__dirname, "..");
 const srcRoot = path.join(projectRoot, "src");
-const routesRoot = path.join(projectRoot, "routes");
-const serverRoot = path.join(projectRoot, "Server");
 
 const sourceExtensions = new Set([".js", ".cjs", ".mjs"]);
 const violations = [];
@@ -38,9 +36,9 @@ function classifyFile(filePath) {
   const rel = relativeProjectPath(filePath);
   if (rel.startsWith("src/bootstrap/")) return "bootstrap";
   if (rel.startsWith("src/modules/")) return "module";
-  if (rel.startsWith("routes/")) return "route";
-  if (rel.startsWith("Server/")) return "server";
-  if (rel.startsWith("services/")) return "service";
+  if (rel.startsWith("src/http/routes/")) return "route";
+  if (rel === "src/server.js") return "server";
+  if (rel.startsWith("src/services/")) return "service";
   return "other";
 }
 
@@ -105,8 +103,6 @@ function inspectFile(filePath) {
 
 const filesToInspect = [
   ...walk(srcRoot),
-  ...walk(routesRoot),
-  ...walk(serverRoot),
 ];
 
 for (const filePath of filesToInspect) {

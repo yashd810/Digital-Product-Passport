@@ -1,58 +1,59 @@
-# Claros DPP Documentation
+# Claros DPP Docs
 
-This folder is the canonical home for project documentation. App folders intentionally contain application code and runtime configuration; durable Markdown documentation should live here.
+This folder is the single home for project documentation.
 
-## Start Here
+If you are new to the codebase, start here.
 
-1. [Project Structure](./architecture/PROJECT_STRUCTURE.md) explains the folder layout and where to make changes.
-2. [Architecture](./architecture/ARCHITECTURE.md) explains the service boundaries.
-3. [Service Map](./architecture/SERVICES.md) maps apps, containers, ports, routes, and ownership.
-4. [Data Flow](./architecture/DATA_FLOW.md) explains how information moves through the system.
-5. [Workflows](./development/WORKFLOWS.md) explains the main product and engineering workflows.
-6. [Database Schema](./database/DATABASE_SCHEMA.md) explains persistence.
-7. [API Endpoints](./api/ENDPOINTS.md) is the endpoint reference.
+## In Plain English
 
-## Documentation Structure
+Claros DPP is a system for creating and sharing digital product passports.
 
-| Folder | Purpose |
+- Company users work in a dashboard app.
+- The dashboard talks to a backend API.
+- The backend stores data in PostgreSQL and stores files through a storage service.
+- Released passports can be opened through public URLs and a standalone public viewer.
+- Super admins manage companies, passport types, and product modules from a separate admin area inside the dashboard.
+
+You do not need to understand every source file before making safe changes. The goal of these docs is to help you answer three questions quickly:
+
+1. What part of the app am I looking at?
+2. What other parts does it talk to?
+3. Where should I make the next change?
+
+## Read In This Order
+
+1. [Getting Started](./guides/getting-started.md)
+2. [System Overview](./architecture/system-overview.md)
+3. [Repository Layout](./architecture/repository-layout.md)
+4. [Runtime Wiring](./architecture/runtime-wiring.md)
+5. [Backend API](./apps/backend-api.md)
+6. [Frontend Dashboard](./apps/frontend-dashboard.md)
+7. [Public Passport Viewer](./apps/public-passport-viewer.md)
+8. [Database and Storage](./database/schema-and-storage.md)
+9. [API Surface](./api/api-surface.md)
+10. [Developer Workflows](./development/developer-workflows.md)
+
+## Current Docs Map
+
+| Folder | What it explains |
 | --- | --- |
-| `admin/` | Product policies and admin operating rules. |
-| `api/` | REST API, public DPP API, DID, data carrier, grants, and representation docs. |
-| `apps/` | Service-specific docs moved out of application folders. |
-| `architecture/` | System design, project structure, service map, data movement, and design records. |
-| `archive/` | Historical fixes, old organization notes, and dated reports. Do not use as current guidance unless a current doc links to it. |
-| `configuration/` | Environment variable and configuration-file notes. |
-| `database/` | Schema and persistence documentation. |
-| `deployment/` | Local, OCI, distributed, domain, and deploy-script guides. |
-| `development/` | Coding standards, workflow docs, scripts, and developer runbooks. |
-| `frontend/` | Frontend-specific accessibility, portability, and migration notes. |
-| `guides/` | First-run setup and task-oriented guides. |
-| `infrastructure/` | Docker, Caddy, database operations, and compose-file references. |
-| `reference/` | External datasets, templates, and import references. |
-| `security/` | Authentication, audit logging, signing, backup, revocation, persistence, and anti-counterfeiting controls. |
-| `troubleshooting/` | Common failures and recovery steps. |
+| `guides/` | First-time setup and orientation |
+| `architecture/` | How the whole system is arranged and wired |
+| `apps/` | What each app does and where its main files live |
+| `api/` | Backend route groups and what they are for |
+| `database/` | Schema, storage, and generated passport tables |
+| `development/` | How to work on the repo day to day |
+| `deployment/` | Local stack, production stack, and OCI notes |
+| `infrastructure/` | Docker and compose file behavior |
+| `reference/` | Passport modules, semantic models, and glossary terms |
+| `security/` | Authentication, signing, audit, and access model |
+| `troubleshooting/` | Common breakpoints and where to look first |
+| `archive/` | Historical or internal notes that are not the main source of truth |
 
-## App Docs
+## Rules For Future Docs
 
-- [Backend API](./apps/backend-api.md)
-- [Frontend Dashboard](./apps/frontend-app.md)
-- [Public Passport Viewer](./apps/public-passport-viewer.md)
-- [Marketing Site](./apps/marketing-site.md)
-
-## Current Stack Snapshot
-
-| Area | Current implementation |
-| --- | --- |
-| Dashboard | React 18, Vite, React Router |
-| Public viewer | React 18, Vite, React Router, imports shared viewer pages from the dashboard app |
-| Backend | Node.js, Express, PostgreSQL |
-| Static apps | Nginx-served HTML/CSS/JS |
-| Local stack | `docker/docker-compose.yml` |
-| Production edge | Caddy plus Nginx containers |
-
-## Documentation Rules
-
-- Put new Markdown files under the most specific `docs/` folder.
-- Keep app folders focused on code, `package.json`, Dockerfiles, and app runtime files.
-- When a doc becomes historical, move it to `docs/archive/` and add a note if it should not be followed.
-- Prefer linking from this index and from the relevant folder index over leaving standalone docs disconnected.
+- Write current behavior, not planned behavior.
+- Prefer plain English first, then technical detail.
+- Link to the real source files when describing wiring.
+- When the code moves, update the docs in the same change.
+- Keep Markdown in `docs/` unless it must stay at repository root, such as the root `README.md`.

@@ -1,6 +1,0 @@
-<svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="repair icon">
-  <rect x="4" y="4" width="64" height="64" rx="20" fill="#EAF6F4"/>
-  <g stroke="#0F766E" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M30 14c2 5 1 10-3 14l17 17c4-4 9-5 14-3-1 4-3 7-6 10s-6 5-10 6c-2-5-1-10 2-13L27 28c-4 3-9 4-14 2 1-4 3-7 6-10s7-5 11-6z"/><circle cx="54" cy="19" r="6"/>
-  </g>
-</svg>

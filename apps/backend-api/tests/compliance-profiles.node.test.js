@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const createComplianceService = require("../services/compliance-service");
+const createComplianceService = require("../src/services/compliance-service");
 const createSemanticModelRegistry = require("../src/infrastructure/semantics/create-semantic-model-registry");
 const { getPassportTypeModule } = require("../src/passport-modules");
 
@@ -222,7 +222,7 @@ test("textile passport evaluates through textile compliance profile and semantic
 
   assert.equal(result.profile.key, "textileDppV1");
   assert.equal(result.semanticModelKey, "claros_textile_dictionary_v1");
-  assert.equal(result.isBatteryPassport, false);
+  assert.equal("isBatteryPassport" in result, false);
   assert.equal(result.workflowReleaseAllowed, true);
   assert.equal(result.directReleaseAllowed, true);
   assert.deepEqual(result.semanticIssues, []);
@@ -242,7 +242,7 @@ test("arbitrary product modules can use semantic category policy without battery
 
     assert.equal(result.profile.key, "applianceDppV3");
     assert.equal(result.semanticModelKey, "claros_appliance_dictionary_v3");
-    assert.equal(result.isBatteryPassport, false);
+    assert.equal("isBatteryPassport" in result, false);
     assert.equal(result.categoryPolicyKind, "semanticCategory");
     assert.equal(result.category.productKind, "appliance");
     assert.equal(result.category.normalized, "Home");
@@ -279,7 +279,8 @@ test("battery module evaluates through battery profile using semantic field-key 
 
   assert.equal(result.profile.key, "batteryDppV1");
   assert.equal(result.semanticModelKey, "claros_battery_dictionary_v1");
-  assert.equal(result.isBatteryPassport, true);
+  assert.equal("isBatteryPassport" in result, false);
+  assert.equal(result.category.productKind, "battery");
   assert.equal(result.category.normalized, "EV");
   assert.ok(result.category.ruleCoverage.some((field) => field.key === "batteryModelIdentifier"));
   assert.equal(result.workflowReleaseAllowed, true);

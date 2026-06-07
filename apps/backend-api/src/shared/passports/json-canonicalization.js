@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/json-canonicalization");
+module.exports = require("../../services/json-canonicalization");

@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/email");
+module.exports = require("../../services/email");

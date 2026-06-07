@@ -37,6 +37,16 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       audience: "Super admins",
       title: "Use the super-admin workspace as the control tower",
       summary: "The super-admin area is designed for system-wide setup, not tenant day-to-day work. Use it to monitor the network, onboard new companies, publish passport types, manage admin access, and drill into company-specific analytics when support or governance work is needed.",
+      simpleGuide: {
+        title: "In simple words",
+        intro: "The admin area is for shaping and supervising the platform, not for doing regular company work.",
+        items: [
+          "Use Analytics to understand what is happening across the whole system.",
+          "Use Companies to create tenants and help them get set up correctly.",
+          "Use Passport Types to manage what kinds of passports the platform supports.",
+          "Use Admin Management only for super-admin access and recovery work.",
+        ],
+      },
       facts: [
         { label: "Current role", value: user?.role === "super_admin" ? "Super Admin" : prettifyName(user?.role) },
         { label: "Live company count", value: companiesCount ? `${companiesCount} companies` : "No companies fetched yet" },
@@ -86,6 +96,16 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       audience: "Super admins onboarding or supporting tenants",
       title: "Create companies and launch their initial setup",
       summary: "The Companies page is the tenant entry point. From there you can create new companies, set DPP issuance policy, see granted passport types, toggle Asset Management, jump into company-specific access or branding tools, invite users, and remove tenants when necessary.",
+      simpleGuide: {
+        title: "Simple onboarding order",
+        intro: "When setting up a new company, this order usually causes the least confusion:",
+        items: [
+          "Create the company first.",
+          "Set its DPP policy and default behavior next.",
+          "Grant the passport types the company should use.",
+          "Invite users only after the workspace is ready for them.",
+        ],
+      },
       facts: [
         { label: "Company actions", value: "Access, DPP Policy, Asset Management, Branding, Invite, and Delete" },
         { label: "Creation outcome", value: "A new tenant record that can then receive passport-type access and user invites" },
@@ -139,6 +159,16 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       audience: "Super admins configuring standards, DID, VC, and operator behavior",
       title: "Configure DPP policy, operator identity, granularity, and facility behavior",
       summary: "The current platform has a standards-oriented identity layer. A company is not just a tenant name: it can have a DID slug, economic-operator identifier, operator identifier scheme, DPP granularity policy, DID minting switches, VC issuance control, JSON-LD export control, semantic dictionary access, and managed facilities.",
+      simpleGuide: {
+        title: "What this policy really changes",
+        intro: "This is the page that decides how a company behaves in standards-oriented passport work.",
+        items: [
+          "Set the default granularity so model, batch, and item behavior is predictable.",
+          "Set operator identity before large imports or public standards use begins.",
+          "Decide whether DIDs, JSON-LD, and VC-style outputs should be available.",
+          "Treat facility setup as part of real-world traceability, not just extra metadata.",
+        ],
+      },
       facts: [
         { label: "Policy endpoint", value: "GET, PUT, PATCH /api/admin/companies/:id/dpp-policy" },
         { label: "Compliance identity endpoint", value: "GET/POST /api/companies/:companyId/compliance-identity" },
@@ -190,6 +220,16 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       audience: "Super admins supporting tenant rollout",
       title: "Grant company access, review tenant analytics, and support branding",
       summary: "After a company exists, the next layer is access and support. Grant the correct type catalog, verify the tenant can see the right product categories, use company analytics to inspect adoption, and help with branding when public-facing views need polish.",
+      simpleGuide: {
+        title: "Simple support checklist",
+        intro: "When a company says something is missing or confusing, check these first:",
+        items: [
+          "Does the company have access to the right passport types?",
+          "Are the right users and roles in place for the work they need to do?",
+          "Does the company profile or branding need cleanup for public-facing pages?",
+          "Do analytics show a local tenant issue or a broader platform issue?",
+        ],
+      },
       facts: [
         { label: "Access screen", value: "Grouped by product category so you can see each company's type portfolio clearly" },
         { label: "Company analytics", value: "Per-company usage, exports, and user-role management" },
@@ -246,6 +286,16 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       audience: "Super admins publishing the catalog",
       title: "Manage product categories and the published passport-type catalog",
       summary: "Passport Types is the central catalog workspace. Product categories provide the visual grouping, while versioned code modules and admin-created custom types provide the actual passport definitions that companies can receive through access grants.",
+      simpleGuide: {
+        title: "What this page really controls",
+        intro: "This page decides what kinds of passports the platform can create.",
+        items: [
+          "Categories are the visible groups people browse.",
+          "Passport types are the actual forms and schemas companies use.",
+          "Code modules are the safer pattern for stable production types.",
+          "Custom builder types are useful for internal or experimental cases.",
+        ],
+      },
       facts: [
         { label: "Category features", value: "Create category, choose icon, and delete when no longer needed" },
         { label: "Type actions", value: "Preview registered modules, view fields, edit metadata, clone, activate/deactivate, and delete" },
@@ -374,6 +424,16 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       audience: "Super admins designing passport schemas and semantic exports",
       title: "Use semantic dictionaries when designing passport types",
       summary: "The admin shell includes the same dictionary browser as the user dashboard, but the admin use case is schema and module design. It helps you choose the right semantic model, inspect canonical term IRIs, verify units and access-right expectations, and avoid stale field mappings before companies start authoring passports.",
+      simpleGuide: {
+        title: "What the dictionary means for admins",
+        intro: "For admins, the dictionary is mainly a design tool.",
+        items: [
+          "Use it to choose the right semantic term before publishing a field.",
+          "Use it to confirm units, data type, and expected meaning.",
+          "Use it when explaining exports or integrations to technical partners.",
+          "Use it before changing a live type, because semantic meaning is harder to change than display text.",
+        ],
+      },
       facts: [
         { label: "Admin route", value: "/admin/dictionary/:family/:version" },
         { label: "Semantic model", value: "Each passport type selects the dictionary model it needs" },

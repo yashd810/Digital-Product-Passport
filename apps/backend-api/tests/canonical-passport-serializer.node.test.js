@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const createCanonicalPassportSerializer = require("../services/canonicalPassportSerializer");
+const createCanonicalPassportSerializer = require("../src/services/canonicalPassportSerializer");
 const createSemanticModelRegistry = require("../src/infrastructure/semantics/create-semantic-model-registry");
 
 function createDidService() {

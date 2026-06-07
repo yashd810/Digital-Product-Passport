@@ -2,9 +2,9 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "Digital Product Passport Multi-Tenant System",
-  "main": "Server/server.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node Server/server.js",
+    "start": "node src/server.js",
     "db:migrate": "node scripts/migrate-db.js",
     "check:passport-storage": "node scripts/check-passport-storage.js",
     "check:boundaries": "node scripts/check-module-boundaries.js",
@@ -27,7 +27,7 @@
     "bootstrap:passport-modules": "node scripts/bootstrap-passport-modules.js",
     "seed:passport-types": "node scripts/seed-passport-types.js",
     "repair:passport-storage": "node scripts/check-passport-storage.js --repair",
-    "dev": "nodemon Server/server.js",
+    "dev": "nodemon src/server.js",
     "test": "node --test tests/*.node.test.js"
   },
   "keywords": [],

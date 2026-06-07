@@ -1,52 +1,37 @@
 # Public Passport Viewer
 
-Source: `apps/public-passport-viewer`
+## In Plain English
 
-The public viewer is a small React 18/Vite shell for released passport URLs. It imports the shared consumer and technical viewer pages from `apps/frontend-app/src/passport-viewer`, so the dashboard preview and public deployment render passports consistently.
+This is the lightweight public-facing app that opens released passport URLs.
 
-## Table of Contents
+It exists so public passport pages can have their own app shell without carrying the entire authenticated dashboard.
 
-- [Main Responsibilities](#main-responsibilities)
-- [Important Files](#important-files)
-- [Commands](#commands)
-- [Backend Dependencies](#backend-dependencies)
-- [Related Documentation](#related-documentation)
+## Main Files
 
-## Main Responsibilities
+- [apps/public-passport-viewer/src/bootstrap/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/bootstrap/index.js:1)
+- [apps/public-passport-viewer/src/containers/PublicViewerApp.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/src/containers/PublicViewerApp.js:19)
+- [apps/public-passport-viewer/vite.config.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/public-passport-viewer/vite.config.js:15)
 
-- Serve public URLs without requiring login.
-- Render consumer passport pages.
-- Render technical passport pages.
-- Support current `/dpp/*` public passport paths.
-- Redirect the root path to a not-found passport view.
+## What It Actually Renders
 
-## Important Files
+The public viewer reuses viewer screens from the main frontend app by importing them through the `@frontend` alias.
 
-| Path | Purpose |
-| --- | --- |
-| `src/bootstrap/index.js` | React mount point |
-| `src/containers/PublicViewerApp.js` | Public route tree |
-| `vite.config.js` | Aliases shared dashboard viewer modules |
-| `Dockerfile` | Production image |
+That means:
 
-## Commands
+- the standalone viewer stays small
+- viewer UI is shared instead of duplicated
+- changes in shared viewer components affect both apps
 
-```bash
-cd apps/public-passport-viewer
-npm run start
-npm run build
-npm run preview
-```
+## Main Route Families
 
-## Backend Dependencies
+- `/p/:internalAliasId`
+- `/p/inactive/:internalAliasId/:versionNumber`
+- `/dpp/:manufacturerSlug/:modelSlug/:internalAliasId`
+- `/dpp/inactive/:manufacturerSlug/:modelSlug/:internalAliasId/:versionNumber`
 
-The viewer reads public passport data from backend public routes in `apps/backend-api/routes/passport-public.js` and standards-oriented routes in `apps/backend-api/routes/dpp-api.js`.
+## Backend Endpoints It Depends On
 
-## Related Documentation
+Mostly public backend routes from:
 
-- [Backend API](./backend-api.md) - Backend services and routes
-- [Frontend Dashboard](./frontend-app.md) - Shared viewer components
-- [Data Flow](../architecture/DATA_FLOW.md) - Request/response patterns
-- [Passport Representations](../api/passport-representations.md) - Content formats
-- [DID Resolution](../api/did-resolution.md) - DID endpoints
-- [API Endpoints](../api/ENDPOINTS.md) - Public passport routes
+- [apps/backend-api/src/http/routes/passport-public.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passport-public.js:12)
+- [apps/backend-api/src/http/routes/dpp-api.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/dpp-api.js:26)

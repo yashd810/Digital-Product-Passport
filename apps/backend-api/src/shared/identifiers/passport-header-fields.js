@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/passport-header-fields");
+module.exports = require("../../services/passport-header-fields");

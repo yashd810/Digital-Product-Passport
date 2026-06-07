@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
-import "../../../assets/styles/CreatePass.css";
+import "../../../shared/styles/CreatePass.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 

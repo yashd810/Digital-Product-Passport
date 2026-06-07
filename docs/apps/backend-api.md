@@ -1,74 +1,112 @@
 # Backend API
 
-Source: `apps/backend-api`
+## In Plain English
 
-The backend is a Node.js/Express API backed by PostgreSQL. It is the trust boundary for authentication, company access, passport lifecycle rules, public passport reads, DID/signing behavior, repository files, workflow, audit logging, and admin operations.
+The backend is the part that actually enforces the rules.
 
-## Table of Contents
+It decides:
 
-- [Important Files](#important-files)
-- [Route Modules](#route-modules)
-- [Commands](#commands)
-- [Environment](#environment)
-- [Persistence](#persistence)
-- [Related Documentation](#related-documentation)
+- who is allowed to do what
+- how passports are created and updated
+- how company data is stored
+- how files are stored
+- how released passports are exposed to the public
+- how semantic exports, signatures, and DID documents are produced
 
-## Important Files
+If the frontend is the face of the product, the backend is the engine room.
 
-| Path | Purpose |
+## Entry Point
+
+- [apps/backend-api/src/server.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/server.js:1)
+
+## Main Backend Areas
+
+| Folder | Purpose |
 | --- | --- |
-| `Server/server.js` | Express bootstrap, middleware, service construction, route registration |
-| `db/init.js` | Idempotent database schema setup and migrations |
-| `routes/` | Feature-specific HTTP routes |
-| `services/` | Business logic and infrastructure services |
-| `src/passport-modules/` | Versioned code-defined passport modules such as `battery:v1`, `textile:v1`, and future product categories |
-| `resources/semantics/` | Versioned semantic model resources: manifests, contexts, field maps, category rules, units, and terms |
-| `src/shared/passports/passport-helpers.js` | Passport normalization, status, field, identifier, and asset helpers |
-| `middleware/auth.js` | Session/JWT auth helpers and company access checks |
-| `middleware/rate-limit.js` | Rate limiter setup |
-| `tests/` | Node test-runner backend suites |
+| `src/bootstrap/` | startup config, route registration, HTTP setup |
+| `src/db/` | schema creation and startup migrations |
+| `src/http/routes/` | top-level route groups |
+| `src/http/middleware/` | auth and rate limiting middleware |
+| `src/modules/` | feature-specific route helpers and domain logic |
+| `src/infrastructure/` | wrappers and construction points for storage, email, signing, OAuth, semantics, backup, logging |
+| `src/services/` | core implementations |
+| `src/shared/` | shared helpers used across backend layers |
+| `src/passport-modules/` | product passport type templates and compliance metadata |
 
-## Route Modules
+## Route Group Map
 
-See [Service Map](../architecture/SERVICES.md) for the route-module inventory.
+| Route file | Main purpose |
+| --- | --- |
+| `src/http/routes/auth.js` | auth, OTP, password reset, invites, profile, team access |
+| `src/http/routes/admin.js` | super-admin operations, company policies, passport type management |
+| `src/http/routes/passports.js` | company-side passport CRUD, lifecycle, backup, API keys, access grants |
+| `src/http/routes/passport-public.js` | public passport reads, verification, DID docs, semantic outputs |
+| `src/http/routes/dpp-api.js` | standards-style `/api/v1` DPP routes |
+| `src/http/routes/company.js` | company profile, facilities, templates, import endpoints |
+| `src/http/routes/repository.js` | company repository files and symbols |
+| `src/http/routes/workflow.js` | review workflow and backlog |
+| `src/http/routes/dictionary.js` | semantic model and dictionary endpoints |
+| `src/http/routes/asset-management-api.js` | passport data management / ERP-style asset sync area |
+| `src/http/routes/notifications.js` | notification reads and read markers |
+| `src/http/routes/messaging.js` | internal messaging |
+| `src/http/routes/health.js` | health and storage checks |
 
-High-traffic feature areas:
+## Passport Logic
 
-- `routes/auth.js` for user/session/team flows.
-- `routes/passports.js` for company passport CRUD, release/revise/archive, access grants, QR/data-carrier, audit, backup, dynamic values, and API keys.
-- `routes/passport-public.js` for public reads, signatures, DIDs, unlocks, and context routes.
-- `routes/dpp-api.js` for `/api/v1` DPP and DID resolver behavior.
-- `routes/admin.js` for super-admin companies, passport modules, passport types, symbols, analytics, and access management.
-- `routes/dictionary.js` for generic semantic dictionary resources under `/dictionary/:family/:version/*`.
+Most complex passport behavior is coordinated through:
 
-## Commands
+- [apps/backend-api/src/http/routes/passports.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/http/routes/passports.js:34)
+- `apps/backend-api/src/modules/passports/*.js`
+- [apps/backend-api/src/services/passport-service.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/passport-service.js:1)
+
+That area handles:
+
+- create and update
+- workflow changes
+- edit sessions
+- version history
+- archive/delete flows
+- API keys and scoped writes
+- public access representations
+- backup replication hooks
+- carrier authenticity metadata
+
+## Semantic And Product-Module Logic
+
+The backend is generic, but it ships with built-in product modules.
+
+Current module loader:
+
+- [apps/backend-api/src/passport-modules/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/passport-modules/index.js:1)
+
+Current built-in module files:
+
+- `battery-v1.js`
+- `textile-v1.js`
+- `electronics-v1.js`
+- `appliance-v1.js`
+
+Current semantic model registry:
+
+- [apps/backend-api/src/services/semantic-model-registry.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/services/semantic-model-registry.js:1)
+
+Semantic resource files live under:
+
+- `apps/backend-api/resources/semantics/`
+
+## Database Startup
+
+Schema creation and idempotent startup migrations live in:
+
+- [apps/backend-api/src/db/init.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/db/init.js:202)
+
+## Useful Commands
 
 ```bash
 cd apps/backend-api
 npm run start
-npm run dev
 npm run test
-npm run db:migrate
+npm run check:syntax
+npm run check:boundaries
 npm run seed:passport-types
-npm run bootstrap:passport-modules
-npm run check:passport-storage
 ```
-
-## Environment
-
-Local Docker development loads runtime values from `docker/.env`; production deployments load from `docker/.env.prod` locally or the configured server env file such as `/etc/dpp/dpp.env`.
-
-Production requires at least `JWT_SECRET`, `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `ALLOWED_ORIGINS`.
-
-## Persistence
-
-The backend initializes and migrates schema through `db/init.js` at startup when `RUN_SCHEMA_MIGRATIONS` allows it. See [Database Schema](../database/DATABASE_SCHEMA.md).
-
-## Related Documentation
-
-- [Architecture Overview](../architecture/ARCHITECTURE.md) - System architecture and design
-- [Services Map](../architecture/SERVICES.md) - Backend service responsibilities
-- [API Endpoints](../api/ENDPOINTS.md) - Complete endpoint reference
-- [Database Schema](../database/DATABASE_SCHEMA.md) - Database table definitions
-- [Data Carrier Authenticity](../api/data-carrier-authenticity.md) - Signing and verification
-- [Deployment Guide](../deployment/) - Deployment instructions

@@ -6,7 +6,7 @@ import {
   PASSWORD_REQUIREMENT_TEXT,
   validatePasswordPolicy,
 } from "../../auth/utils/passwordPolicy";
-import "../../assets/styles/Dashboard.css";
+import "../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 

@@ -7,11 +7,11 @@ RUN apk add --no-cache --virtual .build-deps python3 build-base \
   && apk del .build-deps
 
 COPY apps/backend-api/ ./
-COPY apps/frontend-app/src/assets/styles/email-styles.css /app/shared/email-styles.css
+COPY apps/frontend-app/src/shared/styles/email-styles.css /app/shared/email-styles.css
 RUN chown -R node:node /app
 
 ENV EMAIL_STYLES_PATH=/app/shared/email-styles.css
 
 USER node
 EXPOSE 3001
-CMD ["node", "Server/server.js"]
+CMD ["node", "src/server.js"]

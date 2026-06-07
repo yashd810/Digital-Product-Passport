@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
-const createOauthService = require("../services/oauth-service");
+const createOauthService = require("../src/services/oauth-service");
 
 function createProviderEnv() {
   return JSON.stringify([{

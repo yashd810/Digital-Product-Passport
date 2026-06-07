@@ -1,18 +1,18 @@
 "use strict";
 
-const registerRepositoryRoutes = require("../../routes/repository");
-const registerNotificationRoutes = require("../../routes/notifications");
-const registerMessagingRoutes = require("../../routes/messaging");
-const registerWorkflowRoutes = require("../../routes/workflow");
-const registerHealthRoutes = require("../../routes/health");
-const registerAuthRoutes = require("../../routes/auth");
-const registerAdminRoutes = require("../../routes/admin");
-const registerAssetManagementApiRoutes = require("../../routes/asset-management-api");
-const registerPassportRoutes = require("../../routes/passports");
-const registerPassportPublicRoutes = require("../../routes/passport-public");
-const registerCompanyRoutes = require("../../routes/company");
-const registerDppApiRoutes = require("../../routes/dpp-api");
-const registerDictionaryRoutes = require("../../routes/dictionary");
+const registerRepositoryRoutes = require("../http/routes/repository");
+const registerNotificationRoutes = require("../http/routes/notifications");
+const registerMessagingRoutes = require("../http/routes/messaging");
+const registerWorkflowRoutes = require("../http/routes/workflow");
+const registerHealthRoutes = require("../http/routes/health");
+const registerAuthRoutes = require("../http/routes/auth");
+const registerAdminRoutes = require("../http/routes/admin");
+const registerAssetManagementApiRoutes = require("../http/routes/asset-management-api");
+const registerPassportRoutes = require("../http/routes/passports");
+const registerPassportPublicRoutes = require("../http/routes/passport-public");
+const registerCompanyRoutes = require("../http/routes/company");
+const registerDppApiRoutes = require("../http/routes/dpp-api");
+const registerDictionaryRoutes = require("../http/routes/dictionary");
 
 function registerAppRoutes(app, deps) {
   registerRepositoryRoutes(app, {

@@ -1,3 +1,3 @@
 "use strict";
 
-module.exports = require("../../../services/compliance-service");
+module.exports = require("../../services/compliance-service");
