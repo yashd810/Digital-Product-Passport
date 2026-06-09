@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
+import UserProfile from "../../user/profile/UserProfile";
 import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -145,6 +146,16 @@ function AdminSecurity({ user }) {
       {msg.text && (
         <div ref={alertRef} className={`sec-alert sec-alert-${msg.type}`}>{msg.text}</div>
       )}
+
+      <div className="sec-profile-stack">
+        <UserProfile
+          user={user}
+          showHeader={false}
+          showPersonalInfo={false}
+          showWorkflowDefaults={false}
+          showLanguageSelector={false}
+        />
+      </div>
 
       <div className="create-company-card admin-card-spaced">
         <h3>Invite Super Admin</h3>

@@ -46,6 +46,7 @@ const AdminAnalytics = lazy(() => import("../../admin/pages/AdminAnalytics"));
 const AdminCompanies = lazy(() => import("../../admin/pages/AdminCompanies"));
 const AdminInvite = lazy(() => import("../../admin/pages/AdminInvite"));
 const CompanyAccess = lazy(() => import("../../admin/pages/CompanyAccess"));
+const AdminEditCompanyPage = lazy(() => import("../../admin/pages/AdminEditCompanyPage"));
 const AdminCompanyAnalytics = lazy(() => import("../../admin/pages/AdminCompanyAnalytics"));
 const AdminPassportTypes = lazy(() => import("../../admin/passport-types/AdminPassportTypes"));
 const AdminPassportModules = lazy(() => import("../../admin/passport-modules/AdminPassportModules"));
@@ -200,12 +201,12 @@ function App() {
           <Route path="passport-types/:typeName/fields" element={<AdminPassportTypeFields />} />
           <Route path="invite"                       element={<AdminInvite />} />
           <Route path="admin-management"             element={<AdminSecurity user={user} />} />
-          <Route path="profile"                      element={<UserProfile user={user} companyId={companyId} onUserUpdate={handleUserUpdate} showWorkflowDefaults={false} showLanguageSelector={false} profileTitle="My Profile" profileSubtitle={user?.email} />} />
+          <Route path="profile"                      element={<Navigate to="/admin/admin-management" replace />} />
           <Route path="manual"                       element={<ManualCenter mode="admin" user={user} companyId={companyId} />} />
           <Route path="security"                     element={<Navigate to="/admin/admin-management" replace />} />
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
+          <Route path="company/:companyId/edit"      element={<AdminEditCompanyPage />} />
           <Route path="analytics/:companySlug"        element={<AdminCompanyAnalytics />} />
-          <Route path="company/:companyId/profile"   element={<CompanyProfile user={user} />} />
           <Route path="dictionary" element={<Navigate to="dictionary/battery/v1" replace />} />
           <Route path="dictionary/:family/:version" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />

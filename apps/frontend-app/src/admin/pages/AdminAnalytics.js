@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { PieChart } from "../../passport-viewer/components/PieChart";
 import { openAnalyticsPrintReport, renderClusteredBarChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { STATUS_COLORS } from "../../shared/utils/statusColors";
+import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 import "../styles/AdminDashboard.css";
 import "../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
-const slugify = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const ADMIN_BAR_COLORS = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e", "#f97316", "#a855f7"];
 const COMPANY_SERIES = [
   { key: "draftCount",      label: "Draft",       color: STATUS_COLORS.draft },
@@ -22,16 +22,20 @@ const COMPANY_SERIES = [
 function BarChart({ data, height = 120 }) {
   if (!data?.length) return null;
   const max = Math.max(...data.map((item) => item.value), 1);
-  const barW = 36;
-  const gap = 16;
-  const totalW = data.length * (barW + gap) + gap;
+  const chartW = 420;
+  const barW = Math.min(64, Math.max(36, chartW / Math.max(data.length * 2.8, 5)));
+  const groupW = chartW / data.length;
+  const topPad = 18;
+  const labelY = topPad + height + 26;
+  const totalH = labelY + 18;
 
   return (
-    <svg className="overview-bar-chart" width="100%" viewBox={`0 0 ${Math.max(totalW, 200)} ${height + 30}`}>
+    <svg className="overview-bar-chart admin-type-bar-chart" width="100%" viewBox={`0 0 ${chartW} ${totalH}`}>
       {data.map((item, index) => {
         const barHeight = Math.max(4, (item.value / max) * height);
-        const x = gap + index * (barW + gap);
-        const y = height - barHeight + 10;
+        const groupCenter = groupW * index + groupW / 2;
+        const x = groupCenter - barW / 2;
+        const y = topPad + height - barHeight;
         return (
           <g key={item.label}>
             <rect
@@ -43,11 +47,11 @@ function BarChart({ data, height = 120 }) {
               fill={item.color || ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length]}
               opacity="0.92"
             />
-            <text x={x + barW / 2} y={height + 18} textAnchor="middle" className="overview-bar-chart-label">
-              {item.label.length > 10 ? `${item.label.substring(0, 8)}...` : item.label}
+            <text x={groupCenter} y={labelY} textAnchor="middle" className="overview-bar-chart-label">
+              {item.label.length > 13 ? `${item.label.substring(0, 11)}...` : item.label}
             </text>
             {item.value > 0 && (
-              <text x={x + barW / 2} y={y - 5} textAnchor="middle" className="overview-bar-chart-value">
+              <text x={groupCenter} y={y - 6} textAnchor="middle" className="overview-bar-chart-value">
                 {item.value}
               </text>
             )}
@@ -130,7 +134,6 @@ function ClusteredCompanyChart({ data, height = 180 }) {
 }
 
 function AdminAnalytics() {
-  const navigate = useNavigate();
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -139,8 +142,7 @@ function AdminAnalytics() {
   const [expanded, setExpanded] = useState({});
   const [companyFilter, setCompanyFilter] = useState("");
 
-  useEffect(() => {
-    (async () => {
+  const loadAnalytics = async () => {
       try {
         setLoading(true);
         const response = await fetchWithAuth(`${API}/api/admin/analytics`, {
@@ -153,8 +155,16 @@ function AdminAnalytics() {
       } finally {
         setLoading(false);
       }
-    })();
+  };
+
+  useEffect(() => {
+    loadAnalytics();
   }, []);
+
+  const showMessage = (type, text) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage({ type: "", text: "" }), type === "success" ? 4000 : 3000);
+  };
 
   if (loading) return <div className="loading">Loading analytics…</div>;
   if (error) return <div className="alert alert-error">{error}</div>;
@@ -416,17 +426,24 @@ function AdminAnalytics() {
               <th>In Revision</th>
               <th>Obsolete</th>
               <th>Archived</th>
-              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {filteredCompanies.length === 0 ? (
               <tr>
-                <td colSpan={9} className="admin-analytics-empty-cell">No companies match that filter.</td>
+                <td colSpan={8} className="admin-analytics-empty-cell">No companies match that filter.</td>
               </tr>
             ) : filteredCompanies.map((company) => (
               <tr key={company.id}>
-                <td className="company-name">{company.companyName}</td>
+                <td className="company-name">
+                  <Link
+                    to={buildCompanyAnalyticsPath(company)}
+                    state={{ companyId: company.id }}
+                    className="company-name-link"
+                  >
+                    {company.companyName}
+                  </Link>
+                </td>
                 <td>{company.totalPassports || 0}</td>
                 <td><span className="mini-badge draft">{company.draftCount || 0}</span></td>
                 <td><span className="mini-badge review">{company.inReviewCount || 0}</span></td>
@@ -434,14 +451,6 @@ function AdminAnalytics() {
                 <td><span className="mini-badge revised">{company.revisedCount || 0}</span></td>
                 <td><span className="mini-badge obsolete">{company.obsoleteCount || 0}</span></td>
                 <td><span className="mini-badge archived">{company.archivedCount || 0}</span></td>
-                <td>
-                  <button
-                    className="manage-btn manage-btn-analytics"
-                    onClick={() => navigate(`/admin/analytics/${slugify(company.companyName)}`, { state: { companyId: company.id } })}
-                  >
-                    📊 Analytics
-                  </button>
-                </td>
               </tr>
             ))}
           </tbody>

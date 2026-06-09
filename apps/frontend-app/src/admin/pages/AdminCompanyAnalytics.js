@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-
-const slugify = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 import { PieChart } from "../../passport-viewer/components/PieChart";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { STATUS_COLORS } from "../../shared/utils/statusColors";
+import AdminCompanyActions from "../components/AdminCompanyActions";
+import { buildCompanyAnalyticsPath, slugifyCompanyName as slugify } from "../utils/companyRoutes";
 import "../styles/AdminDashboard.css";
 import "../../shared/styles/Dashboard.css";
 
@@ -26,6 +26,7 @@ function normalizeAdminAnalyticsPayload(payload) {
         ...item,
         passportType: item.passportType || "",
         displayName: item.displayName || "",
+        total: item.total ?? item.totalCount ?? 0,
         draftCount: item.draftCount ?? 0,
         inReviewCount: item.inReviewCount ?? 0,
         releasedCount: item.releasedCount ?? 0,
@@ -62,16 +63,21 @@ function RolePill({ role }) {
 function BarChart({ data, height = 120 }) {
   if (!data?.length) return null;
   const max = Math.max(...data.map((item) => item.value), 1);
-  const barW = 36;
-  const gap = 16;
-  const totalW = data.length * (barW + gap) + gap;
+  const chartW = 420;
+  const barW = Math.min(64, Math.max(36, chartW / Math.max(data.length * 2.8, 5)));
+  const groupW = chartW / data.length;
+  const topPad = 18;
+  const labelY = topPad + height + 26;
+  const totalH = labelY + 18;
 
   return (
-    <svg className="overview-bar-chart" width="100%" viewBox={`0 0 ${Math.max(totalW, 200)} ${height + 30}`}>
+    <svg className="overview-bar-chart admin-type-bar-chart" width="100%" viewBox={`0 0 ${chartW} ${totalH}`}>
       {data.map((item, index) => {
         const barHeight = Math.max(4, (item.value / max) * height);
-        const x = gap + index * (barW + gap);
-        const y = height - barHeight + 10;
+        const groupCenter = groupW * index + groupW / 2;
+        const x = groupCenter - barW / 2;
+        const y = topPad + height - barHeight;
+        const label = item.shortLabel || item.label;
         return (
           <g key={item.label}>
             <rect
@@ -83,11 +89,11 @@ function BarChart({ data, height = 120 }) {
               fill={item.color || OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length]}
               opacity="0.9"
             />
-            <text x={x + barW / 2} y={height + 18} textAnchor="middle" className="overview-bar-chart-label">
-              {item.label.length > 10 ? `${item.label.substring(0, 8)}...` : item.label}
+            <text x={groupCenter} y={labelY} textAnchor="middle" className="overview-bar-chart-label">
+              {label.length > 13 ? `${label.substring(0, 11)}...` : label}
             </text>
             {item.value > 0 && (
-              <text x={x + barW / 2} y={y - 5} textAnchor="middle" className="overview-bar-chart-value">
+              <text x={groupCenter} y={y - 6} textAnchor="middle" className="overview-bar-chart-value">
                 {item.value}
               </text>
             )}
@@ -120,7 +126,12 @@ function LineChart({ labels, series }) {
   const step = Math.ceil(rawMax / yTicks);
   const niceMax = step * yTicks;
 
-  const getX = (index) => (
+  const getX = (index, seriesIndex = 0) => (
+    labels.length === 1
+      ? leftPad + innerW / 2 + (seriesIndex - (series.length - 1) / 2) * 12
+      : leftPad + (index / (labels.length - 1)) * innerW
+  );
+  const getLabelX = (index) => (
     labels.length === 1
       ? leftPad + innerW / 2
       : leftPad + (index / (labels.length - 1)) * innerW
@@ -157,7 +168,7 @@ function LineChart({ labels, series }) {
         })}
 
         {labels.map((label, index) => (
-          <text key={index} x={getX(index)} y={H - 8} textAnchor="middle" className="overview-line-chart-label">
+          <text key={index} x={getLabelX(index)} y={H - 8} textAnchor="middle" className="overview-line-chart-label">
             {label}
           </text>
         ))}
@@ -165,9 +176,9 @@ function LineChart({ labels, series }) {
         {series.map((item, index) => {
           const values = item.values || [];
           if (!values.length) return null;
-          const linePoints = values.map((value, pointIndex) => `${getX(pointIndex)},${getY(value)}`).join(" ");
+          const linePoints = values.map((value, pointIndex) => `${getX(pointIndex, index)},${getY(value)}`).join(" ");
           const bottomY = getY(0);
-          const area = `${getX(0)},${bottomY} ${linePoints} ${getX(values.length - 1)},${bottomY}`;
+          const area = `${getX(0, index)},${bottomY} ${linePoints} ${getX(values.length - 1, index)},${bottomY}`;
           return <polygon key={index} points={area} fill={`url(#admin-ovlcg-${index})`} />;
         })}
 
@@ -175,7 +186,7 @@ function LineChart({ labels, series }) {
           const color = item.color || OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length];
           const values = item.values || [];
           if (!values.length) return null;
-          const points = values.map((value, pointIndex) => `${getX(pointIndex)},${getY(value)}`).join(" ");
+          const points = values.map((value, pointIndex) => `${getX(pointIndex, index)},${getY(value)}`).join(" ");
           return (
             <g key={index}>
               <polyline
@@ -189,7 +200,7 @@ function LineChart({ labels, series }) {
               {values.map((value, pointIndex) => (
                 <circle
                   key={pointIndex}
-                  cx={getX(pointIndex)}
+                  cx={getX(pointIndex, index)}
                   cy={getY(value)}
                   r={hoveredCol === pointIndex ? 5 : 3.5}
                   fill={color}
@@ -205,9 +216,9 @@ function LineChart({ labels, series }) {
 
         {hoveredCol !== null && (
           <line
-            x1={getX(hoveredCol)}
+            x1={getLabelX(hoveredCol)}
             y1={topPad}
-            x2={getX(hoveredCol)}
+            x2={getLabelX(hoveredCol)}
             y2={H - bottomPad}
             stroke="rgba(184,204,217,0.3)"
             strokeWidth="1"
@@ -259,6 +270,7 @@ function AdminCompanyAnalytics() {
   const location = useLocation();
   const navigate = useNavigate();
   const [companyId, setCompanyId] = useState(location.state?.companyId || null);
+  const [companyRecord, setCompanyRecord] = useState(null);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -276,41 +288,80 @@ function AdminCompanyAnalytics() {
   const [showAnalyticsFilters, setShowAnalyticsFilters] = useState(false);
   const [showUsersFilters, setShowUsersFilters] = useState(false);
 
-  useEffect(() => {
-    if (companyId) {
-      load(companyId);
-    } else {
-      // Resolve slug → ID via companies list (direct URL access)
-      fetchWithAuth(`${API}/api/admin/companies`, { headers: authHeaders() })
-        .then(r => r.json())
-        .then(companies => {
-          const found = companies.find(c => slugify(c.companyName) === companySlug);
-          if (found) setCompanyId(found.id);
-          else setError("Company not found");
-        })
-        .catch(() => setError("Failed to resolve company"));
-    }
-  }, [companySlug]);
-
-  useEffect(() => {
-    if (companyId) load(companyId);
-  }, [companyId]);
-
-  const load = async (id) => {
+  const load = async (id = companyId) => {
+    if (!id) return;
     setLoading(true);
     setError("");
     try {
-      const response = await fetchWithAuth(`${API}/api/admin/companies/${id}/analytics`, {
-        headers: authHeaders(),
+      const [analyticsResponse, companyResponse] = await Promise.all([
+        fetchWithAuth(`${API}/api/admin/companies/${id}/analytics`, {
+          headers: authHeaders(),
+        }),
+        fetchWithAuth(`${API}/api/admin/companies/${id}`, {
+          headers: authHeaders(),
+        }),
+      ]);
+
+      const analyticsPayload = await analyticsResponse.json().catch(() => ({}));
+      const companyPayload = await companyResponse.json().catch(() => ({}));
+      if (!analyticsResponse.ok) throw new Error(analyticsPayload.error || "Failed to load analytics");
+      if (!companyResponse.ok) throw new Error(companyPayload.error || "Failed to load company");
+
+      const normalized = normalizeAdminAnalyticsPayload(analyticsPayload);
+      const fullCompany = {
+        ...companyPayload,
+        id,
+        companyName: companyPayload.companyName || normalized.company?.companyName || `Company ${id}`,
+      };
+      setCompanyRecord(fullCompany);
+      setData({
+        ...normalized,
+        company: {
+          ...(normalized.company || {}),
+          ...fullCompany,
+        },
       });
-      if (!response.ok) throw new Error("Failed to load");
-      setData(normalizeAdminAnalyticsPayload(await response.json()));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (companyId) return () => { cancelled = true; };
+
+    setLoading(true);
+    setError("");
+    fetchWithAuth(`${API}/api/admin/companies`, { headers: authHeaders() })
+      .then((response) => response.json())
+      .then((companies) => {
+        if (cancelled) return;
+        const found = Array.isArray(companies)
+          ? companies.find((item) => slugify(item.companyName) === companySlug)
+          : null;
+        if (found) {
+          setCompanyRecord(found);
+          setCompanyId(found.id);
+        } else {
+          setError("Company not found");
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError("Failed to resolve company");
+          setLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [companyId, companySlug]);
+
+  useEffect(() => {
+    if (companyId) load(companyId);
+  }, [companyId]);
 
   const flash = (type, text, duration = 4000) => {
     setMsg({ type, text });
@@ -330,7 +381,7 @@ function AdminCompanyAnalytics() {
       if (!response.ok) throw new Error("Failed");
       flash("success", "Role updated");
       setEditUserId(null);
-      load();
+      load(companyId);
     } catch (err) {
       flash("error", err.message);
     } finally {
@@ -496,6 +547,7 @@ function AdminCompanyAnalytics() {
   ].filter((item) => item.value > 0);
   const typeChartData = (data.analytics || []).map((item, index) => ({
     label: item.displayName || item.passportType,
+    shortLabel: item.productCategory || item.displayName || item.passportType,
     value: parseInt(item.total || 0, 10),
     color: OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length],
   }));
@@ -503,6 +555,40 @@ function AdminCompanyAnalytics() {
     ...series,
     color: OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length],
   }));
+  const currentCompany = companyRecord || data.company || { id: companyId, companyName: `Company ${companyId}` };
+
+  const handleCompanyUpdated = (updatedCompany) => {
+    const nextCompany = { ...currentCompany, ...(updatedCompany || {}) };
+    setCompanyRecord(nextCompany);
+    setData((prev) => prev ? {
+      ...prev,
+      company: { ...(prev.company || {}), ...nextCompany },
+    } : prev);
+
+    if (nextCompany.companyName && slugify(nextCompany.companyName) !== companySlug) {
+      navigate(buildCompanyAnalyticsPath(nextCompany), {
+        replace: true,
+        state: { companyId: nextCompany.id || companyId },
+      });
+    }
+    load(nextCompany.id || companyId);
+  };
+
+  const handleCompanyDeleted = () => {
+    navigate("/admin/analytics");
+  };
+
+  const openCompanyAccess = () => {
+    if (!companyId) return;
+    navigate(`/admin/company/${companyId}/access`);
+  };
+
+  const openInviteUser = () => {
+    if (!companyId) return;
+    navigate("/admin/invite", {
+      state: { preselectedCompanyId: String(companyId) },
+    });
+  };
 
   return (
     <div className="aca-page">
@@ -515,13 +601,24 @@ function AdminCompanyAnalytics() {
             <h2 className="aca-title">📊 {data.company?.companyName || "Company"} Analytics</h2>
             <p className="aca-subtitle">Company-specific passport statistics, trends, and exportable reporting.</p>
           </div>
-          <button
-            className="export-pdf-btn aca-export-btn"
-            onClick={exportAnalyticsToPDF}
-            disabled={exporting || !data}
-          >
-            {exporting ? "⏳ Exporting..." : "📄 Export as PDF"}
-          </button>
+          <div className="aca-header-actions">
+            <AdminCompanyActions
+              company={currentCompany}
+              hideKebabTrigger
+              hideDeleteMenuItem
+              inlineActions={["edit"]}
+              onCompanyDeleted={handleCompanyDeleted}
+              onCompanyUpdated={handleCompanyUpdated}
+              onMessage={flash}
+            />
+            <button
+              className="export-pdf-btn aca-export-btn"
+              onClick={exportAnalyticsToPDF}
+              disabled={exporting || !data}
+            >
+              {exporting ? "⏳ Exporting..." : "📄 Export as PDF"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -560,7 +657,7 @@ function AdminCompanyAnalytics() {
                   {typeChartData.length > 2 && (
                     <div className="chart-card chart-card-compact">
                       <div className="chart-title">Passports by type</div>
-                      <BarChart data={typeChartData} height={70} />
+                      <BarChart data={typeChartData} height={210} />
                     </div>
                   )}
                   <div className="chart-card chart-card-wide">
@@ -641,6 +738,11 @@ function AdminCompanyAnalytics() {
               ))}
             </tbody>
           </table>
+          <div className="aca-table-footer-actions">
+            <button type="button" className="manage-btn manage-btn-analytics" onClick={openCompanyAccess}>
+              Manage Access
+            </button>
+          </div>
         </div>
       )}
 
@@ -666,75 +768,101 @@ function AdminCompanyAnalytics() {
         </div>
 
         {filteredUsers.length === 0 ? (
-          <p className="admin-muted-copy">No users found.</p>
+          <>
+            <p className="admin-muted-copy">No users found.</p>
+            <div className="aca-table-footer-actions">
+              <button type="button" className="manage-btn manage-btn-analytics" onClick={openInviteUser}>
+                Invite User
+              </button>
+            </div>
+          </>
         ) : (
-          <table className="aca-table">
-            <thead>
-              <tr>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("name")}>Name{sortIndicator(usersSort, "name") && ` ${sortIndicator(usersSort, "name")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("email")}>Email{sortIndicator(usersSort, "email") && ` ${sortIndicator(usersSort, "email")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("id")}>User ID{sortIndicator(usersSort, "id") && ` ${sortIndicator(usersSort, "id")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("role")}>Role{sortIndicator(usersSort, "role") && ` ${sortIndicator(usersSort, "role")}`}</button></th>
-                <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("lastLoginAt")}>Last Login{sortIndicator(usersSort, "lastLoginAt") && ` ${sortIndicator(usersSort, "lastLoginAt")}`}</button></th>
-                <th>Actions</th>
-              </tr>
-              {showUsersFilters && (
-                <tr className="table-filter-row">
-                  <th><input className="table-filter-input" value={usersFilters.name || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, name: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={usersFilters.email || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, email: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={usersFilters.id || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, id: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={usersFilters.role || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, role: e.target.value }))} placeholder="Filter" /></th>
-                  <th><input className="table-filter-input" value={usersFilters.lastLoginAt || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, lastLoginAt: e.target.value }))} placeholder="Filter" /></th>
-                  <th></th>
+          <>
+            <table className="aca-table">
+              <thead>
+                <tr>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("name")}>Name{sortIndicator(usersSort, "name") && ` ${sortIndicator(usersSort, "name")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("email")}>Email{sortIndicator(usersSort, "email") && ` ${sortIndicator(usersSort, "email")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("id")}>User ID{sortIndicator(usersSort, "id") && ` ${sortIndicator(usersSort, "id")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("role")}>Role{sortIndicator(usersSort, "role") && ` ${sortIndicator(usersSort, "role")}`}</button></th>
+                  <th><button type="button" className="table-sort-btn" onClick={() => toggleUsersSort("lastLoginAt")}>Last Login{sortIndicator(usersSort, "lastLoginAt") && ` ${sortIndicator(usersSort, "lastLoginAt")}`}</button></th>
+                  <th>Actions</th>
                 </tr>
-              )}
-            </thead>
-            <tbody>
-              {controlledUsers.map((user) => (
-                <tr key={user.id}>
-                  <td><div className="aca-user-name">{user.firstName} {user.lastName}</div></td>
-                  <td className="aca-user-email">{user.email}</td>
-                  <td className="aca-user-id">#{user.id}</td>
-                  <td>
-                    {editUserId === user.id ? (
-                      <div className="aca-role-editor">
-                        <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="aca-role-select">
-                          {ROLES.map((role) => (
-                            <option key={role.key} value={role.key}>{role.label}</option>
-                          ))}
-                        </select>
-                        <button onClick={() => handleRoleChange(user.id)} disabled={saving} className="aca-inline-btn aca-inline-btn-save">
-                          {saving ? "…" : "✓"}
+                {showUsersFilters && (
+                  <tr className="table-filter-row">
+                    <th><input className="table-filter-input" value={usersFilters.name || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, name: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={usersFilters.email || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, email: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={usersFilters.id || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, id: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={usersFilters.role || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, role: e.target.value }))} placeholder="Filter" /></th>
+                    <th><input className="table-filter-input" value={usersFilters.lastLoginAt || ""} onChange={(e) => setUsersFilters((prev) => ({ ...prev, lastLoginAt: e.target.value }))} placeholder="Filter" /></th>
+                    <th></th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {controlledUsers.map((user) => (
+                  <tr key={user.id}>
+                    <td><div className="aca-user-name">{user.firstName} {user.lastName}</div></td>
+                    <td className="aca-user-email">{user.email}</td>
+                    <td className="aca-user-id">#{user.id}</td>
+                    <td>
+                      {editUserId === user.id ? (
+                        <div className="aca-role-editor">
+                          <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="aca-role-select">
+                            {ROLES.map((role) => (
+                              <option key={role.key} value={role.key}>{role.label}</option>
+                            ))}
+                          </select>
+                          <button onClick={() => handleRoleChange(user.id)} disabled={saving} className="aca-inline-btn aca-inline-btn-save">
+                            {saving ? "…" : "✓"}
+                          </button>
+                          <button onClick={() => setEditUserId(null)} className="aca-inline-btn aca-inline-btn-cancel">
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <RolePill role={user.role} />
+                      )}
+                    </td>
+                    <td className="aca-last-login">
+                      {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : "Never"}
+                    </td>
+                    <td>
+                      {editUserId !== user.id && (
+                        <button
+                          onClick={() => {
+                            setEditUserId(user.id);
+                            setEditRole(user.role);
+                          }}
+                          className="aca-edit-btn"
+                        >
+                          ✏️ Change Role
                         </button>
-                        <button onClick={() => setEditUserId(null)} className="aca-inline-btn aca-inline-btn-cancel">
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <RolePill role={user.role} />
-                    )}
-                  </td>
-                  <td className="aca-last-login">
-                    {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : "Never"}
-                  </td>
-                  <td>
-                    {editUserId !== user.id && (
-                      <button
-                        onClick={() => {
-                          setEditUserId(user.id);
-                          setEditRole(user.role);
-                        }}
-                        className="aca-edit-btn"
-                      >
-                        ✏️ Change Role
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="aca-table-footer-actions">
+              <button type="button" className="manage-btn manage-btn-analytics" onClick={openInviteUser}>
+                Invite User
+              </button>
+            </div>
+          </>
         )}
+      </div>
+
+      <div className="aca-page-footer-actions">
+        <AdminCompanyActions
+          company={currentCompany}
+          hideKebabTrigger
+          hideDeleteMenuItem
+          inlineActions={["delete"]}
+          onCompanyDeleted={handleCompanyDeleted}
+          onCompanyUpdated={handleCompanyUpdated}
+          onMessage={flash}
+        />
       </div>
     </div>
   );

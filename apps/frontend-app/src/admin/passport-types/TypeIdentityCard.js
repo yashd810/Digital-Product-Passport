@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import AdminSelectMenu from "../components/AdminSelectMenu";
 
 export function TypeIdentityCard({
   displayName,
@@ -20,6 +21,38 @@ export function TypeIdentityCard({
   setInvalidFields,
   iconPresets,
 }) {
+  const categoryMenuRef = useRef(null);
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+
+  const filteredProductCategoryOptions = useMemo(() => {
+    const normalizedQuery = String(productCategory || "").trim().toLowerCase();
+    if (!normalizedQuery) return productCategoryOptions;
+    return productCategoryOptions.filter((option) =>
+      String(option.name || "").toLowerCase().includes(normalizedQuery)
+    );
+  }, [productCategory, productCategoryOptions]);
+
+  useEffect(() => {
+    if (!categoryMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target)) {
+        setCategoryMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setCategoryMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [categoryMenuOpen]);
+
   return (
     <div className="acpt-card">
       <h3 className="acpt-card-title">Type Identity</h3>
@@ -40,26 +73,54 @@ export function TypeIdentityCard({
 
         <div className="acpt-field-group acpt-span2">
           <label>Product Category *</label>
-          <input
-            type="text"
-            value={productCategory}
-            onChange={e => {
-              const selected = productCategoryOptions.find(o => o.name === e.target.value);
-              setProductCategory(e.target.value);
-              setError("");
-              setInvalidFields([]);
-              if (selected) setProductIcon(selected.icon);
-            }}
-            list="passport-product-category-options"
-            placeholder="e.g. Appliance"
-            className={`acpt-input${hasInvalid("productCategory") ? " acpt-input-error" : ""}`}
-            required
-          />
-          <datalist id="passport-product-category-options">
-            {productCategoryOptions.map(o => (
-              <option key={o.id || o.name} value={o.name}>{o.icon} {o.name}</option>
-            ))}
-          </datalist>
+          <div className="acpt-category-combobox" ref={categoryMenuRef}>
+            <input
+              type="text"
+              value={productCategory}
+              onFocus={() => setCategoryMenuOpen(true)}
+              onChange={e => {
+                const nextValue = e.target.value;
+                const selected = productCategoryOptions.find(o => o.name === nextValue);
+                setProductCategory(nextValue);
+                setError("");
+                setInvalidFields([]);
+                if (selected) setProductIcon(selected.icon);
+                setCategoryMenuOpen(true);
+              }}
+              placeholder="e.g. Appliance"
+              className={`acpt-input${hasInvalid("productCategory") ? " acpt-input-error" : ""}`}
+              required
+              aria-expanded={categoryMenuOpen}
+              aria-haspopup="listbox"
+            />
+            {categoryMenuOpen && filteredProductCategoryOptions.length > 0 && (
+              <div className="acpt-category-menu" role="listbox">
+                {filteredProductCategoryOptions.map((option) => {
+                  const selected = option.name === productCategory;
+                  return (
+                    <button
+                      key={option.id || option.name}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`acpt-category-option${selected ? " selected" : ""}`}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        setProductCategory(option.name);
+                        setProductIcon(option.icon);
+                        setError("");
+                        setInvalidFields([]);
+                        setCategoryMenuOpen(false);
+                      }}
+                    >
+                      <span className="acpt-category-option-icon">{option.icon}</span>
+                      <span className="acpt-category-option-label">{option.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <span className="acpt-hint">
             Type a new product category or choose an existing one. New categories are saved when the passport type is created.
           </span>
@@ -111,24 +172,24 @@ export function TypeIdentityCard({
 
         <div className="acpt-field-group acpt-span2">
           <label>Semantic Model</label>
-          <select
+          <AdminSelectMenu
+            id="semanticModelKey"
             value={semanticModelKey}
-            onChange={e => {
-              setSemanticModelKey(e.target.value);
+            onChange={(nextValue) => {
+              setSemanticModelKey(nextValue);
               setError("");
               setInvalidFields([]);
             }}
-            className={`acpt-input${hasInvalid("semanticModelKey") ? " acpt-input-error" : ""}`}
-          >
-            {semanticModelOptions.map((option) => (
-              <option
-                key={option.key || "none"}
-                value={option.key}
-              >
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={semanticModelOptions.map((option) => ({
+              value: option.key,
+              label: option.label,
+            }))}
+            className={hasInvalid("semanticModelKey") ? "acpt-select acpt-select-error" : "acpt-select"}
+            triggerClassName="acpt-input acpt-select-trigger"
+            menuClassName="acpt-select-menu"
+            optionClassName="acpt-select-option"
+            ariaLabel="Semantic model"
+          />
           <span className="acpt-hint">
             {(semanticModelOptions.find((option) => option.key === semanticModelKey) || semanticModelOptions[0])?.description}
           </span>

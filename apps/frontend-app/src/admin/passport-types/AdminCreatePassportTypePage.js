@@ -34,6 +34,7 @@ import {
   resolveSelectedSemanticMatch,
   resolveSemanticTermDefinitionByInput,
 } from "./semanticTermCatalog";
+import AdminSelectMenu from "../components/AdminSelectMenu";
 import { TypeIdentityCard } from "./TypeIdentityCard";
 import "../styles/AdminDashboard.css";
 
@@ -1195,15 +1196,19 @@ function AdminCreatePassportType() {
                         🌐
                       </button>
 
-                      <select
+                      <AdminSelectMenu
                         value={field.type}
-                        onChange={e => updateField(section.localId, field.localId, { type: e.target.value })}
-                        className="acpt-type-select"
-                      >
-                        {FIELD_TYPES.map(t => (
-                          <option key={t.value} value={t.value}>{t.label}</option>
-                        ))}
-                      </select>
+                        onChange={(nextValue) => updateField(section.localId, field.localId, { type: nextValue })}
+                        options={FIELD_TYPES.map((typeOption) => ({
+                          value: typeOption.value,
+                          label: typeOption.label,
+                        }))}
+                        className="acpt-select acpt-select-inline"
+                        triggerClassName="acpt-type-select acpt-select-trigger acpt-select-trigger-sm"
+                        menuClassName="acpt-select-menu acpt-select-menu-compact"
+                        optionClassName="acpt-select-option"
+                        ariaLabel="Field type"
+                      />
 
                       <div className="acpt-field-actions">
                         <button
@@ -1224,27 +1229,31 @@ function AdminCreatePassportType() {
                         >
                           ↓
                         </button>
-                        <select
+                        <AdminSelectMenu
                           value={section.localId}
-                          onChange={e => {
-                            const targetSectionId = e.target.value;
+                          onChange={(targetSectionId) => {
                             if (targetSectionId !== section.localId) {
                               moveFieldToSection(section.localId, targetSectionId, field.localId);
                               setError("");
                               setInvalidFields([]);
                             }
                           }}
-                          className="acpt-move-select"
+                          options={[
+                            { value: section.localId, label: "Move section" },
+                            ...sections.map((sec) => ({
+                              value: sec.localId,
+                              label: sec.label?.trim() || "Untitled section",
+                            })),
+                          ]}
+                          triggerLabel="Move section"
+                          className="acpt-select acpt-select-inline"
+                          triggerClassName="acpt-move-select acpt-select-trigger acpt-select-trigger-sm"
+                          menuClassName="acpt-select-menu acpt-select-menu-compact"
+                          optionClassName="acpt-select-option"
                           title="Move field to another section"
                           disabled={sections.length < 2}
-                        >
-                          <option value={section.localId}>Move section</option>
-                          {sections.map(sec => (
-                            <option key={sec.localId} value={sec.localId}>
-                              {sec.label?.trim() || "Untitled section"}
-                            </option>
-                          ))}
-                        </select>
+                          ariaLabel="Move field to another section"
+                        />
                       </div>
 
                       <button type="button" className="acpt-remove-btn"
@@ -1296,17 +1305,19 @@ function AdminCreatePassportType() {
                         <div className="acpt-field-access">
                           <label className="acpt-access-check">
                             <span>🛡️ Confidentiality:</span>
-                            <select
+                            <AdminSelectMenu
                               value={field.confidentiality || "public"}
-                              onChange={e => updateField(section.localId, field.localId, { confidentiality: e.target.value })}
-                              className="acpt-governance-select"
-                            >
-                              {CONFIDENTIALITY_LEVELS.map(level => (
-                                <option key={level.value} value={level.value}>
-                                  {level.label}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(nextValue) => updateField(section.localId, field.localId, { confidentiality: nextValue })}
+                              options={CONFIDENTIALITY_LEVELS.map((level) => ({
+                                value: level.value,
+                                label: level.label,
+                              }))}
+                              className="acpt-select acpt-select-inline"
+                              triggerClassName="acpt-governance-select acpt-select-trigger acpt-select-trigger-sm"
+                              menuClassName="acpt-select-menu acpt-select-menu-compact"
+                              optionClassName="acpt-select-option"
+                              ariaLabel="Confidentiality"
+                            />
                           </label>
                         </div>
 
@@ -1393,19 +1404,24 @@ function AdminCreatePassportType() {
                           </div>
                           <div className="acpt-meta-field-group">
                             <span className="acpt-meta-sub-label">Data Type</span>
-                            <select
+                            <AdminSelectMenu
                               value={field.dataType || ""}
-                              onChange={e => updateField(section.localId, field.localId, { dataType: e.target.value })}
-                              className="acpt-type-select acpt-type-select-sm"
-                            >
-                              <option value="">Auto-detect</option>
-                              <option value="string">Text (string)</option>
-                              <option value="number">Number (decimal)</option>
-                              <option value="integer">Integer</option>
-                              <option value="date">Date</option>
-                              <option value="boolean">Boolean</option>
-                              <option value="uri">URI / Link</option>
-                            </select>
+                              onChange={(nextValue) => updateField(section.localId, field.localId, { dataType: nextValue })}
+                              options={[
+                                { value: "", label: "Auto-detect" },
+                                { value: "string", label: "Text (string)" },
+                                { value: "number", label: "Number (decimal)" },
+                                { value: "integer", label: "Integer" },
+                                { value: "date", label: "Date" },
+                                { value: "boolean", label: "Boolean" },
+                                { value: "uri", label: "URI / Link" },
+                              ]}
+                              className="acpt-select acpt-select-inline"
+                              triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
+                              menuClassName="acpt-select-menu acpt-select-menu-compact"
+                              optionClassName="acpt-select-option"
+                              ariaLabel="Data type"
+                            />
                           </div>
                           <div className="acpt-meta-field-group acpt-meta-field-group-full">
                             <span className="acpt-meta-sub-label">Semantic Term</span>

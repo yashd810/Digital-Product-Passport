@@ -26,7 +26,6 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
     ? firstCompany.company_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
     : "";
   const firstCompanyAnalyticsRoute = firstCompanyAnalyticsSlug ? `/admin/analytics/${firstCompanyAnalyticsSlug}` : "";
-  const firstCompanyProfileRoute = firstCompany ? `/admin/company/${firstCompany.id}/profile` : "";
   const firstTypeFieldsRoute = firstType ? `/admin/passport-types/${encodeURIComponent(firstType.typeName || firstType.type_name)}/fields` : "";
 
   return [
@@ -67,7 +66,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           title: "Operate at the right level",
           items: [
             "Stay in the super-admin shell for cross-tenant design and governance work.",
-            "Jump into a company's branding or analytics only when you need to support that tenant directly.",
+            "Jump into a company's analytics only when you need to support that tenant directly.",
             "Keep company-day-to-day authoring inside the normal dashboard so super-admin actions remain focused and auditable.",
           ],
         },
@@ -95,7 +94,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Companies",
       audience: "Super admins onboarding or supporting tenants",
       title: "Create companies and launch their initial setup",
-      summary: "The Companies page is the tenant entry point. From there you can create new companies, set DPP issuance policy, see granted passport types, toggle Asset Management, jump into company-specific access or branding tools, invite users, and remove tenants when necessary.",
+      summary: "The Companies page is the tenant entry point. From there you can create new companies, set DPP issuance policy, see granted passport types, toggle Asset Management, jump into company-specific access tools, invite users, and remove tenants when necessary.",
       simpleGuide: {
         title: "Simple onboarding order",
         intro: "When setting up a new company, this order usually causes the least confusion:",
@@ -107,7 +106,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         ],
       },
       facts: [
-        { label: "Company actions", value: "Access, DPP Policy, Asset Management, Branding, Invite, and Delete" },
+        { label: "Company actions", value: "Access, DPP Policy, Asset Management, Invite, and Delete" },
         { label: "Creation outcome", value: "A new tenant record that can then receive passport-type access and user invites" },
         { label: "DPP policy", value: "Default granularity, override permission, DID minting, VC issuance, JSON-LD export, and semantic dictionary access" },
         { label: "Delete protection", value: "Deletion requires confirmation and is designed as an intentional super-admin action" },
@@ -129,7 +128,6 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
             "Access opens the company passport-type assignment screen.",
             "DPP Policy controls default model/batch/item behavior, DID minting, VC issuance, JSON-LD export, and dictionary behavior.",
             "Asset Management enables or revokes the separate bulk-update workspace for that tenant.",
-            "Branding opens the company profile editor from the super-admin side so you can help with public-facing setup.",
             "Invite sends company-user invitation links without leaving the tenant-management workflow.",
             "Delete is reserved for real tenant removal and should be treated as an end-of-life operation.",
           ],
@@ -138,7 +136,6 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       links: [
         { label: "Open Companies", route: "/admin/companies", description: "Create and manage company tenants." },
         { label: "Open Company Access", route: firstCompanyAccessRoute || "/admin/companies", description: "Grant or revoke passport types for a selected company." },
-        { label: "Open Company Branding", route: firstCompanyProfileRoute || "/admin/companies", description: "Help configure a tenant's public-facing profile." },
       ],
       previews: [
         buildPreview(
@@ -206,7 +203,6 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       ],
       links: [
         { label: "Open Companies", route: "/admin/companies", description: "Open the DPP Policy action from a company row." },
-        { label: "Open Company Branding", route: firstCompanyProfileRoute || "/admin/companies", description: "Support public presentation after identity policy is set." },
       ],
       tips: [
         "For production onboarding, decide granularity and operator identifiers before the first bulk import. Correcting identifiers later is more sensitive than correcting display fields.",
@@ -218,22 +214,20 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       icon: "🧱",
       category: "Companies",
       audience: "Super admins supporting tenant rollout",
-      title: "Grant company access, review tenant analytics, and support branding",
-      summary: "After a company exists, the next layer is access and support. Grant the correct type catalog, verify the tenant can see the right product categories, use company analytics to inspect adoption, and help with branding when public-facing views need polish.",
+      title: "Grant company access and review tenant analytics",
+      summary: "After a company exists, the next layer is access and support. Grant the correct type catalog, verify the tenant can see the right product categories, and use company analytics to inspect adoption.",
       simpleGuide: {
         title: "Simple support checklist",
         intro: "When a company says something is missing or confusing, check these first:",
         items: [
           "Does the company have access to the right passport types?",
           "Are the right users and roles in place for the work they need to do?",
-          "Does the company profile or branding need cleanup for public-facing pages?",
           "Do analytics show a local tenant issue or a broader platform issue?",
         ],
       },
       facts: [
         { label: "Access screen", value: "Grouped by product category so you can see each company's type portfolio clearly" },
         { label: "Company analytics", value: "Per-company usage, exports, and user-role management" },
-        { label: "Branding support", value: "Super admins can open a company's profile editor directly" },
         { label: "Data preservation", value: "Revoking access preserves data instead of silently erasing company records" },
       ],
       journeys: [
@@ -246,18 +240,16 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           ],
         },
         {
-          title: "Support the tenant with analytics and branding",
+          title: "Support the tenant with analytics",
           items: [
             "Open company analytics when you need a tenant-specific picture of usage, statuses, and user distribution.",
             "Use the role-edit capability in company analytics if support work requires adjusting a user's role from the super-admin side.",
-            "Open the company profile editor when the public viewer, tagline, variants, or branding colors need adjustment.",
           ],
         },
       ],
       links: [
         { label: "Open Company Access", route: firstCompanyAccessRoute || "/admin/companies", description: "Review and change type grants for a tenant." },
         { label: "Open Company Analytics", route: firstCompanyAnalyticsRoute || "/admin/companies", description: "Investigate a tenant's usage and users." },
-        { label: "Open Company Profile", route: firstCompanyProfileRoute || "/admin/companies", description: "Edit branding from the super-admin side." },
       ],
       previews: [
         buildPreview(

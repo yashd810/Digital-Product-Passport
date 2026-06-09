@@ -10,7 +10,17 @@ import "../../shared/styles/Dashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = true, showLanguageSelector = true, profileTitle, profileSubtitle }) {
+function UserProfile({
+  user,
+  companyId,
+  onUserUpdate,
+  showWorkflowDefaults = true,
+  showLanguageSelector = true,
+  profileTitle,
+  profileSubtitle,
+  showPersonalInfo = true,
+  showHeader = true,
+}) {
   const { t } = useI18n();
   const flashRef = useRef(null);
 
@@ -180,10 +190,12 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
 
   return (
     <div className="profile-page">
-      <div className="profile-header">
-        <h2 className="profile-title">{profileTitle || t("myProfile")}</h2>
-        <p className="profile-sub">{profileSubtitle || user?.email}</p>
-      </div>
+      {showHeader && (
+        <div className="profile-header">
+          <h2 className="profile-title">{profileTitle || t("myProfile")}</h2>
+          <p className="profile-sub">{profileSubtitle || user?.email}</p>
+        </div>
+      )}
 
       {msg.text && (
         <div
@@ -195,84 +207,85 @@ function UserProfile({ user, companyId, onUserUpdate, showWorkflowDefaults = tru
       )}
 
       <div className="profile-right">
-          {/* Personal Info */}
-          <div className="profile-card">
-            <h4 className="card-section-title">Personal Information</h4>
-            <form onSubmit={handleSaveProfile} className="profile-form">
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>{t("firstName")}</label>
-                  <input type="text" value={firstName} disabled={saving}
-                    onChange={e => setFirstName(e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>{t("lastName")}</label>
-                  <input type="text" value={lastName} disabled={saving}
-                    onChange={e => setLastName(e.target.value)} />
-                </div>
-              </div>
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label>{t("phone")} <span className="opt">(optional)</span></label>
-                  <input type="tel" value={phone} placeholder="+46 70 000 0000" disabled={saving}
-                    onChange={e => setPhone(e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>{t("jobTitle")} <span className="opt">(optional)</span></label>
-                  <input type="text" value={jobTitle} placeholder="e.g. Product Manager" disabled={saving}
-                    onChange={e => setJobTitle(e.target.value)} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>{t("bio")} <span className="opt">(optional)</span></label>
-                <textarea rows={3} value={bio} placeholder="Brief description…" disabled={saving}
-                  onChange={e => setBio(e.target.value)} />
-              </div>
-
-              {showWorkflowDefaults && companyId && (
-                <>
-                  <h4 className="card-section-title profile-section-spaced">
-                    Workflow Defaults
-                  </h4>
-                  <p className="profile-helper-text">
-                    Default reviewer and approver pre-filled when you release a passport.
-                  </p>
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label>Default Reviewer</label>
-                      <select value={defReviewer} disabled={saving}
-                        onChange={e => setDefReviewer(e.target.value)}>
-                        <option value="">— None —</option>
-                        {teamUsers.filter(u => u.id !== user?.id).map(u => (
-                          <option key={u.id} value={u.id}>
-                            {u.firstName} {u.lastName} ({u.email})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Default Approver</label>
-                      <select value={defApprover} disabled={saving}
-                        onChange={e => setDefApprover(e.target.value)}>
-                        <option value="">— None —</option>
-                        {teamUsers.filter(u => u.id !== user?.id).map(u => (
-                          <option key={u.id} value={u.id}>
-                            {u.firstName} {u.lastName} ({u.email})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+          {showPersonalInfo && (
+            <div className="profile-card">
+              <h4 className="card-section-title">Personal Information</h4>
+              <form onSubmit={handleSaveProfile} className="profile-form">
+                <div className="form-row-2">
+                  <div className="form-group">
+                    <label>{t("firstName")}</label>
+                    <input type="text" value={firstName} disabled={saving}
+                      onChange={e => setFirstName(e.target.value)} />
                   </div>
-                </>
-              )}
+                  <div className="form-group">
+                    <label>{t("lastName")}</label>
+                    <input type="text" value={lastName} disabled={saving}
+                      onChange={e => setLastName(e.target.value)} />
+                  </div>
+                </div>
+                <div className="form-row-2">
+                  <div className="form-group">
+                    <label>{t("phone")} <span className="opt">(optional)</span></label>
+                    <input type="tel" value={phone} placeholder="+46 70 000 0000" disabled={saving}
+                      onChange={e => setPhone(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label>{t("jobTitle")} <span className="opt">(optional)</span></label>
+                    <input type="text" value={jobTitle} placeholder="e.g. Product Manager" disabled={saving}
+                      onChange={e => setJobTitle(e.target.value)} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>{t("bio")} <span className="opt">(optional)</span></label>
+                  <textarea rows={3} value={bio} placeholder="Brief description…" disabled={saving}
+                    onChange={e => setBio(e.target.value)} />
+                </div>
 
-              <div className="form-actions">
-                <button type="submit" className="btn-primary dashboard-btn-primary">
-                  {saving ? "Saving…" : t("saveChanges")}
-                </button>
-              </div>
-            </form>
-          </div>
+                {showWorkflowDefaults && companyId && (
+                  <>
+                    <h4 className="card-section-title profile-section-spaced">
+                      Workflow Defaults
+                    </h4>
+                    <p className="profile-helper-text">
+                      Default reviewer and approver pre-filled when you release a passport.
+                    </p>
+                    <div className="form-row-2">
+                      <div className="form-group">
+                        <label>Default Reviewer</label>
+                        <select value={defReviewer} disabled={saving}
+                          onChange={e => setDefReviewer(e.target.value)}>
+                          <option value="">— None —</option>
+                          {teamUsers.filter(u => u.id !== user?.id).map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.firstName} {u.lastName} ({u.email})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>Default Approver</label>
+                        <select value={defApprover} disabled={saving}
+                          onChange={e => setDefApprover(e.target.value)}>
+                          <option value="">— None —</option>
+                          {teamUsers.filter(u => u.id !== user?.id).map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.firstName} {u.lastName} ({u.email})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="form-actions">
+                  <button type="submit" className="btn-primary dashboard-btn-primary">
+                    {saving ? "Saving…" : t("saveChanges")}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {/* Change Password */}
           <div className="profile-card">
