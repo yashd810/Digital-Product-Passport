@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import UserProfile from "../../user/profile/UserProfile";
@@ -7,6 +8,8 @@ import "../styles/AdminDashboard.css";
 const API = import.meta.env.VITE_API_URL || "";
 
 function AdminSecurity({ user }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState({ type: "", text: "" });
   const alertRef = useRef(null);
@@ -15,6 +18,7 @@ function AdminSecurity({ user }) {
   const [adminsLoading, setAdminsLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
+  const [approvingInviteId, setApprovingInviteId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [accessTarget, setAccessTarget] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: "", direction: "" });
@@ -32,6 +36,14 @@ function AdminSecurity({ user }) {
     () => applyTableControls(admins, adminColumns, sortConfig, columnFilters),
     [admins, adminColumns, sortConfig, columnFilters]
   );
+  const emailInviteAction = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const approveInvite = searchParams.get("approveInvite");
+    const declineInvite = searchParams.get("declineInvite");
+    if (approveInvite) return { type: "approve", inviteId: approveInvite };
+    if (declineInvite) return { type: "decline", inviteId: declineInvite };
+    return null;
+  }, [location.search]);
 
   const flash = (type, text, duration = 4000) => {
     setMsg({ type, text });
@@ -85,18 +97,65 @@ function AdminSecurity({ user }) {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to send invitation");
-      if (data.emailSent === false) {
-        const manualLinkCopy = data.registerUrl ? ` Manual link: ${data.registerUrl}` : "";
-        flash("success", `${data.message || `Super admin invite created for ${inviteEmail.trim()}.`}${manualLinkCopy}`, 9000);
-      } else {
-        flash("success", `${data.message || `Super admin invitation sent to ${inviteEmail.trim()}`}`, 5000);
-      }
+      flash("success", `${data.message || `Approval requested for ${inviteEmail.trim()}.`}`, 9000);
       setInviteEmail("");
     } catch (err) {
       flash("error", `${err.message || "Failed to send invitation"}`, 5000);
     } finally {
       setInviting(false);
     }
+  };
+
+  const handleApproveInvite = async (inviteId) => {
+    try {
+      setApprovingInviteId(inviteId);
+      const response = await fetchWithAuth(`${API}/api/admin/super-admins/invite-requests/${inviteId}/approve`, {
+        method: "POST",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to approve invitation");
+      flash("success", data.message || "Invitation approved and sent.", 6000);
+    } catch (err) {
+      flash("error", err.message || "Failed to approve invitation", 6000);
+    } finally {
+      setApprovingInviteId(null);
+    }
+  };
+
+  const handleDeclineInvite = async (inviteId) => {
+    try {
+      setApprovingInviteId(inviteId);
+      const response = await fetchWithAuth(`${API}/api/admin/super-admins/invite-requests/${inviteId}/decline`, {
+        method: "POST",
+        headers: authHeaders({
+          "Content-Type": "application/json",
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to decline invitation");
+      flash("success", data.message || "Invitation request declined.", 6000);
+    } catch (err) {
+      flash("error", err.message || "Failed to decline invitation", 6000);
+    } finally {
+      setApprovingInviteId(null);
+    }
+  };
+
+  const clearEmailInviteAction = () => {
+    navigate("/admin/admin-management", { replace: true });
+  };
+
+  const confirmEmailInviteAction = async () => {
+    if (!emailInviteAction?.inviteId) return;
+    if (emailInviteAction.type === "approve") {
+      await handleApproveInvite(emailInviteAction.inviteId);
+    } else {
+      await handleDeclineInvite(emailInviteAction.inviteId);
+    }
+    clearEmailInviteAction();
   };
 
   const handleToggleAccess = async (admin) => {
@@ -147,6 +206,32 @@ function AdminSecurity({ user }) {
         <div ref={alertRef} className={`sec-alert sec-alert-${msg.type}`}>{msg.text}</div>
       )}
 
+      {emailInviteAction && (
+        <div className="create-company-card admin-card-spaced">
+          <h3>{emailInviteAction.type === "approve" ? "Approve Super Admin Invite" : "Decline Super Admin Invite"}</h3>
+          <p className="admin-intro-copy">
+            {emailInviteAction.type === "approve"
+              ? "Confirm approval to send the super admin invitation email."
+              : "Confirm decline to cancel this pending super admin invitation request."}
+          </p>
+          <div className="apt-modal-actions">
+            <button
+              type="button"
+              className={`manage-btn ${emailInviteAction.type === "approve" ? "manage-btn-access" : "manage-btn-danger"}`}
+              onClick={confirmEmailInviteAction}
+              disabled={Boolean(approvingInviteId)}
+            >
+              {approvingInviteId
+                ? (emailInviteAction.type === "approve" ? "Approving…" : "Declining…")
+                : (emailInviteAction.type === "approve" ? "Approve & Send" : "Decline Request")}
+            </button>
+            <button type="button" className="cancel-btn" onClick={clearEmailInviteAction} disabled={Boolean(approvingInviteId)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="sec-profile-stack">
         <UserProfile
           user={user}
@@ -160,8 +245,8 @@ function AdminSecurity({ user }) {
       <div className="create-company-card admin-card-spaced">
         <h3>Invite Super Admin</h3>
         <p className="admin-intro-copy">
-          Send a secure one-time registration link for platform-level super admin access.
-          This invite is not tied to any company and expires in <strong>48 hours</strong>.
+          Request a secure one-time registration link for platform-level super admin access.
+          The invite is held in pending approval until one active super admin approves it, then the email is sent.
         </p>
         <form onSubmit={handleInvite} className="company-form">
           <div className="form-group">
@@ -177,7 +262,7 @@ function AdminSecurity({ user }) {
             />
           </div>
           <button type="submit" className="create-btn" disabled={inviting}>
-            {inviting ? "Sending…" : "✉️ Send Super Admin Invite"}
+            {inviting ? "Submitting…" : "✉️ Request Super Admin Invite"}
           </button>
         </form>
       </div>

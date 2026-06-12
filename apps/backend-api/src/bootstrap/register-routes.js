@@ -2,7 +2,6 @@
 
 const registerRepositoryRoutes = require("../http/routes/repository");
 const registerNotificationRoutes = require("../http/routes/notifications");
-const registerMessagingRoutes = require("../http/routes/messaging");
 const registerWorkflowRoutes = require("../http/routes/workflow");
 const registerHealthRoutes = require("../http/routes/health");
 const registerAuthRoutes = require("../http/routes/auth");
@@ -31,7 +30,6 @@ function registerAppRoutes(app, deps) {
   });
 
   registerNotificationRoutes(app, { pool: deps.pool, authenticateToken: deps.authenticateToken });
-  registerMessagingRoutes(app, { pool: deps.pool, authenticateToken: deps.authenticateToken });
 
   registerWorkflowRoutes(app, {
     pool: deps.pool,

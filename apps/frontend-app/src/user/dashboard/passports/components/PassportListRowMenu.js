@@ -14,20 +14,15 @@ export function PassportListRowMenu({
   pType,
   isPinned,
   navigate,
-  openPassportViewer,
   setOpenMenuId,
   setMenuAnchorRect,
   setReleaseModal,
   handleRevise,
   handleClone,
-  setCsvModal,
-  setHistoryModal,
   setDeviceModal,
   showError,
   showSuccess,
   getViewerPath,
-  handleArchive,
-  handleDelete,
   togglePin,
   companyName,
   companyId,
@@ -36,7 +31,7 @@ export function PassportListRowMenu({
   const compareVersionsPath = buildDashboardPath({
     companyName,
     companyId,
-    subpath: `passports/${passport.dppId}/diff?passportType=${encodeURIComponent(effectivePassportType)}`,
+    subpath: `passports/${passport.dppId}/history?passportType=${encodeURIComponent(effectivePassportType)}`,
   });
 
   return (
@@ -53,23 +48,14 @@ export function PassportListRowMenu({
       <button className="menu-item" onClick={() => { setReleaseModal({ ...passport, passportType: effectivePassportType, checkerOnly: true }); setOpenMenuId(null); }}>
         🧪 Verification check
       </button>
-      <button className="menu-item" onClick={() => { openPassportViewer(passport, { forcePreview: true }); setOpenMenuId(null); }}>
-        👁 Preview public view
-      </button>
       <button className={`menu-item revise-item${!isReleasedPassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isReleasedPassportStatus(passport.releaseStatus)} onClick={() => { handleRevise(passport.dppId, passport.versionNumber, effectivePassportType); setOpenMenuId(null); }}>
         🔄 Revise
       </button>
       <button className="menu-item" onClick={() => handleClone(passport, effectivePassportType)}>
         🔁 Clone
       </button>
-      <button className={`menu-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.releaseStatus)} onClick={() => { setCsvModal({ passport, pType: effectivePassportType }); setOpenMenuId(null); }}>
-        📤 Update data via CSV
-      </button>
-      <button className="menu-item" onClick={() => { setHistoryModal({ dppId: passport.dppId, passportType: effectivePassportType }); setOpenMenuId(null); }}>
-        🕘 Update history
-      </button>
       <button className="menu-item" onClick={() => { navigate(compareVersionsPath); setOpenMenuId(null); }}>
-        🔀 Compare versions
+        🕘 Update history
       </button>
       <button className="menu-item" onClick={() => { setDeviceModal({ passport, pType: effectivePassportType }); setOpenMenuId(null); }}>
         📡 Device Integration
@@ -94,12 +80,6 @@ export function PassportListRowMenu({
         }}
       >
         🔗 {getPassportLinkType(passport.releaseStatus) === "passport" ? "Copy passport link" : "Copy preview link"}
-      </button>
-      <button className="menu-item" onClick={() => { handleArchive(passport.dppId, effectivePassportType); setOpenMenuId(null); }}>
-        📦 Archive
-      </button>
-      <button className={`menu-item delete-item${!isEditablePassportStatus(passport.releaseStatus) ? " disabled" : ""}`} disabled={!isEditablePassportStatus(passport.releaseStatus)} onClick={() => { handleDelete(passport.dppId, effectivePassportType); setOpenMenuId(null); }}>
-        🗑️ Delete
       </button>
     </KebabMenu>
   );

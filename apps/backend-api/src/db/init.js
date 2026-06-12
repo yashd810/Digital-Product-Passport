@@ -209,6 +209,13 @@ async function initDb(pool, {
   try {
     await ensureSchemaMigrationsTable(pool);
     await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
+    await runMigration(pool, "2026-06-11.remove-messaging-tables", async (db) => {
+      await db.query(`
+        DROP TABLE IF EXISTS messages CASCADE;
+        DROP TABLE IF EXISTS conversation_members CASCADE;
+        DROP TABLE IF EXISTS conversations CASCADE;
+      `);
+    });
 
   // Core user and company management tables
   await pool.query(`
@@ -1110,6 +1117,27 @@ async function initDb(pool, {
       expires_at       TIMESTAMPTZ NOT NULL,
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE invite_tokens
+    ADD COLUMN IF NOT EXISTS approval_status VARCHAR(32) NOT NULL DEFAULT 'approved'
+  `);
+  await pool.query(`
+    ALTER TABLE invite_tokens
+    ADD COLUMN IF NOT EXISTS approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+  `);
+  await pool.query(`
+    ALTER TABLE invite_tokens
+    ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ
+  `);
+  await pool.query(`
+    ALTER TABLE invite_tokens
+    ADD COLUMN IF NOT EXISTS invite_email_sent_at TIMESTAMPTZ
+  `);
+  await pool.query(`
+    UPDATE invite_tokens
+    SET approval_status = 'approved'
+    WHERE approval_status IS NULL OR approval_status = ''
   `);
 
   await pool.query(`
@@ -2548,28 +2576,6 @@ async function initDb(pool, {
       UNIQUE(template_id, field_key)
     );
   `).catch(e => logger.error("Template table init error:", e.message));
-
-  // ── Messaging tables ─────────────────────────────────────────────────────
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id          SERIAL PRIMARY KEY,
-      company_id  INTEGER NOT NULL,
-      created_at  TIMESTAMPTZ DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS conversation_members (
-      conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-      user_id         INTEGER NOT NULL,
-      last_read_at    TIMESTAMPTZ DEFAULT NOW(),
-      PRIMARY KEY (conversation_id, user_id)
-    );
-    CREATE TABLE IF NOT EXISTS messages (
-      id              SERIAL PRIMARY KEY,
-      conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-      sender_id       INTEGER NOT NULL,
-      body            TEXT NOT NULL,
-      created_at      TIMESTAMPTZ DEFAULT NOW()
-    );
-  `).catch(e => logger.error("Messaging table init error:", e.message));
 
   // ── Password reset tokens ─────────────────────────────────────────────────
   await pool.query(`

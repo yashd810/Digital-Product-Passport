@@ -143,6 +143,9 @@ module.exports = function registerAuthRoutes(app, {
       if (!tokenRow.rows.length)
         return res.status(400).json({ error: "Invalid or expired invitation link. Please ask for a new invite." });
       const invite = tokenRow.rows[0];
+      if ((invite.approval_status || "approved") !== "approved") {
+        return res.status(400).json({ error: "This invitation is awaiting super admin approval." });
+      }
 
       const existing = await pool.query("SELECT id FROM users WHERE email = $1", [invite.email]);
       if (existing.rows.length)
@@ -190,7 +193,7 @@ module.exports = function registerAuthRoutes(app, {
       const { token } = req.query;
       if (!token) return res.status(400).json({ error: "Token is required" });
       const row = await pool.query(
-        `SELECT it.email, it.expires_at, it.used, it.role_to_assign, c.company_name AS "companyName"
+        `SELECT it.email, it.expires_at, it.used, it.role_to_assign, it.approval_status, c.company_name AS "companyName"
          FROM invite_tokens it LEFT JOIN companies c ON c.id = it.company_id WHERE it.token = $1`,
         [token]
       );
@@ -198,6 +201,9 @@ module.exports = function registerAuthRoutes(app, {
       const invite = row.rows[0];
       if (invite.used)    return res.status(400).json({ valid: false, error: "This invitation has already been used." });
       if (new Date(invite.expires_at) < new Date()) return res.status(400).json({ valid: false, error: "This invitation has expired." });
+      if ((invite.approval_status || "approved") !== "approved") {
+        return res.status(400).json({ valid: false, error: "This invitation is awaiting super admin approval." });
+      }
       res.json({
         valid: true,
         email: invite.email,

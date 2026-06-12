@@ -239,6 +239,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const [formData,       setFormData]       = useState({});
   const [modelDataKeys,  setModelDataKeys]  = useState(new Set()); // fields locked from template
   const [templateName,   setTemplateName]   = useState("");
+  const [templateFieldFilter, setTemplateFieldFilter] = useState("full");
   const [fileSelections, setFileSelections] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
   const [repoPicker,     setRepoPicker]     = useState(null);  // field.key being picked, or null
@@ -597,6 +598,32 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     setError("");
     markDirty();
     setFileSelections(p => ({ ...p, [key]: file }));
+  };
+
+  const isTemplateCreateMode = mode === "create" && !!templateId;
+
+  const hasMeaningfulValue = (value) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === "string") return value.trim() !== "";
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === "object") {
+      if (Array.isArray(value?.rows)) {
+        return value.rows.some((row) => Array.isArray(row) && row.some((cell) => String(cell ?? "").trim() !== ""));
+      }
+      return Object.keys(value).length > 0;
+    }
+    return true;
+  };
+
+  const isFieldUnfilled = (field) => !hasMeaningfulValue(formData[field.key]);
+
+  const shouldShowFieldForTemplateFilter = (field) => {
+    if (!isTemplateCreateMode) return true;
+    if (templateFieldFilter === "full") return true;
+    const isModelField = modelDataKeys.has(field.key);
+    if (templateFieldFilter === "model") return isModelField;
+    if (templateFieldFilter === "item") return !isModelField;
+    return true;
   };
 
   const uploadFile = async (key, file, guidToUse) => {
@@ -970,10 +997,12 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const isLocked = mode === "create" && modelDataKeys.has(field.key);
     const disabled = isSaving || (mode==="edit" && isLoading) || isLocked;
     const fieldLabel = formatFieldLabelWithUnit(field.label, field);
+    const highlightMissing = isTemplateCreateMode && !isLocked && isFieldUnfilled(field);
+    const fieldClassName = highlightMissing ? "pf-needs-input" : "";
 
     if (field.type === "boolean") {
       return (
-        <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+        <label className={fieldClassName} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
           <input type="checkbox" checked={!!val}
             onChange={e => handleField(field.key, e.target.checked)} disabled={disabled} />
           <span style={{ fontSize:14, color:"var(--text-primary)", fontFamily:"var(--font)" }}>{fieldLabel}</span>
@@ -1009,7 +1038,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           <div className="file-link-paste">
             <input
               type="text"
-              className="file-link-input"
+              className={`file-link-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
               placeholder="Or paste a repository link here…"
               disabled={disabled}
               value={linkedUrl && document.activeElement?.dataset?.fieldKey !== field.key ? "" : undefined}
@@ -1061,7 +1090,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
           <div className="file-link-paste">
             <input
               type="text"
-              className="file-link-input"
+              className={`file-link-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
               placeholder="Or paste a repository link here…"
               disabled={disabled}
               data-field-key={field.key}
@@ -1187,7 +1216,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                         disabled={disabled}
                         placeholder="—"
                         onChange={e => updateCell(ri, ci, e.target.value)}
-                        className="pf-table-cell-input"
+                        className={`pf-table-cell-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
                       />
                     </td>
                   ))}
@@ -1205,6 +1234,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
     if (field.type === "textarea") {
       return <textarea value={val} disabled={disabled}
+        className={fieldClassName}
         placeholder={getFieldInputPrompt(field)}
         onChange={e => handleField(field.key,e.target.value)} />;
     }
@@ -1225,7 +1255,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
             value={toInput(val)}
             disabled={disabled}
             onChange={e => handleField(field.key, fromInput(e.target.value))}
-            className="pf-date-input"
+            className={`pf-date-input${fieldClassName ? ` ${fieldClassName}` : ""}`}
           />
           <span className="pf-date-hint">DD/MM/YYYY</span>
         </div>
@@ -1233,6 +1263,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     }
 
     return <input type="text" value={val} disabled={disabled}
+      className={fieldClassName}
       placeholder={getFieldInputPrompt(field)}
       onChange={e => handleField(field.key,e.target.value)} />;
   };
@@ -1449,6 +1480,23 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
               </span>
             </div>
           )}
+          {isTemplateCreateMode && (
+            <div className="pf-template-filter-bar">
+              <span className="pf-template-filter-label">Show fields:</span>
+              <div className="pf-template-filter-buttons">
+                <button type="button" className={`pf-template-filter-btn${templateFieldFilter === "model" ? " active" : ""}`} onClick={() => setTemplateFieldFilter("model")}>
+                  Model data
+                </button>
+                <button type="button" className={`pf-template-filter-btn${templateFieldFilter === "item" ? " active" : ""}`} onClick={() => setTemplateFieldFilter("item")}>
+                  Item data
+                </button>
+                <button type="button" className={`pf-template-filter-btn${templateFieldFilter === "full" ? " active" : ""}`} onClick={() => setTemplateFieldFilter("full")}>
+                  Full data
+                </button>
+              </div>
+              <span className="pf-template-filter-hint">Highlighted fields still need item-specific values.</span>
+            </div>
+          )}
           <div className="pf-governance-panel">
             Field confidentiality, access audiences, and update authority are set on the passport type by admins.
             This form shows those governance rules for each field, but editors cannot change them per passport record.
@@ -1463,6 +1511,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
             {sectionKeys.map(sk => {
               const section = SECTIONS[sk];
               const sectionContentId = `passport-section-${sk}`;
+              const visibleFields = section.fields
+                .filter((field) => field?.key && !RESERVED_SYSTEM_FIELD_KEYS.has(field.key))
+                .filter(shouldShowFieldForTemplateFilter);
               return (
                 <div key={sk} className="form-section">
                   <button
@@ -1482,16 +1533,19 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                           Upload official PDF documents. Stored securely and shown in the passport viewer.
                         </p>
                       )}
+                      {visibleFields.length > 0 ? (
                       <div className="form-grid">
-                        {section.fields.filter((field) => field?.key && !RESERVED_SYSTEM_FIELD_KEYS.has(field.key)).map(f => {
+                        {visibleFields.map(f => {
                           const isLocked = mode === "create" && modelDataKeys.has(f.key);
+                          const needsInput = isTemplateCreateMode && !isLocked && isFieldUnfilled(f);
                           return (
                             <div key={f.key}
-                              className={`form-group${f.type==="textarea"||f.type==="file"?" full-width":""}${isLocked?" form-group-locked":""}`}>
+                              className={`form-group${f.type==="textarea"||f.type==="file"?" full-width":""}${isLocked?" form-group-locked":""}${needsInput ? " form-group-needs-input" : ""}`}>
                               {f.type !== "boolean" && (
                                 <label htmlFor={f.type==="file" ? `f-${f.key}` : f.key}>
                                   {formatFieldLabelWithUnit(f.label, f)}
                                   {isLocked && <span className="pf-model-badge">📌 Model data</span>}
+                                  {needsInput && <span className="pf-required-badge">Needs input</span>}
                                 </label>
                               )}
                               {renderField(f)}
@@ -1499,6 +1553,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
                           );
                         })}
                       </div>
+                      ) : (
+                        <div className="pf-filter-empty-state">
+                          No fields in this section match the current filter.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

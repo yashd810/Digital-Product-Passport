@@ -191,7 +191,11 @@ function createPassportQueryRepository({
       liveVersionSql = ` AND p."versionNumber" = $${liveParams.length}`;
     }
     const liveRes = await pool.query(
-      `SELECT p.*, u.email AS "createdByEmail", u."firstName" AS "firstName", u."lastName" AS "lastName"
+      `SELECT p.*,
+              u.email AS "createdByEmail",
+              u."firstName" AS "firstName",
+              u."lastName" AS "lastName",
+              NULLIF(TRIM(CONCAT(COALESCE(u."firstName", ''), ' ', COALESCE(u."lastName", ''))), '') AS "createdByName"
        FROM ${tableName} p
        LEFT JOIN users u ON u.id = p."createdBy"
        WHERE p."dppId" = $1 AND p."companyId" = $2 AND p."deletedAt" IS NULL${liveVersionSql}

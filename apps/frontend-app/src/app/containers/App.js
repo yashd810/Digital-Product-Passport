@@ -77,7 +77,12 @@ function TemplateEditRoute({ user, companyId }) {
 
 function CSVImportTabRoute({ user, companyId }) {
   const { tab } = useParams();
-  return <CSVImportGuide user={user} companyId={companyId} activeTab={tab || "create"} />;
+  const normalizedTab = tab === "update-csv"
+    ? "create-csv"
+    : tab === "update-json"
+      ? "create-json"
+      : tab || "create-csv";
+  return <CSVImportGuide user={user} companyId={companyId} activeTab={normalizedTab} />;
 }
 
 function App() {
@@ -137,7 +142,7 @@ function App() {
         {/* CSV Import */}
         <Route path="/csv-import/:passportType" element={
           <ProtectedRoute token={token} authReady={authReady}>
-            <Navigate to="create" replace />
+            <Navigate to="create-csv" replace />
           </ProtectedRoute>
         } />
         <Route path="/csv-import/:passportType/:tab" element={
@@ -158,14 +163,15 @@ function App() {
           <Route path="passports/product/:productKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="passports/productCategory/:productCategoryKey" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="passports/:dppId/diff" element={<VersionDiff companyId={companyId} />} />
+          <Route path="passports/:dppId/history" element={<VersionDiff companyId={companyId} />} />
           <Route path="passports/:passportType" element={<PassportList user={user} companyId={companyId} filterByUser={false} />} />
           <Route path="notifications"   element={<NotificationsPage user={user} />} />
-          <Route path="messages"        element={<NotificationsPage user={user} initialTab="messages" />} />
+          <Route path="messages"        element={<Navigate to="notifications" replace />} />
           <Route path="templates"       element={<TemplatesPage user={user} companyId={companyId} view="list" />} />
           <Route path="templates/new"   element={<TemplatesPage user={user} companyId={companyId} view="create" />} />
           <Route path="templates/:templateId/edit" element={<TemplateEditRoute user={user} companyId={companyId} />} />
           <Route path="create"          element={<CreateHub user={user} companyId={companyId} />} />
-          <Route path="passport-data"   element={user?.assetManagementEnabled ? <PassportDataManagement user={user} companyId={companyId} /> : <Navigate to={buildUserDashboardHomePath({ user, companyId })} replace />} />
+          <Route path="passport-data"   element={<PassportDataManagement user={user} companyId={companyId} />} />
           <Route path="audit-logs"      element={<AuditLogs companyId={companyId} />} />
           <Route path="workflow"          element={<Navigate to="workflow/inprogress" replace />} />
           <Route path="workflow/inprogress" element={<WorkflowDashboard user={user} companyId={companyId} activeTab="inprogress" />} />

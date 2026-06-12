@@ -1,12 +1,11 @@
 import React from "react";
 import { ReleaseModal } from "../../workflow/WorkflowDashboard";
-import PassportHistoryModal from "../../../../passports/history/PassportHistoryModal";
 import {
   ArchiveConfirmModal,
+  BulkEditModal,
   BulkCreateModal,
   BulkReviseModal,
   BulkWorkflowModal,
-  CsvUpdateModal,
   DeviceIntegrationModal,
   ExportModal,
   PrintQrModal,
@@ -18,16 +17,15 @@ export function PassportListModalStack({
   archiveConfirm,
   bulkActionLoading,
   bulkCreateOpen,
+  bulkEditOpen,
   bulkReviseOpen,
   bulkWorkflowOpen,
   companyId,
-  csvModal,
   deviceModal,
   downloadQrCodes,
   exportModalOpen,
   fetchPassports,
   filteredAndSortedPassports,
-  historyModal,
   passports,
   printQrModalOpen,
   qrExporting,
@@ -36,12 +34,11 @@ export function PassportListModalStack({
   selectedPassports,
   setArchiveConfirm,
   setBulkCreateOpen,
+  setBulkEditOpen,
   setBulkReviseOpen,
   setBulkWorkflowOpen,
-  setCsvModal,
   setDeviceModal,
   setExportModalOpen,
-  setHistoryModal,
   setPrintQrModalOpen,
   setReleaseModal,
   setSelectedPassports,
@@ -90,20 +87,6 @@ export function PassportListModalStack({
         />
       )}
 
-      {csvModal && (
-        <CsvUpdateModal
-          passport={csvModal.passport}
-          passportType={csvModal.pType}
-          companyId={companyId}
-          onClose={() => setCsvModal(null)}
-          onDone={(msg) => {
-            setCsvModal(null);
-            showSuccess(msg);
-            fetchPassports();
-          }}
-        />
-      )}
-
       {exportModalOpen && (
         <ExportModal
           passports={passports}
@@ -117,6 +100,26 @@ export function PassportListModalStack({
           onDone={(msg) => {
             setExportModalOpen(false);
             showSuccess(msg);
+          }}
+        />
+      )}
+
+      {bulkEditOpen && (
+        <BulkEditModal
+          companyId={companyId}
+          user={user}
+          allPassportTypes={allPassportTypes}
+          passports={passports}
+          filteredPassports={filteredAndSortedPassports.map((group) => group.latest)}
+          pagePassports={paginatedPassports.map((group) => group.latest)}
+          selectedPassports={selectedPassports}
+          activeType={activeType}
+          onClose={() => setBulkEditOpen(false)}
+          onApplied={async (data) => {
+            await fetchPassports();
+            showSuccess(
+              `Bulk edit complete: ${data.summary?.updated || 0} updated, ${data.summary?.skipped || 0} skipped, ${data.summary?.failed || 0} failed.`
+            );
           }}
         />
       )}
@@ -138,16 +141,6 @@ export function PassportListModalStack({
               `Bulk revise batch #${data.batch?.id} complete: ${data.summary?.revised || 0} revised, ${data.summary?.skipped || 0} skipped, ${data.summary?.failed || 0} failed.`
             );
           }}
-        />
-      )}
-
-      {historyModal && (
-        <PassportHistoryModal
-          dppId={historyModal.dppId}
-          passportType={historyModal.passportType}
-          companyId={companyId}
-          mode="company"
-          onClose={() => setHistoryModal(null)}
         />
       )}
 

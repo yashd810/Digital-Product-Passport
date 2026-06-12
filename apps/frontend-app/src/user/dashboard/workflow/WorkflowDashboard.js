@@ -577,7 +577,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const renderRow = (wf, showActions) => {
+  const renderRow = (wf, showActions, showActionColumn) => {
     const needsMyReview = showActions && String(wf.reviewerId) === String(user?.id) && wf.reviewStatus === "pending";
     const needsMyApproval = showActions && String(wf.approverId) === String(user?.id) && wf.approvalStatus === "pending" && wf.reviewStatus !== "pending";
     const workflowPassportId = getWorkflowPassportId(wf);
@@ -612,27 +612,29 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
           )}
         </td>
         <td className="small-text">{new Date(getWorkflowCreatedAt(wf)).toLocaleDateString()}</td>
-        <td>
-          <div className="workflow-action-group">
-            {(needsMyReview || needsMyApproval) && (
-              <>
-                <button className="wf-action-btn approve"
-                  onClick={() => setModal({ wf, action:"approve" })}>
-                  ✅ Approve
-                </button>
-                <button className="wf-action-btn reject"
-                  onClick={() => setModal({ wf, action:"reject" })}>
-                  ❌ Reject
-                </button>
-              </>
-            )}
-            <button className="wf-action-btn remove"
-              onClick={() => setRemoveModal(wf)}
-              title="Remove from workflow">
-              🗑️ Remove
-            </button>
-          </div>
-        </td>
+        {showActionColumn && (
+          <td>
+            <div className="workflow-action-group">
+              {(needsMyReview || needsMyApproval) && (
+                <>
+                  <button className="wf-action-btn approve"
+                    onClick={() => setModal({ wf, action:"approve" })}>
+                    ✅ Approve
+                  </button>
+                  <button className="wf-action-btn reject"
+                    onClick={() => setModal({ wf, action:"reject" })}>
+                    ❌ Reject
+                  </button>
+                </>
+              )}
+              <button className="wf-action-btn remove"
+                onClick={() => setRemoveModal(wf)}
+                title="Remove from workflow">
+                🗑️ Remove
+              </button>
+            </div>
+          </td>
+        )}
       </tr>
     );
   };
@@ -640,6 +642,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   const currentData = tab === "inprogress" ? data.inProgress
                     : tab === "backlog"    ? data.backlog
                     : data.history;
+  const showActionColumn = tab !== "history";
 
   const workflowColumns = useMemo(() => ([
     { key: "serialNumber", type: "string", getValue: (wf) => getPassportSerialNumber(wf) },
@@ -719,7 +722,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("reviewerName")}>Reviewer{sortIndicator(sortConfig, "reviewerName") && ` ${sortIndicator(sortConfig, "reviewerName")}`}</button></th>
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("approverName")}>Approver{sortIndicator(sortConfig, "approverName") && ` ${sortIndicator(sortConfig, "approverName")}`}</button></th>
                   <th><button type="button" className="table-sort-btn" onClick={() => toggleSort("createdAt")}>Submitted{sortIndicator(sortConfig, "createdAt") && ` ${sortIndicator(sortConfig, "createdAt")}`}</button></th>
-                  <th>Actions</th>
+                  {showActionColumn && <th>Actions</th>}
                 </tr>
                 {showFilters && <tr className="table-filter-row">
                   <th><input className="table-filter-input" value={columnFilters.serialNumber || ""} onChange={e => setColumnFilters(prev => ({ ...prev, serialNumber: e.target.value }))} placeholder="Filter" /></th>
@@ -727,11 +730,11 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
                   <th><input className="table-filter-input" value={columnFilters.reviewerName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, reviewerName: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={columnFilters.approverName || ""} onChange={e => setColumnFilters(prev => ({ ...prev, approverName: e.target.value }))} placeholder="Filter" /></th>
                   <th><input className="table-filter-input" value={columnFilters.createdAt || ""} onChange={e => setColumnFilters(prev => ({ ...prev, createdAt: e.target.value }))} placeholder="Filter" /></th>
-                  <th></th>
+                  {showActionColumn && <th></th>}
                 </tr>}
               </thead>
               <tbody>
-                {controlledData.map(wf => renderRow(wf, tab === "backlog"))}
+                {controlledData.map(wf => renderRow(wf, tab === "backlog", showActionColumn))}
               </tbody>
             </table>
           </div>

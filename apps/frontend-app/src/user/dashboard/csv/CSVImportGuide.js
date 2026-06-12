@@ -75,7 +75,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
     subpath: `passports/${passportType}`,
   });
 
-  const tab = activeTab || "create";
+  const tab = activeTab || "create-csv";
 
   // ── Create tab state ──
   const createFileRef = useRef(null);
@@ -83,9 +83,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
 
-  // ── Update tab state ──
-  const updateCsvRef  = useRef(null);
-  const updateJsonRef = useRef(null);
+  // ── JSON import state ──
+  const createJsonRef = useRef(null);
   const [isUpdating,   setIsUpdating]   = useState(false);
   const [updateResult, setUpdateResult] = useState(null); // { summary, details }
   const [updateError,  setUpdateError]  = useState("");
@@ -186,37 +185,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
     }
   };
 
-  // ─────────────────────────────────────────────
-  // UPDATE: upsert CSV
-  // ─────────────────────────────────────────────
-  const handleUpdateCSV = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    setIsUpdating(true);
-    setUpdateError("");
-    setUpdateResult(null);
-    try {
-      const csv = await file.text();
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/upsert-csv`, {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ passportType, csv }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || "Import failed");
-      setUpdateResult(data);
-    } catch (e) {
-      setUpdateError(e.message);
-    } finally {
-      setIsUpdating(false);
-      if (updateCsvRef.current) updateCsvRef.current.value = "";
-    }
-  };
-
-  // ─────────────────────────────────────────────
-  // UPDATE: upsert JSON
-  // ─────────────────────────────────────────────
-  const handleUpdateJSON = async (event) => {
+  const handleCreateJSON = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
     setIsUpdating(true);
@@ -227,19 +196,49 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       let passports;
       try { passports = JSON.parse(text); } catch { throw new Error("Invalid JSON file"); }
       if (!Array.isArray(passports)) throw new Error("JSON must be an array of passport objects");
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/upsert-json`, {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ passportType, passports }),
+      if (passports.some((passport) => passport?.dppId)) {
+        throw new Error("Create-only JSON import does not accept dppId. Remove update identifiers and use new internalAliasId values.");
+      }
+
+      let created = 0;
+      let failed = 0;
+      const details = [];
+
+      for (const passportData of passports) {
+        try {
+          const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports`, {
+            method: "POST",
+            headers: authHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ passportType, ...passportData }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.error || "Create failed");
+          created += 1;
+          details.push({
+            status: "created",
+            internalAliasId: passportData.internalAliasId || payload?.passport?.internalAliasId || undefined,
+            modelName: passportData.modelName || payload?.passport?.modelName || undefined,
+          });
+        } catch (error) {
+          failed += 1;
+          details.push({
+            status: "failed",
+            internalAliasId: passportData.internalAliasId || undefined,
+            modelName: passportData.modelName || undefined,
+            error: error.message || "Create failed",
+          });
+        }
+      }
+
+      setUpdateResult({
+        summary: { created, updated: 0, skipped: 0, failed },
+        details,
       });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || "Import failed");
-      setUpdateResult(data);
     } catch (e) {
       setUpdateError(e.message);
     } finally {
       setIsUpdating(false);
-      if (updateJsonRef.current) updateJsonRef.current.value = "";
+      if (createJsonRef.current) createJsonRef.current.value = "";
     }
   };
 
@@ -250,7 +249,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       </button>
 
       <div className="guide-container">
-        <h1>📊 Import / Update Passports — {passportType}</h1>
+        <h1>📊 Import Passports — {passportType}</h1>
 
         <div className="upsert-info-box">
           <strong>Governance note:</strong> `access`, `confidentiality`, and `updateAuthority` belong to the passport type schema,
@@ -259,22 +258,17 @@ function CSVImportGuide({ user, companyId, activeTab }) {
 
         {/* Tab switcher */}
         <div className="upsert-tabs">
-          <NavLink to={`/csv-import/${passportType}/create`}
+          <NavLink to={`/csv-import/${passportType}/create-csv`}
             className={({ isActive }) => `upsert-tab${isActive ? " active" : ""}`}>
-            ✨ Create new passports
+            📊 Import from CSV
           </NavLink>
-          <NavLink to={`/csv-import/${passportType}/update-csv`}
+          <NavLink to={`/csv-import/${passportType}/create-json`}
             className={({ isActive }) => `upsert-tab${isActive ? " active" : ""}`}>
-            📝 Update existing (CSV)
-          </NavLink>
-          <NavLink to={`/csv-import/${passportType}/update-json`}
-            className={({ isActive }) => `upsert-tab${isActive ? " active" : ""}`}>
-            🔧 Update existing (JSON)
+            🧾 Import from JSON
           </NavLink>
         </div>
 
-        {/* ── CREATE TAB ── */}
-        {tab === "create" && (
+        {tab === "create-csv" && (
           <>
             <section className="guide-section">
               <h2>Step 1: Download the Template</h2>
@@ -332,79 +326,32 @@ function CSVImportGuide({ user, companyId, activeTab }) {
           </>
         )}
 
-        {/* ── UPDATE CSV TAB ── */}
-        {tab === "update-csv" && (
+        {tab === "create-json" && (
           <>
             <section className="guide-section">
-              <h2>Update existing drafts via CSV</h2>
+              <h2>Create passports via JSON</h2>
               <p>
-                Export your drafts from the <strong>Templates</strong> page using <em>"Export drafts CSV"</em>.
-                The file includes a <code>dppId</code> row — <strong>keep it</strong>. Fill in the non-model fields
-                in Excel or Google Sheets, then upload below.
-              </p>
-              <div className="upsert-info-box">
-                <strong>How it works:</strong>
-                <ul>
-                  <li>Row has a <code>dppId</code> → the matching draft passport is <strong>updated</strong></li>
-                  <li>No <code>dppId</code> but matching <code>internalAliasId</code> on an editable passport → that passport is <strong>updated</strong></li>
-                  <li>New <code>internalAliasId</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
-                  <li>If the matching passport is released or in review, the row is skipped so you can revise it first</li>
-                </ul>
-              </div>
-            </section>
-
-            {updateResult ? (
-              <ResultSummary
-                summary={updateResult.summary}
-                details={updateResult.details}
-                onDone={() => { setUpdateResult(null); navigate(passportListPath); }}
-              />
-            ) : (
-              <section className="guide-section">
-                <h2>Upload filled CSV</h2>
-                <div className="upload-section">
-                  <label className={`upload-label ${isUpdating ? "disabled" : ""}`}>
-                    {isUpdating ? "⏳ Importing…" : "🗂️ Choose CSV File"}
-                    <input ref={updateCsvRef} type="file" accept=".csv"
-                      onChange={handleUpdateCSV} style={{ display: "none" }} disabled={isUpdating} />
-                  </label>
-                </div>
-                {updateError && <div className="alert alert-error">{updateError}</div>}
-              </section>
-            )}
-          </>
-        )}
-
-        {/* ── UPDATE JSON TAB ── */}
-        {tab === "update-json" && (
-          <>
-            <section className="guide-section">
-              <h2>Update existing drafts via JSON</h2>
-              <p>
-                Export your drafts from the <strong>Templates</strong> page using <em>"Export drafts JSON"</em>.
-                Edit the file — change any field values you need. Upload below.
+                Upload a JSON array where each object represents one new passport draft for <strong>{passportType}</strong>.
               </p>
               <div className="upsert-info-box">
                 <strong>JSON format — array of objects:</strong>
                 <pre className="upsert-code">{`[
   {
-    "dppId": "existing-passport-dppId",
     "internalAliasId": "SKU-1001",
     "modelName": "Unit A",
-    "serial_number": "SN-1001",
-    "manufacture_date": "2024-01-15"
+    "serial_number": "SN-1001"
   },
   {
     "internalAliasId": "SKU-1002",
+    "modelName": "Unit B",
     "serial_number": "SN-1002"
   }
 ]`}</pre>
                 <ul>
-                  <li>Object has a <code>dppId</code> → the matching draft is <strong>updated</strong></li>
-                  <li>No <code>dppId</code> but matching <code>internalAliasId</code> on an editable passport → that passport is <strong>updated</strong></li>
-                  <li>New <code>internalAliasId</code> with no <code>dppId</code> → a <strong>new passport is created</strong></li>
-                  <li>If the matching passport is released or in review, the object is skipped so you can revise it first</li>
-                  <li>Only include fields you want to change — unspecified fields are left as-is</li>
+                  <li>Each object creates one new passport draft</li>
+                  <li>Use a unique <code>internalAliasId</code> for every passport</li>
+                  <li>Do not include <code>dppId</code> here — this screen is for creation only</li>
+                  <li>Only include fields you want prefilled at creation time</li>
                 </ul>
               </div>
             </section>
@@ -421,8 +368,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <div className="upload-section">
                   <label className={`upload-label ${isUpdating ? "disabled" : ""}`}>
                     {isUpdating ? "⏳ Importing…" : "🗂️ Choose JSON File"}
-                    <input ref={updateJsonRef} type="file" accept=".json"
-                      onChange={handleUpdateJSON} style={{ display: "none" }} disabled={isUpdating} />
+                    <input ref={createJsonRef} type="file" accept=".json"
+                      onChange={handleCreateJSON} style={{ display: "none" }} disabled={isUpdating} />
                   </label>
                 </div>
                 {updateError && <div className="alert alert-error">{updateError}</div>}
@@ -435,7 +382,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
           <button className="cancel-btn" onClick={() => navigate(passportListPath)}>
             ✕ Cancel
           </button>
-          {tab === "create" && (
+          {tab === "create-csv" && (
             <button className="action-btn download-btn" onClick={handleDownloadTemplate}>
               📥 Download Template Again
             </button>

@@ -26,6 +26,132 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     };
   }
 
+  function buildPendingInviteResponse(row = {}) {
+    return {
+      id: row.id,
+      email: row.email,
+      invitedBy: row.invitedBy ?? null,
+      invitedByEmail: row.invitedByEmail ?? "",
+      invitedAt: row.createdAt ?? null,
+      expiresAt: row.expiresAt ?? null,
+      approvalStatus: row.approvalStatus ?? "pending",
+    };
+  }
+
+  async function sendSuperAdminInviteEmail({
+    transporter,
+    inviteeEmail,
+    inviterName,
+    expiresAt,
+    registerUrl,
+  }) {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+      to: inviteeEmail,
+      subject: `${inviterName} invited you to become a Super Admin on Digital Product Passport`,
+      html: brandedEmail({ preheader: "You have been invited as a Super Admin", bodyHtml: `
+        <p><strong>${inviterName}</strong> has invited you to join <strong>Digital Product Passport</strong> as a <strong>Super Admin</strong>.</p>
+        ${renderInfoTable([
+          { label: "Access level", value: "Super Admin" },
+          { label: "Invitation expires", value: expiresAt.toLocaleString() },
+        ])}
+        <div class="cta-wrap"><a href="${registerUrl}" class="cta-btn">Complete Registration →</a></div>
+      ` })
+    });
+  }
+
+  async function notifyExistingSuperAdmins({
+    transporter,
+    inviterName,
+    inviteeEmail,
+    expiresAt,
+    inviteId,
+    actorUserId,
+  }) {
+    const recipientsRes = await pool.query(
+      `SELECT email, "firstName" AS "firstName", "lastName" AS "lastName"
+       FROM users
+       WHERE role = 'super_admin' AND "isActive" = true`
+    );
+
+    if (!recipientsRes.rows.length) return;
+
+    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    const approveUrl = `${appUrl}/admin/admin-management?approveInvite=${inviteId}`;
+    const declineUrl = `${appUrl}/admin/admin-management?declineInvite=${inviteId}`;
+
+    const mailJobs = recipientsRes.rows
+      .filter((row) => row.email)
+      .map((admin) => {
+        const adminName =
+          `${admin.firstName || ""} ${admin.lastName || ""}`.trim() ||
+          admin.email ||
+          "Super Admin";
+
+        return transporter.sendMail({
+          from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+          to: admin.email,
+          subject: `Super Admin approval requested for ${inviteeEmail}`,
+          html: brandedEmail({
+            preheader: "A new Super Admin invitation needs approval",
+            bodyHtml: `
+              <p>Hi <strong>${adminName}</strong>,</p>
+              <p><strong>${inviterName}</strong> requested a new <strong>Super Admin</strong> invitation.</p>
+              ${renderInfoTable([
+                { label: "Invitee email", value: inviteeEmail },
+                { label: "Invited by", value: inviterName },
+                { label: "Access level", value: "Super Admin" },
+                { label: "Invitation expires", value: expiresAt.toLocaleString() },
+              ])}
+              <div class="cta-wrap">
+                <a href="${approveUrl}" class="cta-btn">Approve Request</a>
+              </div>
+              <div class="cta-wrap" style="margin-top:12px">
+                <a href="${declineUrl}" class="cta-btn" style="background:#7f1d1d;border-color:#7f1d1d">Decline Request</a>
+              </div>
+              <p style="font-size:13px;color:#6a7a79">
+                One super admin approval is enough to release the invitation email. If you are not logged in, you will be asked to sign in first.
+              </p>
+            `,
+          }),
+        });
+      });
+
+    const results = await Promise.allSettled(mailJobs);
+    const failures = results.filter((result) => result.status === "rejected");
+
+    if (failures.length) {
+      logger.error(
+        `Super admin invite notification mail error: ${failures.length} of ${results.length} alerts failed for actor ${actorUserId}`
+      );
+    }
+  }
+
+  app.get("/api/admin/super-admins/pending-invites", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT it.id,
+                it.email,
+                it.approval_status AS "approvalStatus",
+                it.expires_at AS "expiresAt",
+                it.created_at AS "createdAt",
+                inviter.id AS "invitedBy",
+                inviter.email AS "invitedByEmail"
+         FROM invite_tokens it
+         LEFT JOIN users inviter ON inviter.id = it.invited_by
+         WHERE it.role_to_assign = 'super_admin'
+           AND it.used = false
+           AND it.expires_at > NOW()
+           AND COALESCE(it.approval_status, 'approved') = 'pending'
+         ORDER BY it.created_at DESC`
+      );
+      res.json(result.rows.map(buildPendingInviteResponse));
+    } catch (error) {
+      logger.error({ err: error }, "Pending super admin invites fetch error");
+      res.status(500).json({ error: "Failed to fetch pending super admin invites" });
+    }
+  });
+
   app.get("/api/admin/super-admins", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const result = await pool.query(
@@ -48,8 +174,12 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       if (existing.rows.length) return res.status(400).json({ error: "This email is already registered" });
 
       await pool.query(
-        `UPDATE invite_tokens SET expires_at = NOW()
-         WHERE email = $1 AND role_to_assign = 'super_admin' AND used = false AND expires_at > NOW()`,
+        `UPDATE invite_tokens
+         SET expires_at = NOW()
+         WHERE email = $1
+           AND role_to_assign = 'super_admin'
+           AND used = false
+           AND expires_at > NOW()`,
         [inviteeEmail]
       );
 
@@ -60,51 +190,177 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       const tokenValue = uuidv4();
       const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-      await pool.query(
-        `INSERT INTO invite_tokens (token, email, company_id, invited_by, expires_at, role_to_assign)
-         VALUES ($1, $2, NULL, $3, $4, 'super_admin')`,
+      const insertResult = await pool.query(
+        `INSERT INTO invite_tokens (
+           token, email, company_id, invited_by, expires_at, role_to_assign, approval_status
+         )
+         VALUES ($1, $2, NULL, $3, $4, 'super_admin', 'pending')
+         RETURNING id`,
         [tokenValue, inviteeEmail, req.user.userId, expiresAt]
       );
+      const inviteId = insertResult.rows[0]?.id;
 
       const appUrl = process.env.APP_URL || "http://localhost:3000";
       const registerUrl = `${appUrl}/register?token=${tokenValue}`;
 
       if (!process.env.EMAIL_PASS) {
         return res.status(201).json({
-          success: true, emailSent: false, registerUrl,
-          warning: "Invite created, but email is not configured on the server.",
-          message: `Super admin invite created for ${inviteeEmail}. Share the registration link manually.`
+          success: true,
+          emailSent: false,
+          approvalRequired: true,
+          registerUrl,
+          warning: "Approval request created, but email is not configured on the server.",
+          message: `Approval requested for ${inviteeEmail}. The invitation email will be sent after one super admin approves it.`
         });
       }
 
       try {
-        await createTransporter().sendMail({
-          from: process.env.EMAIL_FROM || "onboarding@resend.dev",
-          to: inviteeEmail,
-          subject: `${inviterName} invited you to become a Super Admin on Digital Product Passport`,
-          html: brandedEmail({ preheader: "You have been invited as a Super Admin", bodyHtml: `
-            <p><strong>${inviterName}</strong> has invited you to join <strong>Digital Product Passport</strong> as a <strong>Super Admin</strong>.</p>
-            ${renderInfoTable([
-              { label: "Access level", value: "Super Admin" },
-              { label: "Invitation expires", value: expiresAt.toLocaleString() },
-            ])}
-            <div class="cta-wrap"><a href="${registerUrl}" class="cta-btn">Complete Registration →</a></div>
-          ` })
-        });
+        const transporter = createTransporter();
+
+        try {
+          await notifyExistingSuperAdmins({
+            transporter,
+            inviterName,
+            inviteeEmail,
+            expiresAt,
+            inviteId,
+            actorUserId: req.user.userId,
+          });
+        } catch (notifyError) {
+          logger.error("Super admin invite notification error:", notifyError.message);
+        }
       } catch (mailError) {
-        logger.error("Super admin invite mail error:", mailError.message);
+        logger.error({ err: mailError }, "Super admin invite approval notification error");
         return res.status(201).json({
-          success: true, emailSent: false, registerUrl,
-          warning: "Invite created, but the email could not be sent.",
+          success: true,
+          emailSent: false,
+          approvalRequired: true,
+          registerUrl,
+          warning: "Approval request created, but the approval email could not be sent.",
           detail: mailError.message,
-          message: `Super admin invite created for ${inviteeEmail}. Share the registration link manually.`
+          message: `Approval requested for ${inviteeEmail}. The invitation email will be sent after one super admin approves it.`
         });
       }
 
-      res.status(201).json({ success: true, emailSent: true, message: `Invitation sent to ${inviteeEmail}` });
+      res.status(201).json({
+        success: true,
+        emailSent: false,
+        approvalRequired: true,
+        message: `Approval requested for ${inviteeEmail}. The invitation email will be sent after one super admin approves it.`
+      });
     } catch (error) {
-      logger.error("Super admin invite error:", error.message);
+      logger.error({ err: error }, "Super admin invite error");
       res.status(500).json({ error: "Failed to send super admin invitation", detail: error.message });
+    }
+  });
+
+  app.post("/api/admin/super-admins/invite-requests/:inviteId/approve", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const { inviteId } = req.params;
+      const inviteRes = await pool.query(
+        `SELECT it.id,
+                it.token,
+                it.email,
+                it.expires_at AS "expiresAt",
+                it.approval_status AS "approvalStatus",
+                it.used,
+                inviter.email AS "invitedByEmail",
+                inviter."firstName" AS "inviterFirstName",
+                inviter."lastName" AS "inviterLastName"
+         FROM invite_tokens it
+         LEFT JOIN users inviter ON inviter.id = it.invited_by
+         WHERE it.id = $1
+           AND it.role_to_assign = 'super_admin'`,
+        [inviteId]
+      );
+      if (!inviteRes.rows.length) return res.status(404).json({ error: "Invite request not found" });
+
+      const invite = inviteRes.rows[0];
+      if (invite.used) return res.status(400).json({ error: "This invitation has already been used." });
+      if (new Date(invite.expiresAt) < new Date()) return res.status(400).json({ error: "This invitation has expired." });
+      if ((invite.approvalStatus || "approved") === "approved") {
+        return res.status(400).json({ error: "This invitation has already been approved." });
+      }
+      if (!process.env.EMAIL_PASS) {
+        return res.status(500).json({ error: "Email not configured on server." });
+      }
+
+      const existing = await pool.query("SELECT id FROM users WHERE email = $1", [invite.email]);
+      if (existing.rows.length) return res.status(400).json({ error: "This email is already registered" });
+
+      const inviterName =
+        `${invite.inviterFirstName || ""} ${invite.inviterLastName || ""}`.trim() ||
+        invite.invitedByEmail ||
+        "A colleague";
+      const appUrl = process.env.APP_URL || "http://localhost:3000";
+      const registerUrl = `${appUrl}/register?token=${invite.token}`;
+      const transporter = createTransporter();
+
+      await sendSuperAdminInviteEmail({
+        transporter,
+        inviteeEmail: invite.email,
+        inviterName,
+        expiresAt: invite.expiresAt,
+        registerUrl,
+      });
+
+      await pool.query(
+        `UPDATE invite_tokens
+         SET approval_status = 'approved',
+             approved_by = $1,
+             approved_at = NOW(),
+             invite_email_sent_at = NOW()
+         WHERE id = $2`,
+        [req.user.userId, inviteId]
+      );
+
+      await logAudit(
+        null,
+        req.user.userId,
+        "APPROVE_SUPER_ADMIN_INVITE",
+        "invite_tokens",
+        inviteId,
+        null,
+        { inviteeEmail: invite.email }
+      );
+
+      res.json({ success: true, message: `Invitation email sent to ${invite.email}` });
+    } catch (error) {
+      logger.error({ err: error }, "Super admin invite approval error");
+      res.status(500).json({ error: "Failed to approve super admin invitation", detail: error.message });
+    }
+  });
+
+  app.post("/api/admin/super-admins/invite-requests/:inviteId/decline", authenticateToken, isSuperAdmin, async (req, res) => {
+    try {
+      const { inviteId } = req.params;
+      const result = await pool.query(
+        `UPDATE invite_tokens
+         SET approval_status = 'declined',
+             expires_at = NOW()
+         WHERE id = $1
+           AND role_to_assign = 'super_admin'
+           AND used = false
+           AND COALESCE(approval_status, 'approved') = 'pending'
+         RETURNING id, email`,
+        [inviteId]
+      );
+      if (!result.rows.length) return res.status(404).json({ error: "Invite request not found or already resolved" });
+
+      await logAudit(
+        null,
+        req.user.userId,
+        "DECLINE_SUPER_ADMIN_INVITE",
+        "invite_tokens",
+        inviteId,
+        null,
+        { inviteeEmail: result.rows[0].email }
+      );
+
+      res.json({ success: true, message: `Invite request declined for ${result.rows[0].email}` });
+    } catch (error) {
+      logger.error({ err: error }, "Super admin invite decline error");
+      res.status(500).json({ error: "Failed to decline super admin invitation", detail: error.message });
     }
   });
 

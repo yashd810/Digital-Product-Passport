@@ -338,19 +338,11 @@ export default function CreateHub({ user, companyId }) {
                 />
                 <MethodCard
                   icon="📊"
-                  title="Import from CSV"
-                  description="Create passports by uploading a spreadsheet. Download the template CSV first, fill in one column per passport, then upload. Best for large batches with structured data."
-                  tag="Spreadsheet"
+                  title="Import passport data"
+                  description="Open the import workspace for CSV or JSON creation. Use CSV for spreadsheet-based batches and JSON when your source system already exports structured passport objects."
+                  tag="CSV or JSON"
                   tagColor="blue"
-                  onClick={() => navigate(`/csv-import/${selectedType.typeName}`)}
-                />
-                <MethodCard
-                  icon="🔧"
-                  title="Import / update via JSON or CSV"
-                  description="Upload a JSON array or a CSV file to create new passports or update existing drafts. If a DPP ID is present in the file, the matching draft is updated instead of a new one created."
-                  tag="Create + Update"
-                  tagColor="blue"
-                  onClick={() => navigate(`/csv-import/${selectedType.typeName}/update-csv`)}
+                  onClick={() => navigate(`/csv-import/${selectedType.typeName}/create-csv`)}
                 />
               </div>
             )}
@@ -365,6 +357,7 @@ export default function CreateHub({ user, companyId }) {
                   <li><strong>Repeated model (same specs, different units)</strong> → Create a template first, then use it</li>
                   <li><strong>Many units at once</strong> → Bulk create, then export CSV to fill in unit-level fields and re-import</li>
                   <li><strong>Data already in a spreadsheet</strong> → CSV import</li>
+                  <li><strong>Data already in JSON</strong> → JSON import</li>
                 </ul>
               </div>
             </div>

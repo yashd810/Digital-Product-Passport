@@ -162,6 +162,7 @@ module.exports = function registerAdminRoutes(app, {
   IN_REVISION_STATUSES_SQL,
   createTransporter,
   brandedEmail,
+  renderInfoTable,
   storageService
 }) {
   function findReservedPassportHeaderFieldConflicts(sections = []) {
@@ -453,6 +454,7 @@ module.exports = function registerAdminRoutes(app, {
     logAudit,
     createTransporter,
     brandedEmail,
+    renderInfoTable,
   });
 
   registerAnalyticsRoutes(app, {

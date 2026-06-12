@@ -56,7 +56,6 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           items: [
             "Open Overview to review totals, recent activity, and exported analytics if you need a snapshot report.",
             "Check Notifications for approvals, review requests, and system updates that need your attention.",
-            "Open Messages when you need to continue a thread with teammates inside the same company workspace.",
           ],
         },
         {
@@ -79,7 +78,6 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       links: [
         { label: "Open Overview", route: dashboardPath("overview"), description: "See KPI cards, activity, and analytics export." },
         { label: "Open Notifications", route: dashboardPath("notifications"), description: "Review unread system and workflow events." },
-        { label: "Open Messages", route: dashboardPath("messages"), description: "Continue internal company conversations." },
       ],
       previews: [
         buildPreview(
@@ -230,8 +228,8 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       },
       facts: [
         { label: "List tools", value: "Search, sort, per-column filters, pagination, selection mode, pinned records, and completeness bars" },
-        { label: "Row actions", value: "Edit, Release, Revise, Clone, CSV update, Compare versions, Device Integration, JSON-LD export, Copy link, Delete" },
-        { label: "Bulk tools", value: "Selection mode, QR label export, bulk export modal, and bulk revise modal" },
+        { label: "Row actions", value: "Edit, Release, Revise, Clone, Update History, Device Integration, JSON-LD export, and Copy link" },
+        { label: "Bulk tools", value: "Selection mode, QR label export, bulk export modal, bulk edit, bulk revise, archive, and delete" },
         { label: "Export formats", value: "Bulk CSV export, bulk JSON-LD export, QR label export, and public-link sharing" },
         { label: "Revision logic", value: "Released passports can move into In Revision individually or through bulk revise, then be released as newer versions." },
       ],
@@ -265,9 +263,9 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         {
           title: "Bulk edit and update draft data",
           items: [
-            "Use 'Import / update via JSON or CSV' from the Create Hub when you want to patch many drafts in one upload.",
-            "Include a DPP ID when a row should update an existing draft passport instead of creating a new one.",
-            "Use the per-row 'Update data via CSV' action when you want to edit one draft outside the form but still keep the update structured.",
+            "Use Bulk Edit from selection mode when you want to update many editable passports in one go.",
+            "Choose direct form entry when every selected passport should receive the same field changes.",
+            "Use the CSV or JSON upload tabs in Bulk Edit when each selected passport needs different values.",
             "Draft and In Revision records remain editable directly in the form, with auto-save and live edit-session presence shown to teammates.",
           ],
         },
@@ -278,7 +276,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Release publishes the current version immediately or opens the workflow path if reviewer/approver assignments are used.",
             "Revise creates the next editable version for an already released passport.",
             "Clone creates a new passport based on the current record so teams do not need to re-enter repeated information.",
-            "Compare versions opens the diff view so changes between releases are obvious before sign-off.",
+            "Update History opens the combined timeline and comparison page so changes between releases are easy to review.",
             "Export JSON-LD generates the passport with the selected semantic model's IDs and contexts for interoperable exchange.",
           ],
         },
@@ -900,12 +898,12 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       category: "Collaboration",
       audience: "Editors, company admins, and auditors",
       title: "Invite people, coordinate work, and keep an audit trail",
-      summary: "Team management, messaging, notifications, and audit logs work together. Use them to onboard teammates, keep role boundaries clear, communicate in context, and retain a reliable change history for compliance or operations follow-up.",
+      summary: "Team management, notifications, and audit logs work together. Use them to onboard teammates, keep role boundaries clear, and retain a reliable change history for compliance or operations follow-up.",
       facts: [
         { label: "Team roles", value: "Admin, Editor, and Viewer" },
         { label: "Invite rules", value: "Admins can invite all company roles; Editors can invite viewers" },
         { label: "Audit tools", value: "Audit log filters by user, action, and date range with CSV export" },
-        { label: "Messaging", value: "Create conversations, send messages, and track unread counts inside the app" },
+        { label: "Notifications", value: "Track workflow and system updates inside the app" },
       ],
       journeys: [
         {
@@ -915,14 +913,6 @@ export function buildUserSections({ user, companyId, passportTypes }) {
             "Use the role legend on the page to understand exactly what Admin, Editor, and Viewer can do.",
             "Change roles or deactivate users when responsibilities shift or access should be removed.",
             "Use session revocation when a teammate's existing browser sessions should be invalidated immediately after a role or access change.",
-          ],
-        },
-        {
-          title: "Communicate inside the workspace",
-          items: [
-            "Use Messages to start a new conversation with users inside your company.",
-            "Unread counts in the sidebar help you spot active threads without constantly opening the messaging page.",
-            "Keep operational context in the same tool where passports and workflow actions already happen.",
           ],
         },
         {
@@ -936,7 +926,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       ],
       links: [
         { label: "Open Manage Team", route: dashboardPath("team"), description: "Invite, role-manage, and deactivate users." },
-        { label: "Open Messages", route: dashboardPath("messages"), description: "Create and continue internal conversations." },
+        { label: "Open Notifications", route: dashboardPath("notifications"), description: "Review workflow and system updates." },
         { label: "Open Audit Logs", route: dashboardPath("audit-logs"), description: "Filter and export change history." },
       ],
       previews: [

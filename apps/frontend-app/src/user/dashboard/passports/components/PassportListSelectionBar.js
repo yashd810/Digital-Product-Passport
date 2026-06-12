@@ -5,6 +5,7 @@ export function PassportListSelectionBar({
   selectedPassportList,
   bulkActionLoading,
   setBulkWorkflowOpen,
+  setBulkEditOpen,
   setBulkReviseOpen,
   bulkExportJson,
   setPrintQrModalOpen,
@@ -21,6 +22,9 @@ export function PassportListSelectionBar({
       <div className="bulk-actions-buttons">
         <button className="bulk-action-btn bulk-action-workflow" onClick={() => setBulkWorkflowOpen(true)} disabled={bulkActionLoading} title="Submit selected passports to review/approval workflow">
           📋 Send to Workflow
+        </button>
+        <button className="bulk-action-btn bulk-action-edit" onClick={() => setBulkEditOpen(true)} disabled={bulkActionLoading} title="Update selected passports by form, CSV, or JSON">
+          ✏️ Bulk Edit
         </button>
         <button className="bulk-action-btn bulk-action-revise" onClick={() => setBulkReviseOpen(true)} disabled={bulkActionLoading} title="Open the bulk revise flow for the selected passports">
           🔄 Bulk Revise

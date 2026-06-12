@@ -121,6 +121,18 @@ function flattenSections(sections) {
   );
 }
 
+async function fetchJsonWithTimeout(url, timeoutMs = 4000, options = {}) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchWithAuth(url, { ...options, signal: controller.signal });
+    const payload = await response.json().catch(() => null);
+    return { response, payload };
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 function getSchemaFieldValue(source, key) {
   if (!source || !key) return undefined;
   if (Object.prototype.hasOwnProperty.call(source, key)) return source[key];
@@ -572,6 +584,7 @@ export default function PublicPassportPortal({
   passport,
   companyData,
   typeDef,
+  publicHistoryPayload = null,
   qrCode,
   qrLoading,
   unlockedPassport,
@@ -590,6 +603,11 @@ export default function PublicPassportPortal({
 }) {
   const [activePage, setActivePage] = useState("overview");
   const [previewImage, setPreviewImage] = useState(null);
+  const [publicHistoryState, setPublicHistoryState] = useState(() => (
+    publicHistoryPayload
+      ? { loading: false, loaded: true, data: publicHistoryPayload.history || [], failed: false }
+      : { loading: false, loaded: false, data: [], failed: false }
+  ));
   const passportDisplayName = typeDef?.displayName ||
     String(passport?.passportType || "Digital product passport").replace(/_/g, " ");
   const sections = (typeDef?.fieldsJson?.sections || typeDef?.sections || []).map((section) => ({
@@ -601,6 +619,56 @@ export default function PublicPassportPortal({
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [activePage]);
+
+  useEffect(() => {
+    if (!publicHistoryPayload) return;
+    setPublicHistoryState({
+      loading: false,
+      loaded: true,
+      data: publicHistoryPayload.history || [],
+      failed: false,
+    });
+  }, [publicHistoryPayload]);
+
+  useEffect(() => {
+    if (publicHistoryPayload || (!passport?.internalAliasId && !passport?.dppId) || publicHistoryState.loaded || publicHistoryState.loading) return;
+    let cancelled = false;
+    const loadHistory = async () => {
+      setPublicHistoryState({ loading: true, loaded: false, data: [], failed: false });
+      const endpoints = [
+        passport?.dppId
+          ? `${API}/api/passports/${encodeURIComponent(passport.dppId)}/history`
+          : null,
+        passport?.internalAliasId
+          ? `${API}/api/passports/by-product/${encodeURIComponent(passport.internalAliasId)}/history`
+          : null,
+      ].filter(Boolean);
+
+      try {
+        for (const endpoint of endpoints) {
+          const { response, payload } = await fetchJsonWithTimeout(endpoint);
+          if (!response.ok) continue;
+          if (cancelled) return;
+          setPublicHistoryState({
+            loading: false,
+            loaded: true,
+            data: payload?.history || [],
+            failed: false,
+          });
+          return;
+        }
+      } catch {
+      }
+
+      if (cancelled) return;
+      setPublicHistoryState({ loading: false, loaded: true, data: [], failed: true });
+    };
+
+    loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [passport?.dppId, passport?.internalAliasId, publicHistoryPayload, publicHistoryState.loaded, publicHistoryState.loading]);
 
   const modelEntry = findFieldEntry(fields, ["model name", "product name"], passport, unlockedPassport, dynamicValues);
   const displayModelName = passport?.modelName || (modelEntry ? formatValue(modelEntry.raw) : "");
@@ -629,6 +697,8 @@ export default function PublicPassportPortal({
     .slice(0, 3);
 
   const lifecycleEvents = buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues, lastUpdateAt);
+  const publicHistory = publicHistoryState.data || [];
+  const compactPublicHistory = publicHistory.filter((entry) => entry.isCurrent || entry.inactivePath);
   const headerRows = buildHeaderRows(passport, typeDef, companyData, lastUpdateAt);
   const trustRows = buildTrustRows(passport, carrierAuthenticity, sigVerification);
   const verificationRows = buildVerificationRows(verificationBundle);
@@ -847,6 +917,43 @@ export default function PublicPassportPortal({
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="public-history-inline-block">
+                <h3>Update history</h3>
+                {publicHistoryState.loading ? (
+                  <div className="pv-history-state">Loading history…</div>
+                ) : publicHistoryState.failed ? (
+                  <div className="pv-history-state">Update history is unavailable right now.</div>
+                ) : compactPublicHistory.length === 0 ? (
+                  <div className="pv-history-state">No public update history is available yet.</div>
+                ) : (
+                  <div className="pv-history-list public-history-inline-list">
+                    {compactPublicHistory.map((entry) => (
+                      <article key={`public-history-${entry.versionNumber}`} className="pv-history-card">
+                        <div className="pv-history-card-top">
+                          <div className="pv-history-version-group">
+                            <span className="pv-history-version-pill">v{entry.versionNumber}</span>
+                            <span className={`pv-history-status ${entry.releaseStatus}`}>{formatPassportStatus(entry.releaseStatus)}</span>
+                            {entry.isCurrent && <span className="pv-history-current">Current</span>}
+                          </div>
+                        </div>
+                        <div className="pv-history-meta pv-history-meta-compact">
+                          <span>{formatIsoDate(entry.updatedAt || entry.createdAt) || ""}</span>
+                          {(entry.publicPath || entry.inactivePath) && (
+                            <a
+                              href={entry.isCurrent ? entry.publicPath : entry.inactivePath}
+                              className="pv-history-open-link"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {entry.isCurrent ? "Open current passport" : `Open v${entry.versionNumber} snapshot`}
+                            </a>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
               </div>
             </article>
           </div>

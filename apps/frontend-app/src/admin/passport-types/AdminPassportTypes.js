@@ -249,9 +249,14 @@ function AdminPassportTypes() {
             Types are <strong>immutable after creation</strong> — new fields require a new type.
           </p>
         </div>
-        <button className="apt-create-btn" onClick={() => navigate("/admin/passport-types/new")}>
-          + Create New Type
-        </button>
+        <div className="apt-toolbar-actions">
+          <button className="apt-create-btn apt-toolbar-secondary-btn" onClick={() => navigate("/admin/passport-modules")}>
+            🧩 Passport Modules
+          </button>
+          <button className="apt-create-btn" onClick={() => navigate("/admin/passport-types/new")}>
+            + Create New Type
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

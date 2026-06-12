@@ -32,15 +32,11 @@ export function PassportListRow({
   setReleaseModal,
   handleRevise,
   handleClone,
-  setCsvModal,
-  setHistoryModal,
   setDeviceModal,
   companyId,
   showError,
   showSuccess,
   getViewerPath,
-  handleArchive,
-  handleDelete,
   calcCompleteness,
   togglePin,
 }) {
@@ -128,7 +124,7 @@ export function PassportListRow({
       <td><CompletenessBar pct={pct} /></td>
       {!filterByUser && (
         <td className="small-text">
-          {passport.createdByName || passport.createdByEmail || "—"}
+          {passport.createdByName || "—"}
         </td>
       )}
       <td className="options-cell" onClick={e => e.stopPropagation()}>
@@ -146,20 +142,15 @@ export function PassportListRow({
             companyName={user?.companyName}
             companyId={companyId}
             navigate={navigate}
-            openPassportViewer={openPassportViewer}
             setOpenMenuId={setOpenMenuId}
             setMenuAnchorRect={setMenuAnchorRect}
             setReleaseModal={setReleaseModal}
             handleRevise={handleRevise}
             handleClone={handleClone}
-            setCsvModal={setCsvModal}
-            setHistoryModal={setHistoryModal}
             setDeviceModal={setDeviceModal}
             showError={showError}
             showSuccess={showSuccess}
             getViewerPath={getViewerPath}
-            handleArchive={handleArchive}
-            handleDelete={handleDelete}
             togglePin={togglePin}
           />
         )}

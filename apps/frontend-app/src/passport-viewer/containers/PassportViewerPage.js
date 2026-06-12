@@ -28,6 +28,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [passport,         setPassport]         = useState(null);
   const [companyData,      setCompanyData]      = useState(null);
   const [typeDef,          setTypeDef]          = useState(null);
+  const [publicHistoryPayload, setPublicHistoryPayload] = useState(null);
   const [qrCode,           setQrCode]           = useState(null);
   const [carrierAuthenticity, setCarrierAuthenticity] = useState(null);
   const [qrLoading,        setQrLoading]        = useState(true);
@@ -80,6 +81,28 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     return data;
   }, [isPreviewMode, passportEndpoint, previewCompanyId]);
 
+  const fetchPublicHistoryPayload = useCallback(async (passportData) => {
+    const endpoints = [
+      passportData?.internalAliasId
+        ? `${API}/api/passports/by-product/${encodeURIComponent(passportData.internalAliasId)}/history`
+        : null,
+      passportData?.dppId
+        ? `${API}/api/passports/${encodeURIComponent(passportData.dppId)}/history`
+        : null,
+    ].filter(Boolean);
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetchWithAuth(endpoint);
+        const payload = await response.json().catch(() => null);
+        if (response.ok && payload) return payload;
+      } catch {
+      }
+    }
+
+    return { history: [] };
+  }, []);
+
   const refreshFieldUrl = useCallback(async (fieldKey, fallbackUrl) => {
     const refreshed = await fetchPassportRecord({ applyState: true });
     const nextValue = refreshed?.[fieldKey];
@@ -107,11 +130,12 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         const resolvedCompanyId = data?.companyId || previewCompanyId || null;
 
         // 2. Fetch company branding in parallel with type definition
-        const [profileRes, typeRes] = await Promise.all([
+        const [profileRes, typeRes, historyPayload] = await Promise.all([
           isPreviewMode && resolvedCompanyId
             ? fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`)
             : Promise.resolve(null),
           fetchWithAuth(`${API}/api/passport-types/${data.passportType}`),
+          fetchPublicHistoryPayload(data),
         ]);
 
         if (profileRes?.ok) setCompanyData(await profileRes.json());
@@ -121,13 +145,14 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           // Graceful fallback: empty sections
           setTypeDef({ sections: [] });
         }
+        setPublicHistoryPayload(historyPayload || { history: [] });
       } catch (e) {
         setError(e.message);
       } finally {
         setLoading(false);
       }
     })();
-  }, [encodedPreviewId, encodedProductId, fetchPassportRecord, isPreviewMode, previewCompanyId, previewId, internalAliasId, versionNumber]);
+  }, [encodedPreviewId, encodedProductId, fetchPassportRecord, fetchPublicHistoryPayload, isPreviewMode, previewCompanyId, previewId, internalAliasId, versionNumber]);
 
   useEffect(() => {
     if (!isPreviewMode || !previewCompanyId) return;
@@ -393,6 +418,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           passport={passport}
           companyData={companyData}
           typeDef={typeDef}
+          publicHistoryPayload={publicHistoryPayload}
           qrCode={qrCode}
           qrLoading={qrLoading}
           unlockedPassport={unlockedPassport}

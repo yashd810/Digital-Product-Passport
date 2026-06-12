@@ -16,6 +16,7 @@ export function PassportListTableSection({
   selectedPassportList,
   bulkActionLoading,
   setBulkWorkflowOpen,
+  setBulkEditOpen,
   setBulkReviseOpen,
   bulkExportJson,
   bulkArchive,
@@ -66,6 +67,7 @@ export function PassportListTableSection({
         selectedPassportList={selectedPassportList}
         bulkActionLoading={bulkActionLoading}
         setBulkWorkflowOpen={setBulkWorkflowOpen}
+        setBulkEditOpen={setBulkEditOpen}
         setBulkReviseOpen={setBulkReviseOpen}
         bulkExportJson={bulkExportJson}
         setPrintQrModalOpen={setPrintQrModalOpen}

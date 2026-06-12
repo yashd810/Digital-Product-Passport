@@ -43,8 +43,11 @@
   border-bottom: 2px solid var(--border);
   display: flex;
   flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: stretch;
   padding: 0 30px;
   box-shadow: 0 2px 6px rgba(0,15,8,0.1);
+  gap: 0;
 }
 
 [data-theme="light"] .admin-tabs {
@@ -53,6 +56,7 @@
 }
 
 .tab {
+  flex: 1 1 180px;
   padding: 14px 20px;
   background: none;
   border: none;
@@ -68,6 +72,8 @@
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .tab:hover  { color: var(--text-primary); }
@@ -1039,6 +1045,14 @@
 
 [data-theme="light"] .apt-subtitle { color: #4f6b7c; }
 
+.apt-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .apt-create-btn {
   background: linear-gradient(135deg, var(--jet) 0%, var(--onyx) 100%);
   color: #fff;
@@ -1052,6 +1066,10 @@
   transition: opacity .15s;
 }
 .apt-create-btn:hover { opacity: .88; }
+
+.apt-toolbar-secondary-btn {
+  background: linear-gradient(135deg, #0db5b0 0%, #0a8f9a 100%);
+}
 
 /* ── Empty state ─────────────────────────────────────────── */
 .apt-empty {

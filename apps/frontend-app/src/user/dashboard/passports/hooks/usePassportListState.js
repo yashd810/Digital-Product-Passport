@@ -33,10 +33,9 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const [printQrModalOpen, setPrintQrModalOpen] = useState(false);
   const [qrExporting, setQrExporting] = useState(false);
   const [releaseModal, setReleaseModal] = useState(null);
-  const [csvModal, setCsvModal] = useState(null);
   const [deviceModal, setDeviceModal] = useState(null);
-  const [historyModal, setHistoryModal] = useState(null);
   const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkReviseOpen, setBulkReviseOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [bulkWorkflowOpen, setBulkWorkflowOpen] = useState(false);
@@ -313,9 +312,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       columns.push({
         key: "createdBy",
         type: "string",
-        getValue: (group) => (
-          group.latest?.createdByName || group.latest?.createdByEmail || ""
-        ),
+        getValue: (group) => group.latest?.createdByName || "",
       });
     }
 
@@ -433,10 +430,10 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     archiveConfirm,
     bulkActionLoading,
     bulkCreateOpen,
+    bulkEditOpen,
     bulkReviseOpen,
     bulkWorkflowOpen,
     columnFilters,
-    csvModal,
     currentPage,
     deviceModal,
     error,
@@ -447,7 +444,6 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     filterStatus,
     getViewerPath,
     getVisiblePassportKeys,
-    historyModal,
     isFiltering,
     isLoading,
     menuAnchorRect,
@@ -469,16 +465,15 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     setArchiveConfirm,
     setBulkActionLoading,
     setBulkCreateOpen,
+    setBulkEditOpen,
     setBulkReviseOpen,
     setBulkWorkflowOpen,
     setColumnFilters,
-    setCsvModal,
     setCurrentPage,
     setDeviceModal,
     setExpandedPassportGroups,
     setExportModalOpen,
     setFilterStatus,
-    setHistoryModal,
     setMenuAnchorRect,
     setOpenMenuId,
     setPassports,

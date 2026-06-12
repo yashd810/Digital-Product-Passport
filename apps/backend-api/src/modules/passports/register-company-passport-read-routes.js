@@ -35,7 +35,11 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       if (!typeSchema) return res.status(404).json({ error: "Passport type not found" });
 
       const tableName = getTable(passportType);
-      let query = `SELECT p.*, u.email AS "createdByEmail", u."firstName" AS "firstName", u."lastName" AS "lastName"
+      let query = `SELECT p.*,
+                          u.email AS "createdByEmail",
+                          u."firstName" AS "firstName",
+                          u."lastName" AS "lastName",
+                          NULLIF(TRIM(CONCAT(COALESCE(u."firstName", ''), ' ', COALESCE(u."lastName", ''))), '') AS "createdByName"
                FROM ${tableName} p
                LEFT JOIN users u ON u.id = p."createdBy"
                WHERE p."deletedAt" IS NULL AND p."companyId" = $1`;
@@ -96,7 +100,11 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
           let row = null;
           if (dppId) {
             const result = await pool.query(
-              `SELECT p.*, u.email AS "createdByEmail", u."firstName" AS "firstName", u."lastName" AS "lastName"
+              `SELECT p.*,
+                      u.email AS "createdByEmail",
+                      u."firstName" AS "firstName",
+                      u."lastName" AS "lastName",
+                      NULLIF(TRIM(CONCAT(COALESCE(u."firstName", ''), ' ', COALESCE(u."lastName", ''))), '') AS "createdByName"
                FROM ${tableName} p LEFT JOIN users u ON u.id = p."createdBy"
                WHERE p."dppId" = $1 AND p."companyId" = $2 AND p."deletedAt" IS NULL LIMIT 1`,
               [dppId, companyId]
@@ -118,7 +126,11 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
                    AND "deletedAt" IS NULL
                  ORDER BY "lineageId", "versionNumber" DESC, "updatedAt" DESC
                )
-               SELECT latest.*, u.email AS "createdByEmail", u."firstName" AS "firstName", u."lastName" AS "lastName"
+               SELECT latest.*,
+                      u.email AS "createdByEmail",
+                      u."firstName" AS "firstName",
+                      u."lastName" AS "lastName",
+                      NULLIF(TRIM(CONCAT(COALESCE(u."firstName", ''), ' ', COALESCE(u."lastName", ''))), '') AS "createdByName"
                FROM latest LEFT JOIN users u ON u.id = latest."createdBy"
                ORDER BY latest."versionNumber" DESC LIMIT 1`,
               [productIdCandidates, companyId]

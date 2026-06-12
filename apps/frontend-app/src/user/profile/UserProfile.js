@@ -361,7 +361,6 @@ function UserProfile({
             <h4 className="card-section-title">ℹ️ Account Info</h4>
             <div className="info-grid">
               <div className="info-row"><span>Email</span><strong>{user?.email}</strong></div>
-              <div className="info-row"><span>Company</span><strong>{user?.companyName}</strong></div>
               <div className="info-row"><span>Role</span>
                 <span className={`role-chip role-${profile?.role}`}>
                   {profile?.role?.replace("_", " ")}

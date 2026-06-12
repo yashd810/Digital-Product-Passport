@@ -187,21 +187,6 @@ export const CORE_DATABASE_TABLES = [
         purpose: "Hash-chain anchor records for proving audit-log continuity.",
         columns: ["id", "company_id", "log_count", "first_log_id", "latest_log_id", "root_event_hash", "previous_anchor_hash", "anchor_hash", "anchor_type", "anchor_reference", "notes", "metadata_json", "anchored_by", "anchored_at", "created_at"],
       },
-      {
-        name: "conversations",
-        purpose: "Top-level messaging threads scoped to a company.",
-        columns: ["id", "company_id", "created_at"],
-      },
-      {
-        name: "conversation_members",
-        purpose: "Conversation participants and last-read timestamps.",
-        columns: ["conversation_id", "user_id", "last_read_at"],
-      },
-      {
-        name: "messages",
-        purpose: "Message bodies sent inside each conversation.",
-        columns: ["id", "conversation_id", "sender_id", "body", "created_at"],
-      },
     ],
   },
   {
@@ -342,12 +327,11 @@ export const BACKEND_API_FAMILIES = [
     ],
   },
   {
-    name: "Workflow, notifications, and messaging",
-    route: "/api/companies/:companyId/workflow, /api/passports/:dppId/workflow*, /api/users/me/notifications*, /api/messaging/*",
+    name: "Workflow and notifications",
+    route: "/api/companies/:companyId/workflow, /api/passports/:dppId/workflow*, /api/users/me/notifications*",
     details: [
       "Creates reviewer and approver tasks, updates backlog and history views, and records review comments.",
       "Creates notification entries for workflow activity and powers mark-read actions in the UI.",
-      "Drives internal company conversations, unread counters, thread creation, and message posting.",
     ],
   },
   {

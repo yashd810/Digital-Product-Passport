@@ -137,6 +137,17 @@ const quoteSqlIdentifier = (value) => {
 const joinQuotedSqlIdentifiers = (identifiers = []) =>
   identifiers.map((identifier) => quoteSqlIdentifier(identifier)).join(", ");
 
+const getDisplayName = (rowData = {}) => {
+  const explicitName = typeof rowData.createdByName === "string" ? rowData.createdByName.trim() : "";
+  if (explicitName) return explicitName;
+
+  const firstName = typeof rowData.firstName === "string" ? rowData.firstName.trim() : "";
+  const lastName = typeof rowData.lastName === "string" ? rowData.lastName.trim() : "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+  if (fullName) return fullName;
+  return null;
+};
+
 const normalizePassportRow = (row, schema) => {
   if (!row) return row;
   const dppId = row.dppId ?? null;
@@ -199,6 +210,7 @@ const normalizePassportRow = (row, schema) => {
     versionNumber: rowData.versionNumber ?? null,
     qrCode: rowData.qrCode ?? null,
     createdBy: rowData.createdBy ?? null,
+    createdByName: getDisplayName(rowData),
     updatedBy: rowData.updatedBy ?? null,
     createdAt: rowData.createdAt ?? null,
     updatedAt: rowData.updatedAt ?? null,

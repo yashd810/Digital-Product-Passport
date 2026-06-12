@@ -97,12 +97,10 @@ function DashboardLayout({ user, companyId, onLogout }) {
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <div className="header-content">
+          <div className="header-content">
           <h1>Dashboard</h1>
           <div className="header-actions">
-            <span className="user-info">
-              {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}
-            </span>
+            <span className="user-info">{displayName}</span>
             <NotificationsPanel user={user} />
             {/* Theme toggle button in header */}
             <button
@@ -126,7 +124,6 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 <div className="user-details">
                   <h3>Your Account</h3>
                   <p className="user-name">{displayName}</p>
-                  <p className="user-email">{user?.email}</p>
                 </div>
               </div>
 
@@ -154,17 +151,17 @@ function DashboardLayout({ user, companyId, onLogout }) {
 
             <nav className="sidebar-nav">
               {isEditor && (
-                <NavLink to={dashboardPath("create")} className={({isActive})=>`sidebar-link sidebar-create-btn${isActive?" active":""}`}>
-                  + Create Passport
-                </NavLink>
+                <>
+                  <NavLink to={dashboardPath("create")} className={({isActive})=>`sidebar-link sidebar-create-btn${isActive?" active":""}`}>
+                    + Create Passport
+                  </NavLink>
+                  <NavLink to={dashboardPath("passport-data")} className={({isActive})=>`sidebar-link sidebar-create-btn${isActive?" active":""}`}>
+                    Passport Data Management
+                  </NavLink>
+                </>
               )}
 
               <p className="sidebar-section-label sidebar-section-label-spaced">Start Here</p>
-              {user?.assetManagementEnabled && (
-                <NavLink to={dashboardPath("passport-data")} className={({isActive})=>`sidebar-link sidebar-data-btn${isActive?" active":""}`}>
-                  Passport Data Management
-                </NavLink>
-              )}
               <NavLink to={dashboardPath("overview")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
                 📊 {t("overview")}
               </NavLink>
@@ -215,7 +212,7 @@ function DashboardLayout({ user, companyId, onLogout }) {
                 ⚙️ {t("workflow")}
               </NavLink>
               <NavLink to={dashboardPath("notifications")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
-                🔔 Notifications & Messages
+                🔔 Notifications
               </NavLink>
 
               <NavLink to={dashboardPath("archived")} className={({isActive})=>`sidebar-link${isActive?" active":""}`}>
