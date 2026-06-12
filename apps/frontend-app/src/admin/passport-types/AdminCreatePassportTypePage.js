@@ -34,6 +34,14 @@ import {
   resolveSelectedSemanticMatch,
   resolveSemanticTermDefinitionByInput,
 } from "./semanticTermCatalog";
+import {
+  createEmptyTableRow,
+  createTableColumn,
+  normalizeTableColumns,
+  normalizeTableDefaultRows,
+  serializeTableColumns,
+  tableColumnKeyFromLabel,
+} from "../../shared/passports/tableSchemaUtils";
 import AdminSelectMenu from "../components/AdminSelectMenu";
 import { TypeIdentityCard } from "./TypeIdentityCard";
 import "../styles/AdminDashboard.css";
@@ -85,10 +93,25 @@ function normalizeFieldForSemanticModel(field, semanticModelKey, { clearSemantic
     key: field.key || toFieldKey(field.label || ""),
   };
 
+  if (nextField.type === "table") {
+    nextField.table_columns = normalizeTableColumns(nextField);
+    nextField.table_cols = nextField.table_columns.length;
+    nextField.table_default_rows = normalizeTableDefaultRows(nextField);
+  }
+
   if (!normalizeSemanticModelKey(semanticModelKey) || clearSemanticId) {
     delete nextField.semanticId;
     delete nextField._semanticSearch;
     delete nextField._semanticOpen;
+    if (nextField.type === "table") {
+      nextField.table_columns = normalizeTableColumns(nextField).map((column) => {
+        const nextColumn = { ...column };
+        delete nextColumn.semanticId;
+        delete nextColumn._semanticSearch;
+        delete nextColumn._semanticOpen;
+        return nextColumn;
+      });
+    }
   }
 
   return nextField;
@@ -282,10 +305,13 @@ function AdminCreatePassportType() {
           );
           if (Object.keys(fi18n).length > 0) base.label_i18n = fi18n;
           if (normalizedField.type === "table") {
-            base.table_rows = normalizedField.table_rows || 2;
-            base.table_cols = normalizedField.table_cols || 2;
-            base.table_columns = normalizedField.table_columns || ["Column 1", "Column 2"];
-            base.table_default_rows = normalizedField.table_default_rows || [];
+            const tableColumns = serializeTableColumns(normalizedField);
+            base.table_cols = tableColumns.length;
+            base.table_columns = tableColumns;
+            base.table_default_rows = normalizeTableDefaultRows({
+              ...normalizedField,
+              table_columns: tableColumns,
+            });
           }
           if (normalizedField.dynamic) base.dynamic = true;
           if (normalizedField.composition) base.composition = true;
@@ -554,29 +580,23 @@ function AdminCreatePassportType() {
           }
           // Switching TO table: set defaults
           if (patch.type === "table" && f.type !== "table") {
-            updated.table_rows = 2;
             updated.table_cols = 2;
-            updated.table_columns = ["Column 1", "Column 2"];
+            updated.table_columns = [createTableColumn(0), createTableColumn(1)];
             updated.table_default_rows = [];
           }
           // Switching AWAY from table: clear config
           if ("type" in patch && patch.type !== "table") {
-            delete updated.table_rows;
             delete updated.table_cols;
             delete updated.table_columns;
             delete updated.table_default_rows;
           }
-          // Cols count changed: resize column names array and default rows
+          // Cols count changed: resize fixed column definitions and default rows.
           if ("table_cols" in patch) {
             const n = Math.max(1, parseInt(patch.table_cols) || 1);
-            const existing = f.table_columns || [];
-            updated.table_columns = Array.from({ length: n }, (_, i) => existing[i] || `Column ${i + 1}`);
+            const existing = normalizeTableColumns(f);
+            updated.table_columns = Array.from({ length: n }, (_, i) => existing[i] || createTableColumn(i));
             updated.table_cols = n;
-            // Resize existing default rows to match new column count
-            const existingDefaultRows = f.table_default_rows || [];
-            updated.table_default_rows = existingDefaultRows.map(row =>
-              Array.from({ length: n }, (_, i) => row[i] ?? "")
-            );
+            updated.table_default_rows = normalizeTableDefaultRows(updated);
           }
           return updated;
         }),
@@ -671,6 +691,132 @@ function AdminCreatePassportType() {
             _semanticSearch: "",
           }, semanticModelKey);
           return normalized;
+        }),
+      };
+    }));
+
+  const updateTableColumn = (sectionId, fieldId, columnIndex, patch) =>
+    setSections(s => s.map(sec => {
+      if (sec.localId !== sectionId) return sec;
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f.localId !== fieldId) return f;
+          const columns = normalizeTableColumns(f).map((column, index) => {
+            if (index !== columnIndex) return column;
+            const nextColumn = { ...column, ...patch };
+            if ("label" in patch && !column._keyManual && !("key" in patch)) {
+              nextColumn.key = tableColumnKeyFromLabel(patch.label, `column${index + 1}`);
+            }
+            if ("key" in patch) {
+              nextColumn.key = tableColumnKeyFromLabel(patch.key, `column${index + 1}`);
+              nextColumn._keyManual = true;
+            }
+            return nextColumn;
+          });
+          return {
+            ...f,
+            table_columns: columns,
+            table_cols: columns.length,
+            table_default_rows: normalizeTableDefaultRows({ ...f, table_columns: columns }),
+          };
+        }),
+      };
+    }));
+
+  const applyManualTableColumnSemanticSelection = (sectionId, fieldId, columnIndex, selectionValue) =>
+    setSections(s => s.map(sec => {
+      if (sec.localId !== sectionId) return sec;
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f.localId !== fieldId) return f;
+          const selected = resolveSemanticTermDefinitionByInput(semanticTermCatalog, selectionValue);
+          const columns = normalizeTableColumns(f).map((column, index) => {
+            if (index !== columnIndex) return column;
+            if (!selected) {
+              return {
+                ...column,
+                _semanticSearch: selectionValue,
+              };
+            }
+            return {
+              ...column,
+              semanticId: selected.semanticId,
+              unit: deriveSemanticTermUnit(selected),
+              dataType: deriveSemanticTermDataType(selected),
+              _semanticOpen: false,
+              _semanticSearch: `${selected.key} - ${selected.label}`,
+            };
+          });
+          return { ...f, table_columns: columns, table_cols: columns.length };
+        }),
+      };
+    }));
+
+  const updateTableColumnSemanticSearchInput = (sectionId, fieldId, columnIndex, value) =>
+    setSections(s => s.map(sec => {
+      if (sec.localId !== sectionId) return sec;
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f.localId !== fieldId) return f;
+          const nextValue = String(value || "");
+          const columns = normalizeTableColumns(f).map((column, index) => {
+            if (index !== columnIndex) return column;
+            if (!nextValue.trim()) {
+              return {
+                ...column,
+                semanticId: undefined,
+                _semanticSearch: "",
+                _semanticOpen: true,
+              };
+            }
+            return {
+              ...column,
+              semanticId: undefined,
+              _semanticSearch: nextValue,
+              _semanticOpen: true,
+            };
+          });
+          return { ...f, table_columns: columns, table_cols: columns.length };
+        }),
+      };
+    }));
+
+  const setTableColumnSemanticPickerOpen = (sectionId, fieldId, columnIndex, isOpen) =>
+    setSections(s => s.map(sec => {
+      if (sec.localId !== sectionId) return sec;
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f.localId !== fieldId) return f;
+          const columns = normalizeTableColumns(f).map((column, index) =>
+            index === columnIndex ? { ...column, _semanticOpen: isOpen } : column
+          );
+          return { ...f, table_columns: columns, table_cols: columns.length };
+        }),
+      };
+    }));
+
+  const clearManualTableColumnSemanticSelection = (sectionId, fieldId, columnIndex) =>
+    setSections(s => s.map(sec => {
+      if (sec.localId !== sectionId) return sec;
+      return {
+        ...sec,
+        fields: sec.fields.map(f => {
+          if (f.localId !== fieldId) return f;
+          const columns = normalizeTableColumns(f).map((column, index) => {
+            if (index !== columnIndex) return column;
+            const nextColumn = {
+              ...column,
+              semanticId: undefined,
+              _semanticSearch: "",
+            };
+            delete nextColumn.semanticId;
+            return nextColumn;
+          });
+          return { ...f, table_columns: columns, table_cols: columns.length };
         }),
       };
     }));
@@ -1487,96 +1633,207 @@ function AdminCreatePassportType() {
                       </div>
                     </div>
 
-                    {field.type === "table" && (
-                      <div className="acpt-table-config">
-                        <div className="acpt-table-dims">
-                          <label>Columns</label>
-                          <input
-                            type="number" min="1" max="10"
-                            value={field.table_cols || 2}
-                            onChange={e => updateField(section.localId, field.localId, { table_cols: parseInt(e.target.value) || 1 })}
-                            className="acpt-table-num-input"
-                          />
-                        </div>
-                        <div className="acpt-table-colnames">
-                          <span className="acpt-table-colnames-label">Column names:</span>
-                          {(field.table_columns || []).map((col, ci) => (
+                    {field.type === "table" && (() => {
+                      const tableColumns = normalizeTableColumns(field);
+                      const defaultRows = normalizeTableDefaultRows({ ...field, table_columns: tableColumns });
+                      return (
+                        <div className="acpt-table-config">
+                          <div className="acpt-table-dims">
+                            <label>Fixed columns</label>
                             <input
-                              key={ci}
-                              type="text"
-                              value={col}
-                              placeholder={`Column ${ci + 1}`}
-                              className="acpt-table-col-input"
-                              onChange={e => {
-                                const cols = [...(field.table_columns || [])];
-                                cols[ci] = e.target.value;
-                                updateField(section.localId, field.localId, { table_columns: cols });
-                              }}
+                              type="number" min="1" max="10"
+                              value={tableColumns.length}
+                              onChange={e => updateField(section.localId, field.localId, { table_cols: parseInt(e.target.value, 10) || 1 })}
+                              className="acpt-table-num-input"
                             />
-                          ))}
-                        </div>
-                        {/* Default rows editor */}
-                        <div className="acpt-table-default-rows">
-                          <div className="acpt-table-default-rows-header">
-                            <span className="acpt-table-colnames-label">Default rows (optional):</span>
-                            <span className="acpt-table-default-hint">Users will see these pre-filled and can add more rows.</span>
                           </div>
-                          {(field.table_default_rows || []).length > 0 && (
-                            <table className="acpt-default-row-table">
-                              <thead>
-                                <tr>
-                                  {(field.table_columns || []).map((col, ci) => (
-                                    <th key={ci}>{col || `Column ${ci + 1}`}</th>
-                                  ))}
-                                  <th />
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {(field.table_default_rows || []).map((row, ri) => (
-                                  <tr key={ri}>
-                                    {Array.from({ length: field.table_cols || 2 }, (_, ci) => (
-                                      <td key={ci}>
+                          <div className="acpt-table-colnames">
+                            <span className="acpt-table-colnames-label">Column schema:</span>
+                            {tableColumns.map((column, ci) => {
+                              const selectedColumnSemanticMatch = resolveSelectedSemanticMatch(column, semanticTermCatalog);
+                              const columnSemanticSearchOptions = getFilteredSemanticTermCatalog(
+                                semanticTermCatalog,
+                                column._semanticSearch || "",
+                                column.semanticId || ""
+                              );
+                              const columnSemanticSearchValue = getSemanticSearchDisplayValue(column, semanticTermCatalog);
+                              return (
+                                <div key={`${field.localId}-column-${ci}`} className="acpt-table-column-config">
+                                  <div className="acpt-table-column-main-row">
+                                    <input
+                                      type="text"
+                                      value={column.label}
+                                      placeholder={`Column ${ci + 1}`}
+                                      className="acpt-table-col-input"
+                                      onChange={e => updateTableColumn(section.localId, field.localId, ci, { label: e.target.value })}
+                                    />
+                                    <input
+                                      type="text"
+                                      value={column.key}
+                                      placeholder={`column${ci + 1}`}
+                                      className="acpt-table-col-input acpt-mono"
+                                      onChange={e => updateTableColumn(section.localId, field.localId, ci, { key: e.target.value })}
+                                    />
+                                    <label className="acpt-access-check">
+                                      <input
+                                        type="checkbox"
+                                        checked={!!column.required}
+                                        onChange={e => updateTableColumn(section.localId, field.localId, ci, { required: e.target.checked })}
+                                      />
+                                      <span>Required</span>
+                                    </label>
+                                  </div>
+                                  <div className="acpt-meta-fields-row">
+                                    <div className="acpt-meta-field-group">
+                                      <span className="acpt-meta-sub-label">Unit</span>
+                                      <input
+                                        type="text"
+                                        value={column.unit || ""}
+                                        onChange={e => updateTableColumn(section.localId, field.localId, ci, { unit: e.target.value })}
+                                        placeholder="%, kg, kWh"
+                                        className="acpt-input acpt-input-small"
+                                      />
+                                    </div>
+                                    <div className="acpt-meta-field-group">
+                                      <span className="acpt-meta-sub-label">Data Type</span>
+                                      <AdminSelectMenu
+                                        value={column.dataType || ""}
+                                        onChange={(nextValue) => updateTableColumn(section.localId, field.localId, ci, { dataType: nextValue })}
+                                        options={[
+                                          { value: "", label: "Auto-detect" },
+                                          { value: "string", label: "Text (string)" },
+                                          { value: "number", label: "Number (decimal)" },
+                                          { value: "integer", label: "Integer" },
+                                          { value: "date", label: "Date" },
+                                          { value: "boolean", label: "Boolean" },
+                                          { value: "uri", label: "URI / Link" },
+                                        ]}
+                                        className="acpt-select acpt-select-inline"
+                                        triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
+                                        menuClassName="acpt-select-menu acpt-select-menu-compact"
+                                        optionClassName="acpt-select-option"
+                                        ariaLabel="Column data type"
+                                      />
+                                    </div>
+                                    <div className="acpt-meta-field-group acpt-meta-field-group-full">
+                                      <span className="acpt-meta-sub-label">Column Semantic Term</span>
+                                      <div className="acpt-semantic-picker">
                                         <input
                                           type="text"
-                                          value={row[ci] ?? ""}
-                                          placeholder="—"
-                                          className="acpt-table-col-input"
-                                          onChange={e => {
-                                            const rows = (field.table_default_rows || []).map(r => [...r]);
-                                            rows[ri][ci] = e.target.value;
+                                          value={columnSemanticSearchValue}
+                                          onFocus={() => setTableColumnSemanticPickerOpen(section.localId, field.localId, ci, true)}
+                                          onBlur={() => window.setTimeout(() => setTableColumnSemanticPickerOpen(section.localId, field.localId, ci, false), 120)}
+                                          onChange={e => updateTableColumnSemanticSearchInput(section.localId, field.localId, ci, e.target.value)}
+                                          placeholder={hasSelectedSemanticModel ? `Search ${selectedSemanticModelOption.label} terms` : "Select a semantic model first"}
+                                          disabled={!hasSelectedSemanticModel || semanticTermsLoading}
+                                          className="acpt-input acpt-input-small acpt-semantic-search"
+                                        />
+                                        {column._semanticOpen && hasSelectedSemanticModel && (
+                                          <div className="acpt-semantic-results">
+                                            <button
+                                              type="button"
+                                              className={`acpt-semantic-option${!selectedColumnSemanticMatch ? " selected" : ""}`}
+                                              onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                clearManualTableColumnSemanticSelection(section.localId, field.localId, ci);
+                                              }}
+                                            >
+                                              <span className="acpt-semantic-option-title">No semantic term selected</span>
+                                            </button>
+                                            {columnSemanticSearchOptions.map((entry) => (
+                                              <button
+                                                key={entry.semanticId}
+                                                type="button"
+                                                className={`acpt-semantic-option${column.semanticId === entry.semanticId ? " selected" : ""}`}
+                                                onMouseDown={(e) => {
+                                                  e.preventDefault();
+                                                  applyManualTableColumnSemanticSelection(section.localId, field.localId, ci, entry.semanticId);
+                                                }}
+                                              >
+                                                <span className="acpt-semantic-option-title">{entry.key} - {entry.label}</span>
+                                                <span className="acpt-semantic-option-meta">{entry.semanticId}</span>
+                                              </button>
+                                            ))}
+                                            {!semanticTermsLoading && columnSemanticSearchOptions.length === 0 && (
+                                              <div className="acpt-semantic-option acpt-semantic-option-empty">
+                                                <span className="acpt-semantic-option-title">No matching terms found</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                      {selectedColumnSemanticMatch && (
+                                        <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
+                                          Selected term: {selectedColumnSemanticMatch.label || selectedColumnSemanticMatch.key}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="acpt-table-default-rows">
+                            <div className="acpt-table-default-rows-header">
+                              <span className="acpt-table-colnames-label">Default rows (optional):</span>
+                              <span className="acpt-table-default-hint">Users can edit cell values and add rows, but columns remain fixed.</span>
+                            </div>
+                            {defaultRows.length > 0 && (
+                              <table className="acpt-default-row-table">
+                                <thead>
+                                  <tr>
+                                    {tableColumns.map((column) => (
+                                      <th key={column.key}>{column.label || column.key}</th>
+                                    ))}
+                                    <th />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {defaultRows.map((row, ri) => (
+                                    <tr key={ri}>
+                                      {tableColumns.map((column) => (
+                                        <td key={column.key}>
+                                          <input
+                                            type="text"
+                                            value={row[column.key] ?? ""}
+                                            placeholder="—"
+                                            className="acpt-table-col-input"
+                                            onChange={e => {
+                                              const rows = defaultRows.map(r => ({ ...r }));
+                                              rows[ri][column.key] = e.target.value;
+                                              updateField(section.localId, field.localId, { table_default_rows: rows });
+                                            }}
+                                          />
+                                        </td>
+                                      ))}
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="acpt-default-row-remove"
+                                          title="Remove row"
+                                          onClick={() => {
+                                            const rows = defaultRows.filter((_, i) => i !== ri);
                                             updateField(section.localId, field.localId, { table_default_rows: rows });
                                           }}
-                                        />
+                                        >✕</button>
                                       </td>
-                                    ))}
-                                    <td>
-                                      <button
-                                        type="button"
-                                        className="acpt-default-row-remove"
-                                        title="Remove row"
-                                        onClick={() => {
-                                          const rows = (field.table_default_rows || []).filter((_, i) => i !== ri);
-                                          updateField(section.localId, field.localId, { table_default_rows: rows });
-                                        }}
-                                      >✕</button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-                          <button
-                            type="button"
-                            className="acpt-add-default-row-btn"
-                            onClick={() => {
-                              const cols = field.table_cols || 2;
-                              const rows = [...(field.table_default_rows || []), Array(cols).fill("")];
-                              updateField(section.localId, field.localId, { table_default_rows: rows });
-                            }}
-                          >+ Add Default Row</button>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                            <button
+                              type="button"
+                              className="acpt-add-default-row-btn"
+                              onClick={() => {
+                                const rows = [...defaultRows, createEmptyTableRow(tableColumns)];
+                                updateField(section.localId, field.localId, { table_default_rows: rows });
+                              }}
+                            >+ Add Default Row</button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                         </>
                       );
                     })()}

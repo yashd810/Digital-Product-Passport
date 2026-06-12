@@ -141,17 +141,12 @@ function resolveProfileSemanticModelKey(typeDef, profile) {
 }
 
 function parseTableValue(value) {
-  if (Array.isArray(value)) return value;
-  if (value && typeof value === "object") {
-    if (Array.isArray(value.rows)) return value.rows;
-    return [];
-  }
+  if (Array.isArray(value)) return value.filter((row) => row && typeof row === "object" && !Array.isArray(row));
   const text = normalizeText(value);
   if (!text) return [];
   try {
     const parsed = JSON.parse(text);
-    if (Array.isArray(parsed)) return parsed;
-    if (parsed && typeof parsed === "object" && Array.isArray(parsed.rows)) return parsed.rows;
+    if (Array.isArray(parsed)) return parsed.filter((row) => row && typeof row === "object" && !Array.isArray(row));
     return [];
   } catch {
     return [];
@@ -170,9 +165,7 @@ function hasMeaningfulValue(field, value) {
   if (field?.type === "table") {
     const rows = parseTableValue(value);
     return rows.some((row) =>
-      Array.isArray(row)
-        ? row.some((cell) => normalizeText(cell) !== "")
-        : normalizeText(row) !== ""
+      Object.values(row).some((cell) => normalizeText(cell) !== "")
     );
   }
 

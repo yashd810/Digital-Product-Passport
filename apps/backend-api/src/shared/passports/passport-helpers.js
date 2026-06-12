@@ -500,7 +500,22 @@ const coerceBulkFieldValue = (fieldDef, rawValue) => {
   if (fieldDef?.type === "table" && typeof rawValue === "string") {
     const trimmed = rawValue.trim();
     if (!trimmed) return rawValue;
-    try { return JSON.parse(trimmed); } catch { return rawValue; }
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed) && parsed.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
+        return parsed;
+      }
+    } catch {
+      // Fall through to the explicit table-shape error below.
+    }
+    throw new Error(`Expected table rows as a JSON array of objects for ${fieldDef?.label || fieldDef?.key}`);
+  }
+
+  if (fieldDef?.type === "table" && Array.isArray(rawValue)) {
+    if (rawValue.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
+      return rawValue;
+    }
+    throw new Error(`Expected table rows as objects for ${fieldDef?.label || fieldDef?.key}`);
   }
 
   return rawValue;
@@ -533,12 +548,11 @@ const formatHistoryFieldValue = (fieldDef, rawValue) => {
     if (typeof rawValue === "string") {
       try { rows = JSON.parse(rawValue); } catch { rows = rawValue; }
     }
-    if (rows && typeof rows === "object" && !Array.isArray(rows)) {
-      rows = Array.isArray(rows.rows) ? rows.rows : rows;
-    }
     if (Array.isArray(rows)) {
       const formatted = rows
-        .map((row) => Array.isArray(row) ? row.filter(Boolean).join(" | ") : String(row || ""))
+        .map((row) => row && typeof row === "object" && !Array.isArray(row)
+          ? Object.values(row).filter(Boolean).join(" | ")
+          : "")
         .filter(Boolean)
         .join(" ; ");
       return formatted.length > 180 ? `${formatted.slice(0, 177)}...` : formatted || "—";
@@ -630,18 +644,21 @@ const coerceAssetFieldValue = (fieldDef, rawValue) => {
   }
 
   if (type === "table") {
-    if (Array.isArray(rawValue)) return { ok: true, value: rawValue };
-    if (rawValue && typeof rawValue === "object" && Array.isArray(rawValue.rows)) {
-      return { ok: true, value: rawValue };
+    if (Array.isArray(rawValue)) {
+      const isRowObjectArray = rawValue.every((row) => row && typeof row === "object" && !Array.isArray(row));
+      return isRowObjectArray
+        ? { ok: true, value: rawValue }
+        : { ok: false, error: `Expected table rows as objects for ${fieldDef?.label || fieldDef?.key}` };
     }
     if (typeof rawValue === "string") {
       try {
         const parsed = JSON.parse(rawValue);
-        if (Array.isArray(parsed)) return { ok: true, value: parsed };
-        if (parsed && typeof parsed === "object" && Array.isArray(parsed.rows)) return { ok: true, value: parsed };
+        if (Array.isArray(parsed) && parsed.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
+          return { ok: true, value: parsed };
+        }
       } catch {}
     }
-    return { ok: false, error: `Expected table data for ${fieldDef?.label || fieldDef?.key}` };
+    return { ok: false, error: `Expected table rows as a JSON array of objects for ${fieldDef?.label || fieldDef?.key}` };
   }
 
   if (type === "date") {

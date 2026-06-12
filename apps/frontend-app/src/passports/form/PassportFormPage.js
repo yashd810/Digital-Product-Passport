@@ -9,6 +9,11 @@ import {
   extractFieldValuesFromElements,
 } from "../../shared/passports/schemaKeyUtils";
 import {
+  createEmptyTableRow,
+  normalizeTableColumns,
+  parseTableRows,
+} from "../../shared/passports/tableSchemaUtils";
+import {
   HEADER_OWNERSHIP_LABELS,
   normalizeSystemPassportHeader,
 } from "../../admin/passport-types/builderHelpers";
@@ -605,12 +610,9 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const hasMeaningfulValue = (value) => {
     if (value === null || value === undefined) return false;
     if (typeof value === "string") return value.trim() !== "";
-    if (Array.isArray(value)) return value.length > 0;
+    if (Array.isArray(value)) return value.some((item) => hasMeaningfulValue(item));
     if (typeof value === "object") {
-      if (Array.isArray(value?.rows)) {
-        return value.rows.some((row) => Array.isArray(row) && row.some((cell) => String(cell ?? "").trim() !== ""));
-      }
-      return Object.keys(value).length > 0;
+      return Object.values(value).some((item) => hasMeaningfulValue(item));
     }
     return true;
   };
@@ -1115,92 +1117,30 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     }
 
     if (field.type === "table") {
-      const cols     = field.table_cols || 2;
-      const fallbackColumns = field.table_columns?.length
-        ? field.table_columns
-        : Array.from({ length: cols }, (_, i) => `Column ${i + 1}`);
-      let parsed = val;
-      if (typeof val === "string" && (val.startsWith("[") || val.startsWith("{"))) {
-        try { parsed = JSON.parse(val); } catch { parsed = null; }
-      }
-      const parsedColumns = Array.isArray(parsed?.columns) && parsed.columns.length
-        ? parsed.columns.map((name, index) => {
-            const rawName = String(name ?? "");
-            return rawName.trim() ? rawName : `Column ${index + 1}`;
-          })
-        : fallbackColumns;
-      const defaultRows = Array.isArray(field.table_default_rows) && field.table_default_rows.length
-        ? field.table_default_rows.map(r => Array.from({ length: cols }, (_, i) => r[i] ?? ""))
-        : [Array(cols).fill("")];
-      const parsedRowsSource = Array.isArray(parsed?.rows) ? parsed.rows : (Array.isArray(parsed) ? parsed : null);
-      const normalizedRowLength = parsedColumns.length || cols;
-      const rows = Array.isArray(parsedRowsSource) && parsedRowsSource.length
-        ? parsedRowsSource.map((row) => Array.from({ length: normalizedRowLength }, (_, i) => Array.isArray(row) ? (row[i] ?? "") : ""))
-        : defaultRows.map((row) => Array.from({ length: normalizedRowLength }, (_, i) => row[i] ?? ""));
-
-      const commitTable = (nextColumns, nextRows) => {
-        handleField(field.key, {
-          columns: nextColumns,
-          rows: nextRows,
-        });
-      };
+      const tableColumns = normalizeTableColumns(field);
+      const rows = parseTableRows(val, field);
+      const commitTable = (nextRows) => handleField(field.key, nextRows);
 
       const updateCell = (ri, ci, v) => {
-        const next = rows.map(r => [...r]);
-        next[ri][ci] = v;
-        commitTable(parsedColumns, next);
+        const column = tableColumns[ci];
+        if (!column) return;
+        const next = rows.map(r => ({ ...r }));
+        next[ri][column.key] = v;
+        commitTable(next);
       };
-      const updateColumnName = (ci, value) => {
-        const nextColumns = parsedColumns.map((name, index) => index === ci ? value : name);
-        commitTable(nextColumns, rows);
-      };
-      const addRow = () => commitTable(parsedColumns, [...rows, Array(parsedColumns.length).fill("")]);
+      const addRow = () => commitTable([...rows, createEmptyTableRow(tableColumns)]);
       const removeRow = (ri) => {
         const next = rows.filter((_, i) => i !== ri);
-        commitTable(parsedColumns, next.length ? next : [Array(parsedColumns.length).fill("")]);
-      };
-      const addColumn = () => {
-        const nextColumns = [...parsedColumns, `Column ${parsedColumns.length + 1}`];
-        const nextRows = rows.map((row) => [...row, ""]);
-        commitTable(nextColumns, nextRows);
-      };
-      const removeColumn = (ci) => {
-        if (parsedColumns.length <= 1) return;
-        const nextColumns = parsedColumns.filter((_, index) => index !== ci);
-        const nextRows = rows.map((row) => row.filter((_, index) => index !== ci));
-        commitTable(nextColumns, nextRows);
+        commitTable(next.length ? next : [createEmptyTableRow(tableColumns)]);
       };
 
       return (
         <div className="pf-table-wrap">
-          <div className="pf-table-toolbar">
-            <button type="button" className="pf-table-add-col" onClick={addColumn} disabled={disabled}>+ Add Column</button>
-          </div>
           <table className="pf-table">
             <thead>
               <tr>
-                {parsedColumns.map((name, ci) => (
-                  <th key={ci}>
-                    <div className="pf-table-head-cell">
-                      <input
-                        type="text"
-                        value={name}
-                        disabled={disabled}
-                        onChange={(e) => updateColumnName(ci, e.target.value)}
-                        className="pf-table-head-input"
-                        placeholder={`Column ${ci + 1}`}
-                      />
-                      <button
-                        type="button"
-                        className="pf-table-remove-col"
-                        onClick={() => removeColumn(ci)}
-                        disabled={disabled || parsedColumns.length <= 1}
-                        title="Remove column"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </th>
+                {tableColumns.map((column) => (
+                  <th key={column.key}>{formatFieldLabelWithUnit(column.label || column.key, column)}</th>
                 ))}
                 <th className="pf-table-action-col" />
               </tr>
@@ -1208,11 +1148,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
             <tbody>
               {rows.map((row, ri) => (
                 <tr key={ri}>
-                  {Array(parsedColumns.length).fill(null).map((_, ci) => (
-                    <td key={ci}>
+                  {tableColumns.map((column, ci) => (
+                    <td key={column.key}>
                       <input
                         type="text"
-                        value={row[ci] ?? ""}
+                        value={row[column.key] ?? ""}
                         disabled={disabled}
                         placeholder="—"
                         onChange={e => updateCell(ri, ci, e.target.value)}

@@ -3,6 +3,7 @@ import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i
 import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
 import { formatPassportStatus } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
+import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
 import { FileCell, LiveBadge, LockedFieldCell, RefreshableImage, ViewerDomainIndicator } from "./ViewerBlocks";
@@ -179,31 +180,6 @@ function findFieldEntry(fields, matchers, passport, unlockedPassport, dynamicVal
 function getCompositionItems(field, raw) {
   if (!field.composition || !isFilled(raw)) return null;
   return field.type === "table" ? parseCompositionFromTable(raw) : parseCompositionFromText(raw);
-}
-
-function parseStoredTableValue(raw) {
-  if (Array.isArray(raw)) return { columns: [], rows: raw };
-  if (raw && typeof raw === "object") {
-    return {
-      columns: Array.isArray(raw.columns) ? raw.columns : [],
-      rows: Array.isArray(raw.rows) ? raw.rows : [],
-    };
-  }
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return { columns: [], rows: parsed };
-      if (parsed && typeof parsed === "object") {
-        return {
-          columns: Array.isArray(parsed.columns) ? parsed.columns : [],
-          rows: Array.isArray(parsed.rows) ? parsed.rows : [],
-        };
-      }
-    } catch {
-      return { columns: [], rows: [] };
-    }
-  }
-  return { columns: [], rows: [] };
 }
 
 function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues, lastUpdateAt) {
@@ -442,8 +418,8 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
   } else if (field.type === "boolean") {
     content = <strong className="field-value-strong">{translateFieldValue(lang, !!raw, "boolean")}</strong>;
   } else if (field.type === "table") {
-    const { columns: storedColumns, rows: tableRows } = parseStoredTableValue(raw);
-    const tableColumns = storedColumns.length ? storedColumns : (Array.isArray(field.table_columns) ? field.table_columns : []);
+    const tableColumns = normalizeTableColumns(field);
+    const tableRows = parseTableRows(raw, field, { includeDefault: false });
     content = Array.isArray(tableRows) && tableRows.length > 0 ? (
       <div className="inline-table-wrap">
         <table className="inline-table">
@@ -451,7 +427,7 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
             <thead>
               <tr>
                 {tableColumns.map((column) => (
-                  <th key={column}>{translateSchemaLabel(lang, { label: column })}</th>
+                  <th key={column.key}>{translateSchemaLabel(lang, { label: column.label || column.key })}</th>
                 ))}
               </tr>
             </thead>
@@ -459,8 +435,8 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
           <tbody>
             {tableRows.map((row, index) => (
               <tr key={`${field.key}-row-${index}`}>
-                {(Array.isArray(row) ? row : []).map((cell, cellIndex) => (
-                  <td key={`${field.key}-cell-${index}-${cellIndex}`}>{isFilled(cell) ? String(cell) : "—"}</td>
+                {tableColumns.map((column) => (
+                  <td key={`${field.key}-cell-${index}-${column.key}`}>{isFilled(row?.[column.key]) ? String(row[column.key]) : "—"}</td>
                 ))}
               </tr>
             ))}

@@ -5,36 +5,12 @@ import { PieChart, parseCompositionFromTable, parseCompositionFromText } from ".
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
+import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
 import { ACCESS_LABEL_MAP, appendUnitToDisplayValue, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
 import { getMarketingContactUrl } from "../utils/QRcode";
 
 const API = import.meta.env.VITE_API_URL || "";
 const PUBLIC_VIEWER_URL = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
-
-function parseStoredTableValue(raw) {
-  if (Array.isArray(raw)) return { columns: [], rows: raw };
-  if (raw && typeof raw === "object") {
-    return {
-      columns: Array.isArray(raw.columns) ? raw.columns : [],
-      rows: Array.isArray(raw.rows) ? raw.rows : [],
-    };
-  }
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return { columns: [], rows: parsed };
-      if (parsed && typeof parsed === "object") {
-        return {
-          columns: Array.isArray(parsed.columns) ? parsed.columns : [],
-          rows: Array.isArray(parsed.rows) ? parsed.rows : [],
-        };
-      }
-    } catch {
-      return { columns: [], rows: [] };
-    }
-  }
-  return { columns: [], rows: [] };
-}
 
 function getDomainIndicatorState() {
   if (typeof window === "undefined") {
@@ -578,22 +554,22 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     } else if (f.type === "file" && isFileUrl(raw)) {
       display = <FileCell url={raw} label={`${passport.modelName}_${f.key}`} onRefreshUrl={onRefreshFieldUrl ? () => onRefreshFieldUrl(f.key, raw) : null} />;
     } else if (f.type === "table") {
-      const { columns: storedColumns, rows: tableData } = parseStoredTableValue(raw);
+      const cols = normalizeTableColumns(f);
+      const tableData = parseTableRows(raw, f, { includeDefault: false });
       if (Array.isArray(tableData) && tableData.length > 0) {
-        const cols = storedColumns.length ? storedColumns : (f.table_columns || []);
         display = (
           <div className="pv-field-table-wrap">
             <table className="field-table-display">
               {cols.length > 0 && (
                 <thead>
-                  <tr>{cols.map((col, index) => <th key={index}>{translateSchemaLabel(lang, { label: col })}</th>)}</tr>
+                  <tr>{cols.map((col) => <th key={col.key}>{translateSchemaLabel(lang, { label: col.label || col.key })}</th>)}</tr>
                 </thead>
               )}
               <tbody>
                 {tableData.map((row, rowIndex) => (
                   <tr key={rowIndex}>
-                    {(Array.isArray(row) ? row : []).map((cell, cellIndex) => (
-                      <td key={cellIndex}>{cell || "—"}</td>
+                    {cols.map((column) => (
+                      <td key={column.key}>{row?.[column.key] || "—"}</td>
                     ))}
                   </tr>
                 ))}
@@ -1001,20 +977,20 @@ export function PrintView({ passport, companyData, sections }) {
                 } else if (f.type === "file" && isFileUrl(raw)) {
                   display = <a href={raw} target="_blank" rel="noopener noreferrer">{raw}</a>;
                 } else if (f.type === "table") {
-                  const { columns: storedColumns, rows: tableData } = parseStoredTableValue(raw);
+                  const cols = normalizeTableColumns(f);
+                  const tableData = parseTableRows(raw, f, { includeDefault: false });
                   if (Array.isArray(tableData) && tableData.length > 0) {
-                    const cols = storedColumns.length ? storedColumns : (f.table_columns || []);
                     display = (
                       <table className="field-table-display">
                         {cols.length > 0 && (
                           <thead>
-                            <tr>{cols.map((col, i) => <th key={i}>{col}</th>)}</tr>
+                            <tr>{cols.map((col) => <th key={col.key}>{col.label || col.key}</th>)}</tr>
                           </thead>
                         )}
                         <tbody>
                           {tableData.map((row, ri) => (
                             <tr key={ri}>
-                              {(Array.isArray(row) ? row : []).map((cell, ci) => <td key={ci}>{cell || "—"}</td>)}
+                              {cols.map((column) => <td key={column.key}>{row?.[column.key] || "—"}</td>)}
                             </tr>
                           ))}
                         </tbody>

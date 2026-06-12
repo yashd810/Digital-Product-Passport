@@ -185,11 +185,16 @@ export function BulkReviseModal({
       if (field.type === "table") {
         const raw = String(row.value || "").trim();
         if (!raw) {
-          setError(`Enter a JSON array value for ${field.label}.`);
+          setError(`Enter a JSON array of row objects for ${field.label}.`);
           return;
         }
         try {
-          parsedChanges[row.key] = JSON.parse(raw);
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed) || parsed.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry))) {
+            setError(`${field.label} must be a JSON array of row objects.`);
+            return;
+          }
+          parsedChanges[row.key] = parsed;
         } catch {
           setError(`${field.label} must be valid JSON.`);
           return;
@@ -285,7 +290,7 @@ export function BulkReviseModal({
           rows={3}
           value={row.value}
           onChange={(e) => updateChangeRow(row.id, { value: e.target.value })}
-          placeholder='Enter JSON, e.g. [["Cell 1","Cell 2"]]'
+          placeholder='Enter JSON, e.g. [{"casNumber":"7439-92-1","concentration":"0.1"}]'
         />
       );
     }

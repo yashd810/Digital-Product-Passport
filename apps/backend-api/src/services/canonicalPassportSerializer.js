@@ -545,6 +545,7 @@ function createCanonicalPassportSerializer({
 
   function buildSemanticValidationIssues(value, term, fieldDef, key, options = {}) {
     if (!term || isBlankValue(value)) return [];
+    if (fieldDef?.type === "table") return [];
 
     const issues = [];
     const jsonType = normalizeText(term?.dataType?.jsonType).toLowerCase();
@@ -782,6 +783,15 @@ function createCanonicalPassportSerializer({
       pushIssue("FIELD_ARRAY_ITEM_TYPE_MISMATCH", `Array value for "${key}" contains mixed JSON item types.`);
     }
 
+    if (normalizedFieldType === "table") {
+      const isRowObjectArray = Array.isArray(value)
+        && value.every((row) => row && typeof row === "object" && !Array.isArray(row));
+      if (!isRowObjectArray) {
+        pushIssue("FIELD_TABLE_SHAPE_MISMATCH", `Table "${key}" must be a JSON array of row objects.`);
+      }
+      return issues;
+    }
+
     if (!skipTypeValidation && (normalizedDataType === "boolean" || normalizedFieldType === "boolean")) {
       if (typeof value !== "boolean") {
         pushIssue("FIELD_TYPE_MISMATCH", `Expected boolean value for "${key}".`);
@@ -943,7 +953,51 @@ function createCanonicalPassportSerializer({
     return "SingleValuedDataElement";
   }
 
-  function buildNestedElements(value, semanticModel = null) {
+  function normalizeTableColumnDefinition(column, index) {
+    if (!column || typeof column !== "object" || Array.isArray(column)) return null;
+    const key = normalizeText(column.key);
+    if (!key) return null;
+    return {
+      ...column,
+      key,
+      elementId: column.elementId || key,
+      label: normalizeText(column.label) || key,
+      type: column.type || column.dataType || "text",
+    };
+  }
+
+  function getTableColumnDefinitions(fieldDef) {
+    if (fieldDef?.type !== "table" || !Array.isArray(fieldDef.table_columns)) return [];
+    return fieldDef.table_columns
+      .map(normalizeTableColumnDefinition)
+      .filter(Boolean);
+  }
+
+  function buildTableRowElement(row, rowIndex, fieldDef, semanticModel = null) {
+    const columns = getTableColumnDefinitions(fieldDef);
+    return {
+      elementId: String(rowIndex),
+      objectType: "DataElementCollection",
+      dictionaryReference: null,
+      valueDataType: "Object",
+      value: row,
+      elements: columns.map((column) => buildExpandedDataElement({
+        elementIdPath: column.key,
+        value: row?.[column.key],
+        fieldDef: column,
+        semanticModel,
+      })),
+    };
+  }
+
+  function buildNestedElements(value, semanticModel = null, fieldDef = null) {
+    if (fieldDef?.type === "table") {
+      if (!Array.isArray(value)) return [];
+      return value
+        .filter((row) => row && typeof row === "object" && !Array.isArray(row))
+        .map((row, index) => buildTableRowElement(row, index, fieldDef, semanticModel));
+    }
+
     if (Array.isArray(value)) {
       return value.map((item, index) => buildExpandedDataElement({
         elementIdPath: String(index),
@@ -975,7 +1029,7 @@ function createCanonicalPassportSerializer({
       dictionaryReference: resolveDictionaryReference(resolvedFieldDef, elementIdPath, resolvedSemanticModel),
       valueDataType: inferValueDataType(resolvedFieldDef, value, semanticTerm),
       value,
-      elements: buildNestedElements(value, resolvedSemanticModel),
+      elements: buildNestedElements(value, resolvedSemanticModel, resolvedFieldDef),
     };
   }
 

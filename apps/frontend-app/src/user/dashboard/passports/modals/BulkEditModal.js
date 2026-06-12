@@ -27,7 +27,11 @@ function normalizeCellValue(value, field) {
     return String(value).toLowerCase() === "true" || String(value) === "1";
   }
   if (field?.type === "table") {
-    return JSON.parse(value);
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed) || parsed.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
+      throw new Error("Expected a JSON array of row objects.");
+    }
+    return parsed;
   }
   return value;
 }
@@ -251,7 +255,7 @@ export function BulkEditModal({
           rows={3}
           value={row.value}
           onChange={(event) => updateChangeRow(row.id, { value: event.target.value })}
-          placeholder='Enter JSON, e.g. [["Cell 1","Cell 2"]]'
+          placeholder='Enter JSON, e.g. [{"casNumber":"7439-92-1","concentration":"0.1"}]'
         />
       );
     }

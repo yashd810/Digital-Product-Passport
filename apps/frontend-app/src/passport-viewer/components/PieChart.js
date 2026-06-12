@@ -25,32 +25,30 @@ function extractPct(s) {
 }
 
 /**
- * Parse a table JSON value (stored as "[["Material","60%"],...]") into
+ * Parse a table JSON value (stored as row objects) into
  * composition items. First column = label, second column = percentage.
  */
 export function parseCompositionFromTable(jsonStr) {
   let rows;
   if (Array.isArray(jsonStr)) {
     rows = jsonStr;
-  } else if (jsonStr && typeof jsonStr === "object") {
-    rows = Array.isArray(jsonStr.rows) ? jsonStr.rows : null;
   } else {
     try { rows = JSON.parse(jsonStr); } catch { return null; }
-    if (rows && typeof rows === "object" && !Array.isArray(rows)) {
-      rows = Array.isArray(rows.rows) ? rows.rows : null;
-    }
   }
   if (!Array.isArray(rows) || rows.length === 0) return null;
+  const rowValues = (row) => row && typeof row === "object" && !Array.isArray(row)
+    ? Object.values(row)
+    : [];
 
   // Auto-detect which column holds percentages by finding the one where
   // most cells contain a number (supports "80%", "80", "0.8" formats)
-  const numCols = Math.max(...rows.map(r => (Array.isArray(r) ? r.length : 0)));
+  const numCols = Math.max(...rows.map(r => rowValues(r).length));
   if (numCols < 2) return null;
 
   let pctCol = -1;
   let bestScore = 0;
   for (let ci = 0; ci < numCols; ci++) {
-    const hits = rows.filter(r => extractPct(r?.[ci]) > 0).length;
+    const hits = rows.filter(r => extractPct(rowValues(r)?.[ci]) > 0).length;
     if (hits > bestScore) { bestScore = hits; pctCol = ci; }
   }
   if (pctCol < 0 || bestScore < 2) return null;
@@ -59,10 +57,13 @@ export function parseCompositionFromTable(jsonStr) {
   const labelCol = pctCol === 0 ? 1 : 0;
 
   const items = rows
-    .map(row => ({
-      label: String(row?.[labelCol] ?? "").trim(),
-      value: extractPct(row?.[pctCol]),
-    }))
+    .map((row) => {
+      const values = rowValues(row);
+      return {
+        label: String(values?.[labelCol] ?? "").trim(),
+        value: extractPct(values?.[pctCol]),
+      };
+    })
     .filter(item => item.label && item.value > 0);
 
   return items.length >= 2 ? items : null;

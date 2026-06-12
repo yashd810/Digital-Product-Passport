@@ -97,6 +97,11 @@ function createSemanticPassportExportService({
     for (const section of (getFieldsJson(typeDef).sections || [])) {
       for (const field of (section.fields || [])) {
         addField(field.key, field.semanticId);
+        if (field?.type === "table") {
+          for (const column of (field.table_columns || [])) {
+            addField(column?.key, column?.semanticId);
+          }
+        }
       }
     }
 

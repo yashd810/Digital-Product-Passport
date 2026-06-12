@@ -210,7 +210,7 @@ function ArchivedPassports({ user, companyId }) {
 
         if (!exported.length) continue;
 
-        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, semanticModel });
+        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, semanticModel, typeDef: typeData });
         const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);

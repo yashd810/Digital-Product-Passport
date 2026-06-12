@@ -318,7 +318,8 @@ module.exports = function registerPassportPublicRoutes(app, {
     const semanticSource = flattenSemanticPayload(canonicalPayload);
     const exported = buildSemanticPassportJsonExport([semanticSource], passportType, {
       semanticModelKey: typeDef?.semanticModelKey,
-      productCategory: typeDef?.productCategory
+      productCategory: typeDef?.productCategory,
+      typeDef
     });
     const graphItem = { ...(exported?.["@graph"]?.[0] || semanticSource) };
     delete graphItem.passport_type;
@@ -832,7 +833,8 @@ module.exports = function registerPassportPublicRoutes(app, {
         delete semanticPayload.company_profile;
         const exported = buildSemanticPassportJsonExport([semanticPayload], getPassportType(passport), {
           semanticModelKey: typeDef?.semanticModelKey,
-          productCategory: typeDef?.productCategory
+          productCategory: typeDef?.productCategory,
+          typeDef
         });
         res.setHeader("Content-Type", "application/ld+json");
         return res.json({

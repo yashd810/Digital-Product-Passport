@@ -53,6 +53,29 @@ function normalizeSemanticModel(options = {}) {
   };
 }
 
+function getTypeDefSections(typeDef = {}) {
+  return typeDef?.fieldsJson?.sections || typeDef?.sections || [];
+}
+
+function buildInlineContext(typeDef = null) {
+  const inlineContext = {};
+  for (const section of getTypeDefSections(typeDef)) {
+    for (const field of (section.fields || [])) {
+      if (field?.key && field.semanticId) {
+        inlineContext[field.key] = { "@id": field.semanticId };
+      }
+      if (field?.type === "table") {
+        for (const column of (field.table_columns || [])) {
+          if (column?.key && column.semanticId) {
+            inlineContext[column.key] = { "@id": column.semanticId };
+          }
+        }
+      }
+    }
+  }
+  return inlineContext;
+}
+
 function sanitizePassport(passport, passportType) {
   const clean = { "@type": "DigitalProductPassport" };
   const resolvedPassportType = passport.passportType || passportType || null;
@@ -80,6 +103,10 @@ export function buildPassportJsonLdExport(passports, passportType, options = {})
 
   if (semanticModel?.contextUrl && !contexts.includes(semanticModel.contextUrl)) {
     contexts.push(semanticModel.contextUrl);
+  }
+  const inlineContext = buildInlineContext(options.typeDef || null);
+  if (Object.keys(inlineContext).length > 0) {
+    contexts.push(inlineContext);
   }
 
   return {

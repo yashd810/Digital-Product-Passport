@@ -544,7 +544,8 @@ module.exports = function registerCompanyRoutes(app, {
         ));
         return res.json(buildSemanticPassportJsonExport(exportRows, tmpl.passportType, {
           semanticModelKey: typeRes.rows[0]?.semanticModelKey || null,
-          productCategory: typeRes.rows[0]?.productCategory || null
+          productCategory: typeRes.rows[0]?.productCategory || null,
+          typeDef: typeRes.rows[0]
         }));
       }
 

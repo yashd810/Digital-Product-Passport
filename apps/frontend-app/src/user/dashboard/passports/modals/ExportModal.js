@@ -139,7 +139,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     const semanticModelKey = data.semanticModelKey || typeSummary.semanticModelKey || "";
     const semanticModel = data.semanticModel || typeSummary.semanticModel || null;
     const output = await Promise.all(list.map((passport) => loadFullPassportPayload(type, passport)));
-    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, semanticModel });
+    const exportPayload = buildPassportJsonLdExport(output, type, { semanticModelKey, semanticModel, typeDef: data });
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

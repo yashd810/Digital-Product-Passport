@@ -218,6 +218,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         return res.json(buildSemanticPassportJsonExport(exportRows, passportType, {
           semanticModelKey: typeResult.rows[0]?.semanticModelKey || null,
           productCategory: typeResult.rows[0]?.productCategory || null,
+          typeDef: typeResult.rows[0],
         }));
       }
 

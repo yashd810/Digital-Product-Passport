@@ -696,7 +696,7 @@ function PassportDataManagementPage({ companyId, user }) {
           rows={2}
           value={serializeCell(value)}
           disabled={disabled}
-          placeholder={field.type === "table" ? "{\"rows\":[...]}" : ""}
+          placeholder={field.type === "table" ? "[{\"columnKey\":\"value\"}]" : ""}
           onChange={(event) => setRowValue(rowIndex, field.key, event.target.value)}
         />
       );

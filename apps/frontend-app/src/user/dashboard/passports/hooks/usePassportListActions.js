@@ -309,7 +309,8 @@ export function usePassportListActions({
           continue;
         }
 
-        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, semanticModel });
+        const typeDef = allPassportTypes.find((item) => item.typeName === passportType) || {};
+        const exportPayload = buildPassportJsonLdExport(exported, passportType, { semanticModelKey, semanticModel, typeDef });
         const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/ld+json" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
@@ -331,7 +332,7 @@ export function usePassportListActions({
     } finally {
       setBulkActionLoading(false);
     }
-  }, [activeType, companyId, selectedPassportList, setBulkActionLoading, showError, showSuccess]);
+  }, [activeType, allPassportTypes, companyId, selectedPassportList, setBulkActionLoading, showError, showSuccess]);
 
   const bulkArchive = useCallback(() => {
     if (!selectedPassportList.length) return;

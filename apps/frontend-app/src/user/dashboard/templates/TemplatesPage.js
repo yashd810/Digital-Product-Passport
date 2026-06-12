@@ -2,6 +2,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
+import {
+  createEmptyTableRow,
+  normalizeTableColumns,
+  parseTableRows,
+} from "../../../shared/passports/tableSchemaUtils";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import RepositoryPicker from "../../../passports/form/components/RepositoryPicker";
 import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRepositoryPicker";
@@ -147,76 +152,29 @@ function TemplateField({
       );
     }
     if (field.type === "table") {
-      const fallbackColumns = field.table_columns?.length
-        ? field.table_columns
-        : Array.from({ length: field.table_cols || 2 }, (_, i) => `Column ${i + 1}`);
-      let parsed = value;
-      if (typeof value === "string" && (value.startsWith("[") || value.startsWith("{"))) {
-        try { parsed = JSON.parse(value); } catch { parsed = null; }
-      }
-      const columns = Array.isArray(parsed?.columns) && parsed.columns.length
-        ? parsed.columns.map((name, index) => {
-            const rawName = String(name ?? "");
-            return rawName.trim() ? rawName : `Column ${index + 1}`;
-          })
-        : fallbackColumns;
-      const defaultRows = Array.isArray(field.table_default_rows) && field.table_default_rows.length
-        ? field.table_default_rows.map((row) => Array.from({ length: columns.length }, (_, i) => row[i] ?? ""))
-        : [Array(columns.length).fill("")];
-      const parsedRowsSource = Array.isArray(parsed?.rows) ? parsed.rows : (Array.isArray(parsed) ? parsed : null);
-      const rows = Array.isArray(parsedRowsSource) && parsedRowsSource.length
-        ? parsedRowsSource.map((row) => Array.from({ length: columns.length }, (_, i) => Array.isArray(row) ? (row[i] ?? "") : ""))
-        : defaultRows;
-
-      const commitTable = (nextColumns, nextRows) => onValueChange({ columns: nextColumns, rows: nextRows });
+      const columns = normalizeTableColumns(field);
+      const rows = parseTableRows(value, field);
+      const commitTable = (nextRows) => onValueChange(nextRows);
       const updateCell = (ri, ci, nextValue) => {
-        const nextRows = rows.map((row) => [...row]);
-        nextRows[ri][ci] = nextValue;
-        commitTable(columns, nextRows);
+        const column = columns[ci];
+        if (!column) return;
+        const nextRows = rows.map((row) => ({ ...row }));
+        nextRows[ri][column.key] = nextValue;
+        commitTable(nextRows);
       };
-      const updateColumnName = (ci, nextValue) => {
-        const nextColumns = columns.map((name, index) => index === ci ? nextValue : name);
-        commitTable(nextColumns, rows);
-      };
-      const addRow = () => commitTable(columns, [...rows, Array(columns.length).fill("")]);
+      const addRow = () => commitTable([...rows, createEmptyTableRow(columns)]);
       const removeRow = (ri) => {
         const nextRows = rows.filter((_, index) => index !== ri);
-        commitTable(columns, nextRows.length ? nextRows : [Array(columns.length).fill("")]);
-      };
-      const addColumn = () => {
-        const nextColumns = [...columns, `Column ${columns.length + 1}`];
-        const nextRows = rows.map((row) => [...row, ""]);
-        commitTable(nextColumns, nextRows);
-      };
-      const removeColumn = (ci) => {
-        if (columns.length <= 1) return;
-        const nextColumns = columns.filter((_, index) => index !== ci);
-        const nextRows = rows.map((row) => row.filter((_, index) => index !== ci));
-        commitTable(nextColumns, nextRows);
+        commitTable(nextRows.length ? nextRows : [createEmptyTableRow(columns)]);
       };
 
       return (
         <div className="pf-table-wrap">
-          <div className="pf-table-toolbar">
-            <button type="button" className="pf-table-add-col" onClick={addColumn} disabled={disabled}>+ Add Column</button>
-          </div>
           <table className="pf-table">
             <thead>
               <tr>
-                {columns.map((name, ci) => (
-                  <th key={ci}>
-                    <div className="pf-table-head-cell">
-                      <input
-                        type="text"
-                        value={name}
-                        disabled={disabled}
-                        onChange={(e) => updateColumnName(ci, e.target.value)}
-                        className="pf-table-head-input"
-                        placeholder={`Column ${ci + 1}`}
-                      />
-                      <button type="button" className="pf-table-remove-col" disabled={disabled || columns.length <= 1} onClick={() => removeColumn(ci)} title="Remove column">✕</button>
-                    </div>
-                  </th>
+                {columns.map((column) => (
+                  <th key={column.key}>{column.label || column.key}</th>
                 ))}
                 <th className="pf-table-action-col" />
               </tr>
@@ -224,11 +182,11 @@ function TemplateField({
             <tbody>
               {rows.map((row, ri) => (
                 <tr key={ri}>
-                  {Array(columns.length).fill(null).map((_, ci) => (
-                    <td key={ci}>
+                  {columns.map((column, ci) => (
+                    <td key={column.key}>
                       <input
                         type="text"
-                        value={row[ci] ?? ""}
+                        value={row[column.key] ?? ""}
                         disabled={disabled}
                         placeholder="—"
                         onChange={(e) => updateCell(ri, ci, e.target.value)}
