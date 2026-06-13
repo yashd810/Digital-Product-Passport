@@ -604,7 +604,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
 
     let pieItems = null;
     if (f.composition && raw) {
-      pieItems = f.type === "table" ? parseCompositionFromTable(raw) : parseCompositionFromText(raw);
+      pieItems = f.type === "table" ? parseCompositionFromTable(raw, f) : parseCompositionFromText(raw);
     }
 
     const isExpanded = isDynamic && expandedKey === f.key;

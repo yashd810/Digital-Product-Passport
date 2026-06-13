@@ -13,10 +13,12 @@ export function tableColumnKeyFromLabel(label, fallback = "column") {
 }
 
 export function createTableColumn(index = 0, overrides = {}) {
-  const label = String(overrides.label || `Column ${index + 1}`).trim() || `Column ${index + 1}`;
+  const rawLabel = overrides.label ?? `Column ${index + 1}`;
+  const label = typeof rawLabel === "string" ? rawLabel : String(rawLabel);
+  const normalizedLabel = label.trim() || `Column ${index + 1}`;
   return {
-    key: String(overrides.key || tableColumnKeyFromLabel(label, `column${index + 1}`)).trim() || `column${index + 1}`,
-    label,
+    key: String(overrides.key || tableColumnKeyFromLabel(normalizedLabel, `column${index + 1}`)).trim() || `column${index + 1}`,
+    label: normalizedLabel === `Column ${index + 1}` && !String(label).trim() ? normalizedLabel : label,
     ...(overrides.semanticId ? { semanticId: overrides.semanticId } : {}),
     ...(overrides.dataType ? { dataType: overrides.dataType } : {}),
     ...(overrides.unit ? { unit: overrides.unit } : {}),
@@ -29,15 +31,18 @@ export function createTableColumn(index = 0, overrides = {}) {
 
 export function normalizeTableColumn(column, index = 0) {
   if (column && typeof column === "object" && !Array.isArray(column)) {
-    const label = String(column.label || column.name || column.key || `Column ${index + 1}`).trim() || `Column ${index + 1}`;
+    const rawLabel = column.label ?? column.name ?? column.key ?? `Column ${index + 1}`;
+    const label = typeof rawLabel === "string" ? rawLabel : String(rawLabel);
+    const normalizedLabel = label.trim() || `Column ${index + 1}`;
     return createTableColumn(index, {
       ...column,
       label,
-      key: String(column.key || tableColumnKeyFromLabel(label, `column${index + 1}`)).trim(),
+      key: String(column.key || tableColumnKeyFromLabel(normalizedLabel, `column${index + 1}`)).trim(),
     });
   }
 
-  const label = String(column || `Column ${index + 1}`).trim() || `Column ${index + 1}`;
+  const rawLabel = column ?? `Column ${index + 1}`;
+  const label = typeof rawLabel === "string" ? rawLabel : String(rawLabel);
   return createTableColumn(index, { label });
 }
 

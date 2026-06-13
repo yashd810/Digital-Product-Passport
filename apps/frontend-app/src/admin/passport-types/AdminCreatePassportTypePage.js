@@ -314,7 +314,17 @@ function AdminCreatePassportType() {
             });
           }
           if (normalizedField.dynamic) base.dynamic = true;
-          if (normalizedField.composition) base.composition = true;
+          if (normalizedField.composition) {
+            base.composition = true;
+            if (normalizedField.type === "table") {
+              if (normalizedField.compositionLabelColumnKey) {
+                base.compositionLabelColumnKey = normalizedField.compositionLabelColumnKey;
+              }
+              if (normalizedField.compositionValueColumnKey) {
+                base.compositionValueColumnKey = normalizedField.compositionValueColumnKey;
+              }
+            }
+          }
           if (normalizedField.semanticId) base.semanticId = normalizedField.semanticId;
           if (normalizedField.unit) base.unit = normalizedField.unit;
           if (normalizedField.dataType) base.dataType = normalizedField.dataType;
@@ -578,6 +588,10 @@ function AdminCreatePassportType() {
             delete updated.semanticId;
             delete updated.semanticMode;
           }
+          if (patch.composition === false) {
+            delete updated.compositionLabelColumnKey;
+            delete updated.compositionValueColumnKey;
+          }
           // Switching TO table: set defaults
           if (patch.type === "table" && f.type !== "table") {
             updated.table_cols = 2;
@@ -589,6 +603,8 @@ function AdminCreatePassportType() {
             delete updated.table_cols;
             delete updated.table_columns;
             delete updated.table_default_rows;
+            delete updated.compositionLabelColumnKey;
+            delete updated.compositionValueColumnKey;
           }
           // Cols count changed: resize fixed column definitions and default rows.
           if ("table_cols" in patch) {
@@ -597,6 +613,13 @@ function AdminCreatePassportType() {
             updated.table_columns = Array.from({ length: n }, (_, i) => existing[i] || createTableColumn(i));
             updated.table_cols = n;
             updated.table_default_rows = normalizeTableDefaultRows(updated);
+            const validColumnKeys = new Set(updated.table_columns.map((column) => column.key));
+            if (updated.compositionLabelColumnKey && !validColumnKeys.has(updated.compositionLabelColumnKey)) {
+              delete updated.compositionLabelColumnKey;
+            }
+            if (updated.compositionValueColumnKey && !validColumnKeys.has(updated.compositionValueColumnKey)) {
+              delete updated.compositionValueColumnKey;
+            }
           }
           return updated;
         }),
@@ -702,6 +725,7 @@ function AdminCreatePassportType() {
         ...sec,
         fields: sec.fields.map(f => {
           if (f.localId !== fieldId) return f;
+          let keyReplacement = null;
           const columns = normalizeTableColumns(f).map((column, index) => {
             if (index !== columnIndex) return column;
             const nextColumn = { ...column, ...patch };
@@ -712,14 +736,26 @@ function AdminCreatePassportType() {
               nextColumn.key = tableColumnKeyFromLabel(patch.key, `column${index + 1}`);
               nextColumn._keyManual = true;
             }
+            if (nextColumn.key !== column.key) {
+              keyReplacement = { from: column.key, to: nextColumn.key };
+            }
             return nextColumn;
           });
-          return {
+          const nextField = {
             ...f,
             table_columns: columns,
             table_cols: columns.length,
             table_default_rows: normalizeTableDefaultRows({ ...f, table_columns: columns }),
           };
+          if (keyReplacement) {
+            if (nextField.compositionLabelColumnKey === keyReplacement.from) {
+              nextField.compositionLabelColumnKey = keyReplacement.to;
+            }
+            if (nextField.compositionValueColumnKey === keyReplacement.from) {
+              nextField.compositionValueColumnKey = keyReplacement.to;
+            }
+          }
+          return nextField;
         }),
       };
     }));
@@ -914,6 +950,23 @@ function AdminCreatePassportType() {
       setInvalidFields([invalidField.field.localId]);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return setError("All fields must have a key and a name.");
+    }
+
+    const invalidCompositionField = sections
+      .flatMap(s => s.fields.map(field => ({ section: s, field })))
+      .find(({ field }) => {
+        if (field.type !== "table" || !field.composition) return false;
+        const columnKeys = new Set(normalizeTableColumns(field).map(column => column.key));
+        return !field.compositionLabelColumnKey ||
+          !field.compositionValueColumnKey ||
+          field.compositionLabelColumnKey === field.compositionValueColumnKey ||
+          !columnKeys.has(field.compositionLabelColumnKey) ||
+          !columnKeys.has(field.compositionValueColumnKey);
+      });
+    if (invalidCompositionField) {
+      setInvalidFields([invalidCompositionField.field.localId]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError(`Choose two different composition columns for "${invalidCompositionField.field.label || "this table field"}".`);
     }
 
     const emptySection = cleanSections.find(s => s.fields.length === 0);
@@ -1300,6 +1353,20 @@ function AdminCreatePassportType() {
                       const updateAuthoritySummary = summarizeSelectedValues(field.updateAuthority || ["economic_operator"], UPDATE_AUTHORITY_LABELS, "Select authority");
                       const accessDropdownId = `${section.localId}:${field.localId}:access`;
                       const updateDropdownId = `${section.localId}:${field.localId}:authority`;
+                      const tableColumnsForField = field.type === "table" ? normalizeTableColumns(field) : [];
+                      const compositionColumnOptions = [
+                        { value: "", label: "Select column" },
+                        ...tableColumnsForField.map((column) => ({
+                          value: column.key,
+                          label: `${column.label || column.key} (${column.key})`,
+                        })),
+                      ];
+                      const hasTableCompositionConfig = field.type === "table" && !!field.composition;
+                      const hasDistinctCompositionColumns = Boolean(
+                        field.compositionLabelColumnKey &&
+                        field.compositionValueColumnKey &&
+                        field.compositionLabelColumnKey !== field.compositionValueColumnKey
+                      );
                       return (
                         <>
                     <div className="acpt-field-row">
@@ -1507,12 +1574,58 @@ function AdminCreatePassportType() {
                             <input
                               type="checkbox"
                               checked={!!field.composition}
-                              onChange={e => updateField(section.localId, field.localId, { composition: e.target.checked })}
+                              onChange={e => updateField(section.localId, field.localId, {
+                                composition: e.target.checked,
+                                ...(e.target.checked ? {} : {
+                                  compositionLabelColumnKey: undefined,
+                                  compositionValueColumnKey: undefined,
+                                }),
+                              })}
                             />
                             <span className="acpt-composition-label">
                               Composition (pie chart)
                             </span>
                           </label>
+                          {hasTableCompositionConfig && (
+                            <div className="acpt-composition-column-config">
+                              <span className="acpt-composition-hint">
+                                Choose the exact table columns for the pie chart. The label column should be text; the data column should contain numeric percentages.
+                              </span>
+                              <div className="acpt-composition-column-row">
+                                <div className="acpt-composition-column-select">
+                                  <span className="acpt-meta-sub-label">Label column</span>
+                                  <AdminSelectMenu
+                                    value={field.compositionLabelColumnKey || ""}
+                                    onChange={(nextValue) => updateField(section.localId, field.localId, { compositionLabelColumnKey: nextValue })}
+                                    options={compositionColumnOptions}
+                                    className="acpt-select acpt-select-inline"
+                                    triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
+                                    menuClassName="acpt-select-menu acpt-select-menu-compact"
+                                    optionClassName="acpt-select-option"
+                                    ariaLabel="Composition label column"
+                                  />
+                                </div>
+                                <div className="acpt-composition-column-select">
+                                  <span className="acpt-meta-sub-label">Data column (%)</span>
+                                  <AdminSelectMenu
+                                    value={field.compositionValueColumnKey || ""}
+                                    onChange={(nextValue) => updateField(section.localId, field.localId, { compositionValueColumnKey: nextValue })}
+                                    options={compositionColumnOptions}
+                                    className="acpt-select acpt-select-inline"
+                                    triggerClassName="acpt-type-select acpt-type-select-sm acpt-select-trigger acpt-select-trigger-sm"
+                                    menuClassName="acpt-select-menu acpt-select-menu-compact"
+                                    optionClassName="acpt-select-option"
+                                    ariaLabel="Composition data column"
+                                  />
+                                </div>
+                              </div>
+                              {!hasDistinctCompositionColumns && (
+                                <span className="acpt-composition-warning">
+                                  Select two different columns before this table can render a pie chart.
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Dynamic (live data) toggle */}
@@ -1619,16 +1732,10 @@ function AdminCreatePassportType() {
                           </div>
                         </div>
                         {hasSelectedSemanticModel && (
-                          <>
-                            <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
-                              {semanticTermsLoading && "Loading dictionary terms..."}
-                              {!semanticTermsLoading && semanticTermsError && semanticTermsError}
-                              {!semanticTermsLoading && !semanticTermsError && selectedSemanticMatch
-                                && `Selected term: ${selectedSemanticMatch?.label || selectedSemanticMatch?.key || "Dictionary term"}`}
-                              {!semanticTermsLoading && !semanticTermsError && !selectedSemanticMatch
-                                && "No semantic term selected yet."}
-                            </div>
-                          </>
+                          <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
+                            {semanticTermsLoading && "Loading dictionary terms..."}
+                            {!semanticTermsLoading && semanticTermsError && semanticTermsError}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1762,11 +1869,6 @@ function AdminCreatePassportType() {
                                           </div>
                                         )}
                                       </div>
-                                      {selectedColumnSemanticMatch && (
-                                        <div className="acpt-semantic-hint" style={{ marginTop: 6 }}>
-                                          Selected term: {selectedColumnSemanticMatch.label || selectedColumnSemanticMatch.key}
-                                        </div>
-                                      )}
                                     </div>
                                   </div>
                                 </div>

@@ -25,10 +25,14 @@ function extractPct(s) {
 }
 
 /**
- * Parse a table JSON value (stored as row objects) into
- * composition items. First column = label, second column = percentage.
+ * Parse a table JSON value into composition items using the explicit columns
+ * selected in the passport type. No column guessing is allowed here.
  */
-export function parseCompositionFromTable(jsonStr) {
+export function parseCompositionFromTable(jsonStr, field = {}) {
+  const labelKey = String(field?.compositionLabelColumnKey || "").trim();
+  const valueKey = String(field?.compositionValueColumnKey || "").trim();
+  if (!labelKey || !valueKey || labelKey === valueKey) return null;
+
   let rows;
   if (Array.isArray(jsonStr)) {
     rows = jsonStr;
@@ -36,35 +40,16 @@ export function parseCompositionFromTable(jsonStr) {
     try { rows = JSON.parse(jsonStr); } catch { return null; }
   }
   if (!Array.isArray(rows) || rows.length === 0) return null;
-  const rowValues = (row) => row && typeof row === "object" && !Array.isArray(row)
-    ? Object.values(row)
-    : [];
-
-  // Auto-detect which column holds percentages by finding the one where
-  // most cells contain a number (supports "80%", "80", "0.8" formats)
-  const numCols = Math.max(...rows.map(r => rowValues(r).length));
-  if (numCols < 2) return null;
-
-  let pctCol = -1;
-  let bestScore = 0;
-  for (let ci = 0; ci < numCols; ci++) {
-    const hits = rows.filter(r => extractPct(rowValues(r)?.[ci]) > 0).length;
-    if (hits > bestScore) { bestScore = hits; pctCol = ci; }
-  }
-  if (pctCol < 0 || bestScore < 2) return null;
-
-  // Label column: first column that isn't the pct column
-  const labelCol = pctCol === 0 ? 1 : 0;
 
   const items = rows
     .map((row) => {
-      const values = rowValues(row);
+      if (!row || typeof row !== "object" || Array.isArray(row)) return null;
       return {
-        label: String(values?.[labelCol] ?? "").trim(),
-        value: extractPct(values?.[pctCol]),
+        label: String(row[labelKey] ?? "").trim(),
+        value: extractPct(row[valueKey]),
       };
     })
-    .filter(item => item.label && item.value > 0);
+    .filter(item => item?.label && item.value > 0);
 
   return items.length >= 2 ? items : null;
 }

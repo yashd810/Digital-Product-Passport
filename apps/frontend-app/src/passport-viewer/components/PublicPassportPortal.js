@@ -179,7 +179,7 @@ function findFieldEntry(fields, matchers, passport, unlockedPassport, dynamicVal
 
 function getCompositionItems(field, raw) {
   if (!field.composition || !isFilled(raw)) return null;
-  return field.type === "table" ? parseCompositionFromTable(raw) : parseCompositionFromText(raw);
+  return field.type === "table" ? parseCompositionFromTable(raw, field) : parseCompositionFromText(raw);
 }
 
 function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues, lastUpdateAt) {
