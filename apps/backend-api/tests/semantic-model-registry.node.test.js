@@ -123,7 +123,7 @@ test("semantic registry loads the existing battery dictionary generically", () =
   assert.equal(model.version, "v1");
   assert.equal(registry.getModelByPath("battery", "v1").semanticModelKey, "claros_battery_dictionary_v1");
   assert.ok(registry.getTerms("claros_battery_dictionary_v1").length > 0);
-  assert.match(registry.resolveFieldKey("claros_battery_dictionary_v1", "dpp_granularity"), /dpp-granularity/);
+  assert.ok(registry.getTermBySlug("claros_battery_dictionary_v1", "dpp-granularity"));
 });
 
 test("semantic registry loads a new product dictionary without battery-specific code", () => {
@@ -143,12 +143,8 @@ test("semantic registry loads a new product dictionary without battery-specific 
       label: "Energy rating",
       definition: "Energy performance rating for the product.",
       iri: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
-      appFieldKeys: ["energyRating"],
     },
   ]);
-  writeJson(path.join(modelDir, "field-map.json"), {
-    energyRating: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
-  });
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
       energyRating: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
@@ -163,7 +159,7 @@ test("semantic registry loads a new product dictionary without battery-specific 
     assert.equal(model.family, "appliance");
     assert.equal(model.version, "v3");
     assert.equal(
-      registry.getTermByFieldKey("claros_appliance_dictionary_v3", "energyRating").slug,
+      registry.getTermBySlug("claros_appliance_dictionary_v3", "energy-rating").slug,
       "energy-rating"
     );
   } finally {
@@ -247,10 +243,6 @@ test("semantic registry expands compact term sources", () => {
       unit: "kwh_per_year",
     },
   ]);
-  writeJson(path.join(modelDir, "field-map.json"), {
-    energyRating: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
-    powerConsumption: "https://example.test/dictionary/appliance/v4/terms/power-consumption",
-  });
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
       energyRating: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
@@ -263,8 +255,8 @@ test("semantic registry expands compact term sources", () => {
 
   try {
     const registry = createSemanticModelRegistry({ resourcesDir });
-    const energyRating = registry.getTermByFieldKey("claros_appliance_dictionary_v4", "energyRating");
-    const powerConsumption = registry.getTermByFieldKey("claros_appliance_dictionary_v4", "powerConsumption");
+    const energyRating = registry.getTermBySlug("claros_appliance_dictionary_v4", "energy-rating");
+    const powerConsumption = registry.getTermBySlug("claros_appliance_dictionary_v4", "power-consumption");
 
     assert.equal(energyRating.iri, "https://example.test/dictionary/appliance/v4/terms/energy-rating");
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "termIri"), false);
@@ -286,7 +278,10 @@ test("semantic registry expands compact term sources", () => {
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "domainClassKey"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "rdfType"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "conformsTo"), false);
-    assert.deepEqual(energyRating.appFieldKeys, ["energyRating"]);
+    assert.deepEqual(
+      Object.keys(energyRating).filter((key) => key.endsWith("Keys")),
+      []
+    );
     assert.deepEqual(energyRating.dataType, { format: "String", jsonType: "string", xsdType: "xsd:string" });
     assert.equal(energyRating.unitDisplay, "n.a.");
     assert.equal(energyRating.categoryLabel, "Performance");
@@ -328,10 +323,10 @@ test("dictionary routes serve registered models and canonical artifacts", async 
   const terms = await invokeRoute(app, {
     path: "/api/dictionary/:family/:version/terms",
     params: { family: "battery", version: "v1" },
-    query: { search: "dpp_granularity" },
+    query: { search: "granularity" },
   });
   assert.equal(terms.statusCode, 200);
-  assert.ok(parseJsonResponse(terms).some((term) => term.appFieldKeys?.includes("dpp_granularity")));
+  assert.ok(parseJsonResponse(terms).some((term) => term.slug === "dpp-granularity"));
 });
 
 test("company semantic models are derived from company passport type access", async () => {
@@ -401,12 +396,8 @@ test("company semantic models support arbitrary registered models and grouped pa
       slug: "udi",
       label: "Unique device identifier",
       iri: "https://example.test/dictionary/medical-device/v1/terms/udi",
-      appFieldKeys: ["udi"],
     },
   ]);
-  writeJson(path.join(modelDir, "field-map.json"), {
-    udi: "https://example.test/dictionary/medical-device/v1/terms/udi",
-  });
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
       udi: "https://example.test/dictionary/medical-device/v1/terms/udi",

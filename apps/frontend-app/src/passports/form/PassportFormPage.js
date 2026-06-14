@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { PASSPORT_SECTIONS_MAP } from "../config/PassportFields";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import {
   alignRecordToSchemaKeys,
-  buildSchemaFieldAliasMap,
+  buildSchemaFieldKeyMap,
   canonicalizeRecordToSchemaKeys,
   extractFieldValuesFromElements,
 } from "../../shared/passports/schemaKeyUtils";
@@ -81,11 +80,11 @@ function buildClonePrefill(record, sections) {
     return { modelName: "", internalAliasId: "", formData: {} };
   }
 
-  const aliasToKey = buildSchemaFieldAliasMap(sections);
+  const keyMap = buildSchemaFieldKeyMap(sections);
   const mergedRecord = {
     ...record,
     ...(record.fields && typeof record.fields === "object" ? record.fields : {}),
-    ...extractFieldValuesFromElements(record.elements, aliasToKey),
+    ...extractFieldValuesFromElements(record.elements, keyMap),
   };
   const aligned = alignRecordToSchemaKeys(mergedRecord, sections);
   const excludedKeys = new Set([
@@ -229,13 +228,13 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     ? (resolvedPassportType || passportType || "")
     : (passportType || "");
 
-  // Support both static PASSPORT_SECTIONS_MAP and dynamic type definitions from DB
+  // Module-derived passport type definitions are the only source of editable fields.
   const [dynamicSections, setDynamicSections] = useState(null);
   const [loadingType,     setLoadingType]     = useState(false);
   const [systemHeader,    setSystemHeader]    = useState(() => normalizeSystemPassportHeader());
   const [complianceContext, setComplianceContext] = useState({ company: null, facilities: [] });
 
-  const SECTIONS    = dynamicSections || PASSPORT_SECTIONS_MAP[activePassportType] || {};
+  const SECTIONS    = dynamicSections || {};
   const sectionKeys = Object.keys(SECTIONS);
 
   const [expanded,       setExpanded]       = useState({});
@@ -313,15 +312,15 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     window.sessionStorage.setItem(draftStorageKey, JSON.stringify(payload));
   };
 
-  const restoreLocalDraft = (fallbackData = null) => {
+  const restoreLocalDraft = (initialData = null) => {
     if (typeof window === "undefined") return false;
     const raw = window.sessionStorage.getItem(draftStorageKey);
     if (!raw) return false;
     try {
       const draft = JSON.parse(raw);
-      setModelName(draft.modelName ?? fallbackData?.modelName ?? "");
-      setInternalAliasId(draft.internalAliasId ?? fallbackData?.internalAliasId ?? "");
-      const draftFormData = draft.formData && typeof draft.formData === "object" ? draft.formData : (fallbackData || {});
+      setModelName(draft.modelName ?? initialData?.modelName ?? "");
+      setInternalAliasId(draft.internalAliasId ?? initialData?.internalAliasId ?? "");
+      const draftFormData = draft.formData && typeof draft.formData === "object" ? draft.formData : (initialData || {});
       formDataRef.current = draftFormData; // ← Update ref
       setFormData(draftFormData);
       dirtyRef.current = true;
@@ -344,11 +343,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const hydrateFromPassportRecord = (data, { allowDraftRestore = false } = {}) => {
-    const aliasToKey = buildSchemaFieldAliasMap(SECTIONS);
+    const keyMap = buildSchemaFieldKeyMap(SECTIONS);
     const flattenedData = {
       ...(data || {}),
       ...(data?.fields && typeof data.fields === "object" ? data.fields : {}),
-      ...extractFieldValuesFromElements(data?.elements, aliasToKey),
+      ...extractFieldValuesFromElements(data?.elements, keyMap),
     };
     const alignedData = alignRecordToSchemaKeys(flattenedData, SECTIONS);
     const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
@@ -523,7 +522,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
             source = mergePassportRepresentations(rawData, fullData);
           }
         } catch {
-          // Keep the navigation-state fallback if refetching the clone source fails.
+          // Keep the navigation-state data if refetching the clone source fails.
         }
       }
 
@@ -551,7 +550,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   useEffect(() => {
     if (mode !== "edit" || !dppId || !activePassportType) return;
     if (loadingType) return;
-    if (!PASSPORT_SECTIONS_MAP[activePassportType] && !dynamicSections) return;
+    if (!dynamicSections) return;
     (async () => {
       try {
         await fetchPassportRecord({ allowDraftRestore: true });
@@ -618,6 +617,17 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   };
 
   const isFieldUnfilled = (field) => !hasMeaningfulValue(formData[field.key]);
+
+  const getRequiredMissingFields = () => {
+    const currentFormData = formDataRef.current || {};
+    const fields = Object.values(SECTIONS || {})
+      .flatMap((section) => Array.isArray(section?.fields) ? section.fields : []);
+    return fields.filter((field) => {
+      if (!field?.required) return false;
+      if (field.type === "file" && fileSelections[field.key]) return false;
+      return !hasMeaningfulValue(currentFormData[field.key]);
+    });
+  };
 
   const shouldShowFieldForTemplateFilter = (field) => {
     if (!isTemplateCreateMode) return true;
@@ -821,6 +831,11 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
   const saveEditChanges = async ({ showSuccessMessage = false } = {}) => {
     if (mode !== "edit" || !dppId || !activePassportType || saveInFlightRef.current) return false;
+    const missingRequiredFields = getRequiredMissingFields();
+    if (missingRequiredFields.length) {
+      setError(`Required fields need values: ${missingRequiredFields.map((field) => field.label || field.key).join(", ")}`);
+      return false;
+    }
     if (!dirtyRef.current) return true;
 
     saveInFlightRef.current = true;
@@ -948,6 +963,10 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       if (mode === "create") {
         if (loadingType) {
           throw new Error("Passport type is still loading. Please wait a moment and save again.");
+        }
+        const missingRequiredFields = getRequiredMissingFields();
+        if (missingRequiredFields.length) {
+          throw new Error(`Required fields need values: ${missingRequiredFields.map((field) => field.label || field.key).join(", ")}`);
         }
         const body = buildPersistedBody();
         const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports`, {
@@ -1212,7 +1231,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
     const releaseStatus = formData.releaseStatus || (mode === "create" ? "draft" : "");
     const values = {
       digitalProductPassportId: formData.dppId || formData.dppId || (mode === "create" ? "Generated when passport is saved" : ""),
-      uniqueProductIdentifier: formData.uniqueProductIdentifier || formData.uniqueProductIdentifier || "Generated from serial number when available",
+      uniqueProductIdentifier: formData.uniqueProductIdentifier || "Generated from module business identifier when available",
       internalAliasId: internalAliasId || formData.internalAliasId || "Generated local passport ID",
       granularity: formData.granularity || "Resolved from company DPP policy",
       dppSchemaVersion: formData.dppSchemaVersion || formData.schemaVersion || "Resolved from passport type",

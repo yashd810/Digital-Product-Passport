@@ -1,7 +1,6 @@
 "use strict";
 
 const {
-  DEFAULT_GENERIC_COMPLIANCE_PROFILE,
   getComplianceProfileForPassportType,
 } = require("../passport-modules");
 const { getPassportFieldValue } = require("../shared/passports/passport-helpers");
@@ -112,10 +111,8 @@ function normalizeCompanyGovernance(row) {
 }
 
 function normalizeProfile(profile = null) {
-  const baseProfile = {
-    ...DEFAULT_GENERIC_COMPLIANCE_PROFILE,
-    ...(profile || {}),
-  };
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return null;
+  const baseProfile = { ...profile };
   return {
     ...baseProfile,
     contentSpecificationIds: Array.isArray(baseProfile.contentSpecificationIds)
@@ -127,8 +124,8 @@ function normalizeProfile(profile = null) {
     requireFacilityAtGranularities: Array.isArray(baseProfile.requireFacilityAtGranularities)
       ? baseProfile.requireFacilityAtGranularities
       : [],
-    managedSemanticFieldKeys: Array.isArray(baseProfile.managedSemanticFieldKeys)
-      ? baseProfile.managedSemanticFieldKeys
+    managedSemanticFields: Array.isArray(baseProfile.managedSemanticFields)
+      ? baseProfile.managedSemanticFields
       : [],
   };
 }
@@ -264,15 +261,7 @@ function parseStructuredValue(field, value) {
 }
 
 function isExplicitMultiLanguageField(field) {
-  const key = normalizeText(field?.key).toLowerCase();
-  const valueKind = normalizeText(field?.valueKind || field?.expandedObjectType || field?.objectTypeHint).toLowerCase();
-  return valueKind === "multilanguage"
-    || valueKind === "multilingual"
-    || valueKind === "i18n"
-    || key.endsWith("_i18n")
-    || key.endsWith("_intl")
-    || key.includes("multilang")
-    || key.includes("localized");
+  return normalizeText(field?.objectType) === "MultiLanguageDataElement";
 }
 
 function isMultiLanguageValue(value) {
@@ -454,22 +443,17 @@ module.exports = function createComplianceService({
     return semanticModelRegistry?.getTermByIri?.(modelKey, iri) || null;
   }
 
-  function getSemanticTermByFieldKey(modelKey, fieldKey) {
-    if (!fieldKey) return null;
-    return semanticModelRegistry?.getTermByFieldKey?.(modelKey, fieldKey) || null;
-  }
-
   function getSemanticTermForField(field, semanticModelKey) {
     if (field?.semanticId) {
       const termByIri = getSemanticTermByIri(semanticModelKey, field.semanticId);
       if (termByIri) return termByIri;
     }
-    return getSemanticTermByFieldKey(semanticModelKey, field?.key) || null;
+    return null;
   }
 
-  function getCategoryRequirementForSemanticKey(modelKey, fieldKey, category) {
-    if (!fieldKey || !category) return null;
-    return semanticModelRegistry?.getCategoryRequirementForField?.(modelKey, fieldKey, category) || null;
+  function getCategoryRequirementForSemanticId(modelKey, semanticId, category) {
+    if (!semanticId || !category) return null;
+    return semanticModelRegistry?.getCategoryRequirementForField?.(modelKey, semanticId, category) || null;
   }
 
   async function loadPassportTypeDefinition(passportType) {
@@ -506,9 +490,15 @@ module.exports = function createComplianceService({
       normalizedTypeDef?.complianceProfile
       || getComplianceProfileForPassportType(profileLookupKey, normalizedTypeDef)
     );
+    if (!profile) {
+      throw new Error(`Compliance profile is required for passport type "${profileLookupKey || "unknown"}".`);
+    }
     const contentSpecificationIds = Array.isArray(profile.contentSpecificationIds) && profile.contentSpecificationIds.length
       ? profile.contentSpecificationIds
-      : [normalizedTypeDef?.semanticModelKey || DEFAULT_GENERIC_COMPLIANCE_PROFILE.key];
+      : [];
+    if (!contentSpecificationIds.length) {
+      throw new Error(`Compliance profile "${profile.key || "unknown"}" must define contentSpecificationIds.`);
+    }
     return {
       ...profile,
       granularity: String(granularity || "item").trim().toLowerCase() || "item",
@@ -518,17 +508,7 @@ module.exports = function createComplianceService({
 
   function getCategoryApplicabilityForField(field, normalizedCategory, semanticModelKey) {
     if (!normalizedCategory) return null;
-    const candidateFieldKeys = new Set([field?.key]);
-    const term = getSemanticTermForField(field, semanticModelKey);
-    for (const appFieldKey of (term?.appFieldKeys || [])) {
-      if (appFieldKey) candidateFieldKeys.add(appFieldKey);
-    }
-
-    let requirementLevel = null;
-    for (const fieldKey of candidateFieldKeys) {
-      requirementLevel = getCategoryRequirementForSemanticKey(semanticModelKey, fieldKey, normalizedCategory);
-      if (requirementLevel) break;
-    }
+    const requirementLevel = getCategoryRequirementForSemanticId(semanticModelKey, field?.semanticId, normalizedCategory);
     if (!requirementLevel) return null;
     return {
       requirementLevel,
@@ -914,27 +894,31 @@ function validateSemanticData(fields, passport, { semanticModelKey = null, profi
     const managedFields = [];
     const issues = [];
 
-    if (!buildCanonicalPassportPayload || !profile?.managedSemanticFieldKeys?.length) {
+    const managedSemanticFields = Array.isArray(profile?.managedSemanticFields) ? profile.managedSemanticFields : [];
+    if (!buildCanonicalPassportPayload || !managedSemanticFields.length) {
       return { managedFields, issues };
     }
 
     const schemaFieldKeys = new Set(fields.map((field) => field.key).filter(Boolean));
     const canonicalPayload = buildCanonicalPassportPayload(passport || {}, typeDef, { company });
 
-    for (const fieldKey of profile.managedSemanticFieldKeys) {
+    for (const managedField of managedSemanticFields) {
+      const fieldKey = normalizeText(managedField?.key);
+      const semanticId = normalizeText(managedField?.semanticId);
+      if (!fieldKey || !semanticId) continue;
       const resolveValue = MANAGED_SEMANTIC_FIELD_RESOLVERS[fieldKey];
       if (!resolveValue) continue;
       if (schemaFieldKeys.has(fieldKey)) continue;
 
-      const term = getSemanticTermByFieldKey(semanticModelKey, fieldKey);
       const syntheticField = {
         key: fieldKey,
-        semanticId: term?.iri || term?.termIri || null,
+        semanticId,
       };
       const applicability = getCategoryApplicabilityForField(syntheticField, normalizedCategory, semanticModelKey);
       if (applicability && !applicability.applicable) continue;
 
-      const label = term?.label || fieldKey;
+      const term = getSemanticTermByIri(semanticModelKey, semanticId);
+      const label = managedField.label || term?.label || fieldKey;
       const value = resolveValue({ canonicalPayload, company, passport: passport || {} });
       const mandatory = applicability ? applicability.mandatory : false;
       const requirementLevel = applicability?.requirementLevel || null;
@@ -973,37 +957,10 @@ function validateSemanticData(fields, passport, { semanticModelKey = null, profi
     return { managedFields, issues };
   }
 
-  function getCategoryPolicyFieldKeys(categoryPolicy = {}) {
-    const keys = new Set([
-      categoryPolicy.fieldKey,
-      ...(Array.isArray(categoryPolicy.fieldKeys) ? categoryPolicy.fieldKeys : []),
-    ]);
-    return [...keys].map(normalizeText).filter(Boolean);
-  }
-
-  function getCategoryPolicyLabels(categoryPolicy = {}) {
-    const labels = new Set([
-      categoryPolicy.label,
-      categoryPolicy.fieldLabel,
-      ...(Array.isArray(categoryPolicy.fieldLabels) ? categoryPolicy.fieldLabels : []),
-    ]);
-    return [...labels].map(normalizeLookupKey).filter(Boolean);
-  }
-
   function findCategoryField(fields = [], categoryPolicy = {}) {
-    const fieldKeys = new Set(getCategoryPolicyFieldKeys(categoryPolicy));
-    const fieldLabels = new Set(getCategoryPolicyLabels(categoryPolicy));
-    return fields.find((field) => fieldKeys.has(field.key))
-      || fields.find((field) => fieldLabels.has(normalizeLookupKey(field.label)))
-      || null;
-  }
-
-  function buildCategoryAliasMap(categoryPolicy = {}) {
-    const aliases = categoryPolicy.aliases || {};
-    if (aliases instanceof Map) {
-      return new Map([...aliases.entries()].map(([alias, value]) => [normalizeLookupKey(alias), value]));
-    }
-    return new Map(Object.entries(aliases).map(([alias, value]) => [normalizeLookupKey(alias), value]));
+    const semanticId = normalizeText(categoryPolicy.semanticId);
+    if (!semanticId) return null;
+    return fields.find((field) => normalizeText(field.semanticId) === semanticId) || null;
   }
 
   function getSupportedCategories(semanticModelKey, categoryPolicy = {}) {
@@ -1015,14 +972,10 @@ function validateSemanticData(fields, passport, { semanticModelKey = null, profi
 
   function normalizeCategoryValue(value, categoryPolicy = {}, supportedCategories = []) {
     const raw = normalizeText(value);
-    const normalized = normalizeLookupKey(raw);
-    if (!normalized) return null;
+    if (!raw) return null;
 
-    const aliases = buildCategoryAliasMap(categoryPolicy);
-    if (aliases.has(normalized)) return aliases.get(normalized);
-
-    const supportedCategory = supportedCategories.find((category) => normalizeLookupKey(category) === normalized);
-    if (supportedCategory) return supportedCategory;
+    const supportedCategory = supportedCategories.find((category) => String(category) === raw);
+    if (supportedCategory) return raw;
     return supportedCategories.length ? null : raw;
   }
 
@@ -1075,6 +1028,7 @@ function validateSemanticData(fields, passport, { semanticModelKey = null, profi
       policyKind: categoryPolicy.kind || null,
       productKind: categoryPolicy.productKind || null,
       fieldKey: categoryField?.key || null,
+      semanticId: categoryField?.semanticId || categoryPolicy.semanticId || null,
       sourceWorkbook: categoryRules?.sourceWorkbook || null,
       sheetName: categoryRules?.sheetName || null,
       mandatoryFieldCount: completeness.applicableFields.filter((field) => field.mandatory).length,
@@ -1155,6 +1109,7 @@ function validateSemanticData(fields, passport, { semanticModelKey = null, profi
           policyKind: categoryPolicy?.kind || null,
           productKind: categoryPolicy?.productKind || null,
           fieldKey: null,
+          semanticId: categoryPolicy?.semanticId || null,
           sourceWorkbook: null,
           sheetName: null,
           mandatoryFieldCount: 0,

@@ -49,4 +49,4 @@ Semantic resource files:
 
 Battery-specific files still exist where they describe the battery module itself. That is expected and correct.
 
-What was removed earlier was battery-specific fallback architecture that had leaked into generic platform code.
+Battery-specific assumptions were removed from generic platform code.

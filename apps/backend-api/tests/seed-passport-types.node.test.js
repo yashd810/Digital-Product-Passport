@@ -112,6 +112,16 @@ test("seed script can discover and select an arbitrary future module file", asyn
       productCategory: "Medical Device",
       productIcon: "MD",
       semanticModelKey: "claros_medical_device_dictionary_v1",
+      identity: {
+        businessIdentifierField: "modelIdentifier",
+      },
+      complianceProfile: {
+        key: "medicalDeviceDppV1",
+        displayName: "Medical Device DPP Profile v1",
+        contentSpecificationIds: ["claros_medical_device_dictionary_v1"],
+        requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds"],
+        enforceSemanticMapping: true,
+      },
       sections: [{
         key: "deviceIdentity",
         label: "Device Identity",
@@ -126,7 +136,7 @@ test("seed script can discover and select an arbitrary future module file", asyn
     const selected = getSelectedModules("medical-device:v1", { modulesDir });
     assert.equal(selected.length, 1);
     assert.equal(selected[0].moduleKey, "medical-device:v1");
-    assert.equal(selected[0].fieldsJson.complianceProfile.key, "genericDppV1");
+    assert.equal(selected[0].fieldsJson.complianceProfile.key, "medicalDeviceDppV1");
 
     const result = await runSeed({
       pool: null,

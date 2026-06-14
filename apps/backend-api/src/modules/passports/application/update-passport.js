@@ -1,5 +1,25 @@
 "use strict";
 
+function hasMeaningfulValue(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim() !== "";
+  if (Array.isArray(value)) return value.some((item) => hasMeaningfulValue(item));
+  if (typeof value === "object") return Object.values(value).some((item) => hasMeaningfulValue(item));
+  return true;
+}
+
+function assertRequiredPassportFields(typeSchema, fields) {
+  const missingFields = (typeSchema?.schemaFields || [])
+    .filter((field) => field?.required && !hasMeaningfulValue(fields[field.key]))
+    .map((field) => field.key);
+  if (!missingFields.length) return;
+
+  const error = new Error("Missing required passport field(s)");
+  error.statusCode = 400;
+  error.payload = { fields: missingFields };
+  throw error;
+}
+
 function updateEditablePassportUseCase(deps) {
   const {
     pool,
@@ -12,6 +32,7 @@ function updateEditablePassportUseCase(deps) {
     hasReleasedLineageVersion,
     normalizeInternalAliasIdValue,
     buildStoredProductIdentifiers,
+    productIdentifierService,
     findExistingPassportByInternalAliasId,
     normalizeReleaseStatus,
     getCompanyNameMap,
@@ -73,6 +94,8 @@ function updateEditablePassportUseCase(deps) {
       }
     }
 
+    assertRequiredPassportFields(typeSchema, { ...current.rows[0], ...fields });
+
     const rowId = current.rows[0].id;
     const currentGranularity = String(current.rows[0].granularity || "item").trim().toLowerCase();
     let cachedCompanyName;
@@ -111,13 +134,15 @@ function updateEditablePassportUseCase(deps) {
           internalAliasId: nextProductIdForGranularity,
           granularity: requestedGranularity,
           passportLike: { ...current.rows[0], ...fields, internalAliasId: nextProductIdForGranularity },
+          typeDef: typeSchema.typeDef || typeSchema,
         });
         fields.internalAliasId = storedProductIdentifiers.internalAliasId;
         fields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
       }
     }
 
-    const hasBusinessIdentifierUpdate = ["serial_number", "serial", "serialNumber", "battery_serial_number", "batterySerialNumber", "product_serial_number", "productSerialNumber"].some((key) => fields[key] !== undefined);
+    const businessIdentifierField = productIdentifierService?.getBusinessIdentifierField?.(typeSchema.typeDef || typeSchema) || "";
+    const hasBusinessIdentifierUpdate = businessIdentifierField ? fields[businessIdentifierField] !== undefined : false;
 
     if (fields.internalAliasId !== undefined) {
       const normalizedProductId = normalizeInternalAliasIdValue(fields.internalAliasId);
@@ -145,6 +170,7 @@ function updateEditablePassportUseCase(deps) {
         internalAliasId: normalizedProductId,
         granularity: fields.granularity || current.rows[0].granularity || "item",
         passportLike: { ...current.rows[0], ...fields, internalAliasId: normalizedProductId },
+        typeDef: typeSchema.typeDef || typeSchema,
       });
       fields.internalAliasId = storedProductIdentifiers.internalAliasId;
       fields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
@@ -156,6 +182,7 @@ function updateEditablePassportUseCase(deps) {
         internalAliasId: current.rows[0].internalAliasId,
         granularity: fields.granularity || current.rows[0].granularity || "item",
         passportLike: { ...current.rows[0], ...fields },
+        typeDef: typeSchema.typeDef || typeSchema,
       });
       fields.uniqueProductIdentifier = storedProductIdentifiers.uniqueProductIdentifier;
     }

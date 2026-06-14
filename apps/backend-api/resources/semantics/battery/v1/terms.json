@@ -16,10 +16,7 @@
       "curie": "clarosBatteryClass:DPPInfo",
       "label": "DPP Information"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "dpp_schema_version"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 2,
@@ -38,10 +35,7 @@
       "curie": "clarosBatteryClass:DPPInfo",
       "label": "DPP Information"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "dpp_status"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 3,
@@ -60,10 +54,7 @@
       "curie": "clarosBatteryClass:DPPInfo",
       "label": "DPP Information"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "dpp_granularity"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 4,
@@ -82,10 +73,7 @@
       "curie": "clarosBatteryClass:DPPInfo",
       "label": "DPP Information"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "last_updated_at"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 5,
@@ -104,11 +92,7 @@
       "curie": "clarosBatteryClass:BatteryIdentifiers",
       "label": "Battery Identifiers"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "unique_dpp_identifier",
-      "unique_passport_identifier"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 6,
@@ -127,11 +111,7 @@
       "curie": "clarosBatteryClass:BatteryIdentifiers",
       "label": "Battery Identifiers"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "unique_battery_identifier",
-      "unique_product_identifier"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 7,
@@ -150,10 +130,7 @@
       "curie": "clarosBatteryClass:BatteryIdentifiers",
       "label": "Battery Identifiers"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "battery_model_identifier"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 8,
@@ -172,10 +149,7 @@
       "curie": "clarosBatteryClass:BatteryIdentifiers",
       "label": "Battery Identifiers"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "battery_serial_number"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 9,
@@ -194,10 +168,7 @@
       "curie": "clarosBatteryClass:OperatorIdentifiers",
       "label": "Operator Identifiers"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "economic_operator_identifier"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 10,
@@ -216,10 +187,7 @@
       "curie": "clarosBatteryClass:OperatorIdentifiers",
       "label": "Operator Identifiers"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "manufacturer_identifier"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 11,
@@ -238,10 +206,7 @@
       "curie": "clarosBatteryClass:OperatorIdentifiers",
       "label": "Operator Identifiers"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "facility_identifier"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 12,
@@ -260,11 +225,7 @@
       "curie": "clarosBatteryClass:ProductData",
       "label": "Product Data"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "economic_operator_info",
-      "economic_operator_information"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 13,
@@ -283,11 +244,7 @@
       "curie": "clarosBatteryClass:ProductData",
       "label": "Product Data"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "manufacturer_info",
-      "manufacturer_information"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 14,
@@ -306,10 +263,7 @@
       "curie": "clarosBatteryClass:ProductData",
       "label": "Product Data"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "manufacturing_place"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 15,
@@ -328,10 +282,7 @@
       "curie": "clarosBatteryClass:ProductData",
       "label": "Product Data"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "manufacturing_date"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 16,
@@ -350,10 +301,7 @@
       "curie": "clarosBatteryClass:RestrictedProductInfo",
       "label": "Restricted Product Info"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "date_of_into_service"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 17,
@@ -372,11 +320,7 @@
       "curie": "clarosBatteryClass:BatteryAttributes",
       "label": "Battery Attributes"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "warranty_period",
-      "warranty_period_the_battery"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 18,
@@ -395,10 +339,7 @@
       "curie": "clarosBatteryClass:BatteryAttributes",
       "label": "Battery Attributes"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "battery_category"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 19,
@@ -417,10 +358,7 @@
       "curie": "clarosBatteryClass:BatteryAttributes",
       "label": "Battery Attributes"
     },
-    "unit": "kg",
-    "appFieldKeys": [
-      "battery_mass"
-    ]
+    "unit": "kg"
   },
   {
     "specRef": 20,
@@ -439,10 +377,7 @@
       "curie": "clarosBatteryClass:RestrictedProductInfo",
       "label": "Restricted Product Info"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "battery_status"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 21,
@@ -461,10 +396,7 @@
       "curie": "clarosBatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "separate_collection_symbol"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 22,
@@ -483,12 +415,7 @@
       "curie": "clarosBatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "symbols_for_cadmium",
-      "symbols_for_cadmium_and_lead",
-      "symbols_for_lead"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 23,
@@ -507,10 +434,7 @@
       "curie": "clarosBatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "carbon_footprint_label_and_performance_class"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 24,
@@ -529,10 +453,7 @@
       "curie": "clarosBatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "extinguishing_agent"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 25,
@@ -551,11 +472,7 @@
       "curie": "clarosBatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "meaning_of_and_symbols",
-      "meaning_of_labels_and_symbols"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 26,
@@ -574,10 +491,7 @@
       "curie": "clarosBatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "eu_declaration_of_conformity"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 27,
@@ -596,11 +510,7 @@
       "curie": "clarosBatteryClass:BatteryComplianceRestricted",
       "label": "Battery Compliance Restricted"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "results_of_proving_compliance",
-      "test_reports_for_proving_compliance"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 28,
@@ -619,10 +529,7 @@
       "curie": "clarosBatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
-    "unit": "kgco2eq_per_kwh",
-    "appFieldKeys": [
-      "batteryCarbonFootprintPerFunctionalUnit"
-    ]
+    "unit": "kgco2eq_per_kwh"
   },
   {
     "specRef": 29,
@@ -641,10 +548,7 @@
       "curie": "clarosBatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
-    "unit": "kgco2eq_per_kwh",
-    "appFieldKeys": [
-      "contributionOfRawMaterialAndPreprocessingLifecycleStage"
-    ]
+    "unit": "kgco2eq_per_kwh"
   },
   {
     "specRef": 30,
@@ -663,10 +567,7 @@
       "curie": "clarosBatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
-    "unit": "kgco2eq_per_kwh",
-    "appFieldKeys": [
-      "contributionOfMainProductProductionLifecycleStage"
-    ]
+    "unit": "kgco2eq_per_kwh"
   },
   {
     "specRef": 31,
@@ -685,10 +586,7 @@
       "curie": "clarosBatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
-    "unit": "kgco2eq_per_kwh",
-    "appFieldKeys": [
-      "contributionOfDistributionLifecycleStage"
-    ]
+    "unit": "kgco2eq_per_kwh"
   },
   {
     "specRef": 32,
@@ -707,10 +605,7 @@
       "curie": "clarosBatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
-    "unit": "kgco2eq_per_kwh",
-    "appFieldKeys": [
-      "contributionOfEndOfLifeAndRecyclingLifecycleStage"
-    ]
+    "unit": "kgco2eq_per_kwh"
   },
   {
     "specRef": 33,
@@ -748,10 +643,7 @@
       "curie": "clarosBatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "webLinkToPublicCarbonFootprintStudy"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 35,
@@ -789,11 +681,7 @@
       "curie": "clarosBatteryClass:SupplyChainDueDiligence",
       "label": "Supply Chain Due Diligence"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "information_of_diligence_report",
-      "information_of_due_diligence_report"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 37,
@@ -812,11 +700,7 @@
       "curie": "clarosBatteryClass:SupplyChainDueDiligence",
       "label": "Supply Chain Due Diligence"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "third_party_assurances_of_recognised_schemes",
-      "third_party_recognised_schemes"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 38,
@@ -835,10 +719,7 @@
       "curie": "clarosBatteryClass:SupplyChainDueDiligence",
       "label": "Supply Chain Due Diligence"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "supply_chain_indices"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 39,
@@ -857,10 +738,7 @@
       "curie": "clarosBatteryClass:BatteryMaterialsPublic",
       "label": "Battery Materials Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "battery_chemistry"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 40,
@@ -882,10 +760,7 @@
       "curie": "clarosBatteryClass:BatteryMaterialsPublic",
       "label": "Battery Materials Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "critical_raw_materials"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 41,
@@ -907,12 +782,7 @@
       "curie": "clarosBatteryClass:BatteryMaterialsRestricted",
       "label": "Battery Materials Restricted"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "materials_used_in_anode",
-      "materials_used_in_cathode",
-      "materials_used_in_electrolyte"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 42,
@@ -931,10 +801,7 @@
       "curie": "clarosBatteryClass:BatteryMaterialsPublic",
       "label": "Battery Materials Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "hazardous_substances"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 43,
@@ -953,10 +820,7 @@
       "curie": "clarosBatteryClass:BatteryMaterialsPublic",
       "label": "Battery Materials Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "substance_impact_info"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 44,
@@ -975,11 +839,7 @@
       "curie": "clarosBatteryClass:BatteryCircularityRestricted",
       "label": "Battery Circularity Restricted"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "dismantling_information",
-      "dismantling_information_for_the_battery_pack"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 45,
@@ -998,10 +858,7 @@
       "curie": "clarosBatteryClass:BatteryCircularityRestricted",
       "label": "Battery Circularity Restricted"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "part_numbers_for_components"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 46,
@@ -1020,11 +877,7 @@
       "curie": "clarosBatteryClass:BatteryCircularityRestricted",
       "label": "Battery Circularity Restricted"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "information_on_sources_of_spare_parts",
-      "information_on_spare_parts"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 47,
@@ -1043,10 +896,7 @@
       "curie": "clarosBatteryClass:BatteryCircularityRestricted",
       "label": "Battery Circularity Restricted"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "safety_measures"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 48,
@@ -1065,11 +915,7 @@
       "curie": "clarosBatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "preconsumer_recycled_nickel",
-      "preconsumer_recycled_nickel_share"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 49,
@@ -1088,11 +934,7 @@
       "curie": "clarosBatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "preconsumer_recycled_cobalt",
-      "preconsumer_recycled_cobalt_share"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 50,
@@ -1111,11 +953,7 @@
       "curie": "clarosBatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "preconsumer_recycled_lithium",
-      "preconsumer_recycled_lithium_share"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 51,
@@ -1134,11 +972,7 @@
       "curie": "clarosBatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "postconsumer_recycled_nickel",
-      "postconsumer_recycled_nickel_share"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 52,
@@ -1157,11 +991,7 @@
       "curie": "clarosBatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "postconsumer_recycled_cobalt",
-      "postconsumer_recycled_cobalt_share"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 53,
@@ -1180,11 +1010,7 @@
       "curie": "clarosBatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "postconsumer_recycled_lithium",
-      "postconsumer_recycled_lithium_share"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 54,
@@ -1203,10 +1029,7 @@
       "curie": "clarosBatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "recycled_lead_share"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 55,
@@ -1225,10 +1048,7 @@
       "curie": "clarosBatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "renewable_content_share"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 56,
@@ -1247,11 +1067,7 @@
       "curie": "clarosBatteryClass:EndUserInformation",
       "label": "End-User Information"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "information_on_waste_prevention",
-      "role_of_endusers_in_waste_prevention"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 57,
@@ -1270,11 +1086,7 @@
       "curie": "clarosBatteryClass:EndUserInformation",
       "label": "End-User Information"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "information_on_waste_batteries",
-      "role_of_endusers_in_separate_collection_of_waste_batteries"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 58,
@@ -1293,11 +1105,7 @@
       "curie": "clarosBatteryClass:EndUserInformation",
       "label": "End-User Information"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "information_on_battery_collection_preparation_for_second_life_and_on_treatment_at_end_of_life",
-      "information_on_of_life"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 59,
@@ -1316,10 +1124,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
-    "unit": "ah",
-    "appFieldKeys": [
-      "rated_capacity"
-    ]
+    "unit": "ah"
   },
   {
     "specRef": 60,
@@ -1338,10 +1143,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
-    "unit": "ah",
-    "appFieldKeys": [
-      "remaining_capacity"
-    ]
+    "unit": "ah"
   },
   {
     "specRef": 61,
@@ -1360,10 +1162,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "capacity_fade"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 62,
@@ -1382,10 +1181,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
-    "unit": "wh",
-    "appFieldKeys": [
-      "certified_usable_battery_energy"
-    ]
+    "unit": "wh"
   },
   {
     "specRef": 63,
@@ -1404,10 +1200,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
-    "unit": "wh",
-    "appFieldKeys": [
-      "remaining_usable_battery_energy"
-    ]
+    "unit": "wh"
   },
   {
     "specRef": 64,
@@ -1426,11 +1219,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "state_of_certified_energy_soce",
-      "state_of_energy_soce"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 65,
@@ -1449,10 +1238,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "state_of_charge_soc"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 66,
@@ -1471,10 +1257,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
-    "unit": "v",
-    "appFieldKeys": [
-      "minimum_voltage"
-    ]
+    "unit": "v"
   },
   {
     "specRef": 67,
@@ -1493,10 +1276,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
-    "unit": "v",
-    "appFieldKeys": [
-      "maximum_voltage"
-    ]
+    "unit": "v"
   },
   {
     "specRef": 68,
@@ -1515,10 +1295,7 @@
       "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
-    "unit": "v",
-    "appFieldKeys": [
-      "nominal_voltage"
-    ]
+    "unit": "v"
   },
   {
     "specRef": 69,
@@ -1537,10 +1314,7 @@
       "curie": "clarosBatteryClass:PowerCapabilityPublic",
       "label": "Power Capability Public"
     },
-    "unit": "w",
-    "appFieldKeys": [
-      "original_power_capability"
-    ]
+    "unit": "w"
   },
   {
     "specRef": 70,
@@ -1559,10 +1333,7 @@
       "curie": "clarosBatteryClass:PowerCapabilityRestricted",
       "label": "Power Capability Restricted"
     },
-    "unit": "w",
-    "appFieldKeys": [
-      "remaining_power_capability"
-    ]
+    "unit": "w"
   },
   {
     "specRef": 71,
@@ -1581,10 +1352,7 @@
       "curie": "clarosBatteryClass:PowerCapabilityRestricted",
       "label": "Power Capability Restricted"
     },
-    "unit": "w",
-    "appFieldKeys": [
-      "power_fade"
-    ]
+    "unit": "w"
   },
   {
     "specRef": 72,
@@ -1603,10 +1371,7 @@
       "curie": "clarosBatteryClass:PowerCapabilityPublic",
       "label": "Power Capability Public"
     },
-    "unit": "w",
-    "appFieldKeys": [
-      "maximum_permitted_battery_power"
-    ]
+    "unit": "w"
   },
   {
     "specRef": 73,
@@ -1625,11 +1390,7 @@
       "curie": "clarosBatteryClass:PowerCapabilityPublic",
       "label": "Power Capability Public"
     },
-    "unit": "w_per_wh",
-    "appFieldKeys": [
-      "ratio_between_battery_energy",
-      "ratio_between_nominal_battery_power_and_battery_energy"
-    ]
+    "unit": "w_per_wh"
   },
   {
     "specRef": 74,
@@ -1648,11 +1409,7 @@
       "curie": "clarosBatteryClass:RoundTripEfficiencyPublic",
       "label": "Round Trip Efficiency Public"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "initial_round_energy_efficiency",
-      "initial_round_trip_energy_efficiency"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 75,
@@ -1671,11 +1428,7 @@
       "curie": "clarosBatteryClass:RoundTripEfficiencyPublic",
       "label": "Round Trip Efficiency Public"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "round_trip_cycle_life",
-      "round_trip_energy_efficiency_at_50_of_cycle_life"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 76,
@@ -1694,11 +1447,7 @@
       "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "remaining_round_energy_efficiency",
-      "remaining_round_trip_energy_efficiency"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 77,
@@ -1717,11 +1466,7 @@
       "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "energy_round_efficiency_fade",
-      "energy_round_trip_efficiency_fade"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 78,
@@ -1740,10 +1485,7 @@
       "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "initial_selfdischarge_rate"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 79,
@@ -1762,10 +1504,7 @@
       "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "current_selfdischarge_rate"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 80,
@@ -1784,10 +1523,7 @@
       "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "evolution_of_selfdischarge_rates"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 81,
@@ -1806,11 +1542,7 @@
       "curie": "clarosBatteryClass:InternalResistancePublic",
       "label": "Internal Resistance Public"
     },
-    "unit": "ohm",
-    "appFieldKeys": [
-      "initial_internal_module_recommended",
-      "initial_internal_resistance_of_battery_cell_and_pack_module_recommended"
-    ]
+    "unit": "ohm"
   },
   {
     "specRef": 82,
@@ -1829,11 +1561,7 @@
       "curie": "clarosBatteryClass:InternalResistanceRestricted",
       "label": "Internal Resistance Restricted"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "internal_resistance_increase_of_pack_cell_and_module_recommended",
-      "internal_resistance_module_recommended"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 83,
@@ -1852,11 +1580,7 @@
       "curie": "clarosBatteryClass:BatteryLifetimeRestricted",
       "label": "Battery Lifetime Restricted"
     },
-    "unit": "years",
-    "appFieldKeys": [
-      "expected_lifetime_calendar_years",
-      "expected_lifetime_in_calendar_years"
-    ]
+    "unit": "years"
   },
   {
     "specRef": 84,
@@ -1875,11 +1599,7 @@
       "curie": "clarosBatteryClass:BatteryLifetimePublic",
       "label": "Battery Lifetime Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "expected_lifetime_chargedischarge_cycles",
-      "expected_lifetime_number_of_chargedischarge_cycles"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 85,
@@ -1898,11 +1618,7 @@
       "curie": "clarosBatteryClass:BatteryLifetimeRestricted",
       "label": "Battery Lifetime Restricted"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "number_of_discharging_cycles",
-      "number_of_full_charging_and_discharging_cycles"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 86,
@@ -1921,10 +1637,7 @@
       "curie": "clarosBatteryClass:BatteryLifetimePublic",
       "label": "Battery Lifetime Public"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "cyclelife_reference_test"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 87,
@@ -1943,11 +1656,7 @@
       "curie": "clarosBatteryClass:BatteryLifetimePublic",
       "label": "Battery Lifetime Public"
     },
-    "unit": "a_per_ah",
-    "appFieldKeys": [
-      "crate_of_cyclelife_test",
-      "crate_of_relevant_cyclelife_test"
-    ]
+    "unit": "a_per_ah"
   },
   {
     "specRef": 88,
@@ -1966,10 +1675,7 @@
       "curie": "clarosBatteryClass:BatteryLifetimeRestricted",
       "label": "Battery Lifetime Restricted"
     },
-    "unit": "wh",
-    "appFieldKeys": [
-      "energy_throughput"
-    ]
+    "unit": "wh"
   },
   {
     "specRef": 89,
@@ -1988,10 +1694,7 @@
       "curie": "clarosBatteryClass:BatteryLifetimeRestricted",
       "label": "Battery Lifetime Restricted"
     },
-    "unit": "ah",
-    "appFieldKeys": [
-      "capacity_throughput"
-    ]
+    "unit": "ah"
   },
   {
     "specRef": 90,
@@ -2010,10 +1713,7 @@
       "curie": "clarosBatteryClass:BatteryLifetimePublic",
       "label": "Battery Lifetime Public"
     },
-    "unit": "percent",
-    "appFieldKeys": [
-      "capacity_threshold_for_exhaustion"
-    ]
+    "unit": "percent"
   },
   {
     "specRef": 91,
@@ -2032,10 +1732,7 @@
       "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
-    "unit": "celsius",
-    "appFieldKeys": [
-      "temperature_information"
-    ]
+    "unit": "celsius"
   },
   {
     "specRef": 92,
@@ -2054,11 +1751,7 @@
       "curie": "clarosBatteryClass:TemperatureConditionsPublic",
       "label": "Temperature Conditions Public"
     },
-    "unit": "celsius",
-    "appFieldKeys": [
-      "temperature_range_boundary_lower",
-      "temperature_range_idle_state_lower_boundary"
-    ]
+    "unit": "celsius"
   },
   {
     "specRef": 93,
@@ -2077,11 +1770,7 @@
       "curie": "clarosBatteryClass:TemperatureConditionsPublic",
       "label": "Temperature Conditions Public"
     },
-    "unit": "celsius",
-    "appFieldKeys": [
-      "temperature_range_boundary_upper",
-      "temperature_range_idle_state_upper_boundary"
-    ]
+    "unit": "celsius"
   },
   {
     "specRef": 94,
@@ -2100,11 +1789,7 @@
       "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
-    "unit": "seconds",
-    "appFieldKeys": [
-      "time_spent_above_boundary",
-      "time_spent_in_extreme_temperatures_above_boundary"
-    ]
+    "unit": "seconds"
   },
   {
     "specRef": 95,
@@ -2123,11 +1808,7 @@
       "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
-    "unit": "seconds",
-    "appFieldKeys": [
-      "time_spent_below_boundary",
-      "time_spent_in_extreme_temperatures_below_boundary"
-    ]
+    "unit": "seconds"
   },
   {
     "specRef": 96,
@@ -2146,11 +1827,7 @@
       "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
-    "unit": "seconds",
-    "appFieldKeys": [
-      "time_spent_above_boundar",
-      "time_spent_charging_during_extreme_temperatures_above_boundary"
-    ]
+    "unit": "seconds"
   },
   {
     "specRef": 97,
@@ -2169,11 +1846,7 @@
       "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
-    "unit": "seconds",
-    "appFieldKeys": [
-      "time_spent_charging_during_extreme_temperatures_below_boundary",
-      "time_spent_temperatures_below_boundary"
-    ]
+    "unit": "seconds"
   },
   {
     "specRef": 98,
@@ -2192,10 +1865,7 @@
       "curie": "clarosBatteryClass:NegativeEvents",
       "label": "Negative Events"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "number_of_deep_discharge_events"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 99,
@@ -2214,10 +1884,7 @@
       "curie": "clarosBatteryClass:NegativeEvents",
       "label": "Negative Events"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "number_of_overcharge_events"
-    ]
+    "unit": "none"
   },
   {
     "specRef": 100,
@@ -2236,9 +1903,6 @@
       "curie": "clarosBatteryClass:NegativeEvents",
       "label": "Negative Events"
     },
-    "unit": "none",
-    "appFieldKeys": [
-      "accident_information"
-    ]
+    "unit": "none"
   }
 ]

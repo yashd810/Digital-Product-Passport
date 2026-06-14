@@ -176,14 +176,19 @@ export function BulkEditModal({
       const rows = parseCsvText(text);
       if (rows.length < 2) throw new Error("CSV must include a header row and at least one data row.");
       const headers = rows[0].map((cell) => String(cell || "").trim());
-      const identifierIndex = headers.findIndex((cell) => ["dppid", "internalaliasid", "internalAliasId", "dppId"].includes(cell));
+      const identifierIndex = headers.findIndex((cell) => cell === "dppId" || cell === "internalAliasId");
       if (identifierIndex < 0) throw new Error("CSV must include a dppId or internalAliasId column.");
+      const allowedHeaders = new Set(["dppId", "internalAliasId", ...availableFields.map((field) => field.key)]);
+      const unknownHeaders = headers.filter((header) => header && !allowedHeaders.has(header));
+      if (unknownHeaders.length) {
+        throw new Error(`Unknown CSV field key(s): ${[...new Set(unknownHeaders)].join(", ")}. Use exact field keys, not UI labels.`);
+      }
 
       const updates = rows.slice(1).flatMap((row) => {
         const identifierHeader = headers[identifierIndex];
         const identifierValue = String(row[identifierIndex] || "").trim();
         if (!identifierValue) return [];
-        const target = identifierHeader.toLowerCase() === "dppid" ? targetByDppId.get(identifierValue) : targetByAlias.get(identifierValue);
+        const target = identifierHeader === "dppId" ? targetByDppId.get(identifierValue) : targetByAlias.get(identifierValue);
         if (!target) return [];
 
         const payload = { dppId: target.dppId };
@@ -191,7 +196,7 @@ export function BulkEditModal({
           if (index === identifierIndex) return;
           const rawValue = String(row[index] || "").trim();
           if (!rawValue) return;
-          const field = availableFields.find((item) => item.key === header || item.label === header);
+          const field = availableFields.find((item) => item.key === header);
           if (!field) return;
           payload[field.key] = normalizeCellValue(rawValue, field);
         });
@@ -213,6 +218,13 @@ export function BulkEditModal({
       const text = await file.text();
       const parsed = JSON.parse(text);
       if (!Array.isArray(parsed)) throw new Error("JSON must be an array of update objects.");
+      const allowedJsonKeys = new Set(["dppId", "internalAliasId", ...availableFields.map((field) => field.key)]);
+      const unknownJsonKeys = parsed.flatMap((item) =>
+        Object.keys(item || {}).filter((key) => !allowedJsonKeys.has(key))
+      );
+      if (unknownJsonKeys.length) {
+        throw new Error(`Unknown JSON field key(s): ${[...new Set(unknownJsonKeys)].join(", ")}. Use exact field keys, not UI labels.`);
+      }
 
       const updates = parsed.flatMap((item) => {
         const match = item?.dppId
@@ -348,7 +360,7 @@ export function BulkEditModal({
 
       {tab === "csv" && (
         <div className="bulk-edit-upload-panel">
-          <p>Upload a CSV with one row per passport. Include `dppId` or `internalAliasId` as the first identifier column, then any field keys or labels you want to update.</p>
+          <p>Upload a CSV with one row per passport. Include `dppId` or `internalAliasId` as the first identifier column, then exact field keys only.</p>
           <label className="dashboard-btn dashboard-btn-primary dashboard-upload-button">
             Upload CSV
             <input type="file" accept=".csv" className="dashboard-hidden-input" onChange={handleCsvUpload} disabled={submitting} />
@@ -359,7 +371,7 @@ export function BulkEditModal({
 
       {tab === "json" && (
         <div className="bulk-edit-upload-panel">
-          <p>Upload a JSON array of update objects. Each object must include `dppId` or `internalAliasId` plus the fields to change.</p>
+          <p>Upload a JSON array of update objects. Each object must include `dppId` or `internalAliasId` plus exact field keys to change.</p>
           <label className="dashboard-btn dashboard-btn-primary dashboard-upload-button">
             Upload JSON
             <input type="file" accept=".json,application/json" className="dashboard-hidden-input" onChange={handleJsonUpload} disabled={submitting} />

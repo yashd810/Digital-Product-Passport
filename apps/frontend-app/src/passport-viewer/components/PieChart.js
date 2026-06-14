@@ -26,7 +26,7 @@ function extractPct(s) {
 
 /**
  * Parse a table JSON value into composition items using the explicit columns
- * selected in the passport type. No column guessing is allowed here.
+ * selected in the passport type metadata.
  */
 export function parseCompositionFromTable(jsonStr, field = {}) {
   const labelKey = String(field?.compositionLabelColumnKey || "").trim();
@@ -50,40 +50,6 @@ export function parseCompositionFromTable(jsonStr, field = {}) {
       };
     })
     .filter(item => item?.label && item.value > 0);
-
-  return items.length >= 2 ? items : null;
-}
-
-/**
- * Parse a free-text value into composition items.
- * Supports formats like:
- *   "Steel: 60%, Aluminium: 25%, Plastic 15%"
- *   "Steel (60%)\nAluminium (25%)"
- *   "60% Steel, 25% Aluminium"
- */
-export function parseCompositionFromText(text) {
-  if (!text) return null;
-  const items = [];
-
-  // Pattern 1: "Label: 60%" or "Label (60%)"
-  const re1 = /([A-Za-z][A-Za-z0-9 \-\/\.]{0,40}?)\s*[:\(]\s*(\d+(?:\.\d+)?)\s*%/g;
-  let m;
-  while ((m = re1.exec(text)) !== null) {
-    items.push({ label: m[1].trim(), value: parseFloat(m[2]) });
-  }
-  if (items.length >= 2) return items;
-  items.length = 0;
-
-  // Pattern 2: segment by comma/newline/semicolon then try each piece
-  const segments = text.split(/[,\n;]+/).map(s => s.trim()).filter(Boolean);
-  for (const seg of segments) {
-    // "Label 60%"
-    const a = seg.match(/^([A-Za-z][A-Za-z0-9 \-\/\.]*?)\s+(\d+(?:\.\d+)?)\s*%/);
-    // "60% Label"
-    const b = seg.match(/^(\d+(?:\.\d+)?)\s*%\s+([A-Za-z][A-Za-z0-9 \-\/\.]*)/);
-    if (a) items.push({ label: a[1].trim(), value: parseFloat(a[2]) });
-    else if (b) items.push({ label: b[2].trim(), value: parseFloat(b[1]) });
-  }
 
   return items.length >= 2 ? items : null;
 }

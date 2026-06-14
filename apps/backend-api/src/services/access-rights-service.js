@@ -150,17 +150,8 @@ function findFieldDefinition(typeDef, elementIdPath) {
 
   const rootElementIdPath = extractRootElementIdPath(normalizedElementIdPath);
   return flattenSchemaFields(typeDef).find((field) =>
-  field.key === normalizedElementIdPath ||
-  field.semanticId === normalizedElementIdPath ||
-  field.elementId === normalizedElementIdPath ||
-  (
-    rootElementIdPath &&
-    (
-      field.key === rootElementIdPath ||
-      field.semanticId === rootElementIdPath ||
-      field.elementId === rootElementIdPath
-    )
-  )
+    field.elementIdPath === normalizedElementIdPath ||
+    field.elementIdPath === rootElementIdPath
   ) || null;
 }
 
@@ -180,9 +171,10 @@ function buildFieldPolicy(typeDef, elementIdPath) {
     return {
       fieldDef: null,
       elementIdPath,
-      access: ["public"],
-      confidentiality: "public",
-      updateAuthority: ["economic_operator"]
+      access: [],
+      confidentiality: "unknown",
+      updateAuthority: [],
+      unknown: true
     };
   }
 
@@ -293,6 +285,16 @@ module.exports = function createAccessRightsService({ pool }) {
 
   async function canReadElement({ passportDppId = null, typeDef, elementIdPath, user = null }) {
     const policy = buildFieldPolicy(typeDef, elementIdPath);
+    if (policy.unknown) {
+      return {
+        allowed: false,
+        reason: "UNKNOWN_ELEMENT_PATH",
+        audiences: [],
+        confidentiality: "unknown",
+        updateAuthority: [],
+        fieldDef: null,
+      };
+    }
     const userContext = await buildUserAccessContext({ user, passportDppId, elementIdPath });
     const matchedAudience = policy.access.find((audience) =>
     audience === "public" || userContext.audiences.includes(audience)
@@ -310,6 +312,15 @@ module.exports = function createAccessRightsService({ pool }) {
 
   async function canWriteElement({ passportDppId = null, typeDef, elementIdPath, user = null, passportCompanyId = null }) {
     const policy = buildFieldPolicy(typeDef, elementIdPath);
+    if (policy.unknown) {
+      return {
+        allowed: false,
+        reason: "UNKNOWN_ELEMENT_PATH",
+        audiences: [],
+        confidentiality: "unknown",
+        updateAuthority: [],
+      };
+    }
     if (!user?.userId) {
       return {
         allowed: false,

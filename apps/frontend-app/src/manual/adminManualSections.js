@@ -429,7 +429,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Admin route", value: "/admin/dictionary/:family/:version" },
         { label: "Semantic model", value: "Each passport type selects the dictionary model it needs" },
-        { label: "Dictionary APIs", value: "Manifest, context, categories, units, field-map, category-rules, terms, and term details" },
+        { label: "Dictionary APIs", value: "Manifest, context, categories, units, category-rules, terms, and term details" },
         { label: "Public availability", value: "Registered dictionaries are also available at /dictionary/:family/:version without dashboard login" },
       ],
       journeys: [
@@ -437,7 +437,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           title: "Validate schema mappings before publishing",
           items: [
             "Open the matching semantic dictionary while designing a backend module or editing a custom passport type.",
-            "Search by term label, definition, slug, app field key, or semantic identifier.",
+            "Search by term label, definition, slug, IRI, or semantic identifier.",
             "Confirm the expected data type, unit, access rights, static/dynamic behavior, element ID, and regulation references.",
             "Map builder fields to dictionary terms intentionally so JSON-LD export uses the correct canonical identifiers.",
             "Remember that company dashboard visibility is derived from company access to passport types that use the semantic model. A company with two granted types using two models can see both dictionaries; unrelated dictionaries stay hidden.",
@@ -447,7 +447,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           title: "Use dictionary governance endpoints correctly",
           items: [
             "Use the manifest and category-rules endpoints to understand which dictionary pieces apply to the selected product category.",
-            "Use the field-map endpoint when checking how app field keys connect to dictionary terms.",
+            "Use module field metadata when checking how passport type fields connect to dictionary terms.",
             "Use the JSON-LD context URL when explaining exported semantic passport payloads to technical partners.",
           ],
         },

@@ -102,7 +102,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           manufacturedBy: passport.manufactured_by,
           modelName: passport.modelName,
           internalAliasId: passport.internalAliasId,
-          fallbackDppId: passport.dppId,
+          previewDppId: passport.dppId,
         }),
         publicPath: buildCurrentPublicPassportPath({
           companyName,

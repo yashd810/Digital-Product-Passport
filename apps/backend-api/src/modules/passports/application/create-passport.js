@@ -2,6 +2,30 @@
 
 const { withTransaction } = require("../../../infrastructure/postgres/with-transaction");
 
+function hasMeaningfulValue(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim() !== "";
+  if (Array.isArray(value)) return value.some((item) => hasMeaningfulValue(item));
+  if (typeof value === "object") return Object.values(value).some((item) => hasMeaningfulValue(item));
+  return true;
+}
+
+function assertRequiredPassportFields(typeSchema, fields, { isBulk = false } = {}) {
+  const missingFields = (typeSchema?.schemaFields || [])
+    .filter((field) => field?.required && !hasMeaningfulValue(fields[field.key]))
+    .map((field) => field.key);
+  if (!missingFields.length) return;
+
+  const error = new Error(
+    isBulk
+      ? `Missing required passport field(s): ${missingFields.join(", ")}`
+      : "Missing required passport field(s)"
+  );
+  error.statusCode = 400;
+  error.payload = { fields: missingFields };
+  throw error;
+}
+
 function createDraftPassportUseCase(deps) {
   const {
     pool,
@@ -92,6 +116,8 @@ function createDraftPassportUseCase(deps) {
       throw error;
     }
 
+    assertRequiredPassportFields(typeSchema, fields, { isBulk });
+
     const effectiveGranularity = resolveGranularityForCreate(companyPolicy, requestedGranularity);
     const companyName = (await getCompanyNameMap([companyId])).get(String(companyId)) || "";
     const storedProductIdentifiers = buildStoredProductIdentifiers({
@@ -101,6 +127,7 @@ function createDraftPassportUseCase(deps) {
       internalAliasId: normalizedProductId,
       granularity: effectiveGranularity,
       passportLike: { ...fields, internalAliasId: normalizedProductId },
+      typeDef: typeSchema.typeDef || typeSchema,
     });
     const complianceManagedFields = await buildComplianceManagedFields({
       companyId,

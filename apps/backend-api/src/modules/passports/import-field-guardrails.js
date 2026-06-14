@@ -29,16 +29,6 @@ const IMPORT_MANAGED_FIELD_KEYS = new Set([
   ...PROFILE_MANAGED_IMPORT_FIELDS,
 ]);
 
-const normalizeImportToken = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-
-const MANAGED_IMPORT_FIELD_TOKENS = new Set(
-  [...IMPORT_MANAGED_FIELD_KEYS].map(normalizeImportToken)
-);
-
 function isImportBuiltInEditableField(key) {
   return IMPORT_BUILT_IN_EDITABLE_FIELDS.has(String(key || "").trim());
 }
@@ -52,31 +42,26 @@ function isManagedImportFieldKey(key) {
 function isManagedImportFieldLabel(label) {
   const normalizedLabel = String(label || "").trim();
   if (!normalizedLabel) return false;
-  if (isManagedImportFieldKey(normalizedLabel)) return true;
-  return MANAGED_IMPORT_FIELD_TOKENS.has(normalizeImportToken(normalizedLabel));
+  return isManagedImportFieldKey(normalizedLabel);
 }
 
 function resolveCsvImportField(rawLabel, typeSchema = {}) {
-  const label = String(rawLabel || "").trim();
-  if (!label) return null;
-
-  const normalized = label.toLowerCase();
+  const key = String(rawLabel || "").trim();
+  if (!key) return null;
   const schemaFields = Array.isArray(typeSchema.schemaFields)
     ? typeSchema.schemaFields
     : [];
-  const schemaField =
-    schemaFields.find((field) => field?.label?.trim().toLowerCase() === normalized) ||
-    schemaFields.find((field) => field?.key?.toLowerCase() === normalized);
+  const schemaField = schemaFields.find((field) => field?.key === key);
 
   if (schemaField?.key) return schemaField;
 
-  const builtInByToken = {
-    dppid: { key: "dppId", type: "text" },
-    modelname: { key: "modelName", type: "text" },
-    internalaliasid: { key: "internalAliasId", type: "text" },
+  const builtInByKey = {
+    dppId: { key: "dppId", type: "text" },
+    modelName: { key: "modelName", type: "text" },
+    internalAliasId: { key: "internalAliasId", type: "text" },
   };
 
-  return builtInByToken[normalizeImportToken(label)] || null;
+  return builtInByKey[key] || null;
 }
 
 function isImportFieldAllowed(key, typeSchema = {}) {

@@ -143,11 +143,19 @@ module.exports = function registerAdminRoutes(app, {
   backupProviderService,
   productIdentifierService,
   getTable,
-  normalizePassportTypeSchema = ({ sections = [], systemHeader = null, currentSchemaVersion = 0 } = {}) => ({
-    schemaVersion: Number.parseInt(currentSchemaVersion, 10) > 0 ? Number.parseInt(currentSchemaVersion, 10) : 1,
-    systemHeader: normalizeSystemPassportHeader(systemHeader),
-    sections: Array.isArray(sections) ? sections : [],
-  }),
+  normalizePassportTypeSchema = ({ sections = [], systemHeader = null, currentSchemaVersion = 0, sourceModule = null, identity = null } = {}) => {
+    const schema = {
+      schemaVersion: Number.parseInt(currentSchemaVersion, 10) > 0 ? Number.parseInt(currentSchemaVersion, 10) : 1,
+      systemHeader: normalizeSystemPassportHeader(systemHeader),
+      sections: Array.isArray(sections) ? sections : [],
+    };
+    const normalizedSourceModule = String(sourceModule || "").trim();
+    if (normalizedSourceModule) schema.sourceModule = normalizedSourceModule;
+    if (identity && typeof identity === "object" && !Array.isArray(identity)) {
+      schema.identity = identity;
+    }
+    return schema;
+  },
   getTypeSchemaVersion = (fieldsJson = {}) => Number.parseInt(fieldsJson.schemaVersion, 10) || 1,
   buildPassportTypeSchemaChange = () => ({ added: [], removed: [], typeChanged: [], additive: true }),
   passportTypeHasStoredRecords = async () => false,
@@ -308,7 +316,7 @@ module.exports = function registerAdminRoutes(app, {
     };
   }
 
-  function normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion }) {
+  function normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion, sourceModule = null, identity = null }) {
     const systemHeaderValidation = validateSystemPassportHeader(systemHeader || normalizeSystemPassportHeader());
     if (!systemHeaderValidation.valid) {
       const error = new Error(systemHeaderValidation.error);
@@ -320,6 +328,8 @@ module.exports = function registerAdminRoutes(app, {
       sections,
       systemHeader: normalizeSystemPassportHeader(systemHeader),
       currentSchemaVersion,
+      sourceModule,
+      identity,
     });
   }
 

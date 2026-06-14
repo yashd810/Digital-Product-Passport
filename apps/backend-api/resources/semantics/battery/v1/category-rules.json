@@ -13,8 +13,8 @@
     "voluntary": "o",
     "not_applicable": ""
   },
-  "requirementsByFieldKey": {
-    "dpp_schema_version": {
+  "requirementsBySemanticId": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/dpp-schema-version": {
       "termNumber": 1,
       "termLabel": "DPP Schema Version",
       "sourceAttribute": "DPP Schema version",
@@ -25,7 +25,7 @@
         "Stationary": "mandatory_espr_jtc24"
       }
     },
-    "dpp_status": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/dpp-status": {
       "termNumber": 2,
       "termLabel": "DPP Status",
       "sourceAttribute": "DPP Status",
@@ -36,7 +36,7 @@
         "Stationary": "mandatory_espr_jtc24"
       }
     },
-    "dpp_granularity": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/dpp-granularity": {
       "termNumber": 3,
       "termLabel": "DPP Granularity",
       "sourceAttribute": "DPP Granularity",
@@ -47,7 +47,7 @@
         "Stationary": "mandatory_espr_jtc24"
       }
     },
-    "last_updated_at": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/last-updated-at": {
       "termNumber": 4,
       "termLabel": "Date-time of Latest DPP Update",
       "sourceAttribute": "Date-time of latest update of DPP",
@@ -58,7 +58,7 @@
         "Stationary": "mandatory_espr_jtc24"
       }
     },
-    "unique_dpp_identifier": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/unique-dpp-identifier": {
       "termNumber": 5,
       "termLabel": "Unique Battery Passport Identifier",
       "sourceAttribute": "Unique battery passport identifier / unique DPP identifier",
@@ -69,18 +69,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "unique_passport_identifier": {
-      "termNumber": 5,
-      "termLabel": "Unique Battery Passport Identifier",
-      "sourceAttribute": "Unique battery passport identifier / unique DPP identifier",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "unique_battery_identifier": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/unique-product-identifier": {
       "termNumber": 6,
       "termLabel": "Unique Battery Identifier",
       "sourceAttribute": "Unique battery identifier / unique product identifier",
@@ -91,18 +80,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "unique_product_identifier": {
-      "termNumber": 6,
-      "termLabel": "Unique Battery Identifier",
-      "sourceAttribute": "Unique battery identifier / unique product identifier",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "battery_model_identifier": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-model-identifier": {
       "termNumber": 7,
       "termLabel": "Battery Model Identifier",
       "sourceAttribute": "Battery model identifier",
@@ -113,7 +91,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "battery_serial_number": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-serial-number": {
       "termNumber": 8,
       "termLabel": "Battery Serial Number",
       "sourceAttribute": "Battery serial number",
@@ -124,7 +102,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "economic_operator_identifier": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/economic-operator-identifier": {
       "termNumber": 9,
       "termLabel": "Unique Economic Operator Identifier",
       "sourceAttribute": "Unique economic operator identifier",
@@ -135,7 +113,7 @@
         "Stationary": "mandatory_espr_jtc24"
       }
     },
-    "manufacturer_identifier": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/manufacturer-identifier": {
       "termNumber": 10,
       "termLabel": "Unique Manufacturer Identifier",
       "sourceAttribute": "Unique manufacturer identifier",
@@ -146,7 +124,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "facility_identifier": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/facility-identifier": {
       "termNumber": 11,
       "termLabel": "Unique Facility Identifier",
       "sourceAttribute": "Unique facility identifier",
@@ -157,7 +135,7 @@
         "Stationary": "mandatory_espr_jtc24"
       }
     },
-    "economic_operator_info": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/economic-operator-info": {
       "termNumber": 12,
       "termLabel": "Economic Operator Information",
       "sourceAttribute": "Economic operator information",
@@ -168,18 +146,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "economic_operator_information": {
-      "termNumber": 12,
-      "termLabel": "Economic Operator Information",
-      "sourceAttribute": "Economic operator information",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "manufacturer_info": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/manufacturer-info": {
       "termNumber": 13,
       "termLabel": "Manufacturer Information",
       "sourceAttribute": "Manufacturer information",
@@ -190,18 +157,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "manufacturer_information": {
-      "termNumber": 13,
-      "termLabel": "Manufacturer Information",
-      "sourceAttribute": "Manufacturer information",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "manufacturing_place": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/manufacturing-place": {
       "termNumber": 14,
       "termLabel": "Manufacturing Place",
       "sourceAttribute": "Manufacturing place",
@@ -212,7 +168,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "manufacturing_date": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/manufacturing-date": {
       "termNumber": 15,
       "termLabel": "Manufacturing Date",
       "sourceAttribute": "Manufacturing date",
@@ -223,7 +179,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "date_of_into_service": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/date-first-use": {
       "termNumber": 16,
       "termLabel": "Date of Putting Battery into Service",
       "sourceAttribute": "Date of putting the battery into service",
@@ -234,7 +190,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "warranty_period": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/warranty-period": {
       "termNumber": 17,
       "termLabel": "Warranty Period",
       "sourceAttribute": "Warranty period of the battery",
@@ -245,18 +201,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "warranty_period_the_battery": {
-      "termNumber": 17,
-      "termLabel": "Warranty Period",
-      "sourceAttribute": "Warranty period of the battery",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "battery_category": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-category": {
       "termNumber": 18,
       "termLabel": "Battery Category",
       "sourceAttribute": "Battery category",
@@ -267,7 +212,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "battery_mass": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-mass": {
       "termNumber": 19,
       "termLabel": "Battery Mass",
       "sourceAttribute": "Battery mass",
@@ -278,7 +223,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "battery_status": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-status": {
       "termNumber": 20,
       "termLabel": "Battery Status",
       "sourceAttribute": "Battery status",
@@ -289,7 +234,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "separate_collection_symbol": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/separate-collection-symbol": {
       "termNumber": 21,
       "termLabel": "Separate Collection Symbol",
       "sourceAttribute": "Separate collection symbol",
@@ -300,7 +245,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "symbols_for_cadmium": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/cadmium-lead-symbols": {
       "termNumber": 22,
       "termLabel": "Cadmium and Lead Symbols",
       "sourceAttribute": "Symbols for cadmium and lead",
@@ -311,29 +256,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "symbols_for_cadmium_and_lead": {
-      "termNumber": 22,
-      "termLabel": "Cadmium and Lead Symbols",
-      "sourceAttribute": "Symbols for cadmium and lead",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "symbols_for_lead": {
-      "termNumber": 22,
-      "termLabel": "Cadmium and Lead Symbols",
-      "sourceAttribute": "Symbols for cadmium and lead",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "carbon_footprint_label_and_performance_class": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-label": {
       "termNumber": 23,
       "termLabel": "Carbon Footprint Label",
       "sourceAttribute": "Carbon footprint label",
@@ -344,7 +267,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "extinguishing_agent": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/extinguishing-agent": {
       "termNumber": 24,
       "termLabel": "Extinguishing Agent",
       "sourceAttribute": "Extinguishing agent",
@@ -355,7 +278,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "meaning_of_and_symbols": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/label-meaning": {
       "termNumber": 25,
       "termLabel": "Meaning of Labels and Symbols",
       "sourceAttribute": "Meaning of labels and symbols",
@@ -366,18 +289,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "meaning_of_labels_and_symbols": {
-      "termNumber": 25,
-      "termLabel": "Meaning of Labels and Symbols",
-      "sourceAttribute": "Meaning of labels and symbols",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "eu_declaration_of_conformity": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/eu-declaration-of-conformity": {
       "termNumber": 26,
       "termLabel": "EU Declaration of Conformity",
       "sourceAttribute": "EU declaration of conformity",
@@ -388,7 +300,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "results_of_proving_compliance": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/compliance-test-report": {
       "termNumber": 27,
       "termLabel": "Compliance Test Report Results",
       "sourceAttribute": "Results of test reports proving compliance",
@@ -399,18 +311,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "test_reports_for_proving_compliance": {
-      "termNumber": 27,
-      "termLabel": "Compliance Test Report Results",
-      "sourceAttribute": "Results of test reports proving compliance",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "batteryCarbonFootprintPerFunctionalUnit": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-per-kwh": {
       "termNumber": 28,
       "termLabel": "Carbon Footprint per Functional Unit",
       "sourceAttribute": "Battery carbon footprint per Functional Unit",
@@ -421,7 +322,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "contributionOfRawMaterialAndPreprocessingLifecycleStage": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-raw-materials": {
       "termNumber": 29,
       "termLabel": "Raw Materials Lifecycle Carbon Contribution",
       "sourceAttribute": "Contribution of raw material acquisition and pre-processing lifecycle stage",
@@ -432,7 +333,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "contributionOfMainProductProductionLifecycleStage": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-production": {
       "termNumber": 30,
       "termLabel": "Production Lifecycle Carbon Contribution",
       "sourceAttribute": "Contribution of main product production lifecycle stage",
@@ -443,7 +344,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "contributionOfDistributionLifecycleStage": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-distribution": {
       "termNumber": 31,
       "termLabel": "Distribution Lifecycle Carbon Contribution",
       "sourceAttribute": "Contribution of distribution lifecycle stage",
@@ -454,7 +355,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "contributionOfEndOfLifeAndRecyclingLifecycleStage": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-end-of-life": {
       "termNumber": 32,
       "termLabel": "End-of-life Lifecycle Carbon Contribution",
       "sourceAttribute": "Contribution of end of life and recycling lifecycle stage",
@@ -465,7 +366,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "carbonFootprintPerformanceClass": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-class": {
       "termNumber": 33,
       "termLabel": "Carbon Footprint Performance Class",
       "sourceAttribute": "Carbon footprint performance class",
@@ -476,7 +377,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "webLinkToPublicCarbonFootprintStudy": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/carbon-footprint-study-url": {
       "termNumber": 34,
       "termLabel": "Public Carbon Footprint Study URL",
       "sourceAttribute": "Web link to public carbon footprint study",
@@ -487,7 +388,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "absoluteCarbonFootprint": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/absolute-carbon-footprint": {
       "termNumber": 35,
       "termLabel": "Absolute Carbon Footprint",
       "sourceAttribute": "Absolute battery carbon footprint",
@@ -498,7 +399,7 @@
         "Stationary": "voluntary"
       }
     },
-    "information_of_diligence_report": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/due-diligence-report": {
       "termNumber": 36,
       "termLabel": "Due Diligence Report",
       "sourceAttribute": "Information of due diligence report",
@@ -509,18 +410,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "information_of_due_diligence_report": {
-      "termNumber": 36,
-      "termLabel": "Due Diligence Report",
-      "sourceAttribute": "Information of due diligence report",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "third_party_assurances_of_recognised_schemes": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/third-party-assurances": {
       "termNumber": 37,
       "termLabel": "Third-party Scheme Assurances",
       "sourceAttribute": "Third party assurances of recognised schemes",
@@ -531,18 +421,7 @@
         "Stationary": "voluntary"
       }
     },
-    "third_party_recognised_schemes": {
-      "termNumber": 37,
-      "termLabel": "Third-party Scheme Assurances",
-      "sourceAttribute": "Third party assurances of recognised schemes",
-      "requirements": {
-        "EV": "voluntary",
-        "LMT": "voluntary",
-        "Industrial": "voluntary",
-        "Stationary": "voluntary"
-      }
-    },
-    "supply_chain_indices": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/supply-chain-indices": {
       "termNumber": 38,
       "termLabel": "Supply Chain Indices",
       "sourceAttribute": "Supply chain indices",
@@ -553,7 +432,7 @@
         "Stationary": "voluntary"
       }
     },
-    "battery_chemistry": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/battery-chemistry": {
       "termNumber": 39,
       "termLabel": "Battery Chemistry",
       "sourceAttribute": "Battery chemistry",
@@ -564,7 +443,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "critical_raw_materials": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/critical-raw-materials": {
       "termNumber": 40,
       "termLabel": "Critical Raw Materials",
       "sourceAttribute": "Critical raw materials",
@@ -575,7 +454,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "materials_used_in_anode": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/electrode-electrolyte-materials": {
       "termNumber": 41,
       "termLabel": "Cathode, Anode and Electrolyte Materials",
       "sourceAttribute": "Materials used in cathode, anode and electrolyte",
@@ -586,29 +465,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "materials_used_in_cathode": {
-      "termNumber": 41,
-      "termLabel": "Cathode, Anode and Electrolyte Materials",
-      "sourceAttribute": "Materials used in cathode, anode and electrolyte",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "materials_used_in_electrolyte": {
-      "termNumber": 41,
-      "termLabel": "Cathode, Anode and Electrolyte Materials",
-      "sourceAttribute": "Materials used in cathode, anode and electrolyte",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "hazardous_substances": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/hazardous-substances": {
       "termNumber": 42,
       "termLabel": "Hazardous Substances",
       "sourceAttribute": "Hazardous substances",
@@ -619,7 +476,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "substance_impact_info": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/substance-impact": {
       "termNumber": 43,
       "termLabel": "Substance Environmental and Health Impact",
       "sourceAttribute": "Impact of substances on environment, human health, safety, persons",
@@ -630,7 +487,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "dismantling_information": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/dismantling-manual": {
       "termNumber": 44,
       "termLabel": "Dismantling and Removal Manual",
       "sourceAttribute": "Dismantling information: Manuals for the removal and the disassembly of the battery pack",
@@ -641,18 +498,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "dismantling_information_for_the_battery_pack": {
-      "termNumber": 44,
-      "termLabel": "Dismantling and Removal Manual",
-      "sourceAttribute": "Dismantling information: Manuals for the removal and the disassembly of the battery pack",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "part_numbers_for_components": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/component-part-numbers": {
       "termNumber": 45,
       "termLabel": "Component Part Numbers",
       "sourceAttribute": "Part numbers for components",
@@ -663,7 +509,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "information_on_sources_of_spare_parts": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/spare-parts-info": {
       "termNumber": 46,
       "termLabel": "Spare Parts Source Information",
       "sourceAttribute": "Information on sources of spare parts",
@@ -674,18 +520,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "information_on_spare_parts": {
-      "termNumber": 46,
-      "termLabel": "Spare Parts Source Information",
-      "sourceAttribute": "Information on sources of spare parts",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "safety_measures": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/safety-measures": {
       "termNumber": 47,
       "termLabel": "Safety Measures",
       "sourceAttribute": "Safety measures",
@@ -696,7 +531,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "preconsumer_recycled_nickel": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/pre-consumer-recycled-nickel": {
       "termNumber": 48,
       "termLabel": "Pre-consumer Recycled Nickel Share",
       "sourceAttribute": "Pre-consumer recycled nickel share",
@@ -707,18 +542,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "preconsumer_recycled_nickel_share": {
-      "termNumber": 48,
-      "termLabel": "Pre-consumer Recycled Nickel Share",
-      "sourceAttribute": "Pre-consumer recycled nickel share",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "preconsumer_recycled_cobalt": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/pre-consumer-recycled-cobalt": {
       "termNumber": 49,
       "termLabel": "Pre-consumer Recycled Cobalt Share",
       "sourceAttribute": "Pre-consumer recycled cobalt share",
@@ -729,18 +553,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "preconsumer_recycled_cobalt_share": {
-      "termNumber": 49,
-      "termLabel": "Pre-consumer Recycled Cobalt Share",
-      "sourceAttribute": "Pre-consumer recycled cobalt share",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "preconsumer_recycled_lithium": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/pre-consumer-recycled-lithium": {
       "termNumber": 50,
       "termLabel": "Pre-consumer Recycled Lithium Share",
       "sourceAttribute": "Pre-consumer recycled lithium share",
@@ -751,18 +564,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "preconsumer_recycled_lithium_share": {
-      "termNumber": 50,
-      "termLabel": "Pre-consumer Recycled Lithium Share",
-      "sourceAttribute": "Pre-consumer recycled lithium share",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "postconsumer_recycled_nickel": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/post-consumer-recycled-nickel": {
       "termNumber": 51,
       "termLabel": "Post-consumer Recycled Nickel Share",
       "sourceAttribute": "Post-consumer recycled nickel share",
@@ -773,18 +575,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "postconsumer_recycled_nickel_share": {
-      "termNumber": 51,
-      "termLabel": "Post-consumer Recycled Nickel Share",
-      "sourceAttribute": "Post-consumer recycled nickel share",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "postconsumer_recycled_cobalt": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/post-consumer-recycled-cobalt": {
       "termNumber": 52,
       "termLabel": "Post-consumer Recycled Cobalt Share",
       "sourceAttribute": "Post-consumer recycled cobalt share",
@@ -795,18 +586,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "postconsumer_recycled_cobalt_share": {
-      "termNumber": 52,
-      "termLabel": "Post-consumer Recycled Cobalt Share",
-      "sourceAttribute": "Post-consumer recycled cobalt share",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "postconsumer_recycled_lithium": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/post-consumer-recycled-lithium": {
       "termNumber": 53,
       "termLabel": "Post-consumer Recycled Lithium Share",
       "sourceAttribute": "Post-consumer recycled lithium share",
@@ -817,18 +597,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "postconsumer_recycled_lithium_share": {
-      "termNumber": 53,
-      "termLabel": "Post-consumer Recycled Lithium Share",
-      "sourceAttribute": "Post-consumer recycled lithium share",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "recycled_lead_share": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/recycled-lead-share": {
       "termNumber": 54,
       "termLabel": "Recycled Lead Share",
       "sourceAttribute": "Recycled lead share",
@@ -839,7 +608,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "renewable_content_share": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/renewable-content-share": {
       "termNumber": 55,
       "termLabel": "Renewable Content Share",
       "sourceAttribute": "Renewable content share",
@@ -850,7 +619,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "information_on_waste_prevention": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/waste-prevention-info": {
       "termNumber": 56,
       "termLabel": "End-user Waste Prevention Information",
       "sourceAttribute": "Information on the role of end-users in contributing to waste prevention",
@@ -861,18 +630,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "role_of_endusers_in_waste_prevention": {
-      "termNumber": 56,
-      "termLabel": "End-user Waste Prevention Information",
-      "sourceAttribute": "Information on the role of end-users in contributing to waste prevention",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "information_on_waste_batteries": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/separate-collection-info": {
       "termNumber": 57,
       "termLabel": "Separate Waste Collection Information",
       "sourceAttribute": "Information on the role of end-users in contributing to the separate collection of waste batteries",
@@ -883,18 +641,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "role_of_endusers_in_separate_collection_of_waste_batteries": {
-      "termNumber": 57,
-      "termLabel": "Separate Waste Collection Information",
-      "sourceAttribute": "Information on the role of end-users in contributing to the separate collection of waste batteries",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "information_on_battery_collection_preparation_for_second_life_and_on_treatment_at_end_of_life": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/end-of-life-info": {
       "termNumber": 58,
       "termLabel": "End-of-life and Collection Information",
       "sourceAttribute": "Information on battery collection, preparation for second life and on treatment at end of life",
@@ -905,18 +652,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "information_on_of_life": {
-      "termNumber": 58,
-      "termLabel": "End-of-life and Collection Information",
-      "sourceAttribute": "Information on battery collection, preparation for second life and on treatment at end of life",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "rated_capacity": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/rated-capacity": {
       "termNumber": 59,
       "termLabel": "Rated Capacity",
       "sourceAttribute": "Rated capacity",
@@ -927,7 +663,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "remaining_capacity": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/remaining-capacity": {
       "termNumber": 60,
       "termLabel": "Remaining Capacity",
       "sourceAttribute": "Remaining capacity",
@@ -938,7 +674,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "capacity_fade": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/capacity-fade": {
       "termNumber": 61,
       "termLabel": "Capacity Fade",
       "sourceAttribute": "Capacity fade",
@@ -949,7 +685,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "certified_usable_battery_energy": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/certified-usable-energy": {
       "termNumber": 62,
       "termLabel": "Certified Usable Battery Energy",
       "sourceAttribute": "Certified usable battery energy",
@@ -960,7 +696,7 @@
         "Stationary": null
       }
     },
-    "remaining_usable_battery_energy": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/remaining-usable-energy": {
       "termNumber": 63,
       "termLabel": "Remaining Usable Battery Energy",
       "sourceAttribute": "Remaining usable battery energy",
@@ -971,7 +707,7 @@
         "Stationary": null
       }
     },
-    "state_of_certified_energy_soce": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/state-of-certified-energy": {
       "termNumber": 64,
       "termLabel": "State of Certified Energy (SoCE)",
       "sourceAttribute": "State of certified energy (SOCE)",
@@ -982,18 +718,7 @@
         "Stationary": null
       }
     },
-    "state_of_energy_soce": {
-      "termNumber": 64,
-      "termLabel": "State of Certified Energy (SoCE)",
-      "sourceAttribute": "State of certified energy (SOCE)",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": null,
-        "Industrial": null,
-        "Stationary": null
-      }
-    },
-    "state_of_charge_soc": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/state-of-charge": {
       "termNumber": 65,
       "termLabel": "State of Charge (SoC)",
       "sourceAttribute": "State of Charge (SoC)",
@@ -1004,7 +729,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "minimum_voltage": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/minimum-voltage": {
       "termNumber": 66,
       "termLabel": "Minimum Voltage",
       "sourceAttribute": "Minimum voltage",
@@ -1015,7 +740,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "maximum_voltage": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/maximum-voltage": {
       "termNumber": 67,
       "termLabel": "Maximum Voltage",
       "sourceAttribute": "Maximum voltage",
@@ -1026,7 +751,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "nominal_voltage": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/nominal-voltage": {
       "termNumber": 68,
       "termLabel": "Nominal Voltage",
       "sourceAttribute": "Nominal voltage",
@@ -1037,7 +762,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "original_power_capability": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/original-power-capability": {
       "termNumber": 69,
       "termLabel": "Original Power Capability",
       "sourceAttribute": "Original power capability",
@@ -1048,7 +773,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "remaining_power_capability": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/remaining-power-capability": {
       "termNumber": 70,
       "termLabel": "Remaining Power Capability",
       "sourceAttribute": "Remaining power capability",
@@ -1059,7 +784,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "power_fade": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/power-fade": {
       "termNumber": 71,
       "termLabel": "Power Fade",
       "sourceAttribute": "Power fade",
@@ -1070,7 +795,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "maximum_permitted_battery_power": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/maximum-permitted-power": {
       "termNumber": 72,
       "termLabel": "Maximum Permitted Battery Power",
       "sourceAttribute": "Maximum permitted battery power",
@@ -1081,7 +806,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "ratio_between_battery_energy": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/power-energy-ratio": {
       "termNumber": 73,
       "termLabel": "Power to Energy Ratio",
       "sourceAttribute": "Ratio between nominal battery power and battery energy",
@@ -1092,18 +817,7 @@
         "Stationary": "voluntary"
       }
     },
-    "ratio_between_nominal_battery_power_and_battery_energy": {
-      "termNumber": 73,
-      "termLabel": "Power to Energy Ratio",
-      "sourceAttribute": "Ratio between nominal battery power and battery energy",
-      "requirements": {
-        "EV": "voluntary",
-        "LMT": "voluntary",
-        "Industrial": "voluntary",
-        "Stationary": "voluntary"
-      }
-    },
-    "initial_round_energy_efficiency": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/initial-round-trip-efficiency": {
       "termNumber": 74,
       "termLabel": "Initial Round-trip Energy Efficiency",
       "sourceAttribute": "Initial round trip energy efficiency",
@@ -1114,18 +828,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "initial_round_trip_energy_efficiency": {
-      "termNumber": 74,
-      "termLabel": "Initial Round-trip Energy Efficiency",
-      "sourceAttribute": "Initial round trip energy efficiency",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "round_trip_cycle_life": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/round-trip-efficiency-50pct": {
       "termNumber": 75,
       "termLabel": "Round-trip Efficiency at 50% Cycle Life",
       "sourceAttribute": "Round trip energy efficiency at 50% of cycle life",
@@ -1136,18 +839,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "round_trip_energy_efficiency_at_50_of_cycle_life": {
-      "termNumber": 75,
-      "termLabel": "Round-trip Efficiency at 50% Cycle Life",
-      "sourceAttribute": "Round trip energy efficiency at 50% of cycle life",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "remaining_round_energy_efficiency": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/remaining-round-trip-efficiency": {
       "termNumber": 76,
       "termLabel": "Remaining Round-trip Energy Efficiency",
       "sourceAttribute": "Remaining round trip energy efficiency",
@@ -1158,18 +850,7 @@
         "Stationary": null
       }
     },
-    "remaining_round_trip_energy_efficiency": {
-      "termNumber": 76,
-      "termLabel": "Remaining Round-trip Energy Efficiency",
-      "sourceAttribute": "Remaining round trip energy efficiency",
-      "requirements": {
-        "EV": null,
-        "LMT": null,
-        "Industrial": null,
-        "Stationary": null
-      }
-    },
-    "energy_round_efficiency_fade": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/energy-efficiency-fade": {
       "termNumber": 77,
       "termLabel": "Energy Efficiency Fade",
       "sourceAttribute": "Energy round trip efficiency fade",
@@ -1180,18 +861,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "energy_round_trip_efficiency_fade": {
-      "termNumber": 77,
-      "termLabel": "Energy Efficiency Fade",
-      "sourceAttribute": "Energy round trip efficiency fade",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "initial_selfdischarge_rate": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/initial-self-discharge-rate": {
       "termNumber": 78,
       "termLabel": "Initial Self-discharge Rate",
       "sourceAttribute": "Initial self-discharge rate",
@@ -1202,7 +872,7 @@
         "Stationary": null
       }
     },
-    "current_selfdischarge_rate": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/current-self-discharge-rate": {
       "termNumber": 79,
       "termLabel": "Current Self-discharge Rate",
       "sourceAttribute": "Current self-discharge rate",
@@ -1213,7 +883,7 @@
         "Stationary": null
       }
     },
-    "evolution_of_selfdischarge_rates": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/self-discharge-rate-evolution": {
       "termNumber": 80,
       "termLabel": "Self-discharge Rate Evolution",
       "sourceAttribute": "Evolution of self-discharge rates",
@@ -1224,7 +894,7 @@
         "Stationary": null
       }
     },
-    "initial_internal_module_recommended": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/initial-internal-resistance": {
       "termNumber": 81,
       "termLabel": "Initial Internal Resistance",
       "sourceAttribute": "Initial internal resistance of battery cell and pack (module recommended)",
@@ -1235,18 +905,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "initial_internal_resistance_of_battery_cell_and_pack_module_recommended": {
-      "termNumber": 81,
-      "termLabel": "Initial Internal Resistance",
-      "sourceAttribute": "Initial internal resistance of battery cell and pack (module recommended)",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "internal_resistance_increase_of_pack_cell_and_module_recommended": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/internal-resistance-increase": {
       "termNumber": 82,
       "termLabel": "Internal Resistance Increase",
       "sourceAttribute": "Internal resistance increase of pack (cell and module recommended)",
@@ -1257,18 +916,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "internal_resistance_module_recommended": {
-      "termNumber": 82,
-      "termLabel": "Internal Resistance Increase",
-      "sourceAttribute": "Internal resistance increase of pack (cell and module recommended)",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "expected_lifetime_calendar_years": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/expected-lifetime-years": {
       "termNumber": 83,
       "termLabel": "Expected Lifetime (years)",
       "sourceAttribute": "Expected lifetime in calendar years",
@@ -1279,18 +927,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "expected_lifetime_in_calendar_years": {
-      "termNumber": 83,
-      "termLabel": "Expected Lifetime (years)",
-      "sourceAttribute": "Expected lifetime in calendar years",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "expected_lifetime_chargedischarge_cycles": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/expected-lifetime-cycles": {
       "termNumber": 84,
       "termLabel": "Expected Lifetime (cycles)",
       "sourceAttribute": "Expected lifetime: Number of charge-discharge cycles",
@@ -1301,18 +938,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "expected_lifetime_number_of_chargedischarge_cycles": {
-      "termNumber": 84,
-      "termLabel": "Expected Lifetime (cycles)",
-      "sourceAttribute": "Expected lifetime: Number of charge-discharge cycles",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "number_of_discharging_cycles": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/full-charge-discharge-cycles": {
       "termNumber": 85,
       "termLabel": "Full Charge-discharge Cycles",
       "sourceAttribute": "Number of full charging and discharging cycles",
@@ -1323,18 +949,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "number_of_full_charging_and_discharging_cycles": {
-      "termNumber": 85,
-      "termLabel": "Full Charge-discharge Cycles",
-      "sourceAttribute": "Number of full charging and discharging cycles",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "cyclelife_reference_test": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/cycle-life-reference-test": {
       "termNumber": 86,
       "termLabel": "Cycle-life Reference Test",
       "sourceAttribute": "Cycle-life reference test",
@@ -1345,7 +960,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "crate_of_cyclelife_test": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/cycle-life-crate": {
       "termNumber": 87,
       "termLabel": "Cycle-life C-rate",
       "sourceAttribute": "C-rate of relevant cycle-life test",
@@ -1356,18 +971,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "crate_of_relevant_cyclelife_test": {
-      "termNumber": 87,
-      "termLabel": "Cycle-life C-rate",
-      "sourceAttribute": "C-rate of relevant cycle-life test",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "energy_throughput": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/energy-throughput": {
       "termNumber": 88,
       "termLabel": "Energy Throughput",
       "sourceAttribute": "Energy throughput",
@@ -1378,7 +982,7 @@
         "Stationary": null
       }
     },
-    "capacity_throughput": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/capacity-throughput": {
       "termNumber": 89,
       "termLabel": "Capacity Throughput",
       "sourceAttribute": "Capacity throughput",
@@ -1389,7 +993,7 @@
         "Stationary": null
       }
     },
-    "capacity_threshold_for_exhaustion": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/capacity-threshold-exhaustion": {
       "termNumber": 90,
       "termLabel": "Capacity Threshold for Exhaustion",
       "sourceAttribute": "Capacity threshold for exhaustion",
@@ -1400,7 +1004,7 @@
         "Stationary": null
       }
     },
-    "temperature_information": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/temperature-info": {
       "termNumber": 91,
       "termLabel": "Temperature Information",
       "sourceAttribute": "Temperature information",
@@ -1411,7 +1015,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "temperature_range_boundary_lower": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/temperature-range-lower": {
       "termNumber": 92,
       "termLabel": "Temperature Range Lower Boundary",
       "sourceAttribute": "Temperature range idle state, lower boundary",
@@ -1422,18 +1026,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "temperature_range_idle_state_lower_boundary": {
-      "termNumber": 92,
-      "termLabel": "Temperature Range Lower Boundary",
-      "sourceAttribute": "Temperature range idle state, lower boundary",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "temperature_range_boundary_upper": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/temperature-range-upper": {
       "termNumber": 93,
       "termLabel": "Temperature Range Upper Boundary",
       "sourceAttribute": "Temperature range idle state, upper boundary",
@@ -1444,18 +1037,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "temperature_range_idle_state_upper_boundary": {
-      "termNumber": 93,
-      "termLabel": "Temperature Range Upper Boundary",
-      "sourceAttribute": "Temperature range idle state, upper boundary",
-      "requirements": {
-        "EV": "mandatory_battreg",
-        "LMT": "mandatory_battreg",
-        "Industrial": "mandatory_battreg",
-        "Stationary": "mandatory_battreg"
-      }
-    },
-    "time_spent_above_boundary": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/time-in-high-temperature": {
       "termNumber": 94,
       "termLabel": "Time in High Temperature",
       "sourceAttribute": "Time spent in extreme temperatures above boundary",
@@ -1466,18 +1048,7 @@
         "Stationary": null
       }
     },
-    "time_spent_in_extreme_temperatures_above_boundary": {
-      "termNumber": 94,
-      "termLabel": "Time in High Temperature",
-      "sourceAttribute": "Time spent in extreme temperatures above boundary",
-      "requirements": {
-        "EV": null,
-        "LMT": null,
-        "Industrial": null,
-        "Stationary": null
-      }
-    },
-    "time_spent_below_boundary": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/time-in-low-temperature": {
       "termNumber": 95,
       "termLabel": "Time in Low Temperature",
       "sourceAttribute": "Time spent in extreme temperatures below boundary",
@@ -1488,18 +1059,7 @@
         "Stationary": null
       }
     },
-    "time_spent_in_extreme_temperatures_below_boundary": {
-      "termNumber": 95,
-      "termLabel": "Time in Low Temperature",
-      "sourceAttribute": "Time spent in extreme temperatures below boundary",
-      "requirements": {
-        "EV": null,
-        "LMT": null,
-        "Industrial": null,
-        "Stationary": null
-      }
-    },
-    "time_spent_above_boundar": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/time-charging-high-temperature": {
       "termNumber": 96,
       "termLabel": "Time Charging in High Temperature",
       "sourceAttribute": "Time spent charging during extreme temperatures above boundary",
@@ -1510,18 +1070,7 @@
         "Stationary": null
       }
     },
-    "time_spent_charging_during_extreme_temperatures_above_boundary": {
-      "termNumber": 96,
-      "termLabel": "Time Charging in High Temperature",
-      "sourceAttribute": "Time spent charging during extreme temperatures above boundary",
-      "requirements": {
-        "EV": null,
-        "LMT": null,
-        "Industrial": null,
-        "Stationary": null
-      }
-    },
-    "time_spent_charging_during_extreme_temperatures_below_boundary": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/time-charging-low-temperature": {
       "termNumber": 97,
       "termLabel": "Time Charging in Low Temperature",
       "sourceAttribute": "Time spent charging during extreme temperatures below boundary",
@@ -1532,18 +1081,7 @@
         "Stationary": null
       }
     },
-    "time_spent_temperatures_below_boundary": {
-      "termNumber": 97,
-      "termLabel": "Time Charging in Low Temperature",
-      "sourceAttribute": "Time spent charging during extreme temperatures below boundary",
-      "requirements": {
-        "EV": null,
-        "LMT": null,
-        "Industrial": null,
-        "Stationary": null
-      }
-    },
-    "number_of_deep_discharge_events": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/deep-discharge-events": {
       "termNumber": 98,
       "termLabel": "Deep Discharge Events",
       "sourceAttribute": "Number of deep discharge events",
@@ -1554,7 +1092,7 @@
         "Stationary": "mandatory_battreg"
       }
     },
-    "number_of_overcharge_events": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/overcharge-events": {
       "termNumber": 99,
       "termLabel": "Overcharge Events",
       "sourceAttribute": "Number of overcharge events",
@@ -1565,7 +1103,7 @@
         "Stationary": "voluntary"
       }
     },
-    "accident_information": {
+    "https://www.claros-dpp.online/dictionary/battery/v1/terms/accident-info": {
       "termNumber": 100,
       "termLabel": "Accident Information",
       "sourceAttribute": "Information on accidents",

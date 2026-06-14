@@ -12,8 +12,8 @@
     "voluntary": "o",
     "not_applicable": ""
   },
-  "requirementsByFieldKey": {
-    "productModelIdentifier": {
+  "requirementsBySemanticId": {
+    "https://www.claros-dpp.online/dictionary/textile/v1/terms/product-model-identifier": {
       "termNumber": 1,
       "termLabel": "Product Model Identifier",
       "sourceAttribute": "Product Model Identifier",
@@ -23,7 +23,7 @@
         "technical_textile": "mandatory_espr_jtc24"
       }
     },
-    "fiberComposition": {
+    "https://www.claros-dpp.online/dictionary/textile/v1/terms/fiber-composition": {
       "termNumber": 2,
       "termLabel": "Fiber Composition",
       "sourceAttribute": "Fiber Composition",
@@ -33,7 +33,7 @@
         "technical_textile": "mandatory_espr_jtc24"
       }
     },
-    "recycledContentPercentage": {
+    "https://www.claros-dpp.online/dictionary/textile/v1/terms/recycled-content-percentage": {
       "termNumber": 3,
       "termLabel": "Recycled Content Percentage",
       "sourceAttribute": "Recycled Content Percentage",
@@ -43,7 +43,7 @@
         "technical_textile": "mandatory_espr_jtc24"
       }
     },
-    "fabricWeight": {
+    "https://www.claros-dpp.online/dictionary/textile/v1/terms/fabric-weight": {
       "termNumber": 4,
       "termLabel": "Fabric Weight",
       "sourceAttribute": "Fabric Weight",
@@ -53,7 +53,7 @@
         "technical_textile": "mandatory_espr_jtc24"
       }
     },
-    "countryOfOrigin": {
+    "https://www.claros-dpp.online/dictionary/textile/v1/terms/country-of-origin": {
       "termNumber": 5,
       "termLabel": "Country of Origin",
       "sourceAttribute": "Country of Origin",
@@ -63,7 +63,7 @@
         "technical_textile": "mandatory_espr_jtc24"
       }
     },
-    "careInstructions": {
+    "https://www.claros-dpp.online/dictionary/textile/v1/terms/care-instructions": {
       "termNumber": 6,
       "termLabel": "Care Instructions",
       "sourceAttribute": "Care Instructions",
@@ -73,7 +73,7 @@
         "technical_textile": "mandatory_espr_jtc24"
       }
     },
-    "durabilityScore": {
+    "https://www.claros-dpp.online/dictionary/textile/v1/terms/durability-score": {
       "termNumber": 7,
       "termLabel": "Durability Score",
       "sourceAttribute": "Durability Score",
@@ -83,7 +83,7 @@
         "technical_textile": "mandatory_espr_jtc24"
       }
     },
-    "restrictedSubstancesDisclosure": {
+    "https://www.claros-dpp.online/dictionary/textile/v1/terms/restricted-substances-disclosure": {
       "termNumber": 8,
       "termLabel": "Restricted Substances Disclosure",
       "sourceAttribute": "Restricted Substances Disclosure",

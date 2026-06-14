@@ -121,9 +121,14 @@ if [ ! -d "$APP_DIR" ]; then
     sudo mkdir -p "$APP_DIR"
     sudo git clone --branch "$BRANCH" "$REPO" "$APP_DIR" 2>&1 | tail -5
     sudo chown -R ubuntu:ubuntu "$APP_DIR"
+    cd "$APP_DIR"
+    git sparse-checkout init --no-cone
+    git sparse-checkout set '/*' '!/local-tools/'
 else
     echo "📥 Pulling latest changes..."
     cd "$APP_DIR"
+    sudo git sparse-checkout init --no-cone
+    sudo git sparse-checkout set '/*' '!/local-tools/'
     sudo git fetch origin 2>&1 | grep -E "(From|Already|Fetching|fetch)" || true
     sudo git checkout "$BRANCH" 2>&1 | grep -E "(Switched|Already)" || true
     sudo git pull --ff-only origin "$BRANCH" 2>&1 | grep -E "(Fast-forward|Already|up to date)" || true

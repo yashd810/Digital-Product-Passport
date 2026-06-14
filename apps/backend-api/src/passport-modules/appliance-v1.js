@@ -18,6 +18,17 @@ function term(slug) {
   return `${APPLIANCE_SEMANTIC_BASE}/${slug}`;
 }
 
+function valueDataTypeFor({ type, dataType }) {
+  if (type === "file") return "Binary";
+  if (type === "url") return "URI";
+  if (dataType === "integer") return "Integer";
+  if (dataType === "number" || dataType === "decimal") return "Decimal";
+  if (dataType === "boolean" || type === "checkbox") return "Boolean";
+  if (dataType === "date" || type === "date") return "Date";
+  if (dataType === "datetime") return "DateTime";
+  return "String";
+}
+
 function field({
   key,
   label,
@@ -26,6 +37,11 @@ function field({
   access = publicFieldDefaults,
   unit = "",
   dataType = "string",
+  displayRole = "detail",
+  presentation = "data",
+  summaryRole = null,
+  lifecycleRole = null,
+  mediaRole = null,
 }) {
   return {
     ...access,
@@ -35,6 +51,14 @@ function field({
     semanticId: term(semanticSlug),
     unit,
     dataType,
+    elementIdPath: key,
+    objectType: type === "file" || type === "url" ? "RelatedResource" : "SingleValuedDataElement",
+    valueDataType: valueDataTypeFor({ type, dataType }),
+    displayRole,
+    presentation,
+    summaryRole,
+    lifecycleRole,
+    mediaRole,
   };
 }
 
@@ -45,6 +69,9 @@ module.exports = {
   productCategory: "Appliance",
   productIcon: "AP",
   semanticModelKey: "claros_appliance_dictionary_v1",
+  identity: {
+    businessIdentifierField: "productModelIdentifier",
+  },
   complianceProfile: {
     key: "applianceDppV1",
     displayName: "Appliance DPP Profile v1",
@@ -60,19 +87,10 @@ module.exports = {
       kind: "semanticCategory",
       productKind: "appliance",
       label: "appliance category",
-      fieldKey: "applianceCategory",
+      semanticId: term("appliance-category"),
       supportedCategories: ["Major Appliance", "Small Appliance", "HVAC", "Consumer Electronics"],
-      aliases: {
-        major: "Major Appliance",
-        major_appliance: "Major Appliance",
-        small: "Small Appliance",
-        small_appliance: "Small Appliance",
-        hvac: "HVAC",
-        electronics: "Consumer Electronics",
-        consumer_electronics: "Consumer Electronics",
-      },
     },
-    managedSemanticFieldKeys: [],
+    managedSemanticFields: [],
   },
   schemaVersion: 1,
   lifecycle: {

@@ -25,7 +25,7 @@ function filterTerms(terms, { category, search } = {}) {
       String(term?.label || "").toLowerCase().includes(q)
       || String(term?.definition || "").toLowerCase().includes(q)
       || String(term?.slug || "").toLowerCase().includes(q)
-      || (term?.appFieldKeys || []).some((key) => String(key).toLowerCase().includes(q))
+      || String(term?.iri || "").toLowerCase().includes(q)
     );
   }
 
@@ -113,7 +113,6 @@ module.exports = function registerDictionaryRoutes(app, {
     }
     if (artifact === "categories") return sendPrettyJson(res, model.categories);
     if (artifact === "units") return sendPrettyJson(res, model.units);
-    if (artifact === "field-map") return sendPrettyJson(res, model.fieldMap);
     if (artifact === "category-rules") {
       if (!model.categoryRules) return sendPrettyError(res, 404, { error: "Category rules not found" });
       return sendPrettyJson(res, model.categoryRules);
@@ -152,7 +151,6 @@ module.exports = function registerDictionaryRoutes(app, {
     ["catalog.jsonld", "catalog"],
     ["categories", "categories"],
     ["units", "units"],
-    ["field-map", "field-map"],
     ["category-rules", "category-rules"],
     ["terms", "terms"],
   ]) {
@@ -171,7 +169,6 @@ module.exports = function registerDictionaryRoutes(app, {
     [["/api/dictionary/:family/:version/manifest", "/dictionary/:family/:version/manifest.json"], "manifest"],
     [["/api/dictionary/:family/:version/categories", "/dictionary/:family/:version/categories"], "categories"],
     [["/api/dictionary/:family/:version/units", "/dictionary/:family/:version/units"], "units"],
-    [["/api/dictionary/:family/:version/field-map", "/dictionary/:family/:version/field-map"], "field-map"],
     [["/api/dictionary/:family/:version/category-rules", "/dictionary/:family/:version/category-rules.json"], "category-rules"],
     [["/api/dictionary/:family/:version/terms", "/dictionary/:family/:version/terms"], "terms"],
   ]) {

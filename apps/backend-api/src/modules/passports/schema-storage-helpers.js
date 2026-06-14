@@ -16,25 +16,6 @@ function createSchemaStorageHelpers({
   LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS,
   IN_REVISION_STATUSES_SQL,
 }) {
-  function isSafeSqlIdentifier(value) {
-    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || "").trim());
-  }
-
-  function buildLegacyFieldMigrationCandidates(fieldKey) {
-    const exactKey = String(fieldKey || "").trim();
-    if (!exactKey) return [];
-
-    const snakeCaseKey = exactKey
-      .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-      .replace(/[^A-Za-z0-9_]+/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .toLowerCase();
-    const compactKey = exactKey.replace(/[^A-Za-z0-9]+/g, "").toLowerCase();
-
-    return Array.from(new Set([snakeCaseKey, compactKey].filter((candidate) => candidate && candidate !== exactKey)));
-  }
-
   async function getLiveTableColumnMap(tableName) {
     const columns = await pool.query(
       `SELECT column_name, data_type
@@ -64,13 +45,19 @@ function createSchemaStorageHelpers({
     });
   }
 
-  function normalizePassportTypeSchema({ sections = [], systemHeader = null, currentSchemaVersion = 0 } = {}) {
+  function normalizePassportTypeSchema({ sections = [], systemHeader = null, currentSchemaVersion = 0, sourceModule = null, identity = null } = {}) {
     const parsedVersion = Number.parseInt(currentSchemaVersion, 10);
-    return {
+    const schema = {
       schemaVersion: Number.isFinite(parsedVersion) && parsedVersion > 0 ? parsedVersion : 1,
       systemHeader: normalizeSystemPassportHeader(systemHeader),
       sections: Array.isArray(sections) ? sections : [],
     };
+    const normalizedSourceModule = String(sourceModule || "").trim();
+    if (normalizedSourceModule) schema.sourceModule = normalizedSourceModule;
+    if (identity && typeof identity === "object" && !Array.isArray(identity)) {
+      schema.identity = identity;
+    }
+    return schema;
   }
 
   function getTypeSchemaVersion(fieldsJson) {
@@ -224,7 +211,7 @@ function createSchemaStorageHelpers({
         "modelName"     VARCHAR(255),
         "internalAliasId"     VARCHAR(255) NOT NULL,
         "uniqueProductIdentifier" TEXT,
-        "complianceProfileKey" VARCHAR(120) NOT NULL DEFAULT 'genericDppV1',
+        "complianceProfileKey" VARCHAR(120) NOT NULL,
         "contentSpecificationIds" TEXT,
         "carrierPolicyKey" VARCHAR(120),
         "carrierAuthenticity" JSONB,
@@ -307,79 +294,19 @@ function createSchemaStorageHelpers({
       }
 
       const columnMap = await getLiveTableColumnMap(tableName);
-      const columnRenames = [];
-      const archiveKeyUpdates = [];
-
-      for (const field of flattenTypeFields(typeRow.fieldsJson)) {
-        const exactKey = String(field?.key || "").trim();
-        if (!exactKey || !isSafeSqlIdentifier(exactKey)) continue;
-
-        const legacyKeys = buildLegacyFieldMigrationCandidates(exactKey)
-          .filter((candidate) => candidate && columnMap.has(candidate) && !LIVE_PASSPORT_SYSTEM_COLUMNS.has(candidate));
-        if (!legacyKeys.length) continue;
-
-        let exactColumnExists = columnMap.has(exactKey);
-        const dataType = getPassportFieldDataType(field);
-
-        for (const legacyKey of legacyKeys) {
-          const action = exactColumnExists ? "merge_drop" : "rename";
-          if (apply) {
-            if (!exactColumnExists) {
-              const legacyDataType = columnMap.get(legacyKey);
-              await pool.query(
-                `ALTER TABLE ${tableName}
-                 RENAME COLUMN ${quoteSqlIdentifier(legacyKey)} TO ${quoteSqlIdentifier(exactKey)}`
-              );
-              columnMap.delete(legacyKey);
-              columnMap.set(exactKey, legacyDataType || dataType);
-              exactColumnExists = true;
-            } else {
-              const mergeExpression = dataType === "text"
-                ? `CASE
-                     WHEN ${quoteSqlIdentifier(exactKey)} IS NULL OR ${quoteSqlIdentifier(exactKey)} = ''
-                       THEN ${quoteSqlIdentifier(legacyKey)}
-                     ELSE ${quoteSqlIdentifier(exactKey)}
-                   END`
-                : `COALESCE(${quoteSqlIdentifier(exactKey)}, ${quoteSqlIdentifier(legacyKey)})`;
-              await pool.query(
-                `UPDATE ${tableName}
-                 SET ${quoteSqlIdentifier(exactKey)} = ${mergeExpression}
-                 WHERE ${quoteSqlIdentifier(legacyKey)} IS NOT NULL`
-              );
-              await pool.query(`ALTER TABLE ${tableName} DROP COLUMN IF EXISTS ${quoteSqlIdentifier(legacyKey)}`);
-              columnMap.delete(legacyKey);
-            }
-          }
-          columnRenames.push({ from: legacyKey, to: exactKey, action });
-
-          if (includeArchives) {
-            let affectedRows = 0;
-            if (apply) {
-              const archiveResult = await pool.query(
-                `UPDATE passport_archives
-                 SET "rowData" = jsonb_set(
-                   "rowData" - $2,
-                   ARRAY[$3],
-                   COALESCE("rowData" -> $3, "rowData" -> $2),
-                   true
-                 )
-                 WHERE "passportType" = $1
-                   AND "rowData" ? $2`,
-                [typeRow.typeName, legacyKey, exactKey]
-              );
-              affectedRows = archiveResult.rowCount || 0;
-            }
-            archiveKeyUpdates.push({ from: legacyKey, to: exactKey, affectedRows });
-          }
-        }
-      }
+      const missingExactColumns = flattenTypeFields(typeRow.fieldsJson)
+        .map((field) => String(field?.key || "").trim())
+        .filter((key) => key && !columnMap.has(key));
 
       results.push({
         typeName: typeRow.typeName,
         tableName,
-        status: columnRenames.length || archiveKeyUpdates.length ? (apply ? "migrated" : "pending") : "ok",
-        columnRenames,
-        archiveKeyUpdates,
+        status: missingExactColumns.length ? "missing_exact_columns" : "ok",
+        missingExactColumns,
+        columnRenames: [],
+        archiveKeyUpdates: [],
+        exactKeyPolicy: true,
+        applied: false,
       });
     }
 

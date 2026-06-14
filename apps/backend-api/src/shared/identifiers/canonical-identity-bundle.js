@@ -41,6 +41,7 @@ function buildCanonicalIdentityBundle({
   companyName = "",
   granularity = null,
   passportType = null,
+  typeDef = null,
   didService = null,
   productIdentifierService = null,
 } = {}) {
@@ -67,7 +68,7 @@ function buildCanonicalIdentityBundle({
   let subjectDid = null;
   let dppDid = null;
   let uniqueProductIdentifier = null;
-  const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
+  const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}, typeDef) || "";
 
   try {
     companyDid = companySlug ? didService?.generateCompanyDid?.(companySlug) || null : null;

@@ -4,8 +4,7 @@
   "version": "1.0.0",
   "description": "Internal appliance passport dictionary used as a reference pattern for future modular Digital Product Passport categories.",
   "versioning": {
-    "dictionaryVersion": "1.0.0",
-    "compatibilityPolicy": "IRIs under /dictionary/appliance/v1 remain stable for non-breaking revisions. Breaking semantic changes require a new version path and semantic model key."
+    "dictionaryVersion": "1.0.0"
   },
   "productCategoryScope": [
     "Major Appliance",
@@ -24,7 +23,6 @@
   "unitsUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/units",
   "categoriesUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/categories",
   "categoryRulesUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/category-rules",
-  "fieldMapUrl": "https://www.claros-dpp.online/api/dictionary/appliance/v1/field-map",
   "catalogUrl": "https://www.claros-dpp.online/dictionary/appliance/v1/catalog.jsonld",
   "interoperabilityProfile": {
     "catalogUrl": "https://www.claros-dpp.online/dictionary/appliance/v1/catalog.jsonld"

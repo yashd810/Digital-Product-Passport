@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { LANGUAGES, translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
 import { DynamicChart } from "./DynamicChart";
-import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
+import { PieChart, parseCompositionFromTable } from "./PieChart";
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
@@ -192,25 +192,6 @@ function formatHeaderValue(value) {
   return String(value);
 }
 
-function slugifyDidSegment(value, fallback = "company") {
-  const slug = String(value || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-+/g, "-");
-  return slug || fallback;
-}
-
-function stableDidSegment(value, fallback = "passport") {
-  const segment = String(value || "")
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return segment || fallback;
-}
-
 function isViewerHiddenField(field) {
   const normalizedKey = String(field?.key || "")
     .toLowerCase()
@@ -223,27 +204,6 @@ function isViewerHiddenField(field) {
     .replace(/\s+/g, " ")
     .trim();
   return normalizedKey === "internal alias id" || normalizedLabel === "internal alias id";
-}
-
-function buildViewerDidFallbacks(passport) {
-  const didDomain = "www.claros-dpp.online";
-  const companyName = passport?.companyProfile?.companyName
-    || passport?.companyName
-    || passport?.companyId
-    || "company";
-  const companySlug = slugifyDidSegment(passport?.companyProfile?.didSlug || companyName);
-  const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
-  const stableId = stableDidSegment(passport?.lineageId || passport?.dppId || passport?.internalAliasId);
-  return {
-    companyDid: `did:web:${didDomain}:did:company:${companySlug}`,
-    dppDid: `did:web:${didDomain}:did:dpp:${granularity}:${stableId}`,
-  };
-}
-
-function buildFacilityDidFallback(facilityId) {
-  const rawFacilityId = String(facilityId || "").trim();
-  if (!rawFacilityId) return null;
-  return `did:web:www.claros-dpp.online:did:facility:${encodeURIComponent(rawFacilityId)}`;
 }
 
 function parseHeaderArray(value) {
@@ -269,11 +229,10 @@ export function PassportHeaderPanel({ passport, typeDef }) {
     ? systemHeader.fields.filter((field) => field?.key !== "internalAliasId" && !isViewerHiddenField(field))
     : [];
   const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
-  const fallbackDids = buildViewerDidFallbacks(passport);
-  const resolvedCompanyDid = passport.companyDid || canonicalSubjects.companyDid || fallbackDids.companyDid;
-  const resolvedFacilityDid = passport.facilityDid || canonicalSubjects.facilityDid || buildFacilityDidFallback(passport.facilityId);
-  const resolvedSubjectDid = passport.subjectDid || canonicalSubjects.subjectDid || passport.uniqueProductIdentifier || null;
-  const resolvedDppDid = passport.dppDid || canonicalSubjects.dppDid || fallbackDids.dppDid;
+  const resolvedCompanyDid = passport.companyDid || canonicalSubjects.companyDid || null;
+  const resolvedFacilityDid = passport.facilityDid || canonicalSubjects.facilityDid || null;
+  const resolvedSubjectDid = passport.subjectDid || canonicalSubjects.subjectDid || null;
+  const resolvedDppDid = passport.dppDid || canonicalSubjects.dppDid || null;
   const headerValues = {
     digitalProductPassportId: passport.digitalProductPassportId || passport.dppId,
     uniqueProductIdentifier: passport.uniqueProductIdentifier || null,
@@ -319,114 +278,6 @@ export function PassportHeaderPanel({ passport, typeDef }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Viewer UI Blocks
 // ─────────────────────────────────────────────────────────────────────────────
-export function PassportIntro({
-  passport,
-  companyData,
-  displayName,
-  qrCode,
-  qrLoading,
-  carrierAuthenticity = null,
-  onReportSuspiciousCarrier = null,
-  securityReportState = {},
-  onPrint,
-  onOpenHistory,
-}) {
-  if (!passport) return null;
-  const activityState = getPassportActivityState(passport);
-  const manufacturingDate = passport.manufacturingDate || "—";
-  const uniqueProductIdentifier = passport.uniqueProductIdentifier || passport.uniqueBatteryIdentifier || "—";
-  const productMass = passport.productMass || passport.mass || passport.batteryMass || "—";
-  const serialNumber =
-    passport.batterySerialNumber ||
-    passport.productSerialNumber ||
-    passport.serialNumber ||
-    "—";
-  const manufacturerInfo =
-    companyData?.companyName ||
-    passport.manufacturerInformation ||
-    passport.manufacturer ||
-    "—";
-  const carbonFootprintRaw = passport.carbonFootprintPerformanceClass || "";
-  const carbonFootprintIsUrl = /^(https?:)?\/\//i.test(String(carbonFootprintRaw)) || String(carbonFootprintRaw).startsWith("/");
-  const carbonFootprintLabelAndClass = carbonFootprintRaw
-    ? (carbonFootprintIsUrl
-        ? <img src={carbonFootprintRaw} alt="Carbon Footprint Label" className="pv-hero-stat-symbol" />
-        : carbonFootprintRaw)
-    : "—";
-  const productComposition = passport.productComposition || passport.materialComposition || passport.batteryChemistry || "—";
-  const summaryStats = [
-    { label: "Digital Passport ID", value: passport.dppId || "—" },
-    { label: "Manufacturing Date", value: manufacturingDate },
-    { label: "Unique Product Identifier", value: uniqueProductIdentifier },
-    { label: "Serial Number", value: serialNumber },
-    { label: "Carbon Footprint Label and Performance Class", value: carbonFootprintLabelAndClass },
-    { label: "Product Composition", value: productComposition },
-    { label: "Product Mass", value: productMass },
-    { label: "Manufacturer Information", value: manufacturerInfo },
-  ];
-
-  return (
-    <section className="pv-hero">
-      <div className="pv-hero-main">
-        <div className="pv-hero-brandline">
-          <div>
-            <p className="pv-hero-kicker">{displayName || passport.passportType}</p>
-            <h1>{passport.modelName}</h1>
-          </div>
-        </div>
-
-        <div className="pv-hero-stat-grid">
-          {summaryStats.map(item => (
-            <article key={item.label} className="pv-hero-stat">
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </article>
-          ))}
-        </div>
-      </div>
-
-      <aside className="pv-hero-side">
-        <div className="pv-hero-actions">
-          <button type="button" className="pv-secondary-btn" onClick={onOpenHistory}>
-            Version History
-          </button>
-          <button type="button" className="pv-primary-btn" onClick={onPrint}>
-            Print PDF
-          </button>
-        </div>
-
-        {companyData?.companyLogo && (
-          <div className="pv-company-card">
-            <img src={companyData.companyLogo} alt="Company Logo" className="pv-company-logo" />
-          </div>
-        )}
-
-        <div className="pv-qr-card">
-          <span className="pv-qr-label">Passport QR</span>
-          {qrLoading ? (
-            <div className="pv-qr-placeholder">Generating QR…</div>
-          ) : qrCode ? (
-            <img src={qrCode} alt="Passport QR" className="pv-qr-image" />
-          ) : (
-            <div className="pv-qr-placeholder">QR unavailable</div>
-          )}
-          <div className={`pv-dpp-status pv-dpp-status-${activityState}`}>
-            <span className="pv-dpp-status-dot" />
-            {activityState === "archived" ? "Archived" : activityState === "obsolete" ? "Obsolete" : "Active"}
-          </div>
-        </div>
-
-        <TrustedEntryPanel
-          passport={passport}
-          carrierAuthenticity={carrierAuthenticity}
-          onReportSuspiciousCarrier={onReportSuspiciousCarrier}
-          securityReportState={securityReportState}
-        />
-      </aside>
-    </section>
-  );
-}
-
 export function Header({ displayName, lang, setLang, dppId, companyData, brandTheme }) {
   return (
     <header className="viewer-header">
@@ -603,8 +454,8 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     }
 
     let pieItems = null;
-    if (f.composition && raw) {
-      pieItems = f.type === "table" ? parseCompositionFromTable(raw, f) : parseCompositionFromText(raw);
+    if (f.composition && f.type === "table" && raw) {
+      pieItems = parseCompositionFromTable(raw, f);
     }
 
     const isExpanded = isDynamic && expandedKey === f.key;

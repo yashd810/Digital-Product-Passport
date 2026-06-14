@@ -170,8 +170,7 @@ module.exports = function registerDidRoutes(app, deps) {
       const companyName = companyNameMap.get(String(companyId)) || "";
 
       const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
-      const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
-      const productDid = businessIdentifier ? (passport.productIdentifierDid || passport.uniqueProductIdentifier || null) : null;
+      const productDid = passport.productIdentifierDid || passport.uniqueProductIdentifier || null;
       const pDppDid = (passport.lineageId || passport.dppId || passport.internalAliasId) ?
         dppIdentity.dppDid("model", passport.lineageId || passport.dppId || passport.internalAliasId) :
         null;
@@ -179,7 +178,7 @@ module.exports = function registerDidRoutes(app, deps) {
       res.json({
         publicUrl,
         internalAliasId: passport.internalAliasId || null,
-        productIdentifierDid: businessIdentifier ? (passport.productIdentifierDid || passport.uniqueProductIdentifier || null) : null,
+        productIdentifierDid: productDid,
         modelName: passport.modelName || null,
         companyName,
         dppDid: pDppDid,

@@ -10,7 +10,7 @@ import {
   getSemanticModelOption,
 } from "../admin/passport-types/semanticTermCatalog";
 import {
-  getPassportSerialNumber,
+  getPassportSerialNumberForType,
 } from "../user/dashboard/passports/utils/passportListHelpers";
 import { buildPassportJsonLdExport } from "../shared/utils/semanticPassportExport";
 
@@ -24,8 +24,7 @@ describe("frontend modularity helpers", () => {
 
   test("semantic model labels are generated from any model key", () => {
     expect(formatSemanticModelLabel("claros_appliance_dictionary_v3")).toBe("Claros Appliance Dictionary V3");
-    expect(formatSemanticModelLabel("genericDppV1")).toBe("Generic DPP V1");
-    expect(formatSemanticModelLabel("")).toBe("No semantic model");
+    expect(formatSemanticModelLabel("claros_textile_dictionary_v1")).toBe("Claros Textile Dictionary V1");
   });
 
   test("semantic options preserve registered and selected external models", () => {
@@ -49,12 +48,28 @@ describe("frontend modularity helpers", () => {
     });
   });
 
-  test("passport lists prefer product-neutral serial fields before battery aliases", () => {
-    expect(getPassportSerialNumber({
+  test("passport lists use module business identifier from explicit module metadata", () => {
+    const typeDefinitions = [{
+      typeName: "batteryPassportV1",
+      fieldsJson: {
+        identity: {
+          businessIdentifierField: "batterySerialNumber",
+        },
+      },
+    }];
+
+    expect(getPassportSerialNumberForType({
+      passportType: "batteryPassportV1",
       batterySerialNumber: "BAT-001",
-      serialNumber: "SER-001",
-      productSerialNumber: "PROD-001",
-    })).toBe("PROD-001");
+      internalAliasId: "SKU-001",
+      uniqueProductIdentifier: "did:web:example:product:001",
+    }, typeDefinitions)).toBe("BAT-001");
+
+    expect(getPassportSerialNumberForType({
+      passportType: "manualPassportV1",
+      internalAliasId: "SKU-001",
+      uniqueProductIdentifier: "did:web:example:product:001",
+    }, typeDefinitions)).toBe("");
   });
 
   test("semantic JSON-LD export includes the selected non-battery model context", () => {

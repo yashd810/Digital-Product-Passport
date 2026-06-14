@@ -2688,6 +2688,57 @@
   min-width: 0;
 }
 
+.acpt-module-source-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.acpt-module-source-summary {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.acpt-module-source-summary strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.acpt-field-required {
+  margin: 8px 0 0 26px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.acpt-required-toggle,
+.acpt-canonical-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.acpt-required-label {
+  color: var(--text-primary);
+}
+
+.acpt-canonical-note code {
+  color: var(--accent);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .acpt-field-meta-row .acpt-field-side-options,
 .acpt-field-meta-row .acpt-field-semantic,
 .acpt-field-meta-row .acpt-field-composition,
@@ -2713,6 +2764,7 @@
 
 /* ── Field option panels: theme-aligned overrides ────────── */
 .acpt-field-access,
+.acpt-field-required,
 .acpt-field-composition,
 .acpt-field-semantic,
 .acpt-field-dynamic {
@@ -2727,6 +2779,7 @@
 }
 
 [data-theme="light"] .acpt-field-access,
+[data-theme="light"] .acpt-field-required,
 [data-theme="light"] .acpt-field-composition,
 [data-theme="light"] .acpt-field-semantic,
 [data-theme="light"] .acpt-field-dynamic {
@@ -2735,6 +2788,17 @@
     #ffffff;
   border-color: rgba(13, 181, 176, 0.22);
   box-shadow: 0 6px 18px rgba(17, 44, 72, 0.06);
+}
+
+[data-theme="light"] .acpt-module-source-summary {
+  background: #f7fbff;
+  border-color: rgba(13,181,176,0.2);
+}
+
+@media (max-width: 1080px) {
+  .acpt-module-source-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .acpt-access-label,

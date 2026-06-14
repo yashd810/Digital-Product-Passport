@@ -193,7 +193,7 @@ function updateDppUseCase(deps) {
         companyId: editable.passport.companyId,
         passportType: editable.passport.passportType,
         rawProductId: nextProductId,
-        canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.(normalizedBody) || null,
+        canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.(normalizedBody, editable.typeDef) || null,
         uniqueProductIdentifier: explicitUniqueProductIdentifier,
         granularity: nextGranularity,
       });
@@ -204,7 +204,7 @@ function updateDppUseCase(deps) {
         companyId: editable.passport.companyId,
         passportType: editable.passport.passportType,
         rawProductId: editable.passport.internalAliasId,
-        canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.({ ...editable.passport, ...fields }) || null,
+        canonicalProductIdSource: productIdentifierService.extractBusinessProductIdentifier?.({ ...editable.passport, ...fields }, editable.typeDef) || null,
         uniqueProductIdentifier: explicitUniqueProductIdentifier,
         granularity: nextGranularity,
       });

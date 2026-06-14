@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Passport Module Generator</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Passport Module Generator</h1>
+          <p>Local-only helper for generating backend passport module and dictionary files.</p>
+        </div>
+        <div class="status" id="status">Checking server...</div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>1. Module Info</h2>
+            <p>These values become the module identity, semantic dictionary path, and compliance profile.</p>
+          </div>
+          <button type="button" id="loadSample">Load sample</button>
+        </div>
+        <div class="grid">
+          <label>Family
+            <input id="family" value="electronics" placeholder="electronics">
+          </label>
+          <label>Version
+            <input id="version" value="v1" placeholder="v1">
+          </label>
+          <label>Product icon
+            <input id="productIcon" value="EL" maxlength="4" placeholder="EL">
+          </label>
+          <label>Base URL
+            <input id="baseUrl" value="https://www.claros-dpp.online" placeholder="https://www.claros-dpp.online">
+          </label>
+          <label class="span2">Dictionary description
+            <input id="dictionaryDescription" value="Internal electronics passport dictionary used for Digital Product Passport implementations." placeholder="Short dictionary description">
+          </label>
+          <label>Supported categories
+            <input id="supportedCategories" placeholder="Consumer Electronics, Industrial Electronics">
+          </label>
+          <details class="auto-group span4">
+            <summary>Auto-filled fields</summary>
+            <div class="auto-group-grid">
+              <label>Module key <span class="auto-note">(editable but auto filled)</span>
+                <input id="moduleKey" value="electronics:v1" placeholder="electronics:v1">
+              </label>
+              <label>Type name <span class="auto-note">(editable but auto filled)</span>
+                <input id="typeName" value="electronicsPassportV1" placeholder="electronicsPassportV1">
+              </label>
+              <label>Display name <span class="auto-note">(editable but auto filled)</span>
+                <input id="displayName" value="Electronics Passport v1" placeholder="Electronics Passport v1">
+              </label>
+              <label>Product category <span class="auto-note">(editable but auto filled)</span>
+                <input id="productCategory" value="Electronics" placeholder="Electronics">
+              </label>
+              <label>Semantic model key <span class="auto-note">(editable but auto filled)</span>
+                <input id="semanticModelKey" value="claros_electronics_dictionary_v1" placeholder="claros_electronics_dictionary_v1">
+              </label>
+              <label>Compliance profile key <span class="auto-note">(editable but auto filled)</span>
+                <input id="complianceProfileKey" value="electronicsDppV1" placeholder="electronicsDppV1">
+              </label>
+              <label class="span2">Dictionary name <span class="auto-note">(editable but auto filled)</span>
+                <input id="dictionaryName" value="Claros Electronics Dictionary" placeholder="Claros Electronics Dictionary">
+              </label>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>2. Sections And Fields</h2>
+            <p>Add fields once. The generator uses them for both the module file and dictionary artifacts.</p>
+          </div>
+          <button type="button" id="addSection">Add section</button>
+        </div>
+        <div id="sections"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>3. Roles And Presentation</h2>
+            <p>Mark only the fields that need special meaning. Everything else stays canonical detail data.</p>
+          </div>
+        </div>
+        <div class="role-grid">
+          <article class="role-card">
+            <h3>Identity and category</h3>
+            <label>Business identifier field
+              <select id="businessIdentifierField">
+                <option value="">Select business identifier</option>
+              </select>
+            </label>
+            <label>Category field
+              <select id="categoryFieldKey">
+                <option value="">No category policy field</option>
+              </select>
+            </label>
+          </article>
+
+          <article class="role-card">
+            <h3>Composition pie chart</h3>
+            <p>Charts are created only from an explicit table and explicit columns.</p>
+            <label>Table field
+              <select id="compositionFieldKey">
+                <option value="">No composition chart</option>
+              </select>
+            </label>
+            <div class="role-inline">
+              <label>Label column
+                <select id="compositionLabelColumnKey">
+                  <option value="">Select label column</option>
+                </select>
+              </label>
+              <label>Data column (%)
+                <select id="compositionValueColumnKey">
+                  <option value="">Select data column</option>
+                </select>
+              </label>
+            </div>
+          </article>
+
+          <article class="role-card role-card-wide">
+            <h3>Display roles</h3>
+            <p>Hero fields appear in the top summary, summary fields appear in compact cards, and trust fields support verification display.</p>
+            <div class="role-lists">
+              <div>
+                <strong>Hero</strong>
+                <div id="heroFields" class="role-check-list"></div>
+              </div>
+              <div>
+                <strong>Summary</strong>
+                <div id="summaryFields" class="role-check-list"></div>
+              </div>
+              <div>
+                <strong>Trust</strong>
+                <div id="trustFields" class="role-check-list"></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="role-card role-card-wide">
+            <h3>Presentation</h3>
+            <p>Choose how the viewer should render each field. These choices are stored as explicit module metadata.</p>
+            <div id="presentationFields" class="presentation-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>4. Compliance Profile</h2>
+            <p>Configure release checks and managed system fields for passport types generated from this module.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <label class="span2">Required passport fields
+            <input id="requiredPassportFields" value="complianceProfileKey, contentSpecificationIds" placeholder="complianceProfileKey, contentSpecificationIds, carrierPolicyKey">
+          </label>
+          <label>Default carrier policy key
+            <input id="defaultCarrierPolicyKey" value="web_public_entry_v1" placeholder="web_public_entry_v1">
+          </label>
+          <label class="check"><input type="checkbox" id="requireCompanyOperatorIdentifier" checked> Require company operator identifier</label>
+          <label class="check"><input type="checkbox" id="requireCarrierPolicy"> Require carrier policy</label>
+          <label class="check"><input type="checkbox" id="enforceSemanticMapping" checked> Enforce semantic mapping</label>
+          <label class="check"><input type="checkbox" id="requirePublicAccessLayer" checked> Require public access layer</label>
+          <label class="span2">Require facility ID at granularities
+            <select id="requireFacilityAtGranularities" multiple size="3">
+              <option value="model">model</option>
+              <option value="batch">batch</option>
+              <option value="item">item</option>
+            </select>
+          </label>
+          <label class="span2">Managed semantic fields JSON
+            <textarea id="managedSemanticFieldsText" rows="4" placeholder='[{"semanticId":"https://.../terms/operator-id","source":"company.economicOperatorIdentifier"}]'></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>5. Generate</h2>
+            <p>Preview first. Write only when the target paths look right.</p>
+          </div>
+          <div class="actions">
+            <label class="check"><input type="checkbox" id="overwrite"> overwrite existing files</label>
+            <button type="button" id="preview">Preview</button>
+            <button type="button" id="writeFiles" class="primary">Write files</button>
+          </div>
+        </div>
+        <div id="message" class="message hidden"></div>
+        <div class="preview-layout">
+          <aside>
+            <h3>Files</h3>
+            <div id="fileList" class="file-list"></div>
+          </aside>
+          <pre id="previewOutput">Preview output appears here.</pre>
+        </div>
+      </section>
+    </main>
+
+    <template id="sectionTemplate">
+      <article class="section-card">
+        <div class="section-head">
+          <label>Section label <span class="auto-note">(editable but auto filled)</span><input data-section-label placeholder="Electronics Identity"></label>
+          <div class="section-actions">
+            <button type="button" data-add-field>Add field</button>
+            <button type="button" data-remove-section>Remove</button>
+          </div>
+        </div>
+        <details class="auto-group section-auto-group">
+          <summary>Auto-filled fields</summary>
+          <div class="auto-group-grid">
+            <label>Section key <span class="auto-note">(editable but auto filled)</span><input data-section-key placeholder="electronicsIdentity"></label>
+          </div>
+        </details>
+        <div data-fields></div>
+      </article>
+    </template>
+
+    <template id="fieldTemplate">
+      <div class="field-row">
+        <label>UI type
+          <select data-field="fieldType">
+            <option value="text">text</option>
+            <option value="textarea">textarea</option>
+            <option value="checkbox">checkbox</option>
+            <option value="date">date</option>
+            <option value="url">url</option>
+            <option value="file">file</option>
+            <option value="table">table</option>
+          </select>
+        </label>
+        <label class="span2">Definition <input data-field="definition" placeholder="Short semantic definition"></label>
+        <label>Data type
+          <select data-field="dataType">
+            <option value="string">string</option>
+            <option value="number">number</option>
+            <option value="integer">integer</option>
+            <option value="boolean">boolean</option>
+            <option value="date">date</option>
+            <option value="datetime">datetime</option>
+            <option value="uri">uri</option>
+          </select>
+        </label>
+        <label>Unit key <input data-field="unitKey" value="none" placeholder="none"></label>
+        <label>Unit label <input data-field="unitLabel" placeholder="Kilogram"></label>
+        <label>Unit symbol <input data-field="unitSymbol" placeholder="kg"></label>
+        <label>Access
+          <select data-field="accessRights">
+            <option value="public">public</option>
+            <option value="restricted">restricted</option>
+          </select>
+        </label>
+        <label>Regulatory level
+          <select data-field="defaultRequirement">
+            <option value="optional">optional</option>
+            <option value="recommended">recommended</option>
+            <option value="required">required</option>
+          </select>
+        </label>
+        <details class="auto-group span4">
+          <summary>Auto-filled fields</summary>
+          <div class="auto-group-grid">
+            <label>Label <span class="auto-note">(editable but auto filled)</span><input data-field="fieldLabel" placeholder="Manufacturer Name"></label>
+            <label>Field key <span class="auto-note">(editable but auto filled)</span><input data-field="fieldKey" placeholder="manufacturerName"></label>
+            <label>Semantic slug <span class="auto-note">(editable but auto filled)</span><input data-field="semanticSlug" placeholder="manufacturer-name"></label>
+            <label>Category key <span class="auto-note">(editable but auto filled)</span><input data-field="categoryKey" placeholder="product-identification"></label>
+            <label>Category label <span class="auto-note">(editable but auto filled)</span><input data-field="categoryLabel" placeholder="Product Identification"></label>
+          </div>
+        </details>
+        <div class="table-config hidden" data-table-config>
+          <div class="table-config-head">
+            <div>
+              <strong>Table schema</strong>
+              <p>Define the fixed columns that passport users will see. These become <code>table_columns</code> in the generated module.</p>
+            </div>
+            <button type="button" data-add-column>Add column</button>
+          </div>
+          <div class="table-columns" data-table-columns></div>
+          <label class="span2">Default rows JSON
+            <textarea data-field="tableDefaultRowsText" rows="4" placeholder='[{"casNumber":"7439-92-1","concentration":"0.1"}]'></textarea>
+          </label>
+        </div>
+        <div class="field-actions">
+          <label class="check"><input type="checkbox" data-field="queryable"> queryable</label>
+          <label class="check"><input type="checkbox" data-field="indexed"> indexed</label>
+          <button type="button" data-remove-field>Remove field</button>
+        </div>
+      </div>
+    </template>
+
+    <template id="tableColumnTemplate">
+      <div class="table-column-card">
+        <div class="table-column-grid">
+          <label>Data type
+            <select data-column="dataType">
+              <option value="string">string</option>
+              <option value="number">number</option>
+              <option value="integer">integer</option>
+              <option value="boolean">boolean</option>
+              <option value="date">date</option>
+              <option value="datetime">datetime</option>
+              <option value="uri">uri</option>
+            </select>
+          </label>
+          <label>Unit key <input data-column="unitKey" value="none" placeholder="none"></label>
+          <label>Unit label <input data-column="unitLabel" placeholder="Percent"></label>
+          <label>Unit symbol <input data-column="unitSymbol" placeholder="%"></label>
+          <label>Object type
+            <select data-column="objectType">
+              <option value="SingleValuedDataElement">Single value</option>
+              <option value="MultiValuedDataElement">Multi value</option>
+              <option value="DataElementCollection">Collection</option>
+              <option value="RelatedResource">Related resource</option>
+              <option value="MultiLanguageDataElement">Multi-language</option>
+            </select>
+          </label>
+          <label>Value data type
+            <select data-column="valueDataType">
+              <option value="String">String</option>
+              <option value="Boolean">Boolean</option>
+              <option value="Integer">Integer</option>
+              <option value="Decimal">Decimal</option>
+              <option value="Date">Date</option>
+              <option value="DateTime">DateTime</option>
+              <option value="URI">URI</option>
+              <option value="Binary">Binary</option>
+              <option value="Array">Array</option>
+              <option value="Object">Object</option>
+            </select>
+          </label>
+          <label class="check table-column-required"><input type="checkbox" data-column="required"> required</label>
+        </div>
+        <details class="auto-group span4">
+          <summary>Auto-filled fields</summary>
+          <div class="auto-group-grid">
+            <label>Label <span class="auto-note">(editable but auto filled)</span><input data-column="columnLabel" placeholder="CAS Number"></label>
+            <label>Column key <span class="auto-note">(editable but auto filled)</span><input data-column="columnKey" placeholder="casNumber"></label>
+            <label>Semantic slug <span class="auto-note">(editable but auto filled)</span><input data-column="semanticSlug" placeholder="cas-number"></label>
+          </div>
+        </details>
+        <div class="table-column-actions">
+          <button type="button" data-remove-column>Remove column</button>
+        </div>
+      </div>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

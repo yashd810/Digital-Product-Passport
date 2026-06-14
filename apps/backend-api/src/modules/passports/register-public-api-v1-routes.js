@@ -142,18 +142,18 @@ function registerPublicApiV1Routes(app, deps) {
       }
 
       const schemaFields = flattenTypeFields(typeSchema);
-      const fieldMap = new Map(schemaFields.map((field) => [field.key, field]));
+      const schemaFieldsByKey = new Map(schemaFields.map((field) => [field.key, field]));
       const incomingFieldKeys = Object.keys(fields);
       if (!incomingFieldKeys.length) return res.status(400).json({ error: "No fields to update" });
 
-      const invalidFieldKeys = incomingFieldKeys.filter((key) => !fieldMap.has(key));
+      const invalidFieldKeys = incomingFieldKeys.filter((key) => !schemaFieldsByKey.has(key));
       if (invalidFieldKeys.length) {
         return res.status(400).json({ error: "Unknown or unsupported field(s) in request body", fields: invalidFieldKeys });
       }
 
       const forbiddenFields = [];
       for (const key of incomingFieldKeys) {
-        const fieldDef = fieldMap.get(key);
+        const fieldDef = schemaFieldsByKey.get(key);
         const decision = buildApiKeyFieldWriteDecision(fieldDef, req.apiKey);
         if (!decision.allowed) {
           forbiddenFields.push({

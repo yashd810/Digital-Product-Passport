@@ -16,18 +16,18 @@ function createComplianceHelpers({
 }) {
   const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
 
-  function extractBusinessIdentifierSource(source = null) {
-    return productIdentifierService.extractBusinessProductIdentifier?.(source || {}) || "";
+  function extractBusinessIdentifierSource(source = null, typeDef = null) {
+    return productIdentifierService.extractBusinessProductIdentifier?.(source || {}, typeDef) || "";
   }
 
-  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, internalAliasId, granularity, passportLike = null }) {
+  function buildStoredProductIdentifiers({ companyId, companySlug = null, companyName = null, passportType, internalAliasId, granularity, passportLike = null, typeDef = null }) {
     const normalized = productIdentifierService.normalizeProductIdentifiers({
       companyId,
       companySlug,
       companyName,
       passportType,
       rawProductId: internalAliasId,
-      canonicalProductIdSource: extractBusinessIdentifierSource(passportLike),
+      canonicalProductIdSource: extractBusinessIdentifierSource(passportLike, typeDef),
       granularity,
     });
     return {
@@ -104,7 +104,7 @@ function createComplianceHelpers({
   }
 
   function resolveGranularityForCreate(companyPolicy, requestedGranularity) {
-    const fallbackGranularity = String(companyPolicy?.defaultGranularity || "item").trim().toLowerCase();
+    const enforcedGranularity = String(companyPolicy?.defaultGranularity || "item").trim().toLowerCase();
     const normalizedRequested = requestedGranularity === undefined || requestedGranularity === null || requestedGranularity === ""
       ? null
       : String(requestedGranularity).trim().toLowerCase();
@@ -115,17 +115,17 @@ function createComplianceHelpers({
       throw error;
     }
 
-    if (!companyPolicy) return normalizedRequested || fallbackGranularity;
+    if (!companyPolicy) return normalizedRequested || enforcedGranularity;
 
-    if (!companyPolicy.allowGranularityOverride && normalizedRequested && normalizedRequested !== fallbackGranularity) {
-      const error = new Error(`Granularity override is disabled for this company. The enforced value is "${fallbackGranularity}".`);
+    if (!companyPolicy.allowGranularityOverride && normalizedRequested && normalizedRequested !== enforcedGranularity) {
+      const error = new Error(`Granularity override is disabled for this company. The enforced value is "${enforcedGranularity}".`);
       error.statusCode = 400;
       throw error;
     }
 
     const effectiveGranularity = normalizedRequested && companyPolicy.allowGranularityOverride
       ? normalizedRequested
-      : fallbackGranularity;
+      : enforcedGranularity;
 
     if (effectiveGranularity === "model" && companyPolicy.mintModelDids === false) {
       const error = new Error("Model-level DIDs are disabled for this company policy.");

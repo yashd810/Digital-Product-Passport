@@ -34,7 +34,7 @@ function createCarrierSecurityHelpers({
       companyName,
       modelName: passport.modelName,
       internalAliasId: passport.internalAliasId,
-      fallbackDppId: passport.dppId,
+      previewDppId: passport.dppId,
     });
   }
 

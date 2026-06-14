@@ -10,34 +10,24 @@ export function getSchemaFieldDescriptors(sections) {
     .filter((field) => field?.key)
     .map((field) => ({
       key: field.key,
-      aliases: [
-        field.key,
-        field.elementId,
-        field.semanticId,
-      ]
-        .filter((alias) => typeof alias === "string")
-        .map((alias) => alias.trim())
-        .filter(Boolean),
     }));
 }
 
-export function buildSchemaFieldAliasMap(sections) {
-  const aliasToKey = new Map();
+export function buildSchemaFieldKeyMap(sections) {
+  const keyMap = new Map();
   for (const field of getSchemaFieldDescriptors(sections)) {
-    for (const alias of field.aliases) {
-      aliasToKey.set(alias, field.key);
-    }
+    keyMap.set(field.key, field.key);
   }
-  return aliasToKey;
+  return keyMap;
 }
 
 export function alignRecordToSchemaKeys(record, sections) {
   if (!record || typeof record !== "object") return record || {};
   const aligned = { ...record };
-  const aliasToKey = buildSchemaFieldAliasMap(sections);
+  const keyMap = buildSchemaFieldKeyMap(sections);
 
   for (const [rawKey, value] of Object.entries(record)) {
-    const canonicalKey = aliasToKey.get(String(rawKey).trim());
+    const canonicalKey = keyMap.get(String(rawKey).trim());
     if (canonicalKey && aligned[canonicalKey] === undefined) {
       aligned[canonicalKey] = value;
     }
@@ -48,11 +38,11 @@ export function alignRecordToSchemaKeys(record, sections) {
 
 export function canonicalizeRecordToSchemaKeys(record, sections) {
   if (!record || typeof record !== "object") return {};
-  const aliasToKey = buildSchemaFieldAliasMap(sections);
+  const keyMap = buildSchemaFieldKeyMap(sections);
   const canonical = {};
 
   for (const [rawKey, value] of Object.entries(record)) {
-    const canonicalKey = aliasToKey.get(String(rawKey).trim()) || rawKey;
+    const canonicalKey = keyMap.get(String(rawKey).trim()) || rawKey;
     if (canonical[canonicalKey] === undefined) {
       canonical[canonicalKey] = value;
     }
@@ -61,25 +51,15 @@ export function canonicalizeRecordToSchemaKeys(record, sections) {
   return canonical;
 }
 
-export function extractFieldValuesFromElements(elements, aliasToKey = new Map(), values = {}) {
+export function extractFieldValuesFromElements(elements, keyMap = new Map(), values = {}) {
   if (!Array.isArray(elements)) return values;
   for (const element of elements) {
     if (!element || typeof element !== "object") continue;
-    const candidateAliases = [
-      element.elementId,
-      element.dictionaryReference,
-    ]
-      .filter((entry) => typeof entry === "string")
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-    const canonicalKey = candidateAliases
-      .map((alias) => aliasToKey.get(alias))
-      .find(Boolean);
     const rawElementId = typeof element.elementId === "string" ? element.elementId.trim() : "";
-    const targetKey = canonicalKey || rawElementId;
+    const targetKey = keyMap.get(rawElementId) || "";
 
     if (Array.isArray(element.elements) && element.elements.length) {
-      extractFieldValuesFromElements(element.elements, aliasToKey, values);
+      extractFieldValuesFromElements(element.elements, keyMap, values);
     }
 
     if (!targetKey) continue;

@@ -18,7 +18,29 @@ function term(slug) {
   return `${BATTERY_SEMANTIC_BASE}/${slug}`;
 }
 
-function textField({ key, label, semanticSlug, access = publicFieldDefaults, unit = "", dataType = "string" }) {
+function valueDataTypeFor(dataType) {
+  if (dataType === "integer") return "Integer";
+  if (dataType === "number" || dataType === "decimal") return "Decimal";
+  if (dataType === "boolean") return "Boolean";
+  if (dataType === "date") return "Date";
+  if (dataType === "datetime") return "DateTime";
+  if (dataType === "uri" || dataType === "url") return "URI";
+  return "String";
+}
+
+function textField({
+  key,
+  label,
+  semanticSlug,
+  access = publicFieldDefaults,
+  unit = "",
+  dataType = "string",
+  displayRole = "detail",
+  presentation = "data",
+  summaryRole = null,
+  lifecycleRole = null,
+  mediaRole = null,
+}) {
   return {
     ...access,
     key,
@@ -27,6 +49,14 @@ function textField({ key, label, semanticSlug, access = publicFieldDefaults, uni
     semanticId: term(semanticSlug),
     unit,
     dataType,
+    elementIdPath: key,
+    objectType: "SingleValuedDataElement",
+    valueDataType: valueDataTypeFor(dataType),
+    displayRole,
+    presentation,
+    summaryRole,
+    lifecycleRole,
+    mediaRole,
   };
 }
 
@@ -37,6 +67,9 @@ module.exports = {
   productCategory: "Battery",
   productIcon: "🔋",
   semanticModelKey: "claros_battery_dictionary_v1",
+  identity: {
+    businessIdentifierField: "batterySerialNumber",
+  },
   complianceProfile: {
     key: "batteryDppV1",
     displayName: "Battery DPP Profile v1",
@@ -52,36 +85,10 @@ module.exports = {
       kind: "semanticCategory",
       productKind: "battery",
       label: "battery category",
-      fieldKey: "batteryCategory",
+      semanticId: term("battery-category"),
       supportedCategories: ["EV", "LMT", "Industrial", "Stationary"],
-      aliases: {
-        ev: "EV",
-        electricvehicle: "EV",
-        electric_vehicle: "EV",
-        "electric vehicle": "EV",
-        lmt: "LMT",
-        lightmeansoftransport: "LMT",
-        light_means_of_transport: "LMT",
-        "light means of transport": "LMT",
-        industrial: "Industrial",
-        stationary: "Stationary",
-        stationarystorage: "Stationary",
-        stationary_storage: "Stationary",
-        "stationary storage": "Stationary",
-      },
     },
-    managedSemanticFieldKeys: [
-      "dpp_schema_version",
-      "dpp_status",
-      "dpp_granularity",
-      "last_updated_at",
-      "unique_dpp_identifier",
-      "unique_passport_identifier",
-      "unique_battery_identifier",
-      "unique_product_identifier",
-      "economic_operator_identifier",
-      "facility_identifier",
-    ],
+    managedSemanticFields: [],
   },
   schemaVersion: 1,
   lifecycle: {

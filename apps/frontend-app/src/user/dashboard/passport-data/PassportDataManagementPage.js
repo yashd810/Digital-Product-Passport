@@ -182,7 +182,7 @@ function PassportDataManagementPage({ companyId, user }) {
   const [activeView, setActiveView] = useState("all");
   const [showSources, setShowSources] = useState(false);
   const [sourceConfig, setSourceConfig] = useState(DEFAULT_SOURCE_CONFIG);
-  const [sourceFieldMap, setSourceFieldMap] = useState([{ source: "serialNumber", target: "internalAliasId" }]);
+  const [sourceFieldMap, setSourceFieldMap] = useState([{ source: "", target: "internalAliasId" }]);
   const [erpPresets, setErpPresets] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [runs, setRuns] = useState([]);

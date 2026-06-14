@@ -16,7 +16,7 @@ function createCanonicalPassportSerializer({
     "mandatory_espr_jtc24",
     "voluntary",
   ]);
-  const HEADER_FIELD_ALIASES = {
+  const HEADER_FIELD_KEYS = {
     granularity: new Set(["granularity"]),
     dppSchemaVersion: new Set(["dppSchemaVersion"]),
     dppStatus: new Set(["dppStatus"]),
@@ -200,10 +200,11 @@ function createCanonicalPassportSerializer({
   }
 
   function findSchemaFieldDefinition(typeDef, elementIdPath) {
+    const normalizedPath = normalizeText(elementIdPath);
+    const rootPath = normalizedPath.split(/[.[\]]/).filter(Boolean)[0] || normalizedPath;
     return getSchemaFieldDefinitions(typeDef).find((field) =>
-      field.key === elementIdPath
-      || field.semanticId === elementIdPath
-      || field.elementId === elementIdPath
+      field.elementIdPath === normalizedPath
+      || field.elementIdPath === rootPath
     ) || null;
   }
 
@@ -223,20 +224,9 @@ function createCanonicalPassportSerializer({
     return term?.iri || term?.termIri || null;
   }
 
-  function getTermAliases(term) {
-    const aliases = new Set([
-      term?.slug,
-      term?.internalKey,
-    ]);
-    for (const fieldKey of (term?.appFieldKeys || [])) aliases.add(fieldKey);
-    return [...aliases].filter(Boolean).map(String);
-  }
-
   function getSemanticLookup(semanticModel) {
     if (!semanticModel?.semanticModelKey) {
       return {
-        semanticIdByAlias: new Map(),
-        semanticTermByAlias: new Map(),
         semanticTermByIri: new Map(),
       };
     }
@@ -244,27 +234,15 @@ function createCanonicalPassportSerializer({
     const cacheKey = semanticModel.semanticModelKey;
     if (semanticLookupCache.has(cacheKey)) return semanticLookupCache.get(cacheKey);
 
-    const semanticIdByAlias = new Map();
-    const semanticTermByAlias = new Map();
     const semanticTermByIri = new Map();
-    const fieldMap = semanticModel.fieldMap || semanticModelRegistry?.getFieldMap?.(cacheKey) || {};
     const terms = semanticModel.terms || semanticModelRegistry?.getTerms?.(cacheKey) || [];
 
-    for (const [fieldKey, iri] of Object.entries(fieldMap || {})) {
-      if (fieldKey && iri) semanticIdByAlias.set(String(fieldKey), iri);
-    }
     for (const term of terms || []) {
       const semanticId = getTermSemanticId(term);
       if (semanticId) semanticTermByIri.set(String(semanticId), term);
-      for (const alias of getTermAliases(term)) {
-        if (semanticId) semanticIdByAlias.set(alias, semanticId);
-        semanticTermByAlias.set(alias, term);
-      }
     }
 
     const lookup = {
-      semanticIdByAlias,
-      semanticTermByAlias,
       semanticTermByIri,
     };
     semanticLookupCache.set(cacheKey, lookup);
@@ -274,42 +252,17 @@ function createCanonicalPassportSerializer({
   function resolveDictionaryReference(fieldDef, elementIdPath = null, semanticModel = null) {
     const explicitReference = fieldDef?.semanticId || null;
     if (explicitReference) return explicitReference;
-
-    const { semanticIdByAlias } = getSemanticLookup(semanticModel);
-    const candidates = [
-      fieldDef?.key,
-      fieldDef?.elementId,
-      elementIdPath,
-    ].filter(Boolean);
-
-    for (const candidate of candidates) {
-      const resolved = semanticIdByAlias.get(String(candidate));
-      if (resolved) return resolved;
-    }
-
     return null;
   }
 
   function resolveSemanticTerm(fieldDef, elementIdPath = null, semanticModel = null) {
-    const { semanticTermByAlias, semanticTermByIri } = getSemanticLookup(semanticModel);
+    const { semanticTermByIri } = getSemanticLookup(semanticModel);
     const explicitReference = fieldDef?.semanticId || null;
     if (explicitReference) {
       const byReference = semanticTermByIri.get(String(explicitReference))
         || semanticModelRegistry?.getTermByIri?.(semanticModel?.semanticModelKey, explicitReference);
       if (byReference) return byReference;
     }
-
-    const candidates = [
-      fieldDef?.key,
-      fieldDef?.elementId,
-      elementIdPath,
-    ].filter(Boolean);
-
-    for (const candidate of candidates) {
-      const term = semanticTermByAlias.get(String(candidate));
-      if (term) return term;
-    }
-
     return null;
   }
 
@@ -412,37 +365,10 @@ function createCanonicalPassportSerializer({
       || null;
   }
 
-  function getCategoryPolicyFieldKeys(categoryPolicy = {}) {
-    const keys = new Set([
-      categoryPolicy.fieldKey,
-      ...(Array.isArray(categoryPolicy.fieldKeys) ? categoryPolicy.fieldKeys : []),
-    ]);
-    return [...keys].map(normalizeText).filter(Boolean);
-  }
-
-  function getCategoryPolicyLabels(categoryPolicy = {}) {
-    const labels = new Set([
-      categoryPolicy.label,
-      categoryPolicy.fieldLabel,
-      ...(Array.isArray(categoryPolicy.fieldLabels) ? categoryPolicy.fieldLabels : []),
-    ]);
-    return [...labels].map(normalizeLookupKey).filter(Boolean);
-  }
-
   function findCategoryField(typeDef, categoryPolicy = {}) {
-    const fieldKeys = new Set(getCategoryPolicyFieldKeys(categoryPolicy));
-    const fieldLabels = new Set(getCategoryPolicyLabels(categoryPolicy));
-    return getSchemaFieldDefinitions(typeDef).find((field) => fieldKeys.has(field.key))
-      || getSchemaFieldDefinitions(typeDef).find((field) => fieldLabels.has(normalizeLookupKey(field.label)))
-      || null;
-  }
-
-  function buildCategoryAliasMap(categoryPolicy = {}) {
-    const aliases = categoryPolicy.aliases || {};
-    if (aliases instanceof Map) {
-      return new Map([...aliases.entries()].map(([alias, value]) => [normalizeLookupKey(alias), value]));
-    }
-    return new Map(Object.entries(aliases).map(([alias, value]) => [normalizeLookupKey(alias), value]));
+    const semanticId = normalizeText(categoryPolicy.semanticId);
+    if (!semanticId) return null;
+    return getSchemaFieldDefinitions(typeDef).find((field) => normalizeText(field.semanticId) === semanticId) || null;
   }
 
   function getSupportedCategories(semanticModel, categoryPolicy = {}) {
@@ -454,21 +380,17 @@ function createCanonicalPassportSerializer({
 
   function normalizeCategoryValue(value, categoryPolicy = {}, supportedCategories = []) {
     const raw = normalizeText(value);
-    const normalized = normalizeLookupKey(raw);
-    if (!normalized) return null;
+    if (!raw) return null;
 
-    const aliases = buildCategoryAliasMap(categoryPolicy);
-    if (aliases.has(normalized)) return aliases.get(normalized);
-
-    const supportedCategory = supportedCategories.find((category) => normalizeLookupKey(category) === normalized);
-    if (supportedCategory) return supportedCategory;
+    const supportedCategory = supportedCategories.find((category) => String(category) === raw);
+    if (supportedCategory) return raw;
     return supportedCategories.length ? null : raw;
   }
 
-  function getCategoryRequirementForField(semanticModel, fieldKey, normalizedCategory) {
-    if (!fieldKey || !normalizedCategory) return null;
+  function getCategoryRequirementForField(semanticModel, fieldDef, normalizedCategory) {
+    if (!fieldDef?.semanticId || !normalizedCategory) return null;
     const categoryRules = getCategoryRules(semanticModel);
-    const requirementLevel = categoryRules?.requirementsByFieldKey?.[String(fieldKey)]?.requirements?.[normalizedCategory] || null;
+    const requirementLevel = categoryRules?.requirementsBySemanticId?.[String(fieldDef.semanticId)]?.requirements?.[normalizedCategory] || null;
     if (!requirementLevel) return null;
     return {
       requirementLevel,
@@ -686,20 +608,11 @@ function createCanonicalPassportSerializer({
       if (normalized !== null) values.add(normalized);
     }
 
-    const normalizedKeyCandidates = new Set([
-      fieldDef?.key,
-      fieldDef?.elementId,
-      semanticTerm?.internalKey,
-      ...(semanticTerm?.appFieldKeys || []),
-    ].filter(Boolean));
-
     const categoryPolicy = options.categoryPolicy || null;
-    const categoryFieldKeys = new Set(getCategoryPolicyFieldKeys(categoryPolicy || {}));
-    const categoryFieldLabels = new Set(getCategoryPolicyLabels(categoryPolicy || {}));
-    const isCategoryField = categoryPolicy?.kind === "semanticCategory" && (
-      [...normalizedKeyCandidates].some((key) => categoryFieldKeys.has(key))
-      || categoryFieldLabels.has(normalizeLookupKey(fieldDef?.label))
-    );
+    const categoryPolicySemanticId = normalizeText(categoryPolicy?.semanticId);
+    const isCategoryField = categoryPolicy?.kind === "semanticCategory"
+      && categoryPolicySemanticId
+      && normalizeText(fieldDef?.semanticId) === categoryPolicySemanticId;
     if (isCategoryField) {
       getSupportedCategories(options.semanticModel, categoryPolicy).forEach((entry) => values.add(entry));
     }
@@ -718,12 +631,7 @@ function createCanonicalPassportSerializer({
   }
 
   function isExplicitMultiLanguageField(fieldDef) {
-    const key = normalizeText(fieldDef?.key).toLowerCase();
-    return resolveExplicitObjectType(fieldDef) === "MultiLanguageDataElement"
-      || key.endsWith("_i18n")
-      || key.endsWith("_intl")
-      || key.includes("multilang")
-      || key.includes("localized");
+    return resolveExplicitObjectType(fieldDef) === "MultiLanguageDataElement";
   }
 
   function buildLanguageTagValidationIssues(value, fieldDef, key) {
@@ -806,11 +714,11 @@ function createCanonicalPassportSerializer({
       }
     } else if (!skipTypeValidation && (normalizedDataType === "date" || normalizedFieldType === "date")) {
       if (typeof value !== "string" || !isDateLike(value)) {
-        pushIssue("FIELD_TYPE_MISMATCH", `Expected date-compatible value for "${key}".`);
+        pushIssue("FIELD_TYPE_MISMATCH", `Expected date value for "${key}".`);
       }
     } else if (!skipTypeValidation && normalizedDataType === "datetime") {
       if (typeof value !== "string" || !isDateTimeLike(value)) {
-        pushIssue("FIELD_TYPE_MISMATCH", `Expected date-time-compatible value for "${key}".`);
+        pushIssue("FIELD_TYPE_MISMATCH", `Expected date-time value for "${key}".`);
       }
     } else if (!skipTypeValidation && (normalizedDataType === "uri" || normalizedFieldType === "url")) {
       if (typeof value !== "string" || !isUriLike(value)) {
@@ -855,7 +763,9 @@ function createCanonicalPassportSerializer({
     };
   }
 
-  function inferValueDataType(fieldDef, value, semanticTerm = null) {
+  function resolveValueDataType(fieldDef, semanticTerm = null) {
+    const explicitValueDataType = normalizeText(fieldDef?.valueDataType);
+    if (explicitValueDataType) return explicitValueDataType;
     const semanticJsonType = normalizeText(semanticTerm?.dataType?.jsonType).toLowerCase();
     const semanticXsdType = normalizeText(semanticTerm?.dataType?.xsdType).toLowerCase();
 
@@ -868,89 +778,30 @@ function createCanonicalPassportSerializer({
     if (semanticXsdType.endsWith(":anyuri")) return "URI";
     if (semanticXsdType.endsWith(":base64binary")) return "Base64Binary";
 
-    const normalizedDataType = String(fieldDef?.dataType || "").trim().toLowerCase();
-    const normalizedFieldType = String(fieldDef?.type || "").trim().toLowerCase();
-
-    if (normalizedDataType === "boolean" || normalizedFieldType === "boolean" || typeof value === "boolean") {
-      return "Boolean";
-    }
-    if (normalizedDataType === "integer") return "Integer";
-    if (normalizedDataType === "number" || normalizedDataType === "decimal" || typeof value === "number") {
-      return Number.isInteger(value) ? "Integer" : "Decimal";
-    }
-    if (normalizedFieldType === "date") return "Date";
-    if (normalizedFieldType === "url") return "URI";
-    if (normalizedFieldType === "file") return "Binary";
-    if (normalizedFieldType === "table") {
-      if (Array.isArray(value)) return "Array";
-      return "Object";
-    }
-    if (Array.isArray(value)) return "Array";
-    if (isPlainObject(value)) return "Object";
-    return "String";
-  }
-
-  function normalizeExpandedObjectType(valueKind) {
-    const normalized = normalizeText(valueKind).toLowerCase();
-    if (!normalized) return null;
-
-    if ([
-      "dataelementcollection",
-      "collection",
-      "object",
-    ].includes(normalized)) return "DataElementCollection";
-
-    if ([
-      "singlevalueddataelement",
-      "single",
-      "scalar",
-    ].includes(normalized)) return "SingleValuedDataElement";
-
-    if ([
-      "multivalueddataelement",
-      "multi",
-      "multiple",
-      "array",
-      "list",
-    ].includes(normalized)) return "MultiValuedDataElement";
-
-    if ([
-      "relatedresource",
-      "related_resource",
-      "resource",
-      "uri_resource",
-    ].includes(normalized)) return "RelatedResource";
-
-    if ([
-      "multilanguagedataelement",
-      "multilanguage",
-      "multi_language",
-      "multilingual",
-      "i18n",
-      "localized",
-    ].includes(normalized)) return "MultiLanguageDataElement";
-
     return null;
   }
 
+  function normalizeObjectType(value) {
+    const normalized = normalizeText(value);
+    return [
+      "DataElementCollection",
+      "SingleValuedDataElement",
+      "MultiValuedDataElement",
+      "RelatedResource",
+      "MultiLanguageDataElement",
+    ].includes(normalized) ? normalized : null;
+  }
+
   function resolveExplicitObjectType(fieldDef) {
-    return normalizeExpandedObjectType(
-      fieldDef?.expandedObjectType
-      || fieldDef?.objectTypeHint
-      || fieldDef?.valueKind
-      || fieldDef?.valueKind
-      || fieldDef?.objectType
+    return normalizeObjectType(
+      fieldDef?.objectType
     );
   }
 
-  function inferObjectType(fieldDef, value) {
+  function resolveObjectType(fieldDef) {
     const explicitObjectType = resolveExplicitObjectType(fieldDef);
     if (explicitObjectType) return explicitObjectType;
-    if (isRelatedResourceValue(fieldDef, value)) return "RelatedResource";
-    if (isMultiLanguageValue(value)) return "MultiLanguageDataElement";
-    if (Array.isArray(value)) return "MultiValuedDataElement";
-    if (isPlainObject(value)) return "DataElementCollection";
-    return "SingleValuedDataElement";
+    return null;
   }
 
   function normalizeTableColumnDefinition(column, index) {
@@ -1019,28 +870,17 @@ function createCanonicalPassportSerializer({
     const resolvedFieldDef = fieldDef || findSchemaFieldDefinition(typeDef, elementIdPath);
     const resolvedSemanticModel = semanticModel || resolveSemanticModel(typeDef, getTypeName(typeDef));
     const semanticTerm = resolveSemanticTerm(resolvedFieldDef, elementIdPath, resolvedSemanticModel);
-    const resolvedElementId = resolvedFieldDef?.elementId
-      || resolvedFieldDef?.key
+    const resolvedElementId = resolvedFieldDef?.elementIdPath
       || elementIdPath
       || null;
     return {
       elementId: resolvedElementId,
-      objectType: inferObjectType(resolvedFieldDef, value),
+      objectType: resolveObjectType(resolvedFieldDef),
       dictionaryReference: resolveDictionaryReference(resolvedFieldDef, elementIdPath, resolvedSemanticModel),
-      valueDataType: inferValueDataType(resolvedFieldDef, value, semanticTerm),
+      valueDataType: resolveValueDataType(resolvedFieldDef, semanticTerm),
       value,
       elements: buildNestedElements(value, resolvedSemanticModel, resolvedFieldDef),
     };
-  }
-
-  function findHeaderAliasValue(fieldValues, aliasSet) {
-    for (const [fieldKey, value] of Object.entries(fieldValues)) {
-      const compactKey = String(fieldKey || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (aliasSet.has(fieldKey) || aliasSet.has(compactKey)) {
-        return value;
-      }
-    }
-    return null;
   }
 
   function getHeaderFieldConfig(typeDef, key) {
@@ -1070,6 +910,7 @@ function createCanonicalPassportSerializer({
       companyName,
       granularity: options.granularity || null,
       passportType,
+      typeDef,
       didService,
       productIdentifierService,
     });
@@ -1088,7 +929,7 @@ function createCanonicalPassportSerializer({
     for (const fieldDef of schemaFields) {
       const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key, semanticModel);
       const categoryRequirement = categoryInfo.normalized
-        ? getCategoryRequirementForField(semanticModel, fieldDef.key, categoryInfo.normalized)
+        ? getCategoryRequirementForField(semanticModel, fieldDef, categoryInfo.normalized)
         : null;
       if (semanticModel && !semanticTerm) {
         validationIssues.push({
@@ -1152,17 +993,16 @@ function createCanonicalPassportSerializer({
       ? contentSpecificationIdsRaw
       : parseArrayValue(contentSpecificationIdsRaw);
 
-    Object.values(HEADER_FIELD_ALIASES).forEach((aliases) => {
+    Object.values(HEADER_FIELD_KEYS).forEach((headerKeys) => {
       Object.keys(fields).forEach((fieldKey) => {
-        const compactKey = String(fieldKey || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-        if (aliases.has(fieldKey) || aliases.has(compactKey)) {
+        if (headerKeys.has(fieldKey)) {
           delete fields[fieldKey];
         }
       });
     });
 
     const internalAliasId = passport.internalAliasId || null;
-    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
+    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}, typeDef) || "";
     const storedProductIdentifier = isUriLikeValue(passport.uniqueProductIdentifier)
       ? passport.uniqueProductIdentifier
       : null;

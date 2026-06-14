@@ -6,56 +6,74 @@ const { normalizeSystemPassportHeader } = require("../shared/identifiers/passpor
 
 const DEFAULT_MODULES_DIR = __dirname;
 
-const DEFAULT_GENERIC_COMPLIANCE_PROFILE = {
-  key: "genericDppV1",
-  displayName: "Generic DPP Profile v1",
-  contentSpecificationIds: ["genericDppV1"],
-  requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds"],
-  requireCompanyOperatorIdentifier: true,
-  requireCarrierPolicy: false,
-  requireFacilityAtGranularities: [],
-  defaultCarrierPolicyKey: "web_public_entry_v1",
-  enforceSemanticMapping: false,
-  requirePublicAccessLayer: false,
-  categoryPolicy: null,
-  managedSemanticFieldKeys: [],
-};
-
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
 function normalizeComplianceProfile(profileDefinition = null, moduleDefinition = {}) {
-  const baseProfile = profileDefinition
-    ? { ...DEFAULT_GENERIC_COMPLIANCE_PROFILE, ...clone(profileDefinition) }
-    : clone(DEFAULT_GENERIC_COMPLIANCE_PROFILE);
+  if (!profileDefinition || typeof profileDefinition !== "object" || Array.isArray(profileDefinition)) {
+    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" must define an explicit complianceProfile.`);
+  }
+  const baseProfile = clone(profileDefinition);
   const semanticModelKey = moduleDefinition.semanticModelKey || null;
   const contentSpecificationIds = Array.isArray(baseProfile.contentSpecificationIds)
     && baseProfile.contentSpecificationIds.length
       ? baseProfile.contentSpecificationIds
-      : (semanticModelKey ? [semanticModelKey] : DEFAULT_GENERIC_COMPLIANCE_PROFILE.contentSpecificationIds);
+      : (semanticModelKey ? [semanticModelKey] : []);
+  if (!baseProfile.key) {
+    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" complianceProfile.key is required.`);
+  }
+  if (!contentSpecificationIds.length) {
+    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" complianceProfile.contentSpecificationIds is required.`);
+  }
 
   return {
     ...baseProfile,
-    key: baseProfile.key || DEFAULT_GENERIC_COMPLIANCE_PROFILE.key,
-    displayName: baseProfile.displayName || DEFAULT_GENERIC_COMPLIANCE_PROFILE.displayName,
+    key: baseProfile.key,
+    displayName: baseProfile.displayName || baseProfile.key,
     contentSpecificationIds,
     requiredPassportFields: Array.isArray(baseProfile.requiredPassportFields)
       ? baseProfile.requiredPassportFields
-      : DEFAULT_GENERIC_COMPLIANCE_PROFILE.requiredPassportFields,
+      : [],
     requireFacilityAtGranularities: Array.isArray(baseProfile.requireFacilityAtGranularities)
       ? baseProfile.requireFacilityAtGranularities
       : [],
-    managedSemanticFieldKeys: Array.isArray(baseProfile.managedSemanticFieldKeys)
-      ? baseProfile.managedSemanticFieldKeys
+    managedSemanticFields: Array.isArray(baseProfile.managedSemanticFields)
+      ? baseProfile.managedSemanticFields
       : [],
   };
+}
+
+function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null) {
+  return sections.map((section) => ({
+    ...section,
+    sourceModuleKey,
+    fields: (section.fields || []).map((field) => {
+      const nextField = {
+        ...field,
+        canonicalLocked: true,
+        sourceModuleKey,
+        sourceModuleFieldKey: field.key,
+      };
+      if (field.type === "table" && Array.isArray(field.table_columns)) {
+        nextField.table_columns = field.table_columns.map((column) => ({
+          ...column,
+          canonicalLocked: true,
+          sourceModuleKey,
+          sourceModuleColumnKey: column.key,
+        }));
+        nextField.table_cols = nextField.table_columns.length;
+      }
+      return nextField;
+    }),
+  }));
 }
 
 function normalizeModuleDefinition(moduleDefinition = {}) {
   const definition = clone(moduleDefinition);
   const sections = Array.isArray(definition.sections) ? definition.sections : [];
   const complianceProfile = normalizeComplianceProfile(definition.complianceProfile, definition);
+  const sourceModuleKey = definition.moduleKey || null;
 
   return {
     moduleKey: definition.moduleKey,
@@ -69,8 +87,9 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
     fieldsJson: {
       schemaVersion: Number.parseInt(definition.schemaVersion, 10) || 1,
       systemHeader: normalizeSystemPassportHeader(definition.systemHeader),
-      sections,
-      sourceModule: definition.moduleKey || null,
+      sections: normalizeCanonicalModuleSections(sections, sourceModuleKey),
+      sourceModule: sourceModuleKey,
+      identity: definition.identity,
       complianceProfileKey: complianceProfile.key,
       complianceProfile,
     },
@@ -121,13 +140,7 @@ function getComplianceProfileForPassportType(moduleKeyOrTypeName, typeDef = null
     || getPassportTypeModule(moduleKeyOrTypeName, options)
     || getPassportTypeModule(typeDef?.typeName || typeDef?.type_name, options);
   if (resolvedModule?.complianceProfile) return clone(resolvedModule.complianceProfile);
-
-  const semanticModelKey = typeDef?.semanticModelKey || typeDef?.semantic_model_key || null;
-  const fallbackProfile = normalizeComplianceProfile(null, { semanticModelKey });
-  if (semanticModelKey) {
-    fallbackProfile.contentSpecificationIds = [semanticModelKey];
-  }
-  return fallbackProfile;
+  return null;
 }
 
 function getComplianceProfileCatalog(options = {}) {
@@ -136,12 +149,10 @@ function getComplianceProfileCatalog(options = {}) {
     if (!definition.complianceProfile?.key) continue;
     profilesByKey.set(definition.complianceProfile.key, clone(definition.complianceProfile));
   }
-  profilesByKey.set(DEFAULT_GENERIC_COMPLIANCE_PROFILE.key, clone(DEFAULT_GENERIC_COMPLIANCE_PROFILE));
   return [...profilesByKey.values()].sort((left, right) => left.key.localeCompare(right.key));
 }
 
 module.exports = {
-  DEFAULT_GENERIC_COMPLIANCE_PROFILE,
   getComplianceProfileCatalog,
   getComplianceProfileForPassportType,
   getPassportTypeModule,

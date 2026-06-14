@@ -34,12 +34,8 @@ function createRegistryWithApplianceDictionary() {
       label: "Energy rating",
       definition: "Energy performance rating for the product.",
       iri: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
-      appFieldKeys: ["energyRating"],
     },
   ]);
-  writeJson(path.join(modelDir, "field-map.json"), {
-    energyRating: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
-  });
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
       energyRating: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
@@ -60,7 +56,7 @@ test("semantic export does not infer a dictionary from product category names", 
   const typeDef = {
     type_name: "evBatteryPassportCustom",
     product_category: "Battery Digital Passport",
-    semantic_model_key: "genericDppV1",
+    semantic_model_key: "unregistered_test_model_v1",
     fields_json: {
       sections: [
         {
@@ -78,7 +74,7 @@ test("semantic export does not infer a dictionary from product category names", 
   const exported = buildPassportJsonLdExport([
     { dppId: "dpp-1", passportType: "evBatteryPassportCustom", batteryMass: "450.5" },
   ], "evBatteryPassportCustom", {
-    semanticModelKey: "genericDppV1",
+    semanticModelKey: "unregistered_test_model_v1",
     productCategory: "Battery Digital Passport",
   });
 
@@ -100,7 +96,10 @@ test("semantic export supports arbitrary registered semantic models without cate
       sections: [
         {
           fields: [
-            { key: "energyRating" },
+            {
+              key: "energyRating",
+              semanticId: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
+            },
           ],
         },
       ],

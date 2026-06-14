@@ -316,7 +316,7 @@ const getWritablePassportColumns = (data, excluded = SYSTEM_PASSPORT_FIELDS) =>
 const getStoredPassportValues = (keys, data) =>
   keys.map((key) => toStoredPassportValue(data[key]));
 
-const slugifyRouteSegment = (value, fallback = "item") => {
+const slugifyRouteSegment = (value, emptySegment = "item") => {
   const normalized = String(value ?? "")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "");
@@ -326,7 +326,7 @@ const slugifyRouteSegment = (value, fallback = "item") => {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-+/g, "-");
-  return slug || fallback;
+  return slug || emptySegment;
 };
 
 const buildCurrentPublicPassportPath = ({
@@ -364,9 +364,9 @@ const buildPreviewPassportPath = ({
   manufacturedBy = "",
   modelName = "",
   internalAliasId = "",
-  fallbackDppId = "",
+  previewDppId = "",
 }) => {
-  const routeKey = normalizeInternalAliasIdValue(internalAliasId) || String(fallbackDppId || "").trim();
+  const routeKey = normalizeInternalAliasIdValue(internalAliasId) || String(previewDppId || "").trim();
   if (!routeKey) return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
   const modelSlug = slugifyRouteSegment(modelName || routeKey, "product");
@@ -381,7 +381,7 @@ const decodePathSegment = (value) => {
   }
 };
 
-const inferFacilityStableId = (passport) => extractExplicitFacilityId(passport);
+const getExplicitFacilityStableId = (passport) => extractExplicitFacilityId(passport);
 
 async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didService }) {
   const rawPath = String(publicPath || "").trim();
@@ -460,7 +460,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
         const stableId = didService.normalizeStableId(passport.lineageId || passport.dppId);
         const granularity = didService.normalizeGranularity(passport.granularity || "model");
         const companySlug = didService.normalizeCompanySlug(company.companyName || company.didSlug || `company-${company.id}`);
-        const facilityStableId = inferFacilityStableId(passport);
+        const facilityStableId = getExplicitFacilityStableId(passport);
 
         const subjectNamespace = didService.normalizePassportTypeSegment(company.companyName || company.didSlug || "passport");
         return {

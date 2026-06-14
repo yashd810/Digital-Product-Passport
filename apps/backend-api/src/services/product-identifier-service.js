@@ -13,21 +13,15 @@ function createProductIdentifierService({ didService, pool = null }) {
     return typeof value === "string" && value.trim().toLowerCase().startsWith("dpp_");
   }
 
-  function extractBusinessProductIdentifier(source = {}) {
-    const candidates = [
-      source.serial_number,
-      source.product_serial_number,
-      source.battery_serial_number,
-      source.serialNumber,
-      source.serial,
-      source.batterySerialNumber,
-      source.productSerialNumber,
-    ];
-    for (const candidate of candidates) {
-      const normalized = normalizeRawProductId(candidate);
-      if (normalized) return normalized;
-    }
-    return "";
+  function getBusinessIdentifierField(typeDef = null) {
+    const fieldsJson = typeDef?.fieldsJson || typeDef?.fields_json || typeDef || {};
+    return normalizeRawProductId(fieldsJson?.identity?.businessIdentifierField || "");
+  }
+
+  function extractBusinessProductIdentifier(source = {}, typeDef = null) {
+    const fieldKey = getBusinessIdentifierField(typeDef);
+    if (!fieldKey || !source || typeof source !== "object") return "";
+    return normalizeRawProductId(source[fieldKey]);
   }
 
   function buildStableProductId({ rawProductId }) {
@@ -282,6 +276,7 @@ function createProductIdentifierService({ didService, pool = null }) {
     getIdentifierPersistencePolicy,
     recordGranularityTransition,
     listIdentifierLineage,
+    getBusinessIdentifierField,
   };
 }
 

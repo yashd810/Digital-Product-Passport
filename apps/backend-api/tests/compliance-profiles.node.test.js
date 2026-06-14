@@ -124,29 +124,21 @@ function createApplianceComplianceFixture() {
       slug: "appliance-class",
       label: "Appliance class",
       iri: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
-      appFieldKeys: ["applianceClass"],
       dataType: "string",
     },
     {
       slug: "model-identifier",
       label: "Model identifier",
       iri: "https://example.test/dictionary/appliance/v3/terms/model-identifier",
-      appFieldKeys: ["modelIdentifier"],
       dataType: "string",
     },
     {
       slug: "energy-rating",
       label: "Energy rating",
       iri: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
-      appFieldKeys: ["energyRating"],
       dataType: "string",
     },
   ]);
-  writeJson(path.join(modelDir, "field-map.json"), {
-    applianceClass: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
-    modelIdentifier: "https://example.test/dictionary/appliance/v3/terms/model-identifier",
-    energyRating: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
-  });
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
       applianceClass: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
@@ -156,8 +148,8 @@ function createApplianceComplianceFixture() {
   });
   writeJson(path.join(modelDir, "category-rules.json"), {
     categories: ["Home", "Industrial"],
-    requirementsByFieldKey: {
-      energyRating: {
+    requirementsBySemanticId: {
+      "https://example.test/dictionary/appliance/v3/terms/energy-rating": {
         requirements: {
           Home: "mandatory_espr_jtc24",
           Industrial: "voluntary",
@@ -181,12 +173,8 @@ function createApplianceComplianceFixture() {
         kind: "semanticCategory",
         productKind: "appliance",
         label: "appliance class",
-        fieldKey: "applianceClass",
-        aliases: {
-          home: "Home",
-          household: "Home",
-          industrial: "Industrial",
-        },
+        semanticId: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
+        supportedCategories: ["Home", "Industrial"],
       },
     },
     fieldsJson: {
@@ -194,9 +182,30 @@ function createApplianceComplianceFixture() {
         key: "applianceIdentity",
         label: "Identity",
         fields: [
-          { key: "applianceClass", label: "Appliance Class", type: "text" },
-          { key: "modelIdentifier", label: "Model Identifier", type: "text" },
-          { key: "energyRating", label: "Energy Rating", type: "text" },
+          {
+            key: "applianceClass",
+            label: "Appliance Class",
+            type: "text",
+            semanticId: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+          },
+          {
+            key: "modelIdentifier",
+            label: "Model Identifier",
+            type: "text",
+            semanticId: "https://example.test/dictionary/appliance/v3/terms/model-identifier",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+          },
+          {
+            key: "energyRating",
+            label: "Energy Rating",
+            type: "text",
+            semanticId: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+          },
         ],
       }],
     },
@@ -235,7 +244,7 @@ test("arbitrary product modules can use semantic category policy without battery
     const result = await service.evaluatePassport({
       passportType: passportType.typeName,
       companyId: 12,
-      applianceClass: "household",
+      applianceClass: "Home",
       modelIdentifier: "APP-2026-01",
       energyRating: "A",
     }, passportType.typeName);
@@ -270,7 +279,7 @@ test("textile semantic profile blocks values that violate textile datatypes", as
   );
 });
 
-test("battery module evaluates through battery profile using semantic field-key bridges", async () => {
+test("battery module evaluates through battery profile using explicit semantic IDs", async () => {
   const { service, passportType } = createModuleComplianceService("battery:v1");
   const result = await service.evaluatePassport(
     createCompleteBatteryPassport(),

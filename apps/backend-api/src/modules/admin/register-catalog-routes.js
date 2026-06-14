@@ -63,6 +63,128 @@ module.exports = function registerCatalogRoutes(app, deps) {
     };
   };
 
+  const getModuleDefinitionByKey = (moduleKey) => {
+    const normalizedModuleKey = String(moduleKey || "").trim();
+    if (!normalizedModuleKey) return null;
+    return getPassportTypeModules().find((definition) => definition.moduleKey === normalizedModuleKey) || null;
+  };
+
+  const validateModuleBackedPassportType = ({ sourceModule, semanticModelKey, sections, identity = null }) => {
+    const moduleDefinition = getModuleDefinitionByKey(sourceModule);
+    if (!moduleDefinition) {
+      return {
+        error: "Passport types must be created from a registered passport module.",
+        fields: [{ code: "SOURCE_MODULE_REQUIRED", field: "sourceModule" }],
+      };
+    }
+
+    const normalizedSemanticModelKey = String(semanticModelKey || "").trim();
+    if (normalizedSemanticModelKey && normalizedSemanticModelKey !== moduleDefinition.semanticModelKey) {
+      return {
+        error: `Semantic model must stay locked to module "${sourceModule}".`,
+        fields: [{
+          code: "SOURCE_MODULE_SEMANTIC_MODEL_MISMATCH",
+          field: "semanticModelKey",
+          expected: moduleDefinition.semanticModelKey,
+          actual: normalizedSemanticModelKey,
+        }],
+      };
+    }
+
+    const issues = [];
+    const fieldKeys = new Set();
+    for (const section of sections || []) {
+      for (const field of section?.fields || []) {
+        if (field?.key) fieldKeys.add(field.key);
+        if (!field?.canonicalLocked || field?.sourceModuleKey !== moduleDefinition.moduleKey || !field?.sourceModuleFieldKey) {
+          issues.push({
+            code: "MODULE_FIELD_NOT_CANONICAL",
+            field: field?.key || null,
+            message: `Field "${field?.key || "unknown"}" must come from the selected passport module.`,
+          });
+        }
+        if (!field?.semanticId) {
+          issues.push({
+            code: "FIELD_SEMANTIC_ID_REQUIRED",
+            field: field?.key || null,
+            message: `Field "${field?.key || "unknown"}" must have an explicit semanticId from the module.`,
+          });
+        }
+        for (const metadataKey of ["elementIdPath", "objectType", "valueDataType"]) {
+          if (!field?.[metadataKey]) {
+            issues.push({
+              code: "FIELD_RUNTIME_METADATA_REQUIRED",
+              field: field?.key || null,
+              metadataKey,
+              message: `Field "${field?.key || "unknown"}" must have explicit ${metadataKey} metadata from the module.`,
+            });
+          }
+        }
+        if (field?.type === "table") {
+          const columns = Array.isArray(field.table_columns) ? field.table_columns : [];
+          if (!columns.length) {
+            issues.push({
+              code: "TABLE_COLUMNS_REQUIRED",
+              field: field?.key || null,
+              message: `Table field "${field?.key || "unknown"}" must define module table columns.`,
+            });
+          }
+          for (const column of columns) {
+            if (!column?.canonicalLocked || column?.sourceModuleKey !== moduleDefinition.moduleKey || !column?.sourceModuleColumnKey) {
+              issues.push({
+                code: "MODULE_TABLE_COLUMN_NOT_CANONICAL",
+                field: field?.key || null,
+                column: column?.key || null,
+                message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must come from the selected passport module.`,
+              });
+            }
+            if (!column?.semanticId) {
+              issues.push({
+                code: "TABLE_COLUMN_SEMANTIC_ID_REQUIRED",
+                field: field?.key || null,
+                column: column?.key || null,
+                message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must have an explicit semanticId from the module.`,
+              });
+            }
+            for (const metadataKey of ["elementIdPath", "objectType", "valueDataType"]) {
+              if (!column?.[metadataKey]) {
+                issues.push({
+                  code: "TABLE_COLUMN_RUNTIME_METADATA_REQUIRED",
+                  field: field?.key || null,
+                  column: column?.key || null,
+                  metadataKey,
+                  message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must have explicit ${metadataKey} metadata from the module.`,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+    const businessIdentifierField = String(identity?.businessIdentifierField || "").trim();
+    if (!businessIdentifierField) {
+      issues.push({
+        code: "BUSINESS_IDENTIFIER_FIELD_REQUIRED",
+        field: "identity.businessIdentifierField",
+        message: "Passport types must include a module-defined business identifier field.",
+      });
+    } else if (!fieldKeys.has(businessIdentifierField)) {
+      issues.push({
+        code: "BUSINESS_IDENTIFIER_FIELD_NOT_INCLUDED",
+        field: businessIdentifierField,
+        message: `Business identifier field "${businessIdentifierField}" must be included in the passport type.`,
+      });
+    }
+
+    if (issues.length) {
+      return {
+        error: "Passport type fields must use canonical module semantics only.",
+        fields: issues,
+      };
+    }
+    return null;
+  };
+
   app.get("/api/admin/product-categories", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const result = await pool.query("SELECT * FROM product_categories ORDER BY name");
@@ -186,6 +308,8 @@ module.exports = function registerCatalogRoutes(app, deps) {
         productCategory,
         productIcon,
         semanticModelKey,
+        sourceModule,
+        identity,
         sections,
         systemHeader,
       } = req.body;
@@ -194,9 +318,27 @@ module.exports = function registerCatalogRoutes(app, deps) {
       const existing = await pool.query("SELECT * FROM passport_types WHERE id = $1", [id]);
       if (!existing.rows.length) return res.status(404).json({ error: "Passport type not found" });
       const currentType = existing.rows[0];
+      const effectiveSourceModule = sourceModule || currentType.fieldsJson?.sourceModule || null;
+      const effectiveSemanticModelKey = semanticModelKey !== undefined
+        ? semanticModelKey
+        : currentType.semanticModelKey;
+      const effectiveSections = sections !== undefined
+        ? sections
+        : (currentType.fieldsJson?.sections || []);
+      const effectiveIdentity = identity !== undefined
+        ? identity
+        : (currentType.fieldsJson?.identity || null);
       const updates = [];
       const values = [];
       let index = 1;
+
+      const moduleValidation = validateModuleBackedPassportType({
+        sourceModule: effectiveSourceModule,
+        semanticModelKey: effectiveSemanticModelKey,
+        sections: effectiveSections,
+        identity: effectiveIdentity,
+      });
+      if (moduleValidation) return res.status(400).json(moduleValidation);
 
       if (displayName !== undefined) { updates.push(`"displayName" = $${index++}`); values.push(displayName); }
       if (productCategory !== undefined) { updates.push(`"productCategory" = $${index++}`); values.push(productCategory); }
@@ -229,6 +371,8 @@ module.exports = function registerCatalogRoutes(app, deps) {
           sections,
           systemHeader,
           currentSchemaVersion: getTypeSchemaVersion(currentType.fieldsJson || {}) + 1,
+          sourceModule: effectiveSourceModule,
+          identity: effectiveIdentity,
         });
         updates.push(`"fieldsJson" = $${index++}`);
         values.push(JSON.stringify(fieldsJson));
@@ -308,7 +452,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
 
   app.post("/api/admin/passport-types", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
-      const { typeName, displayName, productCategory, productIcon, semanticModelKey, sections, systemHeader } = req.body;
+      const { typeName, displayName, productCategory, productIcon, semanticModelKey, sourceModule, identity, sections, systemHeader } = req.body;
 
       if (!typeName || !displayName || !productCategory || !sections) {
         return res.status(400).json({ error: "typeName, displayName, productCategory, and sections are required" });
@@ -331,7 +475,15 @@ module.exports = function registerCatalogRoutes(app, deps) {
       const sectionValidationError = validatePassportTypeSections(sections);
       if (sectionValidationError) return res.status(400).json({ error: sectionValidationError });
 
-      const fieldsJson = normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion: 1 });
+      const moduleValidation = validateModuleBackedPassportType({
+        sourceModule,
+        semanticModelKey,
+        sections,
+        identity,
+      });
+      if (moduleValidation) return res.status(400).json(moduleValidation);
+
+      const fieldsJson = normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion: 1, sourceModule, identity });
 
       const result = await pool.query(
         `INSERT INTO passport_types ("typeName", "displayName", "productCategory", "productIcon", "semanticModelKey", "fieldsJson", "createdBy")
@@ -351,7 +503,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
       });
 
       await logAudit(null, req.user.userId, "CREATE_PASSPORT_TYPE", "passport_types", null, null,
-        { typeName, displayName, productCategory, semanticModelKey: semanticModelKey || null });
+        { typeName, displayName, productCategory, semanticModelKey: semanticModelKey || null, sourceModule: sourceModule || null });
 
       const verification = buildPassportTypeGovernanceCheck(sections);
       res.status(201).json({

@@ -243,7 +243,7 @@ function parseDelimitedValues(value) {
     .filter(Boolean);
 }
 
-function parseGovernanceList(rawValue, validEntries, fallbackValues) {
+function parseGovernanceList(rawValue, validEntries) {
   const requested = parseDelimitedValues(rawValue)
     .map((entry) => normalizeToken(entry));
   const matched = [...new Set(
@@ -251,7 +251,7 @@ function parseGovernanceList(rawValue, validEntries, fallbackValues) {
       .map((token) => validEntries.find((entry) => normalizeToken(entry.value) === token)?.value || null)
       .filter(Boolean)
   )];
-  return matched.length ? matched : fallbackValues;
+  return matched;
 }
 
 function parseHeaderIndexMap(headerRow = []) {

@@ -99,13 +99,13 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const passportTypeData = await response.json();
       const sections = passportTypeData.fieldsJson?.sections || [];
       const csvRows = [];
-      csvRows.push(["Field Name", "Passport 1", "Passport 2", "Passport 3"]);
+      csvRows.push(["Field Key", "Passport 1", "Passport 2", "Passport 3"]);
       csvRows.push(["internalAliasId", "", "", ""]);
       csvRows.push(["modelName", "", "", ""]);
       sections.forEach(section => {
         (section.fields || []).forEach(field => {
           if (field.type !== "file" && field.type !== "table") {
-            csvRows.push([field.label, "", "", ""]);
+            csvRows.push([field.key, "", "", ""]);
           }
         });
       });
@@ -129,29 +129,34 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       const passportTypeData = await typeResponse.json();
       const sections = passportTypeData.fieldsJson?.sections || [];
       const allFields = sections.flatMap(section => section.fields || []);
+      const fieldsByKey = new Map([
+        ["modelName", { key: "modelName", type: "text" }],
+        ["internalAliasId", { key: "internalAliasId", type: "text" }],
+        ...allFields.map((field) => [field.key, field]),
+      ]);
       const text = await file.text();
       const rows = parseCsvText(text);
       if (rows.length < 2) throw new Error("CSV must have at least a header row and one data row");
       const numPassports = rows[0].length - 1;
       const fieldRows = rows.slice(1);
+      const unknownKeys = fieldRows
+        .map((row) => String(row[0] || "").trim())
+        .filter(Boolean)
+        .filter((key) => !fieldsByKey.has(key));
+      if (unknownKeys.length) {
+        throw new Error(`Unknown field key(s): ${[...new Set(unknownKeys)].join(", ")}. Use the downloaded template field keys exactly.`);
+      }
       const createdPassports = [];
       for (let colIdx = 1; colIdx <= numPassports; colIdx++) {
         const passportData = {};
         let hasData = false;
         fieldRows.forEach(row => {
-          const rawLabel = row[0];
-          if (!rawLabel || !rawLabel.trim()) return;
-          const normalized = rawLabel.trim().toLowerCase();
+          const rawKey = String(row[0] || "").trim();
+          if (!rawKey) return;
           const value = (row[colIdx] || "").trim();
           if (!value) return;
           hasData = true;
-          const field =
-            allFields.find(f => f.label?.trim().toLowerCase() === normalized) ||
-            allFields.find(f => f.key?.toLowerCase() === normalized) ||
-            (normalized === "modelName" ? { key: "modelName", type: "text" } : null) ||
-            (normalized === "internalAliasId" ? { key: "internalAliasId", type: "text" } : null) ||
-            (normalized === "modelname" ? { key: "modelName", type: "text" } : null) ||
-            (normalized === "internalaliasid" ? { key: "internalAliasId", type: "text" } : null);
+          const field = fieldsByKey.get(rawKey);
           if (field) {
             passportData[field.key] = field.type === "boolean"
               ? (value.toLowerCase() === "true" || value === "1")
@@ -198,6 +203,22 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       if (!Array.isArray(passports)) throw new Error("JSON must be an array of passport objects");
       if (passports.some((passport) => passport?.dppId)) {
         throw new Error("Create-only JSON import does not accept dppId. Remove update identifiers and use new internalAliasId values.");
+      }
+      const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
+      if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
+      const passportTypeData = await typeResponse.json();
+      const allowedJsonKeys = new Set([
+        "internalAliasId",
+        "modelName",
+        ...((passportTypeData.fieldsJson?.sections || [])
+          .flatMap((section) => section.fields || [])
+          .map((field) => field.key)),
+      ]);
+      const unknownJsonKeys = passports.flatMap((passport) =>
+        Object.keys(passport || {}).filter((key) => !allowedJsonKeys.has(key))
+      );
+      if (unknownJsonKeys.length) {
+        throw new Error(`Unknown JSON field key(s): ${[...new Set(unknownJsonKeys)].join(", ")}. Use exact passport type field keys.`);
       }
 
       let created = 0;
@@ -290,11 +311,11 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               <div className="subsection">
                 <h3>Example Format</h3>
                 <table className="example-table">
-                  <thead><tr><th>Field Name</th><th>Passport 1</th><th>Passport 2</th></tr></thead>
+                  <thead><tr><th>Field Key</th><th>Passport 1</th><th>Passport 2</th></tr></thead>
                   <tbody>
                     <tr><td className="field-name">internalAliasId</td><td>SKU-001</td><td>SKU-002</td></tr>
                     <tr><td className="field-name">modelName</td><td>Model A</td><td>Model B</td></tr>
-                    <tr><td className="field-name">Category</td><td>Electronics</td><td>Textiles</td></tr>
+                    <tr><td className="field-name">electronicsCategory</td><td>Consumer Electronics</td><td>Industrial Electronics</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -319,7 +340,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                 <li><strong>Internal Alias ID drives uniqueness</strong> — use a stable internal identifier; model names can repeat</li>
                 <li><strong>Boolean fields:</strong> use "true"/"false" or "1"/"0"</li>
                 <li><strong>Save as CSV</strong>, not .xlsx or .xls</li>
-                <li><strong>Partial fields supported</strong> — missing cells stay empty</li>
+                  <li><strong>Exact field keys only</strong> — use the downloaded template keys, not UI labels</li>
+                  <li><strong>Partial fields supported</strong> — missing cells stay empty</li>
                 <li><strong>File/PDF fields</strong> cannot be set via CSV — upload manually after</li>
               </ul>
             </section>
@@ -339,19 +361,19 @@ function CSVImportGuide({ user, companyId, activeTab }) {
   {
     "internalAliasId": "SKU-1001",
     "modelName": "Unit A",
-    "serial_number": "SN-1001"
+    "productModelIdentifier": "SN-1001"
   },
   {
     "internalAliasId": "SKU-1002",
     "modelName": "Unit B",
-    "serial_number": "SN-1002"
+    "productModelIdentifier": "SN-1002"
   }
 ]`}</pre>
                 <ul>
                   <li>Each object creates one new passport draft</li>
                   <li>Use a unique <code>internalAliasId</code> for every passport</li>
                   <li>Do not include <code>dppId</code> here — this screen is for creation only</li>
-                  <li>Only include fields you want prefilled at creation time</li>
+                  <li>Only include exact passport type field keys you want prefilled at creation time</li>
                 </ul>
               </div>
             </section>

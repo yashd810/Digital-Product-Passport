@@ -143,9 +143,10 @@ function createCatalogApp({ calls, createdTables, audits, registeredTypes = [] }
     createPassportTable: async (typeName, metadata) => createdTables.push({ typeName, metadata }),
     passportTypeHasStoredRecords: async () => false,
     buildPassportTypeSchemaChange: () => ({ changeType: "metadata_only" }),
-    normalizeRequestedPassportTypeSchema: ({ sections, systemHeader, currentSchemaVersion }) => ({
+    normalizeRequestedPassportTypeSchema: ({ sections, systemHeader, currentSchemaVersion, sourceModule }) => ({
       schemaVersion: currentSchemaVersion,
       systemHeader,
+      sourceModule,
       sections,
     }),
     getTypeSchemaVersion: () => 1,
@@ -159,7 +160,7 @@ function createCatalogApp({ calls, createdTables, audits, registeredTypes = [] }
   return app;
 }
 
-test("admin can create passport type with a brand-new product category", async () => {
+test("admin cannot create manual passport type without a registered module source", async () => {
   const calls = [];
   const createdTables = [];
   const audits = [];
@@ -184,16 +185,11 @@ test("admin can create passport type with a brand-new product category", async (
     },
   });
 
-  assert.equal(response.statusCode, 201);
-  assert.equal(response.body.success, true);
-  assert.equal(response.body.passportType.productCategory, "Medical Device");
-  assert.equal(response.body.passportType.semanticModelKey, "claros_medical_device_dictionary_v1");
-
-  const categoryInsert = calls.find((call) => call.sql.includes("INSERT INTO product_categories"));
-  assert.ok(categoryInsert, "Expected category upsert when creating a passport type");
-  assert.deepEqual(categoryInsert.params, ["Medical Device", "MD"]);
-  assert.deepEqual(createdTables.map((entry) => entry.typeName), ["medicalDevicePassportV1"]);
-  assert.equal(audits.length, 1);
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.body.error, "Passport types must be created from a registered passport module.");
+  assert.equal(calls.some((call) => call.sql.includes("INSERT INTO passport_types")), false);
+  assert.deepEqual(createdTables, []);
+  assert.equal(audits.length, 0);
 });
 
 test("admin can preview registered passport type modules before seeding", async () => {

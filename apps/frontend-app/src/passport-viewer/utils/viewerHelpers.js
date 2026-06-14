@@ -43,52 +43,8 @@ export function renderTextBlock(raw, className = "") {
   );
 }
 
-export function isHeroSummaryField(field, fieldLabel = "") {
-  const key = String(field?.key || "").toLowerCase();
-  const label = String(fieldLabel || field?.label || "").toLowerCase();
-
-  if ([
-    "dppId",
-    "passport_identifier",
-    "unique_passport_identifier",
-    "manufactured_date",
-    "manufacture_date",
-    "manufacturing_date",
-    "date_of_manufacture",
-    "battery_identifier",
-    "unique_battery_identifier",
-    "battery_mass",
-    "battery_weight",
-    "weight",
-    "serial_number",
-    "battery_serial_number",
-    "carbon_footprint_label_and_performance_class",
-    "battery_chemistry",
-    "manufacturer",
-    "manufactured_by",
-  ].includes(key)) {
-    return true;
-  }
-
-  return (
-    label === "dppId" ||
-    label.includes("passport identifier") ||
-    label.includes("manufactured date") ||
-    label.includes("manufacturing date") ||
-    label.includes("manufacture date") ||
-    label.includes("date of manufacture") ||
-    label.includes("battery identifier") ||
-    label.includes("battery mass") ||
-    label.includes("battery weight") ||
-    label === "weight" ||
-    label.includes("product id") ||
-    label.includes("battery serial") ||
-    label.includes("serial number") ||
-    label.includes("carbon footprint label and performance class") ||
-    label.includes("battery chemistry") ||
-    label.includes("manufacturer") ||
-    label.includes("manufactured by")
-  );
+export function isHeroSummaryField(field) {
+  return field?.displayRole === "hero";
 }
 
 export function toInlineText(value) {
@@ -158,19 +114,28 @@ export function formatIsoDate(value, { dateOnly = false } = {}) {
   });
 }
 
+const PRESENTATION_TONES = {
+  data: { tone: "data", eyebrow: "" },
+  specCard: { tone: "data", eyebrow: "" },
+  document: { tone: "document", eyebrow: "Evidence file" },
+  evidenceFile: { tone: "document", eyebrow: "Evidence file" },
+  table: { tone: "table", eyebrow: "Structured data" },
+  dataset: { tone: "table", eyebrow: "Structured data" },
+  compositionChart: { tone: "composition", eyebrow: "Composition" },
+  liveMetric: { tone: "live", eyebrow: "Live metric" },
+  link: { tone: "link", eyebrow: "Reference link" },
+  symbol: { tone: "symbol", eyebrow: "Visual marker" },
+  badge: { tone: "status", eyebrow: "Status" },
+  status: { tone: "status", eyebrow: "Status" },
+  narrative: { tone: "narrative", eyebrow: "Detailed information" },
+  narrativeBlock: { tone: "narrative", eyebrow: "Detailed information" },
+};
+
 export function getFieldPresentation(field, raw, isLocked, pieItems) {
   if (isLocked) return { tone: "restricted", eyebrow: "Protected data" };
-  if (field.type === "file") return { tone: "document", eyebrow: "Evidence file" };
-  if (field.type === "table") return { tone: "table", eyebrow: "Structured data" };
-  if (pieItems) return { tone: "composition", eyebrow: "Composition" };
-  if (field.dynamic) return { tone: "live", eyebrow: "Live metric" };
-  if (field.type === "url") return { tone: "link", eyebrow: "Reference link" };
-  if (field.type === "symbol") return { tone: "symbol", eyebrow: "Visual marker" };
-  if (field.type === "boolean") return { tone: "status", eyebrow: "Status" };
-  if (typeof raw === "string" && (raw.includes("\n") || raw.length > 120)) {
-    return { tone: "narrative", eyebrow: "Detailed information" };
-  }
-  return { tone: "data", eyebrow: "" };
+  if (pieItems) return PRESENTATION_TONES.compositionChart;
+  const presentation = String(field?.presentation).trim();
+  return PRESENTATION_TONES[presentation];
 }
 
 export function getSummaryValue(field, raw, isLocked, lang) {
@@ -190,15 +155,8 @@ export function getSummaryValue(field, raw, isLocked, lang) {
 }
 
 export function shouldFeatureInSummary(field, raw, isLocked, pieItems) {
-  if (field.type === "file" || field.type === "table" || field.type === "symbol" || pieItems) {
-    return false;
-  }
-  if (isLocked) return true;
-  if (raw === 0) return true;
-  if (!raw) return false;
-  if (field.type === "boolean" || field.type === "url" || field.dynamic) return true;
-  const text = toInlineText(raw);
-  return !!text && text.length <= 72;
+  if (pieItems) return false;
+  return field?.displayRole === "summary" || field?.displayRole === "trust";
 }
 
 export function getSummaryHint(field, isLocked, isDynamic, tone) {

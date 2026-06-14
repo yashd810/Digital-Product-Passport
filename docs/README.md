@@ -23,15 +23,16 @@ You do not need to understand every source file before making safe changes. The 
 ## Read In This Order
 
 1. [Getting Started](./guides/getting-started.md)
-2. [System Overview](./architecture/system-overview.md)
-3. [Repository Layout](./architecture/repository-layout.md)
-4. [Runtime Wiring](./architecture/runtime-wiring.md)
-5. [Backend API](./apps/backend-api.md)
-6. [Frontend Dashboard](./apps/frontend-dashboard.md)
-7. [Public Passport Viewer](./apps/public-passport-viewer.md)
-8. [Database and Storage](./database/schema-and-storage.md)
-9. [API Surface](./api/api-surface.md)
-10. [Developer Workflows](./development/developer-workflows.md)
+2. [Seeding Passport Modules](./guides/seeding-passport-modules.md)
+3. [System Overview](./architecture/system-overview.md)
+4. [Repository Layout](./architecture/repository-layout.md)
+5. [Runtime Wiring](./architecture/runtime-wiring.md)
+6. [Backend API](./apps/backend-api.md)
+7. [Frontend Dashboard](./apps/frontend-dashboard.md)
+8. [Public Passport Viewer](./apps/public-passport-viewer.md)
+9. [Database and Storage](./database/schema-and-storage.md)
+10. [API Surface](./api/api-surface.md)
+11. [Developer Workflows](./development/developer-workflows.md)
 
 ## Current Docs Map
 

@@ -67,14 +67,6 @@ function TermCard({ term, unitsByKey, termHref }) {
               {term.iri}
             </a>
           </div>
-          {term.appFieldKeys?.length > 0 && (
-            <div className="dictionary-term-field-row">
-              <span className="dictionary-term-meta-label">Field keys:</span>
-              {term.appFieldKeys.map((key) => (
-                <code key={key} className="dictionary-field-pill">{key}</code>
-              ))}
-            </div>
-          )}
         </div>
         <div className="dictionary-term-side">
           <div className="dictionary-term-ref">#{term.specRef || term.number}</div>
@@ -155,18 +147,6 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath, ap
             )}
           </div>
 
-          <div className="dictionary-detail-section">
-            <h2>Application field keys</h2>
-            {term.appFieldKeys?.length ? (
-              <div className="dictionary-detail-pill-row">
-                {term.appFieldKeys.map((key) => (
-                  <code key={key} className="dictionary-field-pill">{key}</code>
-                ))}
-              </div>
-            ) : (
-              <p className="dictionary-detail-empty">No application field keys are mapped yet.</p>
-            )}
-          </div>
         </section>
 
         <aside className="dictionary-detail-panel dictionary-detail-sidebar">
@@ -302,7 +282,7 @@ export default function DictionaryBrowserPage() {
         || nextTerm.label.toLowerCase().includes(query)
         || nextTerm.definition.toLowerCase().includes(query)
         || nextTerm.slug.includes(query)
-        || (nextTerm.appFieldKeys || []).some((key) => key.toLowerCase().includes(query));
+        || String(nextTerm.iri || "").toLowerCase().includes(query);
       return matchesCategory && matchesSearch;
     });
   }, [terms, activeCategory, deferredSearch]);
@@ -335,8 +315,8 @@ export default function DictionaryBrowserPage() {
           <h1>{isDetailView ? term?.label : (manifest?.name || "Semantic Dictionary")}</h1>
           <p className="dictionary-hero-subtitle">
             {isDetailView
-              ? "Canonical dictionary metadata for this term, including its JSON-LD identifier, datatype contract, and field mappings."
-              : `${manifest?.description || "Browse canonical terms, JSON-LD links, and field-key mappings for this semantic model."}`}
+              ? "Canonical dictionary metadata for this term, including its JSON-LD identifier and datatype contract."
+              : `${manifest?.description || "Browse canonical terms, JSON-LD links, and module-ready metadata for this semantic model."}`}
           </p>
 
           <div className="dictionary-meta-grid">
@@ -371,9 +351,6 @@ export default function DictionaryBrowserPage() {
             <div className="dictionary-footer-links">
               <a href={manifest?.categoryRulesUrl || `${apiPath}/category-rules`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
                 Applicability rules
-              </a>
-              <a href={`${apiPath}/field-map`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
-                Field map
               </a>
             </div>
           </div>

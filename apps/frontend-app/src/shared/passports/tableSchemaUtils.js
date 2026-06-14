@@ -1,4 +1,4 @@
-export function tableColumnKeyFromLabel(label, fallback = "column") {
+export function tableColumnKeyFromLabel(label, emptyKey = "column") {
   const words = String(label || "")
     .trim()
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -6,7 +6,7 @@ export function tableColumnKeyFromLabel(label, fallback = "column") {
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
 
-  if (!words.length) return fallback;
+  if (!words.length) return emptyKey;
   return words
     .map((word, index) => index === 0 ? word : `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
     .join("");
@@ -20,9 +20,15 @@ export function createTableColumn(index = 0, overrides = {}) {
     key: String(overrides.key || tableColumnKeyFromLabel(normalizedLabel, `column${index + 1}`)).trim() || `column${index + 1}`,
     label: normalizedLabel === `Column ${index + 1}` && !String(label).trim() ? normalizedLabel : label,
     ...(overrides.semanticId ? { semanticId: overrides.semanticId } : {}),
+    ...(overrides.elementIdPath ? { elementIdPath: overrides.elementIdPath } : {}),
+    ...(overrides.objectType ? { objectType: overrides.objectType } : {}),
+    ...(overrides.valueDataType ? { valueDataType: overrides.valueDataType } : {}),
     ...(overrides.dataType ? { dataType: overrides.dataType } : {}),
     ...(overrides.unit ? { unit: overrides.unit } : {}),
     ...(overrides.required ? { required: true } : {}),
+    ...(overrides.canonicalLocked ? { canonicalLocked: true } : {}),
+    ...(overrides.sourceModuleKey ? { sourceModuleKey: overrides.sourceModuleKey } : {}),
+    ...(overrides.sourceModuleColumnKey ? { sourceModuleColumnKey: overrides.sourceModuleColumnKey } : {}),
     ...(overrides._keyManual ? { _keyManual: true } : {}),
     ...(overrides._semanticSearch ? { _semanticSearch: overrides._semanticSearch } : {}),
     ...(overrides._semanticOpen ? { _semanticOpen: overrides._semanticOpen } : {}),
@@ -51,12 +57,7 @@ export function normalizeTableColumns(fieldOrColumns = {}) {
     ? fieldOrColumns
     : (Array.isArray(fieldOrColumns?.table_columns) ? fieldOrColumns.table_columns : []);
 
-  if (source.length) {
-    return source.map((column, index) => normalizeTableColumn(column, index));
-  }
-
-  const fallbackCount = Math.max(1, Number.parseInt(fieldOrColumns?.table_cols, 10) || 2);
-  return Array.from({ length: fallbackCount }, (_, index) => createTableColumn(index));
+  return source.map((column, index) => normalizeTableColumn(column, index));
 }
 
 export function serializeTableColumns(fieldOrColumns = {}) {
@@ -66,9 +67,15 @@ export function serializeTableColumns(fieldOrColumns = {}) {
       label: column.label,
     };
     if (column.semanticId) clean.semanticId = column.semanticId;
+    if (column.elementIdPath) clean.elementIdPath = column.elementIdPath;
+    if (column.objectType) clean.objectType = column.objectType;
+    if (column.valueDataType) clean.valueDataType = column.valueDataType;
     if (column.dataType) clean.dataType = column.dataType;
     if (column.unit) clean.unit = column.unit;
     if (column.required) clean.required = true;
+    if (column.canonicalLocked) clean.canonicalLocked = true;
+    if (column.sourceModuleKey) clean.sourceModuleKey = column.sourceModuleKey;
+    if (column.sourceModuleColumnKey) clean.sourceModuleColumnKey = column.sourceModuleColumnKey;
     return clean;
   });
 }

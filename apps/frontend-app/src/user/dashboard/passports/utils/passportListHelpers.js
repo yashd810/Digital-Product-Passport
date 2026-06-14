@@ -1,4 +1,3 @@
-import { PASSPORT_SECTIONS_MAP } from "../../../../passports/config/PassportFields";
 import { isReleasedPassportStatus } from "../../../../passports/utils/passportStatus";
 
 const BASE_COMPLETENESS_FIELDS = [
@@ -79,42 +78,14 @@ function getPassportFieldValue(passport, key) {
   return Object.prototype.hasOwnProperty.call(passport, key) ? passport[key] : undefined;
 }
 
-export function getPassportSerialNumber(passport) {
-  const value = getPassportFieldValue(passport || {}, "productSerialNumber")
-    ?? getPassportFieldValue(passport || {}, "serialNumber")
-    ?? getPassportFieldValue(passport || {}, "batterySerialNumber");
-  return value == null ? "" : String(value).trim();
-}
-
-function normalizeSerialHint(value) {
-  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function isLikelySerialField(field = {}) {
-  const hints = [
-    field.key,
-    field.label,
-    field.elementId,
-    field.semanticId,
-    field.dictionaryReference,
-  ];
-  return hints.some((hint) => {
-    const normalized = normalizeSerialHint(hint);
-    return normalized.includes("serialnumber") || normalized === "serial";
-  });
-}
-
 export function getPassportSerialNumberForType(passport, typeDefinitions = []) {
-  const explicitSerial = getPassportSerialNumber(passport);
-  if (explicitSerial) return explicitSerial;
-
   const passportType = passport?.passportType;
-  const typeFields = passportType ? getTypeFields(passportType, typeDefinitions) : [];
-  const serialField = typeFields.find(isLikelySerialField);
-  if (!serialField?.key) return "";
+  const dynamicType = typeDefinitions.find((type) => type.typeName === passportType);
+  const businessIdentifierField = dynamicType?.fieldsJson?.identity?.businessIdentifierField || "";
+  if (!businessIdentifierField) return "";
 
-  const value = getPassportFieldValue(passport || {}, serialField.key);
-  return value == null ? "" : String(value).trim();
+  const value = getPassportFieldValue(passport || {}, businessIdentifierField);
+  return value == null || String(value).trim() === "" ? "" : String(value).trim();
 }
 
 function hasCompletionValue(value, field = {}) {
@@ -146,11 +117,7 @@ function hasCompletionValue(value, field = {}) {
 function getTypeFields(passportType, typeDefinitions = []) {
   const dynamicType = typeDefinitions.find((type) => type.typeName === passportType);
   const dynamicFields = dynamicType?.fieldsJson?.sections?.flatMap((section) => section.fields || []) || [];
-  if (dynamicFields.length) return dynamicFields;
-
-  return PASSPORT_SECTIONS_MAP[passportType]
-    ? Object.values(PASSPORT_SECTIONS_MAP[passportType]).flatMap((section) => section.fields)
-    : [];
+  return dynamicFields;
 }
 
 export function calcCompleteness(passport, typeDefinitions = []) {

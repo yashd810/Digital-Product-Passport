@@ -264,20 +264,9 @@ function findSchemaFieldDefinition(typeDef, elementIdPath) {
   const rootPath = normalizedPath.error ? String(elementIdPath || "").trim() : normalizedPath.rootElementIdPath;
 
   return getSchemaFieldDefinitions(typeDef).find((field) =>
-    field.key === exactPath ||
-    field.semanticId === exactPath ||
-    field.elementId === exactPath ||
-    field.key === rootPath ||
-    field.semanticId === rootPath ||
-    field.elementId === rootPath ||
-    (
-      rootPath &&
-      (
-        field.key === rootPath ||
-        field.semanticId === rootPath ||
-        field.elementId === rootPath
-      )
-    )) || null;
+    field.elementIdPath === exactPath ||
+    field.elementIdPath === rootPath
+  ) || null;
 }
 
 function createElementHelpers({
@@ -289,7 +278,7 @@ function createElementHelpers({
     const elementIdPath = normalizedPath?.path || String(normalizedPath || "");
     const fieldDef = normalizedPath?.childSegments?.length ? null : findSchemaFieldDefinition(typeDef, elementIdPath);
     const granularity = String(passport?.granularity || "item").trim().toLowerCase() || "item";
-    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
+    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}, typeDef) || "";
     const derivedProductIdentifier = businessIdentifier ?
       productIdentifierService?.buildCanonicalProductDid?.({
         companyId: passport.companyId,
@@ -328,13 +317,13 @@ function createElementHelpers({
 
     const elementIdPath = normalizedPath?.path || "";
     const fieldDef = findSchemaFieldDefinition(typeDef, elementIdPath);
+    if (!fieldDef) {
+      return { error: "Unknown elementIdPath" };
+    }
     const allowedElementIds = new Set(
       [
-        fieldDef?.elementId,
-        fieldDef?.key,
+        fieldDef?.elementIdPath,
         elementIdPath,
-        normalizedPath?.leafElementId,
-        normalizedPath?.rootElementIdPath,
       ]
         .filter(Boolean)
         .map((value) => String(value))

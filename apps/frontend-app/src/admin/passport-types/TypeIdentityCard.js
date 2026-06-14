@@ -20,6 +20,7 @@ export function TypeIdentityCard({
   setError,
   setInvalidFields,
   iconPresets,
+  semanticModelLocked = false,
 }) {
   const categoryMenuRef = useRef(null);
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
@@ -189,9 +190,12 @@ export function TypeIdentityCard({
             menuClassName="acpt-select-menu"
             optionClassName="acpt-select-option"
             ariaLabel="Semantic model"
+            disabled={semanticModelLocked}
           />
           <span className="acpt-hint">
-            {(semanticModelOptions.find((option) => option.key === semanticModelKey) || semanticModelOptions[0])?.description}
+            {semanticModelLocked
+              ? "Controlled by the selected passport module."
+              : (semanticModelOptions.find((option) => option.key === semanticModelKey) || semanticModelOptions[0])?.description}
           </span>
         </div>
       </div>

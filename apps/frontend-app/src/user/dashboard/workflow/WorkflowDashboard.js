@@ -6,7 +6,6 @@ import { isObsoletePassportStatus, normalizePassportStatus } from "../../../pass
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
 import { extractComplianceError, formatComplianceIssueSummary } from "../../../shared/utils/complianceErrors";
-import { getPassportSerialNumber } from "../passports/utils/passportListHelpers";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../admin/styles/AdminDashboard.css";
 
@@ -581,13 +580,13 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     const needsMyReview = showActions && String(wf.reviewerId) === String(user?.id) && wf.reviewStatus === "pending";
     const needsMyApproval = showActions && String(wf.approverId) === String(user?.id) && wf.approvalStatus === "pending" && wf.reviewStatus !== "pending";
     const workflowPassportId = getWorkflowPassportId(wf);
-    const serialNumber = getPassportSerialNumber(wf);
+    const passportLabel = getWorkflowModelName(wf) || workflowPassportId;
     return (
       <tr key={wf.id}>
         <td>
           <button className="model-link-btn"
             onClick={() => openPassportViewer(wf)}>
-            {serialNumber || getWorkflowModelName(wf) || workflowPassportId}
+            {passportLabel}
           </button>
           <div className="workflow-meta-copy">
             {getWorkflowPassportType(wf)} · v{getWorkflowVersionNumber(wf)}
@@ -645,7 +644,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
   const showActionColumn = tab !== "history";
 
   const workflowColumns = useMemo(() => ([
-    { key: "serialNumber", type: "string", getValue: (wf) => getPassportSerialNumber(wf) },
+    { key: "serialNumber", type: "string", getValue: (wf) => getWorkflowModelName(wf) || getWorkflowPassportId(wf) || "" },
     { key: "modelName", type: "string", getValue: (wf) => getWorkflowModelName(wf) },
     { key: "status", type: "string", getValue: (wf) => (
       wf.overallStatus === "rejected" ? "rejected" :

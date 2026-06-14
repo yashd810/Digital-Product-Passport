@@ -103,10 +103,10 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     return { history: [] };
   }, []);
 
-  const refreshFieldUrl = useCallback(async (fieldKey, fallbackUrl) => {
+  const refreshFieldUrl = useCallback(async (fieldKey) => {
     const refreshed = await fetchPassportRecord({ applyState: true });
     const nextValue = refreshed?.[fieldKey];
-    return typeof nextValue === "string" && nextValue.trim() ? nextValue : fallbackUrl;
+    return typeof nextValue === "string" && nextValue.trim() ? nextValue : "";
   }, [fetchPassportRecord]);
 
   // Primary data loading
@@ -142,7 +142,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         if (typeRes.ok) {
           setTypeDef(await typeRes.json());
         } else {
-          // Graceful fallback: empty sections
           setTypeDef({ sections: [] });
         }
         setPublicHistoryPayload(historyPayload || { history: [] });

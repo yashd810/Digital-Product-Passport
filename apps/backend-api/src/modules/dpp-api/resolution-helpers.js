@@ -50,7 +50,7 @@ function createResolutionHelpers({
   function buildIdentifierLineageEnvelope(passport, identifierLineage = []) {
     return {
       ...buildDppIdentifierFields(passport),
-      uniqueProductIdentifier: productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) ? (passport?.uniqueProductIdentifier || null) : null,
+      uniqueProductIdentifier: passport?.uniqueProductIdentifier || null,
       internalAliasId: passport?.internalAliasId || null,
       granularity: passport?.granularity || "item",
       lineageId: passport?.lineageId || null,

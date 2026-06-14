@@ -1,8 +1,8 @@
 const NO_SEMANTIC_MODEL_OPTION = {
   key: "",
-  label: "No semantic model",
-  description: "Do not attach a semantic model to this passport type yet.",
-  registered: true,
+  label: "Semantic model required",
+  description: "Select a passport module so its semantic model can be applied.",
+  registered: false,
 };
 
 export function normalizeSemanticModelKey(semanticModelKey) {
@@ -10,8 +10,8 @@ export function normalizeSemanticModelKey(semanticModelKey) {
 }
 
 export function buildSemanticModelOptions(models = [], selectedModelKey = "") {
-  const options = [NO_SEMANTIC_MODEL_OPTION];
-  const seen = new Set([""]);
+  const options = [];
+  const seen = new Set();
 
   for (const model of Array.isArray(models) ? models : []) {
     const key = normalizeSemanticModelKey(model?.semanticModelKey || model?.key);
@@ -47,7 +47,7 @@ export function getSemanticModelOption(options = [], modelKey = "") {
 
 export function formatSemanticModelLabel(modelKey) {
   const normalized = normalizeSemanticModelKey(modelKey);
-  if (!normalized) return "No semantic model";
+  if (!normalized) return "Semantic model required";
   return normalized
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/_v(\d+)$/i, " v$1")
@@ -81,20 +81,12 @@ function semanticHumanize(value) {
     .join(" ");
 }
 
-function semanticInternalKey(value) {
-  return String(value || "")
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .replace(/_+/g, "_");
-}
-
 function resolveTermKey(term = {}) {
   return (
-    term.appFieldKeys?.[0]
-    || term.internalKey
-    || semanticInternalKey(term.label || term.attributeName || term.slug)
+    term.internalKey
+    || term.slug
+    || term.iri
+    || term.termIri
   );
 }
 
@@ -104,22 +96,6 @@ export function normalizeSemanticTermCatalog(terms = []) {
       const key = resolveTermKey(term);
       const semanticId = term.iri || term.termIri;
       if (!key || !semanticId) return null;
-
-      const aliases = new Set([
-        key,
-        term.label,
-        term.attributeName,
-        term.sourceAttributeName,
-        term.internalKey,
-        semanticHumanize(term.internalKey),
-        term.slug,
-        semanticHumanize(term.slug),
-      ]);
-
-      for (const fieldKey of (term.appFieldKeys || [])) {
-        aliases.add(fieldKey);
-        aliases.add(semanticHumanize(fieldKey));
-      }
 
       return {
         key,
@@ -132,7 +108,6 @@ export function normalizeSemanticTermCatalog(terms = []) {
         range: term.range || null,
         category: term.category || null,
         categoryLabel: term.categoryLabel || null,
-        normalizedAliases: [...aliases].map(semanticNormalize).filter(Boolean),
       };
     })
     .filter(Boolean);
@@ -169,69 +144,17 @@ export function resolveSemanticTermDefinitionBySemanticId(catalog = [], semantic
   return catalog.find((entry) => entry.semanticId === normalized) || null;
 }
 
-function semanticExactCatalogMatch(catalog = [], value = "") {
-  const normalized = semanticNormalize(value);
-  if (!normalized) return null;
-  return (
-    catalog.find((entry) =>
-      entry.normalizedAliases.includes(normalized) || semanticNormalize(entry.key) === normalized
-    ) || null
-  );
-}
-
-export function resolveSemanticTermDefinition(catalog = [], label = "", currentKey = "") {
-  const exactKeyMatch = semanticExactCatalogMatch(catalog, currentKey);
-  const normalizedLabel = semanticNormalize(label);
-  if (!normalizedLabel) return exactKeyMatch;
-
-  const exactLabelMatch = semanticExactCatalogMatch(catalog, label);
-  if (exactLabelMatch) return exactLabelMatch;
-  if (exactKeyMatch && semanticNormalize(currentKey) === normalizedLabel) return exactKeyMatch;
-
-  let best = null;
-  let bestScore = 0;
-
-  for (const entry of catalog) {
-    for (const alias of entry.normalizedAliases) {
-      if (!alias) continue;
-      let score = 0;
-      if (normalizedLabel === alias) {
-        score = 1000 + alias.length;
-      } else {
-        const labelWords = new Set(normalizedLabel.split(" "));
-        const aliasWords = new Set(alias.split(" "));
-        const overlap = [...labelWords].filter((word) => aliasWords.has(word)).length;
-        const coverage = overlap / Math.max(labelWords.size, aliasWords.size);
-        const startsWithSameWord = normalizedLabel.split(" ")[0] && normalizedLabel.split(" ")[0] === alias.split(" ")[0];
-
-        if (normalizedLabel.includes(alias) || alias.includes(normalizedLabel)) {
-          score = 700 + Math.min(normalizedLabel.length, alias.length);
-        } else if (overlap >= 2 && coverage >= 0.5) {
-          score = 400 + overlap * 40 + Math.round(coverage * 100);
-        } else if (overlap === 1 && startsWithSameWord && labelWords.size <= 3 && aliasWords.size <= 3) {
-          score = 180 + Math.round(coverage * 100);
-        }
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        best = entry;
-      }
-    }
-  }
-
-  if (exactKeyMatch && bestScore < 700) return exactKeyMatch;
-  if (bestScore >= 220) return best;
-  return exactKeyMatch;
-}
-
 export function resolveSemanticTermDefinitionByInput(catalog = [], value = "") {
   const raw = String(value || "").trim();
   if (!raw) return null;
+  const normalized = semanticNormalize(raw);
   return (
     resolveSemanticTermDefinitionBySemanticId(catalog, raw)
     || catalog.find((entry) => entry.key === raw)
     || catalog.find((entry) => entry.label === raw)
-    || semanticExactCatalogMatch(catalog, raw)
+    || catalog.find((entry) => `${entry.key} - ${entry.label}` === raw)
+    || catalog.find((entry) => semanticNormalize(entry.key) === normalized)
+    || catalog.find((entry) => semanticNormalize(entry.label) === normalized)
     || null
   );
 }
@@ -267,9 +190,10 @@ export function getSemanticSearchDisplayValue(field = {}, catalog = []) {
 export function resolveSelectedSemanticMatch(field = {}, catalog = []) {
   if (!field.semanticId) return null;
   const catalogEntry = resolveSemanticTermDefinitionBySemanticId(catalog, field.semanticId);
+  if (!catalogEntry) return null;
   return {
-    key: catalogEntry?.key || field.key || "",
-    label: catalogEntry?.label || field.label || semanticHumanize(field.key || ""),
+    key: catalogEntry.key,
+    label: catalogEntry.label,
     semanticId: field.semanticId,
   };
 }

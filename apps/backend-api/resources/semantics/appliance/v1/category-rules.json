@@ -13,8 +13,8 @@
     "voluntary": "o",
     "not_applicable": ""
   },
-  "requirementsByFieldKey": {
-    "productModelIdentifier": {
+  "requirementsBySemanticId": {
+    "https://www.claros-dpp.online/dictionary/appliance/v1/terms/product-model-identifier": {
       "termNumber": 1,
       "termLabel": "Product Model Identifier",
       "sourceAttribute": "Product Model Identifier",
@@ -25,7 +25,7 @@
         "Consumer Electronics": "mandatory_espr_jtc24"
       }
     },
-    "applianceCategory": {
+    "https://www.claros-dpp.online/dictionary/appliance/v1/terms/appliance-category": {
       "termNumber": 2,
       "termLabel": "Appliance Category",
       "sourceAttribute": "Appliance Category",
@@ -36,7 +36,7 @@
         "Consumer Electronics": "mandatory_espr_jtc24"
       }
     },
-    "manufacturerName": {
+    "https://www.claros-dpp.online/dictionary/appliance/v1/terms/manufacturer-name": {
       "termNumber": 3,
       "termLabel": "Manufacturer Name",
       "sourceAttribute": "Manufacturer Name",
@@ -47,7 +47,7 @@
         "Consumer Electronics": "mandatory_espr_jtc24"
       }
     },
-    "energyRating": {
+    "https://www.claros-dpp.online/dictionary/appliance/v1/terms/energy-rating": {
       "termNumber": 4,
       "termLabel": "Energy Rating",
       "sourceAttribute": "Energy Rating",
@@ -58,7 +58,7 @@
         "Consumer Electronics": "voluntary"
       }
     },
-    "powerConsumption": {
+    "https://www.claros-dpp.online/dictionary/appliance/v1/terms/power-consumption": {
       "termNumber": 5,
       "termLabel": "Power Consumption",
       "sourceAttribute": "Power Consumption",
@@ -69,7 +69,7 @@
         "Consumer Electronics": "voluntary"
       }
     },
-    "repairabilityScore": {
+    "https://www.claros-dpp.online/dictionary/appliance/v1/terms/repairability-score": {
       "termNumber": 6,
       "termLabel": "Repairability Score",
       "sourceAttribute": "Repairability Score",
@@ -80,7 +80,7 @@
         "Consumer Electronics": "voluntary"
       }
     },
-    "sparePartsAvailability": {
+    "https://www.claros-dpp.online/dictionary/appliance/v1/terms/spare-parts-availability": {
       "termNumber": 7,
       "termLabel": "Spare Parts Availability",
       "sourceAttribute": "Spare Parts Availability",
@@ -91,7 +91,7 @@
         "Consumer Electronics": "mandatory_espr_jtc24"
       }
     },
-    "complianceDeclaration": {
+    "https://www.claros-dpp.online/dictionary/appliance/v1/terms/compliance-declaration": {
       "termNumber": 8,
       "termLabel": "Compliance Declaration",
       "sourceAttribute": "Compliance Declaration",

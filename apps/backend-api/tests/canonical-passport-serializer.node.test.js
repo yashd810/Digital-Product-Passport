@@ -40,8 +40,22 @@ function createTextileTypeDef() {
       sections: [{
         key: "textileIdentity",
         fields: [
-          { key: "fiberComposition", label: "Fiber Composition", type: "text" },
-          { key: "recycledContentPercentage", label: "Recycled Content Percentage", type: "text" },
+          {
+            key: "fiberComposition",
+            label: "Fiber Composition",
+            type: "text",
+            semanticId: "https://www.claros-dpp.online/dictionary/textile/v1/terms/fiber-composition",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+          },
+          {
+            key: "recycledContentPercentage",
+            label: "Recycled Content Percentage",
+            type: "text",
+            semanticId: "https://www.claros-dpp.online/dictionary/textile/v1/terms/recycled-content-percentage",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "Decimal",
+          },
         ],
       }],
     },
@@ -67,21 +81,15 @@ function createApplianceRegistryFixture() {
       slug: "appliance-class",
       label: "Appliance class",
       iri: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
-      appFieldKeys: ["applianceClass"],
       dataType: "string",
     },
     {
       slug: "energy-rating",
       label: "Energy rating",
       iri: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
-      appFieldKeys: ["energyRating"],
       dataType: "string",
     },
   ]);
-  writeJson(path.join(modelDir, "field-map.json"), {
-    applianceClass: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
-    energyRating: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
-  });
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
       applianceClass: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
@@ -90,8 +98,8 @@ function createApplianceRegistryFixture() {
   });
   writeJson(path.join(modelDir, "category-rules.json"), {
     categories: ["Home", "Industrial"],
-    requirementsByFieldKey: {
-      energyRating: {
+    requirementsBySemanticId: {
+      "https://example.test/dictionary/appliance/v3/terms/energy-rating": {
         requirements: {
           Home: "mandatory_espr_jtc24",
           Industrial: "voluntary",
@@ -119,15 +127,29 @@ function createApplianceTypeDef() {
         kind: "semanticCategory",
         productKind: "appliance",
         label: "appliance class",
-        fieldKey: "applianceClass",
+        semanticId: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
       },
     },
     fieldsJson: {
       sections: [{
         key: "applianceIdentity",
         fields: [
-          { key: "applianceClass", label: "Appliance Class", type: "text" },
-          { key: "energyRating", label: "Energy Rating", type: "text" },
+          {
+            key: "applianceClass",
+            label: "Appliance Class",
+            type: "text",
+            semanticId: "https://example.test/dictionary/appliance/v3/terms/appliance-class",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+          },
+          {
+            key: "energyRating",
+            label: "Energy Rating",
+            type: "text",
+            semanticId: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
+            objectType: "SingleValuedDataElement",
+            valueDataType: "String",
+          },
         ],
       }],
     },

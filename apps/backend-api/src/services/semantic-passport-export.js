@@ -79,8 +79,7 @@ function createSemanticPassportExportService({
 
   function resolveDictionaryTermIri(model, fieldKey, semanticId = null) {
     if (semanticId) return semanticId;
-    if (!model || !fieldKey) return null;
-    return semanticModelRegistry.resolveFieldKey(model.semanticModelKey, fieldKey);
+    return null;
   }
 
   function buildInlineContext({ model, passports = [], typeDef = null } = {}) {

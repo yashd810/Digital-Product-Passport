@@ -11,8 +11,8 @@
     "voluntary": "o",
     "not_applicable": ""
   },
-  "requirementsByFieldKey": {
-    "productModelIdentifier": {
+  "requirementsBySemanticId": {
+    "https://www.claros-dpp.online/dictionary/electronics/v1/terms/product-model-identifier": {
       "termNumber": 1,
       "termLabel": "Product Model Identifier",
       "sourceAttribute": "Product Model Identifier",
@@ -21,7 +21,7 @@
         "Industrial Electronics": "mandatory_espr_jtc24"
       }
     },
-    "manufacturerName": {
+    "https://www.claros-dpp.online/dictionary/electronics/v1/terms/manufacturer-name": {
       "termNumber": 2,
       "termLabel": "Manufacturer Name",
       "sourceAttribute": "Manufacturer Name",
@@ -30,7 +30,7 @@
         "Industrial Electronics": "mandatory_espr_jtc24"
       }
     },
-    "ratedPower": {
+    "https://www.claros-dpp.online/dictionary/electronics/v1/terms/rated-power": {
       "termNumber": 3,
       "termLabel": "Rated Power",
       "sourceAttribute": "Rated Power",

@@ -18,6 +18,17 @@ function term(slug) {
   return `${ELECTRONICS_V1_SEMANTIC_BASE}/${slug}`;
 }
 
+function valueDataTypeFor({ type, dataType }) {
+  if (type === "file") return "Binary";
+  if (type === "url") return "URI";
+  if (dataType === "integer") return "Integer";
+  if (dataType === "number" || dataType === "decimal") return "Decimal";
+  if (dataType === "boolean" || type === "checkbox") return "Boolean";
+  if (dataType === "date" || type === "date") return "Date";
+  if (dataType === "datetime") return "DateTime";
+  return "String";
+}
+
 function field({
   key,
   label,
@@ -29,6 +40,11 @@ function field({
   queryable = false,
   indexed = false,
   storageType = "",
+  displayRole = "detail",
+  presentation = "data",
+  summaryRole = null,
+  lifecycleRole = null,
+  mediaRole = null,
 }) {
   const access = accessLevel === "restricted" ? restrictedFieldDefaults : publicFieldDefaults;
   return {
@@ -39,6 +55,14 @@ function field({
     semanticId: term(semanticSlug),
     unit,
     dataType,
+    elementIdPath: key,
+    objectType: type === "file" || type === "url" ? "RelatedResource" : "SingleValuedDataElement",
+    valueDataType: valueDataTypeFor({ type, dataType }),
+    displayRole,
+    presentation,
+    summaryRole,
+    lifecycleRole,
+    mediaRole,
     ...(queryable ? { queryable: true } : {}),
     ...(indexed ? { indexed: true } : {}),
     ...(storageType ? { storageType } : {}),
@@ -52,6 +76,9 @@ module.exports = {
   productCategory: "Electronics",
   productIcon: "EL",
   semanticModelKey: "claros_electronics_dictionary_v1",
+  identity: {
+    businessIdentifierField: "productModelIdentifier",
+  },
   complianceProfile: {
     key: "electronicsDppV1",
     displayName: "Electronics Passport DPP Profile v1",
@@ -63,18 +90,8 @@ module.exports = {
     defaultCarrierPolicyKey: "web_public_entry_v1",
     enforceSemanticMapping: true,
     requirePublicAccessLayer: true,
-    categoryPolicy: {
-        "kind": "semanticCategory",
-        "productKind": "electronics",
-        "label": "Electronics category",
-        "fieldKey": "electronicsCategory",
-        "supportedCategories": [
-            "Consumer Electronics",
-            "Industrial Electronics"
-        ],
-        "aliases": {}
-    },
-    managedSemanticFieldKeys: [],
+    categoryPolicy: null,
+    managedSemanticFields: [],
   },
   schemaVersion: 1,
   lifecycle: {

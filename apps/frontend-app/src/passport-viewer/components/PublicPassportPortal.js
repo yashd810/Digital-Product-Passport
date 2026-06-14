@@ -5,7 +5,7 @@ import { formatPassportStatus } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
 import { DynamicChart } from "./DynamicChart";
-import { PieChart, parseCompositionFromTable, parseCompositionFromText } from "./PieChart";
+import { PieChart, parseCompositionFromTable } from "./PieChart";
 import { FileCell, LiveBadge, LockedFieldCell, RefreshableImage, ViewerDomainIndicator } from "./ViewerBlocks";
 import { appendUnitToDisplayValue, formatFieldLabelWithUnit, formatIsoDate, renderTextBlock } from "../utils/viewerHelpers";
 
@@ -73,45 +73,11 @@ function formatDisplayValue(field, value) {
   return appendUnitToDisplayValue(formatValue(value), field);
 }
 
-function slugifyDidSegment(value, fallback = "company") {
-  const slug = String(value || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-+/g, "-");
-  return slug || fallback;
-}
-
-function stableDidSegment(value, fallback = "passport") {
-  const segment = String(value || "")
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return segment || fallback;
-}
-
-function buildViewerDidFallbacks(passport, companyData) {
-  const didDomain = "www.claros-dpp.online";
-  const companyName = companyData?.companyName
-    || passport?.companyProfile?.companyName
-    || passport?.companyName
-    || passport?.companyId
-    || "company";
-  const companySlug = slugifyDidSegment(companyData?.didSlug || passport?.companyProfile?.didSlug || companyName);
-  const granularity = slugifyDidSegment(passport?.granularity || "item", "item");
-  const stableId = stableDidSegment(passport?.lineageId || passport?.dppId || passport?.internalAliasId);
-  return {
-    companyDid: `did:web:${didDomain}:did:company:${companySlug}`,
-    dppDid: `did:web:${didDomain}:did:dpp:${granularity}:${stableId}`,
-  };
-}
-
-function buildFacilityDidFallback(facilityId) {
-  const rawFacilityId = String(facilityId || "").trim();
-  if (!rawFacilityId) return null;
-  return `did:web:www.claros-dpp.online:did:facility:${encodeURIComponent(rawFacilityId)}`;
+function getBusinessIdentifierValue(passport, typeDef) {
+  const fieldKey = typeDef?.fieldsJson?.identity?.businessIdentifierField || "";
+  if (!fieldKey) return "";
+  const value = passport?.[fieldKey];
+  return isFilled(value) ? formatValue(value) : "";
 }
 
 function flattenSections(sections) {
@@ -137,8 +103,6 @@ async function fetchJsonWithTimeout(url, timeoutMs = 4000, options = {}) {
 function getSchemaFieldValue(source, key) {
   if (!source || !key) return undefined;
   if (Object.prototype.hasOwnProperty.call(source, key)) return source[key];
-  const foldedKey = typeof key === "string" ? key.toLowerCase() : key;
-  if (foldedKey && Object.prototype.hasOwnProperty.call(source, foldedKey)) return source[foldedKey];
   return undefined;
 }
 
@@ -161,13 +125,9 @@ function resolveFieldValue(field, passport, unlockedPassport, dynamicValues) {
   };
 }
 
-function findFieldEntry(fields, matchers, passport, unlockedPassport, dynamicValues, extraPredicate = null) {
+function findFieldEntryByRole(fields, roleKey, roleValue, passport, unlockedPassport, dynamicValues, extraPredicate = null) {
   for (const field of fields) {
-    const fieldText = `${normalizeText(field.key)} ${normalizeText(field.label)}`;
-    const matched = matchers.some((matcher) =>
-      typeof matcher === "string" ? fieldText.includes(normalizeText(matcher)) : matcher.test(fieldText)
-    );
-    if (!matched) continue;
+    if (field?.[roleKey] !== roleValue) continue;
 
     const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
     if (!isFilled(resolved.raw)) continue;
@@ -179,34 +139,39 @@ function findFieldEntry(fields, matchers, passport, unlockedPassport, dynamicVal
 
 function getCompositionItems(field, raw) {
   if (!field.composition || !isFilled(raw)) return null;
-  return field.type === "table" ? parseCompositionFromTable(raw, field) : parseCompositionFromText(raw);
+  if (field.type !== "table") return null;
+  return parseCompositionFromTable(raw, field);
 }
 
 function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues, lastUpdateAt) {
-  const manufactured = findFieldEntry(
+  const manufactured = findFieldEntryByRole(
     fields,
-    ["manufactured date", "manufacture date", "manufacturing date", "date of manufacture", "production date"],
+    "lifecycleRole",
+    "manufacturedDate",
     passport,
     unlockedPassport,
     dynamicValues
   );
-  const manufactureContext = findFieldEntry(
+  const manufactureContext = findFieldEntryByRole(
     fields,
-    ["manufacturing place", "manufacturing location", "manufacturing site", "facility", "country of origin"],
+    "lifecycleRole",
+    "manufacturedContext",
     passport,
     unlockedPassport,
     dynamicValues
   );
-  const putIntoService = findFieldEntry(
+  const putIntoService = findFieldEntryByRole(
     fields,
-    ["putting the battery into service", "put into service", "date of putting", "date in service", "in service date"],
+    "lifecycleRole",
+    "putIntoServiceDate",
     passport,
     unlockedPassport,
     dynamicValues
   );
-  const serviceContext = findFieldEntry(
+  const serviceContext = findFieldEntryByRole(
     fields,
-    ["warranty period", "warranty", "battery status", "service period", "service status"],
+    "lifecycleRole",
+    "serviceContext",
     passport,
     unlockedPassport,
     dynamicValues
@@ -246,11 +211,10 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues,
 function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader || typeDef?.systemHeader);
   const canonicalSubjects = passport?.linked_data?.canonical_subjects || {};
-  const fallbackDids = buildViewerDidFallbacks(passport, companyData);
-  const resolvedCompanyDid = passport?.companyDid || canonicalSubjects.companyDid || fallbackDids.companyDid;
-  const resolvedFacilityDid = passport?.facilityDid || canonicalSubjects.facilityDid || buildFacilityDidFallback(passport?.facilityId);
-  const resolvedSubjectDid = passport?.subjectDid || canonicalSubjects.subjectDid || passport?.uniqueProductIdentifier || null;
-  const resolvedDppDid = passport?.dppDid || canonicalSubjects.dppDid || fallbackDids.dppDid;
+  const resolvedCompanyDid = passport?.companyDid || canonicalSubjects.companyDid || null;
+  const resolvedFacilityDid = passport?.facilityDid || canonicalSubjects.facilityDid || null;
+  const resolvedSubjectDid = passport?.subjectDid || canonicalSubjects.subjectDid || null;
+  const resolvedDppDid = passport?.dppDid || canonicalSubjects.dppDid || null;
   const values = {
     digitalProductPassportId: passport?.digitalProductPassportId || passport?.dppId,
     uniqueProductIdentifier: passport?.uniqueProductIdentifier || null,
@@ -646,13 +610,14 @@ export default function PublicPassportPortal({
     };
   }, [passport?.dppId, passport?.internalAliasId, publicHistoryPayload, publicHistoryState.loaded, publicHistoryState.loading]);
 
-  const modelEntry = findFieldEntry(fields, ["model name", "product name"], passport, unlockedPassport, dynamicValues);
+  const modelEntry = findFieldEntryByRole(fields, "summaryRole", "model", passport, unlockedPassport, dynamicValues);
   const displayModelName = passport?.modelName || (modelEntry ? formatValue(modelEntry.raw) : "");
-  const capacityEntry = findFieldEntry(fields, ["rated capacity", "capacity", "usable battery energy", "certified usable battery energy"], passport, unlockedPassport, dynamicValues);
-  const categoryEntry = findFieldEntry(fields, ["battery category", "product category", "category"], passport, unlockedPassport, dynamicValues);
-  const productImageEntry = findFieldEntry(
+  const capacityEntry = findFieldEntryByRole(fields, "summaryRole", "capacity", passport, unlockedPassport, dynamicValues);
+  const categoryEntry = findFieldEntryByRole(fields, "summaryRole", "category", passport, unlockedPassport, dynamicValues);
+  const productImageEntry = findFieldEntryByRole(
     fields,
-    ["product image", "product photo", "product picture", "item image"],
+    "mediaRole",
+    "productImage",
     passport,
     unlockedPassport,
     dynamicValues,
@@ -691,7 +656,7 @@ export default function PublicPassportPortal({
   const currentStatus = formatPassportStatus(passport?.releaseStatus || "");
   const heroMetrics = [
     ["Manufacturer", companyData?.companyName || passport?.manufacturer || passport?.manufacturedBy || ""],
-    ["Serial number", passport?.batterySerialNumber || passport?.serialNumber || passport?.productSerialNumber || ""],
+    ["Product identifier", getBusinessIdentifierValue(passport, typeDef)],
     ["Status", currentStatus || ""],
     ["Last update", formatIsoDate(lastUpdateAt || passport?.updatedAt || passport?.createdAt)],
   ];

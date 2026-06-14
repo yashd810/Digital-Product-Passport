@@ -1,4 +1,4 @@
-function slugifyRouteSegment(value, fallback = "item") {
+function slugifyRouteSegment(value, emptySegment = "item") {
   const normalized = String(value ?? "")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "");
@@ -8,7 +8,7 @@ function slugifyRouteSegment(value, fallback = "item") {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/-+/g, "-");
-  return slug || fallback;
+  return slug || emptySegment;
 }
 
 function getManufacturerSegment({ companyName = "", manufacturerName = "", manufacturedBy = "" }) {

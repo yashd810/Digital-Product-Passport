@@ -2363,7 +2363,7 @@ async function initDb(pool, {
       `);
       await pool.query(`
         ALTER TABLE ${tableName}
-        ADD COLUMN IF NOT EXISTS "complianceProfileKey" VARCHAR(120) NOT NULL DEFAULT 'genericDppV1'
+        ADD COLUMN IF NOT EXISTS "complianceProfileKey" VARCHAR(120) NOT NULL
       `);
       await pool.query(`
         ALTER TABLE ${tableName}

@@ -17,8 +17,8 @@ const DATA_TYPE_PRESETS = {
   url: { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" },
 };
 
-function loadJsonIfExists(filePath, fallback) {
-  if (!fs.existsSync(filePath)) return fallback;
+function loadJsonIfExists(filePath, defaultValue) {
+  if (!fs.existsSync(filePath)) return defaultValue;
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
@@ -103,18 +103,11 @@ function normalizeTermsSource(termsSource, { manifest, basePath, categories, uni
   return sourceTerms.map((rawTerm, index) => {
     const term = { ...(rawTerm || {}) };
     const slug = term.slug ? String(term.slug) : "";
-    const currentAppFieldKeys = Array.isArray(term.appFieldKeys) ? term.appFieldKeys.filter(Boolean).map(String) : [];
     const internalKey = term.internalKey
       || term.internal_key
       || term.elementId
       || term.element_id
-      || term.fieldKey
-      || currentAppFieldKeys[0];
-    const appFieldKeys = currentAppFieldKeys.length
-      ? currentAppFieldKeys
-      : internalKey
-        ? [String(internalKey)]
-        : [];
+      || term.fieldKey;
     const number = term.number ?? term.id ?? index + 1;
     const iri = term.iri
       || term.termIri
@@ -182,7 +175,6 @@ function normalizeTermsSource(termsSource, { manifest, basePath, categories, uni
       dataType,
       unit,
       unitDisplay,
-      appFieldKeys,
       domain,
       range,
       categoryRequirements: term.categoryRequirements,
@@ -196,20 +188,15 @@ function modelSortValue(model) {
 
 function indexTerms(terms = []) {
   const termsBySlug = new Map();
-  const termsByFieldKey = new Map();
   const termsByIri = new Map();
 
   for (const term of terms) {
     if (term?.slug) termsBySlug.set(String(term.slug), term);
     if (term?.iri) termsByIri.set(String(term.iri), term);
     if (term?.termIri) termsByIri.set(String(term.termIri), term);
-    const fieldKeys = new Set([term?.internalKey, ...(term?.appFieldKeys || [])]);
-    for (const fieldKey of fieldKeys) {
-      if (fieldKey) termsByFieldKey.set(String(fieldKey), term);
-    }
   }
 
-  return { termsBySlug, termsByFieldKey, termsByIri };
+  return { termsBySlug, termsByIri };
 }
 
 function summarizeModel(model) {
@@ -248,7 +235,6 @@ function buildModel({ resourcesDir, family, version }) {
   const categories = loadJsonIfExists(path.join(modelDir, "categories.json"), []);
   const units = loadJsonIfExists(path.join(modelDir, "units.json"), []);
   const terms = normalizeTermsSource(termsSource, { manifest, basePath, categories, units });
-  const fieldMap = loadJsonIfExists(path.join(modelDir, "field-map.json"), {});
   const context = loadJsonIfExists(path.join(modelDir, "context.jsonld"), {});
   const dcatCatalog = loadJsonIfExists(path.join(modelDir, "catalog.jsonld"), null);
   const categoryRules = loadJsonIfExists(path.join(modelDir, "category-rules.json"), null);
@@ -263,7 +249,6 @@ function buildModel({ resourcesDir, family, version }) {
     terms,
     categories,
     units,
-    fieldMap,
     context,
     dcatCatalog,
     categoryRules,
@@ -333,10 +318,6 @@ module.exports = function createSemanticModelRegistry({ resourcesDir = DEFAULT_R
     return getModel(modelKey)?.units || [];
   }
 
-  function getFieldMap(modelKey) {
-    return getModel(modelKey)?.fieldMap || {};
-  }
-
   function getContext(modelKey) {
     return getModel(modelKey)?.context || null;
   }
@@ -353,22 +334,12 @@ module.exports = function createSemanticModelRegistry({ resourcesDir = DEFAULT_R
     return getModel(modelKey)?.indexes.termsBySlug.get(String(slug || "")) || null;
   }
 
-  function getTermByFieldKey(modelKey, fieldKey) {
-    return getModel(modelKey)?.indexes.termsByFieldKey.get(String(fieldKey || "")) || null;
-  }
-
   function getTermByIri(modelKey, iri) {
     return getModel(modelKey)?.indexes.termsByIri.get(String(iri || "")) || null;
   }
 
-  function resolveFieldKey(modelKey, fieldKey) {
-    const model = getModel(modelKey);
-    if (!model) return null;
-    return model.fieldMap[String(fieldKey || "")] || null;
-  }
-
-  function getCategoryRequirementForField(modelKey, fieldKey, category) {
-    const requirements = getCategoryRules(modelKey)?.requirementsByFieldKey?.[String(fieldKey || "")]?.requirements || null;
+  function getCategoryRequirementForField(modelKey, semanticId, category) {
+    const requirements = getCategoryRules(modelKey)?.requirementsBySemanticId?.[String(semanticId || "")]?.requirements || null;
     if (!requirements) return null;
     return requirements[String(category || "")] || null;
   }
@@ -398,7 +369,7 @@ module.exports = function createSemanticModelRegistry({ resourcesDir = DEFAULT_R
     for (const section of (typeDef?.fieldsJson?.sections || [])) {
       for (const field of (section.fields || [])) {
         if (!field?.key) continue;
-        const termIri = resolveFieldKey(model.semanticModelKey, field.key) || field.semanticId;
+        const termIri = field.semanticId;
         if (termIri && !model.context?.["@context"]?.[field.key]) {
           inlineOverrides[field.key] = { "@id": termIri };
         }
@@ -418,14 +389,11 @@ module.exports = function createSemanticModelRegistry({ resourcesDir = DEFAULT_R
     getTerms,
     getCategories,
     getUnits,
-    getFieldMap,
     getContext,
     getDcatCatalog,
     getCategoryRules,
     getTermBySlug,
-    getTermByFieldKey,
     getTermByIri,
-    resolveFieldKey,
     getCategoryRequirementForField,
     buildJsonLdContext,
   };

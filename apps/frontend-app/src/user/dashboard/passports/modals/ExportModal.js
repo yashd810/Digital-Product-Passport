@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import {
   alignRecordToSchemaKeys,
-  buildSchemaFieldAliasMap,
+  buildSchemaFieldKeyMap,
   extractFieldValuesFromElements,
 } from "../../../../shared/passports/schemaKeyUtils";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/semanticPassportExport";
@@ -96,13 +96,13 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     const data = await loadTypeSchema(type);
     const sections = data.fieldsJson?.sections || [];
     const allFields = sections.flatMap((section) => section.fields || []);
-    const aliasToKey = buildSchemaFieldAliasMap(sections);
+    const keyMap = buildSchemaFieldKeyMap(sections);
     const normalizedRecords = await Promise.all(list.map(async (passport) => {
       const payload = await loadFullPassportPayload(type, passport);
       const flattened = {
         ...payload,
         ...(payload?.fields && typeof payload.fields === "object" ? payload.fields : {}),
-        ...extractFieldValuesFromElements(payload?.elements, aliasToKey),
+        ...extractFieldValuesFromElements(payload?.elements, keyMap),
       };
       return alignRecordToSchemaKeys(flattened, sections);
     }));

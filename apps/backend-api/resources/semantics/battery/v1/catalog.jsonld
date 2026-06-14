@@ -136,19 +136,6 @@
         },
         "dcat:mediaType": "application/json",
         "dcterms:format": "JSON"
-      },
-      {
-        "@id": "https://www.claros-dpp.online/dictionary/battery/v1/distributions/field-map-json",
-        "@type": "dcat:Distribution",
-        "dcterms:title": "Application field to semantic term map",
-        "dcat:accessURL": {
-          "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1/field-map"
-        },
-        "dcat:downloadURL": {
-          "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1/field-map"
-        },
-        "dcat:mediaType": "application/json",
-        "dcterms:format": "JSON"
       }
     ]
   },

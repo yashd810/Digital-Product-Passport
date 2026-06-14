@@ -36,7 +36,6 @@ import {
 } from "./semanticTermCatalog";
 import {
   createEmptyTableRow,
-  createTableColumn,
   normalizeTableColumns,
   normalizeTableDefaultRows,
   serializeTableColumns,
@@ -48,9 +47,9 @@ import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-function summarizeSelectedValues(values = [], labelMap = {}, fallback = "Select options") {
+function summarizeSelectedValues(values = [], labelMap = {}, emptyLabel = "Select options") {
   const normalized = Array.isArray(values) ? values : [];
-  if (!normalized.length) return fallback;
+  if (!normalized.length) return emptyLabel;
   if (normalized.length <= 2) {
     return normalized.map((value) => labelMap[value] || value).join(", ");
   }
@@ -161,6 +160,69 @@ function syncSectionsWithSemanticModel(currentSections, semanticModelKey, option
   return hasChanges ? nextSections : currentSections;
 }
 
+function rekeyModuleSection(section = {}, sourceModuleKey = "") {
+  return {
+    ...section,
+    localId: Math.random().toString(36).slice(2),
+    label_i18n: section.label_i18n || {},
+    sourceModuleKey,
+    fields: (section.fields || []).map((field) => {
+      const tableColumns = field.type === "table"
+        ? normalizeTableColumns(field).map((column) => ({
+          ...column,
+          canonicalLocked: true,
+          sourceModuleKey,
+          sourceModuleColumnKey: column.key,
+        }))
+        : undefined;
+      const nextField = {
+        ...field,
+        localId: Math.random().toString(36).slice(2),
+        label_i18n: field.label_i18n || {},
+        _keyManual: true,
+        canonicalLocked: true,
+        sourceModuleKey,
+        sourceModuleFieldKey: field.key,
+        required: false,
+      };
+      if (tableColumns) {
+        nextField.table_columns = tableColumns;
+        nextField.table_cols = tableColumns.length;
+        nextField.table_default_rows = normalizeTableDefaultRows({ ...field, table_columns: tableColumns });
+      }
+      return nextField;
+    }),
+  };
+}
+
+function unlockModuleSection(section = {}) {
+  const sectionRest = { ...section };
+  delete sectionRest.sourceModuleKey;
+  return {
+    ...sectionRest,
+    fields: (section.fields || []).map((field) => {
+      const fieldRest = { ...field };
+      delete fieldRest.canonicalLocked;
+      delete fieldRest.sourceModuleKey;
+      delete fieldRest.sourceModuleFieldKey;
+      if (fieldRest.type !== "table") return fieldRest;
+
+      const tableColumns = normalizeTableColumns(fieldRest).map((column) => {
+        const columnRest = { ...column };
+        delete columnRest.canonicalLocked;
+        delete columnRest.sourceModuleKey;
+        delete columnRest.sourceModuleColumnKey;
+        return columnRest;
+      });
+      return {
+        ...fieldRest,
+        table_columns: tableColumns,
+        table_default_rows: normalizeTableDefaultRows({ ...fieldRest, table_columns: tableColumns }),
+      };
+    }),
+  };
+}
+
 function AdminCreatePassportType() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -172,6 +234,7 @@ function AdminCreatePassportType() {
   const [semanticModelKey, setSemanticModelKey] = useState("");
   const [typeName,       setTypeName]       = useState("");
   const [typeNameManual, setTypeNameManual] = useState(false);
+  const [sourceModuleKey, setSourceModuleKey] = useState("");
   const cloneSourceTypeName = useRef(null); // tracks original typeName when cloning
 
   // ── Edit mode (patch existing type metadata) ───────────────
@@ -193,6 +256,7 @@ function AdminCreatePassportType() {
   const [invalidFields, setInvalidFields] = useState([]);  // section/field IDs with errors
   const [openGovernanceDropdown, setOpenGovernanceDropdown] = useState(null);
   const [semanticModels, setSemanticModels] = useState([]);
+  const [passportModules, setPassportModules] = useState([]);
   const [semanticTermCatalog, setSemanticTermCatalog] = useState([]);
   const [semanticTermsLoading, setSemanticTermsLoading] = useState(false);
   const [semanticTermsError, setSemanticTermsError] = useState("");
@@ -234,12 +298,24 @@ function AdminCreatePassportType() {
   }, [openGovernanceDropdown]);
 
   useEffect(() => {
-    fetchWithAuth(`${API}/api/semantic-models`, {
-      headers: authHeaders(),
-    })
-      .then(r => r.ok ? r.json() : [])
-      .then((models) => setSemanticModels(Array.isArray(models) ? models : []))
-      .catch(() => setSemanticModels([]));
+    Promise.all([
+      fetchWithAuth(`${API}/api/semantic-models`, {
+        headers: authHeaders(),
+      }),
+      fetchWithAuth(`${API}/api/admin/passport-type-modules`, {
+        headers: authHeaders(),
+      }),
+    ])
+      .then(async ([modelsResponse, modulesResponse]) => {
+        const models = modelsResponse.ok ? await modelsResponse.json() : [];
+        const modules = modulesResponse.ok ? await modulesResponse.json() : [];
+        setSemanticModels(Array.isArray(models) ? models : []);
+        setPassportModules(Array.isArray(modules) ? modules : []);
+      })
+      .catch(() => {
+        setSemanticModels([]);
+        setPassportModules([]);
+      });
   }, []);
 
   useEffect(() => {
@@ -304,6 +380,18 @@ function AdminCreatePassportType() {
             Object.entries(normalizedField.label_i18n || {}).filter(([, v]) => v?.trim())
           );
           if (Object.keys(fi18n).length > 0) base.label_i18n = fi18n;
+          if (normalizedField.required) base.required = true;
+          if (normalizedField.displayRole) base.displayRole = normalizedField.displayRole;
+          if (normalizedField.summaryRole) base.summaryRole = normalizedField.summaryRole;
+          if (normalizedField.lifecycleRole) base.lifecycleRole = normalizedField.lifecycleRole;
+          if (normalizedField.mediaRole) base.mediaRole = normalizedField.mediaRole;
+          if (normalizedField.presentation) base.presentation = normalizedField.presentation;
+          if (normalizedField.elementIdPath) base.elementIdPath = normalizedField.elementIdPath;
+          if (normalizedField.objectType) base.objectType = normalizedField.objectType;
+          if (normalizedField.valueDataType) base.valueDataType = normalizedField.valueDataType;
+          if (normalizedField.canonicalLocked) base.canonicalLocked = true;
+          if (normalizedField.sourceModuleKey) base.sourceModuleKey = normalizedField.sourceModuleKey;
+          if (normalizedField.sourceModuleFieldKey) base.sourceModuleFieldKey = normalizedField.sourceModuleFieldKey;
           if (normalizedField.type === "table") {
             const tableColumns = serializeTableColumns(normalizedField);
             base.table_cols = tableColumns.length;
@@ -347,6 +435,8 @@ function AdminCreatePassportType() {
         productCategory,
         productIcon,
         semanticModelKey: normalizeSemanticModelKey(semanticModelKey) || null,
+        sourceModule: sourceModuleKey || null,
+        identity: selectedPassportModule?.fieldsJson?.identity || null,
         systemHeader: normalizeSystemPassportHeader(systemHeader),
         sections: cleanSections,
       },
@@ -360,6 +450,7 @@ function AdminCreatePassportType() {
     setProductCategory(nextProductCategory);
     setProductIcon(draft.productIcon || "📋");
     setSemanticModelKey(nextSemanticModelKey);
+    setSourceModuleKey(draft.sourceModuleKey || draft.sourceModule || "");
     setTypeName(draft.typeName || "");
     setTypeNameManual(draft.typeNameManual || false);
     const restored = (draft.sections || []).map(sec => rekeySection({
@@ -391,11 +482,11 @@ function AdminCreatePassportType() {
       fetchWithAuth(DRAFT_API, {
         method: "PUT",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ draft_json: { displayName, productCategory, productIcon, semanticModelKey, typeName, typeNameManual, sections, systemHeader } }),
+        body: JSON.stringify({ draft_json: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
       }).catch(() => {});
     }, 1500);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [draftEnabled, displayName, productCategory, productIcon, semanticModelKey, typeName, typeNameManual, sections, systemHeader]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [draftEnabled, displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveDraft = () => {
     if (!draftEnabled) return;
@@ -408,7 +499,7 @@ function AdminCreatePassportType() {
     fetchWithAuth(DRAFT_API, {
       method: "PUT",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ draft_json: { displayName, productCategory, productIcon, semanticModelKey, typeName, typeNameManual, sections, systemHeader } }),
+      body: JSON.stringify({ draft_json: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
     })
       .then(r => r.ok ? (
         setSuccess("Draft saved successfully!"),
@@ -464,6 +555,7 @@ function AdminCreatePassportType() {
     setProductIcon(ed.productIcon || "📋");
     const nextSemanticModelKey = normalizeSemanticModelKey(ed.semanticModelKey || "");
     setSemanticModelKey(nextSemanticModelKey);
+    setSourceModuleKey(ed.fieldsJson?.sourceModule || "");
     setTypeName(ed.typeName || "");
     setTypeNameManual(true); // lock typeName, it cannot change
     const editSections = (ed.fieldsJson?.sections || []).map(sec => rekeySection({
@@ -488,6 +580,7 @@ function AdminCreatePassportType() {
     setProductIcon(cd.productIcon || "📋");
     const nextSemanticModelKey = normalizeSemanticModelKey(cd.semanticModelKey || "");
     setSemanticModelKey(nextSemanticModelKey);
+    setSourceModuleKey(cd.fieldsJson?.sourceModule || "");
     const clonedSections = (cd.fieldsJson?.sections || []).map(sec => rekeySection({
       ...sec,
       localId:   Math.random().toString(36).slice(2),
@@ -512,6 +605,10 @@ function AdminCreatePassportType() {
   }, [semanticModelKey]);
 
   const handleSemanticModelSelection = (nextModelKey) => {
+    if (sourceModuleKey) {
+      setError("Semantic model is controlled by the selected passport module.");
+      return;
+    }
     const normalizedNextModelKey = normalizeSemanticModelKey(nextModelKey);
     const normalizedCurrentModelKey = normalizeSemanticModelKey(semanticModelKey);
     setSemanticModelKey(normalizedNextModelKey);
@@ -524,6 +621,70 @@ function AdminCreatePassportType() {
         { clearSemanticId: true }
       ));
     }
+  };
+
+  const applyPassportModule = (moduleKey) => {
+    const selectedModule = passportModules.find((moduleTemplate) => moduleTemplate.moduleKey === moduleKey);
+    setSourceModuleKey(moduleKey || "");
+    if (!moduleKey) {
+      setSections((currentSections) => currentSections.map(unlockModuleSection));
+      setError("");
+      return;
+    }
+    if (!selectedModule) return;
+
+    const nextSemanticModelKey = normalizeSemanticModelKey(selectedModule.semanticModelKey || "");
+    setDisplayName(selectedModule.displayName || "");
+    setProductCategory(selectedModule.productCategory || "");
+    setProductIcon(selectedModule.productIcon || "📋");
+    setSemanticModelKey(nextSemanticModelKey);
+    const moduleSections = (selectedModule.fieldsJson?.sections || [])
+      .map((section) => rekeyModuleSection(section, selectedModule.moduleKey));
+    setSections(moduleSections.length ? moduleSections : [newSection("General")]);
+    setVerification(null);
+    setError("");
+    setInvalidFields([]);
+  };
+
+  const getCanonicalSchemaIssues = (cleanSections = []) => {
+    if (!sourceModuleKey) {
+      return [{ fieldId: "sourceModule", message: "Select a passport module source before creating a passport type." }];
+    }
+    const issues = [];
+    cleanSections.forEach((section) => {
+      (section.fields || []).forEach((field) => {
+        if (!field.canonicalLocked || field.sourceModuleKey !== sourceModuleKey || !field.sourceModuleFieldKey) {
+          issues.push({
+            fieldId: field.localId,
+            message: `Field "${field.label || field.key}" must come from the selected passport module.`,
+          });
+        }
+        if (!field.semanticId) {
+          issues.push({
+            fieldId: field.localId,
+            message: `Field "${field.label || field.key}" needs explicit module semantics.`,
+          });
+        }
+        if (field.type === "table") {
+          const columns = normalizeTableColumns(field);
+          if (!columns.length) {
+            issues.push({
+              fieldId: field.localId,
+              message: `Table field "${field.label || field.key}" needs module-defined columns.`,
+            });
+          }
+          columns.forEach((column) => {
+            if (!column.canonicalLocked || column.sourceModuleKey !== sourceModuleKey || !column.sourceModuleColumnKey || !column.semanticId) {
+              issues.push({
+                fieldId: field.localId,
+                message: `Table column "${column.label || column.key}" in "${field.label || field.key}" needs locked module semantics.`,
+              });
+            }
+          });
+        }
+      });
+    });
+    return issues;
   };
 
   // ── Section helpers ────────────────────────────────────────
@@ -570,56 +731,47 @@ function AdminCreatePassportType() {
         ...sec,
         fields: sec.fields.map(f => {
           if (f.localId !== fieldId) return f;
-          let updated = { ...f, ...patch };
-          const shouldNormalizeSemantic =
-            "label" in patch ||
-            "key" in patch ||
-            "_keyManual" in patch;
+          const canonicalPatch = f.canonicalLocked
+            ? Object.fromEntries(Object.entries(patch).filter(([key]) =>
+              !["key", "type", "semanticId", "unit", "dataType", "composition", "compositionLabelColumnKey", "compositionValueColumnKey"].includes(key)
+            ))
+            : patch;
+          let updated = { ...f, ...canonicalPatch };
+          const shouldNormalizeSemantic = !f.canonicalLocked && (
+            "label" in canonicalPatch ||
+            "key" in canonicalPatch ||
+            "_keyManual" in canonicalPatch
+          );
 
           if (shouldNormalizeSemantic) {
             updated = normalizeFieldForSemanticModel(updated, semanticModelKey);
           }
 
-          if ("label" in patch && !updated._keyManual) {
-            updated.key = toFieldKey(patch.label || "");
+          if (!f.canonicalLocked && "label" in canonicalPatch && !updated._keyManual) {
+            updated.key = toFieldKey(canonicalPatch.label || "");
           }
 
-          if ("label" in patch && !patch.label) {
+          if (!f.canonicalLocked && "label" in canonicalPatch && !canonicalPatch.label) {
             delete updated.semanticId;
             delete updated.semanticMode;
           }
-          if (patch.composition === false) {
+          if (canonicalPatch.composition === false) {
             delete updated.compositionLabelColumnKey;
             delete updated.compositionValueColumnKey;
           }
-          // Switching TO table: set defaults
-          if (patch.type === "table" && f.type !== "table") {
-            updated.table_cols = 2;
-            updated.table_columns = [createTableColumn(0), createTableColumn(1)];
+          // Switching TO table: preserve explicit module columns only.
+          if (canonicalPatch.type === "table" && f.type !== "table") {
+            updated.table_columns = normalizeTableColumns(updated);
+            updated.table_cols = updated.table_columns.length;
             updated.table_default_rows = [];
           }
           // Switching AWAY from table: clear config
-          if ("type" in patch && patch.type !== "table") {
+          if ("type" in canonicalPatch && canonicalPatch.type !== "table") {
             delete updated.table_cols;
             delete updated.table_columns;
             delete updated.table_default_rows;
             delete updated.compositionLabelColumnKey;
             delete updated.compositionValueColumnKey;
-          }
-          // Cols count changed: resize fixed column definitions and default rows.
-          if ("table_cols" in patch) {
-            const n = Math.max(1, parseInt(patch.table_cols) || 1);
-            const existing = normalizeTableColumns(f);
-            updated.table_columns = Array.from({ length: n }, (_, i) => existing[i] || createTableColumn(i));
-            updated.table_cols = n;
-            updated.table_default_rows = normalizeTableDefaultRows(updated);
-            const validColumnKeys = new Set(updated.table_columns.map((column) => column.key));
-            if (updated.compositionLabelColumnKey && !validColumnKeys.has(updated.compositionLabelColumnKey)) {
-              delete updated.compositionLabelColumnKey;
-            }
-            if (updated.compositionValueColumnKey && !validColumnKeys.has(updated.compositionValueColumnKey)) {
-              delete updated.compositionValueColumnKey;
-            }
           }
           return updated;
         }),
@@ -728,12 +880,17 @@ function AdminCreatePassportType() {
           let keyReplacement = null;
           const columns = normalizeTableColumns(f).map((column, index) => {
             if (index !== columnIndex) return column;
-            const nextColumn = { ...column, ...patch };
-            if ("label" in patch && !column._keyManual && !("key" in patch)) {
-              nextColumn.key = tableColumnKeyFromLabel(patch.label, `column${index + 1}`);
+            const canonicalPatch = column.canonicalLocked || f.canonicalLocked
+              ? Object.fromEntries(Object.entries(patch).filter(([key]) =>
+                !["key", "semanticId", "unit", "dataType"].includes(key)
+              ))
+              : patch;
+            const nextColumn = { ...column, ...canonicalPatch };
+            if (!column.canonicalLocked && !f.canonicalLocked && "label" in canonicalPatch && !column._keyManual && !("key" in canonicalPatch)) {
+              nextColumn.key = tableColumnKeyFromLabel(canonicalPatch.label, `column${index + 1}`);
             }
-            if ("key" in patch) {
-              nextColumn.key = tableColumnKeyFromLabel(patch.key, `column${index + 1}`);
+            if ("key" in canonicalPatch) {
+              nextColumn.key = tableColumnKeyFromLabel(canonicalPatch.key, `column${index + 1}`);
               nextColumn._keyManual = true;
             }
             if (nextColumn.key !== column.key) {
@@ -936,6 +1093,13 @@ function AdminCreatePassportType() {
 
     const { fieldKeyToId, cleanSections, payload } = buildSubmissionPayload();
 
+    const canonicalSchemaIssues = getCanonicalSchemaIssues(cleanSections);
+    if (canonicalSchemaIssues.length) {
+      setInvalidFields(canonicalSchemaIssues.map((issue) => issue.fieldId).filter(Boolean));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return setError(canonicalSchemaIssues[0].message);
+    }
+
     const invalidSection = cleanSections.find(s => !s.key || !s.label);
     if (invalidSection) {
       setInvalidFields([invalidSection.localId]);
@@ -1033,6 +1197,7 @@ function AdminCreatePassportType() {
           setProductCategory("");
           setProductIcon("📋");
           setSemanticModelKey("");
+          setSourceModuleKey("");
         setTypeName("");
         setTypeNameManual(false);
         setSystemHeader(normalizeSystemPassportHeader());
@@ -1071,6 +1236,12 @@ function AdminCreatePassportType() {
       setVerificationLoading(false);
     }
   };
+
+  const selectedPassportModule = passportModules.find((moduleTemplate) => moduleTemplate.moduleKey === sourceModuleKey) || null;
+  const passportModuleOptions = passportModules.map((moduleTemplate) => ({
+      value: moduleTemplate.moduleKey,
+      label: `${moduleTemplate.displayName || moduleTemplate.moduleKey} (${moduleTemplate.moduleKey})`,
+    }));
 
   return (
     <div className="acpt-page">
@@ -1141,7 +1312,54 @@ function AdminCreatePassportType() {
           setError={setError}
           setInvalidFields={setInvalidFields}
           iconPresets={ICON_PRESETS}
+          semanticModelLocked={!!sourceModuleKey}
         />
+
+        {!editMode && (
+          <div className="acpt-card acpt-module-source-card">
+            <div className="acpt-builder-header">
+              <div>
+                <h3 className="acpt-card-title">Passport Module Source</h3>
+                <p className="acpt-builder-hint">
+                  Use a code-defined module as the canonical field library, then trim fields and decide required or optional for this passport type.
+                </p>
+              </div>
+              {selectedPassportModule && (
+                <span className="acpt-system-header-lock">Canonical fields locked</span>
+              )}
+            </div>
+            <div className="acpt-module-source-grid">
+              <div className="acpt-meta-field-group">
+                <span className="acpt-meta-sub-label">Passport module</span>
+                <AdminSelectMenu
+                  value={sourceModuleKey}
+                  onChange={applyPassportModule}
+                  options={passportModuleOptions}
+                  placeholder="Select a passport module"
+                  className="acpt-select acpt-select-inline"
+                  triggerClassName="acpt-type-select acpt-select-trigger"
+                  menuClassName="acpt-select-menu"
+                  optionClassName="acpt-select-option"
+                  ariaLabel="Passport module source"
+                />
+              </div>
+              <div className="acpt-module-source-summary">
+                {selectedPassportModule ? (
+                  <>
+                    <strong>{selectedPassportModule.fieldCount || 0} canonical fields</strong>
+                    <span>{selectedPassportModule.sectionCount || 0} sections from {selectedPassportModule.moduleKey}</span>
+                    <span>Semantic model: {getSemanticModelOption(semanticModelOptions, selectedPassportModule.semanticModelKey).label}</span>
+                  </>
+                ) : (
+                  <>
+                    <strong>Module source required</strong>
+                    <span>Select a module to load the canonical fields and semantics required for interoperable exports.</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="acpt-card acpt-system-header-card">
           <div className="acpt-builder-header">
@@ -1380,6 +1598,12 @@ function AdminCreatePassportType() {
                           placeholder="Field label, e.g. Manufacturer"
                           className={`acpt-input acpt-field-label-input${hasInvalid(field.localId) ? " acpt-input-error" : ""}`}
                         />
+                        {field.canonicalLocked && (
+                          <div className="acpt-canonical-note">
+                            <span>Canonical module field</span>
+                            <code>{field.sourceModuleKey}:{field.sourceModuleFieldKey || field.key}</code>
+                          </div>
+                        )}
                         {field._i18nOpen && (
                           <div className="acpt-i18n-panel acpt-i18n-panel-field">
                             {TRANS_LANGS.map(l => (
@@ -1421,6 +1645,7 @@ function AdminCreatePassportType() {
                         menuClassName="acpt-select-menu acpt-select-menu-compact"
                         optionClassName="acpt-select-option"
                         ariaLabel="Field type"
+                        disabled={!!field.canonicalLocked}
                       />
 
                       <div className="acpt-field-actions">
@@ -1568,12 +1793,26 @@ function AdminCreatePassportType() {
                       </div>
 
                       <div className="acpt-field-side-options">
+                        <div className="acpt-field-required">
+                          <label className="acpt-required-toggle">
+                            <input
+                              type="checkbox"
+                              checked={!!field.required}
+                              onChange={e => updateField(section.localId, field.localId, { required: e.target.checked })}
+                            />
+                            <span className="acpt-required-label">
+                              Required in this passport type
+                            </span>
+                          </label>
+                        </div>
+
                         {/* Composition toggle */}
                         <div className="acpt-field-composition">
                           <label className="acpt-composition-toggle">
                             <input
                               type="checkbox"
                               checked={!!field.composition}
+                              disabled={!!field.canonicalLocked}
                               onChange={e => updateField(section.localId, field.localId, {
                                 composition: e.target.checked,
                                 ...(e.target.checked ? {} : {
@@ -1603,6 +1842,7 @@ function AdminCreatePassportType() {
                                     menuClassName="acpt-select-menu acpt-select-menu-compact"
                                     optionClassName="acpt-select-option"
                                     ariaLabel="Composition label column"
+                                    disabled={!!field.canonicalLocked}
                                   />
                                 </div>
                                 <div className="acpt-composition-column-select">
@@ -1616,6 +1856,7 @@ function AdminCreatePassportType() {
                                     menuClassName="acpt-select-menu acpt-select-menu-compact"
                                     optionClassName="acpt-select-option"
                                     ariaLabel="Composition data column"
+                                    disabled={!!field.canonicalLocked}
                                   />
                                 </div>
                               </div>
@@ -1634,6 +1875,7 @@ function AdminCreatePassportType() {
                             <input
                               type="checkbox"
                               checked={!!field.dynamic}
+                              disabled={!!field.canonicalLocked}
                               onChange={e => updateField(section.localId, field.localId, { dynamic: e.target.checked })}
                             />
                             <span className="acpt-dynamic-label">
@@ -1659,6 +1901,7 @@ function AdminCreatePassportType() {
                               onChange={e => updateField(section.localId, field.localId, { unit: e.target.value })}
                               placeholder="kg CO₂-eq, %, kWh…"
                               className="acpt-input acpt-input-small"
+                              disabled={!!field.canonicalLocked}
                             />
                           </div>
                           <div className="acpt-meta-field-group">
@@ -1680,6 +1923,7 @@ function AdminCreatePassportType() {
                               menuClassName="acpt-select-menu acpt-select-menu-compact"
                               optionClassName="acpt-select-option"
                               ariaLabel="Data type"
+                              disabled={!!field.canonicalLocked}
                             />
                           </div>
                           <div className="acpt-meta-field-group acpt-meta-field-group-full">
@@ -1692,7 +1936,7 @@ function AdminCreatePassportType() {
                                 onBlur={() => window.setTimeout(() => setSemanticPickerOpen(section.localId, field.localId, false), 120)}
                                 onChange={e => updateSemanticSearchInput(section.localId, field.localId, e.target.value)}
                                 placeholder={hasSelectedSemanticModel ? `Search ${selectedSemanticModelOption.label} terms` : "Select a semantic model first"}
-                                disabled={!hasSelectedSemanticModel || semanticTermsLoading}
+                                disabled={!!field.canonicalLocked || !hasSelectedSemanticModel || semanticTermsLoading}
                                 className="acpt-input acpt-input-small acpt-semantic-search"
                               />
                               {field._semanticOpen && hasSelectedSemanticModel && (
@@ -1750,8 +1994,9 @@ function AdminCreatePassportType() {
                             <input
                               type="number" min="1" max="10"
                               value={tableColumns.length}
-                              onChange={e => updateField(section.localId, field.localId, { table_cols: parseInt(e.target.value, 10) || 1 })}
+                              readOnly
                               className="acpt-table-num-input"
+                              disabled
                             />
                           </div>
                           <div className="acpt-table-colnames">
@@ -1780,6 +2025,7 @@ function AdminCreatePassportType() {
                                       placeholder={`column${ci + 1}`}
                                       className="acpt-table-col-input acpt-mono"
                                       onChange={e => updateTableColumn(section.localId, field.localId, ci, { key: e.target.value })}
+                                      disabled={!!field.canonicalLocked || !!column.canonicalLocked}
                                     />
                                     <label className="acpt-access-check">
                                       <input
@@ -1799,6 +2045,7 @@ function AdminCreatePassportType() {
                                         onChange={e => updateTableColumn(section.localId, field.localId, ci, { unit: e.target.value })}
                                         placeholder="%, kg, kWh"
                                         className="acpt-input acpt-input-small"
+                                        disabled={!!field.canonicalLocked || !!column.canonicalLocked}
                                       />
                                     </div>
                                     <div className="acpt-meta-field-group">
@@ -1820,6 +2067,7 @@ function AdminCreatePassportType() {
                                         menuClassName="acpt-select-menu acpt-select-menu-compact"
                                         optionClassName="acpt-select-option"
                                         ariaLabel="Column data type"
+                                        disabled={!!field.canonicalLocked || !!column.canonicalLocked}
                                       />
                                     </div>
                                     <div className="acpt-meta-field-group acpt-meta-field-group-full">
@@ -1832,7 +2080,7 @@ function AdminCreatePassportType() {
                                           onBlur={() => window.setTimeout(() => setTableColumnSemanticPickerOpen(section.localId, field.localId, ci, false), 120)}
                                           onChange={e => updateTableColumnSemanticSearchInput(section.localId, field.localId, ci, e.target.value)}
                                           placeholder={hasSelectedSemanticModel ? `Search ${selectedSemanticModelOption.label} terms` : "Select a semantic model first"}
-                                          disabled={!hasSelectedSemanticModel || semanticTermsLoading}
+                                          disabled={!!field.canonicalLocked || !!column.canonicalLocked || !hasSelectedSemanticModel || semanticTermsLoading}
                                           className="acpt-input acpt-input-small acpt-semantic-search"
                                         />
                                         {column._semanticOpen && hasSelectedSemanticModel && (

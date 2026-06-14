@@ -89,11 +89,6 @@ module.exports = function createPassportRepresentationService({
     let economicOperatorId = passport.economicOperatorId || null;
     if (!economicOperatorId && dppIdentity) {
       economicOperatorId = dppIdentity.companyDid(passport.companyId);
-    } else if (!economicOperatorId) {
-      // Legacy fallback using :org: path
-      const appUrl = process.env.APP_URL || "http://localhost:3001";
-      const domain = new URL(appUrl).host;
-      economicOperatorId = `did:web:${domain}:org:${passport.companyId}`;
     }
 
     // ── Product and DPP DIDs ──────────────────────────────────────────────────
@@ -101,7 +96,7 @@ module.exports = function createPassportRepresentationService({
     let dppDidValue = null;
     let publicUrl = null;
 
-    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}) || "";
+    const businessIdentifier = productIdentifierService?.extractBusinessProductIdentifier?.(passport || {}, typeDef) || "";
     if (businessIdentifier) {
       productDid = productIdentifierService?.buildCanonicalProductDid?.({
         companyId: passport.companyId,

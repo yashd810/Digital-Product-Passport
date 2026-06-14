@@ -98,11 +98,11 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
         const tableName = getTable(passportType);
         const typeRes = await pool.query('SELECT "fieldsJson" AS "fieldsJson", "displayName" AS "displayName" FROM passport_types WHERE "typeName" = $1', [passportType]);
         const sections = typeRes.rows[0]?.fieldsJson?.sections || [];
-        const fieldMap = new Map(sections.flatMap((section) => section.fields || []).map((field) => [field.key, field]));
-        fieldMap.set("modelName", { key: "modelName", label: "Model Name", type: "text" });
-        fieldMap.set("internalAliasId", { key: "internalAliasId", label: "Internal Alias ID", type: "text" });
+        const schemaFieldsByKey = new Map(sections.flatMap((section) => section.fields || []).map((field) => [field.key, field]));
+        schemaFieldsByKey.set("modelName", { key: "modelName", label: "Model Name", type: "text" });
+        schemaFieldsByKey.set("internalAliasId", { key: "internalAliasId", label: "Internal Alias ID", type: "text" });
 
-        const applicableChanges = Object.entries(changes).filter(([key]) => fieldMap.has(key) && /^[a-z][A-Za-z0-9_]*$/.test(key));
+        const applicableChanges = Object.entries(changes).filter(([key]) => schemaFieldsByKey.has(key) && /^[a-z][A-Za-z0-9_]*$/.test(key));
 
         const releasedRes = await pool.query(
           `SELECT * FROM ${tableName}
@@ -163,7 +163,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             const excluded = new Set(["id", "dppId", "createdAt", "updatedAt", "updatedBy", "qrCode", "lineageId"]);
             const columns = Object.keys(source).filter((key) => !excluded.has(key));
             const mappedChanges = Object.fromEntries(
-              applicableChanges.map(([key, value]) => [key, coerceBulkFieldValue(fieldMap.get(key), value)])
+              applicableChanges.map(([key, value]) => [key, coerceBulkFieldValue(schemaFieldsByKey.get(key), value)])
             );
 
             const values = columns.map((key) => {

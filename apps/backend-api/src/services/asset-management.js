@@ -60,7 +60,7 @@ module.exports = function createAssetService({
   }
 
   function resolveGranularityForCreate(companyPolicy, requestedGranularity) {
-    const fallbackGranularity = String(companyPolicy?.defaultGranularity || "item").trim().toLowerCase();
+    const enforcedGranularity = String(companyPolicy?.defaultGranularity || "item").trim().toLowerCase();
     const normalizedRequested = requestedGranularity === undefined || requestedGranularity === null || requestedGranularity === ""
       ? null
       : String(requestedGranularity).trim().toLowerCase();
@@ -68,14 +68,14 @@ module.exports = function createAssetService({
     if (normalizedRequested && !VALID_GRANULARITIES.has(normalizedRequested)) {
       throw new Error("granularity must be one of: model, batch, item");
     }
-    if (!companyPolicy) return normalizedRequested || fallbackGranularity;
-    if (!companyPolicy.allowGranularityOverride && normalizedRequested && normalizedRequested !== fallbackGranularity) {
-      throw new Error(`Granularity override is disabled for this company. The enforced value is "${fallbackGranularity}".`);
+    if (!companyPolicy) return normalizedRequested || enforcedGranularity;
+    if (!companyPolicy.allowGranularityOverride && normalizedRequested && normalizedRequested !== enforcedGranularity) {
+      throw new Error(`Granularity override is disabled for this company. The enforced value is "${enforcedGranularity}".`);
     }
 
     const effectiveGranularity = normalizedRequested && companyPolicy.allowGranularityOverride
       ? normalizedRequested
-      : fallbackGranularity;
+      : enforcedGranularity;
 
     if (effectiveGranularity === "model" && companyPolicy.mintModelDids === false) {
       throw new Error("Model-level DIDs are disabled for this company policy.");
@@ -375,18 +375,7 @@ module.exports = function createAssetService({
         if (ASSET_MATCH_FIELDS.has(key)) return;
         if (ASSET_IGNORED_SYSTEM_COLUMNS.has(key)) return;
 
-          let resolvedKey = key;
-          let fieldDef = fieldMap.get(key);
-
-          if (!fieldDef && key.length >= 63) {
-            for (const [fk, fd] of fieldMap) {
-              if (fk.length > 63 && fk.substring(0, 63) === key.substring(0, 63)) {
-                resolvedKey = fk;
-                fieldDef = fd;
-                break;
-              }
-            }
-          }
+          const fieldDef = fieldMap.get(key);
 
           if (fieldDef) {
             const coerced = coerceAssetFieldValue(fieldDef, value);
@@ -394,7 +383,7 @@ module.exports = function createAssetService({
               errors.push(coerced.error);
               return;
             }
-            passportCreate[resolvedKey] = coerced.value;
+            passportCreate[key] = coerced.value;
             return;
           }
 
@@ -493,27 +482,16 @@ module.exports = function createAssetService({
         if (ASSET_MATCH_FIELDS.has(key)) return;
         if (ASSET_IGNORED_SYSTEM_COLUMNS.has(key)) return;
 
-        let resolvedKey = key;
-        let fieldDef = fieldMap.get(key);
-
-        if (!fieldDef && key.length >= 63) {
-          for (const [fk, fd] of fieldMap) {
-            if (fk.length > 63 && fk.substring(0, 63) === key.substring(0, 63)) {
-              resolvedKey = fk;
-              fieldDef = fd;
-              break;
-            }
-          }
-          }
+        const fieldDef = fieldMap.get(key);
 
           if (fieldDef) {
-            if (resolvedKey === "internalAliasId" && !matchGuid && !nextProductIdProvided) return;
+            if (key === "internalAliasId" && !matchGuid && !nextProductIdProvided) return;
             const coerced = coerceAssetFieldValue(fieldDef, value);
           if (!coerced.ok) {
             errors.push(coerced.error);
             return;
           }
-          passportUpdate[resolvedKey] = coerced.value;
+          passportUpdate[key] = coerced.value;
             return;
           }
 
