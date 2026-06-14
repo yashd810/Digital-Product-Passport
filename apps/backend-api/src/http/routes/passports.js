@@ -1,8 +1,8 @@
 "use strict";
 
-const logger = require("../../infrastructure/logging/logger");
-const { generateDppRecordId } = require("../../shared/identifiers/dpp-record-id");
-const { recordSignedDppRelease } = require("../../infrastructure/audit/dpp-release-record-service");
+const logger = require("../../services/logger");
+const { generateDppRecordId } = require("../../services/dpp-record-id");
+const { recordSignedDppRelease } = require("../../services/dpp-release-record-service");
 const {
   extractCarrierAuthenticityMutation,
   applyCarrierAuthenticityMutation,

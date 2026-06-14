@@ -1,7 +1,7 @@
 "use strict";
 
 const nodeCrypto = require("crypto");
-const canonicalizeJson = require("../../shared/passports/json-canonicalization");
+const canonicalizeJson = require("../../services/json-canonicalization");
 
 function buildAuditEventPayload({
   createdAt = null,

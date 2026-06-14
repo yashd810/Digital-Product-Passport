@@ -113,10 +113,6 @@ module.exports = function registerDictionaryRoutes(app, {
     }
     if (artifact === "categories") return sendPrettyJson(res, model.categories);
     if (artifact === "units") return sendPrettyJson(res, model.units);
-    if (artifact === "category-rules") {
-      if (!model.categoryRules) return sendPrettyError(res, 404, { error: "Category rules not found" });
-      return sendPrettyJson(res, model.categoryRules);
-    }
     if (artifact === "terms") return sendPrettyJson(res, filterTerms(model.terms, req.query));
     return sendPrettyError(res, 404, { error: "Dictionary artifact not found" });
   };
@@ -151,7 +147,6 @@ module.exports = function registerDictionaryRoutes(app, {
     ["catalog.jsonld", "catalog"],
     ["categories", "categories"],
     ["units", "units"],
-    ["category-rules", "category-rules"],
     ["terms", "terms"],
   ]) {
     app.get(`/api/semantic-models/:modelKey/${suffix}`, publicReadRateLimit, (req, res) => {
@@ -169,7 +164,6 @@ module.exports = function registerDictionaryRoutes(app, {
     [["/api/dictionary/:family/:version/manifest", "/dictionary/:family/:version/manifest.json"], "manifest"],
     [["/api/dictionary/:family/:version/categories", "/dictionary/:family/:version/categories"], "categories"],
     [["/api/dictionary/:family/:version/units", "/dictionary/:family/:version/units"], "units"],
-    [["/api/dictionary/:family/:version/category-rules", "/dictionary/:family/:version/category-rules.json"], "category-rules"],
     [["/api/dictionary/:family/:version/terms", "/dictionary/:family/:version/terms"], "terms"],
   ]) {
     app.get(paths, publicReadRateLimit, (req, res) => {

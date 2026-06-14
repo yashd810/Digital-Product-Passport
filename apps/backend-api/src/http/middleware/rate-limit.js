@@ -1,6 +1,6 @@
 "use strict";
 
-const logger = require("../../infrastructure/logging/logger");
+const logger = require("../../services/logger");
 
 const envInt = (name, fallback) => {
   const raw = process.env[name];

@@ -8,7 +8,7 @@ const { SYSTEM_PASSPORT_FIELDS } = require("../../shared/passports/passport-help
 const {
   normalizeSystemPassportHeader,
   validateSystemPassportHeader,
-} = require("../../shared/identifiers/passport-header-fields");
+} = require("../../services/passport-header-fields");
 
 const COMPANY_POLICY_DEFAULTS = {
   default_granularity: "item",

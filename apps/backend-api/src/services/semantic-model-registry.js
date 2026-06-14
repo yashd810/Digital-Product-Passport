@@ -237,7 +237,6 @@ function buildModel({ resourcesDir, family, version }) {
   const terms = normalizeTermsSource(termsSource, { manifest, basePath, categories, units });
   const context = loadJsonIfExists(path.join(modelDir, "context.jsonld"), {});
   const dcatCatalog = loadJsonIfExists(path.join(modelDir, "catalog.jsonld"), null);
-  const categoryRules = loadJsonIfExists(path.join(modelDir, "category-rules.json"), null);
   const indexes = indexTerms(terms);
 
   return {
@@ -251,7 +250,6 @@ function buildModel({ resourcesDir, family, version }) {
     units,
     context,
     dcatCatalog,
-    categoryRules,
     indexes,
     contextUrl: manifest.contextUrl || `${basePath}/context.jsonld`,
     termsUrl: manifest.termsUrl || `${basePath}/terms`,
@@ -326,22 +324,12 @@ module.exports = function createSemanticModelRegistry({ resourcesDir = DEFAULT_R
     return getModel(modelKey)?.dcatCatalog || null;
   }
 
-  function getCategoryRules(modelKey) {
-    return getModel(modelKey)?.categoryRules || null;
-  }
-
   function getTermBySlug(modelKey, slug) {
     return getModel(modelKey)?.indexes.termsBySlug.get(String(slug || "")) || null;
   }
 
   function getTermByIri(modelKey, iri) {
     return getModel(modelKey)?.indexes.termsByIri.get(String(iri || "")) || null;
-  }
-
-  function getCategoryRequirementForField(modelKey, semanticId, category) {
-    const requirements = getCategoryRules(modelKey)?.requirementsBySemanticId?.[String(semanticId || "")]?.requirements || null;
-    if (!requirements) return null;
-    return requirements[String(category || "")] || null;
   }
 
   function buildJsonLdContext(typeDef, modelKey = null) {
@@ -391,10 +379,8 @@ module.exports = function createSemanticModelRegistry({ resourcesDir = DEFAULT_R
     getUnits,
     getContext,
     getDcatCatalog,
-    getCategoryRules,
     getTermBySlug,
     getTermByIri,
-    getCategoryRequirementForField,
     buildJsonLdContext,
   };
 };

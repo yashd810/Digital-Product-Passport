@@ -31,6 +31,9 @@
           <label>Version
             <input id="version" value="v1" placeholder="v1">
           </label>
+          <label>Display name
+            <input id="displayName" value="Electronics Passport v1" placeholder="Electronics Passport v1">
+          </label>
           <label>Product icon
             <input id="productIcon" value="EL" maxlength="4" placeholder="EL">
           </label>
@@ -40,31 +43,25 @@
           <label class="span2">Dictionary description
             <input id="dictionaryDescription" value="Internal electronics passport dictionary used for Digital Product Passport implementations." placeholder="Short dictionary description">
           </label>
-          <label>Supported categories
-            <input id="supportedCategories" placeholder="Consumer Electronics, Industrial Electronics">
-          </label>
-          <details class="auto-group span4">
-            <summary>Auto-filled fields</summary>
-            <div class="auto-group-grid">
-              <label>Module key <span class="auto-note">(editable but auto filled)</span>
+        <details class="auto-group span4">
+          <summary>Auto-filled fields</summary>
+          <div class="auto-group-grid">
+              <label>Module key
                 <input id="moduleKey" value="electronics:v1" placeholder="electronics:v1">
               </label>
-              <label>Type name <span class="auto-note">(editable but auto filled)</span>
+              <label>Type name
                 <input id="typeName" value="electronicsPassportV1" placeholder="electronicsPassportV1">
               </label>
-              <label>Display name <span class="auto-note">(editable but auto filled)</span>
-                <input id="displayName" value="Electronics Passport v1" placeholder="Electronics Passport v1">
-              </label>
-              <label>Product category <span class="auto-note">(editable but auto filled)</span>
+              <label>Product category
                 <input id="productCategory" value="Electronics" placeholder="Electronics">
               </label>
-              <label>Semantic model key <span class="auto-note">(editable but auto filled)</span>
+              <label>Semantic model key
                 <input id="semanticModelKey" value="claros_electronics_dictionary_v1" placeholder="claros_electronics_dictionary_v1">
               </label>
-              <label>Compliance profile key <span class="auto-note">(editable but auto filled)</span>
+              <label>Compliance profile key
                 <input id="complianceProfileKey" value="electronicsDppV1" placeholder="electronicsDppV1">
               </label>
-              <label class="span2">Dictionary name <span class="auto-note">(editable but auto filled)</span>
+              <label class="span2">Dictionary name
                 <input id="dictionaryName" value="Claros Electronics Dictionary" placeholder="Claros Electronics Dictionary">
               </label>
             </div>
@@ -92,15 +89,10 @@
         </div>
         <div class="role-grid">
           <article class="role-card">
-            <h3>Identity and category</h3>
-            <label>Business identifier field
+            <h3>Identity</h3>
+            <label>Product identifier field
               <select id="businessIdentifierField">
-                <option value="">Select business identifier</option>
-              </select>
-            </label>
-            <label>Category field
-              <select id="categoryFieldKey">
-                <option value="">No category policy field</option>
+                <option value="">Select product identifier</option>
               </select>
             </label>
           </article>
@@ -211,7 +203,7 @@
     <template id="sectionTemplate">
       <article class="section-card">
         <div class="section-head">
-          <label>Section label <span class="auto-note">(editable but auto filled)</span><input data-section-label placeholder="Electronics Identity"></label>
+          <label>Section label <input data-section-label placeholder="Electronics Identity"></label>
           <div class="section-actions">
             <button type="button" data-add-field>Add field</button>
             <button type="button" data-remove-section>Remove</button>
@@ -220,7 +212,7 @@
         <details class="auto-group section-auto-group">
           <summary>Auto-filled fields</summary>
           <div class="auto-group-grid">
-            <label>Section key <span class="auto-note">(editable but auto filled)</span><input data-section-key placeholder="electronicsIdentity"></label>
+            <label>Section key <input data-section-key placeholder="electronicsIdentity"></label>
           </div>
         </details>
         <div data-fields></div>
@@ -241,6 +233,8 @@
           </select>
         </label>
         <label class="span2">Definition <input data-field="definition" placeholder="Short semantic definition"></label>
+        <label>Label <input data-field="fieldLabel" placeholder="Manufacturer Name"></label>
+        <label>Category label <input data-field="categoryLabel" placeholder="Product Identification"></label>
         <label>Data type
           <select data-field="dataType">
             <option value="string">string</option>
@@ -252,7 +246,6 @@
             <option value="uri">uri</option>
           </select>
         </label>
-        <label>Unit key <input data-field="unitKey" value="none" placeholder="none"></label>
         <label>Unit label <input data-field="unitLabel" placeholder="Kilogram"></label>
         <label>Unit symbol <input data-field="unitSymbol" placeholder="kg"></label>
         <label>Access
@@ -271,11 +264,10 @@
         <details class="auto-group span4">
           <summary>Auto-filled fields</summary>
           <div class="auto-group-grid">
-            <label>Label <span class="auto-note">(editable but auto filled)</span><input data-field="fieldLabel" placeholder="Manufacturer Name"></label>
-            <label>Field key <span class="auto-note">(editable but auto filled)</span><input data-field="fieldKey" placeholder="manufacturerName"></label>
-            <label>Semantic slug <span class="auto-note">(editable but auto filled)</span><input data-field="semanticSlug" placeholder="manufacturer-name"></label>
-            <label>Category key <span class="auto-note">(editable but auto filled)</span><input data-field="categoryKey" placeholder="product-identification"></label>
-            <label>Category label <span class="auto-note">(editable but auto filled)</span><input data-field="categoryLabel" placeholder="Product Identification"></label>
+            <label>Field key <input data-field="fieldKey" placeholder="manufacturerName"></label>
+            <label>Semantic slug <input data-field="semanticSlug" placeholder="manufacturer-name"></label>
+            <label>Category key <input data-field="categoryKey" placeholder="product-identification"></label>
+            <label>Unit key <input data-field="unitKey" value="none" placeholder="none"></label>
           </div>
         </details>
         <div class="table-config hidden" data-table-config>
@@ -313,7 +305,6 @@
               <option value="uri">uri</option>
             </select>
           </label>
-          <label>Unit key <input data-column="unitKey" value="none" placeholder="none"></label>
           <label>Unit label <input data-column="unitLabel" placeholder="Percent"></label>
           <label>Unit symbol <input data-column="unitSymbol" placeholder="%"></label>
           <label>Object type
@@ -344,9 +335,10 @@
         <details class="auto-group span4">
           <summary>Auto-filled fields</summary>
           <div class="auto-group-grid">
-            <label>Label <span class="auto-note">(editable but auto filled)</span><input data-column="columnLabel" placeholder="CAS Number"></label>
-            <label>Column key <span class="auto-note">(editable but auto filled)</span><input data-column="columnKey" placeholder="casNumber"></label>
-            <label>Semantic slug <span class="auto-note">(editable but auto filled)</span><input data-column="semanticSlug" placeholder="cas-number"></label>
+            <label>Label <input data-column="columnLabel" placeholder="CAS Number"></label>
+            <label>Column key <input data-column="columnKey" placeholder="casNumber"></label>
+            <label>Semantic slug <input data-column="semanticSlug" placeholder="cas-number"></label>
+            <label>Unit key <input data-column="unitKey" value="none" placeholder="none"></label>
           </div>
         </details>
         <div class="table-column-actions">

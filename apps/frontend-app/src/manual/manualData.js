@@ -724,7 +724,7 @@ export const DICTIONARY_API_TABLE = {
     ["Open dictionary in admin dashboard", "/admin/dictionary/:family/:version", "Super-admin session", "The same dictionary browser inside the admin shell, with module/type context where available", "Super admins designing passport modules, custom types, and semantic mappings."],
     ["Public dictionary browser", "/dictionary/:family/:version", "No login", "Public term browser and term detail pages", "External implementers and verifiers."],
     ["JSON-LD context", "GET /dictionary/:family/:version/context.jsonld or /api/dictionary/:family/:version/context.jsonld", "No login", "Canonical JSON-LD context", "Semantic exports and linked-data verification."],
-    ["Manifest and rules", "GET /api/dictionary/:family/:version/manifest, /category-rules, /categories, /units", "No login", "Dictionary metadata, applicability rules, unit definitions, and category lists", "Builder validation, export guidance, and documentation."],
+    ["Manifest and dictionary data", "GET /api/dictionary/:family/:version/manifest, /categories, /units", "No login", "Dictionary metadata, unit definitions, and category lists", "Dictionary browsing, export guidance, and documentation."],
     ["Term JSON", "GET /api/dictionary/:family/:version/terms or /terms/:slug", "No login", "All terms, filtered terms, or one term detail record", "Dictionary search and direct term references."],
   ],
 };

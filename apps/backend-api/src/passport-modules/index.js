@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { normalizeSystemPassportHeader } = require("../shared/identifiers/passport-header-fields");
+const { normalizeSystemPassportHeader } = require("../services/passport-header-fields");
 
 const DEFAULT_MODULES_DIR = __dirname;
 

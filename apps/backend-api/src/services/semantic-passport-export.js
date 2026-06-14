@@ -1,6 +1,6 @@
 "use strict";
 
-const createSemanticModelRegistry = require("../infrastructure/semantics/create-semantic-model-registry");
+const createSemanticModelRegistry = require("./semantic-model-registry");
 
 const DPP_CONTEXT = {
   "@version": 1.1,

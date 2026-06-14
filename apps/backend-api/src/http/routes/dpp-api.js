@@ -1,5 +1,5 @@
 "use strict";
-const logger = require("../../infrastructure/logging/logger");
+const logger = require("../../services/logger");
 const {
   extractCarrierAuthenticityMutation,
   applyCarrierAuthenticityMutation,
@@ -7,7 +7,7 @@ const {
 const {
   generateDppRecordId,
   isDppRecordId
-} = require("../../shared/identifiers/dpp-record-id");
+} = require("../../services/dpp-record-id");
 const registerDidRoutes = require("../../modules/dpp-api/register-did-routes");
 const { createElementHelpers } = require("../../modules/dpp-api/element-helpers");
 const { createRequestResponseHelpers } = require("../../modules/dpp-api/request-response-helpers");

@@ -5,7 +5,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { isObsoletePassportStatus, normalizePassportStatus } from "../../../passports/utils/passportStatus";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../../passports/utils/publicViewerUrl";
-import { extractComplianceError, formatComplianceIssueSummary } from "../../../shared/utils/complianceErrors";
+import { extractComplianceError } from "../../../shared/utils/complianceErrors";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../admin/styles/AdminDashboard.css";
 
@@ -38,7 +38,6 @@ function WorkflowBadge({ status }) {
 function ComplianceFailureNotice({ error }) {
   if (!error?.message) return null;
 
-  const blockingIssues = Array.isArray(error.blockingIssues) ? error.blockingIssues : [];
   const missingFields = Array.isArray(error.missingFields) ? error.missingFields : [];
   const mandatoryMissingFields = missingFields.filter((field) => field?.mandatory);
 
@@ -46,24 +45,9 @@ function ComplianceFailureNotice({ error }) {
     <div className="alert alert-error dashboard-alert-inline wf-compliance-alert">
       <div className="wf-error-title">{error.message}</div>
 
-      {blockingIssues.length > 0 && (
-        <div className="wf-error-section">
-          <div className="wf-error-heading">Blocking issues</div>
-          <ul className="wf-error-list">
-            {blockingIssues.map((issue, index) => (
-              <li key={`${issue.code || "issue"}-${issue.key || index}`}>
-                {formatComplianceIssueSummary(issue)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {mandatoryMissingFields.length > 0 && (
         <div className="wf-error-section">
-          <div className="wf-error-heading">
-            {error.workflowRequired ? "Missing fields before direct release" : "Missing required fields"}
-          </div>
+          <div className="wf-error-heading">Missing required fields</div>
           <ul className="wf-error-list">
             {mandatoryMissingFields.map((field, index) => (
               <li key={`${field.key || field.label || "missing"}-${index}`}>
@@ -81,12 +65,8 @@ function ComplianceFailureNotice({ error }) {
 function VerificationCheckerNotice({ verification, compliance }) {
   if (!verification && !compliance) return null;
 
-  const blockingIssues = Array.isArray(compliance?.blockingIssues) ? compliance.blockingIssues : [];
   const missingMandatoryFields = Array.isArray(compliance?.completeness?.missingMandatoryFields)
     ? compliance.completeness.missingMandatoryFields
-    : [];
-  const missingOptionalFields = Array.isArray(compliance?.completeness?.missingVoluntaryFields)
-    ? compliance.completeness.missingVoluntaryFields
     : [];
   const passedChecks = Array.isArray(verification?.passedChecks) ? verification.passedChecks : [];
 
@@ -96,27 +76,21 @@ function VerificationCheckerNotice({ verification, compliance }) {
         <div>
           <strong>Verification checker</strong>
           <div className="wf-checker-subtitle">
-            Advisory only. This helps you see what is complete and what is still missing.
+            Advisory only. This checks whether all super-admin required fields are filled in.
           </div>
         </div>
         <span className={`wf-checker-status ${verification?.status || "unknown"}`}>
           {verification?.status === "ready"
             ? "Ready"
-            : verification?.status === "missing_optional_fields"
-              ? "Missing optional fields"
-              : verification?.status === "missing_required_fields"
-                ? "Missing required fields"
-                : verification?.status === "issues_found"
-                  ? "Issues found"
-                  : "Not run yet"}
+            : verification?.status === "missing_required_fields"
+              ? "Missing required fields"
+              : "Not run yet"}
         </span>
       </div>
 
       <div className="wf-checker-metrics">
         <div><span>Completeness</span><strong>{verification?.completenessPercentage ?? 0}%</strong></div>
-        <div><span>Blocking issues</span><strong>{verification?.counts?.blockingIssues ?? blockingIssues.length}</strong></div>
         <div><span>Missing required</span><strong>{verification?.counts?.missingRequiredFields ?? missingMandatoryFields.length}</strong></div>
-        <div><span>Missing optional</span><strong>{verification?.counts?.missingOptionalFields ?? missingOptionalFields.length}</strong></div>
       </div>
 
       {passedChecks.length > 0 && (
@@ -128,39 +102,12 @@ function VerificationCheckerNotice({ verification, compliance }) {
         </div>
       )}
 
-      {blockingIssues.length > 0 && (
-        <div className="wf-error-section">
-          <div className="wf-error-heading">Needs attention</div>
-          <ul className="wf-error-list">
-            {blockingIssues.map((issue, index) => (
-              <li key={`${issue.code || "issue"}-${issue.key || index}`}>
-                {formatComplianceIssueSummary(issue)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {missingMandatoryFields.length > 0 && (
         <div className="wf-error-section">
           <div className="wf-error-heading">Missing required fields</div>
           <ul className="wf-error-list">
             {missingMandatoryFields.map((field, index) => (
               <li key={`${field.key || field.label || "required"}-${index}`}>
-                {field.label || field.key}
-                {field.section ? ` (${field.section})` : ""}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {missingOptionalFields.length > 0 && (
-        <div className="wf-error-section">
-          <div className="wf-error-heading">Missing optional fields</div>
-          <ul className="wf-error-list">
-            {missingOptionalFields.map((field, index) => (
-              <li key={`${field.key || field.label || "optional"}-${index}`}>
                 {field.label || field.key}
                 {field.section ? ` (${field.section})` : ""}
               </li>
@@ -264,19 +211,13 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
             success: true,
             compliance: d.compliance,
             verification: {
-              status: d.compliance?.blockingIssues?.length
-                ? "issues_found"
-                : d.compliance?.completeness?.missingMandatoryFields?.length
+              status: d.compliance?.completeness?.missingMandatoryFields?.length
                   ? "missing_required_fields"
-                  : d.compliance?.completeness?.missingVoluntaryFields?.length
-                    ? "missing_optional_fields"
-                    : "ready",
+                  : "ready",
               passedChecks: [],
               completenessPercentage: d.compliance?.completeness?.percentage ?? 0,
               counts: {
-                blockingIssues: d.compliance?.blockingIssues?.length ?? 0,
                 missingRequiredFields: d.compliance?.completeness?.missingMandatoryFields?.length ?? 0,
-                missingOptionalFields: d.compliance?.completeness?.missingVoluntaryFields?.length ?? 0,
               },
             },
           });
@@ -327,8 +268,8 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
           </p>
           <p className="modal-hint">
             {checkerOnly
-              ? "Run the verification checker to see what is good, what is missing, and what may need attention."
-              : "Optionally assign a reviewer and/or approver. Leave both empty to release immediately. Verification is advisory and does not block the workflow."}
+              ? "Run the checker to see whether any required fields are still missing."
+              : "Optionally assign a reviewer and/or approver. Leave both empty to release immediately. The checker is advisory only and does not block release."}
           </p>
 
           <ComplianceFailureNotice error={error} />

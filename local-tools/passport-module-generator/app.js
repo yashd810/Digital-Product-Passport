@@ -25,11 +25,9 @@ const sample = {
     baseUrl: "https://www.claros-dpp.online",
     dictionaryName: "Claros Electronics Dictionary",
     dictionaryDescription: "Internal electronics passport dictionary used for Digital Product Passport implementations.",
-    supportedCategories: "Consumer Electronics, Industrial Electronics",
   },
   roles: {
     businessIdentifierField: "productModelIdentifier",
-    categoryFieldKey: "electronicsCategory",
     heroFieldKeys: ["productModelIdentifier"],
     summaryFieldKeys: ["manufacturerName", "ratedPower"],
     trustFieldKeys: [],
@@ -212,6 +210,11 @@ function slugFromValue(value) {
     .join("-");
 }
 
+function unitKeyFromLabel(value) {
+  const slug = slugFromValue(value);
+  return slug || "none";
+}
+
 function snakeCaseFromValue(value) {
   return splitWords(value)
     .map((word) => word.toLowerCase())
@@ -317,22 +320,28 @@ function setupFieldAutoFill(node) {
   const semanticSlugInput = $("[data-field='semanticSlug']", node);
   const categoryKeyInput = $("[data-field='categoryKey']", node);
   const categoryLabelInput = $("[data-field='categoryLabel']", node);
+  const unitKeyInput = $("[data-field='unitKey']", node);
+  const unitLabelInput = $("[data-field='unitLabel']", node);
 
   bindDerivedInput(keyInput, () => camelCaseFromWords(labelInput.value), [labelInput]);
   bindDerivedInput(labelInput, () => titleCase(keyInput.value), [keyInput]);
   bindDerivedInput(semanticSlugInput, () => slugFromValue(labelInput.value || keyInput.value), [labelInput, keyInput]);
   bindDerivedInput(categoryKeyInput, () => slugFromValue(categoryLabelInput.value), [categoryLabelInput]);
   bindDerivedInput(categoryLabelInput, () => titleCase(categoryKeyInput.value), [categoryKeyInput]);
+  bindDerivedInput(unitKeyInput, () => unitKeyFromLabel(unitLabelInput.value), [unitLabelInput]);
 }
 
 function setupTableColumnAutoFill(row, node) {
   const keyInput = $("[data-column='columnKey']", node);
   const labelInput = $("[data-column='columnLabel']", node);
   const semanticSlugInput = $("[data-column='semanticSlug']", node);
+  const unitKeyInput = $("[data-column='unitKey']", node);
+  const unitLabelInput = $("[data-column='unitLabel']", node);
 
   bindDerivedInput(keyInput, () => columnKeyFromLabel(labelInput.value), [labelInput]);
   bindDerivedInput(labelInput, () => titleCase(keyInput.value), [keyInput]);
   bindDerivedInput(semanticSlugInput, () => slugFromValue(labelInput.value || keyInput.value), [labelInput, keyInput]);
+  bindDerivedInput(unitKeyInput, () => unitKeyFromLabel(unitLabelInput.value), [unitLabelInput]);
 
   labelInput.addEventListener("input", () => {
     syncRoleOptions();
@@ -534,8 +543,7 @@ function syncCompositionRoleColumns() {
 function syncRoleOptions() {
   const fields = getAllFieldsFromDom();
   const fieldOptions = fields.map((field) => ({ value: field.fieldKey, label: fieldOptionLabel(field) }));
-  setSelectOptions($("#businessIdentifierField"), fieldOptions, "Select business identifier");
-  setSelectOptions($("#categoryFieldKey"), fieldOptions, "No category policy field");
+  setSelectOptions($("#businessIdentifierField"), fieldOptions, "Select product identifier");
   setSelectOptions(
     $("#compositionFieldKey"),
     getTableFieldsFromDom().map((field) => ({ value: field.fieldKey, label: fieldOptionLabel(field) })),
@@ -695,11 +703,9 @@ function readSpec() {
       baseUrl: getFormValue("baseUrl"),
       dictionaryName: getFormValue("dictionaryName"),
       dictionaryDescription: getFormValue("dictionaryDescription"),
-      supportedCategories: getFormValue("supportedCategories"),
     },
     roles: {
       businessIdentifierField: getFormValue("businessIdentifierField"),
-      categoryFieldKey: getFormValue("categoryFieldKey"),
       heroFieldKeys: $$("[data-role-hero]").filter((input) => input.checked).map((input) => input.value),
       summaryFieldKeys: $$("[data-role-summary]").filter((input) => input.checked).map((input) => input.value),
       trustFieldKeys: $$("[data-role-trust]").filter((input) => input.checked).map((input) => input.value),
@@ -734,7 +740,6 @@ function loadSpec(spec) {
   syncRoleOptions();
   const roles = spec.roles || {};
   setFormValue("businessIdentifierField", roles.businessIdentifierField);
-  setFormValue("categoryFieldKey", roles.categoryFieldKey);
   setFormValue("compositionFieldKey", roles.compositionFieldKey);
   syncCompositionRoleColumns();
   setFormValue("compositionLabelColumnKey", roles.compositionLabelColumnKey);

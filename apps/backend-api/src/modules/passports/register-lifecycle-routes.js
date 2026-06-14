@@ -74,44 +74,26 @@ module.exports = function registerLifecycleRoutes(app, deps) {
   };
 
   function buildVerificationSummary(compliance = {}) {
-    const blockingIssues = Array.isArray(compliance?.blockingIssues) ? compliance.blockingIssues : [];
     const completeness = compliance?.completeness || {};
     const missingMandatoryFields = Array.isArray(completeness?.missingMandatoryFields)
       ? completeness.missingMandatoryFields
       : [];
-    const missingOptionalFields = Array.isArray(completeness?.missingVoluntaryFields)
-      ? completeness.missingVoluntaryFields
+    const passedChecks = missingMandatoryFields.length === 0
+      ? ["All required fields are currently present."]
       : [];
-    const profileIssues = Array.isArray(compliance?.profileIssues) ? compliance.profileIssues : [];
-    const managedSemanticIssues = Array.isArray(compliance?.managedSemanticIssues) ? compliance.managedSemanticIssues : [];
-    const semanticIssues = Array.isArray(compliance?.semanticIssues) ? compliance.semanticIssues : [];
-    const categoryIssues = Array.isArray(compliance?.category?.issues) ? compliance.category.issues : [];
-    const passedChecks = [];
-
-    if (blockingIssues.length === 0) passedChecks.push("No blocking semantic, category, or governance issues found.");
-    if (missingMandatoryFields.length === 0) passedChecks.push("All required fields are currently present.");
-    if (profileIssues.length === 0 && managedSemanticIssues.length === 0) {
-      passedChecks.push("Managed compliance identifiers and profile fields are resolved.");
-    }
-    if (semanticIssues.length === 0) passedChecks.push("Mapped semantic values match the expected data types.");
-    if (categoryIssues.length === 0) passedChecks.push("Category-specific requirement checks passed.");
 
     return {
-      status: blockingIssues.length > 0
-        ? "issues_found"
-        : missingMandatoryFields.length > 0
+      status: missingMandatoryFields.length > 0
           ? "missing_required_fields"
-          : missingOptionalFields.length > 0
-            ? "missing_optional_fields"
-            : "ready",
-      isReleaseReady: Boolean(compliance?.directReleaseAllowed),
-      canProceedWithWorkflow: Boolean(compliance?.workflowReleaseAllowed),
+          : "ready",
+      isReleaseReady: true,
+      canProceedWithWorkflow: true,
       completenessPercentage: Number.isFinite(completeness?.percentage) ? completeness.percentage : 0,
       passedChecks,
       counts: {
-        blockingIssues: blockingIssues.length,
+        blockingIssues: 0,
         missingRequiredFields: missingMandatoryFields.length,
-        missingOptionalFields: missingOptionalFields.length,
+        missingOptionalFields: 0,
       },
     };
   }

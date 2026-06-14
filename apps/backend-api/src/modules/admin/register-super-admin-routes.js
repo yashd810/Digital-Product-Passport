@@ -1,7 +1,7 @@
 "use strict";
 
 const { v4: uuidv4 } = require("uuid");
-const logger = require("../../infrastructure/logging/logger");
+const logger = require("../../services/logger");
 
 module.exports = function registerSuperAdminRoutes(app, deps) {
   const {

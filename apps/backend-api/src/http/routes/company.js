@@ -1,7 +1,7 @@
 "use strict";
 
-const logger = require("../../infrastructure/logging/logger");
-const { generateDppRecordId } = require("../../shared/identifiers/dpp-record-id");
+const logger = require("../../services/logger");
+const { generateDppRecordId } = require("../../services/dpp-record-id");
 const {
   mapCompanyRow,
   mapCompanyFacilityRow,

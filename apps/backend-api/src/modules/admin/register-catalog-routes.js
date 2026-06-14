@@ -1,7 +1,7 @@
 "use strict";
 
 const path = require("path");
-const logger = require("../../infrastructure/logging/logger");
+const logger = require("../../services/logger");
 const { getPassportTypeModules } = require("../../passport-modules");
 
 module.exports = function registerCatalogRoutes(app, deps) {
@@ -22,7 +22,6 @@ module.exports = function registerCatalogRoutes(app, deps) {
     getTypeSchemaVersion,
     findReservedPassportHeaderFieldConflicts,
     validatePassportTypeSections,
-    buildPassportTypeGovernanceCheck,
     storageService,
   } = deps;
 
@@ -396,17 +395,9 @@ module.exports = function registerCatalogRoutes(app, deps) {
         });
       }
 
-      const verification = sections !== undefined
-        ? buildPassportTypeGovernanceCheck(sections)
-        : buildPassportTypeGovernanceCheck((result.rows[0]?.fieldsJson || {}).sections || []);
-
       res.json({
         success: true,
         passportType: mapPassportTypeRow(result.rows[0]),
-        verification,
-        warning: verification.issueCount
-          ? "Passport type fields contain governance metadata that should be reviewed."
-          : null,
       });
     } catch (error) {
       logger.error("Patch passport type error:", error.message);
@@ -505,40 +496,14 @@ module.exports = function registerCatalogRoutes(app, deps) {
       await logAudit(null, req.user.userId, "CREATE_PASSPORT_TYPE", "passport_types", null, null,
         { typeName, displayName, productCategory, semanticModelKey: semanticModelKey || null, sourceModule: sourceModule || null });
 
-      const verification = buildPassportTypeGovernanceCheck(sections);
       res.status(201).json({
         success: true,
         passportType: mapPassportTypeRow(result.rows[0]),
-        verification,
-        warning: verification.issueCount
-          ? "Passport type fields contain governance metadata that should be reviewed."
-          : null,
       });
     } catch (error) {
       if (error.code === "23505") return res.status(400).json({ error: "A passport type with this typeName already exists" });
       logger.error("Create passport type error:", error.message);
       res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : "Failed to create passport type" });
-    }
-  });
-
-  app.post("/api/admin/passport-types/verification-check", authenticateToken, isSuperAdmin, async (req, res) => {
-    try {
-      const { sections } = req.body || {};
-      const reservedFieldConflicts = findReservedPassportHeaderFieldConflicts(sections);
-      const sectionValidationError = validatePassportTypeSections(sections);
-      const governance = buildPassportTypeGovernanceCheck(sections);
-
-      return res.json({
-        status: !reservedFieldConflicts.length && !sectionValidationError && governance.issueCount === 0
-          ? "ok"
-          : "attention_needed",
-        reservedFieldConflicts,
-        structuralError: sectionValidationError || null,
-        governance,
-      });
-    } catch (error) {
-      logger.error("Passport type verification check error:", error.message);
-      res.status(500).json({ error: "Failed to run passport type verification check" });
     }
   });
 

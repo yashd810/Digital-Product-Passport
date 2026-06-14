@@ -303,8 +303,6 @@ function validateSpec(input) {
   const dictionaryDescription = clean(module.dictionaryDescription)
     || `Internal ${family} passport dictionary used for Digital Product Passport implementations.`;
   const businessIdentifierField = clean(roles.businessIdentifierField || module.businessIdentifierField);
-  const categoryFieldKey = clean(roles.categoryFieldKey || module.categoryFieldKey);
-  const supportedCategories = splitList(module.supportedCategories);
   const summaryFieldKeys = new Set(Array.isArray(roles.summaryFieldKeys) ? roles.summaryFieldKeys.map(clean).filter(Boolean) : []);
   const heroFieldKeys = new Set(Array.isArray(roles.heroFieldKeys) ? roles.heroFieldKeys.map(clean).filter(Boolean) : []);
   const trustFieldKeys = new Set(Array.isArray(roles.trustFieldKeys) ? roles.trustFieldKeys.map(clean).filter(Boolean) : []);
@@ -387,9 +385,6 @@ function validateSpec(input) {
     throw new Error("Business identifier field is required.");
   }
   requireKnownFieldKey(businessIdentifierField, "Business identifier field");
-  if (categoryFieldKey && !fieldKeys.includes(categoryFieldKey)) {
-    throw new Error(`Category field key "${categoryFieldKey}" must exist as a generated field.`);
-  }
   for (const fieldKey of [...summaryFieldKeys, ...heroFieldKeys, ...trustFieldKeys]) {
     requireKnownFieldKey(fieldKey, "Display role field");
   }
@@ -490,8 +485,6 @@ function validateSpec(input) {
       dictionaryName,
       dictionaryDescription,
       businessIdentifierField,
-      categoryFieldKey,
-      supportedCategories,
     },
     sections,
   };
@@ -610,7 +603,6 @@ function buildManifest(spec) {
       url: baseUrl,
     },
     issuerDid: `did:web:${baseUrl.replace(/^https?:\/\//, "")}`,
-    ...(spec.module.supportedCategories.length ? { productCategoryScope: spec.module.supportedCategories } : {}),
     baseIri: publicBase,
     contextUrl: `${publicBase}/context.jsonld`,
     termsUrl: `${dictionaryApiBase}/terms`,
@@ -691,31 +683,15 @@ function requirementLevelFor(value) {
 }
 
 function buildCategoryRules(spec) {
-  const { categoryFieldKey, supportedCategories } = spec.module;
-  const rules = {};
-  for (const field of spec.sections.flatMap((section) => section.fields)) {
-    const requirementLevel = requirementLevelFor(field.defaultRequirement);
-    if (!requirementLevel) continue;
-    rules[termIri(spec, { slug: field.semanticSlug })] = {
-      termLabel: field.fieldLabel,
-      requirements: supportedCategories.reduce((acc, category) => {
-        acc[category] = requirementLevel;
-        return acc;
-      }, {}),
-    };
-  }
-  const categoryField = spec.sections
-    .flatMap((section) => section.fields)
-    .find((field) => field.fieldKey === categoryFieldKey);
   return {
-    supportedCategories,
-    categories: supportedCategories,
+    supportedCategories: [],
+    categories: [],
     legend: {
       mandatory_espr_jtc24: "required",
       voluntary: "recommended",
       not_applicable: "optional",
     },
-    requirementsBySemanticId: rules,
+    requirementsBySemanticId: {},
   };
 }
 
@@ -732,8 +708,6 @@ function buildModuleJs(spec) {
     complianceProfileKey,
     baseUrl,
     businessIdentifierField,
-    categoryFieldKey,
-    supportedCategories,
     requiredPassportFields,
     requireCompanyOperatorIdentifier,
     requireCarrierPolicy,
@@ -745,13 +719,6 @@ function buildModuleJs(spec) {
   } = spec.module;
   const constName = `${family.replace(/[^A-Za-z0-9]/g, "_").toUpperCase()}_${version.toUpperCase()}_SEMANTIC_BASE`;
   const semanticBase = `${baseUrl}/dictionary/${family}/${version}/terms`;
-  const categoryPolicy = categoryFieldKey ? {
-    kind: "semanticCategory",
-    productKind: family,
-    label: `${titleCase(family)} category`,
-    semanticId: `${semanticBase}/${spec.sections.flatMap((section) => section.fields).find((field) => field.fieldKey === categoryFieldKey)?.semanticSlug}`,
-    supportedCategories,
-  } : null;
 
   const sectionLines = spec.sections.map((section) => {
     const fieldLines = section.fields.map((field) => {
@@ -904,7 +871,6 @@ module.exports = {
     defaultCarrierPolicyKey: ${jsValue(defaultCarrierPolicyKey)},
     enforceSemanticMapping: ${enforceSemanticMapping ? "true" : "false"},
     requirePublicAccessLayer: ${requirePublicAccessLayer ? "true" : "false"},
-    categoryPolicy: ${JSON.stringify(categoryPolicy, null, 4).replace(/\n/g, "\n    ")},
     managedSemanticFields: ${JSON.stringify(managedSemanticFields, null, 4).replace(/\n/g, "\n    ")},
   },
   schemaVersion: 1,

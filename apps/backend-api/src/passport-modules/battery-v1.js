@@ -81,13 +81,6 @@ module.exports = {
     defaultCarrierPolicyKey: "battery_qr_public_entry_v1",
     enforceSemanticMapping: true,
     requirePublicAccessLayer: true,
-    categoryPolicy: {
-      kind: "semanticCategory",
-      productKind: "battery",
-      label: "battery category",
-      semanticId: term("battery-category"),
-      supportedCategories: ["EV", "LMT", "Industrial", "Stationary"],
-    },
     managedSemanticFields: [],
   },
   schemaVersion: 1,

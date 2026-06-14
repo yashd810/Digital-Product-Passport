@@ -83,13 +83,6 @@ module.exports = {
     defaultCarrierPolicyKey: "web_public_entry_v1",
     enforceSemanticMapping: true,
     requirePublicAccessLayer: true,
-    categoryPolicy: {
-      kind: "semanticCategory",
-      productKind: "appliance",
-      label: "appliance category",
-      semanticId: term("appliance-category"),
-      supportedCategories: ["Major Appliance", "Small Appliance", "HVAC", "Consumer Electronics"],
-    },
     managedSemanticFields: [],
   },
   schemaVersion: 1,

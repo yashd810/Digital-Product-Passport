@@ -1,5 +1,5 @@
-const logger = require("../../infrastructure/logging/logger");
-const { recordSignedDppRelease } = require("../../infrastructure/audit/dpp-release-record-service");
+const logger = require("../../services/logger");
+const { recordSignedDppRelease } = require("../../services/dpp-release-record-service");
 const { buildDashboardPath } = require("../../shared/navigation/dashboard-paths");
 
 module.exports = function registerWorkflowRoutes(app, {

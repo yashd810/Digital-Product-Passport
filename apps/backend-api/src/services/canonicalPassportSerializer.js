@@ -1,7 +1,7 @@
 "use strict";
 
 const { buildCarrierAuthenticityResponseFields } = require("../shared/passports/carrier-authenticity");
-const createSemanticModelRegistry = require("../infrastructure/semantics/create-semantic-model-registry");
+const createSemanticModelRegistry = require("./semantic-model-registry");
 const { buildCanonicalIdentityBundle } = require("../shared/identifiers/canonical-identity-bundle");
 const { getPassportFieldValue } = require("../shared/passports/passport-helpers");
 const { getSystemPassportHeader } = require("./passport-header-fields");
@@ -11,11 +11,6 @@ function createCanonicalPassportSerializer({
   productIdentifierService = null,
   semanticModelRegistry = createSemanticModelRegistry(),
 }) {
-  const APPLICABLE_REQUIREMENT_LEVELS = new Set([
-    "mandatory_battreg",
-    "mandatory_espr_jtc24",
-    "voluntary",
-  ]);
   const HEADER_FIELD_KEYS = {
     granularity: new Set(["granularity"]),
     dppSchemaVersion: new Set(["dppSchemaVersion"]),
@@ -350,71 +345,6 @@ function createCanonicalPassportSerializer({
     return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(text);
   }
 
-  function isMandatoryRequirementLevel(level) {
-    return level === "mandatory_battreg" || level === "mandatory_espr_jtc24";
-  }
-
-  function getCategoryRules(semanticModel) {
-    if (!semanticModel?.semanticModelKey) return null;
-    return semanticModel.categoryRules || semanticModelRegistry?.getCategoryRules?.(semanticModel.semanticModelKey) || null;
-  }
-
-  function getCategoryPolicy(typeDef) {
-    return readTypeValue(typeDef, "complianceProfile", "compliance_profile")?.categoryPolicy
-      || getFieldsJson(typeDef)?.complianceProfile?.categoryPolicy
-      || null;
-  }
-
-  function findCategoryField(typeDef, categoryPolicy = {}) {
-    const semanticId = normalizeText(categoryPolicy.semanticId);
-    if (!semanticId) return null;
-    return getSchemaFieldDefinitions(typeDef).find((field) => normalizeText(field.semanticId) === semanticId) || null;
-  }
-
-  function getSupportedCategories(semanticModel, categoryPolicy = {}) {
-    const rules = getCategoryRules(semanticModel);
-    if (Array.isArray(rules?.categories) && rules.categories.length) return rules.categories;
-    if (Array.isArray(categoryPolicy.supportedCategories)) return categoryPolicy.supportedCategories;
-    return [];
-  }
-
-  function normalizeCategoryValue(value, categoryPolicy = {}, supportedCategories = []) {
-    const raw = normalizeText(value);
-    if (!raw) return null;
-
-    const supportedCategory = supportedCategories.find((category) => String(category) === raw);
-    if (supportedCategory) return raw;
-    return supportedCategories.length ? null : raw;
-  }
-
-  function getCategoryRequirementForField(semanticModel, fieldDef, normalizedCategory) {
-    if (!fieldDef?.semanticId || !normalizedCategory) return null;
-    const categoryRules = getCategoryRules(semanticModel);
-    const requirementLevel = categoryRules?.requirementsBySemanticId?.[String(fieldDef.semanticId)]?.requirements?.[normalizedCategory] || null;
-    if (!requirementLevel) return null;
-    return {
-      requirementLevel,
-      applicable: APPLICABLE_REQUIREMENT_LEVELS.has(requirementLevel),
-      mandatory: isMandatoryRequirementLevel(requirementLevel),
-    };
-  }
-
-  function resolveCategoryInfo(passport, typeDef, semanticModel) {
-    const categoryPolicy = getCategoryPolicy(typeDef);
-    if (categoryPolicy?.kind !== "semanticCategory") return { raw: null, normalized: null };
-    const categoryField = findCategoryField(typeDef, categoryPolicy);
-    const rawCategory = categoryField?.key ? getPassportFieldValue(passport, categoryField.key) : null;
-    const supportedCategories = getSupportedCategories(semanticModel, categoryPolicy);
-    return {
-      raw: rawCategory || null,
-      normalized: normalizeCategoryValue(rawCategory, categoryPolicy, supportedCategories),
-      label: categoryPolicy.label || categoryField?.label || "category",
-      policyKind: categoryPolicy.kind || null,
-      productKind: categoryPolicy.productKind || null,
-      supported: supportedCategories,
-    };
-  }
-
   function coerceValueToSemanticType(value, term) {
     if (!term || isBlankValue(value)) return value;
 
@@ -579,8 +509,7 @@ function createCanonicalPassportSerializer({
     return issues;
   }
 
-  function isRequiredField(fieldDef, categoryRequirement = null) {
-    if (categoryRequirement?.applicable && categoryRequirement.mandatory) return true;
+  function isRequiredField(fieldDef) {
     return fieldDef?.required === true || fieldDef?.mandatory === true;
   }
 
@@ -606,15 +535,6 @@ function createCanonicalPassportSerializer({
     for (const option of fieldOptions) {
       const normalized = normalizeAllowedOptionValue(option);
       if (normalized !== null) values.add(normalized);
-    }
-
-    const categoryPolicy = options.categoryPolicy || null;
-    const categoryPolicySemanticId = normalizeText(categoryPolicy?.semanticId);
-    const isCategoryField = categoryPolicy?.kind === "semanticCategory"
-      && categoryPolicySemanticId
-      && normalizeText(fieldDef?.semanticId) === categoryPolicySemanticId;
-    if (isCategoryField) {
-      getSupportedCategories(options.semanticModel, categoryPolicy).forEach((entry) => values.add(entry));
     }
 
     return [...values];
@@ -924,13 +844,8 @@ function createCanonicalPassportSerializer({
 
     const fields = {};
     const validationIssues = [];
-    const categoryPolicy = getCategoryPolicy(typeDef);
-    const categoryInfo = resolveCategoryInfo(passport, typeDef, semanticModel);
     for (const fieldDef of schemaFields) {
       const semanticTerm = resolveSemanticTerm(fieldDef, fieldDef.key, semanticModel);
-      const categoryRequirement = categoryInfo.normalized
-        ? getCategoryRequirementForField(semanticModel, fieldDef, categoryInfo.normalized)
-        : null;
       if (semanticModel && !semanticTerm) {
         validationIssues.push({
           key: fieldDef.key,
@@ -941,18 +856,12 @@ function createCanonicalPassportSerializer({
         continue;
       }
       const rawValue = getPassportFieldValue(passport, fieldDef.key);
-      if (isRequiredField(fieldDef, categoryRequirement) && isBlankValue(rawValue)) {
+      if (isRequiredField(fieldDef) && isBlankValue(rawValue)) {
         validationIssues.push({
           key: fieldDef.key,
-          code: categoryRequirement?.mandatory
-            ? "CATEGORY_REQUIRED_FIELD_MISSING"
-            : "REQUIRED_FIELD_MISSING",
-          message: categoryRequirement?.mandatory
-            ? `Field "${fieldDef.key}" is mandatory for ${categoryInfo.label || "category"} "${categoryInfo.normalized}" but is missing from the export.`
-            : `Field "${fieldDef.key}" is required but is missing from the export.`,
+          code: "REQUIRED_FIELD_MISSING",
+          message: `Field "${fieldDef.key}" is required but is missing from the export.`,
           dictionaryReference: resolveDictionaryReference(fieldDef, fieldDef.key, semanticModel),
-          ...(categoryRequirement?.requirementLevel ? { requirementLevel: categoryRequirement.requirementLevel } : {}),
-          ...(categoryInfo.normalized ? { category: categoryInfo.normalized } : {}),
         });
       }
       const typedValue = coerceValueToSemanticType(
@@ -962,13 +871,10 @@ function createCanonicalPassportSerializer({
       if (typedValue === null) continue;
       const issues = [
         ...buildSemanticValidationIssues(typedValue, semanticTerm, fieldDef, fieldDef.key, {
-          category: categoryInfo.normalized,
-          categoryPolicy,
           semanticModel,
         }),
         ...buildSchemaValidationIssues(typedValue, fieldDef, fieldDef.key, {
           skipTypeValidation: Boolean(semanticTerm),
-          categoryPolicy,
           semanticModel,
         }),
       ];
@@ -1039,15 +945,6 @@ function createCanonicalPassportSerializer({
     });
     if (extensions?.claros) {
       extensions.claros.validation = summarizeValidationIssues(validationIssues);
-      if (categoryInfo.raw || categoryInfo.normalized) {
-        extensions.claros.validation.category = {
-          raw: categoryInfo.raw,
-          normalized: categoryInfo.normalized,
-          supported: categoryInfo.supported || [],
-          policyKind: categoryInfo.policyKind || null,
-          productKind: categoryInfo.productKind || null,
-        };
-      }
       if (validationIssues.length) {
         extensions.claros.validationIssues = validationIssues;
       }

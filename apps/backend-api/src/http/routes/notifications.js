@@ -1,4 +1,4 @@
-const logger = require("../../infrastructure/logging/logger");
+const logger = require("../../services/logger");
 
 module.exports = function registerNotificationRoutes(app, {
   pool,

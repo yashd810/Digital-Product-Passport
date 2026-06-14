@@ -168,11 +168,8 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath, ap
 
           <div className="dictionary-side-card dictionary-side-card-plain">
             <h2>Dictionary artifacts</h2>
-            <p>Use these JSON artifacts for validation, field mappings, and semantic exports.</p>
+            <p>Use these JSON artifacts for field mappings and semantic exports.</p>
             <div className="dictionary-footer-links">
-              <a href={manifest?.categoryRulesUrl || `${apiPath}/category-rules`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
-                Applicability rules
-              </a>
               <a href={manifest?.termsUrl || `${apiPath}/terms`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
                 Terms JSON
               </a>
@@ -349,8 +346,8 @@ export default function DictionaryBrowserPage() {
             <h2>Dictionary artifacts</h2>
             <p>Open the generated artifacts behind this semantic model.</p>
             <div className="dictionary-footer-links">
-              <a href={manifest?.categoryRulesUrl || `${apiPath}/category-rules`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
-                Applicability rules
+              <a href={manifest?.termsUrl || `${apiPath}/terms`} target="_blank" rel="noopener noreferrer" className="dictionary-inline-link">
+                Terms JSON
               </a>
             </div>
           </div>

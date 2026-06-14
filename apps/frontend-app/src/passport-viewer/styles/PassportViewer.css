@@ -477,10 +477,12 @@
 
 .passport-portal .overview-symbols {
   margin-top: 14px;
-  border: 1px solid rgba(13, 181, 176, 0.16);
-  background: linear-gradient(180deg, rgba(13, 181, 176, 0.08), rgba(238, 246, 255, 0.48));
-  border-radius: 20px;
-  padding: 14px;
+  border: 1px solid rgba(16, 36, 58, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 250, 252, 0.98));
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
 .passport-portal .overview-symbols-head {
@@ -507,36 +509,55 @@
 
 .passport-portal .verification-panel {
   margin-top: 14px;
-  border: 1px solid rgba(13, 181, 176, 0.16);
-  background: linear-gradient(180deg, rgba(13, 181, 176, 0.08), rgba(238, 246, 255, 0.48));
-  border-radius: 20px;
-  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(16, 36, 58, 0.1);
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 12px 28px rgba(16, 36, 58, 0.05);
+}
+
+.passport-portal .verification-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, var(--teal), #6ee7e1);
+}
+
+.passport-portal .verification-panel-head {
+  position: relative;
+  z-index: 1;
 }
 
 .passport-portal .verification-panel-head h3 {
-  margin: 0.5rem 0 0.35rem;
-  font-size: 1.08rem;
-  letter-spacing: -0.03em;
+  margin: 0.6rem 0 0.32rem;
+  font-size: 1.22rem;
+  letter-spacing: -0.04em;
+  color: var(--navy);
 }
 
 .passport-portal .verification-panel-head p {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+  max-width: 42rem;
 }
 
 .passport-portal .verification-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
 }
 
 .passport-portal .verification-card {
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 16px;
-  padding: 12px;
+  border: 1px solid rgba(16, 36, 58, 0.08);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  border-radius: 18px;
+  padding: 15px 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .passport-portal .verification-card span {
@@ -551,16 +572,42 @@
 
 .passport-portal .verification-card strong {
   display: block;
-  font-size: 0.94rem;
-  line-height: 1.35;
+  font-size: 1.02rem;
+  line-height: 1.4;
   overflow-wrap: anywhere;
+  color: var(--navy);
 }
 
 .passport-portal .verification-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(16, 36, 58, 0.08);
+}
+
+.passport-portal .pill-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 181, 176, 0.22);
+  background: rgba(13, 181, 176, 0.08);
+  color: var(--teal-dark);
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.2;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.passport-portal .pill-button:hover {
+  background: rgba(13, 181, 176, 0.14);
+  border-color: rgba(13, 181, 176, 0.34);
+  color: #044f4e;
+  transform: translateY(-1px);
 }
 
 .passport-portal .verification-inline-note {
@@ -569,10 +616,11 @@
   gap: 12px;
   align-items: center;
   margin-bottom: 14px;
-  padding: 14px;
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(13, 181, 176, 0.08), rgba(238, 246, 255, 0.5));
-  border: 1px solid rgba(13, 181, 176, 0.16);
+  padding: 15px 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 249, 252, 0.98));
+  border: 1px solid rgba(16, 36, 58, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .passport-portal .verification-inline-note span {
@@ -3024,10 +3072,13 @@
   gap: 14px;
   width: 100%;
   margin-top: 14px;
-  padding: 16px;
-  border-radius: 20px;
-  border: 1px solid rgba(11, 24, 38, 0.12);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(233,241,247,0.95));
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(16, 36, 58, 0.1);
+  background:
+    radial-gradient(circle at top right, rgba(13, 181, 176, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255,255,255,0.99), rgba(242,248,252,0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
   color: #10243a;
   text-align: left;
 }
@@ -3062,10 +3113,11 @@
 
 .trusted-entry-card,
 .trusted-entry-guidance-card {
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.86);
-  border: 1px solid rgba(16, 36, 58, 0.1);
+  padding: 14px 15px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.96);
+  border: 1px solid rgba(16, 36, 58, 0.09);
+  box-shadow: 0 10px 24px rgba(16, 36, 58, 0.04);
 }
 
 .trusted-entry-guidance-card.warning {
@@ -4312,8 +4364,8 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(4, 12, 24, 0.72);
-  backdrop-filter: blur(4px);
+  background: rgba(16, 36, 58, 0.32);
+  backdrop-filter: blur(7px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4322,13 +4374,15 @@
 
 .access-unlock-modal {
   position: relative;
-  background: var(--viewer-secondary, #17304a);
-  border: 1px solid rgba(13, 181, 176, 0.26);
-  border-radius: 16px;
-  padding: 36px 32px 28px;
+  background:
+    radial-gradient(circle at top right, rgba(13, 181, 176, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(244, 249, 252, 0.99));
+  border: 1px solid rgba(16, 36, 58, 0.1);
+  border-radius: 28px;
+  padding: 34px 30px 28px;
   width: 100%;
-  max-width: 420px;
-  box-shadow: 0 24px 56px rgba(4, 12, 24, 0.5);
+  max-width: 460px;
+  box-shadow: 0 30px 80px rgba(16, 36, 58, 0.2);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -4338,34 +4392,39 @@
   position: absolute;
   top: 14px;
   right: 16px;
-  background: none;
-  border: none;
-  color: var(--viewer-accent, #0db5b0);
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(16, 36, 58, 0.08);
+  color: #47657d;
   font-size: 18px;
   cursor: pointer;
   line-height: 1;
-  padding: 4px 6px;
-  border-radius: 6px;
-  opacity: 0.7;
+  padding: 6px 8px;
+  border-radius: 999px;
+  opacity: 1;
+  box-shadow: 0 6px 18px rgba(16, 36, 58, 0.08);
 }
-.access-unlock-close:hover { opacity: 1; }
+.access-unlock-close:hover {
+  color: var(--navy);
+  border-color: rgba(13, 181, 176, 0.28);
+}
 
 .access-unlock-icon {
-  font-size: 32px;
+  font-size: 34px;
   text-align: center;
 }
 
 .access-unlock-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #f0f6fa;
+  font-size: 1.42rem;
+  font-weight: 800;
+  color: var(--navy);
   margin: 0;
   text-align: center;
+  letter-spacing: -0.03em;
 }
 
 .access-unlock-desc {
-  font-size: 14px;
-  color: #b8ccd9;
+  font-size: 0.98rem;
+  color: #4d6980;
   margin: 0;
   line-height: 1.55;
   text-align: center;
@@ -4373,68 +4432,78 @@
 
 .access-unlock-input {
   width: 100%;
-  padding: 10px 14px;
-  border-radius: 9px;
-  border: 1.5px solid rgba(13, 181, 176, 0.3);
-  background: rgba(255, 255, 255, 0.05);
-  color: #f0f6fa;
-  font-size: 14px;
-  font-family: monospace;
+  padding: 13px 15px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(16, 36, 58, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--navy);
+  font-size: 0.98rem;
+  font-family: inherit;
   box-sizing: border-box;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
+
+.access-unlock-input::placeholder {
+  color: #7b91a4;
+}
+
 .access-unlock-input:focus {
   outline: none;
-  border-color: var(--viewer-accent, #0db5b0);
-  box-shadow: 0 0 0 3px rgba(13, 181, 176, 0.14);
+  border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(13, 181, 176, 0.14);
 }
 
 .access-unlock-error {
-  font-size: 13px;
-  color: #ff8f8f;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  border-radius: 7px;
-  padding: 8px 12px;
+  font-size: 0.84rem;
+  color: #a22727;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: 12px;
+  padding: 10px 12px;
 }
 
 .access-unlock-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .access-unlock-btn {
-  padding: 9px 20px;
-  border-radius: 9px;
-  font-size: 14px;
-  font-weight: 600;
+  min-height: 46px;
+  padding: 11px 22px;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  font-weight: 800;
   cursor: pointer;
-  border: 1.5px solid transparent;
-  transition: background 0.15s, border-color 0.15s;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
 }
 
 .access-unlock-btn.cancel {
-  background: rgba(255, 255, 255, 0.06);
-  color: #b8ccd9;
-  border-color: rgba(255, 255, 255, 0.1);
+  background: #fff;
+  color: #48657c;
+  border-color: rgba(16, 36, 58, 0.12);
 }
 .access-unlock-btn.cancel:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f0f6fa;
+  background: #f3f8fb;
+  color: var(--navy);
 }
 
 .access-unlock-btn.submit {
-  background: var(--viewer-accent, #0db5b0);
-  color: #07111f;
+  background: linear-gradient(135deg, var(--teal), #18c8c3);
+  color: #052e34;
   border-color: transparent;
+  box-shadow: 0 12px 26px rgba(13, 181, 176, 0.24);
 }
 .access-unlock-btn.submit:hover:not(:disabled) {
-  background: #06d6d0;
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #0fc2bd, #2ad5d0);
 }
 .access-unlock-btn.submit:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .pv-history-overlay {

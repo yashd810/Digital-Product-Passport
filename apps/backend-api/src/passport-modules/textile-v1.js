@@ -83,7 +83,6 @@ module.exports = {
     defaultCarrierPolicyKey: "web_public_entry_v1",
     enforceSemanticMapping: true,
     requirePublicAccessLayer: true,
-    categoryPolicy: null,
     managedSemanticFields: [],
   },
   schemaVersion: 1,

@@ -429,7 +429,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Admin route", value: "/admin/dictionary/:family/:version" },
         { label: "Semantic model", value: "Each passport type selects the dictionary model it needs" },
-        { label: "Dictionary APIs", value: "Manifest, context, categories, units, category-rules, terms, and term details" },
+        { label: "Dictionary APIs", value: "Manifest, context, categories, units, terms, and term details" },
         { label: "Public availability", value: "Registered dictionaries are also available at /dictionary/:family/:version without dashboard login" },
       ],
       journeys: [
@@ -446,7 +446,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Use dictionary governance endpoints correctly",
           items: [
-            "Use the manifest and category-rules endpoints to understand which dictionary pieces apply to the selected product category.",
+            "Use the manifest, categories, and terms endpoints to understand the dictionary structure used by the selected semantic model.",
             "Use module field metadata when checking how passport type fields connect to dictionary terms.",
             "Use the JSON-LD context URL when explaining exported semantic passport payloads to technical partners.",
           ],

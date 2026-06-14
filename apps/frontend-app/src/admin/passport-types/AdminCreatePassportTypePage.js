@@ -248,10 +248,8 @@ function AdminCreatePassportType() {
 
   // ── UI state ───────────────────────────────────────────────
   const [saving,   setSaving]   = useState(false);
-  const [verificationLoading, setVerificationLoading] = useState(false);
   const [error,    setError]    = useState("");
   const [success,  setSuccess]  = useState("");
-  const [verification, setVerification] = useState(null);
   const [csvError, setCsvError] = useState("");
   const [invalidFields, setInvalidFields] = useState([]);  // section/field IDs with errors
   const [openGovernanceDropdown, setOpenGovernanceDropdown] = useState(null);
@@ -641,7 +639,6 @@ function AdminCreatePassportType() {
     const moduleSections = (selectedModule.fieldsJson?.sections || [])
       .map((section) => rekeyModuleSection(section, selectedModule.moduleKey));
     setSections(moduleSections.length ? moduleSections : [newSection("General")]);
-    setVerification(null);
     setError("");
     setInvalidFields([]);
   };
@@ -1183,12 +1180,7 @@ function AdminCreatePassportType() {
         throw new Error(data.error || data.detail || (editMode ? "Failed to update passport type" : "Failed to create passport type"));
       }
 
-      setVerification(data.verification || null);
-      setSuccess(
-        data?.verification?.issueCount
-          ? `${editMode ? "Passport type updated" : "Passport type created"} with ${data.verification.issueCount} verification checker issue${data.verification.issueCount === 1 ? "" : "s"} to review.`
-          : `${editMode ? "Passport type updated successfully!" : "Passport type created successfully!"}`
-      );
+      setSuccess(`${editMode ? "Passport type updated successfully!" : "Passport type created successfully!"}`);
       if (draftEnabled) fetchWithAuth(DRAFT_API, { method: "DELETE", headers: authHeaders() }).catch(() => {});
       setError("");
       setInvalidFields([]);
@@ -1208,32 +1200,6 @@ function AdminCreatePassportType() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const runVerificationCheck = async () => {
-    try {
-      setVerificationLoading(true);
-      setError("");
-      const { payload } = buildSubmissionPayload();
-      const response = await fetchWithAuth(`${API}/api/admin/passport-types/verification-check`, {
-        method: "POST",
-        headers: authHeaders({
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ sections: payload.sections }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to run passport type verification check");
-      }
-      setVerification(data);
-      if (data.structuralError) setError(data.structuralError);
-    } catch (e) {
-      setError(e.message || "Failed to run passport type verification check");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } finally {
-      setVerificationLoading(false);
     }
   };
 
@@ -1271,25 +1237,6 @@ function AdminCreatePassportType() {
       )}
       {success && <div ref={successAlertRef} className="alert alert-success admin-alert-bottom admin-alert-compact">{success}</div>}
       {error && <div ref={errorAlertRef} className="alert alert-error admin-alert-bottom admin-alert-compact">{error}</div>}
-      {verification && (
-        <div className={`alert ${verification.status === "ok" ? "alert-success" : "alert-warning"} admin-alert-bottom admin-alert-compact`}>
-          <strong>Verification checker</strong>
-          <div>
-            {verification.structuralError
-              ? verification.structuralError
-              : verification.governance
-                ? `${verification.governance.issueCount} governance issue${verification.governance.issueCount === 1 ? "" : "s"} found.`
-                : `${verification.issueCount || 0} issue${verification.issueCount === 1 ? "" : "s"} found.`}
-          </div>
-          {Array.isArray(verification.reservedFieldConflicts) && verification.reservedFieldConflicts.length > 0 && (
-            <div>Reserved field conflicts: {verification.reservedFieldConflicts.map((item) => item.field || item.reservedField).join(", ")}</div>
-          )}
-          {Array.isArray(verification.governance?.issues) && verification.governance.issues.length > 0 && (
-            <div>{verification.governance.issues.slice(0, 6).map((issue) => issue.message).join(" ")}</div>
-          )}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="acpt-form">
 
         {/* ── Meta card ── */}
@@ -2214,9 +2161,6 @@ function AdminCreatePassportType() {
               {draftSaved ? "✓ Draft Saved" : "Save Draft"}
             </button>
           )}
-          <button type="button" className="acpt-save-draft-btn" onClick={runVerificationCheck} disabled={saving || verificationLoading}>
-            {verificationLoading ? "Checking…" : "Run Verification Check"}
-          </button>
           <button type="submit" className="submit-btn" disabled={saving}>
             {saving ? (editMode ? "Saving…" : "Creating…") : (editMode ? "Save Changes" : "Create Passport Type")}
           </button>
