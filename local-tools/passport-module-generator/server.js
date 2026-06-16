@@ -17,6 +17,22 @@ const MIME = {
   ".json": "application/json; charset=utf-8",
 };
 
+const HEADER_SLOT_DEFINITIONS = [
+  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
+  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
+  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId" },
+  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity" },
+  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion" },
+  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus" },
+  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate" },
+  { slotKey: "economicOperatorId", label: "Economic Operator ID", managedKey: "internalManagedEconomicOperatorId" },
+  { slotKey: "facilityId", label: "Facility ID", managedKey: "internalManagedFacilityId" },
+  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds" },
+  { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid" },
+  { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid" },
+  { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid" },
+];
+
 function sendJson(res, status, data) {
   const body = JSON.stringify(data, null, 2);
   res.writeHead(status, {
@@ -200,6 +216,24 @@ function splitList(value) {
     .filter(Boolean);
 }
 
+function normalizeHeaderAssignments(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([slotKey, fieldKey]) => [clean(slotKey), clean(fieldKey)])
+      .filter(([slotKey, fieldKey]) => slotKey && fieldKey)
+  );
+}
+
+function normalizeSummaryRole(value) {
+  const role = clean(value);
+  if (/^card[1-9]$/.test(role)) return role;
+  if (role === "model") return "card1";
+  if (role === "capacity") return "card2";
+  if (role === "category") return "card3";
+  return role;
+}
+
 function normalizeVersion(value) {
   const version = clean(value || "v1").toLowerCase();
   if (/^v\d+$/.test(version)) return version;
@@ -218,6 +252,12 @@ function normalizeJsonType(value) {
   return "string";
 }
 
+function normalizeFieldType(value, jsonType) {
+  const fieldType = clean(value || (jsonType === "boolean" ? "boolean" : "text"));
+  if (fieldType === "checkbox") return "boolean";
+  return fieldType;
+}
+
 function dataTypeFor(value) {
   const jsonType = normalizeJsonType(value);
   if (jsonType === "number") return { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" };
@@ -227,6 +267,32 @@ function dataTypeFor(value) {
   if (jsonType === "datetime") return { format: "DateTime", jsonType: "string", xsdType: "xsd:dateTime" };
   if (jsonType === "uri") return { format: "URI/URL", jsonType: "string", xsdType: "xsd:anyURI" };
   return { format: "String", jsonType: "string", xsdType: "xsd:string" };
+}
+
+function defaultObjectTypeForField(fieldType) {
+  if (fieldType === "table") return "DataElementCollection";
+  if (fieldType === "file" || fieldType === "url" || fieldType === "symbol") return "RelatedResource";
+  return "SingleValuedDataElement";
+}
+
+function defaultValueDataTypeForField(fieldType, jsonType) {
+  if (fieldType === "table") return "Array";
+  if (fieldType === "file") return "Binary";
+  if (fieldType === "url" || fieldType === "symbol") return "URI";
+  if (fieldType === "date") return "Date";
+  if (fieldType === "boolean") return "Boolean";
+  return dataTypeFor(jsonType).format.replace("/URL", "");
+}
+
+function inferPresentation(field) {
+  if (field.fieldType === "table") return "table";
+  if (field.fieldType === "file") return "evidenceFile";
+  if (field.fieldType === "symbol") return "symbol";
+  if (field.fieldType === "url") return "link";
+  if (field.fieldType === "textarea") return "narrative";
+  if (field.fieldType === "boolean" || field.dataType === "boolean") return "badge";
+  if (field.dataType === "number" || field.dataType === "integer") return "liveMetric";
+  return "data";
 }
 
 const OBJECT_TYPES = new Set([
@@ -276,6 +342,16 @@ function jsValue(value) {
   return JSON.stringify(value);
 }
 
+function regulatoryContentSpecificationId(family, version) {
+  const words = String(family || "")
+    .split("-")
+    .map((word) => clean(word))
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`);
+  if (!words.length) return "";
+  return `${words.join("_")}_dictionary_${version}`;
+}
+
 function validateSpec(input) {
   const module = input.module || {};
   const roles = input.roles || {};
@@ -286,30 +362,57 @@ function validateSpec(input) {
   const displayName = clean(module.displayName) || `${titleCase(family)} Passport ${version}`;
   const productCategory = clean(module.productCategory) || titleCase(family);
   const productIcon = clean(module.productIcon) || "PT";
-  const semanticModelKey = clean(module.semanticModelKey) || `claros_${family.replace(/-/g, "_")}_dictionary_${version}`;
-  const complianceProfileKey = clean(module.complianceProfileKey) || `${camelCase(family)}Dpp${pascalCase(version)}`;
-  const requiredPassportFields = splitList(module.requiredPassportFields || "complianceProfileKey, contentSpecificationIds");
-  const requireCompanyOperatorIdentifier = module.requireCompanyOperatorIdentifier !== false;
-  const requireCarrierPolicy = Boolean(module.requireCarrierPolicy);
-  const enforceSemanticMapping = module.enforceSemanticMapping !== false;
-  const requirePublicAccessLayer = module.requirePublicAccessLayer !== false;
-  const requireFacilityAtGranularities = Array.isArray(module.requireFacilityAtGranularities)
-    ? module.requireFacilityAtGranularities.map(clean).filter(Boolean)
-    : splitList(module.requireFacilityAtGranularities);
+  const semanticModelKey = clean(module.semanticModelKey) || `${family.replace(/-/g, "_")}_dictionary_${version}`;
+  const contentSpecificationId = regulatoryContentSpecificationId(family, version);
+  const passportPolicyKey = clean(module.passportPolicyKey) || `${camelCase(family)}Dpp${pascalCase(version)}`;
   const defaultCarrierPolicyKey = clean(module.defaultCarrierPolicyKey || "web_public_entry_v1");
-  const managedSemanticFields = parseJsonArray(module.managedSemanticFieldsText || module.managedSemanticFields || "[]", "Managed semantic fields");
+  const systemHeaderFieldAssignments = normalizeHeaderAssignments(module.systemHeaderFieldAssignments);
+  const legacySystemHeaderFieldKeys = Array.isArray(module.systemHeaderFieldKeys)
+    ? module.systemHeaderFieldKeys.map(clean).filter(Boolean)
+    : splitList(module.systemHeaderFieldKeys);
+  const mergedSystemHeaderFieldAssignments = {
+    ...Object.fromEntries(
+      legacySystemHeaderFieldKeys
+        .map((fieldKey, index) => [HEADER_SLOT_DEFINITIONS[index]?.slotKey, fieldKey])
+        .filter(([slotKey, fieldKey]) => slotKey && fieldKey)
+    ),
+    ...systemHeaderFieldAssignments,
+  };
+  const systemHeaderFieldMappings = HEADER_SLOT_DEFINITIONS
+    .map((slot) => {
+      const selectedValue = clean(mergedSystemHeaderFieldAssignments[slot.slotKey]);
+      if (!selectedValue) return null;
+      if (selectedValue === `__managed__:${slot.managedKey}`) {
+        return {
+          slotKey: slot.slotKey,
+          label: slot.label,
+          sourceType: "managed",
+          managedKey: slot.managedKey,
+        };
+      }
+      return {
+        slotKey: slot.slotKey,
+        label: slot.label,
+        sourceType: "field",
+        fieldKey: selectedValue,
+      };
+    })
+    .filter(Boolean);
+  const systemHeaderFieldKeys = systemHeaderFieldMappings
+    .filter((entry) => entry.sourceType === "field")
+    .map((entry) => entry.fieldKey);
   const baseUrl = clean(module.baseUrl || "https://www.claros-dpp.online").replace(/\/+$/, "");
-  const dictionaryName = clean(module.dictionaryName) || `Claros ${titleCase(family)} Dictionary`;
+  const dictionaryName = clean(module.dictionaryName) || `${titleCase(family)} Dictionary`;
   const dictionaryDescription = clean(module.dictionaryDescription)
     || `Internal ${family} passport dictionary used for Digital Product Passport implementations.`;
   const businessIdentifierField = clean(roles.businessIdentifierField || module.businessIdentifierField);
-  const summaryFieldKeys = new Set(Array.isArray(roles.summaryFieldKeys) ? roles.summaryFieldKeys.map(clean).filter(Boolean) : []);
-  const heroFieldKeys = new Set(Array.isArray(roles.heroFieldKeys) ? roles.heroFieldKeys.map(clean).filter(Boolean) : []);
-  const trustFieldKeys = new Set(Array.isArray(roles.trustFieldKeys) ? roles.trustFieldKeys.map(clean).filter(Boolean) : []);
-  const presentations = roles.presentations && typeof roles.presentations === "object" ? roles.presentations : {};
-  const summaryRoles = roles.summaryRoles && typeof roles.summaryRoles === "object" ? roles.summaryRoles : {};
+  const rawSummaryRoles = roles.summaryRoles && typeof roles.summaryRoles === "object" ? roles.summaryRoles : {};
+  const summaryRoles = Object.fromEntries(
+    Object.entries(rawSummaryRoles)
+      .map(([fieldKey, role]) => [clean(fieldKey), normalizeSummaryRole(role)])
+      .filter(([fieldKey, role]) => fieldKey && role)
+  );
   const lifecycleRoles = roles.lifecycleRoles && typeof roles.lifecycleRoles === "object" ? roles.lifecycleRoles : {};
-  const mediaRoles = roles.mediaRoles && typeof roles.mediaRoles === "object" ? roles.mediaRoles : {};
   const objectTypes = roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {};
   const valueDataTypes = roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {};
   const compositionFieldKey = clean(roles.compositionFieldKey);
@@ -319,11 +422,6 @@ function validateSpec(input) {
   if (!family) throw new Error("Product family is required");
   if (!/^[a-z][A-Za-z0-9]{1,99}$/.test(typeName)) {
     throw new Error("typeName must be camelCase letters/numbers, 2-100 chars, start with lowercase");
-  }
-  for (const granularity of requireFacilityAtGranularities) {
-    if (!["model", "batch", "item"].includes(granularity)) {
-      throw new Error(`Facility granularity "${granularity}" must be one of: model, batch, item.`);
-    }
   }
 
   const sections = (input.sections || []).map((section) => ({
@@ -338,7 +436,7 @@ function validateSpec(input) {
       const unitKey = clean(field.unitKey || field.unit || "none").toLowerCase() || "none";
       const unitSymbol = unitKey === "none" ? "n.a." : clean(field.unitSymbol || field.unitDisplay || unitKey);
       const jsonType = normalizeJsonType(field.dataType);
-      const fieldType = clean(field.fieldType || field.type || (jsonType === "boolean" ? "checkbox" : "text"));
+      const fieldType = normalizeFieldType(field.fieldType || field.type, jsonType);
       const normalized = {
         fieldKey,
         fieldLabel,
@@ -354,10 +452,11 @@ function validateSpec(input) {
         unitLabel: clean(field.unitLabel) || (unitKey === "none" ? "None" : titleCase(unitKey)),
         unitSymbol,
         accessRights: clean(field.accessRights || field.access || "public").toLowerCase(),
-        defaultRequirement: clean(field.defaultRequirement || "optional").toLowerCase(),
         queryable: Boolean(field.queryable),
         indexed: Boolean(field.indexed),
         storageType: clean(field.storageType),
+        objectType: clean(field.objectType),
+        valueDataType: clean(field.valueDataType),
       };
 
       if (fieldType === "table") {
@@ -385,39 +484,40 @@ function validateSpec(input) {
     throw new Error("Business identifier field is required.");
   }
   requireKnownFieldKey(businessIdentifierField, "Business identifier field");
-  for (const fieldKey of [...summaryFieldKeys, ...heroFieldKeys, ...trustFieldKeys]) {
-    requireKnownFieldKey(fieldKey, "Display role field");
-  }
   for (const fieldKey of [
-    ...Object.keys(presentations),
     ...Object.keys(summaryRoles),
     ...Object.keys(lifecycleRoles),
-    ...Object.keys(mediaRoles),
     ...Object.keys(objectTypes),
     ...Object.keys(valueDataTypes),
+    ...systemHeaderFieldKeys,
   ]) {
     requireKnownFieldKey(fieldKey, "Role metadata field");
+  }
+  const duplicateHeaderFieldKey = systemHeaderFieldKeys.find((fieldKey, index) => systemHeaderFieldKeys.indexOf(fieldKey) !== index);
+  if (duplicateHeaderFieldKey) {
+    throw new Error(`Passport header field "${duplicateHeaderFieldKey}" is assigned to multiple header slots.`);
+  }
+  const summaryCardRoles = Object.values(summaryRoles).filter((role) => /^card[1-9]$/.test(role));
+  const duplicateSummaryCardRole = summaryCardRoles.find((role, index) => summaryCardRoles.indexOf(role) !== index);
+  if (duplicateSummaryCardRole) {
+    throw new Error(`Product overview ${duplicateSummaryCardRole.replace("card", "card ")} is assigned to multiple fields.`);
   }
   requireKnownFieldKey(compositionFieldKey, "Composition chart field");
 
   for (const field of fieldByKey.values()) {
-    field.displayRole = heroFieldKeys.has(field.fieldKey)
-      ? "hero"
-      : trustFieldKeys.has(field.fieldKey)
-        ? "trust"
-        : summaryFieldKeys.has(field.fieldKey)
-          ? "summary"
-          : "detail";
-    field.presentation = clean(presentations[field.fieldKey]);
-    if (!field.presentation) {
-      throw new Error(`Presentation is required for field "${field.fieldKey}".`);
-    }
+    field.displayRole = summaryRoles[field.fieldKey] ? "hero" : "detail";
+    field.presentation = inferPresentation(field);
     field.summaryRole = clean(summaryRoles[field.fieldKey]);
     field.lifecycleRole = clean(lifecycleRoles[field.fieldKey]);
-    field.mediaRole = clean(mediaRoles[field.fieldKey]);
     field.elementIdPath = field.fieldKey;
-    field.objectType = normalizeObjectType(objectTypes[field.fieldKey], `Field "${field.fieldKey}"`);
-    field.valueDataType = normalizeValueDataType(valueDataTypes[field.fieldKey], `Field "${field.fieldKey}"`);
+    field.objectType = normalizeObjectType(
+      field.objectType || objectTypes[field.fieldKey] || defaultObjectTypeForField(field.fieldType),
+      `Field "${field.fieldKey}"`
+    );
+    field.valueDataType = normalizeValueDataType(
+      field.valueDataType || valueDataTypes[field.fieldKey] || defaultValueDataTypeForField(field.fieldType, field.dataType),
+      `Field "${field.fieldKey}"`
+    );
     for (const column of field.tableColumns || []) {
       column.elementIdPath = `${field.fieldKey}.${column.columnKey}`;
     }
@@ -472,15 +572,12 @@ function validateSpec(input) {
       productCategory,
       productIcon,
       semanticModelKey,
-      complianceProfileKey,
-      requiredPassportFields,
-      requireCompanyOperatorIdentifier,
-      requireCarrierPolicy,
-      enforceSemanticMapping,
-      requirePublicAccessLayer,
-      requireFacilityAtGranularities,
+      contentSpecificationId,
+      passportPolicyKey,
       defaultCarrierPolicyKey,
-      managedSemanticFields,
+      systemHeaderFieldAssignments: mergedSystemHeaderFieldAssignments,
+      systemHeaderFieldMappings,
+      systemHeaderFieldKeys: [...new Set(systemHeaderFieldKeys)],
       baseUrl,
       dictionaryName,
       dictionaryDescription,
@@ -493,7 +590,7 @@ function validateSpec(input) {
 function buildTerms(spec) {
   const { family } = spec.module;
   const prefix = family.replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "DPP";
-  const classPrefix = `claros${pascalCase(family)}Class`;
+  const classPrefix = `${pascalCase(family)}Class`;
   let number = 0;
   return spec.sections.flatMap((section) => section.fields.flatMap((field) => {
     const domainClassKey = pascalCase(field.categoryKey || field.categoryLabel);
@@ -599,7 +696,7 @@ function buildManifest(spec) {
       dictionaryVersion: "1.0.0",
     },
     publisher: {
-      name: "Claros DPP",
+      name: "Digital Product Passport Platform",
       url: baseUrl,
     },
     issuerDid: `did:web:${baseUrl.replace(/^https?:\/\//, "")}`,
@@ -608,7 +705,6 @@ function buildManifest(spec) {
     termsUrl: `${dictionaryApiBase}/terms`,
     unitsUrl: `${dictionaryApiBase}/units`,
     categoriesUrl: `${dictionaryApiBase}/categories`,
-    categoryRulesUrl: `${dictionaryApiBase}/category-rules`,
     catalogUrl,
     interoperabilityProfile: {
       catalogUrl,
@@ -656,13 +752,6 @@ function buildCatalog(spec, terms = []) {
           "dcat:accessURL": { "@id": `${publicBase}/context.jsonld` },
           "dcat:mediaType": "application/ld+json",
         },
-        {
-          "@id": `${publicBase}/distributions/category-rules-json`,
-          "@type": "dcat:Distribution",
-          "dcterms:title": `${titleCase(family)} category applicability rules`,
-          "dcat:accessURL": { "@id": `${dictionaryApiBase}/category-rules` },
-          "dcat:mediaType": "application/json",
-        },
       ],
     },
     "dcat:service": {
@@ -676,25 +765,6 @@ function buildCatalog(spec, terms = []) {
   };
 }
 
-function requirementLevelFor(value) {
-  if (value === "required") return "mandatory_espr_jtc24";
-  if (value === "recommended") return "voluntary";
-  return null;
-}
-
-function buildCategoryRules(spec) {
-  return {
-    supportedCategories: [],
-    categories: [],
-    legend: {
-      mandatory_espr_jtc24: "required",
-      voluntary: "recommended",
-      not_applicable: "optional",
-    },
-    requirementsBySemanticId: {},
-  };
-}
-
 function buildModuleJs(spec) {
   const {
     family,
@@ -705,17 +775,13 @@ function buildModuleJs(spec) {
     productCategory,
     productIcon,
     semanticModelKey,
-    complianceProfileKey,
+    contentSpecificationId,
+    passportPolicyKey,
     baseUrl,
     businessIdentifierField,
-    requiredPassportFields,
-    requireCompanyOperatorIdentifier,
-    requireCarrierPolicy,
-    enforceSemanticMapping,
-    requirePublicAccessLayer,
-    requireFacilityAtGranularities,
     defaultCarrierPolicyKey,
-    managedSemanticFields,
+    systemHeaderFieldMappings = [],
+    systemHeaderFieldKeys = [],
   } = spec.module;
   const constName = `${family.replace(/[^A-Za-z0-9]/g, "_").toUpperCase()}_${version.toUpperCase()}_SEMANTIC_BASE`;
   const semanticBase = `${baseUrl}/dictionary/${family}/${version}/terms`;
@@ -737,7 +803,6 @@ function buildModuleJs(spec) {
       args.displayRole = field.displayRole;
       if (field.summaryRole) args.summaryRole = field.summaryRole;
       if (field.lifecycleRole) args.lifecycleRole = field.lifecycleRole;
-      if (field.mediaRole) args.mediaRole = field.mediaRole;
       args.presentation = field.presentation;
       args.elementIdPath = field.elementIdPath;
       args.objectType = field.objectType;
@@ -803,7 +868,6 @@ function field({
   displayRole,
   summaryRole = "",
   lifecycleRole = "",
-  mediaRole = "",
   presentation,
   elementIdPath,
   objectType,
@@ -824,7 +888,6 @@ function field({
     displayRole,
     ...(summaryRole ? { summaryRole } : {}),
     ...(lifecycleRole ? { lifecycleRole } : {}),
-    ...(mediaRole ? { mediaRole } : {}),
     presentation,
     ...(queryable ? { queryable: true } : {}),
     ...(indexed ? { indexed: true } : {}),
@@ -857,21 +920,22 @@ module.exports = {
   productCategory: ${jsValue(productCategory)},
   productIcon: ${jsValue(productIcon)},
   semanticModelKey: ${jsValue(semanticModelKey)},
+  systemHeader: {
+    section: {
+      key: "passportHeader",
+      label: "Passport Header",
+    },
+    fieldMappings: ${jsValue(systemHeaderFieldMappings)},
+    fieldKeys: ${jsValue(systemHeaderFieldKeys)},
+  },
   identity: {
     businessIdentifierField: ${businessIdentifierField ? jsValue(businessIdentifierField) : "null"},
   },
-  complianceProfile: {
-    key: ${jsValue(complianceProfileKey)},
-    displayName: ${jsValue(`${displayName.replace(/\s+v\d+$/i, "")} DPP Profile ${version}`)},
-    contentSpecificationIds: [${jsValue(semanticModelKey)}],
-    requiredPassportFields: ${jsValue(requiredPassportFields)},
-    requireCompanyOperatorIdentifier: ${requireCompanyOperatorIdentifier ? "true" : "false"},
-    requireCarrierPolicy: ${requireCarrierPolicy ? "true" : "false"},
-    requireFacilityAtGranularities: ${jsValue(requireFacilityAtGranularities)},
+  passportPolicy: {
+    key: ${jsValue(passportPolicyKey)},
+    displayName: ${jsValue(`${displayName.replace(/\s+passport\s+v\d+$/i, "").replace(/\s+v\d+$/i, "")} Passport Policy ${version}`)},
+    contentSpecificationIds: [${jsValue(contentSpecificationId)}],
     defaultCarrierPolicyKey: ${jsValue(defaultCarrierPolicyKey)},
-    enforceSemanticMapping: ${enforceSemanticMapping ? "true" : "false"},
-    requirePublicAccessLayer: ${requirePublicAccessLayer ? "true" : "false"},
-    managedSemanticFields: ${JSON.stringify(managedSemanticFields, null, 4).replace(/\n/g, "\n    ")},
   },
   schemaVersion: 1,
   lifecycle: {
@@ -898,7 +962,6 @@ function buildArtifacts(input) {
   const context = buildContext(spec, terms);
   const manifest = buildManifest(spec);
   const catalog = buildCatalog(spec, terms);
-  const categoryRules = buildCategoryRules(spec);
   const moduleFileName = `${spec.module.family}-${spec.module.version}.js`;
   const semanticDir = `apps/backend-api/resources/semantics/${spec.module.family}/${spec.module.version}`;
 
@@ -915,7 +978,6 @@ function buildArtifacts(input) {
       { path: `${semanticDir}/categories.json`, content: prettyJson(categories) },
       { path: `${semanticDir}/units.json`, content: prettyJson(units) },
       { path: `${semanticDir}/catalog.jsonld`, content: prettyJson(catalog) },
-      { path: `${semanticDir}/category-rules.json`, content: prettyJson(categoryRules) },
     ],
   };
 }

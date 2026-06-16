@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const createSemanticModelRegistry = require("../src/infrastructure/semantics/create-semantic-model-registry");
+const createSemanticModelRegistry = require("../src/services/semantic-model-registry");
 const createSemanticPassportExportService = require("../src/services/semantic-passport-export");
 
 function createExportService() {
@@ -24,8 +24,8 @@ function createRegistryWithApplianceDictionary() {
   fs.mkdirSync(modelDir, { recursive: true });
 
   writeJson(path.join(modelDir, "manifest.json"), {
-    semanticModelKey: "claros_appliance_dictionary_v3",
-    name: "Claros Appliance Dictionary",
+    semanticModelKey: "appliance_dictionary_v3",
+    name: "Appliance Dictionary",
     version: "3.0.0",
   });
   writeJson(path.join(modelDir, "terms.json"), [
@@ -91,7 +91,7 @@ test("semantic export supports arbitrary registered semantic models without cate
   const typeDef = {
     typeName: "appliancePassportV3",
     productCategory: "Appliance",
-    semanticModelKey: "claros_appliance_dictionary_v3",
+    semanticModelKey: "appliance_dictionary_v3",
     fieldsJson: {
       sections: [
         {
@@ -117,14 +117,14 @@ test("semantic export supports arbitrary registered semantic models without cate
         energyRating: "A",
       },
     ], "appliancePassportV3", {
-      semanticModelKey: "claros_appliance_dictionary_v3",
+      semanticModelKey: "appliance_dictionary_v3",
       productCategory: "Appliance",
       typeDef,
     });
 
     assert.equal(exported.passportType, "appliancePassportV3");
-    assert.equal(exported.semantic_model?.semanticModelKey, "claros_appliance_dictionary_v3");
-    assert.equal(exported.semanticModel?.semanticModelKey, "claros_appliance_dictionary_v3");
+    assert.equal(exported.semantic_model?.semanticModelKey, "appliance_dictionary_v3");
+    assert.equal(exported.semanticModel?.semanticModelKey, "appliance_dictionary_v3");
     assert.ok(exported["@context"].includes("/dictionary/appliance/v3/context.jsonld"));
     assert.equal(exported["@graph"][0].energyRating, "A");
   } finally {

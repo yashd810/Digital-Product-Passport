@@ -4,9 +4,10 @@ import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable } from "./PieChart";
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
-import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
+import { normalizeSystemPassportHeader, resolveSystemHeaderEntries } from "../../admin/passport-types/builderHelpers";
 import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
-import { ACCESS_LABEL_MAP, appendUnitToDisplayValue, renderTextBlock, isHeroSummaryField, getFieldPresentation, getSummaryHint, getSummaryValue, shouldFeatureInSummary, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
+import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
+import { ACCESS_LABEL_MAP, appendUnitToDisplayValue, renderTextBlock, isHeroSummaryField, getFieldPresentation, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
 import { getMarketingContactUrl } from "../utils/QRcode";
 
 const API = import.meta.env.VITE_API_URL || "";
@@ -206,48 +207,14 @@ function isViewerHiddenField(field) {
   return normalizedKey === "internal alias id" || normalizedLabel === "internal alias id";
 }
 
-function parseHeaderArray(value) {
-  if (Array.isArray(value)) return value;
-  if (typeof value !== "string") return value ? [value] : [];
-  const trimmed = value.trim();
-  if (!trimmed) return [];
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      return Array.isArray(parsed) ? parsed : [parsed];
-    } catch {
-      return [trimmed];
-    }
-  }
-  return trimmed.split(",").map((item) => item.trim()).filter(Boolean);
-}
-
 export function PassportHeaderPanel({ passport, typeDef }) {
   if (!passport) return null;
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader || typeDef?.systemHeader);
-  const fields = Array.isArray(systemHeader?.fields)
-    ? systemHeader.fields.filter((field) => field?.key !== "internalAliasId" && !isViewerHiddenField(field))
-    : [];
-  const canonicalSubjects = passport.linked_data?.canonical_subjects || {};
-  const resolvedCompanyDid = passport.companyDid || canonicalSubjects.companyDid || null;
-  const resolvedFacilityDid = passport.facilityDid || canonicalSubjects.facilityDid || null;
-  const resolvedSubjectDid = passport.subjectDid || canonicalSubjects.subjectDid || null;
-  const resolvedDppDid = passport.dppDid || canonicalSubjects.dppDid || null;
-  const headerValues = {
-    digitalProductPassportId: passport.digitalProductPassportId || passport.dppId,
-    uniqueProductIdentifier: passport.uniqueProductIdentifier || null,
-    internalAliasId: passport.internalAliasId,
-    granularity: passport.granularity || "item",
-    dppSchemaVersion: passport.dppSchemaVersion || typeDef?.fieldsJson?.dppSchemaVersion || "prEN 18223:2025",
-    dppStatus: formatPassportStatus(passport.releaseStatus),
-    lastUpdate: formatIsoDate(passport.updatedAt || passport.createdAt) || null,
-    economicOperatorId: resolvedCompanyDid || passport.economicOperatorId,
-    facilityId: resolvedFacilityDid,
-    contentSpecificationIds: parseHeaderArray(passport.contentSpecificationIds || passport.complianceProfileKey || typeDef?.semanticModelKey),
-    subjectDid: resolvedSubjectDid,
-    dppDid: resolvedDppDid,
-    companyDid: resolvedCompanyDid,
-  };
+  const sections = Array.isArray(typeDef?.fieldsJson?.sections) ? typeDef.fieldsJson.sections : [];
+  const entries = resolveSystemHeaderEntries(sections, systemHeader)
+    .filter((entry) => entry.sourceType === "managed" || (entry.field?.key !== "internalAliasId" && !isViewerHiddenField(entry.field)));
+
+  if (!entries.length) return null;
 
   return (
     <section className="pv-header-panel" aria-labelledby="pv-header-panel-title">
@@ -259,17 +226,22 @@ export function PassportHeaderPanel({ passport, typeDef }) {
         <span className="pv-header-panel-badge">JSON-LD required</span>
       </div>
       <p className="pv-header-panel-copy">
-        These identifiers and status fields are generated or governed by the platform and form the mandatory public passport header.
+        These header values come from explicit passport-header mappings defined in the module.
       </p>
       <div className="pv-header-grid">
-        {fields.map((field) => (
-          <article key={field.key} className={`pv-header-card pv-header-card-${field.ownership || "system_generated"}`}>
+        {entries.map((entry) => {
+          const value = entry.sourceType === "managed"
+            ? resolveManagedSystemHeaderValue(entry.managedKey, { passport, typeDef })
+            : appendUnitToDisplayValue(passport?.[entry.fieldKey], entry.field);
+          return (
+          <article key={`${entry.sourceType}:${entry.managedKey || entry.fieldKey || entry.slotKey}`} className="pv-header-card">
             <div className="pv-header-card-top">
-              <span className="pv-header-label">{field.label || field.key}</span>
+              <span className="pv-header-label">{entry.label || entry.fieldKey || entry.slotKey}</span>
             </div>
-            <strong className="pv-header-value">{formatHeaderValue(headerValues[field.key])}</strong>
+            <strong className="pv-header-value">{formatHeaderValue(value)}</strong>
           </article>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -308,7 +280,7 @@ export function Footer({ brandTheme }) {
   const supportHref = brandTheme?.supportLink || getMarketingContactUrl();
   return (
     <footer className="viewer-footer">
-      <p className="viewer-footer-provider">{brandTheme?.footerText || "Powered by ClarosDPP, digital passport provider via software as a service."}</p>
+      <p className="viewer-footer-provider">{brandTheme?.footerText || "Powered by the Digital Product Passport Platform."}</p>
       <ViewerDomainIndicator />
       <p className="viewer-footer-subtle">
         <a href={supportHref} target="_blank" rel="noopener noreferrer" className="viewer-footer-link">Contact information</a>
@@ -484,9 +456,6 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
       fullWidth,
       twoColumn,
       tags,
-      summaryValue: getSummaryValue(f, raw, isLocked, lang),
-      summaryCandidate: shouldFeatureInSummary(f, raw, isLocked, pieItems),
-      summaryHint: getSummaryHint(f, isLocked, isDynamic, presentation.tone),
       presentation,
     };
   });

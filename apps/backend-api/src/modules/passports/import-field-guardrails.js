@@ -10,12 +10,12 @@ const IMPORT_BUILT_IN_EDITABLE_FIELDS = new Set([
   "internalAliasId",
 ]);
 
-const PROFILE_MANAGED_IMPORT_FIELDS = new Set([
+const POLICY_MANAGED_IMPORT_FIELDS = new Set([
   "lineageId",
   "uniqueProductIdentifier",
   "productImage",
   "granularity",
-  "complianceProfileKey",
+  "passportPolicyKey",
   "contentSpecificationIds",
   "carrierPolicyKey",
   "economicOperatorId",
@@ -26,8 +26,27 @@ const PROFILE_MANAGED_IMPORT_FIELDS = new Set([
 
 const IMPORT_MANAGED_FIELD_KEYS = new Set([
   ...SYSTEM_PASSPORT_FIELDS,
-  ...PROFILE_MANAGED_IMPORT_FIELDS,
+  ...POLICY_MANAGED_IMPORT_FIELDS,
 ]);
+
+const MANAGED_IMPORT_FIELD_LABELS = new Map([
+  ["carrier policy key", "carrierPolicyKey"],
+  ["content specification ids", "contentSpecificationIds"],
+  ["dpp status", "releaseStatus"],
+  ["economic operator id", "economicOperatorId"],
+  ["economic operator identifier scheme", "economicOperatorIdentifierScheme"],
+  ["facility id", "facilityId"],
+  ["granularity", "granularity"],
+  ["manufacturing facility id", "manufacturingFacilityId"],
+  ["passport policy key", "passportPolicyKey"],
+  ["release status", "releaseStatus"],
+  ["unique product identifier", "uniqueProductIdentifier"],
+  ["version number", "versionNumber"],
+]);
+
+function normalizeLabel(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
 
 function isImportBuiltInEditableField(key) {
   return IMPORT_BUILT_IN_EDITABLE_FIELDS.has(String(key || "").trim());
@@ -42,7 +61,8 @@ function isManagedImportFieldKey(key) {
 function isManagedImportFieldLabel(label) {
   const normalizedLabel = String(label || "").trim();
   if (!normalizedLabel) return false;
-  return isManagedImportFieldKey(normalizedLabel);
+  return isManagedImportFieldKey(normalizedLabel)
+    || isManagedImportFieldKey(MANAGED_IMPORT_FIELD_LABELS.get(normalizeLabel(normalizedLabel)));
 }
 
 function resolveCsvImportField(rawLabel, typeSchema = {}) {
@@ -51,7 +71,10 @@ function resolveCsvImportField(rawLabel, typeSchema = {}) {
   const schemaFields = Array.isArray(typeSchema.schemaFields)
     ? typeSchema.schemaFields
     : [];
-  const schemaField = schemaFields.find((field) => field?.key === key);
+  const normalizedLabel = normalizeLabel(key);
+  const schemaField = schemaFields.find((field) =>
+    field?.key === key || normalizeLabel(field?.label) === normalizedLabel
+  );
 
   if (schemaField?.key) return schemaField;
 
@@ -81,7 +104,7 @@ function getInvalidImportFieldKeys(fields = {}, typeSchema = {}) {
 }
 
 function buildManagedImportErrorMessage(keys = []) {
-  return `System-managed fields (${keys.join(", ")}) cannot be imported as passport row data. They are assigned by the passport type and compliance profile.`;
+  return `System-managed fields (${keys.join(", ")}) cannot be imported as passport row data. They are assigned by the passport type and passport policy.`;
 }
 
 module.exports = {

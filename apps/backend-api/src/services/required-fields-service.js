@@ -1,7 +1,7 @@
 "use strict";
 
 const {
-  getComplianceProfileForPassportType,
+  getPassportPolicyForPassportType,
 } = require("../passport-modules");
 const { getPassportFieldValue } = require("../shared/passports/passport-helpers");
 
@@ -29,27 +29,18 @@ function normalizePassportTypeDefinition(typeDef) {
     displayName: typeDef.displayName || typeDef.display_name || null,
     productCategory: typeDef.productCategory || typeDef.product_category || null,
     semanticModelKey: typeDef.semanticModelKey || typeDef.semantic_model_key || null,
-    complianceProfile: typeDef.complianceProfile || typeDef.compliance_profile || fieldsJson.complianceProfile || null,
+    passportPolicy: typeDef.passportPolicy || typeDef.passport_policy || fieldsJson.passportPolicy || null,
     fieldsJson,
   };
 }
 
-function normalizeProfile(profile = null) {
-  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return null;
-  const baseProfile = { ...profile };
+function normalizePassportPolicy(policy = null) {
+  if (!policy || typeof policy !== "object" || Array.isArray(policy)) return null;
+  const basePolicy = { ...policy };
   return {
-    ...baseProfile,
-    contentSpecificationIds: Array.isArray(baseProfile.contentSpecificationIds)
-      ? baseProfile.contentSpecificationIds
-      : [],
-    requiredPassportFields: Array.isArray(baseProfile.requiredPassportFields)
-      ? baseProfile.requiredPassportFields
-      : [],
-    requireFacilityAtGranularities: Array.isArray(baseProfile.requireFacilityAtGranularities)
-      ? baseProfile.requireFacilityAtGranularities
-      : [],
-    managedSemanticFields: Array.isArray(baseProfile.managedSemanticFields)
-      ? baseProfile.managedSemanticFields
+    ...basePolicy,
+    contentSpecificationIds: Array.isArray(basePolicy.contentSpecificationIds)
+      ? basePolicy.contentSpecificationIds
       : [],
   };
 }
@@ -118,24 +109,24 @@ module.exports = function createRequiredFieldsService({
     return normalizePassportTypeDefinition(result.rows[0] || null);
   }
 
-  function resolveProfileMetadata({ passportType = null, typeDef = null, granularity = null } = {}) {
+  function resolvePassportPolicyMetadata({ passportType = null, typeDef = null, granularity = null } = {}) {
     const normalizedTypeDef = normalizePassportTypeDefinition(typeDef);
-    const profileLookupKey = passportType || normalizedTypeDef?.typeName || "";
-    const profile = normalizeProfile(
-      normalizedTypeDef?.complianceProfile
-      || getComplianceProfileForPassportType(profileLookupKey, normalizedTypeDef)
+    const policyLookupKey = passportType || normalizedTypeDef?.typeName || "";
+    const policy = normalizePassportPolicy(
+      normalizedTypeDef?.passportPolicy
+      || getPassportPolicyForPassportType(policyLookupKey, normalizedTypeDef)
     );
-    if (!profile) {
-      throw new Error(`Compliance profile is required for passport type "${profileLookupKey || "unknown"}".`);
+    if (!policy) {
+      throw new Error(`Passport policy is required for passport type "${policyLookupKey || "unknown"}".`);
     }
-    const contentSpecificationIds = Array.isArray(profile.contentSpecificationIds) && profile.contentSpecificationIds.length
-      ? profile.contentSpecificationIds
+    const contentSpecificationIds = Array.isArray(policy.contentSpecificationIds) && policy.contentSpecificationIds.length
+      ? policy.contentSpecificationIds
       : [];
     if (!contentSpecificationIds.length) {
-      throw new Error(`Compliance profile "${profile.key || "unknown"}" must define contentSpecificationIds.`);
+      throw new Error(`Passport policy "${policy.key || "unknown"}" must define contentSpecificationIds.`);
     }
     return {
-      ...profile,
+      ...policy,
       granularity: String(granularity || "item").trim().toLowerCase() || "item",
       contentSpecificationIds,
     };
@@ -237,24 +228,26 @@ module.exports = function createRequiredFieldsService({
     }
 
     const resolvedPassportType = requestedPassportType || resolvedTypeDef.typeName;
-    const profile = resolveProfileMetadata({
+    const policy = resolvePassportPolicyMetadata({
       passportType: resolvedPassportType,
       typeDef: resolvedTypeDef,
       granularity: basePassport.granularity,
     });
     const fields = flattenSchemaFields(resolvedTypeDef).map((field) => ({
       ...field,
-      __semanticModelKey: normalizeText(resolvedTypeDef.semanticModelKey || profile.contentSpecificationIds?.[0] || ""),
-      __complianceProfileKey: profile.key,
+      __semanticModelKey: normalizeText(resolvedTypeDef.semanticModelKey || policy.contentSpecificationIds?.[0] || ""),
+      __passportPolicyKey: policy.key,
     }));
     const completeness = buildCompleteness(fields, basePassport);
     const requiredFieldIssues = buildRequiredFieldIssues(completeness);
+    const blockingIssues = requiredFieldIssues.filter((issue) => issue.severity === "error");
+    const releaseAllowed = blockingIssues.length === 0;
 
     return {
-      profile,
+      policy,
       companyIdentity: null,
       passportType: resolvedTypeDef.typeName || null,
-      semanticModelKey: normalizeText(resolvedTypeDef.semanticModelKey || profile.contentSpecificationIds?.[0] || "") || null,
+      semanticModelKey: normalizeText(resolvedTypeDef.semanticModelKey || policy.contentSpecificationIds?.[0] || "") || null,
       completeness,
       accessIssues: [],
       governanceIssues: [],
@@ -282,9 +275,9 @@ module.exports = function createRequiredFieldsService({
         ruleCoverage: [],
         issues: [],
       },
-      blockingIssues: [],
-      directReleaseAllowed: true,
-      workflowReleaseAllowed: true,
+      blockingIssues,
+      directReleaseAllowed: releaseAllowed,
+      workflowReleaseAllowed: releaseAllowed,
       workflowRequired: false,
     };
   }
@@ -292,6 +285,6 @@ module.exports = function createRequiredFieldsService({
   return {
     loadPassportTypeDefinition,
     evaluatePassport,
-    resolveProfileMetadata,
+    resolvePassportPolicyMetadata,
   };
 };

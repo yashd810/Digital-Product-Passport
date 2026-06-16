@@ -17,7 +17,7 @@
     "test:passport-seed": "node --test tests/seed-passport-types.node.test.js",
     "test:semantic-export": "node --test tests/semantic-passport-export.node.test.js",
     "test:did-service-generic": "node --test tests/did-service-generic.node.test.js",
-    "test:compliance-profiles": "node --test tests/compliance-profiles.node.test.js",
+    "test:passport-policy": "node --test tests/passport-policy-required-fields.node.test.js",
     "test:compliance-managed-fields": "node --test tests/compliance-managed-fields.node.test.js",
     "test:canonical-serializer": "node --test tests/canonical-passport-serializer.node.test.js",
     "test:dpp-patch-managed-fields": "node --test tests/dpp-patch-managed-fields.node.test.js",

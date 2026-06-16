@@ -171,7 +171,7 @@ module.exports = function registerDppApiRoutes(app, {
     extractExplicitFacilityId,
   });
   const {
-    serializeProfileDefaultValue,
+    serializePolicyDefaultValue,
   } = complianceManagedFieldHelpers;
 
   async function resolveManagedFacilityId({ companyId, requestedFields = {} }) {
@@ -191,7 +191,7 @@ module.exports = function registerDppApiRoutes(app, {
       requestedFields,
       allowDefaultFacility: false,
       validateExplicitFacility: true,
-      allowProfileOverride: false,
+      allowPolicyOverride: false,
     });
   }
 
@@ -220,7 +220,7 @@ module.exports = function registerDppApiRoutes(app, {
       dppSchemaVersion: "dppSchemaVersion",
       facilityId: "facilityId",
       economicOperatorId: "economicOperatorId",
-      complianceProfileKey: "complianceProfileKey",
+      passportPolicyKey: "passportPolicyKey",
       carrierPolicyKey: "carrierPolicyKey",
       contentSpecificationIds: "contentSpecificationIds"
     };
@@ -379,7 +379,7 @@ module.exports = function registerDppApiRoutes(app, {
     setDppMergePatchHeaders,
     isSupportedPatchContentType,
     parseDppIdentifier,
-    serializeProfileDefaultValue,
+    serializePolicyDefaultValue,
     resolveManagedFacilityId,
     MERGE_PATCH_CONTENT_TYPE,
   });

@@ -5,7 +5,7 @@ function createComplianceManagedFieldHelpers({
   complianceService,
   extractExplicitFacilityId,
 }) {
-  function serializeProfileDefaultValue(value) {
+  function serializePolicyDefaultValue(value) {
     if (Array.isArray(value)) return JSON.stringify(value);
     return value ?? null;
   }
@@ -91,10 +91,10 @@ function createComplianceManagedFieldHelpers({
     existingFields = null,
     allowDefaultFacility = true,
     validateExplicitFacility = false,
-    allowProfileOverride = false,
+    allowPolicyOverride = false,
     allowContentSpecificationOverride = false,
   }) {
-    const profile = complianceService.resolveProfileMetadata({ passportType, granularity });
+    const policy = complianceService.resolvePassportPolicyMetadata({ passportType, granularity });
     const companyIdentity = await loadCompanyComplianceIdentity(companyId);
     let resolvedFacilityId = null;
 
@@ -118,15 +118,15 @@ function createComplianceManagedFieldHelpers({
     }
 
     return {
-      complianceProfileKey: allowProfileOverride && requestedFields.complianceProfileKey
-        ? requestedFields.complianceProfileKey
-        : profile.key,
-      contentSpecificationIds: serializeProfileDefaultValue(
+      passportPolicyKey: allowPolicyOverride && requestedFields.passportPolicyKey
+        ? requestedFields.passportPolicyKey
+        : policy.key,
+      contentSpecificationIds: serializePolicyDefaultValue(
         allowContentSpecificationOverride && requestedFields.contentSpecificationIds
           ? requestedFields.contentSpecificationIds
-          : profile.contentSpecificationIds
+          : policy.contentSpecificationIds
       ),
-      carrierPolicyKey: requestedFields.carrierPolicyKey || profile.defaultCarrierPolicyKey || null,
+      carrierPolicyKey: requestedFields.carrierPolicyKey || policy.defaultCarrierPolicyKey || null,
       economicOperatorId: requestedFields.economicOperatorId || companyIdentity?.economicOperatorIdentifier || null,
       economicOperatorIdentifierScheme:
         requestedFields.economicOperatorIdentifierScheme
@@ -141,7 +141,7 @@ function createComplianceManagedFieldHelpers({
     hasExplicitFacilityOverride,
     loadCompanyComplianceIdentity,
     resolveManagedFacilityId,
-    serializeProfileDefaultValue,
+    serializePolicyDefaultValue,
   };
 }
 

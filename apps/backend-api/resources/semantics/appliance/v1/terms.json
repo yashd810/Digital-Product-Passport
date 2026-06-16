@@ -13,7 +13,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/ProductIdentification",
-      "curie": "clarosApplianceClass:ProductIdentification",
+      "curie": "ApplianceClass:ProductIdentification",
       "label": "Product Identification"
     },
     "unit": "none"
@@ -32,7 +32,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/ProductIdentification",
-      "curie": "clarosApplianceClass:ProductIdentification",
+      "curie": "ApplianceClass:ProductIdentification",
       "label": "Product Identification"
     },
     "unit": "none"
@@ -51,7 +51,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/ProductIdentification",
-      "curie": "clarosApplianceClass:ProductIdentification",
+      "curie": "ApplianceClass:ProductIdentification",
       "label": "Product Identification"
     },
     "unit": "none"
@@ -70,7 +70,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/Performance",
-      "curie": "clarosApplianceClass:Performance",
+      "curie": "ApplianceClass:Performance",
       "label": "Performance"
     },
     "unit": "none"
@@ -89,7 +89,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/Performance",
-      "curie": "clarosApplianceClass:Performance",
+      "curie": "ApplianceClass:Performance",
       "label": "Performance"
     },
     "unit": "kwh_per_year"
@@ -108,7 +108,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/RepairAndService",
-      "curie": "clarosApplianceClass:RepairAndService",
+      "curie": "ApplianceClass:RepairAndService",
       "label": "Repair And Service"
     },
     "unit": "score"
@@ -127,7 +127,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/RepairAndService",
-      "curie": "clarosApplianceClass:RepairAndService",
+      "curie": "ApplianceClass:RepairAndService",
       "label": "Repair And Service"
     },
     "unit": "none"
@@ -146,7 +146,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/Compliance",
-      "curie": "clarosApplianceClass:Compliance",
+      "curie": "ApplianceClass:Compliance",
       "label": "Compliance"
     },
     "unit": "none"

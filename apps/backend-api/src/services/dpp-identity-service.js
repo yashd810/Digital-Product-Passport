@@ -1,7 +1,7 @@
 "use strict";
 
 // ─── DPP IDENTITY SERVICE ─────────────────────────────────────────────────────
-// Stable, product-id-based DID generation for the Claros DPP platform.
+// Stable, product-id-based DID generation for the Digital Product Passport Platform platform.
 // All DIDs use companyId + internalAliasId — never the record ID.
 //
 // Domain is derived from APP_URL env var at call time (not module load time)

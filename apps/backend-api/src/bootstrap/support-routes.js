@@ -196,7 +196,7 @@ function registerSupportRoutes(app, deps) {
       if (adminEmail) {
         try {
           await transporter.sendMail({
-            from: `"ClarosDPP Contact" <${fromAddress}>`,
+            from: `"Digital Product Passport Platform Contact" <${fromAddress}>`,
             to: adminEmail,
             replyTo: email,
             subject: `New Contact Form Submission — ${normalizeHeaderText(firstName)} ${normalizeHeaderText(lastName)}`,
@@ -225,12 +225,12 @@ function registerSupportRoutes(app, deps) {
       }
 
       await transporter.sendMail({
-        from: `"ClarosDPP Contact" <${fromAddress}>`,
+        from: `"Digital Product Passport Platform Contact" <${fromAddress}>`,
         to: email,
         replyTo: adminEmail || fromAddress,
-        subject: "We received your message — ClarosDPP",
+        subject: "We received your message — Digital Product Passport Platform",
         html: brandedEmail({
-          preheader: "Thanks for contacting ClarosDPP",
+          preheader: "Thanks for contacting the Digital Product Passport Platform",
           bodyHtml: `
           <p>Hello ${safeFirstName},</p>
           <p>Thanks for reaching out. We received your message and will review it shortly.</p>

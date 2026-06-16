@@ -51,12 +51,12 @@ module.exports = function createPassportRepresentationService({
     return "Invalid";
   }
 
-  function buildClarosExtensions({ passportType = null, versionNumber = null, internalId = null } = {}) {
-    const claros = {};
-    if (passportType) claros.passportType = passportType;
-    if (versionNumber !== null && versionNumber !== undefined) claros.versionNumber = versionNumber;
-    if (internalId) claros.internalId = internalId;
-    return Object.keys(claros).length ? { claros } : null;
+  function buildPlatformExtensions({ passportType = null, versionNumber = null, internalId = null } = {}) {
+    const platform = {};
+    if (passportType) platform.passportType = passportType;
+    if (versionNumber !== null && versionNumber !== undefined) platform.versionNumber = versionNumber;
+    if (internalId) platform.internalId = internalId;
+    return Object.keys(platform).length ? { platform } : null;
   }
 
   function buildValidationSummary(issues = []) {
@@ -155,13 +155,13 @@ module.exports = function createPassportRepresentationService({
     const resolvedVersionNumber = passport.versionNumber === null || passport.versionNumber === undefined || passport.versionNumber === ""
       ? null
       : Number(passport.versionNumber);
-    const extensions = buildClarosExtensions({
+    const extensions = buildPlatformExtensions({
       passportType: passport.passportType || null,
       versionNumber: Number.isFinite(resolvedVersionNumber) ? resolvedVersionNumber : passport.versionNumber,
       internalId: passport.dppId || passport.guid || null,
     });
-    if (extensions?.claros && !canonicalPayload?.extensions?.claros?.validation) {
-      extensions.claros.validation = buildValidationSummary();
+    if (extensions?.platform && !canonicalPayload?.extensions?.platform?.validation) {
+      extensions.platform.validation = buildValidationSummary();
     }
 
     const internalAliasId = passport.internalAliasId || null;
@@ -180,7 +180,7 @@ module.exports = function createPassportRepresentationService({
       contentSpecificationIds:   Array.isArray(canonicalPayload?.contentSpecificationIds)
         ? canonicalPayload.contentSpecificationIds
         : (Array.isArray(contentSpecificationIds) ? contentSpecificationIds : []),
-      complianceProfileKey:      canonicalPayload?.complianceProfileKey || passport.complianceProfileKey || null,
+      passportPolicyKey:      canonicalPayload?.passportPolicyKey || passport.passportPolicyKey || null,
       carrierPolicyKey:          canonicalPayload?.carrierPolicyKey || passport.carrierPolicyKey || null,
       ...buildCarrierAuthenticityResponseFields(passport.carrierAuthenticity || canonicalPayload),
       ...(companyName ? { economicOperatorName: companyName } : {}),

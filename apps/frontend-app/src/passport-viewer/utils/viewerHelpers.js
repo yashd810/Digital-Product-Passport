@@ -137,33 +137,3 @@ export function getFieldPresentation(field, raw, isLocked, pieItems) {
   const presentation = String(field?.presentation).trim();
   return PRESENTATION_TONES[presentation];
 }
-
-export function getSummaryValue(field, raw, isLocked, lang) {
-  if (isLocked) return "Restricted";
-  if (field.type === "boolean") return translateFieldValue(lang, !!raw, "boolean");
-  if (field.type === "file") return raw ? "Document available" : "No file";
-  if (field.type === "table") {
-    const rowCount = Array.isArray(raw) ? raw.length : null;
-    return rowCount ? `${rowCount} rows` : "Table data";
-  }
-  if (field.type === "url" && raw) return formatLinkLabel(raw);
-  if (raw === 0) return "0";
-  if (!raw) return "Not provided";
-  const text = toInlineText(raw);
-  const displayValue = appendUnitToDisplayValue(text, field);
-  return displayValue.length > 58 ? `${displayValue.slice(0, 58).trim()}…` : displayValue;
-}
-
-export function shouldFeatureInSummary(field, raw, isLocked, pieItems) {
-  if (pieItems) return false;
-  return field?.displayRole === "summary" || field?.displayRole === "trust";
-}
-
-export function getSummaryHint(field, isLocked, isDynamic, tone) {
-  if (isLocked) return "Unlock with an access key to view this value.";
-  if (isDynamic) return "This value refreshes from live field updates.";
-  if (field.type === "url") return "Reference link available for this field.";
-  if (field.type === "boolean") return "Quick compliance-style status indicator.";
-  if (tone === "narrative") return "Expanded context is available in the detail card below.";
-  return "Highlighted here for faster scanning.";
-}

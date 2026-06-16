@@ -116,14 +116,14 @@ function createDictionaryApp({ pool = null, registry = createSemanticModelRegist
 
 test("semantic registry loads the existing battery dictionary generically", () => {
   const registry = createSemanticModelRegistry();
-  const model = registry.getModel("claros_battery_dictionary_v1");
+  const model = registry.getModel("battery_dictionary_v1");
 
   assert.ok(model);
   assert.equal(model.family, "battery");
   assert.equal(model.version, "v1");
-  assert.equal(registry.getModelByPath("battery", "v1").semanticModelKey, "claros_battery_dictionary_v1");
-  assert.ok(registry.getTerms("claros_battery_dictionary_v1").length > 0);
-  assert.ok(registry.getTermBySlug("claros_battery_dictionary_v1", "dpp-granularity"));
+  assert.equal(registry.getModelByPath("battery", "v1").semanticModelKey, "battery_dictionary_v1");
+  assert.ok(registry.getTerms("battery_dictionary_v1").length > 0);
+  assert.ok(registry.getTermBySlug("battery_dictionary_v1", "dpp-granularity"));
 });
 
 test("semantic registry loads a new product dictionary without battery-specific code", () => {
@@ -132,8 +132,8 @@ test("semantic registry loads a new product dictionary without battery-specific 
   fs.mkdirSync(modelDir, { recursive: true });
 
   writeJson(path.join(modelDir, "manifest.json"), {
-    semanticModelKey: "claros_appliance_dictionary_v3",
-    name: "Claros Appliance Dictionary",
+    semanticModelKey: "appliance_dictionary_v3",
+    name: "Appliance Dictionary",
     version: "1.0.0",
     description: "Test appliance dictionary",
   });
@@ -155,11 +155,11 @@ test("semantic registry loads a new product dictionary without battery-specific 
     const registry = createSemanticModelRegistry({ resourcesDir });
     const [model] = registry.listModels();
 
-    assert.equal(model.semanticModelKey, "claros_appliance_dictionary_v3");
+    assert.equal(model.semanticModelKey, "appliance_dictionary_v3");
     assert.equal(model.family, "appliance");
     assert.equal(model.version, "v3");
     assert.equal(
-      registry.getTermBySlug("claros_appliance_dictionary_v3", "energy-rating").slug,
+      registry.getTermBySlug("appliance_dictionary_v3", "energy-rating").slug,
       "energy-rating"
     );
   } finally {
@@ -173,8 +173,8 @@ test("semantic registry expands compact term sources", () => {
   fs.mkdirSync(modelDir, { recursive: true });
 
   writeJson(path.join(modelDir, "manifest.json"), {
-    semanticModelKey: "claros_appliance_dictionary_v4",
-    name: "Claros Appliance Dictionary",
+    semanticModelKey: "appliance_dictionary_v4",
+    name: "Appliance Dictionary",
     version: "1.0.0",
     termsUrl: "https://example.test/dictionary/appliance/v4/terms",
   });
@@ -255,8 +255,8 @@ test("semantic registry expands compact term sources", () => {
 
   try {
     const registry = createSemanticModelRegistry({ resourcesDir });
-    const energyRating = registry.getTermBySlug("claros_appliance_dictionary_v4", "energy-rating");
-    const powerConsumption = registry.getTermBySlug("claros_appliance_dictionary_v4", "power-consumption");
+    const energyRating = registry.getTermBySlug("appliance_dictionary_v4", "energy-rating");
+    const powerConsumption = registry.getTermBySlug("appliance_dictionary_v4", "power-consumption");
 
     assert.equal(energyRating.iri, "https://example.test/dictionary/appliance/v4/terms/energy-rating");
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "termIri"), false);
@@ -302,23 +302,23 @@ test("dictionary routes serve registered models and canonical artifacts", async 
   const modelList = await invokeRoute(app, { path: "/api/semantic-models" });
   const modelListBody = parseJsonResponse(modelList);
   assert.equal(modelList.statusCode, 200);
-  assert.ok(modelListBody.some((model) => model.semanticModelKey === "claros_appliance_dictionary_v1"));
-  assert.ok(modelListBody.some((model) => model.semanticModelKey === "claros_battery_dictionary_v1"));
-  assert.ok(modelListBody.some((model) => model.semanticModelKey === "claros_textile_dictionary_v1"));
+  assert.ok(modelListBody.some((model) => model.semanticModelKey === "appliance_dictionary_v1"));
+  assert.ok(modelListBody.some((model) => model.semanticModelKey === "battery_dictionary_v1"));
+  assert.ok(modelListBody.some((model) => model.semanticModelKey === "textile_dictionary_v1"));
 
   const manifest = await invokeRoute(app, {
     path: "/dictionary/:family/:version/manifest.json",
     params: { family: "battery", version: "v1" },
   });
   assert.equal(manifest.statusCode, 200);
-  assert.equal(parseJsonResponse(manifest).semanticModelKey, "claros_battery_dictionary_v1");
+  assert.equal(parseJsonResponse(manifest).semanticModelKey, "battery_dictionary_v1");
 
   const textileManifest = await invokeRoute(app, {
     path: "/dictionary/:family/:version/manifest.json",
     params: { family: "textile", version: "v1" },
   });
   assert.equal(textileManifest.statusCode, 200);
-  assert.equal(parseJsonResponse(textileManifest).semanticModelKey, "claros_textile_dictionary_v1");
+  assert.equal(parseJsonResponse(textileManifest).semanticModelKey, "textile_dictionary_v1");
 
   const terms = await invokeRoute(app, {
     path: "/api/dictionary/:family/:version/terms",
@@ -337,13 +337,13 @@ test("company semantic models are derived from company passport type access", as
       return {
         rows: [
           {
-            semanticModelKey: "claros_battery_dictionary_v1",
+            semanticModelKey: "battery_dictionary_v1",
             typeName: "euBatteryPassportV1",
             displayName: "EU Battery Passport v1",
             productCategory: "Battery",
           },
           {
-            semanticModelKey: "claros_textile_dictionary_v1",
+            semanticModelKey: "textile_dictionary_v1",
             typeName: "euTextilePassportV1",
             displayName: "EU Textile Passport v1",
             productCategory: "Textile",
@@ -368,12 +368,12 @@ test("company semantic models are derived from company passport type access", as
     typeName: model.passportTypes[0].typeName,
   })), [
     {
-      key: "claros_battery_dictionary_v1",
+      key: "battery_dictionary_v1",
       registered: true,
       typeName: "euBatteryPassportV1",
     },
     {
-      key: "claros_textile_dictionary_v1",
+      key: "textile_dictionary_v1",
       registered: true,
       typeName: "euTextilePassportV1",
     },
@@ -386,8 +386,8 @@ test("company semantic models support arbitrary registered models and grouped pa
   fs.mkdirSync(modelDir, { recursive: true });
 
   writeJson(path.join(modelDir, "manifest.json"), {
-    semanticModelKey: "claros_medical_device_dictionary_v1",
-    name: "Claros Medical Device Dictionary",
+    semanticModelKey: "medical_device_dictionary_v1",
+    name: "Medical Device Dictionary",
     version: "1.0.0",
     description: "Test medical device dictionary",
   });
@@ -408,13 +408,13 @@ test("company semantic models support arbitrary registered models and grouped pa
     query: async () => ({
       rows: [
         {
-          semanticModelKey: "claros_medical_device_dictionary_v1",
+          semanticModelKey: "medical_device_dictionary_v1",
           typeName: "medicalDevicePassportV1",
           displayName: "Medical Device Passport v1",
           productCategory: "Medical Device",
         },
         {
-          semanticModelKey: "claros_medical_device_dictionary_v1",
+          semanticModelKey: "medical_device_dictionary_v1",
           typeName: "implantableDevicePassportV1",
           displayName: "Implantable Device Passport v1",
           productCategory: "Medical Device",
@@ -439,7 +439,7 @@ test("company semantic models support arbitrary registered models and grouped pa
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.length, 2);
-    const medicalModel = response.body.find((model) => model.semanticModelKey === "claros_medical_device_dictionary_v1");
+    const medicalModel = response.body.find((model) => model.semanticModelKey === "medical_device_dictionary_v1");
     const externalModel = response.body.find((model) => model.semanticModelKey === "external_future_dictionary_v9");
 
     assert.equal(medicalModel.registered, true);

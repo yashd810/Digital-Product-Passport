@@ -138,7 +138,7 @@ module.exports = function registerCreateRoutes(app, deps) {
             uniqueProductIdentifier: createdPassport.storedProductIdentifiers.uniqueProductIdentifier,
             modelName: createdPassport.modelName,
             granularity: createdPassport.effectiveGranularity,
-            complianceProfileKey: createdPassport.complianceManagedFields.complianceProfileKey,
+            passportPolicyKey: createdPassport.complianceManagedFields.passportPolicyKey,
           });
           created += 1;
         } catch (error) {

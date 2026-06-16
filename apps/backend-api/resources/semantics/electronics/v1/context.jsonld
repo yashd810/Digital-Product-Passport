@@ -4,9 +4,9 @@
     "@protected": true,
     "id": "@id",
     "type": "@type",
-    "clarosElectronics": "https://www.claros-dpp.online/dictionary/electronics/v1/terms/",
-    "clarosElectronicsClass": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/",
-    "DigitalElectronicsPassport": "clarosElectronicsClass:DigitalElectronicsPassport",
+    "electronics": "https://www.claros-dpp.online/dictionary/electronics/v1/terms/",
+    "ElectronicsClass": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/",
+    "DigitalElectronicsPassport": "ElectronicsClass:DigitalElectronicsPassport",
     "DigitalProductPassport": "dpp:DigitalProductPassport",
     "dcat": "http://www.w3.org/ns/dcat#",
     "dcterms": "http://purl.org/dc/terms/",
@@ -16,18 +16,18 @@
     "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
     "skos": "http://www.w3.org/2004/02/skos/core#",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
-    "ProductIdentification": "clarosElectronicsClass:ProductIdentification",
-    "TechnicalCharacteristics": "clarosElectronicsClass:TechnicalCharacteristics",
+    "ProductIdentification": "ElectronicsClass:ProductIdentification",
+    "TechnicalCharacteristics": "ElectronicsClass:TechnicalCharacteristics",
     "productModelIdentifier": {
-      "@id": "clarosElectronics:product-model-identifier",
+      "@id": "electronics:product-model-identifier",
       "@type": "xsd:string"
     },
     "manufacturerName": {
-      "@id": "clarosElectronics:manufacturer-name",
+      "@id": "electronics:manufacturer-name",
       "@type": "xsd:string"
     },
     "ratedPower": {
-      "@id": "clarosElectronics:rated-power",
+      "@id": "electronics:rated-power",
       "@type": "xsd:decimal"
     }
   }

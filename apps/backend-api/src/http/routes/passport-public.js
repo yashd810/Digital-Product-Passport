@@ -352,7 +352,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   function resolveVerificationStatus(verifyResult) {
     const status = String(verifyResult?.status || "").toLowerCase();
-    if (status === "valid") return "signed_by_claros";
+    if (status === "valid") return "signed_by_platform";
     if (status === "tampered") return "tampered";
     if (status === "unsigned") return "unsigned";
     if (status === "key_missing") return "signing_key_missing";

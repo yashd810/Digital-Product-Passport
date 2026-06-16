@@ -309,7 +309,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           title: "Use modules for stable product categories",
           items: [
             "Add production product families as files under `apps/backend-api/src/passport-modules/`, for example appliance, textile, or a future medical-device module.",
-            "Keep each module versioned with a stable moduleKey, typeName, semanticModelKey, complianceProfile, sections, and fields.",
+            "Keep each module versioned with a stable moduleKey, typeName, semanticModelKey, passportPolicy, sections, and fields.",
             "Seed modules with `npm run seed:passport-types` or `npm run bootstrap:passport-modules` so the database catalog and runtime tables match the code definition.",
             "Create a new module/version for breaking regulatory or semantic changes instead of mutating an old production type that already has passports.",
           ],
@@ -350,7 +350,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       summary: "The passport-type builder is where custom type schemas and schema experiments are designed. For production product categories, the same concepts should usually be captured in versioned backend passport modules so schema, semantic model, and compliance behavior can be reviewed and shipped as code.",
       facts: [
         { label: "Builder outputs", value: "Sections, fields, translations, field access, composition flags, semantic mapping, and dynamic settings" },
-        { label: "Module outputs", value: "moduleKey, typeName, display metadata, semanticModelKey, complianceProfile, sections, and fields" },
+        { label: "Module outputs", value: "moduleKey, typeName, display metadata, semanticModelKey, passportPolicy, sections, and fields" },
         { label: "Input helpers", value: "Draft save/resume, clone workflows, and CSV import for builder definitions" },
         { label: "Field-level access", value: "Public, Notified Bodies, Market Surveillance, EU Commission, and Legitimate Interest" },
         { label: "Special field flags", value: "Composition, semantic IDs, dictionary mapping, dynamic field behavior, and field table configuration" },

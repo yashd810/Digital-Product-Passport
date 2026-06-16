@@ -39,7 +39,6 @@ function textField({
   presentation = "data",
   summaryRole = null,
   lifecycleRole = null,
-  mediaRole = null,
 }) {
   return {
     ...access,
@@ -56,7 +55,6 @@ function textField({
     presentation,
     summaryRole,
     lifecycleRole,
-    mediaRole,
   };
 }
 
@@ -66,22 +64,34 @@ module.exports = {
   displayName: "Battery Passport v1",
   productCategory: "Battery",
   productIcon: "🔋",
-  semanticModelKey: "claros_battery_dictionary_v1",
+  semanticModelKey: "battery_dictionary_v1",
+  systemHeader: {
+    section: { key: "passportHeader", label: "Passport Header" },
+    fieldMappings: [
+      { slotKey: "digitalProductPassportId", sourceType: "managed", managedKey: "internalManagedDigitalProductPassportId" },
+      { slotKey: "uniqueProductIdentifier", sourceType: "managed", managedKey: "internalManagedUniqueProductIdentifier" },
+      { slotKey: "internalAliasId", sourceType: "managed", managedKey: "internalManagedInternalAliasId" },
+      { slotKey: "granularity", sourceType: "managed", managedKey: "internalManagedGranularity" },
+      { slotKey: "dppSchemaVersion", sourceType: "managed", managedKey: "internalManagedDppSchemaVersion" },
+      { slotKey: "dppStatus", sourceType: "managed", managedKey: "internalManagedDppStatus" },
+      { slotKey: "lastUpdate", sourceType: "managed", managedKey: "internalManagedLastUpdate" },
+      { slotKey: "economicOperatorId", sourceType: "managed", managedKey: "internalManagedEconomicOperatorId" },
+      { slotKey: "facilityId", sourceType: "managed", managedKey: "internalManagedFacilityId" },
+      { slotKey: "contentSpecificationIds", sourceType: "managed", managedKey: "internalManagedContentSpecificationIds" },
+      { slotKey: "subjectDid", sourceType: "managed", managedKey: "internalManagedSubjectDid" },
+      { slotKey: "dppDid", sourceType: "managed", managedKey: "internalManagedDppDid" },
+      { slotKey: "companyDid", sourceType: "managed", managedKey: "internalManagedCompanyDid" },
+    ],
+    fieldKeys: [],
+  },
   identity: {
     businessIdentifierField: "batterySerialNumber",
   },
-  complianceProfile: {
+  passportPolicy: {
     key: "batteryDppV1",
-    displayName: "Battery DPP Profile v1",
-    contentSpecificationIds: ["claros_battery_dictionary_v1"],
-    requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds", "carrierPolicyKey"],
-    requireCompanyOperatorIdentifier: true,
-    requireCarrierPolicy: true,
-    requireFacilityAtGranularities: ["batch", "item"],
+    displayName: "Battery Passport Policy v1",
+    contentSpecificationIds: ["Battery_dictionary_v1"],
     defaultCarrierPolicyKey: "battery_qr_public_entry_v1",
-    enforceSemanticMapping: true,
-    requirePublicAccessLayer: true,
-    managedSemanticFields: [],
   },
   schemaVersion: 1,
   lifecycle: {

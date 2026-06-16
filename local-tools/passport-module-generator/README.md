@@ -30,7 +30,6 @@ apps/backend-api/resources/semantics/<family>/<version>/context.jsonld
 apps/backend-api/resources/semantics/<family>/<version>/categories.json
 apps/backend-api/resources/semantics/<family>/<version>/units.json
 apps/backend-api/resources/semantics/<family>/<version>/catalog.jsonld
-apps/backend-api/resources/semantics/<family>/<version>/category-rules.json
 ```
 
 After writing files, review them and run:

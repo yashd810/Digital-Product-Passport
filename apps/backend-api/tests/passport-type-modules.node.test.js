@@ -5,10 +5,10 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const createSemanticModelRegistry = require("../src/infrastructure/semantics/create-semantic-model-registry");
+const createSemanticModelRegistry = require("../src/services/semantic-model-registry");
 const {
-  getComplianceProfileCatalog,
-  getComplianceProfileForPassportType,
+  getPassportPolicyCatalog,
+  getPassportPolicyForPassportType,
   getPassportTypeModules,
   loadPassportTypeModuleDefinitions,
 } = require("../src/passport-modules");
@@ -31,16 +31,33 @@ test("passport type registry discovers arbitrary product modules from files", ()
       displayName: "Appliance Passport v1",
       productCategory: "Appliance",
       productIcon: "AP",
-      semanticModelKey: "claros_appliance_dictionary_v1",
+      semanticModelKey: "appliance_dictionary_v1",
       identity: {
         businessIdentifierField: "modelIdentifier",
       },
-      complianceProfile: {
+      systemHeader: {
+        section: { key: "passportHeader", label: "Passport Header" },
+        fieldMappings: [
+          { slotKey: "digitalProductPassportId", sourceType: "managed", managedKey: "internalManagedDigitalProductPassportId" },
+          { slotKey: "uniqueProductIdentifier", sourceType: "managed", managedKey: "internalManagedUniqueProductIdentifier" },
+          { slotKey: "internalAliasId", sourceType: "managed", managedKey: "internalManagedInternalAliasId" },
+          { slotKey: "granularity", sourceType: "managed", managedKey: "internalManagedGranularity" },
+          { slotKey: "dppSchemaVersion", sourceType: "managed", managedKey: "internalManagedDppSchemaVersion" },
+          { slotKey: "dppStatus", sourceType: "managed", managedKey: "internalManagedDppStatus" },
+          { slotKey: "lastUpdate", sourceType: "managed", managedKey: "internalManagedLastUpdate" },
+          { slotKey: "economicOperatorId", sourceType: "managed", managedKey: "internalManagedEconomicOperatorId" },
+          { slotKey: "facilityId", sourceType: "managed", managedKey: "internalManagedFacilityId" },
+          { slotKey: "contentSpecificationIds", sourceType: "managed", managedKey: "internalManagedContentSpecificationIds" },
+          { slotKey: "subjectDid", sourceType: "managed", managedKey: "internalManagedSubjectDid" },
+          { slotKey: "dppDid", sourceType: "managed", managedKey: "internalManagedDppDid" },
+          { slotKey: "companyDid", sourceType: "managed", managedKey: "internalManagedCompanyDid" },
+        ],
+        fieldKeys: [],
+      },
+      passportPolicy: {
         key: "applianceDppV1",
-        displayName: "Appliance DPP Profile v1",
-        contentSpecificationIds: ["claros_appliance_dictionary_v1"],
-        requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds"],
-        enforceSemanticMapping: true,
+        displayName: "Appliance Passport Policy v1",
+        contentSpecificationIds: ["Appliance_dictionary_v1"],
       },
       sections: [
         {
@@ -57,17 +74,17 @@ test("passport type registry discovers arbitrary product modules from files", ()
   try {
     const rawDefinitions = loadPassportTypeModuleDefinitions({ modulesDir });
     const modules = getPassportTypeModules({ modulesDir });
-    const profiles = getComplianceProfileCatalog({ modulesDir });
-    const profile = getComplianceProfileForPassportType("appliance:v1", null, { modulesDir });
+    const policies = getPassportPolicyCatalog({ modulesDir });
+    const policy = getPassportPolicyForPassportType("appliance:v1", null, { modulesDir });
 
     assert.equal(rawDefinitions.length, 1);
     assert.equal(modules.length, 1);
     assert.equal(modules[0].moduleKey, "appliance:v1");
     assert.equal(modules[0].fieldsJson.sourceModule, "appliance:v1");
-    assert.equal(modules[0].fieldsJson.complianceProfileKey, "applianceDppV1");
-    assert.equal(modules[0].fieldsJson.complianceProfile.key, "applianceDppV1");
-    assert.equal(profile.key, "applianceDppV1");
-    assert.ok(profiles.some((definition) => definition.key === "applianceDppV1"));
+    assert.equal(modules[0].fieldsJson.passportPolicyKey, "applianceDppV1");
+    assert.equal(modules[0].fieldsJson.passportPolicy.key, "applianceDppV1");
+    assert.equal(policy.key, "applianceDppV1");
+    assert.ok(policies.some((definition) => definition.key === "applianceDppV1"));
   } finally {
     fs.rmSync(modulesDir, { recursive: true, force: true });
   }
@@ -92,42 +109,42 @@ test("passport type modules have unique module keys and type names", () => {
   }
 });
 
-test("passport type modules expose compliance profiles", () => {
+test("passport type modules expose passport policies", () => {
   const modules = getPassportTypeModules();
-  const profiles = getComplianceProfileCatalog();
-  const profileKeys = new Set(profiles.map((profile) => profile.key));
+  const policies = getPassportPolicyCatalog();
+  const policyKeys = new Set(policies.map((policy) => policy.key));
 
-  assert.ok(profileKeys.has("applianceDppV1"));
-  assert.ok(profileKeys.has("batteryDppV1"));
-  assert.ok(profileKeys.has("textileDppV1"));
+  assert.ok(policyKeys.has("applianceDppV1"));
+  assert.ok(policyKeys.has("batteryDppV1"));
+  assert.ok(policyKeys.has("textileDppV1"));
 
   for (const definition of modules) {
-    assert.ok(definition.complianceProfile?.key, `${definition.moduleKey} must define a compliance profile key`);
-    assert.ok(profileKeys.has(definition.complianceProfile.key));
+    assert.ok(definition.passportPolicy?.key, `${definition.moduleKey} must define a passport policy key`);
+    assert.ok(policyKeys.has(definition.passportPolicy.key));
     assert.deepEqual(
-      definition.fieldsJson.complianceProfileKey,
-      definition.complianceProfile.key
+      definition.fieldsJson.passportPolicyKey,
+      definition.passportPolicy.key
     );
     assert.deepEqual(
-      definition.fieldsJson.complianceProfile,
-      definition.complianceProfile
+      definition.fieldsJson.passportPolicy,
+      definition.passportPolicy
     );
   }
 });
 
-test("compliance profile resolution follows source modules and type names", () => {
-  const applianceProfile = getComplianceProfileForPassportType("appliancePassportV1");
-  const batteryProfile = getComplianceProfileForPassportType("batteryPassportV1");
-  const textileProfile = getComplianceProfileForPassportType("textilePassportV1");
-  const sourceModuleProfile = getComplianceProfileForPassportType("custom_name", {
+test("passport policy resolution follows source modules and type names", () => {
+  const appliancePolicy = getPassportPolicyForPassportType("appliancePassportV1");
+  const batteryPolicy = getPassportPolicyForPassportType("batteryPassportV1");
+  const textilePolicy = getPassportPolicyForPassportType("textilePassportV1");
+  const sourceModulePolicy = getPassportPolicyForPassportType("custom_name", {
     fieldsJson: { sourceModule: "textile:v1" },
-    semanticModelKey: "claros_textile_dictionary_v1",
+    semanticModelKey: "textile_dictionary_v1",
   });
 
-  assert.equal(applianceProfile.key, "applianceDppV1");
-  assert.equal(batteryProfile.key, "batteryDppV1");
-  assert.equal(textileProfile.key, "textileDppV1");
-  assert.equal(sourceModuleProfile.key, "textileDppV1");
+  assert.equal(appliancePolicy.key, "applianceDppV1");
+  assert.equal(batteryPolicy.key, "batteryDppV1");
+  assert.equal(textilePolicy.key, "textileDppV1");
+  assert.equal(sourceModulePolicy.key, "textileDppV1");
 });
 
 test("passport type modules reference registered semantic models", () => {

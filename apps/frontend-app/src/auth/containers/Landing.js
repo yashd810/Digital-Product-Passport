@@ -28,7 +28,7 @@ function Landing({ token, user, onLogout }) {
               <path d="M7 13 h4" stroke="#0db5b0" strokeWidth="1.4" strokeLinecap="round"/>
               <path d="M7 21 h4" stroke="#0db5b0" strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
-            Claros<span className="lp-logo-accent">DPP</span>
+            Digital Product <span className="lp-logo-accent">Passport</span>
           </a>
 
           <nav className="lp-nav" aria-label="App navigation">
@@ -72,7 +72,7 @@ function Landing({ token, user, onLogout }) {
           </h1>
           <p className="lp-hero-lead">
             Issue, manage, and track regulation-ready product passports across your entire portfolio.
-            ClarosDPP keeps you ahead of EU sustainability mandates — automatically.
+            The platform keeps you ahead of EU sustainability mandates — automatically.
           </p>
           {!token ? (
             <div className="lp-hero-btns">
@@ -152,7 +152,7 @@ function Landing({ token, user, onLogout }) {
       {/* ── FOOTER ── */}
       <footer className="lp-footer" role="contentinfo">
         <div className="lp-container">
-          <p>© 2025 ClarosDPP. All rights reserved.</p>
+          <p>© 2025 Digital Product Passport Platform. All rights reserved.</p>
           <p>Compliance intelligence for the circular economy.</p>
         </div>
       </footer>

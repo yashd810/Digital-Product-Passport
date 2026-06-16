@@ -6,7 +6,6 @@ import {
   ACCESS_LEVELS,
   CONFIDENTIALITY_LEVELS,
   FIELD_TYPES,
-  HEADER_OWNERSHIP_LABELS,
   ICON_PRESETS,
   TRANS_LANGS,
   UPDATE_AUTHORITY_LABELS,
@@ -19,6 +18,7 @@ import {
   normalizeSystemPassportHeader,
   parseCSV,
   rekeySection,
+  resolveSystemHeaderEntries,
   toFieldKey,
   toSlug,
 } from "./builderHelpers";
@@ -382,7 +382,6 @@ function AdminCreatePassportType() {
           if (normalizedField.displayRole) base.displayRole = normalizedField.displayRole;
           if (normalizedField.summaryRole) base.summaryRole = normalizedField.summaryRole;
           if (normalizedField.lifecycleRole) base.lifecycleRole = normalizedField.lifecycleRole;
-          if (normalizedField.mediaRole) base.mediaRole = normalizedField.mediaRole;
           if (normalizedField.presentation) base.presentation = normalizedField.presentation;
           if (normalizedField.elementIdPath) base.elementIdPath = normalizedField.elementIdPath;
           if (normalizedField.objectType) base.objectType = normalizedField.objectType;
@@ -626,6 +625,7 @@ function AdminCreatePassportType() {
     setSourceModuleKey(moduleKey || "");
     if (!moduleKey) {
       setSections((currentSections) => currentSections.map(unlockModuleSection));
+      setSystemHeader(normalizeSystemPassportHeader());
       setError("");
       return;
     }
@@ -636,6 +636,7 @@ function AdminCreatePassportType() {
     setProductCategory(selectedModule.productCategory || "");
     setProductIcon(selectedModule.productIcon || "📋");
     setSemanticModelKey(nextSemanticModelKey);
+    setSystemHeader(normalizeSystemPassportHeader(selectedModule.fieldsJson?.systemHeader));
     const moduleSections = (selectedModule.fieldsJson?.sections || [])
       .map((section) => rekeyModuleSection(section, selectedModule.moduleKey));
     setSections(moduleSections.length ? moduleSections : [newSection("General")]);
@@ -1044,20 +1045,6 @@ function AdminCreatePassportType() {
       );
     });
 
-  const updateSystemHeaderSection = (patch) =>
-    setSystemHeader((current) => normalizeSystemPassportHeader({
-      ...current,
-      section: { ...current.section, ...patch },
-    }));
-
-  const updateSystemHeaderField = (fieldKey, patch) =>
-    setSystemHeader((current) => normalizeSystemPassportHeader({
-      ...current,
-      fields: current.fields.map((field) =>
-        field.key === fieldKey ? { ...field, ...patch } : field
-      ),
-    }));
-
   // ── Submit ─────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1204,6 +1191,7 @@ function AdminCreatePassportType() {
   };
 
   const selectedPassportModule = passportModules.find((moduleTemplate) => moduleTemplate.moduleKey === sourceModuleKey) || null;
+  const systemHeaderEntries = resolveSystemHeaderEntries(sections, systemHeader);
   const passportModuleOptions = passportModules.map((moduleTemplate) => ({
       value: moduleTemplate.moduleKey,
       label: `${moduleTemplate.displayName || moduleTemplate.moduleKey} (${moduleTemplate.moduleKey})`,
@@ -1313,27 +1301,19 @@ function AdminCreatePassportType() {
             <div>
               <h3 className="acpt-card-title">Passport Header</h3>
               <p className="acpt-builder-hint">
-                Standards-required header fields are locked to their JSON-LD keys and filled from controlled system sources.
+                Header rows use explicit module mappings. Real fields keep their own semantics, and managed values stay internal to the app.
               </p>
             </div>
-            <span className="acpt-system-header-lock">Locked standards header</span>
-          </div>
-
-          <div className="acpt-system-header-ownership">
-            {Object.entries(HEADER_OWNERSHIP_LABELS).map(([key, label]) => (
-              <span key={key} className={`acpt-system-header-owner acpt-system-header-owner-${key}`}>
-                {label}
-              </span>
-            ))}
+            <span className="acpt-system-header-lock">Module-defined header</span>
           </div>
 
           <div className="acpt-section-name-row acpt-system-header-section-row">
             <input
               type="text"
               value={systemHeader.section.label}
-              onChange={e => updateSystemHeaderSection({ label: e.target.value })}
               className="acpt-section-name-input"
               placeholder="Passport Header"
+              disabled
             />
             <div className="acpt-section-key-row">
               <span className="acpt-key-label">key:</span>
@@ -1347,51 +1327,22 @@ function AdminCreatePassportType() {
           </div>
 
           <div className="acpt-system-header-grid">
-            {systemHeader.fields.map((field) => (
-              <div key={field.key} className="acpt-system-header-field">
+            {systemHeaderEntries.map((entry) => (
+              <div key={`${entry.sourceType}:${entry.managedKey || entry.fieldKey || entry.slotKey}`} className="acpt-system-header-field">
                 <div className="acpt-system-header-label-row">
                   <input
                     type="text"
-                    value={field.label}
-                    onChange={e => updateSystemHeaderField(field.key, { label: e.target.value })}
+                    value={entry.label}
                     className="acpt-input acpt-field-label-input"
+                    disabled
                   />
-                  <button
-                    type="button"
-                    className={`acpt-i18n-toggle${field._i18nOpen ? " open" : ""}`}
-                    onClick={() => updateSystemHeaderField(field.key, { _i18nOpen: !field._i18nOpen })}
-                    title="Add translations for this header label"
-                  >
-                    🌐
-                  </button>
                 </div>
                 <div className="acpt-system-header-meta">
-                  <code>{field.key}</code>
-                  <span>{field.semanticId}</span>
-                  <span className={`acpt-system-header-owner acpt-system-header-owner-${field.ownership}`}>
-                    {HEADER_OWNERSHIP_LABELS[field.ownership] || field.ownership}
-                  </span>
-                  <span>{field.valueSource.replace(/_/g, " ")}</span>
-                  <strong>{field.required ? "Required" : "Conditional"}</strong>
+                  <code>{entry.sourceType === "managed" ? entry.slotKey : entry.fieldKey}</code>
+                  <span>{entry.semanticId || "No semantic ID"}</span>
+                  <span>{entry.sourceType === "managed" ? "Managed value" : (entry.type || "No type")}</span>
+                  <strong>{entry.required ? "Required" : "Optional"}</strong>
                 </div>
-                {field._i18nOpen && (
-                  <div className="acpt-i18n-panel acpt-i18n-panel-field">
-                    {TRANS_LANGS.map(l => (
-                      <div key={l.code} className="acpt-i18n-row">
-                        <span className="acpt-i18n-flag">{l.flag} {l.name}</span>
-                        <input
-                          type="text"
-                          value={(field.label_i18n || {})[l.code] || ""}
-                          onChange={e => updateSystemHeaderField(field.key, {
-                            label_i18n: { ...(field.label_i18n || {}), [l.code]: e.target.value },
-                          })}
-                          placeholder={`"${field.label || "Header field"}" in ${l.name}`}
-                          className="acpt-i18n-input"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
           </div>

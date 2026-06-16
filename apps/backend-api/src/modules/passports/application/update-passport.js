@@ -55,7 +55,7 @@ function updateEditablePassportUseCase(deps) {
       passportType,
       carrierAuthenticity,
       granularity,
-      complianceProfileKey,
+      passportPolicyKey,
       contentSpecificationIds,
       carrierPolicyKey,
       economicOperatorId,
@@ -216,7 +216,7 @@ function updateEditablePassportUseCase(deps) {
       requestedFields: {
         ...current.rows[0],
         ...fields,
-        complianceProfileKey,
+        passportPolicyKey,
         contentSpecificationIds,
         carrierPolicyKey,
         economicOperatorId,
@@ -226,7 +226,7 @@ function updateEditablePassportUseCase(deps) {
       facilitySource: normalizedBody,
       existingFields: current.rows[0],
     });
-    fields.complianceProfileKey = complianceManagedFields.complianceProfileKey;
+    fields.passportPolicyKey = complianceManagedFields.passportPolicyKey;
     fields.contentSpecificationIds = complianceManagedFields.contentSpecificationIds;
     fields.carrierPolicyKey = complianceManagedFields.carrierPolicyKey;
     fields.economicOperatorId = complianceManagedFields.economicOperatorId;

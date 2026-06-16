@@ -717,7 +717,13 @@
 }
 
 .passport-portal .event span {
+  display: block;
   color: #244058;
+}
+
+.passport-portal .event-lines {
+  display: grid;
+  gap: 3px;
 }
 
 .passport-portal .header-grid,

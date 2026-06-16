@@ -20,7 +20,7 @@ function createUseCaseHarness() {
     typeDef: {
       typeName: "batteryPassportV1",
       productCategory: "Battery",
-      semanticModelKey: "claros_battery_dictionary_v1",
+      semanticModelKey: "battery_dictionary_v1",
       fieldsJson: {
         sourceModule: "battery:v1",
         sections: [{
@@ -40,7 +40,7 @@ function createUseCaseHarness() {
       granularity: "item",
       internalAliasId: "BAT-PATCH-001",
       uniqueProductIdentifier: "did:web:example.test:did:battery-passport-v1:item:bat-patch-001",
-      complianceProfileKey: "wrong_profile",
+      passportPolicyKey: "wrong_profile",
       contentSpecificationIds: JSON.stringify(["wrong_spec"]),
       manufacturer: "Original Manufacturer",
     },
@@ -73,9 +73,9 @@ function createUseCaseHarness() {
       extractBusinessProductIdentifier: () => null,
     },
     complianceService: {
-      resolveProfileMetadata: () => ({
+      resolvePassportPolicyMetadata: () => ({
         key: "batteryDppV1",
-        contentSpecificationIds: ["claros_battery_dictionary_v1"],
+        contentSpecificationIds: ["Battery_dictionary_v1"],
       }),
     },
     SYSTEM_PASSPORT_FIELDS: new Set(["dppId", "lineageId", "releaseStatus"]),
@@ -87,7 +87,7 @@ function createUseCaseHarness() {
     VALID_GRANULARITIES: new Set(["model", "batch", "item"]),
     buildMutationPassportPayload: (passport) => ({
       fields: {
-        complianceProfileKey: passport.complianceProfileKey,
+        passportPolicyKey: passport.passportPolicyKey,
         contentSpecificationIds: passport.contentSpecificationIds,
         manufacturer: passport.manufacturer,
       },
@@ -103,7 +103,7 @@ function createUseCaseHarness() {
     },
     isSupportedPatchContentType: () => true,
     parseDppIdentifier: () => ({ type: "dpp" }),
-    serializeProfileDefaultValue: (value) => Array.isArray(value) ? JSON.stringify(value) : value ?? null,
+    serializePolicyDefaultValue: (value) => Array.isArray(value) ? JSON.stringify(value) : value ?? null,
     resolveManagedFacilityId: async ({ requestedFields }) => requestedFields.facilityId || null,
     MERGE_PATCH_CONTENT_TYPE: "application/merge-patch+json",
     usesConfiguredGlobalProductIdentifierScheme: (value) => String(value || "").startsWith("did:"),
@@ -115,14 +115,14 @@ function createUseCaseHarness() {
   };
 }
 
-test("standards PATCH reconciles profile-owned fields from the passport type", async () => {
+test("standards PATCH reconciles policy-owned fields from the passport type", async () => {
   const { getCapturedUpdateData, updateDpp } = createUseCaseHarness();
   const result = await updateDpp({
     req: {
       params: { dppId: "dpp_patch_test" },
       query: {},
       body: {
-        complianceProfileKey: "client_supplied_profile",
+        passportPolicyKey: "client_supplied_profile",
         contentSpecificationIds: ["client_supplied_spec"],
       },
       user: { userId: 9, companyId: 7, role: "company_admin" },
@@ -132,10 +132,10 @@ test("standards PATCH reconciles profile-owned fields from the passport type", a
 
   assert.equal(result.statusCode, 200);
   assert.deepEqual(getCapturedUpdateData(), {
-    complianceProfileKey: "batteryDppV1",
-    contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+    passportPolicyKey: "batteryDppV1",
+    contentSpecificationIds: JSON.stringify(["Battery_dictionary_v1"]),
   });
-  assert.deepEqual(result.body.updatedFields, ["complianceProfileKey", "contentSpecificationIds"]);
-  assert.equal(result.body.passport.fields.complianceProfileKey, "batteryDppV1");
-  assert.equal(result.body.passport.fields.contentSpecificationIds, JSON.stringify(["claros_battery_dictionary_v1"]));
+  assert.deepEqual(result.body.updatedFields, ["passportPolicyKey", "contentSpecificationIds"]);
+  assert.equal(result.body.passport.fields.passportPolicyKey, "batteryDppV1");
+  assert.equal(result.body.passport.fields.contentSpecificationIds, JSON.stringify(["Battery_dictionary_v1"]));
 });

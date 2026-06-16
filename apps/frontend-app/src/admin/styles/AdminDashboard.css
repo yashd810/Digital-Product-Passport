@@ -6068,12 +6068,6 @@
   background: rgba(255,255,255,0.04);
 }
 
-.acpt-system-header-owner-system_generated {
-  color: #90cdf4;
-  border-color: rgba(144,205,244,0.35);
-  background: rgba(144,205,244,0.08);
-}
-
 .acpt-system-header-owner-company_managed {
   color: var(--accent);
   border-color: rgba(13,181,176,0.35);

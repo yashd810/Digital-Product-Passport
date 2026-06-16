@@ -5,210 +5,143 @@ const DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION = {
   label: "Passport Header",
 };
 
-const DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS = [
-  {
-    key: "digitalProductPassportId",
-    label: "Digital Product Passport ID",
-    semanticId: "dpp:digitalProductPassportId",
-    valueSource: "system",
-    ownership: "system_generated",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "uniqueProductIdentifier",
-    label: "Unique Product Identifier",
-    semanticId: "dpp:uniqueProductIdentifier",
-    valueSource: "system",
-    ownership: "system_generated",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "internalAliasId",
-    label: "Internal Alias ID",
-    semanticId: "dpp:internalAliasId",
-    valueSource: "system",
-    ownership: "passport_author_editable",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "granularity",
-    label: "Granularity",
-    semanticId: "dpp:granularity",
-    valueSource: "company_policy",
-    ownership: "company_managed",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "dppSchemaVersion",
-    label: "DPP Schema Version",
-    semanticId: "dpp:dppSchemaVersion",
-    valueSource: "passport_type",
-    ownership: "company_managed",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "dppStatus",
-    label: "DPP Status",
-    semanticId: "dpp:dppStatus",
-    valueSource: "system",
-    ownership: "system_generated",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "lastUpdate",
-    label: "Last Update",
-    semanticId: "dpp:lastUpdate",
-    valueSource: "system",
-    ownership: "system_generated",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "economicOperatorId",
-    label: "Economic Operator ID",
-    semanticId: "dpp:economicOperatorId",
-    valueSource: "company_identity",
-    ownership: "company_managed",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "facilityId",
-    label: "Facility ID",
-    semanticId: "dpp:facilityId",
-    valueSource: "company_or_passport",
-    ownership: "passport_author_editable",
-    required: false,
-    locked: true,
-  },
-  {
-    key: "contentSpecificationIds",
-    label: "Content Specification IDs",
-    semanticId: "dpp:contentSpecificationIds",
-    valueSource: "passport_type",
-    ownership: "company_managed",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "subjectDid",
-    label: "Subject DID",
-    semanticId: "dpp:subjectDid",
-    valueSource: "system",
-    ownership: "system_generated",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "dppDid",
-    label: "DPP DID",
-    semanticId: "dpp:dppDid",
-    valueSource: "system",
-    ownership: "system_generated",
-    required: true,
-    locked: true,
-  },
-  {
-    key: "companyDid",
-    label: "Company DID",
-    semanticId: "dpp:companyDid",
-    valueSource: "system",
-    ownership: "system_generated",
-    required: true,
-    locked: true,
-  },
+const SYSTEM_HEADER_MANAGED_DEFINITIONS = [
+  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", semanticId: "dpp:digitalProductPassportId", managedKey: "internalManagedDigitalProductPassportId", required: true },
+  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", semanticId: "dpp:uniqueProductIdentifier", managedKey: "internalManagedUniqueProductIdentifier", required: true },
+  { slotKey: "internalAliasId", label: "Internal Alias ID", semanticId: "dpp:internalAliasId", managedKey: "internalManagedInternalAliasId", required: true },
+  { slotKey: "granularity", label: "Granularity", semanticId: "dpp:granularity", managedKey: "internalManagedGranularity", required: true },
+  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", semanticId: "dpp:dppSchemaVersion", managedKey: "internalManagedDppSchemaVersion", required: true },
+  { slotKey: "dppStatus", label: "DPP Status", semanticId: "dpp:dppStatus", managedKey: "internalManagedDppStatus", required: true },
+  { slotKey: "lastUpdate", label: "Last Update", semanticId: "dpp:lastUpdate", managedKey: "internalManagedLastUpdate", required: true },
+  { slotKey: "economicOperatorId", label: "Economic Operator ID", semanticId: "dpp:economicOperatorId", managedKey: "internalManagedEconomicOperatorId", required: true },
+  { slotKey: "facilityId", label: "Facility ID", semanticId: "dpp:facilityId", managedKey: "internalManagedFacilityId", required: false },
+  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", semanticId: "dpp:contentSpecificationIds", managedKey: "internalManagedContentSpecificationIds", required: true },
+  { slotKey: "subjectDid", label: "Subject DID", semanticId: "dpp:subjectDid", managedKey: "internalManagedSubjectDid", required: true },
+  { slotKey: "dppDid", label: "DPP DID", semanticId: "dpp:dppDid", managedKey: "internalManagedDppDid", required: true },
+  { slotKey: "companyDid", label: "Company DID", semanticId: "dpp:companyDid", managedKey: "internalManagedCompanyDid", required: true },
 ];
 
-const DEFAULT_SYSTEM_PASSPORT_HEADER_BY_KEY = new Map(
-  DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS.map((field) => [field.key, field])
+const SYSTEM_HEADER_MANAGED_KEY_SET = new Set(
+  SYSTEM_HEADER_MANAGED_DEFINITIONS.map((definition) => definition.managedKey)
 );
 
-function cleanLabel(value, fallback) {
-  const label = String(value || "").trim();
-  return label || fallback;
+function cleanText(value) {
+  return String(value || "").trim();
+}
+
+function normalizeFieldMappings(input = {}) {
+  if (!Array.isArray(input?.fieldMappings)) return [];
+  return input.fieldMappings
+    .map((mapping) => ({
+      slotKey: cleanText(mapping?.slotKey),
+      sourceType: cleanText(mapping?.sourceType || (mapping?.managedKey ? "managed" : "field")).toLowerCase(),
+      label: cleanText(mapping?.label),
+      fieldKey: cleanText(mapping?.fieldKey),
+      managedKey: cleanText(mapping?.managedKey),
+    }))
+    .filter((mapping) => {
+      if (mapping.sourceType === "managed") return Boolean(mapping.managedKey);
+      return Boolean(mapping.fieldKey);
+    });
+}
+
+function normalizeFieldKeys(input = {}) {
+  const fieldMappings = normalizeFieldMappings(input);
+  if (fieldMappings.length) {
+    return fieldMappings
+      .map((mapping) => mapping.sourceType === "field" ? mapping.fieldKey : "")
+      .filter(Boolean);
+  }
+  if (Array.isArray(input?.fieldKeys)) {
+    return input.fieldKeys.map(cleanText).filter(Boolean);
+  }
+  if (Array.isArray(input?.fields)) {
+    return input.fields.map((field) => cleanText(field?.key)).filter(Boolean);
+  }
+  return [];
+}
+
+function uniqueFieldKeys(fieldKeys = []) {
+  const seen = new Set();
+  const ordered = [];
+  for (const key of fieldKeys) {
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(key);
+  }
+  return ordered;
 }
 
 function normalizeSystemPassportHeader(input = {}) {
   const inputSection = input?.section || {};
-  const inputFields = Array.isArray(input?.fields) ? input.fields : [];
-  const inputByKey = new Map(inputFields.map((field) => [field?.key, field]));
-
+  const fieldMappings = normalizeFieldMappings(input);
   return {
     section: {
       key: DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.key,
-      label: cleanLabel(inputSection.label, DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.label),
+      label: cleanText(inputSection.label) || DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.label,
     },
-    fields: DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS.map((field) => {
-      const override = inputByKey.get(field.key) || {};
-      const label_i18n = Object.fromEntries(
-        Object.entries(override.label_i18n || {}).filter(([, value]) => String(value || "").trim())
-      );
-      return {
-        ...field,
-        label: cleanLabel(override.label, field.label),
-        ...(Object.keys(label_i18n).length ? { label_i18n } : {}),
-      };
-    }),
+    fieldMappings,
+    fieldKeys: uniqueFieldKeys(normalizeFieldKeys(input)),
   };
 }
 
-function getSystemPassportHeader(typeDef = {}) {
-  return normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader);
-}
+function validateSystemPassportHeader(input = {}, sections = []) {
+  const normalized = normalizeSystemPassportHeader(input);
+  const knownFieldKeys = new Set(
+    (Array.isArray(sections) ? sections : [])
+      .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
+      .map((field) => cleanText(field?.key))
+      .filter(Boolean)
+  );
 
-function validateSystemPassportHeader(input = {}) {
-  const fields = Array.isArray(input?.fields) ? input.fields : [];
-  const fieldKeys = fields.map((field) => field?.key).filter(Boolean);
-  const unknownKeys = fieldKeys.filter((key) => !DEFAULT_SYSTEM_PASSPORT_HEADER_BY_KEY.has(key));
-  const missingKeys = DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS
-    .map((field) => field.key)
-    .filter((key) => !fieldKeys.includes(key));
-
-  if (unknownKeys.length || missingKeys.length) {
+  const unknownKeys = normalized.fieldKeys.filter((key) => !knownFieldKeys.has(key));
+  if (unknownKeys.length) {
     return {
       valid: false,
-      error: "Passport header fields are system managed. Required header keys cannot be removed, renamed, or extended.",
+      error: `Passport header fields must reference existing schema field keys. Unknown keys: ${unknownKeys.join(", ")}.`,
       unknownKeys,
-      missingKeys,
     };
   }
 
-  for (const field of fields) {
-    const expected = DEFAULT_SYSTEM_PASSPORT_HEADER_BY_KEY.get(field.key);
-    if (!expected) continue;
-    if (field.semanticId && field.semanticId !== expected.semanticId) {
-      return {
-        valid: false,
-        error: `Passport header field "${field.key}" must keep semanticId "${expected.semanticId}".`,
-      };
-    }
-    if (field.valueSource && field.valueSource !== expected.valueSource) {
-      return {
-        valid: false,
-        error: `Passport header field "${field.key}" must keep value source "${expected.valueSource}".`,
-      };
-    }
-    if (field.ownership && field.ownership !== expected.ownership) {
-      return {
-        valid: false,
-        error: `Passport header field "${field.key}" must keep ownership "${expected.ownership}".`,
-      };
-    }
+  const unknownManagedKeys = normalized.fieldMappings
+    .filter((mapping) => mapping.sourceType === "managed")
+    .map((mapping) => mapping.managedKey)
+    .filter((managedKey) => !SYSTEM_HEADER_MANAGED_KEY_SET.has(managedKey));
+  if (unknownManagedKeys.length) {
+    return {
+      valid: false,
+      error: `Passport header mappings contain unknown managed keys: ${unknownManagedKeys.join(", ")}.`,
+      unknownManagedKeys,
+    };
   }
 
   return { valid: true };
 }
 
+function getSystemPassportHeader(typeDef = {}) {
+  return normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader || typeDef?.systemHeader);
+}
+
+function getSystemPassportHeaderFields(typeDef = {}) {
+  const header = getSystemPassportHeader(typeDef);
+  const sections = typeDef?.fieldsJson?.sections || typeDef?.fields_json?.sections || typeDef?.sections || [];
+  const fieldMap = new Map(
+    sections
+      .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
+      .filter((field) => field?.key)
+      .map((field) => [field.key, field])
+  );
+
+  return header.fieldKeys
+    .map((key) => fieldMap.get(key) || null)
+    .filter(Boolean);
+}
+
 module.exports = {
   DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION,
-  DEFAULT_SYSTEM_PASSPORT_HEADER_FIELDS,
+  SYSTEM_HEADER_MANAGED_DEFINITIONS,
   normalizeSystemPassportHeader,
-  getSystemPassportHeader,
   validateSystemPassportHeader,
+  getSystemPassportHeader,
+  getSystemPassportHeaderFields,
 };

@@ -9,17 +9,17 @@
     "skos": "http://www.w3.org/2004/02/skos/core#",
     "vcard": "http://www.w3.org/2006/vcard/ns#",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
-    "clarosAppliance": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/",
-    "clarosApplianceClass": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/"
+    "appliance": "https://www.claros-dpp.online/dictionary/appliance/v1/terms/",
+    "ApplianceClass": "https://www.claros-dpp.online/dictionary/appliance/v1/classes/"
   },
   "@id": "https://www.claros-dpp.online/dictionary/appliance/v1/catalog",
   "@type": "dcat:Catalog",
-  "dcterms:title": "Claros Appliance Dictionary Catalog",
-  "dcterms:description": "DCAT-AP-aligned metadata catalog for the Claros Appliance Dictionary and its machine-readable distributions.",
+  "dcterms:title": "Appliance Dictionary Catalog",
+  "dcterms:description": "DCAT-AP-aligned metadata catalog for the Appliance Dictionary and its machine-readable distributions.",
   "dcterms:publisher": {
     "@id": "https://www.claros-dpp.online",
     "@type": "foaf:Organization",
-    "foaf:name": "Claros DPP"
+    "foaf:name": "Digital Product Passport Platform"
   },
   "dcterms:language": "en",
   "dcterms:modified": {
@@ -44,13 +44,13 @@
   "dcat:dataset": {
     "@id": "https://www.claros-dpp.online/dictionary/appliance/v1/dataset",
     "@type": "dcat:Dataset",
-    "dcterms:identifier": "claros_appliance_dictionary_v1",
-    "dcterms:title": "Claros Appliance Dictionary",
+    "dcterms:identifier": "appliance_dictionary_v1",
+    "dcterms:title": "Appliance Dictionary",
     "dcterms:description": "Internal appliance passport dictionary used as a reference pattern for future modular Digital Product Passport categories.",
     "dcterms:publisher": {
       "@id": "https://www.claros-dpp.online",
       "@type": "foaf:Organization",
-      "foaf:name": "Claros DPP"
+      "foaf:name": "Digital Product Passport Platform"
     },
     "dcterms:language": "en",
     "dcterms:issued": {
@@ -91,7 +91,7 @@
     },
     "dcat:contactPoint": {
       "@type": "vcard:Organization",
-      "vcard:fn": "Claros DPP",
+      "vcard:fn": "Digital Product Passport Platform",
       "vcard:hasURL": {
         "@id": "https://www.claros-dpp.online"
       }
@@ -141,7 +141,7 @@
   "dcat:service": {
     "@id": "https://www.claros-dpp.online/dictionary/appliance/v1/service",
     "@type": "dcat:DataService",
-    "dcterms:title": "Claros Appliance Dictionary API",
+    "dcterms:title": "Appliance Dictionary API",
     "dcat:endpointURL": {
       "@id": "https://www.claros-dpp.online/api/dictionary/appliance/v1"
     },
@@ -152,7 +152,7 @@
   "dcat:record": {
     "@id": "https://www.claros-dpp.online/dictionary/appliance/v1/records/dataset",
     "@type": "dcat:CatalogRecord",
-    "dcterms:title": "Catalog record for the Claros Appliance Dictionary",
+    "dcterms:title": "Catalog record for the Appliance Dictionary",
     "dcterms:modified": {
       "@value": "2026-06-03T00:00:00.000Z",
       "@type": "xsd:dateTime"

@@ -1,6 +1,6 @@
 {
-  "semanticModelKey": "claros_textile_dictionary_v1",
-  "name": "Claros Textile Dictionary",
+  "semanticModelKey": "textile_dictionary_v1",
+  "name": "Textile Dictionary",
   "version": "1.0.0",
   "description": "Internal textile passport dictionary for modular Digital Product Passport implementations.",
   "versioning": {
@@ -12,7 +12,7 @@
     "technical_textile"
   ],
   "publisher": {
-    "name": "Claros DPP",
+    "name": "Digital Product Passport Platform",
     "url": "https://www.claros-dpp.online"
   },
   "issuerDid": "did:web:www.claros-dpp.online",

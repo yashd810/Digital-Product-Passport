@@ -46,7 +46,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     setDppMergePatchHeaders,
     isSupportedPatchContentType,
     parseDppIdentifier,
-    serializeProfileDefaultValue,
+    serializePolicyDefaultValue,
     resolveManagedFacilityId,
     MERGE_PATCH_CONTENT_TYPE,
   } = deps;
@@ -324,7 +324,7 @@ module.exports = function registerMutationRoutes(app, deps) {
       }
 
       const canonicalPayload = buildCanonicalPassportPayload(result.passport, result.typeDef, { companyName: result.companyName });
-      const clarosExtensions = canonicalPayload.extensions?.claros || null;
+      const platformExtensions = canonicalPayload.extensions?.platform || null;
       const registrationPayload = {
         digitalProductPassportId: canonicalPayload.digitalProductPassportId,
         uniqueProductIdentifier: canonicalPayload.uniqueProductIdentifier,
@@ -335,7 +335,7 @@ module.exports = function registerMutationRoutes(app, deps) {
         publicUrl: dppIdentity.buildCanonicalPublicUrl(result.passport, result.companyName),
         contentSpecificationIds: canonicalPayload.contentSpecificationIds || [],
         requestedBy: req.user.userId,
-        ...(clarosExtensions ? { extensions: { claros: clarosExtensions } } : {})
+        ...(platformExtensions ? { extensions: { platform: platformExtensions } } : {})
       };
 
       const upsert = await pool.query(

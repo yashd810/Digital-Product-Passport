@@ -23,7 +23,7 @@ function valueDataTypeFor({ type, dataType }) {
   if (type === "url") return "URI";
   if (dataType === "integer") return "Integer";
   if (dataType === "number" || dataType === "decimal") return "Decimal";
-  if (dataType === "boolean" || type === "checkbox") return "Boolean";
+  if (dataType === "boolean" || type === "boolean") return "Boolean";
   if (dataType === "date" || type === "date") return "Date";
   if (dataType === "datetime") return "DateTime";
   return "String";
@@ -41,7 +41,6 @@ function field({
   presentation = "data",
   summaryRole = null,
   lifecycleRole = null,
-  mediaRole = null,
 }) {
   return {
     ...access,
@@ -58,7 +57,6 @@ function field({
     presentation,
     summaryRole,
     lifecycleRole,
-    mediaRole,
   };
 }
 
@@ -68,22 +66,34 @@ module.exports = {
   displayName: "Appliance Passport v1",
   productCategory: "Appliance",
   productIcon: "AP",
-  semanticModelKey: "claros_appliance_dictionary_v1",
+  semanticModelKey: "appliance_dictionary_v1",
+  systemHeader: {
+    section: { key: "passportHeader", label: "Passport Header" },
+    fieldMappings: [
+      { slotKey: "digitalProductPassportId", sourceType: "managed", managedKey: "internalManagedDigitalProductPassportId" },
+      { slotKey: "uniqueProductIdentifier", sourceType: "managed", managedKey: "internalManagedUniqueProductIdentifier" },
+      { slotKey: "internalAliasId", sourceType: "managed", managedKey: "internalManagedInternalAliasId" },
+      { slotKey: "granularity", sourceType: "managed", managedKey: "internalManagedGranularity" },
+      { slotKey: "dppSchemaVersion", sourceType: "managed", managedKey: "internalManagedDppSchemaVersion" },
+      { slotKey: "dppStatus", sourceType: "managed", managedKey: "internalManagedDppStatus" },
+      { slotKey: "lastUpdate", sourceType: "managed", managedKey: "internalManagedLastUpdate" },
+      { slotKey: "economicOperatorId", sourceType: "managed", managedKey: "internalManagedEconomicOperatorId" },
+      { slotKey: "facilityId", sourceType: "managed", managedKey: "internalManagedFacilityId" },
+      { slotKey: "contentSpecificationIds", sourceType: "managed", managedKey: "internalManagedContentSpecificationIds" },
+      { slotKey: "subjectDid", sourceType: "managed", managedKey: "internalManagedSubjectDid" },
+      { slotKey: "dppDid", sourceType: "managed", managedKey: "internalManagedDppDid" },
+      { slotKey: "companyDid", sourceType: "managed", managedKey: "internalManagedCompanyDid" },
+    ],
+    fieldKeys: [],
+  },
   identity: {
     businessIdentifierField: "productModelIdentifier",
   },
-  complianceProfile: {
+  passportPolicy: {
     key: "applianceDppV1",
-    displayName: "Appliance DPP Profile v1",
-    contentSpecificationIds: ["claros_appliance_dictionary_v1"],
-    requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds"],
-    requireCompanyOperatorIdentifier: true,
-    requireCarrierPolicy: false,
-    requireFacilityAtGranularities: [],
+    displayName: "Appliance Passport Policy v1",
+    contentSpecificationIds: ["Appliance_dictionary_v1"],
     defaultCarrierPolicyKey: "web_public_entry_v1",
-    enforceSemanticMapping: true,
-    requirePublicAccessLayer: true,
-    managedSemanticFields: [],
   },
   schemaVersion: 1,
   lifecycle: {

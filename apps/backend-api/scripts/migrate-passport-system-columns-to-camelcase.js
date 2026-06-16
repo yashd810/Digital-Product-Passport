@@ -15,7 +15,7 @@ const LEGACY_SYSTEM_PASSPORT_COLUMNS = [
   ["internal_alias_id", "internalAliasId"],
   ["product_identifier_did", "uniqueProductIdentifier"],
   ["product_image", "productImage"],
-  ["compliance_profile_key", "complianceProfileKey"],
+  ["passport_policy_key", "passportPolicyKey"],
   ["content_specification_ids", "contentSpecificationIds"],
   ["carrier_policy_key", "carrierPolicyKey"],
   ["carrier_authenticity", "carrierAuthenticity"],

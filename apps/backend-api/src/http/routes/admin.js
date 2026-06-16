@@ -41,7 +41,7 @@ const RESERVED_PASSPORT_FIELD_KEYS = [
 "modelName",
 "internalAliasId",
 "uniqueProductIdentifier",
-"complianceProfileKey",
+"passportPolicyKey",
 "contentSpecificationIds",
 "carrierPolicyKey",
 "economicOperatorId",
@@ -146,7 +146,7 @@ module.exports = function registerAdminRoutes(app, {
   normalizePassportTypeSchema = ({ sections = [], systemHeader = null, currentSchemaVersion = 0, sourceModule = null, identity = null } = {}) => {
     const schema = {
       schemaVersion: Number.parseInt(currentSchemaVersion, 10) > 0 ? Number.parseInt(currentSchemaVersion, 10) : 1,
-      systemHeader: normalizeSystemPassportHeader(systemHeader),
+      systemHeader: systemHeader ? normalizeSystemPassportHeader(systemHeader) : null,
       sections: Array.isArray(sections) ? sections : [],
     };
     const normalizedSourceModule = String(sourceModule || "").trim();
@@ -317,7 +317,12 @@ module.exports = function registerAdminRoutes(app, {
   }
 
   function normalizeRequestedPassportTypeSchema({ sections, systemHeader, currentSchemaVersion, sourceModule = null, identity = null }) {
-    const systemHeaderValidation = validateSystemPassportHeader(systemHeader || normalizeSystemPassportHeader());
+    if (!systemHeader) {
+      const error = new Error("Passport types must define an explicit systemHeader.");
+      error.statusCode = 400;
+      throw error;
+    }
+    const systemHeaderValidation = validateSystemPassportHeader(systemHeader, sections);
     if (!systemHeaderValidation.valid) {
       const error = new Error(systemHeaderValidation.error);
       error.statusCode = 400;

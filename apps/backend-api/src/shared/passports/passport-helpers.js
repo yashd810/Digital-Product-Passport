@@ -199,7 +199,7 @@ const normalizePassportRow = (row, schema) => {
     internalAliasId: rowData.internalAliasId ?? null,
     uniqueProductIdentifier: rowData.uniqueProductIdentifier ?? null,
     productImage: rowData.productImage ?? null,
-    complianceProfileKey: rowData.complianceProfileKey ?? null,
+    passportPolicyKey: rowData.passportPolicyKey ?? null,
     contentSpecificationIds: rowData.contentSpecificationIds ?? null,
     carrierPolicyKey: rowData.carrierPolicyKey ?? null,
     carrierAuthenticity: rowData.carrierAuthenticity ?? null,

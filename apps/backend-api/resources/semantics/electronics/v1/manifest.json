@@ -1,6 +1,6 @@
 {
-  "semanticModelKey": "claros_electronics_dictionary_v1",
-  "name": "Claros Electronics Dictionary",
+  "semanticModelKey": "electronics_dictionary_v1",
+  "name": "Electronics Dictionary",
   "version": "1.0.0",
   "description": "Internal electronics passport dictionary used for Digital Product Passport implementations.",
   "versioning": {
@@ -11,7 +11,7 @@
     "Industrial Electronics"
   ],
   "publisher": {
-    "name": "Claros DPP",
+    "name": "Digital Product Passport Platform",
     "url": "https://www.claros-dpp.online"
   },
   "issuerDid": "did:web:www.claros-dpp.online",

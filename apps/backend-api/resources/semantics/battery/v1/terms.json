@@ -13,7 +13,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/DPPInfo",
-      "curie": "clarosBatteryClass:DPPInfo",
+      "curie": "BatteryClass:DPPInfo",
       "label": "DPP Information"
     },
     "unit": "none"
@@ -32,7 +32,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/DPPInfo",
-      "curie": "clarosBatteryClass:DPPInfo",
+      "curie": "BatteryClass:DPPInfo",
       "label": "DPP Information"
     },
     "unit": "none"
@@ -51,7 +51,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/DPPInfo",
-      "curie": "clarosBatteryClass:DPPInfo",
+      "curie": "BatteryClass:DPPInfo",
       "label": "DPP Information"
     },
     "unit": "none"
@@ -70,7 +70,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/DPPInfo",
-      "curie": "clarosBatteryClass:DPPInfo",
+      "curie": "BatteryClass:DPPInfo",
       "label": "DPP Information"
     },
     "unit": "none"
@@ -89,7 +89,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryIdentifiers",
-      "curie": "clarosBatteryClass:BatteryIdentifiers",
+      "curie": "BatteryClass:BatteryIdentifiers",
       "label": "Battery Identifiers"
     },
     "unit": "none"
@@ -108,7 +108,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryIdentifiers",
-      "curie": "clarosBatteryClass:BatteryIdentifiers",
+      "curie": "BatteryClass:BatteryIdentifiers",
       "label": "Battery Identifiers"
     },
     "unit": "none"
@@ -127,7 +127,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryIdentifiers",
-      "curie": "clarosBatteryClass:BatteryIdentifiers",
+      "curie": "BatteryClass:BatteryIdentifiers",
       "label": "Battery Identifiers"
     },
     "unit": "none"
@@ -146,7 +146,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryIdentifiers",
-      "curie": "clarosBatteryClass:BatteryIdentifiers",
+      "curie": "BatteryClass:BatteryIdentifiers",
       "label": "Battery Identifiers"
     },
     "unit": "none"
@@ -165,7 +165,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/OperatorIdentifiers",
-      "curie": "clarosBatteryClass:OperatorIdentifiers",
+      "curie": "BatteryClass:OperatorIdentifiers",
       "label": "Operator Identifiers"
     },
     "unit": "none"
@@ -184,7 +184,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/OperatorIdentifiers",
-      "curie": "clarosBatteryClass:OperatorIdentifiers",
+      "curie": "BatteryClass:OperatorIdentifiers",
       "label": "Operator Identifiers"
     },
     "unit": "none"
@@ -203,7 +203,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/OperatorIdentifiers",
-      "curie": "clarosBatteryClass:OperatorIdentifiers",
+      "curie": "BatteryClass:OperatorIdentifiers",
       "label": "Operator Identifiers"
     },
     "unit": "none"
@@ -222,7 +222,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/ProductData",
-      "curie": "clarosBatteryClass:ProductData",
+      "curie": "BatteryClass:ProductData",
       "label": "Product Data"
     },
     "unit": "none"
@@ -241,7 +241,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/ProductData",
-      "curie": "clarosBatteryClass:ProductData",
+      "curie": "BatteryClass:ProductData",
       "label": "Product Data"
     },
     "unit": "none"
@@ -260,7 +260,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/ProductData",
-      "curie": "clarosBatteryClass:ProductData",
+      "curie": "BatteryClass:ProductData",
       "label": "Product Data"
     },
     "unit": "none"
@@ -279,7 +279,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/ProductData",
-      "curie": "clarosBatteryClass:ProductData",
+      "curie": "BatteryClass:ProductData",
       "label": "Product Data"
     },
     "unit": "none"
@@ -298,7 +298,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RestrictedProductInfo",
-      "curie": "clarosBatteryClass:RestrictedProductInfo",
+      "curie": "BatteryClass:RestrictedProductInfo",
       "label": "Restricted Product Info"
     },
     "unit": "none"
@@ -317,7 +317,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryAttributes",
-      "curie": "clarosBatteryClass:BatteryAttributes",
+      "curie": "BatteryClass:BatteryAttributes",
       "label": "Battery Attributes"
     },
     "unit": "none"
@@ -336,7 +336,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryAttributes",
-      "curie": "clarosBatteryClass:BatteryAttributes",
+      "curie": "BatteryClass:BatteryAttributes",
       "label": "Battery Attributes"
     },
     "unit": "none"
@@ -355,7 +355,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryAttributes",
-      "curie": "clarosBatteryClass:BatteryAttributes",
+      "curie": "BatteryClass:BatteryAttributes",
       "label": "Battery Attributes"
     },
     "unit": "kg"
@@ -374,7 +374,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RestrictedProductInfo",
-      "curie": "clarosBatteryClass:RestrictedProductInfo",
+      "curie": "BatteryClass:RestrictedProductInfo",
       "label": "Restricted Product Info"
     },
     "unit": "none"
@@ -393,7 +393,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCompliancePublic",
-      "curie": "clarosBatteryClass:BatteryCompliancePublic",
+      "curie": "BatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
     "unit": "none"
@@ -412,7 +412,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCompliancePublic",
-      "curie": "clarosBatteryClass:BatteryCompliancePublic",
+      "curie": "BatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
     "unit": "none"
@@ -431,7 +431,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCompliancePublic",
-      "curie": "clarosBatteryClass:BatteryCompliancePublic",
+      "curie": "BatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
     "unit": "none"
@@ -450,7 +450,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCompliancePublic",
-      "curie": "clarosBatteryClass:BatteryCompliancePublic",
+      "curie": "BatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
     "unit": "none"
@@ -469,7 +469,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCompliancePublic",
-      "curie": "clarosBatteryClass:BatteryCompliancePublic",
+      "curie": "BatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
     "unit": "none"
@@ -488,7 +488,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCompliancePublic",
-      "curie": "clarosBatteryClass:BatteryCompliancePublic",
+      "curie": "BatteryClass:BatteryCompliancePublic",
       "label": "Battery Compliance Public"
     },
     "unit": "none"
@@ -507,7 +507,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryComplianceRestricted",
-      "curie": "clarosBatteryClass:BatteryComplianceRestricted",
+      "curie": "BatteryClass:BatteryComplianceRestricted",
       "label": "Battery Compliance Restricted"
     },
     "unit": "none"
@@ -526,7 +526,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
-      "curie": "clarosBatteryClass:BatteryCarbonFootprint",
+      "curie": "BatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
     "unit": "kgco2eq_per_kwh"
@@ -545,7 +545,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
-      "curie": "clarosBatteryClass:BatteryCarbonFootprint",
+      "curie": "BatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
     "unit": "kgco2eq_per_kwh"
@@ -564,7 +564,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
-      "curie": "clarosBatteryClass:BatteryCarbonFootprint",
+      "curie": "BatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
     "unit": "kgco2eq_per_kwh"
@@ -583,7 +583,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
-      "curie": "clarosBatteryClass:BatteryCarbonFootprint",
+      "curie": "BatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
     "unit": "kgco2eq_per_kwh"
@@ -602,7 +602,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
-      "curie": "clarosBatteryClass:BatteryCarbonFootprint",
+      "curie": "BatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
     "unit": "kgco2eq_per_kwh"
@@ -621,7 +621,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
-      "curie": "clarosBatteryClass:BatteryCarbonFootprint",
+      "curie": "BatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
     "unit": "none"
@@ -640,7 +640,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
-      "curie": "clarosBatteryClass:BatteryCarbonFootprint",
+      "curie": "BatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
     "unit": "none"
@@ -659,7 +659,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCarbonFootprint",
-      "curie": "clarosBatteryClass:BatteryCarbonFootprint",
+      "curie": "BatteryClass:BatteryCarbonFootprint",
       "label": "Battery Carbon Footprint"
     },
     "unit": "kgco2eq"
@@ -678,7 +678,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/SupplyChainDueDiligence",
-      "curie": "clarosBatteryClass:SupplyChainDueDiligence",
+      "curie": "BatteryClass:SupplyChainDueDiligence",
       "label": "Supply Chain Due Diligence"
     },
     "unit": "none"
@@ -697,7 +697,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/SupplyChainDueDiligence",
-      "curie": "clarosBatteryClass:SupplyChainDueDiligence",
+      "curie": "BatteryClass:SupplyChainDueDiligence",
       "label": "Supply Chain Due Diligence"
     },
     "unit": "none"
@@ -716,7 +716,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/SupplyChainDueDiligence",
-      "curie": "clarosBatteryClass:SupplyChainDueDiligence",
+      "curie": "BatteryClass:SupplyChainDueDiligence",
       "label": "Supply Chain Due Diligence"
     },
     "unit": "none"
@@ -735,7 +735,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryMaterialsPublic",
-      "curie": "clarosBatteryClass:BatteryMaterialsPublic",
+      "curie": "BatteryClass:BatteryMaterialsPublic",
       "label": "Battery Materials Public"
     },
     "unit": "none"
@@ -757,7 +757,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryMaterialsPublic",
-      "curie": "clarosBatteryClass:BatteryMaterialsPublic",
+      "curie": "BatteryClass:BatteryMaterialsPublic",
       "label": "Battery Materials Public"
     },
     "unit": "none"
@@ -779,7 +779,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryMaterialsRestricted",
-      "curie": "clarosBatteryClass:BatteryMaterialsRestricted",
+      "curie": "BatteryClass:BatteryMaterialsRestricted",
       "label": "Battery Materials Restricted"
     },
     "unit": "none"
@@ -798,7 +798,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryMaterialsPublic",
-      "curie": "clarosBatteryClass:BatteryMaterialsPublic",
+      "curie": "BatteryClass:BatteryMaterialsPublic",
       "label": "Battery Materials Public"
     },
     "unit": "none"
@@ -817,7 +817,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryMaterialsPublic",
-      "curie": "clarosBatteryClass:BatteryMaterialsPublic",
+      "curie": "BatteryClass:BatteryMaterialsPublic",
       "label": "Battery Materials Public"
     },
     "unit": "none"
@@ -836,7 +836,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCircularityRestricted",
-      "curie": "clarosBatteryClass:BatteryCircularityRestricted",
+      "curie": "BatteryClass:BatteryCircularityRestricted",
       "label": "Battery Circularity Restricted"
     },
     "unit": "none"
@@ -855,7 +855,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCircularityRestricted",
-      "curie": "clarosBatteryClass:BatteryCircularityRestricted",
+      "curie": "BatteryClass:BatteryCircularityRestricted",
       "label": "Battery Circularity Restricted"
     },
     "unit": "none"
@@ -874,7 +874,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCircularityRestricted",
-      "curie": "clarosBatteryClass:BatteryCircularityRestricted",
+      "curie": "BatteryClass:BatteryCircularityRestricted",
       "label": "Battery Circularity Restricted"
     },
     "unit": "none"
@@ -893,7 +893,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryCircularityRestricted",
-      "curie": "clarosBatteryClass:BatteryCircularityRestricted",
+      "curie": "BatteryClass:BatteryCircularityRestricted",
       "label": "Battery Circularity Restricted"
     },
     "unit": "none"
@@ -912,7 +912,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
-      "curie": "clarosBatteryClass:RecycledRenewableContent",
+      "curie": "BatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
     "unit": "percent"
@@ -931,7 +931,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
-      "curie": "clarosBatteryClass:RecycledRenewableContent",
+      "curie": "BatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
     "unit": "percent"
@@ -950,7 +950,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
-      "curie": "clarosBatteryClass:RecycledRenewableContent",
+      "curie": "BatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
     "unit": "percent"
@@ -969,7 +969,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
-      "curie": "clarosBatteryClass:RecycledRenewableContent",
+      "curie": "BatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
     "unit": "percent"
@@ -988,7 +988,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
-      "curie": "clarosBatteryClass:RecycledRenewableContent",
+      "curie": "BatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
     "unit": "percent"
@@ -1007,7 +1007,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
-      "curie": "clarosBatteryClass:RecycledRenewableContent",
+      "curie": "BatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
     "unit": "percent"
@@ -1026,7 +1026,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
-      "curie": "clarosBatteryClass:RecycledRenewableContent",
+      "curie": "BatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
     "unit": "percent"
@@ -1045,7 +1045,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RecycledRenewableContent",
-      "curie": "clarosBatteryClass:RecycledRenewableContent",
+      "curie": "BatteryClass:RecycledRenewableContent",
       "label": "Recycled and Renewable Content"
     },
     "unit": "percent"
@@ -1064,7 +1064,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/EndUserInformation",
-      "curie": "clarosBatteryClass:EndUserInformation",
+      "curie": "BatteryClass:EndUserInformation",
       "label": "End-User Information"
     },
     "unit": "none"
@@ -1083,7 +1083,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/EndUserInformation",
-      "curie": "clarosBatteryClass:EndUserInformation",
+      "curie": "BatteryClass:EndUserInformation",
       "label": "End-User Information"
     },
     "unit": "none"
@@ -1102,7 +1102,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/EndUserInformation",
-      "curie": "clarosBatteryClass:EndUserInformation",
+      "curie": "BatteryClass:EndUserInformation",
       "label": "End-User Information"
     },
     "unit": "none"
@@ -1121,7 +1121,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityPublic",
-      "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
+      "curie": "BatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
     "unit": "ah"
@@ -1140,7 +1140,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityRestricted",
-      "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
+      "curie": "BatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
     "unit": "ah"
@@ -1159,7 +1159,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityRestricted",
-      "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
+      "curie": "BatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
     "unit": "percent"
@@ -1178,7 +1178,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityPublic",
-      "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
+      "curie": "BatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
     "unit": "wh"
@@ -1197,7 +1197,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityRestricted",
-      "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
+      "curie": "BatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
     "unit": "wh"
@@ -1216,7 +1216,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityRestricted",
-      "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
+      "curie": "BatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
     "unit": "percent"
@@ -1235,7 +1235,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityRestricted",
-      "curie": "clarosBatteryClass:PerformanceDurabilityRestricted",
+      "curie": "BatteryClass:PerformanceDurabilityRestricted",
       "label": "Performance and Durability Restricted"
     },
     "unit": "percent"
@@ -1254,7 +1254,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityPublic",
-      "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
+      "curie": "BatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
     "unit": "v"
@@ -1273,7 +1273,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityPublic",
-      "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
+      "curie": "BatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
     "unit": "v"
@@ -1292,7 +1292,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PerformanceDurabilityPublic",
-      "curie": "clarosBatteryClass:PerformanceDurabilityPublic",
+      "curie": "BatteryClass:PerformanceDurabilityPublic",
       "label": "Performance and Durability Public"
     },
     "unit": "v"
@@ -1311,7 +1311,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PowerCapabilityPublic",
-      "curie": "clarosBatteryClass:PowerCapabilityPublic",
+      "curie": "BatteryClass:PowerCapabilityPublic",
       "label": "Power Capability Public"
     },
     "unit": "w"
@@ -1330,7 +1330,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PowerCapabilityRestricted",
-      "curie": "clarosBatteryClass:PowerCapabilityRestricted",
+      "curie": "BatteryClass:PowerCapabilityRestricted",
       "label": "Power Capability Restricted"
     },
     "unit": "w"
@@ -1349,7 +1349,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PowerCapabilityRestricted",
-      "curie": "clarosBatteryClass:PowerCapabilityRestricted",
+      "curie": "BatteryClass:PowerCapabilityRestricted",
       "label": "Power Capability Restricted"
     },
     "unit": "w"
@@ -1368,7 +1368,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PowerCapabilityPublic",
-      "curie": "clarosBatteryClass:PowerCapabilityPublic",
+      "curie": "BatteryClass:PowerCapabilityPublic",
       "label": "Power Capability Public"
     },
     "unit": "w"
@@ -1387,7 +1387,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/PowerCapabilityPublic",
-      "curie": "clarosBatteryClass:PowerCapabilityPublic",
+      "curie": "BatteryClass:PowerCapabilityPublic",
       "label": "Power Capability Public"
     },
     "unit": "w_per_wh"
@@ -1406,7 +1406,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyPublic",
-      "curie": "clarosBatteryClass:RoundTripEfficiencyPublic",
+      "curie": "BatteryClass:RoundTripEfficiencyPublic",
       "label": "Round Trip Efficiency Public"
     },
     "unit": "percent"
@@ -1425,7 +1425,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyPublic",
-      "curie": "clarosBatteryClass:RoundTripEfficiencyPublic",
+      "curie": "BatteryClass:RoundTripEfficiencyPublic",
       "label": "Round Trip Efficiency Public"
     },
     "unit": "percent"
@@ -1444,7 +1444,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyRestricted",
-      "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
+      "curie": "BatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
     "unit": "percent"
@@ -1463,7 +1463,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyRestricted",
-      "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
+      "curie": "BatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
     "unit": "percent"
@@ -1482,7 +1482,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyRestricted",
-      "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
+      "curie": "BatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
     "unit": "percent"
@@ -1501,7 +1501,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyRestricted",
-      "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
+      "curie": "BatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
     "unit": "percent"
@@ -1520,7 +1520,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/RoundTripEfficiencyRestricted",
-      "curie": "clarosBatteryClass:RoundTripEfficiencyRestricted",
+      "curie": "BatteryClass:RoundTripEfficiencyRestricted",
       "label": "Round Trip Efficiency Restricted"
     },
     "unit": "percent"
@@ -1539,7 +1539,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/InternalResistancePublic",
-      "curie": "clarosBatteryClass:InternalResistancePublic",
+      "curie": "BatteryClass:InternalResistancePublic",
       "label": "Internal Resistance Public"
     },
     "unit": "ohm"
@@ -1558,7 +1558,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/InternalResistanceRestricted",
-      "curie": "clarosBatteryClass:InternalResistanceRestricted",
+      "curie": "BatteryClass:InternalResistanceRestricted",
       "label": "Internal Resistance Restricted"
     },
     "unit": "percent"
@@ -1577,7 +1577,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimeRestricted",
-      "curie": "clarosBatteryClass:BatteryLifetimeRestricted",
+      "curie": "BatteryClass:BatteryLifetimeRestricted",
       "label": "Battery Lifetime Restricted"
     },
     "unit": "years"
@@ -1596,7 +1596,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimePublic",
-      "curie": "clarosBatteryClass:BatteryLifetimePublic",
+      "curie": "BatteryClass:BatteryLifetimePublic",
       "label": "Battery Lifetime Public"
     },
     "unit": "none"
@@ -1615,7 +1615,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimeRestricted",
-      "curie": "clarosBatteryClass:BatteryLifetimeRestricted",
+      "curie": "BatteryClass:BatteryLifetimeRestricted",
       "label": "Battery Lifetime Restricted"
     },
     "unit": "none"
@@ -1634,7 +1634,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimePublic",
-      "curie": "clarosBatteryClass:BatteryLifetimePublic",
+      "curie": "BatteryClass:BatteryLifetimePublic",
       "label": "Battery Lifetime Public"
     },
     "unit": "none"
@@ -1653,7 +1653,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimePublic",
-      "curie": "clarosBatteryClass:BatteryLifetimePublic",
+      "curie": "BatteryClass:BatteryLifetimePublic",
       "label": "Battery Lifetime Public"
     },
     "unit": "a_per_ah"
@@ -1672,7 +1672,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimeRestricted",
-      "curie": "clarosBatteryClass:BatteryLifetimeRestricted",
+      "curie": "BatteryClass:BatteryLifetimeRestricted",
       "label": "Battery Lifetime Restricted"
     },
     "unit": "wh"
@@ -1691,7 +1691,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimeRestricted",
-      "curie": "clarosBatteryClass:BatteryLifetimeRestricted",
+      "curie": "BatteryClass:BatteryLifetimeRestricted",
       "label": "Battery Lifetime Restricted"
     },
     "unit": "ah"
@@ -1710,7 +1710,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/BatteryLifetimePublic",
-      "curie": "clarosBatteryClass:BatteryLifetimePublic",
+      "curie": "BatteryClass:BatteryLifetimePublic",
       "label": "Battery Lifetime Public"
     },
     "unit": "percent"
@@ -1729,7 +1729,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsRestricted",
-      "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
+      "curie": "BatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
     "unit": "celsius"
@@ -1748,7 +1748,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsPublic",
-      "curie": "clarosBatteryClass:TemperatureConditionsPublic",
+      "curie": "BatteryClass:TemperatureConditionsPublic",
       "label": "Temperature Conditions Public"
     },
     "unit": "celsius"
@@ -1767,7 +1767,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsPublic",
-      "curie": "clarosBatteryClass:TemperatureConditionsPublic",
+      "curie": "BatteryClass:TemperatureConditionsPublic",
       "label": "Temperature Conditions Public"
     },
     "unit": "celsius"
@@ -1786,7 +1786,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsRestricted",
-      "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
+      "curie": "BatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
     "unit": "seconds"
@@ -1805,7 +1805,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsRestricted",
-      "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
+      "curie": "BatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
     "unit": "seconds"
@@ -1824,7 +1824,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsRestricted",
-      "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
+      "curie": "BatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
     "unit": "seconds"
@@ -1843,7 +1843,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/TemperatureConditionsRestricted",
-      "curie": "clarosBatteryClass:TemperatureConditionsRestricted",
+      "curie": "BatteryClass:TemperatureConditionsRestricted",
       "label": "Temperature Conditions Restricted"
     },
     "unit": "seconds"
@@ -1862,7 +1862,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/NegativeEvents",
-      "curie": "clarosBatteryClass:NegativeEvents",
+      "curie": "BatteryClass:NegativeEvents",
       "label": "Negative Events"
     },
     "unit": "none"
@@ -1881,7 +1881,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/NegativeEvents",
-      "curie": "clarosBatteryClass:NegativeEvents",
+      "curie": "BatteryClass:NegativeEvents",
       "label": "Negative Events"
     },
     "unit": "none"
@@ -1900,7 +1900,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/battery/v1/classes/NegativeEvents",
-      "curie": "clarosBatteryClass:NegativeEvents",
+      "curie": "BatteryClass:NegativeEvents",
       "label": "Negative Events"
     },
     "unit": "none"

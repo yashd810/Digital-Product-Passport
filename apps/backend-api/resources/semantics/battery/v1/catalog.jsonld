@@ -9,17 +9,17 @@
     "skos": "http://www.w3.org/2004/02/skos/core#",
     "vcard": "http://www.w3.org/2006/vcard/ns#",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
-    "clarosBattery": "https://www.claros-dpp.online/dictionary/battery/v1/terms/",
-    "clarosBatteryClass": "https://www.claros-dpp.online/dictionary/battery/v1/classes/"
+    "battery": "https://www.claros-dpp.online/dictionary/battery/v1/terms/",
+    "BatteryClass": "https://www.claros-dpp.online/dictionary/battery/v1/classes/"
   },
   "@id": "https://www.claros-dpp.online/dictionary/battery/v1/catalog",
   "@type": "dcat:Catalog",
-  "dcterms:title": "Claros Battery Dictionary Catalog",
-  "dcterms:description": "DCAT-AP-aligned metadata catalog for the Claros battery semantic dictionary and its machine-readable distributions.",
+  "dcterms:title": "Battery Dictionary Catalog",
+  "dcterms:description": "DCAT-AP-aligned metadata catalog for the battery semantic dictionary and its machine-readable distributions.",
   "dcterms:publisher": {
     "@id": "https://www.claros-dpp.online",
     "@type": "foaf:Organization",
-    "foaf:name": "Claros DPP"
+    "foaf:name": "Digital Product Passport Platform"
   },
   "dcterms:language": "en",
   "dcterms:modified": {
@@ -44,13 +44,13 @@
   "dcat:dataset": {
     "@id": "https://www.claros-dpp.online/dictionary/battery/v1/dataset",
     "@type": "dcat:Dataset",
-    "dcterms:identifier": "claros_battery_dictionary_v1",
-    "dcterms:title": "Claros Battery Dictionary",
+    "dcterms:identifier": "battery_dictionary_v1",
+    "dcterms:title": "Battery Dictionary",
     "dcterms:description": "Internal battery passport dictionary derived from the BatteryPass Data Attribute Longlist v1.3.",
     "dcterms:publisher": {
       "@id": "https://www.claros-dpp.online",
       "@type": "foaf:Organization",
-      "foaf:name": "Claros DPP"
+      "foaf:name": "Digital Product Passport Platform"
     },
     "dcterms:language": "en",
     "dcterms:issued": {
@@ -92,7 +92,7 @@
     },
     "dcat:contactPoint": {
       "@type": "vcard:Organization",
-      "vcard:fn": "Claros DPP",
+      "vcard:fn": "Digital Product Passport Platform",
       "vcard:hasURL": {
         "@id": "https://www.claros-dpp.online"
       }
@@ -142,7 +142,7 @@
   "dcat:service": {
     "@id": "https://www.claros-dpp.online/dictionary/battery/v1/service",
     "@type": "dcat:DataService",
-    "dcterms:title": "Claros Battery Dictionary API",
+    "dcterms:title": "Battery Dictionary API",
     "dcat:endpointURL": {
       "@id": "https://www.claros-dpp.online/api/dictionary/battery/v1"
     },
@@ -153,7 +153,7 @@
   "dcat:record": {
     "@id": "https://www.claros-dpp.online/dictionary/battery/v1/records/dataset",
     "@type": "dcat:CatalogRecord",
-    "dcterms:title": "Catalog record for the Claros Battery Dictionary",
+    "dcterms:title": "Catalog record for the Battery Dictionary",
     "dcterms:modified": {
       "@value": "2026-04-24T17:40:07.377Z",
       "@type": "xsd:dateTime"

@@ -4,9 +4,9 @@
     "@protected": true,
     "id": "@id",
     "type": "@type",
-    "clarosBattery": "https://www.claros-dpp.online/dictionary/battery/v1/terms/",
-    "clarosBatteryClass": "https://www.claros-dpp.online/dictionary/battery/v1/classes/",
-    "DigitalBatteryPassport": "clarosBatteryClass:DigitalBatteryPassport",
+    "battery": "https://www.claros-dpp.online/dictionary/battery/v1/terms/",
+    "BatteryClass": "https://www.claros-dpp.online/dictionary/battery/v1/classes/",
+    "DigitalBatteryPassport": "BatteryClass:DigitalBatteryPassport",
     "DigitalProductPassport": "dpp:DigitalProductPassport",
     "dcat": "http://www.w3.org/ns/dcat#",
     "dcterms": "http://purl.org/dc/terms/",
@@ -16,1007 +16,1007 @@
     "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
     "skos": "http://www.w3.org/2004/02/skos/core#",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
-    "DPPInfo": "clarosBatteryClass:DPPInfo",
-    "BatteryIdentifiers": "clarosBatteryClass:BatteryIdentifiers",
-    "OperatorIdentifiers": "clarosBatteryClass:OperatorIdentifiers",
-    "ProductData": "clarosBatteryClass:ProductData",
-    "RestrictedProductInfo": "clarosBatteryClass:RestrictedProductInfo",
-    "BatteryAttributes": "clarosBatteryClass:BatteryAttributes",
-    "BatteryCompliancePublic": "clarosBatteryClass:BatteryCompliancePublic",
-    "BatteryComplianceRestricted": "clarosBatteryClass:BatteryComplianceRestricted",
-    "BatteryCarbonFootprint": "clarosBatteryClass:BatteryCarbonFootprint",
-    "SupplyChainDueDiligence": "clarosBatteryClass:SupplyChainDueDiligence",
-    "BatteryMaterialsPublic": "clarosBatteryClass:BatteryMaterialsPublic",
-    "BatteryMaterialsRestricted": "clarosBatteryClass:BatteryMaterialsRestricted",
-    "BatteryCircularityPublic": "clarosBatteryClass:BatteryCircularityPublic",
-    "BatteryCircularityRestricted": "clarosBatteryClass:BatteryCircularityRestricted",
-    "RecycledRenewableContent": "clarosBatteryClass:RecycledRenewableContent",
-    "EndUserInformation": "clarosBatteryClass:EndUserInformation",
-    "PerformanceDurabilityPublic": "clarosBatteryClass:PerformanceDurabilityPublic",
-    "PerformanceDurabilityRestricted": "clarosBatteryClass:PerformanceDurabilityRestricted",
-    "PowerCapabilityPublic": "clarosBatteryClass:PowerCapabilityPublic",
-    "PowerCapabilityRestricted": "clarosBatteryClass:PowerCapabilityRestricted",
-    "RoundTripEfficiencyPublic": "clarosBatteryClass:RoundTripEfficiencyPublic",
-    "RoundTripEfficiencyRestricted": "clarosBatteryClass:RoundTripEfficiencyRestricted",
-    "InternalResistancePublic": "clarosBatteryClass:InternalResistancePublic",
-    "InternalResistanceRestricted": "clarosBatteryClass:InternalResistanceRestricted",
-    "BatteryLifetimePublic": "clarosBatteryClass:BatteryLifetimePublic",
-    "BatteryLifetimeRestricted": "clarosBatteryClass:BatteryLifetimeRestricted",
-    "TemperatureConditionsPublic": "clarosBatteryClass:TemperatureConditionsPublic",
-    "TemperatureConditionsRestricted": "clarosBatteryClass:TemperatureConditionsRestricted",
-    "NegativeEvents": "clarosBatteryClass:NegativeEvents",
+    "DPPInfo": "BatteryClass:DPPInfo",
+    "BatteryIdentifiers": "BatteryClass:BatteryIdentifiers",
+    "OperatorIdentifiers": "BatteryClass:OperatorIdentifiers",
+    "ProductData": "BatteryClass:ProductData",
+    "RestrictedProductInfo": "BatteryClass:RestrictedProductInfo",
+    "BatteryAttributes": "BatteryClass:BatteryAttributes",
+    "BatteryCompliancePublic": "BatteryClass:BatteryCompliancePublic",
+    "BatteryComplianceRestricted": "BatteryClass:BatteryComplianceRestricted",
+    "BatteryCarbonFootprint": "BatteryClass:BatteryCarbonFootprint",
+    "SupplyChainDueDiligence": "BatteryClass:SupplyChainDueDiligence",
+    "BatteryMaterialsPublic": "BatteryClass:BatteryMaterialsPublic",
+    "BatteryMaterialsRestricted": "BatteryClass:BatteryMaterialsRestricted",
+    "BatteryCircularityPublic": "BatteryClass:BatteryCircularityPublic",
+    "BatteryCircularityRestricted": "BatteryClass:BatteryCircularityRestricted",
+    "RecycledRenewableContent": "BatteryClass:RecycledRenewableContent",
+    "EndUserInformation": "BatteryClass:EndUserInformation",
+    "PerformanceDurabilityPublic": "BatteryClass:PerformanceDurabilityPublic",
+    "PerformanceDurabilityRestricted": "BatteryClass:PerformanceDurabilityRestricted",
+    "PowerCapabilityPublic": "BatteryClass:PowerCapabilityPublic",
+    "PowerCapabilityRestricted": "BatteryClass:PowerCapabilityRestricted",
+    "RoundTripEfficiencyPublic": "BatteryClass:RoundTripEfficiencyPublic",
+    "RoundTripEfficiencyRestricted": "BatteryClass:RoundTripEfficiencyRestricted",
+    "InternalResistancePublic": "BatteryClass:InternalResistancePublic",
+    "InternalResistanceRestricted": "BatteryClass:InternalResistanceRestricted",
+    "BatteryLifetimePublic": "BatteryClass:BatteryLifetimePublic",
+    "BatteryLifetimeRestricted": "BatteryClass:BatteryLifetimeRestricted",
+    "TemperatureConditionsPublic": "BatteryClass:TemperatureConditionsPublic",
+    "TemperatureConditionsRestricted": "BatteryClass:TemperatureConditionsRestricted",
+    "NegativeEvents": "BatteryClass:NegativeEvents",
     "dppSchemaVersion": {
-      "@id": "clarosBattery:dpp-schema-version",
+      "@id": "battery:dpp-schema-version",
       "@type": "xsd:string"
     },
     "dpp_schema_version": {
-      "@id": "clarosBattery:dpp-schema-version",
+      "@id": "battery:dpp-schema-version",
       "@type": "xsd:string"
     },
     "dppStatus": {
-      "@id": "clarosBattery:dpp-status",
+      "@id": "battery:dpp-status",
       "@type": "xsd:string"
     },
     "dpp_status": {
-      "@id": "clarosBattery:dpp-status",
+      "@id": "battery:dpp-status",
       "@type": "xsd:string"
     },
     "dppGranularity": {
-      "@id": "clarosBattery:dpp-granularity",
+      "@id": "battery:dpp-granularity",
       "@type": "xsd:string"
     },
     "dpp_granularity": {
-      "@id": "clarosBattery:dpp-granularity",
+      "@id": "battery:dpp-granularity",
       "@type": "xsd:string"
     },
     "dateTimeOfLatestDppUpdate": {
-      "@id": "clarosBattery:last-updated-at",
+      "@id": "battery:last-updated-at",
       "@type": "xsd:dateTime"
     },
     "last_updated_at": {
-      "@id": "clarosBattery:last-updated-at",
+      "@id": "battery:last-updated-at",
       "@type": "xsd:dateTime"
     },
     "uniqueBatteryPassportIdentifier": {
-      "@id": "clarosBattery:unique-dpp-identifier",
+      "@id": "battery:unique-dpp-identifier",
       "@type": "xsd:anyURI"
     },
     "unique_dpp_identifier": {
-      "@id": "clarosBattery:unique-dpp-identifier",
+      "@id": "battery:unique-dpp-identifier",
       "@type": "xsd:anyURI"
     },
     "unique_passport_identifier": {
-      "@id": "clarosBattery:unique-dpp-identifier",
+      "@id": "battery:unique-dpp-identifier",
       "@type": "xsd:anyURI"
     },
     "uniqueBatteryIdentifier": {
-      "@id": "clarosBattery:unique-product-identifier",
+      "@id": "battery:unique-product-identifier",
       "@type": "xsd:anyURI"
     },
     "unique_battery_identifier": {
-      "@id": "clarosBattery:unique-product-identifier",
+      "@id": "battery:unique-product-identifier",
       "@type": "xsd:anyURI"
     },
     "unique_product_identifier": {
-      "@id": "clarosBattery:unique-product-identifier",
+      "@id": "battery:unique-product-identifier",
       "@type": "xsd:anyURI"
     },
     "batteryModelIdentifier": {
-      "@id": "clarosBattery:battery-model-identifier",
+      "@id": "battery:battery-model-identifier",
       "@type": "xsd:string"
     },
     "battery_model_identifier": {
-      "@id": "clarosBattery:battery-model-identifier",
+      "@id": "battery:battery-model-identifier",
       "@type": "xsd:string"
     },
     "batterySerialNumber": {
-      "@id": "clarosBattery:battery-serial-number",
+      "@id": "battery:battery-serial-number",
       "@type": "xsd:string"
     },
     "battery_serial_number": {
-      "@id": "clarosBattery:battery-serial-number",
+      "@id": "battery:battery-serial-number",
       "@type": "xsd:string"
     },
     "uniqueEconomicOperatorIdentifier": {
-      "@id": "clarosBattery:economic-operator-identifier",
+      "@id": "battery:economic-operator-identifier",
       "@type": "xsd:string"
     },
     "economic_operator_identifier": {
-      "@id": "clarosBattery:economic-operator-identifier",
+      "@id": "battery:economic-operator-identifier",
       "@type": "xsd:string"
     },
     "uniqueManufacturerIdentifier": {
-      "@id": "clarosBattery:manufacturer-identifier",
+      "@id": "battery:manufacturer-identifier",
       "@type": "xsd:string"
     },
     "manufacturer_identifier": {
-      "@id": "clarosBattery:manufacturer-identifier",
+      "@id": "battery:manufacturer-identifier",
       "@type": "xsd:string"
     },
     "uniqueFacilityIdentifier": {
-      "@id": "clarosBattery:facility-identifier",
+      "@id": "battery:facility-identifier",
       "@type": "xsd:string"
     },
     "facility_identifier": {
-      "@id": "clarosBattery:facility-identifier",
+      "@id": "battery:facility-identifier",
       "@type": "xsd:string"
     },
     "economicOperatorInformation": {
-      "@id": "clarosBattery:economic-operator-info",
+      "@id": "battery:economic-operator-info",
       "@type": "xsd:string"
     },
     "economic_operator_info": {
-      "@id": "clarosBattery:economic-operator-info",
+      "@id": "battery:economic-operator-info",
       "@type": "xsd:string"
     },
     "economic_operator_information": {
-      "@id": "clarosBattery:economic-operator-info",
+      "@id": "battery:economic-operator-info",
       "@type": "xsd:string"
     },
     "manufacturerInformation": {
-      "@id": "clarosBattery:manufacturer-info",
+      "@id": "battery:manufacturer-info",
       "@type": "xsd:string"
     },
     "manufacturer_info": {
-      "@id": "clarosBattery:manufacturer-info",
+      "@id": "battery:manufacturer-info",
       "@type": "xsd:string"
     },
     "manufacturer_information": {
-      "@id": "clarosBattery:manufacturer-info",
+      "@id": "battery:manufacturer-info",
       "@type": "xsd:string"
     },
     "manufacturingPlace": {
-      "@id": "clarosBattery:manufacturing-place",
+      "@id": "battery:manufacturing-place",
       "@type": "xsd:string"
     },
     "manufacturing_place": {
-      "@id": "clarosBattery:manufacturing-place",
+      "@id": "battery:manufacturing-place",
       "@type": "xsd:string"
     },
     "manufacturingDate": {
-      "@id": "clarosBattery:manufacturing-date",
+      "@id": "battery:manufacturing-date",
       "@type": "xsd:gYearMonth"
     },
     "manufacturing_date": {
-      "@id": "clarosBattery:manufacturing-date",
+      "@id": "battery:manufacturing-date",
       "@type": "xsd:gYearMonth"
     },
     "dateOfPuttingBatteryIntoService": {
-      "@id": "clarosBattery:date-first-use",
+      "@id": "battery:date-first-use",
       "@type": "xsd:gYearMonth"
     },
     "date_of_into_service": {
-      "@id": "clarosBattery:date-first-use",
+      "@id": "battery:date-first-use",
       "@type": "xsd:gYearMonth"
     },
     "warrantyPeriod": {
-      "@id": "clarosBattery:warranty-period",
+      "@id": "battery:warranty-period",
       "@type": "xsd:gYearMonth"
     },
     "warranty_period": {
-      "@id": "clarosBattery:warranty-period",
+      "@id": "battery:warranty-period",
       "@type": "xsd:gYearMonth"
     },
     "warranty_period_the_battery": {
-      "@id": "clarosBattery:warranty-period",
+      "@id": "battery:warranty-period",
       "@type": "xsd:gYearMonth"
     },
     "batteryCategory": {
-      "@id": "clarosBattery:battery-category",
+      "@id": "battery:battery-category",
       "@type": "xsd:string"
     },
     "battery_category": {
-      "@id": "clarosBattery:battery-category",
+      "@id": "battery:battery-category",
       "@type": "xsd:string"
     },
     "batteryMass": {
-      "@id": "clarosBattery:battery-mass",
+      "@id": "battery:battery-mass",
       "@type": "xsd:decimal"
     },
     "battery_mass": {
-      "@id": "clarosBattery:battery-mass",
+      "@id": "battery:battery-mass",
       "@type": "xsd:decimal"
     },
     "batteryStatus": {
-      "@id": "clarosBattery:battery-status",
+      "@id": "battery:battery-status",
       "@type": "xsd:string"
     },
     "battery_status": {
-      "@id": "clarosBattery:battery-status",
+      "@id": "battery:battery-status",
       "@type": "xsd:string"
     },
     "separateCollectionSymbol": {
-      "@id": "clarosBattery:separate-collection-symbol",
+      "@id": "battery:separate-collection-symbol",
       "@type": "xsd:anyURI"
     },
     "separate_collection_symbol": {
-      "@id": "clarosBattery:separate-collection-symbol",
+      "@id": "battery:separate-collection-symbol",
       "@type": "xsd:anyURI"
     },
     "cadmiumAndLeadSymbols": {
-      "@id": "clarosBattery:cadmium-lead-symbols",
+      "@id": "battery:cadmium-lead-symbols",
       "@type": "xsd:string"
     },
     "symbols_for_cadmium": {
-      "@id": "clarosBattery:cadmium-lead-symbols",
+      "@id": "battery:cadmium-lead-symbols",
       "@type": "xsd:string"
     },
     "symbols_for_cadmium_and_lead": {
-      "@id": "clarosBattery:cadmium-lead-symbols",
+      "@id": "battery:cadmium-lead-symbols",
       "@type": "xsd:string"
     },
     "symbols_for_lead": {
-      "@id": "clarosBattery:cadmium-lead-symbols",
+      "@id": "battery:cadmium-lead-symbols",
       "@type": "xsd:string"
     },
     "carbonFootprintLabel": {
-      "@id": "clarosBattery:carbon-footprint-label",
+      "@id": "battery:carbon-footprint-label",
       "@type": "xsd:string"
     },
     "carbon_footprint_label_and_performance_class": {
-      "@id": "clarosBattery:carbon-footprint-label",
+      "@id": "battery:carbon-footprint-label",
       "@type": "xsd:string"
     },
     "extinguishingAgent": {
-      "@id": "clarosBattery:extinguishing-agent",
+      "@id": "battery:extinguishing-agent",
       "@type": "xsd:string"
     },
     "extinguishing_agent": {
-      "@id": "clarosBattery:extinguishing-agent",
+      "@id": "battery:extinguishing-agent",
       "@type": "xsd:string"
     },
     "meaningOfLabelsAndSymbols": {
-      "@id": "clarosBattery:label-meaning",
+      "@id": "battery:label-meaning",
       "@type": "xsd:string"
     },
     "meaning_of_and_symbols": {
-      "@id": "clarosBattery:label-meaning",
+      "@id": "battery:label-meaning",
       "@type": "xsd:string"
     },
     "meaning_of_labels_and_symbols": {
-      "@id": "clarosBattery:label-meaning",
+      "@id": "battery:label-meaning",
       "@type": "xsd:string"
     },
     "euDeclarationOfConformity": {
-      "@id": "clarosBattery:eu-declaration-of-conformity",
+      "@id": "battery:eu-declaration-of-conformity",
       "@type": "xsd:anyURI"
     },
     "eu_declaration_of_conformity": {
-      "@id": "clarosBattery:eu-declaration-of-conformity",
+      "@id": "battery:eu-declaration-of-conformity",
       "@type": "xsd:anyURI"
     },
     "complianceTestReportResults": {
-      "@id": "clarosBattery:compliance-test-report",
+      "@id": "battery:compliance-test-report",
       "@type": "xsd:anyURI"
     },
     "results_of_proving_compliance": {
-      "@id": "clarosBattery:compliance-test-report",
+      "@id": "battery:compliance-test-report",
       "@type": "xsd:anyURI"
     },
     "test_reports_for_proving_compliance": {
-      "@id": "clarosBattery:compliance-test-report",
+      "@id": "battery:compliance-test-report",
       "@type": "xsd:anyURI"
     },
     "carbonFootprintPerFunctionalUnit": {
-      "@id": "clarosBattery:carbon-footprint-per-kwh",
+      "@id": "battery:carbon-footprint-per-kwh",
       "@type": "xsd:decimal"
     },
     "batteryCarbonFootprintPerFunctionalUnit": {
-      "@id": "clarosBattery:carbon-footprint-per-kwh",
+      "@id": "battery:carbon-footprint-per-kwh",
       "@type": "xsd:decimal"
     },
     "rawMaterialsLifecycleCarbonContribution": {
-      "@id": "clarosBattery:carbon-footprint-raw-materials",
+      "@id": "battery:carbon-footprint-raw-materials",
       "@type": "xsd:decimal"
     },
     "contributionOfRawMaterialAndPreprocessingLifecycleStage": {
-      "@id": "clarosBattery:carbon-footprint-raw-materials",
+      "@id": "battery:carbon-footprint-raw-materials",
       "@type": "xsd:decimal"
     },
     "productionLifecycleCarbonContribution": {
-      "@id": "clarosBattery:carbon-footprint-production",
+      "@id": "battery:carbon-footprint-production",
       "@type": "xsd:decimal"
     },
     "contributionOfMainProductProductionLifecycleStage": {
-      "@id": "clarosBattery:carbon-footprint-production",
+      "@id": "battery:carbon-footprint-production",
       "@type": "xsd:decimal"
     },
     "distributionLifecycleCarbonContribution": {
-      "@id": "clarosBattery:carbon-footprint-distribution",
+      "@id": "battery:carbon-footprint-distribution",
       "@type": "xsd:decimal"
     },
     "contributionOfDistributionLifecycleStage": {
-      "@id": "clarosBattery:carbon-footprint-distribution",
+      "@id": "battery:carbon-footprint-distribution",
       "@type": "xsd:decimal"
     },
     "endOfLifeLifecycleCarbonContribution": {
-      "@id": "clarosBattery:carbon-footprint-end-of-life",
+      "@id": "battery:carbon-footprint-end-of-life",
       "@type": "xsd:decimal"
     },
     "contributionOfEndOfLifeAndRecyclingLifecycleStage": {
-      "@id": "clarosBattery:carbon-footprint-end-of-life",
+      "@id": "battery:carbon-footprint-end-of-life",
       "@type": "xsd:decimal"
     },
     "carbonFootprintPerformanceClass": {
-      "@id": "clarosBattery:carbon-footprint-class",
+      "@id": "battery:carbon-footprint-class",
       "@type": "xsd:string"
     },
     "carbonFootprintPerformanceClass": {
-      "@id": "clarosBattery:carbon-footprint-class",
+      "@id": "battery:carbon-footprint-class",
       "@type": "xsd:string"
     },
     "publicCarbonFootprintStudyUrl": {
-      "@id": "clarosBattery:carbon-footprint-study-url",
+      "@id": "battery:carbon-footprint-study-url",
       "@type": "xsd:anyURI"
     },
     "webLinkToPublicCarbonFootprintStudy": {
-      "@id": "clarosBattery:carbon-footprint-study-url",
+      "@id": "battery:carbon-footprint-study-url",
       "@type": "xsd:anyURI"
     },
     "absoluteCarbonFootprint": {
-      "@id": "clarosBattery:absolute-carbon-footprint",
+      "@id": "battery:absolute-carbon-footprint",
       "@type": "xsd:integer"
     },
     "absoluteCarbonFootprint": {
-      "@id": "clarosBattery:absolute-carbon-footprint",
+      "@id": "battery:absolute-carbon-footprint",
       "@type": "xsd:integer"
     },
     "dueDiligenceReport": {
-      "@id": "clarosBattery:due-diligence-report",
+      "@id": "battery:due-diligence-report",
       "@type": "xsd:anyURI"
     },
     "information_of_diligence_report": {
-      "@id": "clarosBattery:due-diligence-report",
+      "@id": "battery:due-diligence-report",
       "@type": "xsd:anyURI"
     },
     "information_of_due_diligence_report": {
-      "@id": "clarosBattery:due-diligence-report",
+      "@id": "battery:due-diligence-report",
       "@type": "xsd:anyURI"
     },
     "thirdPartySchemeAssurances": {
-      "@id": "clarosBattery:third-party-assurances",
+      "@id": "battery:third-party-assurances",
       "@type": "xsd:string"
     },
     "third_party_assurances_of_recognised_schemes": {
-      "@id": "clarosBattery:third-party-assurances",
+      "@id": "battery:third-party-assurances",
       "@type": "xsd:string"
     },
     "third_party_recognised_schemes": {
-      "@id": "clarosBattery:third-party-assurances",
+      "@id": "battery:third-party-assurances",
       "@type": "xsd:string"
     },
     "supplyChainIndices": {
-      "@id": "clarosBattery:supply-chain-indices",
+      "@id": "battery:supply-chain-indices",
       "@type": "xsd:string"
     },
     "supply_chain_indices": {
-      "@id": "clarosBattery:supply-chain-indices",
+      "@id": "battery:supply-chain-indices",
       "@type": "xsd:string"
     },
     "batteryChemistry": {
-      "@id": "clarosBattery:battery-chemistry",
+      "@id": "battery:battery-chemistry",
       "@type": "xsd:string"
     },
     "battery_chemistry": {
-      "@id": "clarosBattery:battery-chemistry",
+      "@id": "battery:battery-chemistry",
       "@type": "xsd:string"
     },
     "criticalRawMaterials": {
-      "@id": "clarosBattery:critical-raw-materials",
+      "@id": "battery:critical-raw-materials",
       "@container": "@set",
       "@type": "xsd:string"
     },
     "critical_raw_materials": {
-      "@id": "clarosBattery:critical-raw-materials",
+      "@id": "battery:critical-raw-materials",
       "@container": "@set",
       "@type": "xsd:string"
     },
     "cathodeAnodeAndElectrolyteMaterials": {
-      "@id": "clarosBattery:electrode-electrolyte-materials",
+      "@id": "battery:electrode-electrolyte-materials",
       "@container": "@set",
       "@type": "xsd:string"
     },
     "materials_used_in_anode": {
-      "@id": "clarosBattery:electrode-electrolyte-materials",
+      "@id": "battery:electrode-electrolyte-materials",
       "@container": "@set",
       "@type": "xsd:string"
     },
     "materials_used_in_cathode": {
-      "@id": "clarosBattery:electrode-electrolyte-materials",
+      "@id": "battery:electrode-electrolyte-materials",
       "@container": "@set",
       "@type": "xsd:string"
     },
     "materials_used_in_electrolyte": {
-      "@id": "clarosBattery:electrode-electrolyte-materials",
+      "@id": "battery:electrode-electrolyte-materials",
       "@container": "@set",
       "@type": "xsd:string"
     },
     "hazardousSubstances": {
-      "@id": "clarosBattery:hazardous-substances",
+      "@id": "battery:hazardous-substances",
       "@type": "xsd:string"
     },
     "hazardous_substances": {
-      "@id": "clarosBattery:hazardous-substances",
+      "@id": "battery:hazardous-substances",
       "@type": "xsd:string"
     },
     "substanceEnvironmentalAndHealthImpact": {
-      "@id": "clarosBattery:substance-impact",
+      "@id": "battery:substance-impact",
       "@type": "xsd:string"
     },
     "substance_impact_info": {
-      "@id": "clarosBattery:substance-impact",
+      "@id": "battery:substance-impact",
       "@type": "xsd:string"
     },
     "dismantlingAndRemovalManual": {
-      "@id": "clarosBattery:dismantling-manual",
+      "@id": "battery:dismantling-manual",
       "@type": "xsd:anyURI"
     },
     "dismantling_information": {
-      "@id": "clarosBattery:dismantling-manual",
+      "@id": "battery:dismantling-manual",
       "@type": "xsd:anyURI"
     },
     "dismantling_information_for_the_battery_pack": {
-      "@id": "clarosBattery:dismantling-manual",
+      "@id": "battery:dismantling-manual",
       "@type": "xsd:anyURI"
     },
     "componentPartNumbers": {
-      "@id": "clarosBattery:component-part-numbers",
+      "@id": "battery:component-part-numbers",
       "@type": "xsd:anyURI"
     },
     "part_numbers_for_components": {
-      "@id": "clarosBattery:component-part-numbers",
+      "@id": "battery:component-part-numbers",
       "@type": "xsd:anyURI"
     },
     "sparePartsSourceInformation": {
-      "@id": "clarosBattery:spare-parts-info",
+      "@id": "battery:spare-parts-info",
       "@type": "xsd:string"
     },
     "information_on_sources_of_spare_parts": {
-      "@id": "clarosBattery:spare-parts-info",
+      "@id": "battery:spare-parts-info",
       "@type": "xsd:string"
     },
     "information_on_spare_parts": {
-      "@id": "clarosBattery:spare-parts-info",
+      "@id": "battery:spare-parts-info",
       "@type": "xsd:string"
     },
     "safetyMeasures": {
-      "@id": "clarosBattery:safety-measures",
+      "@id": "battery:safety-measures",
       "@type": "xsd:string"
     },
     "safety_measures": {
-      "@id": "clarosBattery:safety-measures",
+      "@id": "battery:safety-measures",
       "@type": "xsd:string"
     },
     "preConsumerRecycledNickelShare": {
-      "@id": "clarosBattery:pre-consumer-recycled-nickel",
+      "@id": "battery:pre-consumer-recycled-nickel",
       "@type": "xsd:decimal"
     },
     "preconsumer_recycled_nickel": {
-      "@id": "clarosBattery:pre-consumer-recycled-nickel",
+      "@id": "battery:pre-consumer-recycled-nickel",
       "@type": "xsd:decimal"
     },
     "preconsumer_recycled_nickel_share": {
-      "@id": "clarosBattery:pre-consumer-recycled-nickel",
+      "@id": "battery:pre-consumer-recycled-nickel",
       "@type": "xsd:decimal"
     },
     "preConsumerRecycledCobaltShare": {
-      "@id": "clarosBattery:pre-consumer-recycled-cobalt",
+      "@id": "battery:pre-consumer-recycled-cobalt",
       "@type": "xsd:decimal"
     },
     "preconsumer_recycled_cobalt": {
-      "@id": "clarosBattery:pre-consumer-recycled-cobalt",
+      "@id": "battery:pre-consumer-recycled-cobalt",
       "@type": "xsd:decimal"
     },
     "preconsumer_recycled_cobalt_share": {
-      "@id": "clarosBattery:pre-consumer-recycled-cobalt",
+      "@id": "battery:pre-consumer-recycled-cobalt",
       "@type": "xsd:decimal"
     },
     "preConsumerRecycledLithiumShare": {
-      "@id": "clarosBattery:pre-consumer-recycled-lithium",
+      "@id": "battery:pre-consumer-recycled-lithium",
       "@type": "xsd:decimal"
     },
     "preconsumer_recycled_lithium": {
-      "@id": "clarosBattery:pre-consumer-recycled-lithium",
+      "@id": "battery:pre-consumer-recycled-lithium",
       "@type": "xsd:decimal"
     },
     "preconsumer_recycled_lithium_share": {
-      "@id": "clarosBattery:pre-consumer-recycled-lithium",
+      "@id": "battery:pre-consumer-recycled-lithium",
       "@type": "xsd:decimal"
     },
     "postConsumerRecycledNickelShare": {
-      "@id": "clarosBattery:post-consumer-recycled-nickel",
+      "@id": "battery:post-consumer-recycled-nickel",
       "@type": "xsd:decimal"
     },
     "postconsumer_recycled_nickel": {
-      "@id": "clarosBattery:post-consumer-recycled-nickel",
+      "@id": "battery:post-consumer-recycled-nickel",
       "@type": "xsd:decimal"
     },
     "postconsumer_recycled_nickel_share": {
-      "@id": "clarosBattery:post-consumer-recycled-nickel",
+      "@id": "battery:post-consumer-recycled-nickel",
       "@type": "xsd:decimal"
     },
     "postConsumerRecycledCobaltShare": {
-      "@id": "clarosBattery:post-consumer-recycled-cobalt",
+      "@id": "battery:post-consumer-recycled-cobalt",
       "@type": "xsd:decimal"
     },
     "postconsumer_recycled_cobalt": {
-      "@id": "clarosBattery:post-consumer-recycled-cobalt",
+      "@id": "battery:post-consumer-recycled-cobalt",
       "@type": "xsd:decimal"
     },
     "postconsumer_recycled_cobalt_share": {
-      "@id": "clarosBattery:post-consumer-recycled-cobalt",
+      "@id": "battery:post-consumer-recycled-cobalt",
       "@type": "xsd:decimal"
     },
     "postConsumerRecycledLithiumShare": {
-      "@id": "clarosBattery:post-consumer-recycled-lithium",
+      "@id": "battery:post-consumer-recycled-lithium",
       "@type": "xsd:decimal"
     },
     "postconsumer_recycled_lithium": {
-      "@id": "clarosBattery:post-consumer-recycled-lithium",
+      "@id": "battery:post-consumer-recycled-lithium",
       "@type": "xsd:decimal"
     },
     "postconsumer_recycled_lithium_share": {
-      "@id": "clarosBattery:post-consumer-recycled-lithium",
+      "@id": "battery:post-consumer-recycled-lithium",
       "@type": "xsd:decimal"
     },
     "recycledLeadShare": {
-      "@id": "clarosBattery:recycled-lead-share",
+      "@id": "battery:recycled-lead-share",
       "@type": "xsd:decimal"
     },
     "recycled_lead_share": {
-      "@id": "clarosBattery:recycled-lead-share",
+      "@id": "battery:recycled-lead-share",
       "@type": "xsd:decimal"
     },
     "renewableContentShare": {
-      "@id": "clarosBattery:renewable-content-share",
+      "@id": "battery:renewable-content-share",
       "@type": "xsd:decimal"
     },
     "renewable_content_share": {
-      "@id": "clarosBattery:renewable-content-share",
+      "@id": "battery:renewable-content-share",
       "@type": "xsd:decimal"
     },
     "endUserWastePreventionInformation": {
-      "@id": "clarosBattery:waste-prevention-info",
+      "@id": "battery:waste-prevention-info",
       "@type": "xsd:anyURI"
     },
     "information_on_waste_prevention": {
-      "@id": "clarosBattery:waste-prevention-info",
+      "@id": "battery:waste-prevention-info",
       "@type": "xsd:anyURI"
     },
     "role_of_endusers_in_waste_prevention": {
-      "@id": "clarosBattery:waste-prevention-info",
+      "@id": "battery:waste-prevention-info",
       "@type": "xsd:anyURI"
     },
     "separateWasteCollectionInformation": {
-      "@id": "clarosBattery:separate-collection-info",
+      "@id": "battery:separate-collection-info",
       "@type": "xsd:anyURI"
     },
     "information_on_waste_batteries": {
-      "@id": "clarosBattery:separate-collection-info",
+      "@id": "battery:separate-collection-info",
       "@type": "xsd:anyURI"
     },
     "role_of_endusers_in_separate_collection_of_waste_batteries": {
-      "@id": "clarosBattery:separate-collection-info",
+      "@id": "battery:separate-collection-info",
       "@type": "xsd:anyURI"
     },
     "endOfLifeAndCollectionInformation": {
-      "@id": "clarosBattery:end-of-life-info",
+      "@id": "battery:end-of-life-info",
       "@type": "xsd:anyURI"
     },
     "information_on_battery_collection_preparation_for_second_life_and_on_treatment_at_end_of_life": {
-      "@id": "clarosBattery:end-of-life-info",
+      "@id": "battery:end-of-life-info",
       "@type": "xsd:anyURI"
     },
     "information_on_of_life": {
-      "@id": "clarosBattery:end-of-life-info",
+      "@id": "battery:end-of-life-info",
       "@type": "xsd:anyURI"
     },
     "ratedCapacity": {
-      "@id": "clarosBattery:rated-capacity",
+      "@id": "battery:rated-capacity",
       "@type": "xsd:integer"
     },
     "rated_capacity": {
-      "@id": "clarosBattery:rated-capacity",
+      "@id": "battery:rated-capacity",
       "@type": "xsd:integer"
     },
     "remainingCapacity": {
-      "@id": "clarosBattery:remaining-capacity",
+      "@id": "battery:remaining-capacity",
       "@type": "xsd:integer"
     },
     "remaining_capacity": {
-      "@id": "clarosBattery:remaining-capacity",
+      "@id": "battery:remaining-capacity",
       "@type": "xsd:integer"
     },
     "capacityFade": {
-      "@id": "clarosBattery:capacity-fade",
+      "@id": "battery:capacity-fade",
       "@type": "xsd:decimal"
     },
     "capacity_fade": {
-      "@id": "clarosBattery:capacity-fade",
+      "@id": "battery:capacity-fade",
       "@type": "xsd:decimal"
     },
     "certifiedUsableBatteryEnergy": {
-      "@id": "clarosBattery:certified-usable-energy",
+      "@id": "battery:certified-usable-energy",
       "@type": "xsd:integer"
     },
     "certified_usable_battery_energy": {
-      "@id": "clarosBattery:certified-usable-energy",
+      "@id": "battery:certified-usable-energy",
       "@type": "xsd:integer"
     },
     "remainingUsableBatteryEnergy": {
-      "@id": "clarosBattery:remaining-usable-energy",
+      "@id": "battery:remaining-usable-energy",
       "@type": "xsd:integer"
     },
     "remaining_usable_battery_energy": {
-      "@id": "clarosBattery:remaining-usable-energy",
+      "@id": "battery:remaining-usable-energy",
       "@type": "xsd:integer"
     },
     "stateOfCertifiedEnergySoCe": {
-      "@id": "clarosBattery:state-of-certified-energy",
+      "@id": "battery:state-of-certified-energy",
       "@type": "xsd:decimal"
     },
     "state_of_certified_energy_soce": {
-      "@id": "clarosBattery:state-of-certified-energy",
+      "@id": "battery:state-of-certified-energy",
       "@type": "xsd:decimal"
     },
     "state_of_energy_soce": {
-      "@id": "clarosBattery:state-of-certified-energy",
+      "@id": "battery:state-of-certified-energy",
       "@type": "xsd:decimal"
     },
     "stateOfChargeSoC": {
-      "@id": "clarosBattery:state-of-charge",
+      "@id": "battery:state-of-charge",
       "@type": "xsd:decimal"
     },
     "state_of_charge_soc": {
-      "@id": "clarosBattery:state-of-charge",
+      "@id": "battery:state-of-charge",
       "@type": "xsd:decimal"
     },
     "minimumVoltage": {
-      "@id": "clarosBattery:minimum-voltage",
+      "@id": "battery:minimum-voltage",
       "@type": "xsd:decimal"
     },
     "minimum_voltage": {
-      "@id": "clarosBattery:minimum-voltage",
+      "@id": "battery:minimum-voltage",
       "@type": "xsd:decimal"
     },
     "maximumVoltage": {
-      "@id": "clarosBattery:maximum-voltage",
+      "@id": "battery:maximum-voltage",
       "@type": "xsd:decimal"
     },
     "maximum_voltage": {
-      "@id": "clarosBattery:maximum-voltage",
+      "@id": "battery:maximum-voltage",
       "@type": "xsd:decimal"
     },
     "nominalVoltage": {
-      "@id": "clarosBattery:nominal-voltage",
+      "@id": "battery:nominal-voltage",
       "@type": "xsd:decimal"
     },
     "nominal_voltage": {
-      "@id": "clarosBattery:nominal-voltage",
+      "@id": "battery:nominal-voltage",
       "@type": "xsd:decimal"
     },
     "originalPowerCapability": {
-      "@id": "clarosBattery:original-power-capability",
+      "@id": "battery:original-power-capability",
       "@type": "xsd:integer"
     },
     "original_power_capability": {
-      "@id": "clarosBattery:original-power-capability",
+      "@id": "battery:original-power-capability",
       "@type": "xsd:integer"
     },
     "remainingPowerCapability": {
-      "@id": "clarosBattery:remaining-power-capability",
+      "@id": "battery:remaining-power-capability",
       "@type": "xsd:integer"
     },
     "remaining_power_capability": {
-      "@id": "clarosBattery:remaining-power-capability",
+      "@id": "battery:remaining-power-capability",
       "@type": "xsd:integer"
     },
     "powerFade": {
-      "@id": "clarosBattery:power-fade",
+      "@id": "battery:power-fade",
       "@type": "xsd:integer"
     },
     "power_fade": {
-      "@id": "clarosBattery:power-fade",
+      "@id": "battery:power-fade",
       "@type": "xsd:integer"
     },
     "maximumPermittedBatteryPower": {
-      "@id": "clarosBattery:maximum-permitted-power",
+      "@id": "battery:maximum-permitted-power",
       "@type": "xsd:integer"
     },
     "maximum_permitted_battery_power": {
-      "@id": "clarosBattery:maximum-permitted-power",
+      "@id": "battery:maximum-permitted-power",
       "@type": "xsd:integer"
     },
     "powerToEnergyRatio": {
-      "@id": "clarosBattery:power-energy-ratio",
+      "@id": "battery:power-energy-ratio",
       "@type": "xsd:integer"
     },
     "ratio_between_battery_energy": {
-      "@id": "clarosBattery:power-energy-ratio",
+      "@id": "battery:power-energy-ratio",
       "@type": "xsd:integer"
     },
     "ratio_between_nominal_battery_power_and_battery_energy": {
-      "@id": "clarosBattery:power-energy-ratio",
+      "@id": "battery:power-energy-ratio",
       "@type": "xsd:integer"
     },
     "initialRoundTripEnergyEfficiency": {
-      "@id": "clarosBattery:initial-round-trip-efficiency",
+      "@id": "battery:initial-round-trip-efficiency",
       "@type": "xsd:decimal"
     },
     "initial_round_energy_efficiency": {
-      "@id": "clarosBattery:initial-round-trip-efficiency",
+      "@id": "battery:initial-round-trip-efficiency",
       "@type": "xsd:decimal"
     },
     "initial_round_trip_energy_efficiency": {
-      "@id": "clarosBattery:initial-round-trip-efficiency",
+      "@id": "battery:initial-round-trip-efficiency",
       "@type": "xsd:decimal"
     },
     "roundTripEfficiencyAt50CycleLife": {
-      "@id": "clarosBattery:round-trip-efficiency-50pct",
+      "@id": "battery:round-trip-efficiency-50pct",
       "@type": "xsd:decimal"
     },
     "round_trip_cycle_life": {
-      "@id": "clarosBattery:round-trip-efficiency-50pct",
+      "@id": "battery:round-trip-efficiency-50pct",
       "@type": "xsd:decimal"
     },
     "round_trip_energy_efficiency_at_50_of_cycle_life": {
-      "@id": "clarosBattery:round-trip-efficiency-50pct",
+      "@id": "battery:round-trip-efficiency-50pct",
       "@type": "xsd:decimal"
     },
     "remainingRoundTripEnergyEfficiency": {
-      "@id": "clarosBattery:remaining-round-trip-efficiency",
+      "@id": "battery:remaining-round-trip-efficiency",
       "@type": "xsd:decimal"
     },
     "remaining_round_energy_efficiency": {
-      "@id": "clarosBattery:remaining-round-trip-efficiency",
+      "@id": "battery:remaining-round-trip-efficiency",
       "@type": "xsd:decimal"
     },
     "remaining_round_trip_energy_efficiency": {
-      "@id": "clarosBattery:remaining-round-trip-efficiency",
+      "@id": "battery:remaining-round-trip-efficiency",
       "@type": "xsd:decimal"
     },
     "energyEfficiencyFade": {
-      "@id": "clarosBattery:energy-efficiency-fade",
+      "@id": "battery:energy-efficiency-fade",
       "@type": "xsd:decimal"
     },
     "energy_round_efficiency_fade": {
-      "@id": "clarosBattery:energy-efficiency-fade",
+      "@id": "battery:energy-efficiency-fade",
       "@type": "xsd:decimal"
     },
     "energy_round_trip_efficiency_fade": {
-      "@id": "clarosBattery:energy-efficiency-fade",
+      "@id": "battery:energy-efficiency-fade",
       "@type": "xsd:decimal"
     },
     "initialSelfDischargeRate": {
-      "@id": "clarosBattery:initial-self-discharge-rate",
+      "@id": "battery:initial-self-discharge-rate",
       "@type": "xsd:decimal"
     },
     "initial_selfdischarge_rate": {
-      "@id": "clarosBattery:initial-self-discharge-rate",
+      "@id": "battery:initial-self-discharge-rate",
       "@type": "xsd:decimal"
     },
     "currentSelfDischargeRate": {
-      "@id": "clarosBattery:current-self-discharge-rate",
+      "@id": "battery:current-self-discharge-rate",
       "@type": "xsd:decimal"
     },
     "current_selfdischarge_rate": {
-      "@id": "clarosBattery:current-self-discharge-rate",
+      "@id": "battery:current-self-discharge-rate",
       "@type": "xsd:decimal"
     },
     "selfDischargeRateEvolution": {
-      "@id": "clarosBattery:self-discharge-rate-evolution",
+      "@id": "battery:self-discharge-rate-evolution",
       "@type": "xsd:decimal"
     },
     "evolution_of_selfdischarge_rates": {
-      "@id": "clarosBattery:self-discharge-rate-evolution",
+      "@id": "battery:self-discharge-rate-evolution",
       "@type": "xsd:decimal"
     },
     "initialInternalResistance": {
-      "@id": "clarosBattery:initial-internal-resistance",
+      "@id": "battery:initial-internal-resistance",
       "@type": "xsd:integer"
     },
     "initial_internal_module_recommended": {
-      "@id": "clarosBattery:initial-internal-resistance",
+      "@id": "battery:initial-internal-resistance",
       "@type": "xsd:integer"
     },
     "initial_internal_resistance_of_battery_cell_and_pack_module_recommended": {
-      "@id": "clarosBattery:initial-internal-resistance",
+      "@id": "battery:initial-internal-resistance",
       "@type": "xsd:integer"
     },
     "internalResistanceIncrease": {
-      "@id": "clarosBattery:internal-resistance-increase",
+      "@id": "battery:internal-resistance-increase",
       "@type": "xsd:decimal"
     },
     "internal_resistance_increase_of_pack_cell_and_module_recommended": {
-      "@id": "clarosBattery:internal-resistance-increase",
+      "@id": "battery:internal-resistance-increase",
       "@type": "xsd:decimal"
     },
     "internal_resistance_module_recommended": {
-      "@id": "clarosBattery:internal-resistance-increase",
+      "@id": "battery:internal-resistance-increase",
       "@type": "xsd:decimal"
     },
     "expectedLifetimeYears": {
-      "@id": "clarosBattery:expected-lifetime-years",
+      "@id": "battery:expected-lifetime-years",
       "@type": "xsd:decimal"
     },
     "expected_lifetime_calendar_years": {
-      "@id": "clarosBattery:expected-lifetime-years",
+      "@id": "battery:expected-lifetime-years",
       "@type": "xsd:decimal"
     },
     "expected_lifetime_in_calendar_years": {
-      "@id": "clarosBattery:expected-lifetime-years",
+      "@id": "battery:expected-lifetime-years",
       "@type": "xsd:decimal"
     },
     "expectedLifetimeCycles": {
-      "@id": "clarosBattery:expected-lifetime-cycles",
+      "@id": "battery:expected-lifetime-cycles",
       "@type": "xsd:integer"
     },
     "expected_lifetime_chargedischarge_cycles": {
-      "@id": "clarosBattery:expected-lifetime-cycles",
+      "@id": "battery:expected-lifetime-cycles",
       "@type": "xsd:integer"
     },
     "expected_lifetime_number_of_chargedischarge_cycles": {
-      "@id": "clarosBattery:expected-lifetime-cycles",
+      "@id": "battery:expected-lifetime-cycles",
       "@type": "xsd:integer"
     },
     "fullChargeDischargeCycles": {
-      "@id": "clarosBattery:full-charge-discharge-cycles",
+      "@id": "battery:full-charge-discharge-cycles",
       "@type": "xsd:integer"
     },
     "number_of_discharging_cycles": {
-      "@id": "clarosBattery:full-charge-discharge-cycles",
+      "@id": "battery:full-charge-discharge-cycles",
       "@type": "xsd:integer"
     },
     "number_of_full_charging_and_discharging_cycles": {
-      "@id": "clarosBattery:full-charge-discharge-cycles",
+      "@id": "battery:full-charge-discharge-cycles",
       "@type": "xsd:integer"
     },
     "cycleLifeReferenceTest": {
-      "@id": "clarosBattery:cycle-life-reference-test",
+      "@id": "battery:cycle-life-reference-test",
       "@type": "xsd:string"
     },
     "cyclelife_reference_test": {
-      "@id": "clarosBattery:cycle-life-reference-test",
+      "@id": "battery:cycle-life-reference-test",
       "@type": "xsd:string"
     },
     "cycleLifeCRate": {
-      "@id": "clarosBattery:cycle-life-crate",
+      "@id": "battery:cycle-life-crate",
       "@type": "xsd:decimal"
     },
     "crate_of_cyclelife_test": {
-      "@id": "clarosBattery:cycle-life-crate",
+      "@id": "battery:cycle-life-crate",
       "@type": "xsd:decimal"
     },
     "crate_of_relevant_cyclelife_test": {
-      "@id": "clarosBattery:cycle-life-crate",
+      "@id": "battery:cycle-life-crate",
       "@type": "xsd:decimal"
     },
     "energyThroughput": {
-      "@id": "clarosBattery:energy-throughput",
+      "@id": "battery:energy-throughput",
       "@type": "xsd:integer"
     },
     "energy_throughput": {
-      "@id": "clarosBattery:energy-throughput",
+      "@id": "battery:energy-throughput",
       "@type": "xsd:integer"
     },
     "capacityThroughput": {
-      "@id": "clarosBattery:capacity-throughput",
+      "@id": "battery:capacity-throughput",
       "@type": "xsd:integer"
     },
     "capacity_throughput": {
-      "@id": "clarosBattery:capacity-throughput",
+      "@id": "battery:capacity-throughput",
       "@type": "xsd:integer"
     },
     "capacityThresholdForExhaustion": {
-      "@id": "clarosBattery:capacity-threshold-exhaustion",
+      "@id": "battery:capacity-threshold-exhaustion",
       "@type": "xsd:decimal"
     },
     "capacity_threshold_for_exhaustion": {
-      "@id": "clarosBattery:capacity-threshold-exhaustion",
+      "@id": "battery:capacity-threshold-exhaustion",
       "@type": "xsd:decimal"
     },
     "temperatureInformation": {
-      "@id": "clarosBattery:temperature-info",
+      "@id": "battery:temperature-info",
       "@type": "xsd:integer"
     },
     "temperature_information": {
-      "@id": "clarosBattery:temperature-info",
+      "@id": "battery:temperature-info",
       "@type": "xsd:integer"
     },
     "temperatureRangeLowerBoundary": {
-      "@id": "clarosBattery:temperature-range-lower",
+      "@id": "battery:temperature-range-lower",
       "@type": "xsd:integer"
     },
     "temperature_range_boundary_lower": {
-      "@id": "clarosBattery:temperature-range-lower",
+      "@id": "battery:temperature-range-lower",
       "@type": "xsd:integer"
     },
     "temperature_range_idle_state_lower_boundary": {
-      "@id": "clarosBattery:temperature-range-lower",
+      "@id": "battery:temperature-range-lower",
       "@type": "xsd:integer"
     },
     "temperatureRangeUpperBoundary": {
-      "@id": "clarosBattery:temperature-range-upper",
+      "@id": "battery:temperature-range-upper",
       "@type": "xsd:integer"
     },
     "temperature_range_boundary_upper": {
-      "@id": "clarosBattery:temperature-range-upper",
+      "@id": "battery:temperature-range-upper",
       "@type": "xsd:integer"
     },
     "temperature_range_idle_state_upper_boundary": {
-      "@id": "clarosBattery:temperature-range-upper",
+      "@id": "battery:temperature-range-upper",
       "@type": "xsd:integer"
     },
     "timeInHighTemperature": {
-      "@id": "clarosBattery:time-in-high-temperature",
+      "@id": "battery:time-in-high-temperature",
       "@type": "xsd:integer"
     },
     "time_spent_above_boundary": {
-      "@id": "clarosBattery:time-in-high-temperature",
+      "@id": "battery:time-in-high-temperature",
       "@type": "xsd:integer"
     },
     "time_spent_in_extreme_temperatures_above_boundary": {
-      "@id": "clarosBattery:time-in-high-temperature",
+      "@id": "battery:time-in-high-temperature",
       "@type": "xsd:integer"
     },
     "timeInLowTemperature": {
-      "@id": "clarosBattery:time-in-low-temperature",
+      "@id": "battery:time-in-low-temperature",
       "@type": "xsd:integer"
     },
     "time_spent_below_boundary": {
-      "@id": "clarosBattery:time-in-low-temperature",
+      "@id": "battery:time-in-low-temperature",
       "@type": "xsd:integer"
     },
     "time_spent_in_extreme_temperatures_below_boundary": {
-      "@id": "clarosBattery:time-in-low-temperature",
+      "@id": "battery:time-in-low-temperature",
       "@type": "xsd:integer"
     },
     "timeChargingInHighTemperature": {
-      "@id": "clarosBattery:time-charging-high-temperature",
+      "@id": "battery:time-charging-high-temperature",
       "@type": "xsd:integer"
     },
     "time_spent_above_boundar": {
-      "@id": "clarosBattery:time-charging-high-temperature",
+      "@id": "battery:time-charging-high-temperature",
       "@type": "xsd:integer"
     },
     "time_spent_charging_during_extreme_temperatures_above_boundary": {
-      "@id": "clarosBattery:time-charging-high-temperature",
+      "@id": "battery:time-charging-high-temperature",
       "@type": "xsd:integer"
     },
     "timeChargingInLowTemperature": {
-      "@id": "clarosBattery:time-charging-low-temperature",
+      "@id": "battery:time-charging-low-temperature",
       "@type": "xsd:integer"
     },
     "time_spent_charging_during_extreme_temperatures_below_boundary": {
-      "@id": "clarosBattery:time-charging-low-temperature",
+      "@id": "battery:time-charging-low-temperature",
       "@type": "xsd:integer"
     },
     "time_spent_temperatures_below_boundary": {
-      "@id": "clarosBattery:time-charging-low-temperature",
+      "@id": "battery:time-charging-low-temperature",
       "@type": "xsd:integer"
     },
     "deepDischargeEvents": {
-      "@id": "clarosBattery:deep-discharge-events",
+      "@id": "battery:deep-discharge-events",
       "@type": "xsd:integer"
     },
     "number_of_deep_discharge_events": {
-      "@id": "clarosBattery:deep-discharge-events",
+      "@id": "battery:deep-discharge-events",
       "@type": "xsd:integer"
     },
     "overchargeEvents": {
-      "@id": "clarosBattery:overcharge-events",
+      "@id": "battery:overcharge-events",
       "@type": "xsd:integer"
     },
     "number_of_overcharge_events": {
-      "@id": "clarosBattery:overcharge-events",
+      "@id": "battery:overcharge-events",
       "@type": "xsd:integer"
     },
     "accidentInformation": {
-      "@id": "clarosBattery:accident-info",
+      "@id": "battery:accident-info",
       "@type": "xsd:anyURI"
     },
     "accident_information": {
-      "@id": "clarosBattery:accident-info",
+      "@id": "battery:accident-info",
       "@type": "xsd:anyURI"
     }
   }

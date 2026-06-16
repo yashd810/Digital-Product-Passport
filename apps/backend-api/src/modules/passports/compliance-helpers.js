@@ -198,8 +198,8 @@ function createComplianceHelpers({
       existingFields: passport,
     });
 
-    if (complianceManagedFields.complianceProfileKey !== passport.complianceProfileKey) {
-      nextFields.complianceProfileKey = complianceManagedFields.complianceProfileKey;
+    if (complianceManagedFields.passportPolicyKey !== passport.passportPolicyKey) {
+      nextFields.passportPolicyKey = complianceManagedFields.passportPolicyKey;
     }
     if (complianceManagedFields.contentSpecificationIds !== passport.contentSpecificationIds) {
       nextFields.contentSpecificationIds = complianceManagedFields.contentSpecificationIds;

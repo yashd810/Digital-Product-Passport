@@ -161,7 +161,7 @@ function createCarrierSecurityHelpers({
       ...enrichedMetadata,
       issuerCertificateId: enrichedMetadata.issuerCertificateId || credential.trustMetadata?.issuerCertificateId || null,
       signedCarrierPayload: {
-        format: "claros_dpp_carrier_binding_v1",
+        format: "platform_dpp_carrier_binding_v1",
         dataHash: credential.dataHash,
         keyId: credential.keyId,
         signatureAlgorithm: credential.signatureAlgorithm,

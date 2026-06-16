@@ -1,6 +1,6 @@
 {
-  "semanticModelKey": "claros_appliance_dictionary_v1",
-  "name": "Claros Appliance Dictionary",
+  "semanticModelKey": "appliance_dictionary_v1",
+  "name": "Appliance Dictionary",
   "version": "1.0.0",
   "description": "Internal appliance passport dictionary used as a reference pattern for future modular Digital Product Passport categories.",
   "versioning": {
@@ -13,7 +13,7 @@
     "Consumer Electronics"
   ],
   "publisher": {
-    "name": "Claros DPP",
+    "name": "Digital Product Passport Platform",
     "url": "https://www.claros-dpp.online"
   },
   "issuerDid": "did:web:www.claros-dpp.online",

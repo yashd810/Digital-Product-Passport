@@ -13,7 +13,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/ProductIdentification",
-      "curie": "clarosElectronicsClass:ProductIdentification",
+      "curie": "ElectronicsClass:ProductIdentification",
       "label": "Product Identification"
     },
     "unit": "none"
@@ -32,7 +32,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/ProductIdentification",
-      "curie": "clarosElectronicsClass:ProductIdentification",
+      "curie": "ElectronicsClass:ProductIdentification",
       "label": "Product Identification"
     },
     "unit": "none"
@@ -51,7 +51,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/electronics/v1/classes/TechnicalCharacteristics",
-      "curie": "clarosElectronicsClass:TechnicalCharacteristics",
+      "curie": "ElectronicsClass:TechnicalCharacteristics",
       "label": "Technical Characteristics"
     },
     "unit": "watt"

@@ -56,7 +56,7 @@ export const CORE_DATABASE_TABLES = [
       },
       {
         name: "passport_types",
-        purpose: "Published passport type definitions from code modules or admin-created custom types, including semantic model selection, governance metadata, compliance profile, and field schemas.",
+        purpose: "Published passport type definitions from code modules or admin-created custom types, including semantic model selection, governance metadata, passport policy, and field schemas.",
         columns: ["id", "typeName", "displayName", "productCategory", "productIcon", "semanticModelKey", "fieldsJson", "isActive", "createdBy", "createdAt", "updatedAt"],
       },
       {

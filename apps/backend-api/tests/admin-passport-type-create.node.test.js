@@ -173,7 +173,7 @@ test("admin cannot create manual passport type without a registered module sourc
       displayName: "Medical Device Passport v1",
       productCategory: "Medical Device",
       productIcon: "MD",
-      semanticModelKey: "claros_medical_device_dictionary_v1",
+      semanticModelKey: "medical_device_dictionary_v1",
       systemHeader: { section: { label: "Passport Header" } },
       sections: [{
         key: "deviceIdentity",
@@ -204,8 +204,8 @@ test("admin can preview registered passport type modules before seeding", async 
   const applianceModule = response.body.find((modulePreview) => modulePreview.moduleKey === "appliance:v1");
   assert.ok(applianceModule, "Expected appliance reference module to be listed");
   assert.equal(applianceModule.seeded, false);
-  assert.equal(applianceModule.semanticModelKey, "claros_appliance_dictionary_v1");
-  assert.equal(applianceModule.complianceProfileKey, "applianceDppV1");
+  assert.equal(applianceModule.semanticModelKey, "appliance_dictionary_v1");
+  assert.equal(applianceModule.passportPolicyKey, "applianceDppV1");
   assert.match(applianceModule.seedCommand, /--module=appliance:v1/);
 });
 

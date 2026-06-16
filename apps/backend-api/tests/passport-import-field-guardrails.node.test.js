@@ -47,7 +47,7 @@ test("import guardrails allow schema fields and explicit import controls", () =>
 test("import guardrails reject managed fields even if the passport schema exposes them", () => {
   const typeSchema = createTypeSchema();
   const fields = {
-    complianceProfileKey: "client_profile",
+    passportPolicyKey: "client_profile",
     contentSpecificationIds: ["client_spec"],
     carrierPolicyKey: "client_policy",
     economicOperatorId: "client_operator",
@@ -85,7 +85,7 @@ test("csv import resolution catches managed field labels and keeps safe fields w
 
 test("managed import error message explains ownership", () => {
   assert.match(
-    buildManagedImportErrorMessage(["complianceProfileKey"]),
-    /assigned by the passport type and compliance profile/
+    buildManagedImportErrorMessage(["passportPolicyKey"]),
+    /assigned by the passport type and passport policy/
   );
 });

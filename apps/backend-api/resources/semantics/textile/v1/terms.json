@@ -13,7 +13,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/TextileProductPassport",
-      "curie": "clarosTextileClass:TextileProductPassport",
+      "curie": "TextileClass:TextileProductPassport",
       "label": "Textile Product Passport"
     },
     "unit": "none"
@@ -32,7 +32,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/MaterialComposition",
-      "curie": "clarosTextileClass:MaterialComposition",
+      "curie": "TextileClass:MaterialComposition",
       "label": "Material Composition"
     },
     "unit": "none"
@@ -51,7 +51,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/MaterialComposition",
-      "curie": "clarosTextileClass:MaterialComposition",
+      "curie": "TextileClass:MaterialComposition",
       "label": "Material Composition"
     },
     "unit": "percent"
@@ -70,7 +70,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/MaterialComposition",
-      "curie": "clarosTextileClass:MaterialComposition",
+      "curie": "TextileClass:MaterialComposition",
       "label": "Material Composition"
     },
     "unit": "gsm"
@@ -89,7 +89,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/ManufacturingAndCare",
-      "curie": "clarosTextileClass:ManufacturingAndCare",
+      "curie": "TextileClass:ManufacturingAndCare",
       "label": "Manufacturing and Care"
     },
     "unit": "none"
@@ -108,7 +108,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/ManufacturingAndCare",
-      "curie": "clarosTextileClass:ManufacturingAndCare",
+      "curie": "TextileClass:ManufacturingAndCare",
       "label": "Manufacturing and Care"
     },
     "unit": "none"
@@ -127,7 +127,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/ManufacturingAndCare",
-      "curie": "clarosTextileClass:ManufacturingAndCare",
+      "curie": "TextileClass:ManufacturingAndCare",
       "label": "Manufacturing and Care"
     },
     "unit": "score-1-5"
@@ -146,7 +146,7 @@
     },
     "domain": {
       "iri": "https://www.claros-dpp.online/dictionary/textile/v1/classes/RestrictedSubstances",
-      "curie": "clarosTextileClass:RestrictedSubstances",
+      "curie": "TextileClass:RestrictedSubstances",
       "label": "Restricted Substances"
     },
     "unit": "none"

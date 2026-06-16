@@ -16,7 +16,7 @@ function createHarness() {
     granularity: "item",
     internalAliasId: "BAT-REGULAR-001",
     uniqueProductIdentifier: "did:web:example.test:did:battery-passport-v1:item:bat-regular-001",
-    complianceProfileKey: "wrong_profile",
+    passportPolicyKey: "wrong_profile",
     contentSpecificationIds: JSON.stringify(["wrong_spec"]),
     carrierPolicyKey: "wrong_carrier",
     economicOperatorId: "EORI-OLD",
@@ -52,8 +52,8 @@ function createHarness() {
     buildCarrierAuthenticityStorageValue: (value) => value ? JSON.stringify(value) : null,
     extractCarrierAuthenticityMutation: () => ({ provided: false }),
     buildComplianceManagedFields: async () => ({
-      complianceProfileKey: "batteryDppV1",
-      contentSpecificationIds: JSON.stringify(["claros_battery_dictionary_v1"]),
+      passportPolicyKey: "batteryDppV1",
+      contentSpecificationIds: JSON.stringify(["Battery_dictionary_v1"]),
       carrierPolicyKey: "battery_qr_public_entry_v1",
       economicOperatorId: "EORI-ACME-001",
       economicOperatorIdentifierScheme: "EORI",
@@ -78,7 +78,7 @@ function createHarness() {
   };
 }
 
-test("regular passport update reconciles profile-owned fields from managed compliance fields", async () => {
+test("regular passport update reconciles policy-owned fields from managed policy fields", async () => {
   const { getCapturedUpdateData, updateEditablePassport } = createHarness();
 
   const result = await updateEditablePassport({
@@ -90,15 +90,15 @@ test("regular passport update reconciles profile-owned fields from managed compl
       user: { userId: 9, companyId: 7, role: "company_admin" },
       body: {
         passportType: "batteryPassportV1",
-        complianceProfileKey: "client_supplied_profile",
+        passportPolicyKey: "client_supplied_profile",
         contentSpecificationIds: ["client_supplied_spec"],
       },
     },
   });
 
   assert.equal(result.success, true);
-  assert.equal(getCapturedUpdateData().complianceProfileKey, "batteryDppV1");
-  assert.equal(getCapturedUpdateData().contentSpecificationIds, JSON.stringify(["claros_battery_dictionary_v1"]));
-  assert.equal(result.passport.complianceProfileKey, "batteryDppV1");
-  assert.equal(result.passport.contentSpecificationIds, JSON.stringify(["claros_battery_dictionary_v1"]));
+  assert.equal(getCapturedUpdateData().passportPolicyKey, "batteryDppV1");
+  assert.equal(getCapturedUpdateData().contentSpecificationIds, JSON.stringify(["Battery_dictionary_v1"]));
+  assert.equal(result.passport.passportPolicyKey, "batteryDppV1");
+  assert.equal(result.passport.contentSpecificationIds, JSON.stringify(["Battery_dictionary_v1"]));
 });

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
-import { normalizeSystemPassportHeader } from "../../admin/passport-types/builderHelpers";
+import { normalizeSystemPassportHeader, resolveSystemHeaderEntries } from "../../admin/passport-types/builderHelpers";
 import { formatPassportStatus } from "../../passports/utils/passportStatus";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
+import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable } from "./PieChart";
 import { FileCell, LiveBadge, LockedFieldCell, RefreshableImage, ViewerDomainIndicator } from "./ViewerBlocks";
@@ -137,6 +138,35 @@ function findFieldEntryByRole(fields, roleKey, roleValue, passport, unlockedPass
   return null;
 }
 
+function getProductOverviewCardIndex(summaryRole) {
+  const role = String(summaryRole || "").trim();
+  if (/^card[1-9]$/.test(role)) return Number(role.replace("card", ""));
+  if (role === "model") return 1;
+  if (role === "capacity") return 2;
+  if (role === "category") return 3;
+  return null;
+}
+
+function buildProductOverviewCards(fields, passport, unlockedPassport, dynamicValues, lang) {
+  return fields
+    .map((field, fieldIndex) => {
+      const cardIndex = getProductOverviewCardIndex(field?.summaryRole);
+      if (!cardIndex) return null;
+      const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
+      if (resolved.isLocked || !isFilled(resolved.raw)) return null;
+      return {
+        key: field.key,
+        order: cardIndex,
+        fieldIndex,
+        label: formatFieldLabelWithUnit(translateSchemaLabel(lang, field), field),
+        value: formatDisplayValue(field, resolved.raw),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.order - b.order || a.fieldIndex - b.fieldIndex)
+    .slice(0, 9);
+}
+
 function getCompositionItems(field, raw) {
   if (!field.composition || !isFilled(raw)) return null;
   if (field.type !== "table") return null;
@@ -168,76 +198,45 @@ function buildLifecycleEvents(fields, passport, unlockedPassport, dynamicValues,
     unlockedPassport,
     dynamicValues
   );
-  const serviceContext = findFieldEntryByRole(
-    fields,
-    "lifecycleRole",
-    "serviceContext",
-    passport,
-    unlockedPassport,
-    dynamicValues
-  );
   const updatedAt = lastUpdateAt || passport?.updatedAt || passport?.createdAt || "";
-  const serviceContextText = serviceContext
-    ? (() => {
-        const contextLabel = normalizeText(serviceContext.field?.label || serviceContext.field?.key || "");
-        const value = formatValue(serviceContext.raw);
-        if (!value) return "";
-        if (contextLabel.includes("warranty")) return `Warranty: ${value}`;
-        if (contextLabel.includes("status")) return `Status: ${value}`;
-        if (contextLabel.includes("service")) return `Service: ${value}`;
-        return value;
-      })()
-    : "";
+  const manufacturingPlace = manufactureContext ? formatValue(manufactureContext.raw) : "";
 
   return [
     {
       date: manufactured ? formatValue(manufactured.raw) : "",
       title: "Manufactured",
-      text: manufactureContext ? formatValue(manufactureContext.raw) : "",
+      textLines: [
+        manufactured ? "Product manufactured." : "",
+        manufacturingPlace ? `Manufacturing place: ${manufacturingPlace}` : "",
+      ].filter(Boolean),
     },
     {
       date: putIntoService ? formatValue(putIntoService.raw) : "",
       title: "Put into service",
-      text: serviceContextText,
+      textLines: [putIntoService ? "Product put into service." : ""].filter(Boolean),
     },
     {
       date: formatIsoDate(updatedAt),
       title: "DPP updated",
-      text: updatedAt ? "Latest data, QR binding, and signature checked." : "",
+      textLines: [updatedAt ? "Latest data, QR binding, and signature checked." : ""].filter(Boolean),
     },
   ];
 }
 
 function buildHeaderRows(passport, typeDef, companyData, lastUpdateAt) {
   const systemHeader = normalizeSystemPassportHeader(typeDef?.fieldsJson?.systemHeader || typeDef?.systemHeader);
-  const canonicalSubjects = passport?.linked_data?.canonical_subjects || {};
-  const resolvedCompanyDid = passport?.companyDid || canonicalSubjects.companyDid || null;
-  const resolvedFacilityDid = passport?.facilityDid || canonicalSubjects.facilityDid || null;
-  const resolvedSubjectDid = passport?.subjectDid || canonicalSubjects.subjectDid || null;
-  const resolvedDppDid = passport?.dppDid || canonicalSubjects.dppDid || null;
-  const values = {
-    digitalProductPassportId: passport?.digitalProductPassportId || passport?.dppId,
-    uniqueProductIdentifier: passport?.uniqueProductIdentifier || null,
-    internalAliasId: passport?.internalAliasId,
-    granularity: passport?.granularity || "item",
-    dppSchemaVersion: passport?.dppSchemaVersion || typeDef?.fieldsJson?.dppSchemaVersion || "prEN 18223:2025",
-    dppStatus: formatPassportStatus(passport?.releaseStatus),
-    lastUpdate: formatIsoDate(lastUpdateAt || passport?.updatedAt || passport?.createdAt) || null,
-    economicOperatorId: resolvedCompanyDid || passport?.economicOperatorId,
-    facilityId: resolvedFacilityDid,
-    contentSpecificationIds: Array.isArray(passport?.contentSpecificationIds)
-      ? passport.contentSpecificationIds.join(", ")
-      : passport?.contentSpecificationIds || passport?.complianceProfileKey || typeDef?.semanticModelKey,
-    subjectDid: resolvedSubjectDid,
-    dppDid: resolvedDppDid,
-    companyDid: resolvedCompanyDid,
-  };
-
-  return (systemHeader.fields || []).filter((field) => !isViewerHiddenField(field)).map((field) => ({
-    key: field.key,
-    label: field.label || field.key,
-    value: formatValue(values[field.key]),
-  }));
+  const sections = Array.isArray(typeDef?.fieldsJson?.sections) ? typeDef.fieldsJson.sections : [];
+  return resolveSystemHeaderEntries(sections, systemHeader)
+    .filter((entry) => entry.sourceType === "managed" || !isViewerHiddenField(entry.field))
+    .map((entry) => ({
+      key: entry.managedKey || entry.fieldKey || entry.slotKey,
+      label: entry.label || entry.fieldKey || entry.slotKey,
+      value: formatValue(
+        entry.sourceType === "managed"
+          ? resolveManagedSystemHeaderValue(entry.managedKey, { passport, typeDef, lastUpdateAt })
+          : appendUnitToDisplayValue(passport?.[entry.fieldKey], entry.field)
+      ),
+    }));
 }
 
 function buildTrustRows(passport, carrierAuthenticity, sigVerification) {
@@ -268,7 +267,7 @@ function buildVerificationRows(verificationBundle) {
   if (!verificationBundle) return [];
   return [
     ["DPP integrity", verificationBundle.integrity || ""],
-    ["Signer", verificationBundle.signedBy === "did:web:www.claros-dpp.online" ? "Claros" : (verificationBundle.signedBy || "")],
+    ["Signer", verificationBundle.signedBy === "did:web:www.claros-dpp.online" ? "Platform issuer" : (verificationBundle.signedBy || "")],
     ["Company trust level", verificationBundle.trustLevel || ""],
     ["DPP data unchanged", verificationBundle.dppDataUnchanged ? "Yes" : "No"],
     ["External company certificate", verificationBundle.externalCompanyCertificate || "Not provided"],
@@ -610,24 +609,14 @@ export default function PublicPassportPortal({
     };
   }, [passport?.dppId, passport?.internalAliasId, publicHistoryPayload, publicHistoryState.loaded, publicHistoryState.loading]);
 
-  const modelEntry = findFieldEntryByRole(fields, "summaryRole", "model", passport, unlockedPassport, dynamicValues);
-  const displayModelName = passport?.modelName || (modelEntry ? formatValue(modelEntry.raw) : "");
-  const capacityEntry = findFieldEntryByRole(fields, "summaryRole", "capacity", passport, unlockedPassport, dynamicValues);
-  const categoryEntry = findFieldEntryByRole(fields, "summaryRole", "category", passport, unlockedPassport, dynamicValues);
-  const productImageEntry = findFieldEntryByRole(
-    fields,
-    "mediaRole",
-    "productImage",
-    passport,
-    unlockedPassport,
-    dynamicValues,
-    (raw) => isImageLikeUrl(raw) || isUrlLike(raw)
-  ) || (passport?.productImage
+  const productOverviewCards = buildProductOverviewCards(fields, passport, unlockedPassport, dynamicValues, lang);
+  const displayModelName = passport?.modelName || productOverviewCards[0]?.value || "";
+  const productImageEntry = passport?.productImage
     ? {
         raw: passport.productImage,
         field: { key: "productImage", label: "Product image", type: "image" },
       }
-    : null);
+    : null;
   const overviewSymbols = fields
     .map((field) => ({ field, ...resolveFieldValue(field, passport, unlockedPassport, dynamicValues) }))
     .filter((entry) => {
@@ -754,18 +743,16 @@ export default function PublicPassportPortal({
                   />
                 )}
               </div>
-              <div className="overview-meta">
-                {[
-                  ["Model", displayModelName],
-                  ["Capacity", capacityEntry ? formatDisplayValue(capacityEntry.field, capacityEntry.raw) : ""],
-                  ["Category", categoryEntry ? formatValue(categoryEntry.raw) : ""],
-                ].map(([label, value]) => (
-                  <div key={label} className="mini">
-                    <span>{label}</span>
-                    <strong>{value || ""}</strong>
-                  </div>
-                ))}
-              </div>
+              {productOverviewCards.length > 0 && (
+                <div className="overview-meta">
+                  {productOverviewCards.map((card) => (
+                    <div key={`${card.order}-${card.key}`} className="mini">
+                      <span>{card.label}</span>
+                      <strong>{card.value || ""}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {overviewSymbols.length > 0 && (
                 <div className="overview-symbols" aria-label="Product labels and symbols">
@@ -809,7 +796,7 @@ export default function PublicPassportPortal({
                 <section className="verification-panel" aria-label="Verification">
                   <div className="verification-panel-head">
                     <span className="badge ok">Verification</span>
-                    <h3>This passport is signed by Claros.</h3>
+                    <h3>This passport is signed by the platform issuer.</h3>
                     <p>You can independently verify the data using the links below.</p>
                   </div>
                   <div className="verification-grid">
@@ -854,7 +841,13 @@ export default function PublicPassportPortal({
                     <div className="date">{event.date || ""}</div>
                     <div>
                       <strong>{event.title}</strong>
-                      <span>{event.text || ""}</span>
+                      {(event.textLines || []).length > 0 && (
+                        <div className="event-lines">
+                          {event.textLines.map((line) => (
+                            <span key={line}>{line}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -974,7 +967,7 @@ export default function PublicPassportPortal({
             {verificationBundle && (
               <div className="verification-inline-note">
                 <strong>DPP integrity: {verificationBundle.integrity || "Unknown"}</strong>
-                <span>Signer: {verificationBundle.signedBy === "did:web:www.claros-dpp.online" ? "Claros" : (verificationBundle.signedBy || "Unknown")}</span>
+                <span>Signer: {verificationBundle.signedBy === "did:web:www.claros-dpp.online" ? "Platform issuer" : (verificationBundle.signedBy || "Unknown")}</span>
               </div>
             )}
             <div className="trust-grid">
@@ -1015,7 +1008,7 @@ export default function PublicPassportPortal({
 
       <footer className="footer">
         <div className="footer-inner">
-          <span>{companyData?.companyName || "ClarosDPP"} · Category-specific product passport</span>
+          <span>{companyData?.companyName || "Digital Product Passport Platform"} · Category-specific product passport</span>
           <span>Public passport viewer</span>
         </div>
       </footer>

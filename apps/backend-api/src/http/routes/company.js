@@ -752,7 +752,7 @@ module.exports = function registerCompanyRoutes(app, {
             });
             const allCols = [
             "dppId", "lineageId", "companyId", "modelName", "internalAliasId", "uniqueProductIdentifier",
-            "complianceProfileKey", "contentSpecificationIds", "carrierPolicyKey", "economicOperatorId", "facilityId",
+            "passportPolicyKey", "contentSpecificationIds", "carrierPolicyKey", "economicOperatorId", "facilityId",
             "createdBy", ...dataFields];
 
             const allVals = [
@@ -762,7 +762,7 @@ module.exports = function registerCompanyRoutes(app, {
             modelName || null,
             storedProductIdentifiers.internalAliasId,
             storedProductIdentifiers.uniqueProductIdentifier,
-            complianceManagedFields.complianceProfileKey,
+            complianceManagedFields.passportPolicyKey,
             complianceManagedFields.contentSpecificationIds,
             complianceManagedFields.carrierPolicyKey,
             complianceManagedFields.economicOperatorId,
@@ -952,7 +952,7 @@ module.exports = function registerCompanyRoutes(app, {
             });
             const allCols = [
             "dppId", "lineageId", "companyId", "modelName", "internalAliasId", "uniqueProductIdentifier",
-            "complianceProfileKey", "contentSpecificationIds", "carrierPolicyKey", "economicOperatorId", "facilityId",
+            "passportPolicyKey", "contentSpecificationIds", "carrierPolicyKey", "economicOperatorId", "facilityId",
             "createdBy", ...dataFields];
 
             const allVals = [
@@ -962,7 +962,7 @@ module.exports = function registerCompanyRoutes(app, {
             modelName || null,
             storedProductIdentifiers.internalAliasId,
             storedProductIdentifiers.uniqueProductIdentifier,
-            complianceManagedFields.complianceProfileKey,
+            complianceManagedFields.passportPolicyKey,
             complianceManagedFields.contentSpecificationIds,
             complianceManagedFields.carrierPolicyKey,
             complianceManagedFields.economicOperatorId,

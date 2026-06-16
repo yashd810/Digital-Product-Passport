@@ -23,23 +23,23 @@ describe("frontend modularity helpers", () => {
   });
 
   test("semantic model labels are generated from any model key", () => {
-    expect(formatSemanticModelLabel("claros_appliance_dictionary_v3")).toBe("Claros Appliance Dictionary V3");
-    expect(formatSemanticModelLabel("claros_textile_dictionary_v1")).toBe("Claros Textile Dictionary V1");
+    expect(formatSemanticModelLabel("appliance_dictionary_v3")).toBe("Appliance Dictionary V3");
+    expect(formatSemanticModelLabel("textile_dictionary_v1")).toBe("Textile Dictionary V1");
   });
 
   test("semantic options preserve registered and selected external models", () => {
     const options = buildSemanticModelOptions([
       {
-        semanticModelKey: "claros_appliance_dictionary_v3",
-        name: "Claros Appliance Dictionary",
+        semanticModelKey: "appliance_dictionary_v3",
+        name: "Appliance Dictionary",
         family: "appliance",
         version: "v3",
       },
     ], "external_future_dictionary_v3");
 
-    expect(getSemanticModelOption(options, "claros_appliance_dictionary_v3")).toMatchObject({
-      key: "claros_appliance_dictionary_v3",
-      label: "Claros Appliance Dictionary",
+    expect(getSemanticModelOption(options, "appliance_dictionary_v3")).toMatchObject({
+      key: "appliance_dictionary_v3",
+      label: "Appliance Dictionary",
       registered: true,
     });
     expect(getSemanticModelOption(options, "external_future_dictionary_v3")).toMatchObject({
@@ -81,7 +81,7 @@ describe("frontend modularity helpers", () => {
       },
     ], "appliancePassportV3", {
       semanticModel: {
-        semanticModelKey: "claros_appliance_dictionary_v3",
+        semanticModelKey: "appliance_dictionary_v3",
         contextUrl: "https://www.claros-dpp.online/dictionary/appliance/v3/context.jsonld",
         family: "appliance",
         version: "v3",
@@ -90,7 +90,7 @@ describe("frontend modularity helpers", () => {
 
     expect(exported["@context"]).toContain("https://www.claros-dpp.online/dictionary/appliance/v3/context.jsonld");
     expect(exported.semanticModel).toMatchObject({
-      semanticModelKey: "claros_appliance_dictionary_v3",
+      semanticModelKey: "appliance_dictionary_v3",
       family: "appliance",
       version: "v3",
     });

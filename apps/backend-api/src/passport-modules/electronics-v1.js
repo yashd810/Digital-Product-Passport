@@ -23,7 +23,7 @@ function valueDataTypeFor({ type, dataType }) {
   if (type === "url") return "URI";
   if (dataType === "integer") return "Integer";
   if (dataType === "number" || dataType === "decimal") return "Decimal";
-  if (dataType === "boolean" || type === "checkbox") return "Boolean";
+  if (dataType === "boolean" || type === "boolean") return "Boolean";
   if (dataType === "date" || type === "date") return "Date";
   if (dataType === "datetime") return "DateTime";
   return "String";
@@ -44,7 +44,6 @@ function field({
   presentation = "data",
   summaryRole = null,
   lifecycleRole = null,
-  mediaRole = null,
 }) {
   const access = accessLevel === "restricted" ? restrictedFieldDefaults : publicFieldDefaults;
   return {
@@ -62,7 +61,6 @@ function field({
     presentation,
     summaryRole,
     lifecycleRole,
-    mediaRole,
     ...(queryable ? { queryable: true } : {}),
     ...(indexed ? { indexed: true } : {}),
     ...(storageType ? { storageType } : {}),
@@ -75,22 +73,34 @@ module.exports = {
   displayName: "Electronics Passport v1",
   productCategory: "Electronics",
   productIcon: "EL",
-  semanticModelKey: "claros_electronics_dictionary_v1",
+  semanticModelKey: "electronics_dictionary_v1",
+  systemHeader: {
+    section: { key: "passportHeader", label: "Passport Header" },
+    fieldMappings: [
+      { slotKey: "digitalProductPassportId", sourceType: "managed", managedKey: "internalManagedDigitalProductPassportId" },
+      { slotKey: "uniqueProductIdentifier", sourceType: "managed", managedKey: "internalManagedUniqueProductIdentifier" },
+      { slotKey: "internalAliasId", sourceType: "managed", managedKey: "internalManagedInternalAliasId" },
+      { slotKey: "granularity", sourceType: "managed", managedKey: "internalManagedGranularity" },
+      { slotKey: "dppSchemaVersion", sourceType: "managed", managedKey: "internalManagedDppSchemaVersion" },
+      { slotKey: "dppStatus", sourceType: "managed", managedKey: "internalManagedDppStatus" },
+      { slotKey: "lastUpdate", sourceType: "managed", managedKey: "internalManagedLastUpdate" },
+      { slotKey: "economicOperatorId", sourceType: "managed", managedKey: "internalManagedEconomicOperatorId" },
+      { slotKey: "facilityId", sourceType: "managed", managedKey: "internalManagedFacilityId" },
+      { slotKey: "contentSpecificationIds", sourceType: "managed", managedKey: "internalManagedContentSpecificationIds" },
+      { slotKey: "subjectDid", sourceType: "managed", managedKey: "internalManagedSubjectDid" },
+      { slotKey: "dppDid", sourceType: "managed", managedKey: "internalManagedDppDid" },
+      { slotKey: "companyDid", sourceType: "managed", managedKey: "internalManagedCompanyDid" },
+    ],
+    fieldKeys: [],
+  },
   identity: {
     businessIdentifierField: "productModelIdentifier",
   },
-  complianceProfile: {
+  passportPolicy: {
     key: "electronicsDppV1",
-    displayName: "Electronics Passport DPP Profile v1",
-    contentSpecificationIds: ["claros_electronics_dictionary_v1"],
-    requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds"],
-    requireCompanyOperatorIdentifier: true,
-    requireCarrierPolicy: false,
-    requireFacilityAtGranularities: [],
+    displayName: "Electronics Passport Policy v1",
+    contentSpecificationIds: ["Electronics_dictionary_v1"],
     defaultCarrierPolicyKey: "web_public_entry_v1",
-    enforceSemanticMapping: true,
-    requirePublicAccessLayer: true,
-    managedSemanticFields: [],
   },
   schemaVersion: 1,
   lifecycle: {
@@ -103,15 +113,44 @@ module.exports = {
       key: "electronicsIdentity",
       label: "Electronics Identity",
       fields: [
-        field({"key":"productModelIdentifier","label":"Product Model Identifier","semanticSlug":"product-model-identifier"}),
-        field({"key":"manufacturerName","label":"Manufacturer Name","semanticSlug":"manufacturer-name"})
+        field({
+          "key": "electronicsCategory",
+          "label": "Electronics Category",
+          "semanticSlug": "electronics-category",
+          "displayRole": "hero",
+          "summaryRole": "card3",
+          "presentation": "data",
+        }),
+        field({
+          "key": "productModelIdentifier",
+          "label": "Product Model Identifier",
+          "semanticSlug": "product-model-identifier",
+          "displayRole": "hero",
+          "summaryRole": "card1",
+          "presentation": "data",
+        }),
+        field({
+          "key": "manufacturerName",
+          "label": "Manufacturer Name",
+          "semanticSlug": "manufacturer-name",
+          "presentation": "data",
+        })
       ],
     },
     {
       key: "technicalCharacteristics",
       label: "Technical Characteristics",
       fields: [
-        field({"key":"ratedPower","label":"Rated Power","semanticSlug":"rated-power","unit":"W","dataType":"number"})
+        field({
+          "key": "ratedPower",
+          "label": "Rated Power",
+          "semanticSlug": "rated-power",
+          "unit": "W",
+          "dataType": "number",
+          "displayRole": "hero",
+          "summaryRole": "card2",
+          "presentation": "data",
+        })
       ],
     }
   ],

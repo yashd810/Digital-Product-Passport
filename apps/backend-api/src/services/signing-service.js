@@ -82,7 +82,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
   function getSigningTrustMetadata() {
     return {
       issuerDid: issuerDid(),
-      signingKeyOwner: normalizeOptionalText(process.env.SIGNING_KEY_OWNER) || "Claros DPP platform operator",
+      signingKeyOwner: normalizeOptionalText(process.env.SIGNING_KEY_OWNER) || "Digital Product Passport Platform platform operator",
       globallyUniqueOperatorId: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID) || null,
       globallyUniqueOperatorIdentifier: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID) || null,
       globallyUniqueOperatorIdentifierScheme: normalizeOptionalText(process.env.SIGNING_ECONOMIC_OPERATOR_ID_SCHEME) || null,

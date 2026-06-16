@@ -21,7 +21,7 @@ const DPP_CONTEXT = {
   valueDataType: "dpp:valueDataType",
   value: "dpp:value",
   extensions: "dpp:extensions",
-  claros: "dpp:claros",
+  platform: "dpp:platform",
   passportType: "dpp:passportType",
   versionNumber: { "@id": "dpp:versionNumber", "@type": "http://www.w3.org/2001/XMLSchema#integer" },
   internalId: "dpp:internalId",

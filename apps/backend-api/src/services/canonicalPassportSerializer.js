@@ -4,7 +4,6 @@ const { buildCarrierAuthenticityResponseFields } = require("../shared/passports/
 const createSemanticModelRegistry = require("./semantic-model-registry");
 const { buildCanonicalIdentityBundle } = require("../shared/identifiers/canonical-identity-bundle");
 const { getPassportFieldValue } = require("../shared/passports/passport-helpers");
-const { getSystemPassportHeader } = require("./passport-header-fields");
 
 function createCanonicalPassportSerializer({
   didService,
@@ -18,6 +17,21 @@ function createCanonicalPassportSerializer({
     economicOperatorId: new Set(["economicOperatorId"]),
     facilityId: new Set(["facilityId"]),
     contentSpecificationIds: new Set(["contentSpecificationIds"]),
+  };
+  const HEADER_FIELD_CONFIG = {
+    digitalProductPassportId: { required: true, semanticId: "dpp:digitalProductPassportId", valueSource: "system" },
+    uniqueProductIdentifier: { required: true, semanticId: "dpp:uniqueProductIdentifier", valueSource: "system" },
+    internalAliasId: { required: true, semanticId: "dpp:internalAliasId", valueSource: "system" },
+    granularity: { required: true, semanticId: "dpp:granularity", valueSource: "system" },
+    dppSchemaVersion: { required: true, semanticId: "dpp:dppSchemaVersion", valueSource: "system" },
+    dppStatus: { required: true, semanticId: "dpp:dppStatus", valueSource: "system" },
+    lastUpdate: { required: true, semanticId: "dpp:lastUpdate", valueSource: "system" },
+    economicOperatorId: { required: true, semanticId: "dpp:economicOperatorId", valueSource: "system" },
+    facilityId: { required: false, semanticId: "dpp:facilityId", valueSource: "system" },
+    contentSpecificationIds: { required: true, semanticId: "dpp:contentSpecificationIds", valueSource: "system" },
+    subjectDid: { required: true, semanticId: "dpp:subjectDid", valueSource: "system" },
+    dppDid: { required: true, semanticId: "dpp:dppDid", valueSource: "system" },
+    companyDid: { required: true, semanticId: "dpp:companyDid", valueSource: "system" },
   };
   const semanticLookupCache = new Map();
 
@@ -45,12 +59,12 @@ function createCanonicalPassportSerializer({
     return "Invalid";
   }
 
-  function buildClarosExtensions({ passportType = null, versionNumber = null, internalId = null } = {}) {
-    const claros = {};
-    if (passportType) claros.passportType = passportType;
-    if (versionNumber !== null && versionNumber !== undefined) claros.versionNumber = versionNumber;
-    if (internalId) claros.internalId = internalId;
-    return Object.keys(claros).length ? { claros } : null;
+  function buildPlatformExtensions({ passportType = null, versionNumber = null, internalId = null } = {}) {
+    const platform = {};
+    if (passportType) platform.passportType = passportType;
+    if (versionNumber !== null && versionNumber !== undefined) platform.versionNumber = versionNumber;
+    if (internalId) platform.internalId = internalId;
+    return Object.keys(platform).length ? { platform } : null;
   }
 
   function looksLikeJson(value) {
@@ -804,7 +818,7 @@ function createCanonicalPassportSerializer({
   }
 
   function getHeaderFieldConfig(typeDef, key) {
-    return getSystemPassportHeader(typeDef).fields.find((field) => field.key === key) || null;
+    return HEADER_FIELD_CONFIG[key] || null;
   }
 
   function pushMissingHeaderIssue(validationIssues, typeDef, key, value) {
@@ -938,15 +952,15 @@ function createCanonicalPassportSerializer({
     }
 
     const resolvedVersionNumber = Number(passport.versionNumber) || 1;
-    const extensions = buildClarosExtensions({
+    const extensions = buildPlatformExtensions({
       passportType,
       versionNumber: resolvedVersionNumber,
       internalId: passport?.dppId || passport?.guid || null,
     });
-    if (extensions?.claros) {
-      extensions.claros.validation = summarizeValidationIssues(validationIssues);
+    if (extensions?.platform) {
+      extensions.platform.validation = summarizeValidationIssues(validationIssues);
       if (validationIssues.length) {
-        extensions.claros.validationIssues = validationIssues;
+        extensions.platform.validationIssues = validationIssues;
       }
     }
 
@@ -961,7 +975,7 @@ function createCanonicalPassportSerializer({
       economicOperatorId,
       facilityId,
       contentSpecificationIds: Array.isArray(contentSpecificationIds) ? contentSpecificationIds : [],
-      complianceProfileKey: passport.complianceProfileKey || null,
+      passportPolicyKey: passport.passportPolicyKey || null,
       carrierPolicyKey: passport.carrierPolicyKey || null,
       ...buildCarrierAuthenticityResponseFields(passport.carrierAuthenticity),
       subjectDid,

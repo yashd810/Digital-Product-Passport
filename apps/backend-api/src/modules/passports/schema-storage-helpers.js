@@ -211,7 +211,7 @@ function createSchemaStorageHelpers({
         "modelName"     VARCHAR(255),
         "internalAliasId"     VARCHAR(255) NOT NULL,
         "uniqueProductIdentifier" TEXT,
-        "complianceProfileKey" VARCHAR(120) NOT NULL,
+        "passportPolicyKey" VARCHAR(120) NOT NULL,
         "contentSpecificationIds" TEXT,
         "carrierPolicyKey" VARCHAR(120),
         "carrierAuthenticity" JSONB,

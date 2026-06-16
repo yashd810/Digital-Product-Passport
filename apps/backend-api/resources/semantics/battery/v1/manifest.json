@@ -1,6 +1,6 @@
 {
-  "semanticModelKey": "claros_battery_dictionary_v1",
-  "name": "Claros Battery Dictionary",
+  "semanticModelKey": "battery_dictionary_v1",
+  "name": "Battery Dictionary",
   "version": "1.0.0",
   "description": "Battery passport dictionary for Digital Product Passport implementations.",
   "versioning": {
@@ -13,7 +13,7 @@
     "Stationary"
   ],
   "publisher": {
-    "name": "Claros DPP",
+    "name": "Digital Product Passport Platform",
     "url": "https://www.claros-dpp.online"
   },
   "issuerDid": "did:web:www.claros-dpp.online",

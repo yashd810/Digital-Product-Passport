@@ -28,22 +28,22 @@ function updateDppUseCase(deps) {
     setDppMergePatchHeaders,
     isSupportedPatchContentType,
     parseDppIdentifier,
-    serializeProfileDefaultValue,
+    serializePolicyDefaultValue,
     resolveManagedFacilityId,
     MERGE_PATCH_CONTENT_TYPE,
     usesConfiguredGlobalProductIdentifierScheme,
   } = deps;
 
-  function resolveProfileOwnedPatchFields({ editable, granularity }) {
+  function resolvePolicyOwnedPatchFields({ editable, granularity }) {
     const passportType = editable.passport.passportType || editable.passport.passport_type || editable.typeDef?.typeName || editable.typeDef?.type_name;
-    const profile = complianceService.resolveProfileMetadata({
+    const policy = complianceService.resolvePassportPolicyMetadata({
       passportType,
       typeDef: editable.typeDef,
       granularity,
     });
     return {
-      complianceProfileKey: profile.key,
-      contentSpecificationIds: serializeProfileDefaultValue(profile.contentSpecificationIds),
+      passportPolicyKey: policy.key,
+      contentSpecificationIds: serializePolicyDefaultValue(policy.contentSpecificationIds),
     };
   }
 
@@ -80,7 +80,7 @@ function updateDppUseCase(deps) {
       internalAliasId,
       productIdentifier,
       modelName,
-      complianceProfileKey,
+      passportPolicyKey,
       contentSpecificationIds,
       carrierPolicyKey,
       carrierAuthenticity,
@@ -138,8 +138,8 @@ function updateDppUseCase(deps) {
       updateData.granularity = nextGranularity;
     }
     if (modelName !== undefined) updateData.modelName = modelName ?? null;
-    if (complianceProfileKey !== undefined || contentSpecificationIds !== undefined) {
-      Object.assign(updateData, resolveProfileOwnedPatchFields({
+    if (passportPolicyKey !== undefined || contentSpecificationIds !== undefined) {
+      Object.assign(updateData, resolvePolicyOwnedPatchFields({
         editable,
         granularity: nextGranularity,
       }));

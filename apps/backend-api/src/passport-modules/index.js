@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { normalizeSystemPassportHeader } = require("../services/passport-header-fields");
+const { normalizeSystemPassportHeader, validateSystemPassportHeader } = require("../services/passport-header-fields");
 
 const DEFAULT_MODULES_DIR = __dirname;
 
@@ -10,37 +10,29 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function normalizeComplianceProfile(profileDefinition = null, moduleDefinition = {}) {
-  if (!profileDefinition || typeof profileDefinition !== "object" || Array.isArray(profileDefinition)) {
-    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" must define an explicit complianceProfile.`);
+function normalizePassportPolicy(policyDefinition = null, moduleDefinition = {}) {
+  if (!policyDefinition || typeof policyDefinition !== "object" || Array.isArray(policyDefinition)) {
+    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" must define an explicit passportPolicy.`);
   }
-  const baseProfile = clone(profileDefinition);
+  const basePolicy = clone(policyDefinition);
   const semanticModelKey = moduleDefinition.semanticModelKey || null;
-  const contentSpecificationIds = Array.isArray(baseProfile.contentSpecificationIds)
-    && baseProfile.contentSpecificationIds.length
-      ? baseProfile.contentSpecificationIds
+  const contentSpecificationIds = Array.isArray(basePolicy.contentSpecificationIds)
+    && basePolicy.contentSpecificationIds.length
+      ? basePolicy.contentSpecificationIds
       : (semanticModelKey ? [semanticModelKey] : []);
-  if (!baseProfile.key) {
-    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" complianceProfile.key is required.`);
+  if (!basePolicy.key) {
+    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" passportPolicy.key is required.`);
   }
   if (!contentSpecificationIds.length) {
-    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" complianceProfile.contentSpecificationIds is required.`);
+    throw new Error(`Passport module "${moduleDefinition.moduleKey || moduleDefinition.typeName || "unknown"}" passportPolicy.contentSpecificationIds is required.`);
   }
 
   return {
-    ...baseProfile,
-    key: baseProfile.key,
-    displayName: baseProfile.displayName || baseProfile.key,
+    ...basePolicy,
+    key: basePolicy.key,
+    displayName: basePolicy.displayName || basePolicy.key,
     contentSpecificationIds,
-    requiredPassportFields: Array.isArray(baseProfile.requiredPassportFields)
-      ? baseProfile.requiredPassportFields
-      : [],
-    requireFacilityAtGranularities: Array.isArray(baseProfile.requireFacilityAtGranularities)
-      ? baseProfile.requireFacilityAtGranularities
-      : [],
-    managedSemanticFields: Array.isArray(baseProfile.managedSemanticFields)
-      ? baseProfile.managedSemanticFields
-      : [],
+    defaultCarrierPolicyKey: basePolicy.defaultCarrierPolicyKey || null,
   };
 }
 
@@ -72,8 +64,14 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null)
 function normalizeModuleDefinition(moduleDefinition = {}) {
   const definition = clone(moduleDefinition);
   const sections = Array.isArray(definition.sections) ? definition.sections : [];
-  const complianceProfile = normalizeComplianceProfile(definition.complianceProfile, definition);
+  const passportPolicy = normalizePassportPolicy(definition.passportPolicy, definition);
   const sourceModuleKey = definition.moduleKey || null;
+  const headerValidation = validateSystemPassportHeader(definition.systemHeader || {}, sections);
+  if (!definition.systemHeader || !headerValidation.valid) {
+    throw new Error(
+      `Passport module "${definition.moduleKey || definition.typeName || "unknown"}" must define an explicit valid systemHeader.`
+    );
+  }
 
   return {
     moduleKey: definition.moduleKey,
@@ -82,7 +80,7 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
     productCategory: definition.productCategory,
     productIcon: definition.productIcon || "📋",
     semanticModelKey: definition.semanticModelKey || null,
-    complianceProfile,
+    passportPolicy,
     lifecycle: definition.lifecycle || null,
     fieldsJson: {
       schemaVersion: Number.parseInt(definition.schemaVersion, 10) || 1,
@@ -90,8 +88,8 @@ function normalizeModuleDefinition(moduleDefinition = {}) {
       sections: normalizeCanonicalModuleSections(sections, sourceModuleKey),
       sourceModule: sourceModuleKey,
       identity: definition.identity,
-      complianceProfileKey: complianceProfile.key,
-      complianceProfile,
+      passportPolicyKey: passportPolicy.key,
+      passportPolicy,
     },
   };
 }
@@ -134,30 +132,30 @@ function getPassportTypeModule(moduleKeyOrTypeName, options = {}) {
   ) || null;
 }
 
-function getComplianceProfileForPassportType(moduleKeyOrTypeName, typeDef = null, options = {}) {
+function getPassportPolicyForPassportType(moduleKeyOrTypeName, typeDef = null, options = {}) {
   const sourceModule = typeDef?.fieldsJson?.sourceModule || typeDef?.fields_json?.sourceModule || null;
   const resolvedModule = getPassportTypeModule(sourceModule, options)
     || getPassportTypeModule(moduleKeyOrTypeName, options)
     || getPassportTypeModule(typeDef?.typeName || typeDef?.type_name, options);
-  if (resolvedModule?.complianceProfile) return clone(resolvedModule.complianceProfile);
+  if (resolvedModule?.passportPolicy) return clone(resolvedModule.passportPolicy);
   return null;
 }
 
-function getComplianceProfileCatalog(options = {}) {
-  const profilesByKey = new Map();
+function getPassportPolicyCatalog(options = {}) {
+  const policiesByKey = new Map();
   for (const definition of getPassportTypeModules(options)) {
-    if (!definition.complianceProfile?.key) continue;
-    profilesByKey.set(definition.complianceProfile.key, clone(definition.complianceProfile));
+    if (!definition.passportPolicy?.key) continue;
+    policiesByKey.set(definition.passportPolicy.key, clone(definition.passportPolicy));
   }
-  return [...profilesByKey.values()].sort((left, right) => left.key.localeCompare(right.key));
+  return [...policiesByKey.values()].sort((left, right) => left.key.localeCompare(right.key));
 }
 
 module.exports = {
-  getComplianceProfileCatalog,
-  getComplianceProfileForPassportType,
+  getPassportPolicyCatalog,
+  getPassportPolicyForPassportType,
   getPassportTypeModule,
   getPassportTypeModules,
   loadPassportTypeModuleDefinitions,
-  normalizeComplianceProfile,
+  normalizePassportPolicy,
   normalizeModuleDefinition,
 };

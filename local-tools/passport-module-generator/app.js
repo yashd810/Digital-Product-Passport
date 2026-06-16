@@ -3,6 +3,22 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
+const HEADER_SLOT_DEFINITIONS = [
+  { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
+  { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
+  { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId" },
+  { slotKey: "granularity", label: "Granularity", managedKey: "internalManagedGranularity" },
+  { slotKey: "dppSchemaVersion", label: "DPP Schema Version", managedKey: "internalManagedDppSchemaVersion" },
+  { slotKey: "dppStatus", label: "DPP Status", managedKey: "internalManagedDppStatus" },
+  { slotKey: "lastUpdate", label: "Last Update", managedKey: "internalManagedLastUpdate" },
+  { slotKey: "economicOperatorId", label: "Economic Operator ID", managedKey: "internalManagedEconomicOperatorId" },
+  { slotKey: "facilityId", label: "Facility ID", managedKey: "internalManagedFacilityId" },
+  { slotKey: "contentSpecificationIds", label: "Content Specification IDs", managedKey: "internalManagedContentSpecificationIds" },
+  { slotKey: "subjectDid", label: "Subject DID", managedKey: "internalManagedSubjectDid" },
+  { slotKey: "dppDid", label: "DPP DID", managedKey: "internalManagedDppDid" },
+  { slotKey: "companyDid", label: "Company DID", managedKey: "internalManagedCompanyDid" },
+];
+
 const sample = {
   module: {
     family: "electronics",
@@ -12,50 +28,36 @@ const sample = {
     displayName: "Electronics Passport v1",
     productCategory: "Electronics",
     productIcon: "EL",
-    semanticModelKey: "claros_electronics_dictionary_v1",
-    complianceProfileKey: "electronicsDppV1",
-    requiredPassportFields: "complianceProfileKey, contentSpecificationIds",
+    semanticModelKey: "electronics_dictionary_v1",
+    passportPolicyKey: "electronicsDppV1",
     defaultCarrierPolicyKey: "web_public_entry_v1",
-    requireCompanyOperatorIdentifier: true,
-    requireCarrierPolicy: false,
-    enforceSemanticMapping: true,
-    requirePublicAccessLayer: true,
-    requireFacilityAtGranularities: "",
-    managedSemanticFieldsText: "",
+    systemHeaderFieldAssignments: {
+      digitalProductPassportId: "__managed__:internalManagedDigitalProductPassportId",
+      uniqueProductIdentifier: "__managed__:internalManagedUniqueProductIdentifier",
+      internalAliasId: "__managed__:internalManagedInternalAliasId",
+      granularity: "__managed__:internalManagedGranularity",
+      dppSchemaVersion: "__managed__:internalManagedDppSchemaVersion",
+      dppStatus: "__managed__:internalManagedDppStatus",
+      lastUpdate: "__managed__:internalManagedLastUpdate",
+      economicOperatorId: "__managed__:internalManagedEconomicOperatorId",
+      facilityId: "__managed__:internalManagedFacilityId",
+      contentSpecificationIds: "__managed__:internalManagedContentSpecificationIds",
+      subjectDid: "__managed__:internalManagedSubjectDid",
+      dppDid: "__managed__:internalManagedDppDid",
+      companyDid: "__managed__:internalManagedCompanyDid",
+    },
     baseUrl: "https://www.claros-dpp.online",
-    dictionaryName: "Claros Electronics Dictionary",
+    dictionaryName: "Electronics Dictionary",
     dictionaryDescription: "Internal electronics passport dictionary used for Digital Product Passport implementations.",
   },
   roles: {
     businessIdentifierField: "productModelIdentifier",
-    heroFieldKeys: ["productModelIdentifier"],
-    summaryFieldKeys: ["manufacturerName", "ratedPower"],
-    trustFieldKeys: [],
-    presentations: {
-      electronicsCategory: "badge",
-      productModelIdentifier: "data",
-      manufacturerName: "data",
-      ratedPower: "liveMetric",
-    },
     summaryRoles: {
-      productModelIdentifier: "model",
-      electronicsCategory: "category",
-      ratedPower: "capacity",
+      productModelIdentifier: "card1",
+      ratedPower: "card2",
+      electronicsCategory: "card3",
     },
     lifecycleRoles: {},
-    mediaRoles: {},
-    objectTypes: {
-      electronicsCategory: "SingleValuedDataElement",
-      productModelIdentifier: "SingleValuedDataElement",
-      manufacturerName: "SingleValuedDataElement",
-      ratedPower: "SingleValuedDataElement",
-    },
-    valueDataTypes: {
-      electronicsCategory: "String",
-      productModelIdentifier: "String",
-      manufacturerName: "String",
-      ratedPower: "Decimal",
-    },
     compositionFieldKey: "",
     compositionLabelColumnKey: "",
     compositionValueColumnKey: "",
@@ -76,7 +78,6 @@ const sample = {
           categoryLabel: "Product Identification",
           unitKey: "none",
           accessRights: "public",
-          defaultRequirement: "required",
         },
         {
           fieldKey: "productModelIdentifier",
@@ -89,7 +90,6 @@ const sample = {
           categoryLabel: "Product Identification",
           unitKey: "none",
           accessRights: "public",
-          defaultRequirement: "required",
         },
         {
           fieldKey: "manufacturerName",
@@ -102,7 +102,6 @@ const sample = {
           categoryLabel: "Product Identification",
           unitKey: "none",
           accessRights: "public",
-          defaultRequirement: "required",
         },
       ],
     },
@@ -123,7 +122,6 @@ const sample = {
           unitLabel: "Watt",
           unitSymbol: "W",
           accessRights: "public",
-          defaultRequirement: "recommended",
         },
       ],
     },
@@ -140,6 +138,41 @@ function clearMessage() {
   const box = $("#message");
   box.textContent = "";
   box.className = "message hidden";
+}
+
+function setActiveStep(step) {
+  const nextStep = step || "module";
+  $$("[data-step]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.step === nextStep);
+  });
+  $$("[data-step-target]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.stepTarget === nextStep);
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function setupWorkspaceNavigation() {
+  $$("[data-step-target]").forEach((button) => {
+    button.addEventListener("click", () => setActiveStep(button.dataset.stepTarget));
+  });
+}
+
+function updateSectionSummaries() {
+  $$(".section-card").forEach((section) => {
+    const fieldCount = $$(".field-row", section).length;
+    const count = $("[data-section-count]", section);
+    if (count) count.textContent = `${fieldCount} field${fieldCount === 1 ? "" : "s"}`;
+  });
+}
+
+function updateWorkspaceMeta() {
+  const sectionCount = $$(".section-card").length;
+  const fieldCount = $$(".field-row").length;
+  const meta = $("#fieldsStepMeta");
+  if (meta) {
+    meta.textContent = `${sectionCount} section${sectionCount === 1 ? "" : "s"}, ${fieldCount} field${fieldCount === 1 ? "" : "s"}`;
+  }
+  updateSectionSummaries();
 }
 
 function setFormValue(id, value) {
@@ -265,9 +298,9 @@ function maybeAutoModuleValues() {
   autoFillInput($("#typeName"), familyCamel && versionPascal ? `${familyCamel}Passport${versionPascal}` : "");
   autoFillInput($("#displayName"), title && version ? `${title} Passport ${version}` : "");
   autoFillInput($("#productCategory"), title);
-  autoFillInput($("#semanticModelKey"), familySnake && version ? `claros_${familySnake}_dictionary_${version}` : "");
-  autoFillInput($("#complianceProfileKey"), familyCamel && versionPascal ? `${familyCamel}Dpp${versionPascal}` : "");
-  autoFillInput($("#dictionaryName"), title ? `Claros ${title} Dictionary` : "");
+  autoFillInput($("#semanticModelKey"), familySnake && version ? `${familySnake}_dictionary_${version}` : "");
+  autoFillInput($("#passportPolicyKey"), familyCamel && versionPascal ? `${familyCamel}Dpp${versionPascal}` : "");
+  autoFillInput($("#dictionaryName"), title ? `${title} Dictionary` : "");
 }
 
 function columnKeyFromLabel(value) {
@@ -288,6 +321,28 @@ function valueDataTypeFromJsonType(dataType) {
   return "String";
 }
 
+function defaultDataTypeForFieldType(fieldType) {
+  if (fieldType === "boolean") return "boolean";
+  if (fieldType === "date") return "date";
+  if (fieldType === "url" || fieldType === "symbol") return "uri";
+  return "string";
+}
+
+function defaultObjectTypeForFieldType(fieldType) {
+  if (fieldType === "table") return "DataElementCollection";
+  if (fieldType === "file" || fieldType === "url" || fieldType === "symbol") return "RelatedResource";
+  return "SingleValuedDataElement";
+}
+
+function defaultValueDataTypeForField(fieldType, dataType) {
+  if (fieldType === "table") return "Array";
+  if (fieldType === "file") return "Binary";
+  if (fieldType === "url" || fieldType === "symbol") return "URI";
+  if (fieldType === "date") return "Date";
+  if (fieldType === "boolean") return "Boolean";
+  return valueDataTypeFromJsonType(dataType);
+}
+
 function setupModuleAutoFill() {
   const familyInput = $("#family");
   const versionInput = $("#version");
@@ -297,7 +352,7 @@ function setupModuleAutoFill() {
     $("#displayName"),
     $("#productCategory"),
     $("#semanticModelKey"),
-    $("#complianceProfileKey"),
+    $("#passportPolicyKey"),
     $("#dictionaryName"),
   ].forEach(trackManualInput);
   familyInput.addEventListener("input", maybeAutoModuleValues);
@@ -407,123 +462,109 @@ function setSelectOptions(select, options, placeholder) {
   select.value = options.some((option) => option.value === current) ? current : "";
 }
 
-function renderRoleChecks(container, fields, datasetKey) {
-  if (!container) return;
-  const selected = new Set($$("input[type='checkbox']", container).filter((input) => input.checked).map((input) => input.value));
-  container.innerHTML = "";
-  for (const field of fields) {
-    const label = document.createElement("label");
-    label.className = "check role-check";
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.value = field.fieldKey;
-    input.dataset[datasetKey] = "true";
-    input.checked = selected.has(field.fieldKey);
-    label.appendChild(input);
-    label.append(` ${field.fieldLabel || field.fieldKey}`);
-    container.appendChild(label);
+function createFieldSelect(datasetKey, fieldKey, value, optionPairs, placeholder = "") {
+  const select = document.createElement("select");
+  select.dataset[datasetKey] = fieldKey;
+  if (placeholder) {
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = placeholder;
+    select.appendChild(empty);
   }
+  for (const [optionValue, label] of optionPairs) {
+    const option = document.createElement("option");
+    option.value = optionValue;
+    option.textContent = label;
+    select.appendChild(option);
+  }
+  select.value = value;
+  return select;
+}
+
+function productOverviewCardOptions() {
+  return [
+    ["", "Not shown in Product overview cards"],
+    ...Array.from({ length: 9 }, (_, index) => {
+      const cardNumber = index + 1;
+      return [`card${cardNumber}`, `Card ${cardNumber}`];
+    }),
+  ];
+}
+
+function normalizeProductOverviewCardRole(value) {
+  if (value === "model") return "card1";
+  if (value === "capacity") return "card2";
+  if (value === "category") return "card3";
+  return value || "";
 }
 
 function renderPresentationFields(fields) {
   const container = $("#presentationFields");
   if (!container) return;
-  const current = new Map($$("[data-presentation-field]", container).map((select) => [select.dataset.presentationField, select.value]));
   const currentSummaryRole = new Map($$("[data-summary-role-field]", container).map((select) => [select.dataset.summaryRoleField, select.value]));
   const currentLifecycleRole = new Map($$("[data-lifecycle-role-field]", container).map((select) => [select.dataset.lifecycleRoleField, select.value]));
-  const currentMediaRole = new Map($$("[data-media-role-field]", container).map((select) => [select.dataset.mediaRoleField, select.value]));
-  const currentObjectType = new Map($$("[data-object-type-field]", container).map((select) => [select.dataset.objectTypeField, select.value]));
-  const currentValueDataType = new Map($$("[data-value-data-type-field]", container).map((select) => [select.dataset.valueDataTypeField, select.value]));
   container.innerHTML = "";
-  const options = [
-    ["data", "Data card"],
-    ["liveMetric", "Live metric"],
-    ["badge", "Badge/status"],
-    ["link", "Link"],
-    ["evidenceFile", "Evidence file"],
-    ["table", "Table"],
-    ["compositionChart", "Composition chart"],
-    ["narrative", "Narrative"],
-    ["symbol", "Symbol"],
-  ];
+  const header = document.createElement("div");
+  header.className = "presentation-row presentation-row-head";
+  [
+    "Field",
+    "Product overview card",
+    "Timeline",
+  ].forEach((label) => {
+    const item = document.createElement("span");
+    item.textContent = label;
+    header.appendChild(item);
+  });
+  container.appendChild(header);
   for (const field of fields) {
     const row = document.createElement("label");
     row.className = "presentation-row";
     row.textContent = fieldOptionLabel(field);
-    const createSelect = (datasetKey, value, optionPairs) => {
-      const select = document.createElement("select");
-      select.dataset[datasetKey] = field.fieldKey;
-      for (const [optionValue, label] of optionPairs) {
-        const option = document.createElement("option");
-        option.value = optionValue;
-        option.textContent = label;
-        select.appendChild(option);
-      }
-      select.value = value;
-      return select;
-    };
-  const select = createSelect(
-      "presentationField",
-      current.get(field.fieldKey) || (
-        field.fieldType === "table" ? "table" :
-          field.fieldType === "file" ? "evidenceFile" :
-            field.fieldType === "url" ? "link" :
-              field.fieldType === "checkbox" ? "badge" : "data"
-      ),
-      options
+    row.appendChild(createFieldSelect(
+      "summaryRoleField",
+      field.fieldKey,
+      normalizeProductOverviewCardRole(currentSummaryRole.get(field.fieldKey)),
+      productOverviewCardOptions()
+    ));
+    row.appendChild(createFieldSelect("lifecycleRoleField", field.fieldKey, currentLifecycleRole.get(field.fieldKey) || "", [
+      ["", "Not in lifecycle timeline"],
+      ["manufacturedDate", "Manufacturing Date"],
+      ["manufacturedContext", "Manufacturing Place"],
+      ["putIntoServiceDate", "Date of Putting to Service"],
+    ]));
+    row.title = "Product overview card controls the small cards below the product image. The viewer shows the field label and saved passport value.";
+    container.appendChild(row);
+  }
+}
+
+function renderSystemHeaderFields(fields) {
+  const container = $("#systemHeaderFields");
+  if (!container) return;
+  const previousSelections = Object.fromEntries(
+    $$("[data-system-header-slot]", container).map((select) => [select.dataset.systemHeaderSlot, select.value])
+  );
+  container.innerHTML = "";
+
+  for (const slot of HEADER_SLOT_DEFINITIONS) {
+    const row = document.createElement("label");
+    row.className = "presentation-row";
+    const text = document.createElement("span");
+    text.textContent = slot.label;
+    row.appendChild(text);
+    const optionPairs = [
+      [`__managed__:${slot.managedKey}`, "Use managed value"],
+      ...fields.map((field) => [field.fieldKey, fieldOptionLabel(field)]),
+    ];
+    const select = createFieldSelect(
+      "systemHeaderSlot",
+      slot.slotKey,
+      previousSelections[slot.slotKey] || `__managed__:${slot.managedKey}`,
+      optionPairs,
+      "Leave empty"
     );
-    const objectType = currentObjectType.get(field.fieldKey) || (
-      field.fieldType === "table" ? "MultiValuedDataElement" :
-        field.fieldType === "file" || field.fieldType === "url" ? "RelatedResource" : "SingleValuedDataElement"
-    );
-    const valueDataType = currentValueDataType.get(field.fieldKey) || (
-      field.fieldType === "table" ? "Array" :
-        field.fieldType === "file" ? "Binary" :
-          field.fieldType === "url" ? "URI" :
-            field.fieldType === "date" ? "Date" :
-              field.dataType === "datetime" ? "DateTime" :
-                field.dataType === "uri" ? "URI" :
-              field.dataType === "integer" ? "Integer" :
-                field.dataType === "number" ? "Decimal" :
-                  field.dataType === "boolean" || field.fieldType === "checkbox" ? "Boolean" : "String"
-    );
+    select.dataset.systemHeaderSlot = slot.slotKey;
     row.appendChild(select);
-    row.appendChild(createSelect("summaryRoleField", currentSummaryRole.get(field.fieldKey) || "", [
-      ["", "No summary role"],
-      ["model", "Model"],
-      ["capacity", "Capacity"],
-      ["category", "Category"],
-    ]));
-    row.appendChild(createSelect("lifecycleRoleField", currentLifecycleRole.get(field.fieldKey) || "", [
-      ["", "No lifecycle role"],
-      ["manufacturedDate", "Manufactured date"],
-      ["manufacturedContext", "Manufactured context"],
-      ["putIntoServiceDate", "Put into service date"],
-      ["serviceContext", "Service context"],
-    ]));
-    row.appendChild(createSelect("mediaRoleField", currentMediaRole.get(field.fieldKey) || "", [
-      ["", "No media role"],
-      ["productImage", "Product image"],
-    ]));
-    row.appendChild(createSelect("objectTypeField", objectType, [
-      ["SingleValuedDataElement", "Single value"],
-      ["MultiValuedDataElement", "Multi value"],
-      ["DataElementCollection", "Collection"],
-      ["RelatedResource", "Related resource"],
-      ["MultiLanguageDataElement", "Multi-language"],
-    ]));
-    row.appendChild(createSelect("valueDataTypeField", valueDataType, [
-      ["String", "String"],
-      ["Boolean", "Boolean"],
-      ["Integer", "Integer"],
-      ["Decimal", "Decimal"],
-      ["Date", "Date"],
-      ["DateTime", "DateTime"],
-      ["URI", "URI"],
-      ["Binary", "Binary"],
-      ["Array", "Array"],
-      ["Object", "Object"],
-    ]));
+    row.title = "Choose a managed passport value or map a real module field into this header slot.";
     container.appendChild(row);
   }
 }
@@ -549,11 +590,75 @@ function syncRoleOptions() {
     getTableFieldsFromDom().map((field) => ({ value: field.fieldKey, label: fieldOptionLabel(field) })),
     "No composition chart"
   );
-  renderRoleChecks($("#heroFields"), fields, "roleHero");
-  renderRoleChecks($("#summaryFields"), fields, "roleSummary");
-  renderRoleChecks($("#trustFields"), fields, "roleTrust");
   renderPresentationFields(fields);
+  renderSystemHeaderFields(fields);
   syncCompositionRoleColumns();
+  updateWorkspaceMeta();
+}
+
+function normalizeFilterValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getFieldFilterText(row, key) {
+  if (key === "advanced") {
+    return [
+      "fieldKey",
+      "semanticSlug",
+      "categoryKey",
+      "unitKey",
+      "objectType",
+      "valueDataType",
+      "tableDefaultRowsText",
+    ]
+      .map((fieldKey) => $(`[data-field='${fieldKey}']`, row)?.value || "")
+      .concat($$("[data-column]", row).map((input) => input.type === "checkbox" ? String(input.checked) : input.value))
+      .join(" ");
+  }
+  const input = $(`[data-field='${key}']`, row);
+  if (!input) return "";
+  return input.type === "checkbox" ? String(input.checked) : input.value;
+}
+
+function applySectionFilters(sectionNode) {
+  if (!sectionNode) return;
+  const filters = $$("[data-field-filter]", sectionNode)
+    .map((input) => ({
+      key: input.dataset.fieldFilter,
+      value: normalizeFilterValue(input.value),
+      exact: input.tagName === "SELECT",
+    }))
+    .filter((filter) => filter.key && filter.value);
+  const rows = $$(".field-row", sectionNode);
+  let visibleCount = 0;
+
+  for (const row of rows) {
+    const isMatch = filters.every((filter) => {
+      const value = normalizeFilterValue(getFieldFilterText(row, filter.key));
+      return filter.exact ? value === filter.value : value.includes(filter.value);
+    });
+    row.classList.toggle("filtered-out", !isMatch);
+    if (isMatch) visibleCount += 1;
+  }
+
+  const count = $("[data-filter-count]", sectionNode);
+  if (count) {
+    count.classList.toggle("hidden", filters.length === 0);
+    count.textContent = `${visibleCount}/${rows.length} visible`;
+  }
+}
+
+function setupSectionFilters(sectionNode) {
+  $$("[data-field-filter]", sectionNode).forEach((input) => {
+    input.addEventListener("input", () => applySectionFilters(sectionNode));
+    input.addEventListener("change", () => applySectionFilters(sectionNode));
+  });
+  $("[data-clear-filters]", sectionNode)?.addEventListener("click", () => {
+    $$("[data-field-filter]", sectionNode).forEach((input) => {
+      input.value = "";
+    });
+    applySectionFilters(sectionNode);
+  });
 }
 
 function addTableColumn(row, data = {}) {
@@ -586,10 +691,12 @@ function addTableColumn(row, data = {}) {
 
   $("[data-remove-column]", node).addEventListener("click", () => {
     node.remove();
+    applySectionFilters(row.closest(".section-card"));
     syncRoleOptions();
   });
 
   host.appendChild(node);
+  applySectionFilters(row.closest(".section-card"));
   syncRoleOptions();
   return node;
 }
@@ -609,14 +716,30 @@ function addSection(data = {}) {
   $("[data-section-key]", node).value = data.key || "";
   $("[data-section-label]", node).value = data.label || "";
   $("[data-add-field]", node).addEventListener("click", () => addField(node));
+  $("[data-toggle-section]", node).addEventListener("click", () => {
+    node.classList.toggle("collapsed");
+    const button = $("[data-toggle-section]", node);
+    if (button) button.textContent = node.classList.contains("collapsed") ? "Expand" : "Collapse";
+  });
+  $("[data-toggle-details]", node).addEventListener("click", () => {
+    const shouldOpen = !node.classList.contains("show-details");
+    node.classList.toggle("show-details", shouldOpen);
+    $$("[data-fields] .field-more-group", node).forEach((details) => {
+      details.open = shouldOpen;
+    });
+    const button = $("[data-toggle-details]", node);
+    if (button) button.textContent = shouldOpen ? "Hide details" : "Show details";
+  });
   $("[data-remove-section]", node).addEventListener("click", () => {
     node.remove();
     syncRoleOptions();
   });
   setupSectionAutoFill(node);
+  setupSectionFilters(node);
   $("#sections").appendChild(node);
   (data.fields || []).forEach((field) => addField(node, field));
   if (!data.fields?.length) addField(node);
+  applySectionFilters(node);
   return node;
 }
 
@@ -632,13 +755,53 @@ function addField(sectionNode, data = {}) {
     }
   }
   const typeSelect = $("[data-field='fieldType']", node);
+  const dataTypeSelect = $("[data-field='dataType']", node);
+  const objectTypeSelect = $("[data-field='objectType']", node);
+  const valueDataTypeSelect = $("[data-field='valueDataType']", node);
   const addColumnButton = $("[data-add-column]", node);
+  if (typeSelect.value === "checkbox") typeSelect.value = "boolean";
+  const syncFieldDataType = () => {
+    if (dataTypeSelect && !dataTypeSelect.dataset.manual) {
+      dataTypeSelect.value = defaultDataTypeForFieldType(typeSelect.value);
+    }
+  };
+  const syncFieldSchemaMetadata = () => {
+    syncFieldDataType();
+    if (objectTypeSelect && !objectTypeSelect.dataset.manual) {
+      objectTypeSelect.value = defaultObjectTypeForFieldType(typeSelect.value);
+    }
+    if (valueDataTypeSelect && !valueDataTypeSelect.dataset.manual) {
+      valueDataTypeSelect.value = defaultValueDataTypeForField(typeSelect.value, dataTypeSelect?.value || "string");
+    }
+  };
+  if (data.objectType) objectTypeSelect.dataset.manual = "true";
+  if (data.valueDataType) valueDataTypeSelect.dataset.manual = "true";
+  const defaultDataType = defaultDataTypeForFieldType(typeSelect.value);
+  if (data.dataType && data.dataType !== defaultDataType && typeSelect.value !== "text" && typeSelect.value !== "textarea") {
+    dataTypeSelect.dataset.manual = "true";
+  }
+  syncFieldSchemaMetadata();
   setupFieldAutoFill(node);
   addColumnButton.addEventListener("click", () => addTableColumn(node));
-  typeSelect.addEventListener("change", () => syncTableConfigVisibility(node));
-  typeSelect.addEventListener("change", syncRoleOptions);
+  typeSelect.addEventListener("change", () => {
+    syncFieldSchemaMetadata();
+    syncTableConfigVisibility(node);
+    syncRoleOptions();
+  });
+  dataTypeSelect?.addEventListener("change", () => {
+    dataTypeSelect.dataset.manual = "true";
+    syncFieldSchemaMetadata();
+  });
+  objectTypeSelect?.addEventListener("change", () => {
+    objectTypeSelect.dataset.manual = "true";
+  });
+  valueDataTypeSelect?.addEventListener("change", () => {
+    valueDataTypeSelect.dataset.manual = "true";
+  });
   $("[data-field='fieldKey']", node).addEventListener("input", syncRoleOptions);
   $("[data-field='fieldLabel']", node).addEventListener("input", syncRoleOptions);
+  node.addEventListener("input", () => applySectionFilters(sectionNode));
+  node.addEventListener("change", () => applySectionFilters(sectionNode));
 
   (data.tableColumns || data.table_columns || []).forEach((column) => addTableColumn(node, column));
   if ((data.tableColumns || data.table_columns || []).length === 0) {
@@ -647,12 +810,19 @@ function addField(sectionNode, data = {}) {
     const panel = $("[data-table-config]", node);
     panel.classList.toggle("hidden", typeSelect.value !== "table");
   }
+  if (sectionNode.classList.contains("show-details")) {
+    $$(".field-more-group", node).forEach((details) => {
+      details.open = true;
+    });
+  }
 
   $("[data-remove-field]", node).addEventListener("click", () => {
     node.remove();
+    applySectionFilters(sectionNode);
     syncRoleOptions();
   });
   $("[data-fields]", sectionNode).appendChild(node);
+  applySectionFilters(sectionNode);
   syncRoleOptions();
   return node;
 }
@@ -675,12 +845,8 @@ function readField(row) {
 }
 
 function readSpec() {
-  const presentationEntries = $$("[data-presentation-field]").map((select) => [select.dataset.presentationField, select.value]);
   const summaryRoleEntries = $$("[data-summary-role-field]").map((select) => [select.dataset.summaryRoleField, select.value]);
   const lifecycleRoleEntries = $$("[data-lifecycle-role-field]").map((select) => [select.dataset.lifecycleRoleField, select.value]);
-  const mediaRoleEntries = $$("[data-media-role-field]").map((select) => [select.dataset.mediaRoleField, select.value]);
-  const objectTypeEntries = $$("[data-object-type-field]").map((select) => [select.dataset.objectTypeField, select.value]);
-  const valueDataTypeEntries = $$("[data-value-data-type-field]").map((select) => [select.dataset.valueDataTypeField, select.value]);
   return {
     module: {
       family: getFormValue("family"),
@@ -691,30 +857,19 @@ function readSpec() {
       productCategory: getFormValue("productCategory"),
       productIcon: getFormValue("productIcon"),
       semanticModelKey: getFormValue("semanticModelKey"),
-      complianceProfileKey: getFormValue("complianceProfileKey"),
-      requiredPassportFields: getFormValue("requiredPassportFields"),
+      passportPolicyKey: getFormValue("passportPolicyKey"),
       defaultCarrierPolicyKey: getFormValue("defaultCarrierPolicyKey"),
-      requireCompanyOperatorIdentifier: getCheckboxValue("requireCompanyOperatorIdentifier"),
-      requireCarrierPolicy: getCheckboxValue("requireCarrierPolicy"),
-      enforceSemanticMapping: getCheckboxValue("enforceSemanticMapping"),
-      requirePublicAccessLayer: getCheckboxValue("requirePublicAccessLayer"),
-      requireFacilityAtGranularities: getMultiSelectValues("requireFacilityAtGranularities"),
-      managedSemanticFieldsText: getFormValue("managedSemanticFieldsText"),
+      systemHeaderFieldAssignments: Object.fromEntries(
+        $$("[data-system-header-slot]").map((select) => [select.dataset.systemHeaderSlot, select.value]).filter(([, value]) => value)
+      ),
       baseUrl: getFormValue("baseUrl"),
       dictionaryName: getFormValue("dictionaryName"),
       dictionaryDescription: getFormValue("dictionaryDescription"),
     },
     roles: {
       businessIdentifierField: getFormValue("businessIdentifierField"),
-      heroFieldKeys: $$("[data-role-hero]").filter((input) => input.checked).map((input) => input.value),
-      summaryFieldKeys: $$("[data-role-summary]").filter((input) => input.checked).map((input) => input.value),
-      trustFieldKeys: $$("[data-role-trust]").filter((input) => input.checked).map((input) => input.value),
-      presentations: Object.fromEntries(presentationEntries.filter(([, value]) => value)),
       summaryRoles: Object.fromEntries(summaryRoleEntries.filter(([, value]) => value)),
       lifecycleRoles: Object.fromEntries(lifecycleRoleEntries.filter(([, value]) => value)),
-      mediaRoles: Object.fromEntries(mediaRoleEntries.filter(([, value]) => value)),
-      objectTypes: Object.fromEntries(objectTypeEntries.filter(([, value]) => value)),
-      valueDataTypes: Object.fromEntries(valueDataTypeEntries.filter(([, value]) => value)),
       compositionFieldKey: getFormValue("compositionFieldKey"),
       compositionLabelColumnKey: getFormValue("compositionLabelColumnKey"),
       compositionValueColumnKey: getFormValue("compositionValueColumnKey"),
@@ -729,51 +884,43 @@ function readSpec() {
 
 function loadSpec(spec) {
   Object.entries(spec.module || {}).forEach(([key, value]) => setFormValue(key, value));
-  setCheckboxValue("requireCompanyOperatorIdentifier", spec.module?.requireCompanyOperatorIdentifier ?? true);
-  setCheckboxValue("requireCarrierPolicy", spec.module?.requireCarrierPolicy ?? false);
-  setCheckboxValue("enforceSemanticMapping", spec.module?.enforceSemanticMapping ?? true);
-  setCheckboxValue("requirePublicAccessLayer", spec.module?.requirePublicAccessLayer ?? true);
-  setMultiSelectValues("requireFacilityAtGranularities", spec.module?.requireFacilityAtGranularities || []);
+  const roles = spec.roles || {};
+  const objectTypes = roles.objectTypes && typeof roles.objectTypes === "object" ? roles.objectTypes : {};
+  const valueDataTypes = roles.valueDataTypes && typeof roles.valueDataTypes === "object" ? roles.valueDataTypes : {};
+  const sections = (spec.sections || []).map((section) => ({
+    ...section,
+    fields: (section.fields || []).map((field) => ({
+      ...field,
+      objectType: field.objectType || objectTypes[field.fieldKey || field.key] || "",
+      valueDataType: field.valueDataType || valueDataTypes[field.fieldKey || field.key] || "",
+    })),
+  }));
   $("#sections").innerHTML = "";
-  (spec.sections || []).forEach(addSection);
+  sections.forEach(addSection);
   maybeAutoModuleValues();
   syncRoleOptions();
-  const roles = spec.roles || {};
   setFormValue("businessIdentifierField", roles.businessIdentifierField);
   setFormValue("compositionFieldKey", roles.compositionFieldKey);
   syncCompositionRoleColumns();
   setFormValue("compositionLabelColumnKey", roles.compositionLabelColumnKey);
   setFormValue("compositionValueColumnKey", roles.compositionValueColumnKey);
-  const markChecked = (selector, values = []) => {
-    const selected = new Set(Array.isArray(values) ? values : []);
-    $$(selector).forEach((input) => { input.checked = selected.has(input.value); });
-  };
-  markChecked("[data-role-hero]", roles.heroFieldKeys);
-  markChecked("[data-role-summary]", roles.summaryFieldKeys);
-  markChecked("[data-role-trust]", roles.trustFieldKeys);
-  Object.entries(roles.presentations || {}).forEach(([fieldKey, value]) => {
-    const select = $(`[data-presentation-field="${fieldKey}"]`);
-    if (select) select.value = value;
-  });
   Object.entries(roles.summaryRoles || {}).forEach(([fieldKey, value]) => {
     const select = $(`[data-summary-role-field="${fieldKey}"]`);
-    if (select) select.value = value;
+    if (select) select.value = normalizeProductOverviewCardRole(value);
   });
   Object.entries(roles.lifecycleRoles || {}).forEach(([fieldKey, value]) => {
     const select = $(`[data-lifecycle-role-field="${fieldKey}"]`);
     if (select) select.value = value;
   });
-  Object.entries(roles.mediaRoles || {}).forEach(([fieldKey, value]) => {
-    const select = $(`[data-media-role-field="${fieldKey}"]`);
-    if (select) select.value = value;
-  });
-  Object.entries(roles.objectTypes || {}).forEach(([fieldKey, value]) => {
-    const select = $(`[data-object-type-field="${fieldKey}"]`);
-    if (select) select.value = value;
-  });
-  Object.entries(roles.valueDataTypes || {}).forEach(([fieldKey, value]) => {
-    const select = $(`[data-value-data-type-field="${fieldKey}"]`);
-    if (select) select.value = value;
+  const assignments = spec.module?.systemHeaderFieldAssignments && typeof spec.module.systemHeaderFieldAssignments === "object"
+    ? spec.module.systemHeaderFieldAssignments
+    : Object.fromEntries(
+        (Array.isArray(spec.module?.systemHeaderFieldKeys) ? spec.module.systemHeaderFieldKeys : [])
+          .map((fieldKey, index) => [HEADER_SLOT_DEFINITIONS[index]?.slotKey, fieldKey])
+          .filter(([slotKey, fieldKey]) => slotKey && fieldKey)
+      );
+  $$("[data-system-header-slot]").forEach((select) => {
+    select.value = assignments[select.dataset.systemHeaderSlot] || "";
   });
 }
 
@@ -850,6 +997,7 @@ $("#addSection").addEventListener("click", () => addSection());
 $("#preview").addEventListener("click", preview);
 $("#writeFiles").addEventListener("click", writeFiles);
 $("#compositionFieldKey").addEventListener("change", syncCompositionRoleColumns);
+setupWorkspaceNavigation();
 setupModuleAutoFill();
 loadSpec(sample);
 loadStatus();

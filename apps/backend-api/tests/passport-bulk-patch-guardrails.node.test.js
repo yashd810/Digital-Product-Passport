@@ -23,9 +23,9 @@ test("bulk patch accepts schema fields and explicit editable built-ins", () => {
   assert.deepEqual(invalidKeys, []);
 });
 
-test("bulk patch rejects system-managed and profile-owned fields", () => {
+test("bulk patch rejects system-managed and policy-owned fields", () => {
   const invalidKeys = getInvalidBulkPatchFieldKeys({
-    complianceProfileKey: "client_profile",
+    passportPolicyKey: "client_profile",
     contentSpecificationIds: ["client_spec"],
     carrierPolicyKey: "client_carrier",
     economicOperatorId: "client_operator",
@@ -36,7 +36,7 @@ test("bulk patch rejects system-managed and profile-owned fields", () => {
   }, createTypeSchema());
 
   assert.deepEqual(invalidKeys, [
-    "complianceProfileKey",
+    "passportPolicyKey",
     "contentSpecificationIds",
     "carrierPolicyKey",
     "economicOperatorId",

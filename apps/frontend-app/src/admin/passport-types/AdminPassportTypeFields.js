@@ -3,9 +3,9 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   ACCESS_LEVEL_LABELS,
   CONFIDENTIALITY_LEVEL_LABELS,
-  HEADER_OWNERSHIP_LABELS,
   UPDATE_AUTHORITY_LABELS,
   normalizeSystemPassportHeader,
+  resolveSystemHeaderEntries,
 } from "./builderHelpers";
 import { formatSemanticModelLabel } from "./semanticTermCatalog";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
@@ -49,6 +49,7 @@ function AdminPassportTypeFields() {
 
   const sections = typeDef.fieldsJson?.sections || []; 
   const systemHeader = normalizeSystemPassportHeader(typeDef.fieldsJson?.systemHeader);
+  const systemHeaderEntries = resolveSystemHeaderEntries(sections, systemHeader);
   const fieldCount = sections.reduce((sum, s) => sum + (s.fields?.length || 0), 0);
   const describeList = (values = [], labelMap = {}) =>
     (Array.isArray(values) ? values : [])
@@ -73,27 +74,27 @@ function AdminPassportTypeFields() {
           <div className="apt-fv-section-title apt-fv-section-title-strong">{systemHeader.section.label}</div>
           <table className="apt-fv-table apt-fv-table-full apt-fv-table-header">
             <caption className="apt-sr-only">
-              System-managed passport header fields with standards mapping and source ownership.
+              Passport header fields selected from the passport module schema.
             </caption>
             <thead>
               <tr>
                 <th>Label</th>
                 <th>Key</th>
-                  <th>Semantic ID</th>
-                  <th>Ownership</th>
-                  <th>Source</th>
-                  <th>Required</th>
+                <th>Semantic ID</th>
+                <th>Source</th>
+                <th>Type</th>
+                <th>Required</th>
               </tr>
             </thead>
             <tbody>
-              {systemHeader.fields.map(field => (
-                <tr key={field.key}>
-                  <td>{field.label}</td>
-                  <td><code>{field.key}</code></td>
-                  <td><code>{field.semanticId}</code></td>
-                  <td>{HEADER_OWNERSHIP_LABELS[field.ownership] || field.ownership}</td>
-                  <td>{field.valueSource.replace(/_/g, " ")}</td>
-                  <td>{field.required ? "Yes" : "Conditional"}</td>
+              {systemHeaderEntries.map(entry => (
+                <tr key={`${entry.sourceType}:${entry.managedKey || entry.fieldKey || entry.slotKey}`}>
+                  <td>{entry.label}</td>
+                  <td><code>{entry.sourceType === "managed" ? entry.slotKey : entry.fieldKey}</code></td>
+                  <td><code>{entry.semanticId || "—"}</code></td>
+                  <td>{entry.sourceType === "managed" ? "Managed value" : "Module field"}</td>
+                  <td>{entry.type || "—"}</td>
+                  <td>{entry.required ? "Yes" : "No"}</td>
                 </tr>
               ))}
             </tbody>

@@ -111,16 +111,33 @@ test("seed script can discover and select an arbitrary future module file", asyn
       displayName: "Medical Device Passport v1",
       productCategory: "Medical Device",
       productIcon: "MD",
-      semanticModelKey: "claros_medical_device_dictionary_v1",
+      semanticModelKey: "medical_device_dictionary_v1",
       identity: {
         businessIdentifierField: "modelIdentifier",
       },
-      complianceProfile: {
+      systemHeader: {
+        section: { key: "passportHeader", label: "Passport Header" },
+        fieldMappings: [
+          { slotKey: "digitalProductPassportId", sourceType: "managed", managedKey: "internalManagedDigitalProductPassportId" },
+          { slotKey: "uniqueProductIdentifier", sourceType: "managed", managedKey: "internalManagedUniqueProductIdentifier" },
+          { slotKey: "internalAliasId", sourceType: "managed", managedKey: "internalManagedInternalAliasId" },
+          { slotKey: "granularity", sourceType: "managed", managedKey: "internalManagedGranularity" },
+          { slotKey: "dppSchemaVersion", sourceType: "managed", managedKey: "internalManagedDppSchemaVersion" },
+          { slotKey: "dppStatus", sourceType: "managed", managedKey: "internalManagedDppStatus" },
+          { slotKey: "lastUpdate", sourceType: "managed", managedKey: "internalManagedLastUpdate" },
+          { slotKey: "economicOperatorId", sourceType: "managed", managedKey: "internalManagedEconomicOperatorId" },
+          { slotKey: "facilityId", sourceType: "managed", managedKey: "internalManagedFacilityId" },
+          { slotKey: "contentSpecificationIds", sourceType: "managed", managedKey: "internalManagedContentSpecificationIds" },
+          { slotKey: "subjectDid", sourceType: "managed", managedKey: "internalManagedSubjectDid" },
+          { slotKey: "dppDid", sourceType: "managed", managedKey: "internalManagedDppDid" },
+          { slotKey: "companyDid", sourceType: "managed", managedKey: "internalManagedCompanyDid" },
+        ],
+        fieldKeys: [],
+      },
+      passportPolicy: {
         key: "medicalDeviceDppV1",
-        displayName: "Medical Device DPP Profile v1",
-        contentSpecificationIds: ["claros_medical_device_dictionary_v1"],
-        requiredPassportFields: ["complianceProfileKey", "contentSpecificationIds"],
-        enforceSemanticMapping: true,
+        displayName: "Medical Device Passport Policy v1",
+        contentSpecificationIds: ["Medical_Device_dictionary_v1"],
       },
       sections: [{
         key: "deviceIdentity",
@@ -136,7 +153,7 @@ test("seed script can discover and select an arbitrary future module file", asyn
     const selected = getSelectedModules("medical-device:v1", { modulesDir });
     assert.equal(selected.length, 1);
     assert.equal(selected[0].moduleKey, "medical-device:v1");
-    assert.equal(selected[0].fieldsJson.complianceProfile.key, "medicalDeviceDppV1");
+    assert.equal(selected[0].fieldsJson.passportPolicy.key, "medicalDeviceDppV1");
 
     const result = await runSeed({
       pool: null,
