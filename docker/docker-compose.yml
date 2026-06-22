@@ -85,7 +85,7 @@ services:
       retries: 20
       start_period: 5s
     volumes:
-      - ../.docker-data/postgres:/var/lib/postgresql/data
+      - ../.docker-data/postgres:/var/lib/postgresql
 
 volumes:
   frontend_node_modules:
