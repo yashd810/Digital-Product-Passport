@@ -377,6 +377,19 @@ run_live_edge_check() {
   "$APP_DIR/infra/oracle/check-live-edge.sh" "${LIVE_EDGE_TARGETS[@]}"
 }
 
+ensure_docker_volume() {
+  local name="$1"
+  local label="$2"
+
+  if docker volume inspect "$name" >/dev/null 2>&1; then
+    echo "Using existing $label volume: $name"
+    return 0
+  fi
+
+  docker volume create "$name" >/dev/null
+  echo "Created fresh $label volume: $name"
+}
+
 EXPLICIT_POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-}"
 if [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
   EXPLICIT_POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
@@ -401,6 +414,13 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
     echo "This guard prevents Docker Compose from attaching a fresh database volume by accident."
     exit 1
   fi
+
+  LOCAL_STORAGE_VOLUME_NAME="${LOCAL_STORAGE_VOLUME_NAME:-$(read_env_var LOCAL_STORAGE_VOLUME_NAME)}"
+  LOCAL_STORAGE_VOLUME_NAME="${LOCAL_STORAGE_VOLUME_NAME:-dpp_local_storage_data}"
+  POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-$(read_env_var POSTGRES_VOLUME_NAME)}"
+  POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-dpp_postgres_data}"
+  ensure_docker_volume "$LOCAL_STORAGE_VOLUME_NAME" "local storage"
+  ensure_docker_volume "$POSTGRES_VOLUME_NAME" "PostgreSQL data"
 fi
 
 (
