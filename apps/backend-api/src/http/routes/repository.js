@@ -15,50 +15,52 @@ module.exports = function registerRepositoryRoutes(app, {
   requireEditor,
   repoUpload,
   repoSymbolUpload,
+  validateRepositoryPdfUpload,
+  validateRepositorySymbolUpload,
   REPO_BASE_DIR,
   isPathInsideBase,
   storageService,
 }) {
   const appBaseUrlFromRequest = (req) => `${req.protocol}://${req.get("host")}`;
-  const isAbsoluteHttpUrl = (value) => /^https?:\/\//i.test(String(value || "").trim());
+  const getCompanyId = (row) => row?.companyId || row?.company_id || null;
+  const getStorageKey = (row) => row?.storageKey || row?.storage_key || "";
+  const getFilePath = (row) => row?.filePath || row?.file_path || "";
+  const getFileUrl = (row) => row?.fileUrl || row?.file_url || null;
   const hasStorageProviderMismatch = (row) => {
-    const rowProvider = String(row?.storageProvider || "").trim().toLowerCase();
+    const rowProvider = String(row?.storageProvider || row?.storage_provider || "").trim().toLowerCase();
     const activeProvider = String(storageService?.provider || storageService?.name || "").trim().toLowerCase();
     return Boolean(rowProvider && activeProvider && rowProvider !== activeProvider);
   };
   const canServeStoredObject = (row) =>
-    Boolean(row?.storageKey && storageService.fetchObject && !hasStorageProviderMismatch(row));
+    Boolean(getStorageKey(row) && storageService.fetchObject && !hasStorageProviderMismatch(row));
 
   const repositoryFileUrl = (req, row) => {
-    if (hasStorageProviderMismatch(row) && isAbsoluteHttpUrl(row?.fileUrl)) {
-      return row.fileUrl;
-    }
-    if (row?.id && (row.storageKey || row.filePath)) {
+    if (row?.id && (getStorageKey(row) || getFilePath(row))) {
       return buildRepositoryFilePublicUrl({
         appBaseUrl: appBaseUrlFromRequest(req),
-        companyId: row.companyId,
+        companyId: getCompanyId(row),
         itemId: row.id,
       });
     }
-    return row?.fileUrl || null;
+    return getFileUrl(row);
   };
 
   const withResolvedFileUrl = (req, row) => ({
     id: row.id,
-    companyId: row.companyId ?? null,
-    parentId: row.parentId ?? null,
+    companyId: getCompanyId(row),
+    parentId: row.parentId ?? row.parent_id ?? null,
     name: row.name || "",
     type: row.type || "",
     fileUrl: repositoryFileUrl(req, row),
-    storageKey: row.storageKey ?? null,
-    filePath: row.filePath ?? null,
-    mimeType: row.mimeType ?? null,
-    sizeBytes: row.sizeBytes ?? null,
-    createdAt: row.createdAt ?? null,
+    storageKey: getStorageKey(row) || null,
+    filePath: getFilePath(row) || null,
+    mimeType: row.mimeType ?? row.mime_type ?? null,
+    sizeBytes: row.sizeBytes ?? row.size_bytes ?? null,
+    createdAt: row.createdAt ?? row.created_at ?? null,
   });
 
   const setRepositoryFileHeaders = (res, row) => {
-    const mimeType = row.mimeType || "application/octet-stream";
+    const mimeType = row.mimeType || row.mime_type || "application/octet-stream";
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Cache-Control", "private, max-age=300");
@@ -69,12 +71,6 @@ module.exports = function registerRepositoryRoutes(app, {
       res.removeHeader("X-Frame-Options");
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     }
-  };
-
-  const maybeRedirectToExternalFileUrl = (res, row) => {
-    if (!hasStorageProviderMismatch(row) || !isAbsoluteHttpUrl(row?.fileUrl)) return false;
-    res.redirect(302, row.fileUrl);
-    return true;
   };
 
   app.get("/api/companies/:companyId/repository", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -139,6 +135,7 @@ module.exports = function registerRepositoryRoutes(app, {
     checkCompanyAccess,
     requireEditor,
     repoUpload.single("file"),
+    validateRepositoryPdfUpload,
     async (req, res) => {
       try {
         if (!req.file) return res.status(400).json({ error: "No file received" });
@@ -231,15 +228,17 @@ module.exports = function registerRepositoryRoutes(app, {
         if (children.rows.length) {
           return res.status(409).json({ error: "Folder must be empty before deleting" });
         }
-      } else if (row.storageKey || row.filePath) {
-        if (row.file_path && !row.storage_key) {
-          const safeFilePath = path.resolve(row.file_path);
+      } else if (getStorageKey(row) || getFilePath(row)) {
+        const filePath = getFilePath(row);
+        const storageKey = getStorageKey(row);
+        if (filePath && !storageKey) {
+          const safeFilePath = path.resolve(filePath);
           if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR)) {
             logger.error("[repository-delete] Refusing to delete file outside repository root:", safeFilePath);
             return res.status(400).json({ error: "Stored file path is invalid" });
           }
         }
-        await storageService.deleteStoredFile({ storageKey: row.storage_key });
+        await storageService.deleteStoredFile({ storageKey });
       }
 
       await pool.query("DELETE FROM company_repository WHERE id = $1", [row.id]);
@@ -308,6 +307,7 @@ module.exports = function registerRepositoryRoutes(app, {
     checkCompanyAccess,
     requireEditor,
     repoSymbolUpload.single("file"),
+    validateRepositorySymbolUpload,
     async (req, res) => {
       try {
         if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -371,7 +371,7 @@ module.exports = function registerRepositoryRoutes(app, {
         setRepositoryFileHeaders(res, row);
 
         if (canServeStoredObject(row)) {
-          const objectResponse = await storageService.fetchObject(row.storage_key);
+          const objectResponse = await storageService.fetchObject(getStorageKey(row));
           const contentLength = objectResponse.headers?.get("content-length");
           const etag = objectResponse.headers?.get("etag");
           if (contentLength) res.setHeader("Content-Length", contentLength);
@@ -379,10 +379,9 @@ module.exports = function registerRepositoryRoutes(app, {
           return res.send(Buffer.from(await objectResponse.arrayBuffer()));
         }
 
-        if (maybeRedirectToExternalFileUrl(res, row)) return;
-
-        if (row.file_path) {
-          const safeFilePath = path.resolve(row.file_path);
+        const filePath = getFilePath(row);
+        if (filePath) {
+          const safeFilePath = path.resolve(filePath);
           if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR) || !fs.existsSync(safeFilePath)) {
             return res.status(404).json({ error: "File not found" });
           }
@@ -420,7 +419,7 @@ module.exports = function registerRepositoryRoutes(app, {
         setRepositoryFileHeaders(res, row);
 
         if (canServeStoredObject(row)) {
-          const objectResponse = await storageService.fetchObject(row.storage_key);
+          const objectResponse = await storageService.fetchObject(getStorageKey(row));
           const contentLength = objectResponse.headers?.get("content-length");
           const etag = objectResponse.headers?.get("etag");
           if (contentLength) res.setHeader("Content-Length", contentLength);
@@ -428,10 +427,9 @@ module.exports = function registerRepositoryRoutes(app, {
           return res.send(Buffer.from(await objectResponse.arrayBuffer()));
         }
 
-        if (maybeRedirectToExternalFileUrl(res, row)) return;
-
-        if (row.file_path) {
-          const safeFilePath = path.resolve(row.file_path);
+        const filePath = getFilePath(row);
+        if (filePath) {
+          const safeFilePath = path.resolve(filePath);
           if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR) || !fs.existsSync(safeFilePath)) {
             return res.status(404).json({ error: "File not found" });
           }

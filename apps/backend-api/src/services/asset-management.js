@@ -944,6 +944,7 @@ module.exports = function createAssetService({
   }
 
   let assetSchedulerHandle = null;
+  let assetSchedulerKickoffHandle = null;
   let assetSchedulerBusy = false;
 
   async function runAssetManagementJob(job, triggerType = "manual", userId = null) {
@@ -1091,7 +1092,14 @@ module.exports = function createAssetService({
   function startAssetManagementScheduler() {
     if (assetSchedulerHandle) return;
     assetSchedulerHandle = setInterval(processDueAssetJobs, ASSET_SCHEDULER_INTERVAL_MS);
-    setTimeout(processDueAssetJobs, 5000);
+    assetSchedulerKickoffHandle = setTimeout(processDueAssetJobs, 5000);
+  }
+
+  function stopAssetManagementScheduler() {
+    if (assetSchedulerHandle) clearInterval(assetSchedulerHandle);
+    if (assetSchedulerKickoffHandle) clearTimeout(assetSchedulerKickoffHandle);
+    assetSchedulerHandle = null;
+    assetSchedulerKickoffHandle = null;
   }
 
   return {
@@ -1106,6 +1114,7 @@ module.exports = function createAssetService({
     resolveAssetJobRecords,
     runAssetManagementJob,
     processDueAssetJobs,
-    startAssetManagementScheduler
+    startAssetManagementScheduler,
+    stopAssetManagementScheduler
   };
 };

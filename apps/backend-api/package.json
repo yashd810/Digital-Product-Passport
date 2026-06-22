@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Digital Product Passport Multi-Tenant System",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "scripts": {
     "start": "node src/server.js",
     "db:migrate": "node scripts/migrate-db.js",
@@ -44,8 +47,8 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
-    "multer": "^2.1.1",
-    "nodemailer": "^8.0.7",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.1",
     "pg": "^8.20.0",
     "pino": "^9.9.4",
     "qrcode": "^1.5.4",

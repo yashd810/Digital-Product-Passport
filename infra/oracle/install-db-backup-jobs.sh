@@ -9,9 +9,12 @@ install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup.service" "$UNIT_DIR
 install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup.timer" "$UNIT_DIR/dpp-db-backup.timer"
 install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-verify.service" "$UNIT_DIR/dpp-db-backup-verify.service"
 install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-verify.timer" "$UNIT_DIR/dpp-db-backup-verify.timer"
+install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-drill.service" "$UNIT_DIR/dpp-db-backup-drill.service"
+install -m 0644 "$APP_DIR/infra/oracle/systemd/dpp-db-backup-drill.timer" "$UNIT_DIR/dpp-db-backup-drill.timer"
 
 mkdir -p /var/lib/dpp-db-backups
 
 systemctl daemon-reload
 systemctl enable --now dpp-db-backup.timer
 systemctl enable --now dpp-db-backup-verify.timer
+systemctl enable --now dpp-db-backup-drill.timer

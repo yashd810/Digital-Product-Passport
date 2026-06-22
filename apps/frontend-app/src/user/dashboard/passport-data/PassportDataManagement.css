@@ -843,3 +843,50 @@
     max-height: 62vh;
   }
 }
+
+/* Native dropdowns on the passport-data workspace use the app theme. */
+.pdm-page select:not([multiple]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--select-bg);
+  background-image: var(--select-bg-layer), var(--select-arrow-icon);
+  background-position: 0 0, right 11px center;
+  background-repeat: no-repeat;
+  background-size: auto, 15px;
+  border-color: var(--select-border);
+  color: var(--select-text);
+  cursor: pointer;
+  padding-right: 38px;
+}
+
+.pdm-page select:not([multiple]):hover:not(:disabled) {
+  background-image: var(--select-hover-layer), var(--select-arrow-icon);
+  border-color: var(--select-border-hover);
+}
+
+.pdm-page select:not([multiple]):focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--select-focus-ring);
+  outline: none;
+}
+
+.pdm-table select:not([multiple]) {
+  background-color: rgba(255, 255, 255, 0.035);
+  background-image: var(--select-arrow-icon);
+  background-position: right 8px center;
+  background-size: 14px;
+  border-color: transparent;
+  padding-right: 28px;
+}
+
+.pdm-table select:not([multiple]):hover:not(:disabled),
+.pdm-table select:not([multiple]):focus {
+  background-color: rgba(13, 181, 176, 0.08);
+  background-image: var(--select-arrow-icon);
+  border-color: rgba(13, 181, 176, 0.52);
+}
+
+.pdm-page select option {
+  background: var(--select-option-bg);
+  color: var(--select-option-text);
+}

@@ -83,8 +83,6 @@ function buildClonePrefill(record, sections) {
   const excludedKeys = new Set([
     "id",
     "dppId",
-    "dppId",
-    "companyId",
     "companyId",
     "lineageId",
     "createdAt",
@@ -193,14 +191,10 @@ const NON_PERSISTED_PAYLOAD_KEYS = new Set([
   "subjectDid",
   "dppDid",
   "companyDid",
-  "dppSchemaVersion",
   "schemaVersion",
-  "subjectDid",
-  "dppDid",
-  "companyDid",
 ]);
 
-function PassportForm({ token, user, companyId, mode = "create", passportType: typeProp }) {
+function PassportForm({ user, companyId, mode = "create", passportType: typeProp }) {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { dppId, passportType: typeParam } = useParams();
@@ -256,7 +250,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
   const dirtyRef           = useRef(false);
   const dirtyFieldsRef     = useRef(new Set());
   const baselinePayloadRef = useRef({});
-  const formDataRef        = useRef({}); // ← Track current form data
+  const formDataRef        = useRef({}); // Track current form data
   const saveInFlightRef    = useRef(false);
   const sessionActiveRef   = useRef(false);
   const mountedRef         = useRef(true);
@@ -550,7 +544,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       } catch (e) { setError(e.message); }
       finally { setIsLoading(false); }
     })();
-  }, [dppId, mode, activePassportType, effectiveCompanyId, token, loadingType, dynamicSections]);
+  }, [dppId, mode, activePassportType, effectiveCompanyId, loadingType, dynamicSections]);
 
   useEffect(() => {
     if (mode !== "edit") return;
@@ -1079,7 +1073,7 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
 
     if (field.type === "symbol") {
       const linkedUrl = typeof val === "string" && val.startsWith("http") ? val : null;
-      const picked    = linkedUrl ? symbols.find(s => s.file_url === linkedUrl) : null;
+      const picked    = linkedUrl ? symbols.find(s => s.fileUrl === linkedUrl) : null;
       return (
         <div className="file-upload-widget">
           {linkedUrl ? (
@@ -1530,7 +1524,6 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       {/* ── Repository PDF Picker ── */}
       {repoPicker && (
         <RepositoryPicker
-          token={token}
           companyId={effectiveCompanyId}
           onSelect={(url) => { handleField(repoPicker, url); setRepoPicker(null); }}
           onClose={() => setRepoPicker(null)}
@@ -1540,7 +1533,6 @@ function PassportForm({ token, user, companyId, mode = "create", passportType: t
       {/* ── Symbol Picker ── */}
       {symbolPicker && (
         <SymbolRepositoryPicker
-          token={token}
           companyId={effectiveCompanyId}
           onSelect={(url) => { handleField(symbolPicker, url); setSymbolPicker(null); }}
           onClose={() => setSymbolPicker(null)}

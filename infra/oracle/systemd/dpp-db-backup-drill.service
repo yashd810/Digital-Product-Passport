@@ -1,0 +1,8 @@
+[Unit]
+Description=Run DPP PostgreSQL backup restore drill
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/dpp-db-backup drill

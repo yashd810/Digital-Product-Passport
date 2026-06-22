@@ -18,6 +18,38 @@ read_env_var() {
   ' "$ENV_FILE"
 }
 
+require_env_var() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if [ -z "$value" ]; then
+    echo "Missing required production env var: $key"
+    exit 1
+  fi
+}
+
+require_https_url_env() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if [ -z "$value" ]; then
+    echo "Missing required production URL env var: $key"
+    exit 1
+  fi
+  case "$value" in
+    https://localhost*|https://127.*|https://0.0.0.0*|http://*)
+      echo "Production URL env var $key must be a public https:// origin"
+      exit 1
+      ;;
+    https://*)
+      ;;
+    *)
+      echo "Production URL env var $key must start with https://"
+      exit 1
+      ;;
+  esac
+}
+
 if [ ! -d "$APP_DIR" ]; then
   echo "Missing app directory: $APP_DIR"
   exit 1
@@ -124,6 +156,30 @@ if [ "${AVAILABLE_DISK_KB:-0}" -lt 2097152 ]; then
   exit 1
 fi
 
+case "$DEPLOY_TARGET" in
+  backend|all)
+    require_env_var "JWT_SECRET"
+    require_env_var "PEPPER_V1"
+    require_env_var "DB_HOST"
+    require_env_var "DB_USER"
+    require_env_var "DB_PASSWORD"
+    require_env_var "DB_NAME"
+    require_env_var "ALLOWED_ORIGINS"
+    require_https_url_env "APP_URL"
+    require_https_url_env "SERVER_URL"
+    ;;
+esac
+
+case "$DEPLOY_TARGET" in
+  frontend|all)
+    require_https_url_env "VITE_API_URL"
+    require_https_url_env "VITE_PUBLIC_VIEWER_URL"
+    if [ "$DEPLOY_TARGET" = "frontend" ]; then
+      require_env_var "BACKEND_API_UPSTREAM"
+    fi
+    ;;
+esac
+
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-$DEFAULT_REMOVE_ORPHANS}"
 ORPHAN_ARGS=()
 if [ "$REMOVE_ORPHANS" = "true" ]; then
@@ -229,6 +285,98 @@ wait_for_container_health() {
   return 1
 }
 
+caddyfile_for_target() {
+  case "$DEPLOY_TARGET" in
+    backend)
+      echo "$APP_DIR/infra/oracle/Caddyfile.backend"
+      ;;
+    frontend)
+      echo "$APP_DIR/infra/oracle/Caddyfile.frontend"
+      ;;
+    all)
+      echo "$APP_DIR/infra/oracle/Caddyfile"
+      ;;
+  esac
+}
+
+install_or_reload_caddy() {
+  if [ "${DPP_SKIP_CADDY_RELOAD:-false}" = "true" ]; then
+    echo "Skipping Caddy reload because DPP_SKIP_CADDY_RELOAD=true"
+    return 0
+  fi
+
+  local source_file
+  local destination_file
+  source_file="$(caddyfile_for_target)"
+  destination_file="${DPP_CADDYFILE:-/etc/caddy/Caddyfile}"
+
+  if [ ! -f "$source_file" ]; then
+    echo "Missing Caddyfile for deploy target: $source_file"
+    exit 1
+  fi
+
+  if ! command -v systemctl >/dev/null 2>&1 ||
+    ! systemctl list-unit-files caddy.service --no-legend 2>/dev/null | grep -q '^caddy\.service'; then
+    echo "Caddy service is not installed on this host; skipping edge reload."
+    return 0
+  fi
+
+  if command -v caddy >/dev/null 2>&1; then
+    caddy validate --config "$source_file" --adapter caddyfile
+  else
+    echo "Caddy CLI is not on PATH; skipping config validation before reload."
+  fi
+
+  install -m 0644 "$source_file" "$destination_file"
+  if systemctl is-active --quiet caddy; then
+    systemctl reload caddy || systemctl restart caddy
+  else
+    systemctl restart caddy
+  fi
+  echo "Caddy edge config installed from $source_file"
+}
+
+append_live_edge_target() {
+  local key="$1"
+  local value
+  value="$(read_env_var "$key")"
+  if [ -n "$value" ]; then
+    LIVE_EDGE_TARGETS+=("$value")
+  fi
+}
+
+run_live_edge_check() {
+  if [ "${DPP_SKIP_LIVE_EDGE_CHECK:-false}" = "true" ]; then
+    echo "Skipping live edge check because DPP_SKIP_LIVE_EDGE_CHECK=true"
+    return 0
+  fi
+
+  LIVE_EDGE_TARGETS=()
+  case "$DEPLOY_TARGET" in
+    backend)
+      append_live_edge_target "SERVER_URL"
+      ;;
+    frontend)
+      append_live_edge_target "MARKETING_URL"
+      append_live_edge_target "APP_URL"
+      append_live_edge_target "VITE_PUBLIC_VIEWER_URL"
+      ;;
+    all)
+      append_live_edge_target "MARKETING_URL"
+      append_live_edge_target "APP_URL"
+      append_live_edge_target "VITE_PUBLIC_VIEWER_URL"
+      append_live_edge_target "SERVER_URL"
+      ;;
+  esac
+
+  if [ "${#LIVE_EDGE_TARGETS[@]}" -eq 0 ]; then
+    echo "No public URLs configured for live edge check."
+    return 0
+  fi
+
+  "$APP_DIR/infra/oracle/check-live-edge.sh" "${LIVE_EDGE_TARGETS[@]}"
+}
+
 EXPLICIT_POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-}"
 if [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
   EXPLICIT_POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
@@ -280,5 +428,7 @@ fi
     wait_for_service_http "public-passport-viewer"
     wait_for_service_http "marketing-site"
   fi
+  install_or_reload_caddy
   DPP_ENV_FILE="$ENV_FILE" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps
+  run_live_edge_check
 ) 9>"$LOCK_FILE"

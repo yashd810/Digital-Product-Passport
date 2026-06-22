@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import "../styles/Landing.css";
 
-function Landing({ token, user, onLogout }) {
+function Landing({ isAuthenticated, user, onLogout }) {
   const navigate = useNavigate();
   const dashboardHomePath = buildUserDashboardHomePath({ user });
 
@@ -32,7 +32,7 @@ function Landing({ token, user, onLogout }) {
           </a>
 
           <nav className="lp-nav" aria-label="App navigation">
-            {token ? (
+            {isAuthenticated ? (
               <>
                 <button onClick={() => navigate(dashboardHomePath)} className="lp-nav-btn">
                   Dashboard
@@ -74,7 +74,7 @@ function Landing({ token, user, onLogout }) {
             Issue, manage, and track regulation-ready product passports across your entire portfolio.
             The platform keeps you ahead of EU sustainability mandates — automatically.
           </p>
-          {!token ? (
+          {!isAuthenticated ? (
             <div className="lp-hero-btns">
               <button onClick={() => navigate("/login")} className="lp-btn lp-btn-primary">
                 Sign In to Platform

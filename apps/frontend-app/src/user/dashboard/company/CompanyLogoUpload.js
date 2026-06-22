@@ -1,5 +1,4 @@
 import React, { useRef } from "react";
-import "../../../passport-viewer/styles/PassportViewer.css";
 
 function CompanyLogoUpload({ logoPreview, onLogoChange }) {
   const fileInputRef = useRef(null);
@@ -20,31 +19,31 @@ function CompanyLogoUpload({ logoPreview, onLogoChange }) {
   };
 
   return (
-    <div className="intro-upload-card">
-      <h3 className="intro-upload-title">Company Logo</h3>
+    <div className="company-logo-upload-card">
+      <h3 className="company-logo-upload-title">Company Logo</h3>
 
-      <div className="intro-upload-grid">
-        <div className="intro-col">
-          <p className="intro-col-label">Company Logo</p>
-          <div className="intro-logo-box">
+      <div className="company-logo-upload-grid">
+        <div className="company-logo-upload-col">
+          <p className="company-logo-upload-label">Company Logo</p>
+          <div className="company-logo-upload-box">
             {logoPreview ? (
               <img
                 src={logoPreview}
                 alt="Company logo"
-                className="intro-logo-img"
+                className="company-logo-upload-img"
               />
             ) : (
-              <div className="intro-logo-empty">
-                <span className="intro-logo-icon">🖼</span>
-                <span className="intro-logo-hint">No logo uploaded</span>
+              <div className="company-logo-upload-empty">
+                <span className="company-logo-upload-icon">🖼</span>
+                <span className="company-logo-upload-hint">No logo uploaded</span>
               </div>
             )}
           </div>
 
-          <div className="intro-logo-actions">
+          <div className="company-logo-upload-actions">
             <button
               type="button"
-              className="intro-upload-btn"
+              className="company-logo-upload-btn"
               onClick={() => fileInputRef.current?.click()}
             >
               {logoPreview ? "↺ Change Logo" : "⬆ Upload Logo"}
@@ -53,7 +52,7 @@ function CompanyLogoUpload({ logoPreview, onLogoChange }) {
             {logoPreview ? (
               <button
                 type="button"
-                className="intro-remove-btn"
+                className="company-logo-remove-btn"
                 onClick={() => onLogoChange(null)}
               >
                 ✕ Remove
@@ -61,14 +60,14 @@ function CompanyLogoUpload({ logoPreview, onLogoChange }) {
             ) : null}
           </div>
 
-          <p className="intro-col-hint">JPG, PNG, SVG — max 5 MB</p>
+          <p className="company-logo-upload-hint">JPG, PNG, SVG — max 5 MB</p>
 
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             onChange={handleFileChange}
-            className="intro-upload-hidden-input"
+            className="company-logo-upload-input"
           />
         </div>
       </div>

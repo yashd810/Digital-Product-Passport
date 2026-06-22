@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 
-function OAuthCallback({ setToken, setUser, setCompanyId }) {
+function OAuthCallback({ setIsAuthenticated, setUser, setCompanyId }) {
   const API_BASE_URL = import.meta.env.VITE_API_URL || "";
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,7 +21,7 @@ function OAuthCallback({ setToken, setUser, setCompanyId }) {
 
         localStorage.setItem("user", JSON.stringify(data));
         localStorage.setItem("companyId", data.companyId || "");
-        setToken(true);
+        setIsAuthenticated(true);
         setUser(data);
         setCompanyId(data.companyId || "");
         const next = requestedNext || (
@@ -34,7 +34,7 @@ function OAuthCallback({ setToken, setUser, setCompanyId }) {
         setError(err.message || "SSO login failed");
       }
     })();
-  }, [API_BASE_URL, navigate, requestedNext, setCompanyId, setToken, setUser]);
+  }, [API_BASE_URL, navigate, requestedNext, setCompanyId, setIsAuthenticated, setUser]);
 
   return (
     <div className="auth-container">

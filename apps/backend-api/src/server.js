@@ -259,7 +259,7 @@ const {
   publicHeavyRateLimit, publicUnlockRateLimit,
   apiKeyReadRateLimit, assetWriteRateLimit, assetSourceFetchRateLimit,
 } = createRateLimiters(pool);
-startRateLimitMaintenance(pool);
+const rateLimitMaintenanceTimer = startRateLimitMaintenance(pool);
 
 async function getCompanyAssetSettings(companyId) {
   const result = await pool.query(
@@ -314,6 +314,23 @@ const repoSymbolUpload = multer({
   storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_, file, cb) => { const allowed = [".png",".jpg",".jpeg",".webp"]; allowed.includes(path.extname(file.originalname).toLowerCase()) ? cb(null, true) : cb(new Error("Only PNG, JPG, and WebP files are allowed")); },
 });
+const bufferStartsWith = (buffer, bytes, offset = 0) =>
+  Buffer.isBuffer(buffer) && bytes.every((byte, index) => buffer[offset + index] === byte);
+const isPdfBuffer = (buffer) => bufferStartsWith(buffer, [0x25, 0x50, 0x44, 0x46, 0x2d]);
+const isPngBuffer = (buffer) => bufferStartsWith(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const isJpegBuffer = (buffer) => bufferStartsWith(buffer, [0xff, 0xd8, 0xff]);
+const isWebpBuffer = (buffer) =>
+  bufferStartsWith(buffer, [0x52, 0x49, 0x46, 0x46]) && bufferStartsWith(buffer, [0x57, 0x45, 0x42, 0x50], 8);
+const createUploadSignatureValidator = (predicate, message) => (req, res, next) => {
+  if (!req.file) return next();
+  if (predicate(req.file.buffer)) return next();
+  return res.status(400).json({ error: message });
+};
+const validatePdfUpload = createUploadSignatureValidator(isPdfBuffer, "Uploaded file is not a valid PDF.");
+const validateSymbolUpload = createUploadSignatureValidator(
+  (buffer) => isPngBuffer(buffer) || isJpegBuffer(buffer) || isWebpBuffer(buffer),
+  "Uploaded symbol is not a valid PNG, JPG, or WebP image."
+);
 
 // ─── DID + CANONICAL SERIALIZATION SERVICES ─────────────────────────────────
 const didService = createDidService({
@@ -451,7 +468,6 @@ const startup = pool.query("SELECT NOW()")
         getTable,
         createPassportTable,
         IN_REVISION_STATUS,
-        productIdentifierService,
       });
       logger.info("[DB] Initialized successfully");
     } else {
@@ -533,8 +549,11 @@ registerAppRoutes(app, {
   recordAssetRun,
   resolveAssetJobNextRunAt,
   upload,
+  validatePdfUpload,
   repoUpload,
   repoSymbolUpload,
+  validateRepositoryPdfUpload: validatePdfUpload,
+  validateRepositorySymbolUpload: validateSymbolUpload,
   hashSecret,
   createAccessKeyMaterial,
   createDeviceKeyMaterial,
@@ -630,25 +649,74 @@ registerSupportRoutes(app, {
   renderInfoTable,
 });
 
+let httpServer = null;
+let isShuttingDown = false;
+const SHUTDOWN_TIMEOUT_MS = Number.parseInt(process.env.SHUTDOWN_TIMEOUT_MS || "10000", 10);
+
 startup.then(() => {
-  app.listen(PORT, () => {
+  httpServer = app.listen(PORT, () => {
     logger.info(`[Server] Listening on port ${PORT}`);
   });
 });
 
-// Graceful shutdown handler
+async function closeHttpServer() {
+  if (!httpServer) return;
+  if (typeof httpServer.closeIdleConnections === "function") {
+    httpServer.closeIdleConnections();
+  }
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    let timeout = null;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    };
+    timeout = setTimeout(() => {
+      logger.warn({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, "Forcing HTTP connections closed during shutdown");
+      if (typeof httpServer.closeAllConnections === "function") {
+        httpServer.closeAllConnections();
+      }
+      finish();
+    }, SHUTDOWN_TIMEOUT_MS);
+    timeout.unref?.();
+    httpServer.close(finish);
+  }).finally(() => {
+    if (typeof httpServer.closeIdleConnections === "function") {
+      httpServer.closeIdleConnections();
+    }
+  });
+}
+
+async function shutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  logger.info(`${signal} received: starting graceful shutdown`);
+  if (rateLimitMaintenanceTimer) clearInterval(rateLimitMaintenanceTimer);
+  assetService.stopAssetManagementScheduler?.();
+  try {
+    await closeHttpServer();
+    logger.info("HTTP server closed");
+    await pool.end();
+    logger.info("Database pool closed");
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, "Graceful shutdown failed");
+    process.exit(1);
+  }
+}
+
 process.on("SIGTERM", () => {
-  logger.info("SIGTERM received: starting graceful shutdown");
-  pool.end()
-    .then(() => logger.info("Database pool closed"))
-    .catch((err) => logger.error({ err }, "Error closing database pool"));
+  shutdown("SIGTERM");
 });
 
 process.on("SIGINT", () => {
-  logger.info("SIGINT received: starting graceful shutdown");
-  pool.end()
-    .then(() => logger.info("Database pool closed"))
-    .catch((err) => logger.error({ err }, "Error closing database pool"));
+  shutdown("SIGINT");
 });
 
 process.on("uncaughtException", (err) => {

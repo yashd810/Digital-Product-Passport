@@ -121,22 +121,6 @@ function pascalCase(value) {
   return `${camel.charAt(0).toUpperCase()}${camel.slice(1)}`;
 }
 
-function parseJsonArray(value, label) {
-  if (Array.isArray(value)) return value;
-  const text = String(value || "").trim();
-  if (!text) return [];
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error(`${label} must be valid JSON.`);
-  }
-  if (!Array.isArray(parsed)) {
-    throw new Error(`${label} must be a JSON array.`);
-  }
-  return parsed;
-}
-
 function normalizeTableColumnKey(value) {
   const text = clean(value);
   if (/^[a-z][A-Za-z0-9]*$/.test(text)) return text;
@@ -159,7 +143,6 @@ function normalizeTableColumns(columns = [], fieldLabel = "Table") {
       unitSymbol: unitKey === "none" ? "" : clean(column.unitSymbol || unitKey),
       objectType: normalizeObjectType(column.objectType, `${fieldLabel} column "${columnLabel}"`),
       valueDataType: normalizeValueDataType(column.valueDataType, `${fieldLabel} column "${columnLabel}"`),
-      required: Boolean(column.required),
     };
   }).filter((column) => column.columnKey);
 
@@ -175,16 +158,6 @@ function normalizeTableColumns(columns = [], fieldLabel = "Table") {
   }
 
   return normalized;
-}
-
-function normalizeTableDefaultRows(rawRows, columns, fieldLabel) {
-  const parsedRows = parseJsonArray(rawRows, `${fieldLabel} default rows`);
-  return parsedRows.map((row, index) => {
-    if (!row || typeof row !== "object" || Array.isArray(row)) {
-      throw new Error(`${fieldLabel} default row ${index + 1} must be an object keyed by column key.`);
-    }
-    return Object.fromEntries(columns.map((column) => [column.columnKey, row[column.columnKey] ?? ""]));
-  });
 }
 
 function semanticBase(spec) {
@@ -367,20 +340,9 @@ function validateSpec(input) {
   const passportPolicyKey = clean(module.passportPolicyKey) || `${camelCase(family)}Dpp${pascalCase(version)}`;
   const defaultCarrierPolicyKey = clean(module.defaultCarrierPolicyKey || "web_public_entry_v1");
   const systemHeaderFieldAssignments = normalizeHeaderAssignments(module.systemHeaderFieldAssignments);
-  const legacySystemHeaderFieldKeys = Array.isArray(module.systemHeaderFieldKeys)
-    ? module.systemHeaderFieldKeys.map(clean).filter(Boolean)
-    : splitList(module.systemHeaderFieldKeys);
-  const mergedSystemHeaderFieldAssignments = {
-    ...Object.fromEntries(
-      legacySystemHeaderFieldKeys
-        .map((fieldKey, index) => [HEADER_SLOT_DEFINITIONS[index]?.slotKey, fieldKey])
-        .filter(([slotKey, fieldKey]) => slotKey && fieldKey)
-    ),
-    ...systemHeaderFieldAssignments,
-  };
   const systemHeaderFieldMappings = HEADER_SLOT_DEFINITIONS
     .map((slot) => {
-      const selectedValue = clean(mergedSystemHeaderFieldAssignments[slot.slotKey]);
+      const selectedValue = clean(systemHeaderFieldAssignments[slot.slotKey]);
       if (!selectedValue) return null;
       if (selectedValue === `__managed__:${slot.managedKey}`) {
         return {
@@ -462,7 +424,6 @@ function validateSpec(input) {
       if (fieldType === "table") {
         const tableColumns = normalizeTableColumns(field.tableColumns || field.table_columns || [], fieldLabel);
         normalized.tableColumns = tableColumns;
-        normalized.tableDefaultRows = normalizeTableDefaultRows(field.tableDefaultRowsText || field.table_default_rows || "[]", tableColumns, fieldLabel);
       }
 
       return normalized;
@@ -575,7 +536,7 @@ function validateSpec(input) {
       contentSpecificationId,
       passportPolicyKey,
       defaultCarrierPolicyKey,
-      systemHeaderFieldAssignments: mergedSystemHeaderFieldAssignments,
+      systemHeaderFieldAssignments,
       systemHeaderFieldMappings,
       systemHeaderFieldKeys: [...new Set(systemHeaderFieldKeys)],
       baseUrl,
@@ -817,9 +778,7 @@ function buildModuleJs(spec) {
           valueDataType: column.valueDataType,
           ...(column.unitKey !== "none" ? { unit: column.unitSymbol || column.unitKey } : {}),
           ...(column.dataType !== "string" ? { dataType: column.dataType } : {}),
-          ...(column.required ? { required: true } : {}),
         }));
-        args.tableDefaultRows = field.tableDefaultRows || [];
         if (field.composition) args.composition = true;
         if (field.compositionLabelColumnKey) args.compositionLabelColumnKey = field.compositionLabelColumnKey;
         if (field.compositionValueColumnKey) args.compositionValueColumnKey = field.compositionValueColumnKey;
@@ -861,7 +820,6 @@ function field({
   indexed = false,
   storageType = "",
   tableColumns = [],
-  tableDefaultRows = [],
   composition = false,
   compositionLabelColumnKey = "",
   compositionValueColumnKey = "",
@@ -903,9 +861,7 @@ function field({
         valueDataType: column.valueDataType,
         ...(column.unit ? { unit: column.unit } : {}),
         ...(column.dataType ? { dataType: column.dataType } : {}),
-        ...(column.required ? { required: true } : {}),
       })),
-      table_default_rows: tableDefaultRows,
       ...(composition ? { composition: true } : {}),
       ...(compositionLabelColumnKey ? { compositionLabelColumnKey } : {}),
       ...(compositionValueColumnKey ? { compositionValueColumnKey } : {}),

@@ -4,7 +4,7 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import "../styles/Landing.css";
 
-function Login({ setToken, setUser, setCompanyId }) {
+function Login({ setIsAuthenticated, setUser, setCompanyId }) {
   const navigate = useNavigate();
   const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -48,7 +48,7 @@ function Login({ setToken, setUser, setCompanyId }) {
     // Save user info and company ID; authenticated browser requests use the httpOnly session cookie
     localStorage.setItem("user", JSON.stringify(data.user));
     localStorage.setItem("companyId", data.user.companyId || "");
-    setToken(true);
+    setIsAuthenticated(true);
     setUser(data.user);
     setCompanyId(data.user.companyId || "");
     if (data.user.role === "super_admin") navigate("/admin");

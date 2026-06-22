@@ -42,9 +42,19 @@ function createLocalStorageService(options) {
     uploadsBaseDir,
     serverBaseUrl
   } = options;
+  const resolvedLocalStorageDir = path.resolve(localStorageDir);
 
   function absolutePathForKey(key) {
-    return path.resolve(localStorageDir, key);
+    const relativeKey = String(key || "").replace(/^[/\\]+/, "");
+    const absolutePath = path.resolve(resolvedLocalStorageDir, relativeKey);
+    const insideBase = absolutePath === resolvedLocalStorageDir
+      || absolutePath.startsWith(`${resolvedLocalStorageDir}${path.sep}`);
+    if (!insideBase) {
+      const error = new Error("Storage key resolves outside the configured storage directory");
+      error.code = "INVALID_STORAGE_KEY";
+      throw error;
+    }
+    return absolutePath;
   }
 
   function publicUrlForKey(key) {

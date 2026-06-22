@@ -80,9 +80,18 @@ function AdminPassportModules() {
             Code-defined passport modules registered in the backend. Seed a module to create or update its runtime passport type.
           </p>
         </div>
-        <button type="button" className="apt-create-btn" onClick={fetchModules}>
-          Refresh
-        </button>
+        <div className="apt-toolbar-actions">
+          <button
+            type="button"
+            className="apt-create-btn apt-toolbar-secondary-btn"
+            onClick={() => navigate("/admin/passport-types")}
+          >
+            ← Back to Passport Types
+          </button>
+          <button type="button" className="apt-create-btn" onClick={fetchModules}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

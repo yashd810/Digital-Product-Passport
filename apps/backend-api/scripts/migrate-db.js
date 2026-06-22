@@ -79,7 +79,6 @@ async function main() {
     getTable,
     createPassportTable: passportService.createPassportTable,
     IN_REVISION_STATUS,
-    productIdentifierService,
   });
   logger.info("[DB] Migrations completed successfully");
 }

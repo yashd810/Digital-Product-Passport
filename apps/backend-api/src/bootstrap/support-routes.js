@@ -51,8 +51,8 @@ function registerSupportRoutes(app, deps) {
     // /passport-files direct static serving is intentionally removed.
     // Passport files must be served through /public-files/:publicId so the app
     // can enforce visibility rules and avoid exposing predictable bucket paths.
-    // New uploads store an opaque public_id; legacy files without an attachment
-    // record will 404 via /public-files and need to be re-uploaded.
+    // New uploads store an opaque publicId and require an attachment record.
+    // Files without one intentionally 404 via /public-files.
     // Company repository files are private assets and must go through the
     // repository API so company membership is checked before bytes are served.
     app.use("/repository-files", (_req, res) => res.status(404).json({ error: "File not found" }));

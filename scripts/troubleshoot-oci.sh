@@ -1,10 +1,10 @@
 #!/bin/bash
 # OCI Instance Troubleshooting Script
-# Usage: OCI_IP="79.72.16.68" bash scripts/troubleshoot-oci.sh
+# Usage: OCI_IP="<host-ip>" bash scripts/troubleshoot-oci.sh
 
 set -e
 
-OCI_IP="${OCI_IP:-79.72.16.68}"
+OCI_IP="${OCI_IP:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_FILES_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 DEFAULT_SSH_KEY="$PROJECT_FILES_ROOT/AMD keys/ssh-key-2026-04-27.key"
@@ -14,6 +14,11 @@ if [ ! -f "$SSH_KEY" ] && [ -f "$LEGACY_SSH_KEY" ]; then
     SSH_KEY="$LEGACY_SSH_KEY"
 fi
 OCI_USER="ubuntu"
+
+if [ -z "$OCI_IP" ]; then
+    echo "OCI_IP is required. Example: OCI_IP='<host-ip>' bash scripts/troubleshoot-oci.sh"
+    exit 1
+fi
 
 echo "=================================="
 echo "🔍 OCI Instance Troubleshooting"
@@ -74,7 +79,7 @@ echo ""
 echo "1. Access OCI Console:"
 echo "   https://www.oracle.com/cloud/sign-in/"
 echo ""
-echo "2. Navigate to instance (79.72.16.68)"
+echo "2. Navigate to instance ($OCI_IP)"
 echo ""
 echo "3. Click 'Console Connection' button"
 echo ""
@@ -101,6 +106,6 @@ echo "🔄 Retry Connection"
 echo "=================================="
 echo ""
 echo "Once instance is accessible, retry deployment:"
-echo "  export OCI_IP='79.72.16.68'"
+echo "  export OCI_IP='<host-ip>'"
 echo "  bash scripts/deploy/deploy-to-oci.sh"
 echo ""

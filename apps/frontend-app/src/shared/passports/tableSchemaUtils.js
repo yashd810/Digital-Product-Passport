@@ -25,7 +25,6 @@ export function createTableColumn(index = 0, overrides = {}) {
     ...(overrides.valueDataType ? { valueDataType: overrides.valueDataType } : {}),
     ...(overrides.dataType ? { dataType: overrides.dataType } : {}),
     ...(overrides.unit ? { unit: overrides.unit } : {}),
-    ...(overrides.required ? { required: true } : {}),
     ...(overrides.canonicalLocked ? { canonicalLocked: true } : {}),
     ...(overrides.sourceModuleKey ? { sourceModuleKey: overrides.sourceModuleKey } : {}),
     ...(overrides.sourceModuleColumnKey ? { sourceModuleColumnKey: overrides.sourceModuleColumnKey } : {}),
@@ -72,7 +71,6 @@ export function serializeTableColumns(fieldOrColumns = {}) {
     if (column.valueDataType) clean.valueDataType = column.valueDataType;
     if (column.dataType) clean.dataType = column.dataType;
     if (column.unit) clean.unit = column.unit;
-    if (column.required) clean.required = true;
     if (column.canonicalLocked) clean.canonicalLocked = true;
     if (column.sourceModuleKey) clean.sourceModuleKey = column.sourceModuleKey;
     if (column.sourceModuleColumnKey) clean.sourceModuleColumnKey = column.sourceModuleColumnKey;
@@ -92,13 +90,7 @@ export function normalizeTableRow(row, columns = []) {
   return createEmptyTableRow(normalizedColumns);
 }
 
-export function normalizeTableDefaultRows(field = {}) {
-  const columns = normalizeTableColumns(field);
-  const rows = Array.isArray(field.table_default_rows) ? field.table_default_rows : [];
-  return rows.map((row) => normalizeTableRow(row, columns));
-}
-
-export function parseTableRows(value, field = {}, { includeDefault = true } = {}) {
+export function parseTableRows(value, field = {}) {
   const columns = normalizeTableColumns(field);
   let parsed = value;
   if (typeof value === "string") {
@@ -116,8 +108,7 @@ export function parseTableRows(value, field = {}, { includeDefault = true } = {}
     return sourceRows.map((row) => normalizeTableRow(row, columns));
   }
 
-  const defaults = includeDefault ? normalizeTableDefaultRows(field) : [];
-  return defaults.length ? defaults : [createEmptyTableRow(columns)];
+  return [createEmptyTableRow(columns)];
 }
 
 export function tableRowsHaveValues(rows = []) {

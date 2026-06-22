@@ -403,11 +403,16 @@
 
       const center = document.createElement("div");
       center.className = "loop-center";
-      center.innerHTML = `
-        <div class="loop-center-copy">
-          <div class="loop-center-title">CIRCULAR<br />ECONOMY<br />LOOP</div>
-        </div>
-      `;
+      const centerCopy = document.createElement("div");
+      centerCopy.className = "loop-center-copy";
+      const centerTitle = document.createElement("div");
+      centerTitle.className = "loop-center-title";
+      ["CIRCULAR", "ECONOMY", "LOOP"].forEach((word, index) => {
+        if (index) centerTitle.appendChild(document.createElement("br"));
+        centerTitle.appendChild(document.createTextNode(word));
+      });
+      centerCopy.appendChild(centerTitle);
+      center.appendChild(centerCopy);
       container.appendChild(center);
 
       const nodeElements = NODES.map((node) => {
@@ -420,7 +425,12 @@
 
         const label = document.createElement("div");
         label.className = "loop-node-label";
-        label.innerHTML = `<strong>${node.label.split(" ").join("<br />")}</strong>`;
+        const labelText = document.createElement("strong");
+        node.label.split(" ").forEach((word, index) => {
+          if (index) labelText.appendChild(document.createElement("br"));
+          labelText.appendChild(document.createTextNode(word));
+        });
+        label.appendChild(labelText);
 
         wrapper.appendChild(bubble);
         wrapper.appendChild(label);

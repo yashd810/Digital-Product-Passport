@@ -92,9 +92,9 @@ function App() {
     handleLogout,
     handleUserUpdate,
     setCompanyId,
-    setToken,
+    setIsAuthenticated,
     setUser,
-    token,
+    isAuthenticated,
     user,
   } = useSessionAuth();
 
@@ -112,12 +112,12 @@ function App() {
       <main id="app-main-content">
       <Routes>
         {/* Public */}
-        <Route path="/"                element={<Landing token={token} user={user} onLogout={handleLogout} />} />
-        <Route path="/login"           element={<Login    setToken={setToken} setUser={setUser} setCompanyId={setCompanyId} />} />
-        <Route path="/register"        element={<Register setToken={setToken} setUser={setUser} setCompanyId={setCompanyId} />} />
+        <Route path="/"                element={<Landing isAuthenticated={isAuthenticated} user={user} onLogout={handleLogout} />} />
+        <Route path="/login"           element={<Login    setIsAuthenticated={setIsAuthenticated} setUser={setUser} setCompanyId={setCompanyId} />} />
+        <Route path="/register"        element={<Register setIsAuthenticated={setIsAuthenticated} setUser={setUser} setCompanyId={setCompanyId} />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
-        <Route path="/oauth/callback"  element={<OAuthCallback setToken={setToken} setUser={setUser} setCompanyId={setCompanyId} />} />
+        <Route path="/oauth/callback"  element={<OAuthCallback setIsAuthenticated={setIsAuthenticated} setUser={setUser} setCompanyId={setCompanyId} />} />
 
         {/* Consumer QR landing page */}
         <Route path="/p/:internalAliasId" element={<PublicPassportRedirectPage />} />
@@ -125,12 +125,12 @@ function App() {
 
         {/* Passport viewer — public */}
         <Route path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId/technical/*" element={
-          <ProtectedRoute token={token} authReady={authReady}>
+          <ProtectedRoute isAuthenticated={isAuthenticated} authReady={authReady}>
             <PassportViewer previewMode={true} previewCompanyId={companyId} />
           </ProtectedRoute>
         } />
         <Route path="/dpp/preview/:manufacturerSlug/:modelSlug/:previewId" element={
-          <ProtectedRoute token={token} authReady={authReady}>
+          <ProtectedRoute isAuthenticated={isAuthenticated} authReady={authReady}>
             <PassportViewer previewMode={true} previewCompanyId={companyId} />
           </ProtectedRoute>
         } />
@@ -141,19 +141,19 @@ function App() {
 
         {/* CSV Import */}
         <Route path="/csv-import/:passportType" element={
-          <ProtectedRoute token={token} authReady={authReady}>
+          <ProtectedRoute isAuthenticated={isAuthenticated} authReady={authReady}>
             <Navigate to="create-csv" replace />
           </ProtectedRoute>
         } />
         <Route path="/csv-import/:passportType/:tab" element={
-          <ProtectedRoute token={token} authReady={authReady}>
+          <ProtectedRoute isAuthenticated={isAuthenticated} authReady={authReady}>
             <CSVImportTabRoute user={user} companyId={companyId} />
           </ProtectedRoute>
         } />
 
         {/* Dashboard */}
         <Route path="/dashboard/:companySlug" element={
-          <ProtectedRoute token={token} authReady={authReady}>
+          <ProtectedRoute isAuthenticated={isAuthenticated} authReady={authReady}>
             <DashboardLayout user={user} companyId={companyId} onLogout={handleLogout} />
           </ProtectedRoute>
         }>
@@ -193,7 +193,7 @@ function App() {
 
         {/* Admin */}
         <Route path="/admin" element={
-          <AdminRoute token={token} user={user} authReady={authReady}>
+          <AdminRoute isAuthenticated={isAuthenticated} user={user} authReady={authReady}>
             <AdminLayout user={user} onLogout={handleLogout} />
           </AdminRoute>
         }>
@@ -221,12 +221,12 @@ function App() {
 
         {/* Create / Edit */}
         <Route path="/create/:passportType" element={
-          <ProtectedRoute token={token} authReady={authReady}>
+          <ProtectedRoute isAuthenticated={isAuthenticated} authReady={authReady}>
             <CreatePassportRoute user={user} companyId={companyId} />
           </ProtectedRoute>
         } />
         <Route path="/edit/:dppId" element={
-          <ProtectedRoute token={token} authReady={authReady}>
+          <ProtectedRoute isAuthenticated={isAuthenticated} authReady={authReady}>
             <EditPassportRoute user={user} companyId={companyId} />
           </ProtectedRoute>
         } />

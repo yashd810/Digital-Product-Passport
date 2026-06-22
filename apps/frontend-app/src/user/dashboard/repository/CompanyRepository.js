@@ -34,7 +34,7 @@ function copyText(value) {
 }
 
 // ─── Symbols Tab ─────────────────────────────────────────────────────────────
-function SymbolsTab({ token, companyId }) {
+function SymbolsTab({ companyId }) {
   const [symbols,       setSymbols]       = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [uploading,     setUploading]     = useState(false);
@@ -67,12 +67,11 @@ function SymbolsTab({ token, companyId }) {
     setLoading(true);
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols${qs}`,
-        { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols${qs}`);
       if (r.ok) setSymbols(await r.json());
     } catch {}
     finally { setLoading(false); }
-  }, [companyId, token, currentFolder]);
+  }, [companyId, currentFolder]);
 
   useEffect(() => { fetchSymbols(); }, [fetchSymbols]);
 
@@ -128,7 +127,6 @@ function SymbolsTab({ token, companyId }) {
       if (currentFolder != null) fd.append("parentId", currentFolder);
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols/upload`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       const d = await r.json();
@@ -148,7 +146,7 @@ function SymbolsTab({ token, companyId }) {
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols/folder`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: folderName.trim(), parentId: currentFolder }),
       });
       const data = await r.json();
@@ -169,7 +167,7 @@ function SymbolsTab({ token, companyId }) {
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${symId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: renameValue.trim() }),
       });
       if (!r.ok) throw new Error((await r.json()).error || "Failed");
@@ -181,7 +179,7 @@ function SymbolsTab({ token, companyId }) {
     setDeletingId(sym.id);
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${sym.id}`, {
-        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+        method: "DELETE",
       });
       if (!r.ok) throw new Error((await r.json()).error || "Failed");
       fetchSymbols();
@@ -400,7 +398,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }) {
 }
 
 // ─── Files Tab ────────────────────────────────────────────────────────────────
-function FilesTab({ token, companyId }) {
+function FilesTab({ companyId }) {
   const [items,         setItems]         = useState([]);
   const [breadcrumbs,   setBreadcrumbs]   = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -432,15 +430,14 @@ function FilesTab({ token, companyId }) {
     setLoading(true);
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository${qs}`,
-        { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository${qs}`);
       if (!r.ok) throw new Error();
       // Exclude image files (those are shown in Symbols tab)
       const data = await r.json();
       setItems(data.filter(item => item.type === "folder" || !item.mimeType?.startsWith("image/")));
     } catch { flash("Failed to load repository", true); }
     finally { setLoading(false); }
-  }, [companyId, token, currentFolder]);
+  }, [companyId, currentFolder]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
@@ -481,7 +478,7 @@ function FilesTab({ token, companyId }) {
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/folder`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: folderName.trim(), parentId: currentFolder }),
       });
       const data = await r.json();
@@ -506,7 +503,6 @@ function FilesTab({ token, companyId }) {
       if (currentFolder != null) fd.append("parentId", currentFolder);
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/upload`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       const data = await r.json();
@@ -525,7 +521,7 @@ function FilesTab({ token, companyId }) {
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${itemId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: renameValue.trim() }),
       });
       if (!r.ok) throw new Error((await r.json()).error || "Failed");
@@ -537,7 +533,7 @@ function FilesTab({ token, companyId }) {
   const handleDelete = async (item) => {
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${item.id}`, {
-        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+        method: "DELETE",
       });
       if (!r.ok) throw new Error((await r.json()).error || "Failed");
       flash("Removed"); fetchItems();
@@ -671,7 +667,7 @@ function FilesTab({ token, companyId }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-function CompanyRepository({ token, companyId, activeTab = "files" }) {
+function CompanyRepository({ companyId, activeTab = "files" }) {
   const { companySlug } = useParams();
   const filesPath = buildDashboardPath({ companySlug, companyId, subpath: "repository/files" });
   const symbolsPath = buildDashboardPath({ companySlug, companyId, subpath: "repository/symbols" });
@@ -699,8 +695,8 @@ function CompanyRepository({ token, companyId, activeTab = "files" }) {
       </div>
 
       <div className="repo-tab-body">
-        {activeTab === "files"   && <FilesTab   token={token} companyId={companyId} />}
-        {activeTab === "symbols" && <SymbolsTab token={token} companyId={companyId} />}
+        {activeTab === "files"   && <FilesTab companyId={companyId} />}
+        {activeTab === "symbols" && <SymbolsTab companyId={companyId} />}
       </div>
     </div>
   );

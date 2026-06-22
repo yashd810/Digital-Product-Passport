@@ -7,11 +7,11 @@ const API = import.meta.env.VITE_API_URL || "";
 /**
  * Modal to browse the company repository and pick a file.
  * Props:
- *   token, companyId
+ *   companyId
  *   onSelect(fileUrl, fileName) — called when user picks a file
  *   onClose()
  */
-function RepositoryPicker({ token, companyId, onSelect, onClose }) {
+function RepositoryPicker({ companyId, onSelect, onClose }) {
   const [items,         setItems]         = useState([]);
   const [breadcrumbs,   setBreadcrumbs]   = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -24,13 +24,12 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
     setLoading(true); setError("");
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository${qs}`,
-        { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository${qs}`);
       if (!r.ok) throw new Error();
       setItems(await r.json());
     } catch { setError("Failed to load repository"); }
     finally { setLoading(false); }
-  }, [companyId, token]);
+  }, [companyId]);
 
   useEffect(() => { fetchItems(null); }, [fetchItems]);
 
@@ -53,7 +52,7 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
 
   const pick = (item) => {
     if (item.type !== "file" || !item.fileUrl) return;
-    onSelect(item.file_url, item.name);
+    onSelect(item.fileUrl, item.name);
   };
 
   const goBack = () => {
@@ -114,12 +113,12 @@ function RepositoryPicker({ token, companyId, onSelect, onClose }) {
             items.map(item => (
               <div
                 key={item.id}
-                className={`rp-item ${item.type} ${item.type === "file" && item.file_url ? "selectable" : ""}`}
+                className={`rp-item ${item.type} ${item.type === "file" && item.fileUrl ? "selectable" : ""}`}
                 onClick={() => item.type === "folder" ? navigateTo(item) : pick(item)}
               >
                 <span className="rp-item-icon">{item.type === "folder" ? "📁" : "📄"}</span>
                 <span className="rp-item-name">{item.name}</span>
-                {item.type === "file" && item.file_url && (
+                {item.type === "file" && item.fileUrl && (
                   <span className="rp-pick-hint">Click to link</span>
                 )}
                 {item.type === "folder" && (

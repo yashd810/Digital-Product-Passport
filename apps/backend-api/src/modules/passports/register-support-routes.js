@@ -9,6 +9,7 @@ function registerPassportSupportRoutes(app, deps) {
     checkCompanyAccess,
     requireEditor,
     upload,
+    validatePdfUpload,
     storageService,
     logAudit,
     getTable,
@@ -90,6 +91,7 @@ function registerPassportSupportRoutes(app, deps) {
     checkCompanyAccess,
     requireEditor,
     upload.single("file"),
+    validatePdfUpload,
     async (req, res) => {
       try {
         const { companyId, dppId } = req.params;

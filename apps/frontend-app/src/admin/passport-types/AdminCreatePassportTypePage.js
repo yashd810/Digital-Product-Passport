@@ -35,193 +35,23 @@ import {
   resolveSemanticTermDefinitionByInput,
 } from "./semanticTermCatalog";
 import {
-  createEmptyTableRow,
   normalizeTableColumns,
-  normalizeTableDefaultRows,
   serializeTableColumns,
   tableColumnKeyFromLabel,
 } from "../../shared/passports/tableSchemaUtils";
+import {
+  CheckboxDropdown,
+  normalizeFieldForSemanticModel,
+  rekeyModuleSection,
+  summarizeSelectedValues,
+  syncSectionsWithSemanticModel,
+  unlockModuleSection,
+} from "./AdminCreatePassportTypeHelpers";
 import AdminSelectMenu from "../components/AdminSelectMenu";
 import { TypeIdentityCard } from "./TypeIdentityCard";
 import "../styles/AdminDashboard.css";
 
 const API = import.meta.env.VITE_API_URL || "";
-
-function summarizeSelectedValues(values = [], labelMap = {}, emptyLabel = "Select options") {
-  const normalized = Array.isArray(values) ? values : [];
-  if (!normalized.length) return emptyLabel;
-  if (normalized.length <= 2) {
-    return normalized.map((value) => labelMap[value] || value).join(", ");
-  }
-  const [first, second] = normalized;
-  return `${labelMap[first] || first}, ${labelMap[second] || second} +${normalized.length - 2}`;
-}
-
-function CheckboxDropdown({
-  label,
-  icon,
-  summary,
-  isOpen,
-  onToggle,
-  children,
-  className = "",
-}) {
-  return (
-    <div className={`acpt-checkbox-dropdown ${className}${isOpen ? " open" : ""}`}>
-      <span className="acpt-access-label">{icon} {label}:</span>
-      <button
-        type="button"
-        className="acpt-checkbox-dropdown-trigger"
-        onClick={onToggle}
-      >
-        <span className="acpt-checkbox-dropdown-summary">{summary}</span>
-        <span className="acpt-checkbox-dropdown-caret">{isOpen ? "▲" : "▼"}</span>
-      </button>
-      {isOpen && (
-        <div className="acpt-checkbox-dropdown-menu">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function normalizeFieldForSemanticModel(field, semanticModelKey, { clearSemanticId = false } = {}) {
-  const nextField = {
-    ...field,
-    key: field.key || toFieldKey(field.label || ""),
-  };
-
-  if (nextField.type === "table") {
-    nextField.table_columns = normalizeTableColumns(nextField);
-    nextField.table_cols = nextField.table_columns.length;
-    nextField.table_default_rows = normalizeTableDefaultRows(nextField);
-  }
-
-  if (!normalizeSemanticModelKey(semanticModelKey) || clearSemanticId) {
-    delete nextField.semanticId;
-    delete nextField._semanticSearch;
-    delete nextField._semanticOpen;
-    if (nextField.type === "table") {
-      nextField.table_columns = normalizeTableColumns(nextField).map((column) => {
-        const nextColumn = { ...column };
-        delete nextColumn.semanticId;
-        delete nextColumn._semanticSearch;
-        delete nextColumn._semanticOpen;
-        return nextColumn;
-      });
-    }
-  }
-
-  return nextField;
-}
-
-function syncSectionsWithSemanticModel(currentSections, semanticModelKey, options = {}) {
-  let hasChanges = false;
-
-  const nextSections = currentSections.map((section) => {
-    let sectionChanged = false;
-
-    const nextFields = section.fields.map((field) => {
-      const normalizedField = normalizeFieldForSemanticModel(field, semanticModelKey, options);
-      const nextKey = normalizedField.key || field.key;
-      const nextSemanticId = normalizedField.semanticId;
-      const keyChanged = nextKey !== field.key;
-      const semanticChanged = nextSemanticId !== field.semanticId;
-
-      if (!keyChanged && !semanticChanged) return field;
-
-      sectionChanged = true;
-      hasChanges = true;
-
-      if (nextSemanticId) {
-        return {
-          ...field,
-          key: nextKey,
-          semanticId: nextSemanticId,
-        };
-      }
-
-      const nextField = {
-        ...field,
-        key: nextKey,
-      };
-      delete nextField.semanticId;
-      return nextField;
-    });
-
-    if (!sectionChanged) return section;
-    return {
-      ...section,
-      fields: nextFields,
-    };
-  });
-
-  return hasChanges ? nextSections : currentSections;
-}
-
-function rekeyModuleSection(section = {}, sourceModuleKey = "") {
-  return {
-    ...section,
-    localId: Math.random().toString(36).slice(2),
-    label_i18n: section.label_i18n || {},
-    sourceModuleKey,
-    fields: (section.fields || []).map((field) => {
-      const tableColumns = field.type === "table"
-        ? normalizeTableColumns(field).map((column) => ({
-          ...column,
-          canonicalLocked: true,
-          sourceModuleKey,
-          sourceModuleColumnKey: column.key,
-        }))
-        : undefined;
-      const nextField = {
-        ...field,
-        localId: Math.random().toString(36).slice(2),
-        label_i18n: field.label_i18n || {},
-        _keyManual: true,
-        canonicalLocked: true,
-        sourceModuleKey,
-        sourceModuleFieldKey: field.key,
-        required: false,
-      };
-      if (tableColumns) {
-        nextField.table_columns = tableColumns;
-        nextField.table_cols = tableColumns.length;
-        nextField.table_default_rows = normalizeTableDefaultRows({ ...field, table_columns: tableColumns });
-      }
-      return nextField;
-    }),
-  };
-}
-
-function unlockModuleSection(section = {}) {
-  const sectionRest = { ...section };
-  delete sectionRest.sourceModuleKey;
-  return {
-    ...sectionRest,
-    fields: (section.fields || []).map((field) => {
-      const fieldRest = { ...field };
-      delete fieldRest.canonicalLocked;
-      delete fieldRest.sourceModuleKey;
-      delete fieldRest.sourceModuleFieldKey;
-      if (fieldRest.type !== "table") return fieldRest;
-
-      const tableColumns = normalizeTableColumns(fieldRest).map((column) => {
-        const columnRest = { ...column };
-        delete columnRest.canonicalLocked;
-        delete columnRest.sourceModuleKey;
-        delete columnRest.sourceModuleColumnKey;
-        return columnRest;
-      });
-      return {
-        ...fieldRest,
-        table_columns: tableColumns,
-        table_default_rows: normalizeTableDefaultRows({ ...fieldRest, table_columns: tableColumns }),
-      };
-    }),
-  };
-}
 
 function AdminCreatePassportType() {
   const navigate = useNavigate();
@@ -393,10 +223,6 @@ function AdminCreatePassportType() {
             const tableColumns = serializeTableColumns(normalizedField);
             base.table_cols = tableColumns.length;
             base.table_columns = tableColumns;
-            base.table_default_rows = normalizeTableDefaultRows({
-              ...normalizedField,
-              table_columns: tableColumns,
-            });
           }
           if (normalizedField.dynamic) base.dynamic = true;
           if (normalizedField.composition) {
@@ -761,13 +587,11 @@ function AdminCreatePassportType() {
           if (canonicalPatch.type === "table" && f.type !== "table") {
             updated.table_columns = normalizeTableColumns(updated);
             updated.table_cols = updated.table_columns.length;
-            updated.table_default_rows = [];
           }
           // Switching AWAY from table: clear config
           if ("type" in canonicalPatch && canonicalPatch.type !== "table") {
             delete updated.table_cols;
             delete updated.table_columns;
-            delete updated.table_default_rows;
             delete updated.compositionLabelColumnKey;
             delete updated.compositionValueColumnKey;
           }
@@ -900,7 +724,6 @@ function AdminCreatePassportType() {
             ...f,
             table_columns: columns,
             table_cols: columns.length,
-            table_default_rows: normalizeTableDefaultRows({ ...f, table_columns: columns }),
           };
           if (keyReplacement) {
             if (nextField.compositionLabelColumnKey === keyReplacement.from) {
@@ -1884,7 +1707,6 @@ function AdminCreatePassportType() {
 
                     {field.type === "table" && (() => {
                       const tableColumns = normalizeTableColumns(field);
-                      const defaultRows = normalizeTableDefaultRows({ ...field, table_columns: tableColumns });
                       return (
                         <div className="acpt-table-config">
                           <div className="acpt-table-dims">
@@ -1925,14 +1747,6 @@ function AdminCreatePassportType() {
                                       onChange={e => updateTableColumn(section.localId, field.localId, ci, { key: e.target.value })}
                                       disabled={!!field.canonicalLocked || !!column.canonicalLocked}
                                     />
-                                    <label className="acpt-access-check">
-                                      <input
-                                        type="checkbox"
-                                        checked={!!column.required}
-                                        onChange={e => updateTableColumn(section.localId, field.localId, ci, { required: e.target.checked })}
-                                      />
-                                      <span>Required</span>
-                                    </label>
                                   </div>
                                   <div className="acpt-meta-fields-row">
                                     <div className="acpt-meta-field-group">
@@ -2020,64 +1834,6 @@ function AdminCreatePassportType() {
                                 </div>
                               );
                             })}
-                          </div>
-                          <div className="acpt-table-default-rows">
-                            <div className="acpt-table-default-rows-header">
-                              <span className="acpt-table-colnames-label">Default rows (optional):</span>
-                              <span className="acpt-table-default-hint">Users can edit cell values and add rows, but columns remain fixed.</span>
-                            </div>
-                            {defaultRows.length > 0 && (
-                              <table className="acpt-default-row-table">
-                                <thead>
-                                  <tr>
-                                    {tableColumns.map((column) => (
-                                      <th key={column.key}>{column.label || column.key}</th>
-                                    ))}
-                                    <th />
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {defaultRows.map((row, ri) => (
-                                    <tr key={ri}>
-                                      {tableColumns.map((column) => (
-                                        <td key={column.key}>
-                                          <input
-                                            type="text"
-                                            value={row[column.key] ?? ""}
-                                            placeholder="—"
-                                            className="acpt-table-col-input"
-                                            onChange={e => {
-                                              const rows = defaultRows.map(r => ({ ...r }));
-                                              rows[ri][column.key] = e.target.value;
-                                              updateField(section.localId, field.localId, { table_default_rows: rows });
-                                            }}
-                                          />
-                                        </td>
-                                      ))}
-                                      <td>
-                                        <button
-                                          type="button"
-                                          className="acpt-default-row-remove"
-                                          title="Remove row"
-                                          onClick={() => {
-                                            const rows = defaultRows.filter((_, i) => i !== ri);
-                                            updateField(section.localId, field.localId, { table_default_rows: rows });
-                                          }}
-                                        >✕</button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            )}
-                            <button
-                              type="button"
-                              className="acpt-add-default-row-btn"
-                              onClick={() => {
-                                const rows = [...defaultRows, createEmptyTableRow(tableColumns)];
-                                updateField(section.localId, field.localId, { table_default_rows: rows });
-                              }}
-                            >+ Add Default Row</button>
                           </div>
                         </div>
                       );

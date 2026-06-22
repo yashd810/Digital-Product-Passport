@@ -113,6 +113,31 @@ function toBooleanEnv(value, fallback = false) {
   return !["0", "false", "no", "off"].includes(String(value).trim().toLowerCase());
 }
 
+function isLoopbackHost(hostname) {
+  const host = String(hostname || "").trim().toLowerCase();
+  return host === "localhost"
+    || host === "127.0.0.1"
+    || host === "0.0.0.0"
+    || host === "::1"
+    || host === "[::1]";
+}
+
+function validateProductionUrl(name, logger) {
+  const rawValue = process.env[name];
+  let parsed;
+  try {
+    parsed = new URL(rawValue);
+  } catch {
+    logger.error({ env: name }, "Production URL environment variable is not a valid URL");
+    process.exit(1);
+  }
+
+  if (parsed.protocol !== "https:" || isLoopbackHost(parsed.hostname)) {
+    logger.error({ env: name, protocol: parsed.protocol, hostname: parsed.hostname }, "Production URL must use a public HTTPS origin");
+    process.exit(1);
+  }
+}
+
 function deriveRuntimeFlags(port) {
   const isProduction = process.env.NODE_ENV === "production";
   const runSchemaMigrations =
@@ -142,7 +167,7 @@ function deriveRuntimeFlags(port) {
 function assertRequiredProductionEnvironment({ isProduction, logger }) {
   if (!isProduction) return;
 
-  const requiredEnvVars = ["JWT_SECRET", "DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME"];
+  const requiredEnvVars = ["JWT_SECRET", "PEPPER_V1", "DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME", "APP_URL", "SERVER_URL"];
   const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
   if (missingEnvVars.length > 0) {
     logger.error({ missing: missingEnvVars }, "Missing required environment variables in production");
@@ -153,6 +178,9 @@ function assertRequiredProductionEnvironment({ isProduction, logger }) {
     logger.error("ALLOWED_ORIGINS must be configured in production");
     process.exit(1);
   }
+
+  validateProductionUrl("APP_URL", logger);
+  validateProductionUrl("SERVER_URL", logger);
 }
 
 function assertProductionStorageReadiness({ isProduction, logger }) {

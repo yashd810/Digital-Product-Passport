@@ -186,6 +186,16 @@ const escapeHtml = (value) => String(value ?? "")
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
 
+const sanitizeReportSvg = (svg) => {
+  const value = String(svg || "").trim();
+  if (!value) return "";
+  if (!/^<svg[\s>]/i.test(value)) return "";
+  if (/<script[\s>]/i.test(value)) return "";
+  if (/\son[a-z]+\s*=/i.test(value)) return "";
+  if (/\s(?:href|xlink:href)\s*=\s*["']?\s*(?:javascript|data):/i.test(value)) return "";
+  return value;
+};
+
 const renderLegend = (items = []) => {
   if (!items.length) return "";
   return `
@@ -402,7 +412,7 @@ export function openAnalyticsPrintReport({
         ${chartCards.map((card) => `
           <div class="chart-card">
             <div class="chart-title">${escapeHtml(card.title)}</div>
-            ${card.svg || `<div class="empty">${escapeHtml(card.emptyText || "No chart data yet")}</div>`}
+            ${sanitizeReportSvg(card.svg) || `<div class="empty">${escapeHtml(card.emptyText || "No chart data yet")}</div>`}
             ${renderLegend(card.legendItems)}
           </div>
         `).join("")}

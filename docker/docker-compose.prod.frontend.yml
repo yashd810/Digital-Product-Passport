@@ -4,10 +4,10 @@ services:
       context: ..
       dockerfile: apps/frontend-app/Dockerfile
       args:
-        VITE_API_URL: "${VITE_API_URL:-https://api.claros-dpp.online}"
-        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:-https://viewer.claros-dpp.online}"
+        VITE_API_URL: "${VITE_API_URL:?VITE_API_URL is required}"
+        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
     environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:?BACKEND_API_UPSTREAM is required}"
     ports:
       - "${FRONTEND_PORT:-3000}:8080"
     healthcheck:
@@ -23,10 +23,10 @@ services:
       context: ..
       dockerfile: apps/public-passport-viewer/Dockerfile
       args:
-        VITE_API_URL: "${VITE_API_URL}"
-        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL}"
+        VITE_API_URL: "${VITE_API_URL:?VITE_API_URL is required}"
+        VITE_PUBLIC_VIEWER_URL: "${VITE_PUBLIC_VIEWER_URL:?VITE_PUBLIC_VIEWER_URL is required}"
     environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:?BACKEND_API_UPSTREAM is required}"
     ports:
       - "${PUBLIC_VIEWER_PORT:-3004}:8080"
     healthcheck:
@@ -42,7 +42,7 @@ services:
       context: ..
       dockerfile: apps/marketing-site/Dockerfile
     environment:
-      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:-http://82.70.54.173:3001}"
+      BACKEND_API_UPSTREAM: "${BACKEND_API_UPSTREAM:?BACKEND_API_UPSTREAM is required}"
     ports:
       - "${MARKETING_PORT:-8080}:8080"
     healthcheck:

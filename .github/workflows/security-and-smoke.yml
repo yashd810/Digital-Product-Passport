@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: apps/backend-api/package-lock.json
       - run: npm ci
@@ -25,7 +25,7 @@ jobs:
       - run: npm run check:style
       - run: npm run check:boundaries
       - run: npm test
-      - run: npm audit --audit-level=high
+      - run: npm audit --omit=dev --audit-level=moderate
 
   repository-hygiene:
     runs-on: ubuntu-latest
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: apps/backend-api/package-lock.json
       - run: npm ci
@@ -84,7 +84,7 @@ jobs:
           PUBLIC_APP_URL: http://127.0.0.1:3000
           DID_WEB_DOMAIN: www.example.test
         run: |
-          node Server/server.js > /tmp/backend-smoke.log 2>&1 &
+          node src/server.js > /tmp/backend-smoke.log 2>&1 &
           backend_pid=$!
           cleanup() {
             kill "$backend_pid" >/dev/null 2>&1 || true
@@ -104,9 +104,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose -f docker-compose.yml config -q
-      - run: docker compose -f docker-compose.prod.yml config -q
+      - name: Create safe compose env for CI
+        run: |
+          cat > docker/.env <<'EOF'
+          NODE_ENV=development
+          DB_NAME=dpp_system
+          DB_USER=postgres
+          DB_PASSWORD=postgres
+          JWT_SECRET=ci-compose-secret
+          PEPPER_V1=ci-compose-pepper
+          SERVER_URL=http://localhost:3001
+          APP_URL=http://localhost:3000
+          VITE_API_URL=http://localhost:3001
+          VITE_PUBLIC_VIEWER_URL=http://localhost:3004
+          ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3004
+          EOF
+      - run: docker compose -f docker/docker-compose.yml --env-file docker/.env config -q
+      - run: DPP_ENV_FILE=../infra/oracle/oci.env.example docker compose -f docker/docker-compose.prod.yml --env-file infra/oracle/oci.env.example config -q
+      - run: DPP_ENV_FILE=../infra/oracle/oci.env.example docker compose -f docker/docker-compose.prod.backend.yml --env-file infra/oracle/oci.env.example config -q
+      - run: docker compose -f docker/docker-compose.prod.frontend.yml --env-file infra/oracle/oci.env.example config -q
       - run: sh infra/oracle/check-edge-policy-config.sh
+
+  ops-and-local-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check local generator syntax
+        run: |
+          node --check local-tools/passport-module-generator/server.js
+          node --check local-tools/passport-module-generator/app.js
+      - name: Check deployment shell scripts
+        run: |
+          bash -n infra/oracle/bootstrap.sh
+          bash -n infra/oracle/check-edge-policy-config.sh
+          bash -n infra/oracle/check-edge-tls.sh
+          bash -n infra/oracle/check-live-edge.sh
+          bash -n infra/oracle/db-backup.sh
+          bash -n infra/oracle/deploy-prod.sh
+          bash -n infra/oracle/install-db-backup-jobs.sh
+          bash -n scripts/deploy/deploy-to-oci.sh
+          bash -n scripts/restart-local-stack.sh
+          bash -n scripts/troubleshoot-oci.sh
 
   frontend:
     runs-on: ubuntu-latest
@@ -117,13 +158,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: apps/frontend-app/package-lock.json
       - run: npm ci
       - run: npm test
       - run: npm run test:contrast
       - run: npm run build
+      - run: npm audit --omit=dev --audit-level=moderate
 
   public-viewer:
     runs-on: ubuntu-latest
@@ -134,8 +176,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: apps/public-passport-viewer/package-lock.json
       - run: npm ci
       - run: npm run build
+      - run: npm audit --omit=dev --audit-level=moderate

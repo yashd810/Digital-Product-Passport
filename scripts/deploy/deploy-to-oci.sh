@@ -18,12 +18,15 @@ fi
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:-}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
+SKIP_LIVE_EDGE_CHECK="${DPP_SKIP_LIVE_EDGE_CHECK:-}"
+SKIP_CADDY_RELOAD="${DPP_SKIP_CADDY_RELOAD:-}"
+CADDYFILE="${DPP_CADDYFILE:-}"
 APP_DIR="/opt/dpp"
 ENV_FILE="/etc/dpp/dpp.env"
 REPO="https://github.com/yashd810/Digital-Product-Passport.git"
 BRANCH="main"
 SSH_CMD="/usr/bin/ssh"
-TIMEOUT_SECONDS=600
+TIMEOUT_SECONDS="${DPP_DEPLOY_TIMEOUT_SECONDS:-1800}"
 TIMEOUT_CMD=""
 
 if command -v timeout >/dev/null 2>&1; then
@@ -33,16 +36,16 @@ fi
 if [ -z "$DEPLOY_TARGET" ]; then
     echo "❌ DPP_DEPLOY_TARGET is required. Use one of: frontend, backend, all"
     echo "Examples:"
-    echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=79.72.16.68 bash scripts/deploy/deploy-to-oci.sh"
-    echo "  DPP_DEPLOY_TARGET=backend OCI_IP=82.70.54.173 bash scripts/deploy/deploy-to-oci.sh"
+    echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=<frontend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
+    echo "  DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
     exit 1
 fi
 
 if [ -z "$OCI_IP" ]; then
     echo "❌ OCI_IP is required."
     echo "Examples:"
-    echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=79.72.16.68 bash scripts/deploy/deploy-to-oci.sh"
-    echo "  DPP_DEPLOY_TARGET=backend OCI_IP=82.70.54.173 bash scripts/deploy/deploy-to-oci.sh"
+    echo "  DPP_DEPLOY_TARGET=frontend OCI_IP=<frontend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
+    echo "  DPP_DEPLOY_TARGET=backend OCI_IP=<backend-host-ip> bash scripts/deploy/deploy-to-oci.sh"
     exit 1
 fi
 
@@ -67,6 +70,8 @@ echo "  Compose Project: ${COMPOSE_PROJECT_NAME:-auto-detect}"
 echo "  App Dir: $APP_DIR"
 echo "  Env File: $ENV_FILE"
 echo "  Timeout: ${TIMEOUT_SECONDS}s"
+echo "  Live Edge Check: ${SKIP_LIVE_EDGE_CHECK:-enabled}"
+echo "  Caddy Reload: ${SKIP_CADDY_RELOAD:-enabled}"
 echo ""
 
 # Check if SSH key exists
@@ -80,7 +85,7 @@ echo ""
 
 # Test SSH connection
 echo "🔌 Testing SSH connection..."
-SSH_OPTS=(-i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=60)
+SSH_OPTS=(-i "$SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=60)
 
 if $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "echo 'SSH OK'" > /dev/null 2>&1; then
     echo "✅ SSH connection successful"
@@ -114,6 +119,10 @@ BRANCH="main"
 DEPLOY_TARGET="${DPP_DEPLOY_TARGET:?DPP_DEPLOY_TARGET is required}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-}"
 REMOVE_ORPHANS="${DPP_REMOVE_ORPHANS:-}"
+SKIP_LIVE_EDGE_CHECK="${DPP_SKIP_LIVE_EDGE_CHECK:-}"
+SKIP_CADDY_RELOAD="${DPP_SKIP_CADDY_RELOAD:-}"
+CADDYFILE="${DPP_CADDYFILE:-}"
+DEPLOY_TIMEOUT_SECONDS="${DPP_DEPLOY_TIMEOUT_SECONDS:-1800}"
 
 echo "📂 Checking application directory..."
 if [ ! -d "$APP_DIR" ]; then
@@ -149,15 +158,26 @@ echo ""
 # Run deployment with timeout
 echo "🐳 Building and starting Docker containers (this may take 10-15 minutes)..."
 cd "$APP_DIR"
-if [ -n "$REMOVE_ORPHANS" ] && [ -n "$COMPOSE_PROJECT_NAME" ]; then
-    timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" DPP_REMOVE_ORPHANS="$REMOVE_ORPHANS" ./infra/oracle/deploy-prod.sh
-elif [ -n "$REMOVE_ORPHANS" ]; then
-    timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" DPP_REMOVE_ORPHANS="$REMOVE_ORPHANS" ./infra/oracle/deploy-prod.sh
-elif [ -n "$COMPOSE_PROJECT_NAME" ]; then
-    timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" ./infra/oracle/deploy-prod.sh
-else
-    timeout 600 sudo DPP_ENV_FILE="$ENV_FILE" DPP_DEPLOY_TARGET="$DEPLOY_TARGET" ./infra/oracle/deploy-prod.sh
+DEPLOY_ENV=(
+    DPP_ENV_FILE="$ENV_FILE"
+    DPP_DEPLOY_TARGET="$DEPLOY_TARGET"
+)
+if [ -n "$COMPOSE_PROJECT_NAME" ]; then
+    DEPLOY_ENV+=(COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME")
 fi
+if [ -n "$REMOVE_ORPHANS" ]; then
+    DEPLOY_ENV+=(DPP_REMOVE_ORPHANS="$REMOVE_ORPHANS")
+fi
+if [ -n "$SKIP_LIVE_EDGE_CHECK" ]; then
+    DEPLOY_ENV+=(DPP_SKIP_LIVE_EDGE_CHECK="$SKIP_LIVE_EDGE_CHECK")
+fi
+if [ -n "$SKIP_CADDY_RELOAD" ]; then
+    DEPLOY_ENV+=(DPP_SKIP_CADDY_RELOAD="$SKIP_CADDY_RELOAD")
+fi
+if [ -n "$CADDYFILE" ]; then
+    DEPLOY_ENV+=(DPP_CADDYFILE="$CADDYFILE")
+fi
+timeout "$DEPLOY_TIMEOUT_SECONDS" sudo "${DEPLOY_ENV[@]}" ./infra/oracle/deploy-prod.sh
 
 echo ""
 echo "✅ Deployment process complete!"
@@ -171,7 +191,7 @@ chmod +x "$DEPLOY_SCRIPT"
 
 # Copy script to remote and execute
 echo "📤 Uploading deployment script..."
-if scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$DEPLOY_SCRIPT" "${OCI_USER}@${OCI_IP}:/tmp/deploy.sh" 2>&1 | grep -v "100%" | grep -v "^$"; then
+if scp -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "$DEPLOY_SCRIPT" "${OCI_USER}@${OCI_IP}:/tmp/deploy.sh" 2>&1 | grep -v "100%" | grep -v "^$"; then
     echo "✅ Script uploaded"
 else
     echo "✅ Script uploaded (scp silent mode)"
@@ -189,6 +209,16 @@ fi
 if [ -n "$REMOVE_ORPHANS" ]; then
     REMOTE_ENV="$REMOTE_ENV DPP_REMOVE_ORPHANS='$REMOVE_ORPHANS'"
 fi
+if [ -n "$SKIP_LIVE_EDGE_CHECK" ]; then
+    REMOTE_ENV="$REMOTE_ENV DPP_SKIP_LIVE_EDGE_CHECK='$SKIP_LIVE_EDGE_CHECK'"
+fi
+if [ -n "$SKIP_CADDY_RELOAD" ]; then
+    REMOTE_ENV="$REMOTE_ENV DPP_SKIP_CADDY_RELOAD='$SKIP_CADDY_RELOAD'"
+fi
+if [ -n "$CADDYFILE" ]; then
+    REMOTE_ENV="$REMOTE_ENV DPP_CADDYFILE='$CADDYFILE'"
+fi
+REMOTE_ENV="$REMOTE_ENV DPP_DEPLOY_TIMEOUT_SECONDS='$TIMEOUT_SECONDS'"
 if [ -n "$TIMEOUT_CMD" ]; then
     ($TIMEOUT_CMD $((TIMEOUT_SECONDS + 30)) $SSH_CMD "${SSH_OPTS[@]}" "${OCI_USER}@${OCI_IP}" "$REMOTE_ENV bash /tmp/deploy.sh" 2>&1) | tee /tmp/deploy-output.log
 else

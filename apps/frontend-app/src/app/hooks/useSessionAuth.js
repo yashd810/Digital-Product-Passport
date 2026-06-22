@@ -4,7 +4,7 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 const API = import.meta.env.VITE_API_URL || "";
 
 export function useSessionAuth() {
-  const [token, setToken] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [companyId, setCompanyId] = useState(localStorage.getItem("companyId"));
   const [authReady, setAuthReady] = useState(false);
@@ -26,7 +26,7 @@ export function useSessionAuth() {
         const sessionUser = await response.json();
         if (cancelled) return;
 
-        setToken(true);
+        setIsAuthenticated(true);
         setUser(sessionUser);
         setCompanyId(sessionUser.companyId || "");
         localStorage.setItem("user", JSON.stringify(sessionUser));
@@ -34,7 +34,7 @@ export function useSessionAuth() {
       } catch {
         clearTimeout(timeout);
         if (cancelled) return;
-        setToken(false);
+        setIsAuthenticated(false);
         setUser(null);
         setCompanyId("");
         localStorage.removeItem("user");
@@ -59,7 +59,7 @@ export function useSessionAuth() {
       await fetchWithAuth(`${API}/api/auth/logout`, { method: "POST", credentials: "include" });
     } catch {}
 
-    setToken(false);
+    setIsAuthenticated(false);
     setUser(null);
     setCompanyId("");
     localStorage.removeItem("user");
@@ -72,9 +72,9 @@ export function useSessionAuth() {
     handleLogout,
     handleUserUpdate,
     setCompanyId,
-    setToken,
+    setIsAuthenticated,
     setUser,
-    token,
+    isAuthenticated,
     user,
   };
 }

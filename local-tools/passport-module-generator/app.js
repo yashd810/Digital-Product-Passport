@@ -128,6 +128,48 @@ const sample = {
   ],
 };
 
+const FIELDS_CSV_COLUMNS = [
+  "fieldLabel",
+  "sectionLabel",
+  "fieldType",
+  "definition",
+  "categoryLabel",
+  "dataType",
+  "unitLabel",
+  "unitSymbol",
+  "accessRights",
+  "queryable",
+  "indexed",
+  "tableColumns",
+];
+
+const FIELD_TYPE_OPTIONS = new Set(["text", "textarea", "boolean", "date", "url", "file", "symbol", "table"]);
+const DATA_TYPE_OPTIONS = new Set(["string", "number", "integer", "boolean", "date", "datetime", "uri"]);
+const ACCESS_RIGHTS_OPTIONS = new Set(["public", "restricted"]);
+const OBJECT_TYPE_OPTIONS = new Set([
+  "SingleValuedDataElement",
+  "MultiValuedDataElement",
+  "DataElementCollection",
+  "RelatedResource",
+  "MultiLanguageDataElement",
+]);
+const VALUE_DATA_TYPE_OPTIONS = new Set([
+  "String",
+  "Boolean",
+  "Integer",
+  "Decimal",
+  "Date",
+  "DateTime",
+  "URI",
+  "Binary",
+  "Array",
+  "Object",
+]);
+
+const DRAFT_STORAGE_KEY = "passport-module-generator:draft:v1";
+const SESSION_STORAGE_KEY = "passport-module-generator:session:v1";
+let sessionSaveTimer = null;
+
 function setMessage(text, type = "info") {
   const box = $("#message");
   box.textContent = text;
@@ -140,6 +182,83 @@ function clearMessage() {
   box.className = "message hidden";
 }
 
+function getCurrentStep() {
+  return $(".tool-step.active")?.dataset.step || "module";
+}
+
+function createBlankSpec() {
+  return {
+    module: {
+      family: "",
+      version: "v1",
+      moduleKey: "",
+      typeName: "",
+      displayName: "",
+      productCategory: "",
+      productIcon: "",
+      semanticModelKey: "",
+      passportPolicyKey: "",
+      defaultCarrierPolicyKey: "web_public_entry_v1",
+      systemHeaderFieldAssignments: Object.fromEntries(
+        HEADER_SLOT_DEFINITIONS.map((slot) => [slot.slotKey, `__managed__:${slot.managedKey}`])
+      ),
+      baseUrl: "https://www.claros-dpp.online",
+      dictionaryName: "",
+      dictionaryDescription: "",
+    },
+    roles: {
+      businessIdentifierField: "",
+      summaryRoles: {},
+      lifecycleRoles: {},
+      compositionFieldKey: "",
+      compositionLabelColumnKey: "",
+      compositionValueColumnKey: "",
+    },
+    sections: [],
+  };
+}
+
+function readWorkspaceState() {
+  return {
+    spec: readSpec(),
+    overwrite: getCheckboxValue("overwrite"),
+    activeStep: getCurrentStep(),
+    savedAt: new Date().toISOString(),
+  };
+}
+
+function applyWorkspaceState(state = {}) {
+  loadSpec(state.spec || createBlankSpec());
+  setCheckboxValue("overwrite", state.overwrite);
+  setActiveStep(state.activeStep || "module");
+}
+
+function loadJsonStorage(storage, key) {
+  const raw = storage.getItem(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveSessionNow() {
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(readWorkspaceState()));
+  } catch {
+    // Ignore local browser storage failures.
+  }
+}
+
+function queueSessionSave() {
+  if (sessionSaveTimer) window.clearTimeout(sessionSaveTimer);
+  sessionSaveTimer = window.setTimeout(() => {
+    saveSessionNow();
+    sessionSaveTimer = null;
+  }, 250);
+}
+
 function setActiveStep(step) {
   const nextStep = step || "module";
   $$("[data-step]").forEach((panel) => {
@@ -149,6 +268,7 @@ function setActiveStep(step) {
     button.classList.toggle("active", button.dataset.stepTarget === nextStep);
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
+  queueSessionSave();
 }
 
 function setupWorkspaceNavigation() {
@@ -221,6 +341,220 @@ function titleCase(value) {
   return splitWords(value)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  if (/["\n,]/.test(text)) {
+    return `"${text.replace(/"/g, "\"\"")}"`;
+  }
+  return text;
+}
+
+function downloadTextFile(fileName, content, contentType = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: contentType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let index = 0;
+  let inQuotes = false;
+
+  while (index < text.length) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (inQuotes) {
+      if (char === "\"" && next === "\"") {
+        value += "\"";
+        index += 2;
+        continue;
+      }
+      if (char === "\"") {
+        inQuotes = false;
+        index += 1;
+        continue;
+      }
+      value += char;
+      index += 1;
+      continue;
+    }
+
+    if (char === "\"") {
+      inQuotes = true;
+      index += 1;
+      continue;
+    }
+
+    if (char === ",") {
+      row.push(value);
+      value = "";
+      index += 1;
+      continue;
+    }
+
+    if (char === "\n") {
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+      index += 1;
+      continue;
+    }
+
+    if (char === "\r") {
+      index += 1;
+      continue;
+    }
+
+    value += char;
+    index += 1;
+  }
+
+  row.push(value);
+  if (row.length > 1 || row[0]) rows.push(row);
+  return rows;
+}
+
+function parseBooleanCell(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return ["true", "1", "yes", "y"].includes(text);
+}
+
+function normalizeCsvOption(value, allowedValues, fallback) {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  return allowedValues.has(text) ? text : fallback;
+}
+
+function parseJsonCell(value, label, fallback) {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${label} must be valid JSON.`);
+  }
+}
+
+function getFieldsCsvRowsFromSpec(spec = readSpec()) {
+  return (spec.sections || []).flatMap((section) =>
+    (section.fields || []).map((field) => ({
+      fieldLabel: field.fieldLabel || "",
+      sectionLabel: section.label || "",
+      fieldType: field.fieldType || "text",
+      definition: field.definition || "",
+      categoryLabel: field.categoryLabel || "",
+      dataType: field.dataType || "string",
+      unitLabel: field.unitLabel || "",
+      unitSymbol: field.unitSymbol || "",
+      accessRights: field.accessRights || "public",
+      queryable: field.queryable ? "true" : "false",
+      indexed: field.indexed ? "true" : "false",
+      tableColumns: field.fieldType === "table" ? JSON.stringify(field.tableColumns || []) : "",
+    }))
+  );
+}
+
+function buildFieldsCsvContent(rows = []) {
+  const lines = [
+    FIELDS_CSV_COLUMNS.join(","),
+    ...rows.map((row) => FIELDS_CSV_COLUMNS.map((column) => csvEscape(row[column] || "")).join(",")),
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function readFieldsCsvRows(text) {
+  const rows = parseCsv(text);
+  if (!rows.length) throw new Error("CSV file is empty.");
+
+  const header = rows[0].map((cell) => String(cell || "").trim());
+  for (const column of ["fieldLabel", "sectionLabel"]) {
+    if (!header.includes(column)) {
+      throw new Error(`CSV is missing required column "${column}". Download the template and fill that format only.`);
+    }
+  }
+
+  const unsupported = header.filter((column) => column && !FIELDS_CSV_COLUMNS.includes(column));
+  if (unsupported.length) {
+    throw new Error(`CSV contains unsupported columns: ${unsupported.join(", ")}. Use the fixed local-tool template only.`);
+  }
+
+  const parsedRows = [];
+  let skippedRowCount = 0;
+
+  for (const [rowIndex, row] of rows.slice(1).entries()) {
+    if (!row.some((cell) => String(cell || "").trim())) continue;
+
+      const entry = Object.fromEntries(header.map((column, columnIndex) => [column, String(row[columnIndex] || "").trim()]));
+      const fieldLabel = entry.fieldLabel || "";
+      const sectionLabel = entry.sectionLabel || "";
+      if (!fieldLabel || !sectionLabel) {
+        skippedRowCount += 1;
+        continue;
+      }
+      const fieldType = normalizeCsvOption(entry.fieldType, FIELD_TYPE_OPTIONS, "text");
+      const dataType = normalizeCsvOption(entry.dataType, DATA_TYPE_OPTIONS, defaultDataTypeForFieldType(fieldType));
+      const tableColumnsSource = entry.tableColumns || "";
+      const tableColumns = fieldType === "table"
+        ? parseJsonCell(tableColumnsSource, `CSV row ${rowIndex + 2} tableColumns`, [])
+        : [];
+
+      if (fieldType === "table" && !Array.isArray(tableColumns)) {
+        throw new Error(`CSV row ${rowIndex + 2} tableColumns must be a JSON array.`);
+      }
+
+      parsedRows.push({
+        sectionLabel,
+        field: {
+          fieldLabel,
+          fieldType,
+          definition: entry.definition || "",
+          categoryLabel: entry.categoryLabel || "",
+          dataType,
+          unitLabel: entry.unitLabel || "",
+          unitSymbol: entry.unitSymbol || "",
+          accessRights: normalizeCsvOption(entry.accessRights, ACCESS_RIGHTS_OPTIONS, "public"),
+          queryable: parseBooleanCell(entry.queryable),
+          indexed: parseBooleanCell(entry.indexed),
+          tableColumns,
+        },
+      });
+  }
+
+  return {
+    rows: parsedRows,
+    skippedRowCount,
+  };
+}
+
+function convertFieldsCsvRowsToSections(rows = []) {
+  const sectionsByKey = new Map();
+
+  for (const row of rows) {
+    const sectionLabel = row.sectionLabel;
+    const sectionKey = camelCaseFromWords(sectionLabel);
+    if (!sectionsByKey.has(sectionKey)) {
+      sectionsByKey.set(sectionKey, {
+        key: sectionKey,
+        label: sectionLabel,
+        fields: [],
+      });
+    }
+    sectionsByKey.get(sectionKey).fields.push(row.field);
+  }
+
+  return [...sectionsByKey.values()];
 }
 
 function camelCaseFromWords(value) {
@@ -417,7 +751,6 @@ function getTableColumnDefaults(index = 0) {
     unitSymbol: "",
     objectType: "SingleValuedDataElement",
     valueDataType: "String",
-    required: false,
   };
 }
 
@@ -609,7 +942,6 @@ function getFieldFilterText(row, key) {
       "unitKey",
       "objectType",
       "valueDataType",
-      "tableDefaultRowsText",
     ]
       .map((fieldKey) => $(`[data-field='${fieldKey}']`, row)?.value || "")
       .concat($$("[data-column]", row).map((input) => input.type === "checkbox" ? String(input.checked) : input.value))
@@ -914,14 +1246,128 @@ function loadSpec(spec) {
   });
   const assignments = spec.module?.systemHeaderFieldAssignments && typeof spec.module.systemHeaderFieldAssignments === "object"
     ? spec.module.systemHeaderFieldAssignments
-    : Object.fromEntries(
-        (Array.isArray(spec.module?.systemHeaderFieldKeys) ? spec.module.systemHeaderFieldKeys : [])
-          .map((fieldKey, index) => [HEADER_SLOT_DEFINITIONS[index]?.slotKey, fieldKey])
-          .filter(([slotKey, fieldKey]) => slotKey && fieldKey)
-      );
+    : {};
   $$("[data-system-header-slot]").forEach((select) => {
     select.value = assignments[select.dataset.systemHeaderSlot] || "";
   });
+  queueSessionSave();
+}
+
+function saveDraft() {
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(readWorkspaceState()));
+    setMessage("Saved draft locally in this browser.", "success");
+  } catch {
+    setMessage("Could not save draft in this browser.", "error");
+  }
+}
+
+function loadDraft() {
+  const state = loadJsonStorage(localStorage, DRAFT_STORAGE_KEY);
+  if (!state) {
+    setMessage("No saved draft found in this browser.", "error");
+    return;
+  }
+  applyWorkspaceState(state);
+  setMessage("Loaded saved draft from this browser.", "success");
+}
+
+function restoreSession() {
+  const state = loadJsonStorage(sessionStorage, SESSION_STORAGE_KEY);
+  if (!state) {
+    setMessage("No saved session found for this browser tab.", "error");
+    return;
+  }
+  applyWorkspaceState(state);
+  setMessage("Restored current browser session.", "success");
+}
+
+function clearAll() {
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  loadSpec(createBlankSpec());
+  setCheckboxValue("overwrite", false);
+  clearMessage();
+  setActiveStep("module");
+  setMessage("Cleared the current working session. Saved drafts are kept.", "success");
+}
+
+function downloadFieldsCsvTemplate() {
+  const templateRows = [
+    {
+      fieldLabel: "Manufacturer Name",
+      sectionLabel: "Electronics Identity",
+      fieldType: "text",
+      definition: "Name of the manufacturer responsible for placing the product on the market.",
+      categoryLabel: "Product Identification",
+      dataType: "string",
+      unitLabel: "",
+      unitSymbol: "",
+      accessRights: "public",
+      queryable: "false",
+      indexed: "false",
+      tableColumns: "",
+    },
+    {
+      fieldLabel: "Material Composition",
+      sectionLabel: "Material Data",
+      fieldType: "table",
+      definition: "Lists the component materials used in the product.",
+      categoryLabel: "Material Information",
+      dataType: "string",
+      unitLabel: "",
+      unitSymbol: "",
+      accessRights: "public",
+      queryable: "false",
+      indexed: "false",
+      tableColumns: JSON.stringify([
+        {
+          columnLabel: "Material Name",
+          dataType: "string",
+          unitLabel: "",
+          unitSymbol: "",
+          objectType: "SingleValuedDataElement",
+          valueDataType: "String",
+        },
+        {
+          columnLabel: "Percentage",
+          dataType: "number",
+          unitLabel: "Percent",
+          unitSymbol: "%",
+          objectType: "SingleValuedDataElement",
+          valueDataType: "Decimal",
+        },
+      ]),
+    },
+  ];
+  downloadTextFile("passport-module-fields-template.csv", buildFieldsCsvContent(templateRows), "text/csv;charset=utf-8");
+  setMessage("Downloaded fixed CSV template for Part 2 fields.", "success");
+}
+
+function exportFieldsCsv() {
+  const rows = getFieldsCsvRowsFromSpec();
+  if (!rows.length) {
+    setMessage("Add at least one field before exporting CSV.", "error");
+    return;
+  }
+  downloadTextFile("passport-module-fields.csv", buildFieldsCsvContent(rows), "text/csv;charset=utf-8");
+  setMessage(`Exported ${rows.length} field rows to CSV.`, "success");
+}
+
+async function importFieldsCsvFile(file) {
+  if (!file) return;
+  clearMessage();
+  try {
+    const text = await file.text();
+    const { rows, skippedRowCount } = readFieldsCsvRows(text);
+    const nextSpec = readSpec();
+    nextSpec.sections = convertFieldsCsvRowsToSections(rows);
+    loadSpec(nextSpec);
+    setActiveStep("fields");
+    const skippedText = skippedRowCount ? ` Skipped ${skippedRowCount} incomplete row${skippedRowCount === 1 ? "" : "s"}.` : "";
+    setMessage(`Imported ${rows.length} field rows from CSV using the fixed template.${skippedText}`, "success");
+  } catch (error) {
+    setMessage(error.message, "error");
+  }
 }
 
 function renderPreview(result) {
@@ -994,10 +1440,27 @@ async function loadStatus() {
 
 $("#loadSample").addEventListener("click", () => loadSpec(sample));
 $("#addSection").addEventListener("click", () => addSection());
+$("#saveDraft").addEventListener("click", saveDraft);
+$("#loadDraft").addEventListener("click", loadDraft);
+$("#restoreSession").addEventListener("click", restoreSession);
+$("#clearAll").addEventListener("click", clearAll);
+$("#downloadFieldsCsvTemplate").addEventListener("click", downloadFieldsCsvTemplate);
+$("#exportFieldsCsv").addEventListener("click", exportFieldsCsv);
+$("#importFieldsCsv").addEventListener("click", () => $("#fieldsCsvInput").click());
+$("#fieldsCsvInput").addEventListener("change", async (event) => {
+  const [file] = event.target.files || [];
+  await importFieldsCsvFile(file);
+  event.target.value = "";
+});
 $("#preview").addEventListener("click", preview);
 $("#writeFiles").addEventListener("click", writeFiles);
 $("#compositionFieldKey").addEventListener("change", syncCompositionRoleColumns);
+document.addEventListener("input", queueSessionSave, true);
+document.addEventListener("change", queueSessionSave, true);
 setupWorkspaceNavigation();
 setupModuleAutoFill();
-loadSpec(sample);
+const restoredSession = loadJsonStorage(sessionStorage, SESSION_STORAGE_KEY);
+loadSpec(restoredSession?.spec || sample);
+setCheckboxValue("overwrite", restoredSession?.overwrite);
+setActiveStep(restoredSession?.activeStep || "module");
 loadStatus();

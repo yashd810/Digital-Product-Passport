@@ -107,7 +107,7 @@ function TemplateField({
     }
     if (field.type === "symbol") {
       const linkedUrl = typeof value === "string" && value.startsWith("http") ? value : null;
-      const picked = linkedUrl ? symbols.find((symbol) => symbol.file_url === linkedUrl) : null;
+      const picked = linkedUrl ? symbols.find((symbol) => symbol.fileUrl === linkedUrl) : null;
       return (
         <div className="file-upload-widget">
           {linkedUrl ? (
@@ -231,9 +231,6 @@ function TemplateField({
 
 // ── Template editor (create or edit) ──
 function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTemplate, onSave, onCancel }) {
-  const token = typeof window !== "undefined"
-    ? (window.localStorage.getItem("token") || "")
-    : "";
   const [passportType,  setPassportType]  = useState(editingTemplate?.passportType || cloneTemplate?.passportType || "");
   const [name,          setName]          = useState(editingTemplate?.name || (cloneTemplate?.name ? `Copy of ${cloneTemplate.name}` : ""));
   const [description,   setDescription]  = useState(editingTemplate?.description || cloneTemplate?.description || "");
@@ -443,7 +440,6 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
 
       {repoPicker && (
         <RepositoryPicker
-          token={token}
           companyId={companyId}
           onSelect={(url) => { setFieldValue(repoPicker, url); setRepoPicker(null); }}
           onClose={() => setRepoPicker(null)}
@@ -452,7 +448,6 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
 
       {symbolPicker && (
         <SymbolRepositoryPicker
-          token={token}
           companyId={companyId}
           onSelect={(url) => { setFieldValue(symbolPicker, url); setSymbolPicker(null); }}
           onClose={() => setSymbolPicker(null)}

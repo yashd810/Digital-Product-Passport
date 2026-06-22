@@ -80,115 +80,6 @@
 
 .createpass-main { flex: 1; padding: 36px 20px; }
 
-/* ── Tabs ── */
-.pf-tab-bar {
-  display: flex;
-  gap: 4px;
-  border-bottom: 2px solid var(--border-color, rgba(255,255,255,0.1));
-  margin-bottom: 24px;
-}
-.pf-tab {
-  padding: 8px 20px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 10px 10px 0 0;
-  margin-bottom: -2px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-muted, #8a9ab5);
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.pf-tab:hover {
-  color: var(--text-primary, #e2e8f0);
-  background: rgba(13,181,176,0.08);
-}
-.pf-tab-active {
-  color: var(--accent, #0db5b0);
-  border-bottom-color: var(--accent, #0db5b0);
-  background: rgba(13,181,176,0.10);
-}
-
-[data-theme="light"] .pf-tab {
-  color: #5d7689;
-}
-
-[data-theme="light"] .pf-tab:hover {
-  color: #143244;
-  background: #e8f7f6;
-}
-
-[data-theme="light"] .pf-tab-active {
-  color: #0a7e7a;
-  background: #def3f1;
-}
-
-/* ── Edit / Update tab ── */
-.pf-edit-update-tab {
-  padding: 8px 0 24px;
-}
-.pf-edit-update-desc {
-  font-size: 13px;
-  color: var(--text-muted, #8a9ab5);
-  margin: 0 0 20px;
-  line-height: 1.5;
-}
-.pf-edit-update-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.pf-eu-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.18s ease;
-  min-height: 42px;
-}
-.pf-eu-btn:hover { transform: translateY(-1px); }
-.pf-eu-btn-export {
-  background: var(--surface-2, rgba(255,255,255,0.04));
-  border: 1px solid var(--border-color, rgba(255,255,255,0.12));
-  color: var(--text-primary, #e2e8f0);
-}
-.pf-eu-btn-export:hover {
-  background: rgba(13,181,176,0.10);
-  border-color: rgba(13,181,176,0.30);
-}
-.pf-eu-btn-import {
-  background: linear-gradient(135deg, var(--accent, #0db5b0) 0%, var(--accent-strong, #0a8f8a) 100%);
-  border: none;
-  color: #0b1826;
-  box-shadow: 0 14px 28px rgba(13,181,176,0.18);
-}
-.pf-eu-btn-import:hover {
-  box-shadow: 0 18px 34px rgba(13,181,176,0.26);
-}
-
-[data-theme="light"] .pf-eu-btn-export {
-  background: #ffffff;
-  border-color: rgba(23,48,74,0.14);
-  color: #143244;
-}
-
-[data-theme="light"] .pf-eu-btn-export:hover {
-  background: #e8f7f6;
-  border-color: rgba(13,181,176,0.32);
-  color: #0e5d64;
-}
-
-[data-theme="light"] .pf-eu-btn-import:hover {
-  box-shadow: 0 18px 34px rgba(13,181,176,0.22);
-  filter: saturate(0.98) brightness(1.01);
-}
-
 .createpass-container {
   max-width: 900px;
   margin: 0 auto;
@@ -309,32 +200,6 @@
   outline: none;
   border-color: var(--jet);
   box-shadow: 0 0 0 3px rgba(28,55,56,0.15);
-}
-
-.passport-model-locked {
-  background: rgba(255,255,255,0.02) !important;
-  color: var(--text-secondary) !important;
-  cursor: not-allowed !important;
-  border-color: var(--border) !important;
-}
-
-[data-theme="light"] .passport-model-locked {
-  background: #f0f0f0 !important;
-  color: #888 !important;
-}
-
-.field-locked-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 7px;
-  background: rgba(139,170,173,0.2);
-  color: var(--text-secondary);
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  vertical-align: middle;
 }
 
 /* Form sections */
@@ -557,96 +422,12 @@
   flex-shrink: 0;
 }
 
-.pf-symbol-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 10px;
-  padding: 16px;
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-.pf-symbol-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 8px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border, rgba(184,204,217,0.18));
-  background: var(--bg-soft, rgba(255,255,255,0.04));
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.pf-symbol-item:hover {
-  border-color: var(--accent, #0db5b0);
-  background: rgba(13,181,176,0.08);
-}
-
-.pf-symbol-item.selected {
-  border-color: var(--accent, #0db5b0);
-  background: rgba(13,181,176,0.14);
-}
-
-.pf-symbol-grid-img {
-  width: 52px;
-  height: 52px;
-  object-fit: contain;
-}
-
-.pf-symbol-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-primary);
-  text-align: center;
-  word-break: break-word;
-}
-
-.pf-symbol-cat {
-  font-size: 10px;
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-[data-theme="light"] .pf-symbol-grid {
-  background: #ffffff;
-}
-
-[data-theme="light"] .pf-symbol-item {
-  border-color: rgba(23,48,74,0.12);
-  background: #f6fbfd;
-}
-
-[data-theme="light"] .pf-symbol-item:hover {
-  border-color: #0db5b0;
-  background: rgba(13,181,176,0.10);
-}
-
-[data-theme="light"] .pf-symbol-item.selected {
-  border-color: #0db5b0;
-  background: rgba(13,181,176,0.16);
-}
-
-[data-theme="light"] .pf-symbol-name {
-  color: #143244;
-}
-
-[data-theme="light"] .pf-symbol-cat {
-  color: #5d7689;
-}
-
 /* ── Table Field ── */
 .pf-table-wrap {
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow-x: auto;
-}
-
-.pf-table-toolbar {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .pf-table {
@@ -663,31 +444,6 @@
   color: var(--text-secondary);
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
-}
-
-.pf-table-head-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pf-table-head-input {
-  width: 100%;
-  min-width: 120px;
-  padding: 7px 9px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 7px;
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 700;
-  font-family: var(--font);
-}
-
-.pf-table-head-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(13,181,176,0.12);
 }
 
 .pf-table tbody td {
@@ -718,7 +474,6 @@
   text-align: center;
 }
 
-.pf-table-remove-col,
 .pf-table-remove-row {
   background: rgba(239,68,68,0.12);
   border: 1px solid transparent;
@@ -731,18 +486,12 @@
   transition: all 0.15s;
 }
 
-.pf-table-remove-col {
-  flex-shrink: 0;
-}
-
-.pf-table-remove-col:hover:not(:disabled),
 .pf-table-remove-row:hover:not(:disabled) {
   background: rgba(239,68,68,0.12);
   border-color: rgba(239,68,68,0.3);
   color: #fff;
 }
 
-.pf-table-add-col,
 .pf-table-add-row {
   align-self: flex-start;
   padding: 6px 14px;
@@ -756,7 +505,6 @@
   transition: background 0.15s, color 0.15s;
 }
 
-.pf-table-add-col:hover:not(:disabled),
 .pf-table-add-row:hover:not(:disabled) {
   background: rgba(13,181,176,0.1);
   color: var(--accent);
@@ -764,25 +512,17 @@
 }
 
 [data-theme="light"] .pf-table thead th { background: #f0f6fa; }
-[data-theme="light"] .pf-table-head-input {
-  background: #ffffff;
-  color: #17304a;
-  border-color: rgba(23,48,74,0.16);
-}
 [data-theme="light"] .pf-table-cell-input { color: var(--onyx); }
 [data-theme="light"] .pf-table-cell-input:focus { background: #f7fbff; }
-[data-theme="light"] .pf-table-add-col,
 [data-theme="light"] .pf-table-add-row {
   background: rgba(13,181,176,0.08);
   color: #143244;
 }
-[data-theme="light"] .pf-table-remove-col,
 [data-theme="light"] .pf-table-remove-row {
   background: rgba(239,68,68,0.08);
   color: #b42318;
   border-color: rgba(239,68,68,0.14);
 }
-[data-theme="light"] .pf-table-remove-col:hover:not(:disabled),
 [data-theme="light"] .pf-table-remove-row:hover:not(:disabled) { color: #dc2626; }
 
 /* ── Date Input ── */
@@ -832,9 +572,6 @@
   letter-spacing: 0.03em;
 }
 
-/* ── File Upload Widget ── */
-.file-input-hidden { display: none; }
-
 .file-upload-widget {
   display: flex;
   align-items: center;
@@ -870,9 +607,6 @@
   border-color: var(--jet);
 }
 
-.file-selected  { color: var(--text-primary); font-weight: 600; }
-[data-theme="light"] .file-selected { color: var(--jet); }
-.file-size      { font-weight: 400; color: var(--text-secondary); font-size: 12px; margin-left: 4px; }
 .file-placeholder { color: var(--text-secondary); }
 
 .file-clear-btn {
@@ -887,15 +621,6 @@
   font-family: var(--font);
 }
 .file-clear-btn:hover { background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.3); color: #fff; }
-
-.upload-status {
-  font-size: 13px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 500;
-}
-.upload-status.uploading { background: rgba(240,165,0,0.14); color: #ffd88a; }
-.upload-status.done      { background: rgba(16,185,129,0.14); color: #9ff0ca; }
 
 .section-hint {
   font-size: 13px;
@@ -1017,36 +742,6 @@
   overflow-wrap: anywhere;
 }
 
-.pf-header-owner {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  max-width: 150px;
-  min-height: 23px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255,255,255,0.04);
-  color: var(--text-primary);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.2;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.pf-header-owner-company_managed {
-  color: var(--accent);
-  border-color: rgba(13,181,176,0.35);
-  background: rgba(13,181,176,0.1);
-}
-
-.pf-header-owner-passport_author_editable {
-  color: #fbbf24;
-  border-color: rgba(251,191,36,0.35);
-  background: rgba(251,191,36,0.1);
-}
-
 .pf-header-readonly-input {
   width: 100%;
   padding: 10px 11px;
@@ -1099,65 +794,6 @@
   border: 1px solid rgba(13,181,176,0.2);
   border-radius: 8px;
   line-height: 1.5;
-}
-
-.pf-governance-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: -2px 0 10px 0;
-}
-
-.pf-governance-badge,
-.pf-governance-copy {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-.pf-governance-badge {
-  font-weight: 700;
-  border: 1px solid transparent;
-}
-
-.pf-governance-copy {
-  color: var(--text-secondary);
-  background: rgba(28,55,56,0.06);
-  border: 1px solid var(--border);
-}
-
-.pf-governance-badge-public {
-  color: #0a6f50;
-  background: rgba(16,185,129,0.14);
-  border-color: rgba(16,185,129,0.2);
-}
-
-.pf-governance-badge-restricted {
-  color: #8a5a00;
-  background: rgba(245,158,11,0.16);
-  border-color: rgba(245,158,11,0.22);
-}
-
-.pf-governance-badge-confidential {
-  color: #8f2f5d;
-  background: rgba(236,72,153,0.14);
-  border-color: rgba(236,72,153,0.2);
-}
-
-.pf-governance-badge-trade_secret {
-  color: #7c2d12;
-  background: rgba(249,115,22,0.15);
-  border-color: rgba(249,115,22,0.2);
-}
-
-.pf-governance-badge-regulated {
-  color: #1d4ed8;
-  background: rgba(59,130,246,0.15);
-  border-color: rgba(59,130,246,0.22);
 }
 
 /* Existing file link */
@@ -1573,4 +1209,35 @@
   }
   .rp-footer { flex-direction: column; align-items: stretch; }
   .rp-cancel-btn { width: 100%; text-align: center; }
+}
+
+/* Shared dropdown theme for create and edit passport forms. */
+.form-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--select-bg);
+  background-image: var(--select-bg-layer), var(--select-arrow-icon);
+  background-position: 0 0, right 13px center;
+  background-repeat: no-repeat;
+  background-size: auto, 16px;
+  border-color: var(--select-border);
+  color: var(--select-text);
+  cursor: pointer;
+  padding-right: 42px;
+}
+
+.form-group select:hover:not(:disabled) {
+  background-image: var(--select-hover-layer), var(--select-arrow-icon);
+  border-color: var(--select-border-hover);
+}
+
+.form-group select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--select-focus-ring);
+  outline: none;
+}
+
+.form-group select option {
+  background: var(--select-option-bg);
+  color: var(--select-option-text);
 }

@@ -15,6 +15,53 @@ const SAFE_ID_TOKEN_ALGORITHMS = new Set([
   "PS512",
 ]);
 const DEFAULT_ID_TOKEN_ALGORITHMS = ["RS256"];
+const OAUTH_FETCH_TIMEOUT_MS = Math.min(
+  Math.max(parseInt(process.env.OAUTH_FETCH_TIMEOUT_MS || "10000", 10) || 10000, 1000),
+  30000
+);
+
+function isLoopbackHost(hostname) {
+  const normalized = String(hostname || "").toLowerCase();
+  return normalized === "localhost" || normalized === "::1" || normalized.startsWith("127.");
+}
+
+function validateOauthUrl(value, label) {
+  let parsed;
+  try {
+    parsed = new URL(String(value || ""));
+  } catch {
+    throw new Error(`${label} must be a valid URL`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error(`${label} must not include credentials`);
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(`${label} must use HTTPS`);
+  }
+  const allowInsecureHttp = process.env.OAUTH_ALLOW_INSECURE_HTTP === "true";
+  if (parsed.protocol === "http:" && !allowInsecureHttp && !isLoopbackHost(parsed.hostname)) {
+    throw new Error(`${label} must use HTTPS outside local development`);
+  }
+  return parsed.toString();
+}
+
+async function fetchOauth(url, init = {}, label = "OAuth URL") {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OAUTH_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(validateOauthUrl(url, label), {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`${label} timed out`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function parseJsonEnv(name, fallback) {
   const raw = process.env[name];
@@ -79,11 +126,12 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     const cacheKey = `oauth:metadata:${provider.key}`;
     return cache.wrap(cacheKey, 60 * 60, async () => {
       if (provider.discoveryUrl) {
-        const response = await fetch(provider.discoveryUrl);
+        const response = await fetchOauth(provider.discoveryUrl, {}, `${provider.key} discovery URL`);
         if (!response.ok) throw new Error(`Failed to load discovery document for ${provider.key}`);
         return response.json();
       }
-      const response = await fetch(`${String(provider.issuer).replace(/\/+$/, "")}/.well-known/openid-configuration`);
+      const issuerUrl = validateOauthUrl(provider.issuer, `${provider.key} issuer URL`).replace(/\/+$/, "");
+      const response = await fetchOauth(`${issuerUrl}/.well-known/openid-configuration`, {}, `${provider.key} discovery URL`);
       if (!response.ok) throw new Error(`Failed to load discovery document for ${provider.key}`);
       return response.json();
     });
@@ -92,7 +140,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
   async function getJwks(provider, metadata) {
     const cacheKey = `oauth:jwks:${provider.key}`;
     return cache.wrap(cacheKey, 60 * 60, async () => {
-      const response = await fetch(metadata.jwks_uri);
+      const response = await fetchOauth(metadata.jwks_uri, {}, `${provider.key} JWKS URL`);
       if (!response.ok) throw new Error(`Failed to load JWKS for ${provider.key}`);
       return response.json();
     });
@@ -126,11 +174,11 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       redirect_uri: redirectUri,
     });
     if (codeVerifier) body.set("code_verifier", codeVerifier);
-    const response = await fetch(metadata.token_endpoint, {
+    const response = await fetchOauth(metadata.token_endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
-    });
+    }, `${provider.key} token endpoint`);
     const json = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(json.error_description || json.error || `Token exchange failed for ${provider.key}`);
@@ -161,7 +209,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       audience: provider.clientId,
       issuer: metadata.issuer || provider.issuer,
     });
-    if (expectedNonce && claims.nonce && claims.nonce !== expectedNonce) {
+    if (expectedNonce && claims.nonce !== expectedNonce) {
       throw new Error("Invalid OAuth nonce");
     }
     return claims;
@@ -169,9 +217,9 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
 
   async function hydrateProfile(provider, metadata, tokenSet, claims) {
     if (claims.email || !metadata.userinfo_endpoint || !tokenSet.access_token) return claims;
-    const response = await fetch(metadata.userinfo_endpoint, {
+    const response = await fetchOauth(metadata.userinfo_endpoint, {
       headers: { Authorization: `Bearer ${tokenSet.access_token}` },
-    });
+    }, `${provider.key} userinfo endpoint`);
     if (!response.ok) return claims;
     const profile = await response.json().catch(() => ({}));
     return { ...profile, ...claims };
@@ -190,6 +238,9 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     const subject = String(profile.sub || "");
     if (!email) throw new Error("SSO provider did not return an email address");
     if (!subject) throw new Error("SSO provider did not return a subject identifier");
+    if (profile.email_verified === false) {
+      throw new Error("SSO provider did not verify this email address");
+    }
     assertEmailAllowed(provider, email);
 
     const existingIdentity = await pool.query(
@@ -340,3 +391,4 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
 
 module.exports = createOauthService;
 module.exports.normalizeRedirectPath = normalizeRedirectPath;
+module.exports.validateOauthUrl = validateOauthUrl;

@@ -4,7 +4,7 @@ import "../../../shared/styles/CreatePass.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-function SymbolRepositoryPicker({ token, companyId, onSelect, onClose }) {
+function SymbolRepositoryPicker({ companyId, onSelect, onClose }) {
   const [items, setItems] = useState([]);
   const [breadcrumbs, setBreadcrumbs] = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -19,9 +19,7 @@ function SymbolRepositoryPicker({ token, companyId, onSelect, onClose }) {
     setError("");
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols${qs}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols${qs}`);
       if (!r.ok) throw new Error();
       setItems(await r.json());
     } catch {
@@ -29,7 +27,7 @@ function SymbolRepositoryPicker({ token, companyId, onSelect, onClose }) {
     } finally {
       setLoading(false);
     }
-  }, [companyId, token]);
+  }, [companyId]);
 
   useEffect(() => { fetchItems(null); }, [fetchItems]);
 
@@ -61,7 +59,7 @@ function SymbolRepositoryPicker({ token, companyId, onSelect, onClose }) {
 
   const pick = (item) => {
     if (item.type !== "file" || !item.fileUrl) return;
-    onSelect(item.file_url, item.name);
+    onSelect(item.fileUrl, item.name);
   };
 
   return (
@@ -105,12 +103,12 @@ function SymbolRepositoryPicker({ token, companyId, onSelect, onClose }) {
             items.map((item) => (
               <div
                 key={item.id}
-                className={`rp-item ${item.type} ${item.type === "file" && item.file_url ? "selectable" : ""}`}
+                className={`rp-item ${item.type} ${item.type === "file" && item.fileUrl ? "selectable" : ""}`}
                 onClick={() => item.type === "folder" ? navigateTo(item) : pick(item)}
               >
                 <span className="rp-item-icon">{item.type === "folder" ? "📁" : "🔣"}</span>
                 <span className="rp-item-name">{item.name}</span>
-                {item.type === "file" && item.file_url && (
+                {item.type === "file" && item.fileUrl && (
                   <span className="rp-pick-hint">Click to link</span>
                 )}
                 {item.type === "folder" && (

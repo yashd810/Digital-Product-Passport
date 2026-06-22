@@ -53,7 +53,8 @@ const getTable = (typeName) => {
   if (!typeName) throw new Error("typeName is required for table lookup");
   const safe = toStorageSlug(typeName);
   if (!safe) throw new Error("typeName must contain at least one alphanumeric character");
-  return `${safe}_passports`;
+  const identifierSafeSlug = /^[a-z]/.test(safe) ? safe : `type_${safe}`;
+  return `${identifierSafeSlug}_passports`;
 };
 
 const normalizeReleaseStatus = (status) => status;

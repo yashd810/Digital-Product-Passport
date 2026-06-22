@@ -11,7 +11,7 @@ import "../styles/Landing.css";
 
 const API = import.meta.env.VITE_API_URL || "";
 
-function Register({ setToken, setUser, setCompanyId }) {
+function Register({ setIsAuthenticated, setUser, setCompanyId }) {
   const navigate  = useNavigate();
   const location  = useLocation();
 
@@ -101,7 +101,7 @@ function Register({ setToken, setUser, setCompanyId }) {
       localStorage.setItem("user",      JSON.stringify(data.user));
       localStorage.setItem("companyId", data.user.companyId || "");
 
-      setToken(true);
+      setIsAuthenticated(true);
       setUser(data.user);
       setCompanyId(data.user.companyId);
 
