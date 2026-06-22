@@ -1,76 +1,139 @@
 #!/usr/bin/env node
+"use strict";
+
 /**
- * Fix Script: Grant super_admin role to admin email
- * This script updates the user role to super_admin based on the ADMIN_EMAIL
+ * Ensure one bootstrap super admin exists.
+ *
+ * Uses DB_* and PEPPER_V1 from the active environment or DOTENV_CONFIG_PATH.
+ * Set ADMIN_EMAIL and optionally ADMIN_PASSWORD to override defaults.
  */
+const crypto = require("crypto");
+const fs = require("fs");
 const path = require("path");
-require("dotenv").config({
-  path: process.env.DOTENV_CONFIG_PATH || path.resolve(__dirname, "../../docker/.env"),
-});
 const { Pool } = require("pg");
+const createPasswordService = require("../../src/services/password-service");
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  host: process.env.DB_HOST || "localhost",
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME,
-});
+const DEFAULT_ADMIN_EMAIL = "digitalproductpass@gmail.com";
 
-async function fixAdminRole() {
-  try {
-    const adminEmail = process.env.ADMIN_EMAIL || "digitalproductpass@gmail.com";
-
-    console.log(`🔧 Fixing admin role for: ${adminEmail}`);
-
-    // Check if user exists
-    const checkUser = await pool.query(
-      "SELECT id, email, role FROM users WHERE email = $1",
-      [adminEmail]
-    );
-
-    if (!checkUser.rows.length) {
-      console.log(`⚠️  User not found: ${adminEmail}`);
-      console.log("Please create the user first by registering via the application.");
-      await pool.end();
-      return;
-    }
-
-    const user = checkUser.rows[0];
-    console.log(`📝 Found user: ${user.email} (current role: ${user.role})`);
-
-    if (user.role === "super_admin") {
-      console.log(`✅ User already has super_admin role`);
-      await pool.end();
-      return;
-    }
-
-    // Update role to super_admin
-    const updateResult = await pool.query(
-      "UPDATE users SET role = $1, updated_at = NOW() WHERE email = $2 RETURNING id, email, role",
-      ["super_admin", adminEmail]
-    );
-
-    const updatedUser = updateResult.rows[0];
-    console.log(`✅ Successfully updated role to: ${updatedUser.role}`);
-    console.log(`📌 User ${updatedUser.email} now has admin access`);
-
-    // Also list all super_admin users
-    const allAdmins = await pool.query(
-      "SELECT id, email, company_id FROM users WHERE role = $1 ORDER BY created_at DESC",
-      ["super_admin"]
-    );
-
-    console.log(`\n👥 All super_admin users (${allAdmins.rows.length}):`);
-    allAdmins.rows.forEach((admin) => {
-      console.log(`   - ${admin.email} (ID: ${admin.id})`);
-    });
-
-    await pool.end();
-  } catch (error) {
-    console.error("❌ Error fixing admin role:", error.message);
-    process.exit(1);
+function stripQuotes(value) {
+  const trimmed = String(value || "").trim();
+  if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
   }
+  return trimmed;
 }
 
-fixAdminRole();
+function loadEnvFile(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const index = line.indexOf("=");
+    const key = line.slice(0, index).trim();
+    const value = stripQuotes(line.slice(index + 1));
+    if (key && process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+  return filePath;
+}
+
+function findRepoEnvFile() {
+  if (process.env.DOTENV_CONFIG_PATH) {
+    return process.env.DOTENV_CONFIG_PATH;
+  }
+
+  let current = __dirname;
+  while (current && current !== path.dirname(current)) {
+    const candidate = path.join(current, "docker", ".env");
+    if (fs.existsSync(candidate)) return candidate;
+    current = path.dirname(current);
+  }
+  return null;
+}
+
+const loadedEnvFile = loadEnvFile(findRepoEnvFile());
+
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+const pool = new Pool({
+  user: requireEnv("DB_USER"),
+  password: requireEnv("DB_PASSWORD"),
+  host: process.env.DB_HOST || "localhost",
+  port: process.env.DB_PORT || 5432,
+  database: requireEnv("DB_NAME"),
+});
+
+function createTemporaryPassword() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+async function ensureSuperAdmin() {
+  const adminEmail = String(process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || createTemporaryPassword();
+  const passwordService = createPasswordService({
+    crypto,
+    pepper: requireEnv("PEPPER_V1"),
+    currentPepperVersion: Number.parseInt(process.env.CURRENT_PEPPER_VERSION || "1", 10),
+  });
+  const passwordHash = await passwordService.hashPassword(adminPassword);
+
+  console.log(`Ensuring super_admin user: ${adminEmail}`);
+  if (loadedEnvFile) {
+    console.log(`Loaded DB environment from: ${loadedEnvFile}`);
+  }
+
+  const result = await pool.query(
+    `INSERT INTO users (
+       email,
+       "passwordHash",
+       "firstName",
+       "lastName",
+       "companyId",
+       role,
+       "isActive",
+       "pepperVersion",
+       "authSource",
+       "ssoOnly",
+       "sessionVersion",
+       "createdAt",
+       "updatedAt"
+     )
+     VALUES ($1, $2, $3, $4, NULL, 'super_admin', true, $5, 'local', false, 1, NOW(), NOW())
+     ON CONFLICT (email) DO UPDATE
+       SET "passwordHash" = EXCLUDED."passwordHash",
+           "pepperVersion" = EXCLUDED."pepperVersion",
+           role = 'super_admin',
+           "companyId" = NULL,
+           "isActive" = true,
+           "authSource" = 'local',
+           "ssoOnly" = false,
+           "sessionVersion" = COALESCE(users."sessionVersion", 1) + 1,
+           "updatedAt" = NOW()
+     RETURNING id, email, role, "isActive" AS "isActive", "companyId" AS "companyId"`,
+    [adminEmail, passwordHash.hash, "Digital Product", "Pass Admin", passwordHash.pepperVersion]
+  );
+
+  const admin = result.rows[0];
+  console.log(`Super admin ready: ${admin.email} (id: ${admin.id}, active: ${admin.isActive})`);
+
+  const countResult = await pool.query(
+    "SELECT COUNT(*)::int AS count FROM users WHERE role = 'super_admin' AND \"isActive\" = true"
+  );
+  console.log(`Active super_admin users: ${countResult.rows[0]?.count || 0}`);
+}
+
+ensureSuperAdmin()
+  .catch((error) => {
+    console.error("Error ensuring super admin:", error.message);
+    process.exit(1);
+  })
+  .finally(() => pool.end());
