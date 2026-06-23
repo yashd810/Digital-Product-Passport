@@ -305,10 +305,10 @@ export const translateSchemaLabel = (lang, source, explicitKey) => {
   const candidates = [
     source?.translations?.[lang],
     source?.translations?.en,
-    source?.label_i18n?.[lang],
-    source?.label_i18n?.en,
-    source?.title_i18n?.[lang],
-    source?.title_i18n?.en,
+    source?.labelI18n?.[lang],
+    source?.labelI18n?.en,
+    source?.titleI18n?.[lang],
+    source?.titleI18n?.en,
     explicitKey,
     source?.i18nKey,
     source?.translationKey,
@@ -334,11 +334,11 @@ export const translateFieldValue = (lang, value, type) => {
 
 export function I18nProvider({ children }) {
   const [lang, setLangState] = useState(
-    () => localStorage.getItem("dpp_lang") || "en"
+    () => localStorage.getItem("dppLang") || "en"
   );
 
   const setLang = (l) => {
-    localStorage.setItem("dpp_lang", l);
+    localStorage.setItem("dppLang", l);
     setLangState(l);
   };
 

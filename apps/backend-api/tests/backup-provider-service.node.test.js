@@ -28,15 +28,15 @@ test("implicit env backup provider is normalized before passport replication", a
   let savedObject = null;
   const pool = {
     async query(sql, params = []) {
-      if (sql.includes("FROM backup_service_providers")) return { rows: [] };
-      if (sql.includes("FROM passport_attachments")) return { rows: [] };
-      if (sql.includes("INSERT INTO passport_backup_replications")) {
+      if (sql.includes("FROM \"backupServiceProviders\"")) return { rows: [] };
+      if (sql.includes("FROM \"passportAttachments\"")) return { rows: [] };
+      if (sql.includes("INSERT INTO \"passportBackupReplications\"")) {
         replicationParams = params;
         return {
           rows: [{
-            backup_provider_key: params[1],
-            replication_status: params[9],
-            storage_key: params[11],
+            backupProviderKey: params[1],
+            replicationStatus: params[9],
+            storageKey: params[11],
           }],
         };
       }
@@ -64,39 +64,39 @@ test("implicit env backup provider is normalized before passport replication", a
       dppId: "dpp-1",
       companyId: 7,
       lineageId: "lineage-1",
-      passportType: "electronicsPassportV1",
+      passportType: "medicalDevicePassportV1",
       versionNumber: 2,
     },
-    typeDef: { typeName: "electronicsPassportV1", fieldsJson: { sections: [] } },
-    snapshotScope: "released_current",
+    typeDef: { typeName: "medicalDevicePassportV1", fieldsJson: { sections: [] } },
+    snapshotScope: "releasedCurrent",
   });
 
   assert.equal(result.success, true);
   assert.equal(replicationParams[1], "oci-test");
   assert.equal(replicationParams[9], "synced");
   assert.equal(savedObject.contentType, "application/json");
-  assert.equal(savedObject.key, "custom-prefix/company-7/passport-lineage-1/v2/released_current.json");
+  assert.equal(savedObject.key, "custom-prefix/company-7/passport-lineage-1/v2/releasedCurrent.json");
 });
 
 test("public handover rows expose camelCase fields expected by callers", async () => {
   const pool = {
     async query(sql) {
-      assert.match(sql, /FROM backup_public_handovers/);
+      assert.match(sql, /FROM "backupPublicHandovers"/);
       return {
         rows: [{
           id: 12,
-          company_id: 7,
-          passport_dpp_id: "dpp-1",
-          lineage_id: "lineage-1",
-          passport_type: "electronicsPassportV1",
-          internal_alias_id: "alias-1",
-          version_number: 3,
-          backup_provider_key: "oci-test",
-          source_replication_id: 99,
-          public_url: "https://backup.example/dpp-1.json",
-          public_row_data: JSON.stringify({ dppId: "dpp-1" }),
-          handover_status: "active",
-          verification_status: "verified",
+          companyId: 7,
+          passportDppId: "dpp-1",
+          lineageId: "lineage-1",
+          passportType: "medicalDevicePassportV1",
+          internalAliasId: "alias-1",
+          versionNumber: 3,
+          backupProviderKey: "oci-test",
+          sourceReplicationId: 99,
+          publicUrl: "https://backup.example/dpp-1.json",
+          publicRowData: JSON.stringify({ dppId: "dpp-1" }),
+          handoverStatus: "active",
+          verificationStatus: "verified",
         }],
       };
     },
@@ -113,7 +113,7 @@ test("public handover rows expose camelCase fields expected by callers", async (
   assert.equal(handover.passportDppId, "dpp-1");
   assert.equal(handover.companyId, 7);
   assert.equal(handover.lineageId, "lineage-1");
-  assert.equal(handover.passportType, "electronicsPassportV1");
+  assert.equal(handover.passportType, "medicalDevicePassportV1");
   assert.equal(handover.internalAliasId, "alias-1");
   assert.equal(handover.versionNumber, 3);
   assert.equal(handover.backupProviderKey, "oci-test");

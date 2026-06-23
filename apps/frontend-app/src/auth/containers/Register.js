@@ -21,7 +21,7 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
 
   // Token validation state
   const [tokenStatus,  setTokenStatus]  = useState("checking"); // checking | valid | invalid
-  const [tokenData,    setTokenData]    = useState(null);        // { email, company_name, role_to_assign }
+  const [tokenData,    setTokenData]    = useState(null);        // { email, companyName, roleToAssign }
   const [tokenError,   setTokenError]   = useState("");
 
   // Form state
@@ -36,7 +36,7 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
   useEffect(() => {
     if (!inviteToken) {
       setTokenStatus("invalid");
-      setTokenError("no_token");
+      setTokenError("noToken");
       return;
     }
 
@@ -106,7 +106,7 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
       setCompanyId(data.user.companyId);
 
       navigate(
-        data.user.role === "super_admin"
+        data.user.role === "superAdmin"
           ? "/admin"
           : buildUserDashboardHomePath({ user: data.user, companyId: data.user.companyId || "" })
       );
@@ -151,7 +151,7 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
           <p>This page requires a valid invitation link.</p>
 
           <div className="alert alert-error">
-            {tokenError === "no_token"
+            {tokenError === "noToken"
               ? "No invitation token found. Please use the link from your email."
               : tokenError}
           </div>
@@ -180,7 +180,7 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
         <div className="invite-banner">
           <p className="invite-banner-label">You have been invited to join</p>
           <p className="invite-banner-company">
-            {tokenData.companyName || (tokenData.roleToAssign === "super_admin" ? "Digital Product Passport" : "the platform")}
+            {tokenData.companyName || (tokenData.roleToAssign === "superAdmin" ? "Digital Product Passport" : "the platform")}
           </p>
         </div>
 

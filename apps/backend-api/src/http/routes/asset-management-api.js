@@ -42,10 +42,10 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const types = await pool.query(
         `SELECT pt.id, pt."typeName", pt."displayName", pt."productCategory", pt."productIcon", pt."fieldsJson"
-         FROM passport_types pt
-         JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
-         WHERE cpa.company_id = $1
-           AND cpa.access_revoked = false
+         FROM "passportTypes" pt
+         JOIN "companyPassportAccess" cpa ON cpa."passportTypeId" = pt.id
+         WHERE cpa."companyId" = $1
+           AND cpa."accessRevoked" = false
            AND pt."isActive" = true
          ORDER BY pt."productCategory" NULLS FIRST, pt."displayName" ASC`,
         [companyId]
@@ -203,8 +203,8 @@ module.exports = function registerAssetManagementApiRoutes(app, {
     try {
       const companyId = getCompanyId(req);
       const jobs = await pool.query(
-        `SELECT * FROM asset_management_jobs WHERE company_id = $1
-         ORDER BY updated_at DESC, created_at DESC LIMIT 50`,
+        `SELECT * FROM "assetManagementJobs" WHERE "companyId" = $1
+         ORDER BY "updatedAt" DESC, "createdAt" DESC LIMIT 50`,
         [companyId]
       );
       res.json({ jobs: jobs.rows });
@@ -246,8 +246,8 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         : null;
 
       const inserted = await pool.query(
-        `INSERT INTO asset_management_jobs
-           (company_id, passport_type, name, source_kind, source_config, records_json, options_json, is_active, start_at, interval_minutes, next_run_at)
+        `INSERT INTO "assetManagementJobs"
+           ("companyId", "passportType", name, "sourceKind", "sourceConfig", "recordsJson", "optionsJson", "isActive", "startAt", "intervalMinutes", "nextRunAt")
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          RETURNING *`,
         [
@@ -273,7 +273,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       if (!Number.isFinite(jobId)) return res.status(400).json({ error: "jobId must be numeric" });
 
       const existing = await pool.query(
-        "SELECT * FROM asset_management_jobs WHERE id = $1 AND company_id = $2", [jobId, companyId]
+        "SELECT * FROM \"assetManagementJobs\" WHERE id = $1 AND \"companyId\" = $2", [jobId, companyId]
       );
       if (!existing.rows.length) return res.status(404).json({ error: "Asset job not found" });
 
@@ -314,10 +314,10 @@ module.exports = function registerAssetManagementApiRoutes(app, {
         : null;
 
       const updated = await pool.query(
-        `UPDATE asset_management_jobs
-         SET passport_type = $2, name = $3, source_kind = $4, source_config = $5,
-             records_json = $6, options_json = $7, is_active = $8, start_at = $9,
-             interval_minutes = $10, next_run_at = $11, updated_at = NOW()
+        `UPDATE "assetManagementJobs"
+         SET "passportType" = $2, name = $3, "sourceKind" = $4, "sourceConfig" = $5,
+             "recordsJson" = $6, "optionsJson" = $7, "isActive" = $8, "startAt" = $9,
+             "intervalMinutes" = $10, "nextRunAt" = $11, "updatedAt" = NOW()
          WHERE id = $1
          RETURNING *`,
         [
@@ -343,11 +343,11 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       if (!Number.isFinite(jobId)) return res.status(400).json({ error: "jobId must be numeric" });
 
       const job = await pool.query(
-        "SELECT * FROM asset_management_jobs WHERE id = $1 AND company_id = $2", [jobId, companyId]
+        "SELECT * FROM \"assetManagementJobs\" WHERE id = $1 AND \"companyId\" = $2", [jobId, companyId]
       );
       if (!job.rows.length) return res.status(404).json({ error: "Asset job not found" });
 
-      const result = await runAssetManagementJob(job.rows[0], "manual_job_run", getUserId(req));
+      const result = await runAssetManagementJob(job.rows[0], "manualJobRun", getUserId(req));
       if (result.error) {
         return res.status(400).json({ error: result.error.message, run: result.run });
       }
@@ -365,7 +365,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       const limit = Math.min(Number.parseInt(req.query.limit, 10) || 25, 100);
 
       const runs = await pool.query(
-        `SELECT * FROM asset_management_runs WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2`,
+        `SELECT * FROM "assetManagementRuns" WHERE "companyId" = $1 ORDER BY "createdAt" DESC LIMIT $2`,
         [companyId, limit]
       );
 

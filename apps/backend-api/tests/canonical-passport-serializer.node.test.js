@@ -27,31 +27,31 @@ function createProductIdentifierService() {
   };
 }
 
-function createTextileTypeDef() {
+function createMedicalDeviceTypeDef() {
   return {
-    typeName: "textilePassportV1",
-    displayName: "Textile Passport v1",
-    productCategory: "Textile",
-    semanticModelKey: "textile_dictionary_v1",
+    typeName: "medicalDevicePassportV1",
+    displayName: "Medical Device Passport v1",
+    productCategory: "Medical Device",
+    semanticModelKey: "medicalDeviceDictionaryV1",
     fieldsJson: {
       sections: [{
-        key: "textileIdentity",
+        key: "deviceIdentity",
         fields: [
           {
-            key: "fiberComposition",
-            label: "Fiber Composition",
+            key: "deviceMaterial",
+            label: "Device Material",
             type: "text",
-            semanticId: "https://www.claros-dpp.online/dictionary/textile/v1/terms/fiber-composition",
+            semanticId: "https://www.claros-dpp.online/dictionary/medical-device/v1/terms/device-material",
             objectType: "SingleValuedDataElement",
             valueDataType: "String",
           },
           {
-            key: "recycledContentPercentage",
-            label: "Recycled Content Percentage",
+            key: "sterilizationCycles",
+            label: "Sterilization Cycles",
             type: "text",
-            semanticId: "https://www.claros-dpp.online/dictionary/textile/v1/terms/recycled-content-percentage",
+            semanticId: "https://www.claros-dpp.online/dictionary/medical-device/v1/terms/sterilization-cycles",
             objectType: "SingleValuedDataElement",
-            valueDataType: "Decimal",
+            valueDataType: "Integer",
           },
         ],
       }],
@@ -59,54 +59,54 @@ function createTextileTypeDef() {
   };
 }
 
-test("canonical serializer resolves terms from the selected non-battery semantic model", () => {
+test("canonical serializer resolves terms from explicit semantic field metadata", () => {
   const serializer = createCanonicalPassportSerializer({
     didService: createDidService(),
     productIdentifierService: createProductIdentifierService(),
     semanticModelRegistry: createSemanticModelRegistry(),
   });
-  const typeDef = createTextileTypeDef();
+  const typeDef = createMedicalDeviceTypeDef();
   const passport = {
-    passportType: "textilePassportV1",
-    dppId: "TEX-DPP-001",
-    lineageId: "TEX-LINEAGE-001",
+    passportType: "medicalDevicePassportV1",
+    dppId: "MD-DPP-001",
+    lineageId: "MD-LINEAGE-001",
     companyId: 42,
-    internalAliasId: "STYLE-001",
+    internalAliasId: "DEVICE-001",
     releaseStatus: "released",
     updatedAt: "2026-06-02T08:00:00.000Z",
-    contentSpecificationIds: ["Textile_dictionary_v1"],
-    economicOperatorId: "EORI-TEXTILE-001",
-    fiberComposition: "80% cotton, 20% recycled polyester",
-    recycledContentPercentage: "20.5",
+    contentSpecificationIds: ["medicalDeviceDictionaryV1"],
+    economicOperatorId: "EORI-MEDICAL-001",
+    deviceMaterial: "Surgical steel",
+    sterilizationCycles: "12",
   };
 
   const canonical = serializer.buildCanonicalPassportPayload(passport, typeDef, {
     company: {
       id: 42,
-      companyName: "Nordic Textiles",
-      didSlug: "nordic-textiles",
-      economicOperatorIdentifier: "EORI-TEXTILE-001",
+      companyName: "Nordic Devices",
+      didSlug: "nordic-devices",
+      economicOperatorIdentifier: "EORI-MEDICAL-001",
     },
   });
 
-  assert.equal(canonical.fields.fiberComposition, "80% cotton, 20% recycled polyester");
-  assert.equal(canonical.fields.recycledContentPercentage, 20.5);
+  assert.equal(canonical.fields.deviceMaterial, "Surgical steel");
+  assert.equal(canonical.fields.sterilizationCycles, "12");
   assert.deepEqual(canonical.extensions.platform.validationIssues || [], []);
 
   const expanded = serializer.buildExpandedPassportPayload(passport, typeDef, {
     company: {
       id: 42,
-      companyName: "Nordic Textiles",
-      didSlug: "nordic-textiles",
-      economicOperatorIdentifier: "EORI-TEXTILE-001",
+      companyName: "Nordic Devices",
+      didSlug: "nordic-devices",
+      economicOperatorIdentifier: "EORI-MEDICAL-001",
     },
   });
-  const recycledElement = expanded.elements.find((element) => element.elementId === "recycledContentPercentage");
+  const cyclesElement = expanded.elements.find((element) => element.elementId === "sterilizationCycles");
 
   assert.equal(
-    recycledElement.dictionaryReference,
-    "https://www.claros-dpp.online/dictionary/textile/v1/terms/recycled-content-percentage"
+    cyclesElement.dictionaryReference,
+    "https://www.claros-dpp.online/dictionary/medical-device/v1/terms/sterilization-cycles"
   );
-  assert.equal(recycledElement.valueDataType, "Decimal");
-  assert.equal(recycledElement.value, 20.5);
+  assert.equal(cyclesElement.valueDataType, "Integer");
+  assert.equal(cyclesElement.value, "12");
 });

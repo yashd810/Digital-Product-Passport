@@ -221,8 +221,8 @@ function parseDid(did) {
  *   did:web:www.claros-dpp.online:did:company:5
  *     → https://www.claros-dpp.online/did/company/5/did.json
  *
- *   did:web:www.claros-dpp.online:did:textile-passport-v1:batch:STYLE-001
- *     → https://www.claros-dpp.online/did/textile-passport-v1/batch/STYLE-001/did.json
+ *   did:web:www.claros-dpp.online:did:custom-passport-v1:batch:LOT-001
+ *     → https://www.claros-dpp.online/did/custom-passport-v1/batch/LOT-001/did.json
  *
  *   did:web:www.claros-dpp.online:did:dpp:model:STYLE-001
  *     → https://www.claros-dpp.online/did/dpp/model/STYLE-001/did.json

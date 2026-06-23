@@ -90,7 +90,7 @@ function AuditLogs({ companyId }) {
       const blob = new Blob([csv], { type: "text/csv" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `auditLogs-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(a.href);
       setFlashMsg({ type: "success", text: "✓ Audit logs exported successfully" });

@@ -3299,7 +3299,7 @@
   color: #0c6c68;
 }
 
-.pv-history-status.in_revision,
+.pv-history-status.inRevision,
 .pv-history-status.in_review {
   background: rgba(255, 194, 102, 0.18);
   color: #8c5a00;

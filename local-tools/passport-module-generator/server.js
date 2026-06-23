@@ -338,7 +338,7 @@ function validateSpec(input) {
   const semanticModelKey = clean(module.semanticModelKey) || `${family.replace(/-/g, "_")}_dictionary_${version}`;
   const contentSpecificationId = regulatoryContentSpecificationId(family, version);
   const passportPolicyKey = clean(module.passportPolicyKey) || `${camelCase(family)}Dpp${pascalCase(version)}`;
-  const defaultCarrierPolicyKey = clean(module.defaultCarrierPolicyKey || "web_public_entry_v1");
+  const defaultCarrierPolicyKey = clean(module.defaultCarrierPolicyKey || "webPublicEntryV1");
   const systemHeaderFieldAssignments = normalizeHeaderAssignments(module.systemHeaderFieldAssignments);
   const systemHeaderFieldMappings = HEADER_SLOT_DEFINITIONS
     .map((slot) => {
@@ -422,7 +422,7 @@ function validateSpec(input) {
       };
 
       if (fieldType === "table") {
-        const tableColumns = normalizeTableColumns(field.tableColumns || field.table_columns || [], fieldLabel);
+        const tableColumns = normalizeTableColumns(field.tableColumns || [], fieldLabel);
         normalized.tableColumns = tableColumns;
       }
 
@@ -795,13 +795,13 @@ const ${constName} = ${jsValue(semanticBase)};
 const publicFieldDefaults = {
   access: ["public"],
   confidentiality: "public",
-  updateAuthority: ["economic_operator"],
+  updateAuthority: ["economicOperator"],
 };
 
 const restrictedFieldDefaults = {
-  access: ["economic_operator", "manufacturer", "market_surveillance", "notified_bodies"],
+  access: ["economicOperator", "manufacturer", "marketSurveillance", "notifiedBodies"],
   confidentiality: "restricted",
-  updateAuthority: ["economic_operator", "manufacturer"],
+  updateAuthority: ["economicOperator", "manufacturer"],
 };
 
 function term(slug) {
@@ -851,8 +851,8 @@ function field({
     ...(indexed ? { indexed: true } : {}),
     ...(storageType ? { storageType } : {}),
     ...(type === "table" ? {
-      table_cols: tableColumns.length,
-      table_columns: tableColumns.map((column) => ({
+      tableColumnCount: tableColumns.length,
+      tableColumns: tableColumns.map((column) => ({
         key: column.key,
         label: column.label,
         semanticId: term(column.semanticSlug),

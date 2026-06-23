@@ -31,7 +31,7 @@ export default function PublicPassportRedirectPage() {
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Passport not found")))
       .then((passport) => {
         if (cancelled) return;
-        const targetPath = versionNumber ? passport?.inactive_path : passport?.public_path;
+        const targetPath = versionNumber ? passport?.inactivePath : passport?.publicPath;
         if (!targetPath) throw new Error("Passport not found");
         navigate(targetPath, { replace: true });
       })

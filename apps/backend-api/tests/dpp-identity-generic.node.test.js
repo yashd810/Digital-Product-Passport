@@ -8,19 +8,19 @@ const dppIdentity = require("../src/services/dpp-identity-service");
 test("dpp identity service generates generic product subject DID paths", () => {
   process.env.APP_URL = "https://api.example.test";
 
-  const did = dppIdentity.productItemDid("Textile Passport v1", "STYLE-001");
+  const did = dppIdentity.productItemDid("Custom Passport v1", "ITEM-001");
 
-  assert.equal(did, "did:web:api.example.test:did:textile-passport-v1:item:STYLE-001");
+  assert.equal(did, "did:web:api.example.test:did:custom-passport-v1:item:ITEM-001");
   assert.deepEqual(dppIdentity.parseDid(did), {
     type: "product",
     domain: "api.example.test",
-    passportType: "textile-passport-v1",
+    passportType: "custom-passport-v1",
     level: "item",
-    stableId: "STYLE-001",
+    stableId: "ITEM-001",
   });
   assert.equal(
     dppIdentity.didToDocumentUrl(did),
-    "https://api.example.test/did/textile-passport-v1/item/STYLE-001/did.json"
+    "https://api.example.test/did/custom-passport-v1/item/ITEM-001/did.json"
   );
 });
 

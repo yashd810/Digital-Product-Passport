@@ -1,5 +1,6 @@
 function createCarrierSecurityHelpers({
   pool,
+  logger,
   normalizeReleaseStatus,
   buildCurrentPublicPassportPath,
   buildPreviewPassportPath,
@@ -68,11 +69,13 @@ function createCarrierSecurityHelpers({
   }) {
     if (!dppId || !eventType) return;
     await pool.query(
-      `INSERT INTO passport_security_events
+      `INSERT INTO "passportSecurityEvents"
          ("passportDppId", "companyId", "eventType", severity, source, details)
        VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
       [dppId, companyId, eventType, severity, source, JSON.stringify(details || {})]
-    ).catch(() => {});
+    ).catch((error) => {
+      logger?.warn?.({ err: error, dppId, companyId, eventType }, "Failed to record passport security event");
+    });
   }
 
   function normalizeEvidenceItems(value) {
@@ -93,7 +96,7 @@ function createCarrierSecurityHelpers({
   function buildDataCarrierVerificationRecord(source = {}, actor = {}) {
     const verifiedAt = source.verifiedAt || new Date().toISOString();
     return {
-      evidenceType: "physical_data_carrier_verification",
+      evidenceType: "physicalDataCarrierVerification",
       verifiedAt,
       recordedAt: new Date().toISOString(),
       recordedBy: actor.userId || null,
@@ -161,7 +164,7 @@ function createCarrierSecurityHelpers({
       ...enrichedMetadata,
       issuerCertificateId: enrichedMetadata.issuerCertificateId || credential.trustMetadata?.issuerCertificateId || null,
       signedCarrierPayload: {
-        format: "platform_dpp_carrier_binding_v1",
+        format: "platformDppCarrierBindingV1",
         dataHash: credential.dataHash,
         keyId: credential.keyId,
         signatureAlgorithm: credential.signatureAlgorithm,

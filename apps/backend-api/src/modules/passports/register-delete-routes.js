@@ -21,12 +21,12 @@ module.exports = function registerDeleteRoutes(app, deps) {
   } = deps;
 
   async function hardDeleteDraftPassport(client, { dppId, tableName, companyId = null, rowId = null }) {
-    await client.query("DELETE FROM passport_dynamic_values WHERE \"passportDppId\" = $1", [dppId]);
-    await client.query("DELETE FROM passport_signatures WHERE \"passportDppId\" = $1", [dppId]);
-    await client.query("DELETE FROM passport_scan_events WHERE \"passportDppId\" = $1", [dppId]);
-    await client.query("DELETE FROM passport_workflow WHERE \"passportDppId\" = $1", [dppId]);
-    await client.query("DELETE FROM passport_security_events WHERE \"passportDppId\" = $1", [dppId]);
-    await client.query("DELETE FROM passport_edit_sessions WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM \"passportDynamicValues\" WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM \"passportSignatures\" WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM \"passportScanEvents\" WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM \"passportWorkflow\" WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM \"passportSecurityEvents\" WHERE \"passportDppId\" = $1", [dppId]);
+    await client.query("DELETE FROM \"passportEditSessions\" WHERE \"passportDppId\" = $1", [dppId]);
 
     if (rowId) {
       return client.query(
@@ -80,7 +80,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
           passportType,
           archivedBy: req.user.userId,
           actorIdentifier: getActorIdentifier(req.user),
-          snapshotReason: "before_delete",
+          snapshotReason: "beforeDelete",
         });
       }
 
@@ -169,7 +169,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
                   passportType: typeSchema.typeName,
                   archivedBy: userId,
                   actorIdentifier: getActorIdentifier(req.user),
-                  snapshotReason: "before_bulk_delete",
+                  snapshotReason: "beforeBulkDelete",
                 });
               }
             }
@@ -213,7 +213,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
                     passportType: typeSchema.typeName,
                     archivedBy: userId,
                     actorIdentifier: getActorIdentifier(req.user),
-                    snapshotReason: "before_bulk_delete",
+                    snapshotReason: "beforeBulkDelete",
                   });
                 }
               }

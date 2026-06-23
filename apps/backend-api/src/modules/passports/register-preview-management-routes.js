@@ -37,7 +37,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const resolvedCompanyId = sourcePassport.companyId ?? companyId ?? null;
       const typeDefResult = await pool.query(
         `SELECT id, "typeName", "displayName", "productCategory", "productIcon", "fieldsJson"
-         FROM passport_types
+         FROM "passportTypes"
          WHERE "typeName" = $1
          LIMIT 1`,
         [sourcePassport.passportType]
@@ -50,7 +50,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       );
       const company = resolvedCompanyId
         ? (await pool.query(
-            `SELECT id, company_name, company_logo, did_slug
+            `SELECT id, "companyName", "companyLogo", "didSlug"
              FROM companies
              WHERE id = $1
              LIMIT 1`,
@@ -58,17 +58,17 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           )).rows[0] || null
         : null;
       const companyNameMap = resolvedCompanyId ? await getCompanyNameMap([resolvedCompanyId]) : new Map();
-      const companyName = company?.company_name || (resolvedCompanyId ? companyNameMap.get(String(resolvedCompanyId)) : "") || "";
+      const companyName = company?.companyName || (resolvedCompanyId ? companyNameMap.get(String(resolvedCompanyId)) : "") || "";
       const canonicalPayload = typeof buildCanonicalPassportPayload === "function"
         ? buildCanonicalPassportPayload(sourcePassport, typeDef || resolved.typeDef || null, {
-            company: company || (companyName ? { company_name: companyName } : null),
+            company: company || (companyName ? { companyName: companyName } : null),
             companyName,
             granularity: sourcePassport.granularity || "item",
           })
         : null;
       const canonicalIdentity = buildCanonicalIdentityBundle({
         passport: sourcePassport,
-        company: company || (companyName ? { company_name: companyName } : null),
+        company: company || (companyName ? { companyName: companyName } : null),
         companyName,
         granularity: sourcePassport.granularity || "item",
         passportType: sourcePassport.passportType,
@@ -83,13 +83,13 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         subjectDid: canonicalPayload?.subjectDid || canonicalIdentity.subjectDid || null,
         dppDid: canonicalPayload?.dppDid || canonicalIdentity.dppDid || null,
         companyDid: canonicalPayload?.companyDid || canonicalIdentity.companyDid || null,
-        company_profile: company ? {
-          company_name: company.company_name || "",
-          company_logo: company.company_logo || null,
-          did_slug: company.did_slug || null,
+        companyProfile: company ? {
+          companyName: company.companyName || "",
+          companyLogo: company.companyLogo || null,
+          didSlug: company.didSlug || null,
         } : null,
-        linked_data: (canonicalPayload || canonicalIdentity.subjectDid || canonicalIdentity.dppDid || canonicalIdentity.companyDid) ? {
-          canonical_subjects: {
+        linkedData: (canonicalPayload || canonicalIdentity.subjectDid || canonicalIdentity.dppDid || canonicalIdentity.companyDid) ? {
+          canonicalSubjects: {
             subjectDid: canonicalPayload?.subjectDid || canonicalIdentity.subjectDid || null,
             dppDid: canonicalPayload?.dppDid || canonicalIdentity.dppDid || null,
             companyDid: canonicalPayload?.companyDid || canonicalIdentity.companyDid || null,
@@ -99,7 +99,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         previewPath: buildPreviewPassportPath({
           companyName,
           manufacturerName: passport.manufacturer,
-          manufacturedBy: passport.manufactured_by,
+          manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
           internalAliasId: passport.internalAliasId,
           previewDppId: passport.dppId,
@@ -107,14 +107,14 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         publicPath: buildCurrentPublicPassportPath({
           companyName,
           manufacturerName: passport.manufacturer,
-          manufacturedBy: passport.manufactured_by,
+          manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
           internalAliasId: passport.internalAliasId,
         }),
         inactivePath: buildInactivePublicPassportPath({
           companyName,
           manufacturerName: passport.manufacturer,
-          manufacturedBy: passport.manufactured_by,
+          manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
           internalAliasId: passport.internalAliasId,
           versionNumber: passport.versionNumber,
@@ -143,7 +143,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
 
       await clearExpiredEditSessions();
       await pool.query(
-        `INSERT INTO passport_edit_sessions ("passportDppId", "companyId", "passportType", "userId", "lastActivityAt", "updatedAt")
+        `INSERT INTO "passportEditSessions" ("passportDppId", "companyId", "passportType", "userId", "lastActivityAt", "updatedAt")
          VALUES ($1, $2, $3, $4, NOW(), NOW())
          ON CONFLICT ("passportDppId", "userId")
          DO UPDATE SET "companyId" = EXCLUDED."companyId", "passportType" = EXCLUDED."passportType", "lastActivityAt" = NOW(), "updatedAt" = NOW()`,
@@ -160,7 +160,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
   app.delete("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       await pool.query(
-        "DELETE FROM passport_edit_sessions WHERE \"passportDppId\" = $1 AND \"userId\" = $2",
+        "DELETE FROM \"passportEditSessions\" WHERE \"passportDppId\" = $1 AND \"userId\" = $2",
         [req.params.dppId, req.user.userId]
       );
       res.json({ success: true });
@@ -173,7 +173,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     try {
       const result = await pool.query(
         `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt"
-         FROM passport_registry
+         FROM "passportRegistry"
          WHERE "dppId" = $1 AND "companyId" = $2`,
         [req.params.dppId, req.params.companyId]
       );
@@ -195,9 +195,8 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       const { dppId, companyId } = req.params;
       const material = createAccessKeyMaterial();
       const updated = await pool.query(
-        `UPDATE passport_registry
-         SET "accessKey" = NULL,
-             "accessKeyHash" = $1,
+        `UPDATE "passportRegistry"
+         SET "accessKeyHash" = $1,
              "accessKeyPrefix" = $2,
              "accessKeyLastRotatedAt" = NOW()
          WHERE "dppId" = $3 AND "companyId" = $4
@@ -206,7 +205,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       );
       if (!updated.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passport_registry", dppId, null, { keyPrefix: material.prefix });
+      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passportRegistry", dppId, null, { keyPrefix: material.prefix });
       res.json({
         accessKey: material.rawKey,
         keyPrefix: updated.rows[0].accessKeyPrefix,

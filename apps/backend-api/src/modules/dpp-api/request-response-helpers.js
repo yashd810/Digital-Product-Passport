@@ -149,7 +149,7 @@ function createRequestResponseHelpers({
                 "productCategory" AS "productCategory",
                 "semanticModelKey" AS "semanticModelKey",
                 "fieldsJson" AS "fieldsJson"
-         FROM passport_types
+         FROM "passportTypes"
          WHERE "typeName" = $1`,
         [result.passport.passportType]
       )]
@@ -216,7 +216,7 @@ function createRequestResponseHelpers({
                 "productCategory" AS "productCategory",
                 "semanticModelKey" AS "semanticModelKey",
                 "fieldsJson" AS "fieldsJson"
-         FROM passport_types
+         FROM "passportTypes"
          WHERE "typeName" = $1`,
         [result.passport.passportType]
       )]

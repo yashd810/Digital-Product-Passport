@@ -3,64 +3,64 @@
 const VALID_AUDIENCES = new Set([
 "public",
 "consumers",
-"notified_bodies",
-"market_surveillance",
-"customs_authority",
-"eu_commission",
-"legitimate_interest",
-"economic_operator",
-"delegated_operator",
+"notifiedBodies",
+"marketSurveillance",
+"customsAuthority",
+"euCommission",
+"legitimateInterest",
+"economicOperator",
+"delegatedOperator",
 "manufacturer",
-"authorized_representative",
+"authorizedRepresentative",
 "importer",
 "distributor",
 "dealer",
-"fulfilment_service_provider",
-"professional_repairer",
-"independent_operator",
+"fulfilmentServiceProvider",
+"professionalRepairer",
+"independentOperator",
 "recycler",
-"main_dpp_service_provider",
-"backup_dpp_service_provider"]
+"mainDppServiceProvider",
+"backupDppServiceProvider"]
 );
 
 const VALID_CONFIDENTIALITY_LEVELS = new Set([
 "public",
 "restricted",
 "confidential",
-"trade_secret",
+"tradeSecret",
 "regulated"]
 );
 
 const VALID_UPDATE_AUTHORITIES = new Set([
-"economic_operator",
-"delegated_operator",
+"economicOperator",
+"delegatedOperator",
 "manufacturer",
-"authorized_representative",
+"authorizedRepresentative",
 "importer",
 "distributor",
 "dealer",
-"fulfilment_service_provider",
-"professional_repairer",
-"independent_operator",
+"fulfilmentServiceProvider",
+"professionalRepairer",
+"independentOperator",
 "recycler",
-"notified_bodies",
-"market_surveillance",
-"customs_authority",
-"eu_commission",
-"main_dpp_service_provider",
-"backup_dpp_service_provider",
+"notifiedBodies",
+"marketSurveillance",
+"customsAuthority",
+"euCommission",
+"mainDppServiceProvider",
+"backupDppServiceProvider",
 "system"]
 );
 
 const AUDIENCE_IMPLICATIONS = new Map([
 ["public", ["consumers"]],
-["economic_operator", [
+["economicOperator", [
   "manufacturer",
-  "authorized_representative",
+  "authorizedRepresentative",
   "importer",
   "distributor",
   "dealer",
-  "fulfilment_service_provider",
+  "fulfilmentServiceProvider",
 ]],
 ]);
 
@@ -157,9 +157,9 @@ function findFieldDefinition(typeDef, elementIdPath) {
 
 function defaultUpdateAuthority(fieldDef) {
   const access = normalizeList(fieldDef?.access);
-  const authorities = new Set(["economic_operator"]);
+  const authorities = new Set(["economicOperator"]);
   for (const audience of access) {
-    if (audience === "public" || audience === "consumers" || audience === "legitimate_interest") continue;
+    if (audience === "public" || audience === "consumers" || audience === "legitimateInterest") continue;
     if (VALID_UPDATE_AUTHORITIES.has(audience)) authorities.add(audience);
   }
   return [...authorities];
@@ -193,11 +193,11 @@ function buildFieldPolicy(typeDef, elementIdPath) {
 
 function deriveRoleAudiences(user) {
   if (!user) return expandAudienceAssignments(["public"]);
-  if (user.role === "super_admin") {
+  if (user.role === "superAdmin") {
     return expandAudienceAssignments([...VALID_AUDIENCES]);
   }
-  if (["company_admin", "editor", "viewer"].includes(String(user.role || ""))) {
-    return expandAudienceAssignments(["public", "legitimate_interest", "economic_operator"]);
+  if (["companyAdmin", "editor", "viewer"].includes(String(user.role || ""))) {
+    return expandAudienceAssignments(["public", "legitimateInterest", "economicOperator"]);
   }
   return expandAudienceAssignments(["public"]);
 }
@@ -206,8 +206,8 @@ function isAuthorizedDelegator(row, targetCompanyId = null) {
   if (!row) return false;
   const role = String(row.grantorRole || "").trim();
   if (!row.grantorIsActive) return false;
-  if (role === "super_admin") return true;
-  if (role !== "company_admin") return false;
+  if (role === "superAdmin") return true;
+  if (role !== "companyAdmin") return false;
   if (targetCompanyId === null || targetCompanyId === undefined) return true;
   return Number.parseInt(row.grantorCompanyId, 10) === Number.parseInt(targetCompanyId, 10);
 }
@@ -219,17 +219,17 @@ module.exports = function createAccessRightsService({ pool }) {
     const roleAudiences = deriveRoleAudiences(user);
     const result = await pool.query(
       `SELECT uaa.audience,
-              uaa.company_id AS "companyId",
-              uaa.granted_by AS "grantedBy",
+              uaa."companyId" AS "companyId",
+              uaa."grantedBy" AS "grantedBy",
               grantor.role AS "grantorRole",
-              grantor.company_id AS "grantorCompanyId",
-              COALESCE(grantor.is_active, false) AS "grantorIsActive"
-       FROM user_access_audiences uaa
-       LEFT JOIN users grantor ON grantor.id = uaa.granted_by
-       WHERE user_id = $1
-         AND is_active = true
-         AND (company_id IS NULL OR company_id = $2)
-         AND (expires_at IS NULL OR expires_at > NOW())`,
+              grantor."companyId" AS "grantorCompanyId",
+              COALESCE(grantor."isActive", false) AS "grantorIsActive"
+       FROM "userAccessAudiences" uaa
+       LEFT JOIN users grantor ON grantor.id = uaa."grantedBy"
+       WHERE "userId" = $1
+         AND "isActive" = true
+         AND ("companyId" IS NULL OR "companyId" = $2)
+         AND ("expiresAt" IS NULL OR "expiresAt" > NOW())`,
       [user.userId, user.companyId ? Number.parseInt(user.companyId, 10) : null]
     ).catch(() => ({ rows: [] }));
 
@@ -251,7 +251,7 @@ module.exports = function createAccessRightsService({ pool }) {
               grantor.role AS "grantorRole",
               grantor."companyId" AS "grantorCompanyId",
               COALESCE(grantor."isActive", false) AS "grantorIsActive"
-       FROM passport_access_grants pag
+       FROM "passportAccessGrants" pag
        LEFT JOIN users grantor ON grantor.id = pag."grantedBy"
        WHERE pag."passportDppId" = $1
          AND pag."granteeUserId" = $2
@@ -331,7 +331,7 @@ module.exports = function createAccessRightsService({ pool }) {
       };
     }
 
-    if (user.role === "super_admin") {
+    if (user.role === "superAdmin") {
       return {
         allowed: true,
         matchedAuthority: "system",
@@ -355,7 +355,7 @@ module.exports = function createAccessRightsService({ pool }) {
     userContext.audiences.includes(authority)
     ) || null;
 
-    if (!sameCompany && matchedAuthority !== "delegated_operator") {
+    if (!sameCompany && matchedAuthority !== "delegatedOperator") {
       return {
         allowed: false,
         reason: "COMPANY_SCOPE_REQUIRED",

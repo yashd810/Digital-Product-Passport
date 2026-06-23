@@ -122,7 +122,7 @@ module.exports = function registerMutationRoutes(app, deps) {
         const released = await resolveActiveReleasedPassportByDppId(dppId);
         if (
           released?.passport && (
-            req.user.role === "super_admin" || Number(req.user.companyId) === Number(released.passport.companyId)
+            req.user.role === "superAdmin" || Number(req.user.companyId) === Number(released.passport.companyId)
           )
         ) {
           return res.status(409).json({
@@ -134,7 +134,7 @@ module.exports = function registerMutationRoutes(app, deps) {
         }
         return res.status(404).json({ error: "Editable passport not found" });
       }
-      if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
+      if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
         return res.status(403).json({ error: "Forbidden" });
       }
       if (!isEditablePassportStatus(editable.passport.releaseStatus)) {
@@ -149,28 +149,30 @@ module.exports = function registerMutationRoutes(app, deps) {
           passportType: editable.passport.passportType,
           archivedBy: req.user.userId,
           actorIdentifier: getActorIdentifier(req.user),
-          snapshotReason: "before_standards_delete",
+          snapshotReason: "beforeStandardsDelete",
         });
       }
 
       await replicatePassportToBackup({
         passport: editable.passport,
         typeDef: editable.typeDef,
-        reason: isDraft ? "standards_hard_delete" : "standards_delete",
-        snapshotScope: isDraft ? "hard_deleted_draft" : "deleted_editable"
-      }).catch(() => {});
+        reason: isDraft ? "standardsHardDelete" : "standardsDelete",
+        snapshotScope: isDraft ? "hardDeletedDraft" : "deletedEditable"
+      }).catch((error) => {
+        logger.warn({ err: error, dppId: editable.passport?.dppId, reason: isDraft ? "standardsHardDelete" : "standardsDelete" }, "Failed to replicate standards delete to backup");
+      });
 
       let deleted;
       if (isDraft) {
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
-          await client.query("DELETE FROM passport_dynamic_values WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_signatures WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_scan_events WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_workflow WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_security_events WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
-          await client.query("DELETE FROM passport_edit_sessions WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM \"passportDynamicValues\" WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM \"passportSignatures\" WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM \"passportScanEvents\" WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM \"passportWorkflow\" WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM \"passportSecurityEvents\" WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
+          await client.query("DELETE FROM \"passportEditSessions\" WHERE \"passportDppId\" = $1", [editable.passport.dppId]);
           deleted = await client.query(
             `DELETE FROM ${editable.tableName}
              WHERE "dppId" = $1
@@ -192,7 +194,7 @@ module.exports = function registerMutationRoutes(app, deps) {
            SET "deletedAt" = NOW(),
                "updatedAt" = NOW()
            WHERE "dppId" = $1
-             AND "releaseStatus" IN ('draft', 'in_revision')
+             AND "releaseStatus" IN ('draft', 'inRevision')
              AND "deletedAt" IS NULL
            RETURNING "dppId"`,
           [editable.passport.dppId]
@@ -227,7 +229,7 @@ module.exports = function registerMutationRoutes(app, deps) {
       if (!released?.passport) {
         return res.status(404).json({ error: "Released DPP not found" });
       }
-      if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(released.passport.companyId)) {
+      if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(released.passport.companyId)) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -249,7 +251,7 @@ module.exports = function registerMutationRoutes(app, deps) {
           passportType: released.passport.passportType,
           archivedBy: req.user.userId,
           actorIdentifier: getActorIdentifier(req.user),
-          snapshotReason: "before_standards_archive_delete",
+          snapshotReason: "beforeStandardsArchiveDelete",
         });
       }
 
@@ -268,9 +270,11 @@ module.exports = function registerMutationRoutes(app, deps) {
           passport: { ...row, passportType: released.passport.passportType },
           typeDef: released.typeDef,
           companyName: released.companyName,
-          reason: "standards_archive",
-          snapshotScope: "archived_history"
-        }).catch(() => {});
+          reason: "standardsArchive",
+          snapshotScope: "archivedHistory"
+        }).catch((error) => {
+          logger.warn({ err: error, dppId: row.dppId, reason: "standardsArchive" }, "Failed to replicate standards archive to backup");
+        });
       }
 
       await logAudit(
@@ -280,7 +284,7 @@ module.exports = function registerMutationRoutes(app, deps) {
         released.tableName,
         released.passport.dppId,
         { releaseStatus: released.passport.releaseStatus },
-        { lifecycle_status: "archived", versions_archived: lineageRows.rows.length, dppId }
+        { lifecycleStatus: "archived", versionsArchived: lineageRows.rows.length, dppId }
       );
 
       return res.json({
@@ -304,7 +308,7 @@ module.exports = function registerMutationRoutes(app, deps) {
       const productIdentifier = decodeURIComponent(String(req.body?.productIdentifier || "").trim());
       const registryName = String(req.body?.registryName || "local").trim().toLowerCase();
       const submittedCompanyId = req.body?.companyId !== undefined ? Number.parseInt(req.body.companyId, 10) : null;
-      const companyId = req.user.role === "super_admin" ?
+      const companyId = req.user.role === "superAdmin" ?
         submittedCompanyId :
         Number.parseInt(req.user.companyId, 10);
 
@@ -339,7 +343,7 @@ module.exports = function registerMutationRoutes(app, deps) {
       };
 
       const upsert = await pool.query(
-        `INSERT INTO dpp_registry_registrations (
+        `INSERT INTO "dppRegistryRegistrations" (
            "passportDppId", "companyId", "productIdentifier", "dppId", "registryName", status, "registrationPayload", "registeredBy"
          )
          VALUES ($1, $2, $3, $4, $5, 'registered', $6::jsonb, $7)
@@ -365,9 +369,11 @@ module.exports = function registerMutationRoutes(app, deps) {
         passport: result.passport,
         typeDef: result.typeDef,
         companyName: result.companyName,
-        reason: "registry_registration",
-        snapshotScope: "released_current"
-      }).catch(() => {});
+        reason: "registryRegistration",
+        snapshotScope: "releasedCurrent"
+      }).catch((error) => {
+        logger.warn({ err: error, dppId: result.passport?.dppId, reason: "registryRegistration" }, "Failed to replicate registry registration to backup");
+      });
 
       const registration = upsert.rows[0];
 

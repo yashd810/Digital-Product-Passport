@@ -259,7 +259,7 @@ function buildTrustRows(passport, carrierAuthenticity, sigVerification) {
     ["QR print specification", carrierAuthenticity?.qrPrintSpecification ? `${carrierAuthenticity.qrPrintSpecification.symbology} · ECC ${carrierAuthenticity.qrPrintSpecification.errorCorrectionLevel}` : ""],
     ["Latest verification", formatIsoDate(latestVerification?.verifiedAt) ? `${latestVerification.printGrade || "recorded"} · ${formatIsoDate(latestVerification?.verifiedAt)}` : ""],
     ["Current viewer host", typeof window !== "undefined" ? window.location.host : ""],
-    ["Public passport URL", passport?.linked_data?.public_url || ""],
+    ["Public passport URL", passport?.linkedData?.publicUrl || ""],
   ].filter(([, value]) => isFilled(value));
 }
 

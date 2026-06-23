@@ -3,14 +3,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 export const normalizePassportStatus = (status) => {
   const normalized = String(status || "").trim();
-  return normalized === "revised" ? "in_revision" : normalized;
+  return normalized === "revised" ? "inRevision" : normalized;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Passport Status Predicates
 // ─────────────────────────────────────────────────────────────────────────────
 export const isInRevisionStatus = (status) =>
-  normalizePassportStatus(status) === "in_revision";
+  normalizePassportStatus(status) === "inRevision";
 
 export const isDraftPassportStatus = (status) =>
   normalizePassportStatus(status) === "draft";
@@ -46,7 +46,7 @@ export const getPassportActivityState = (passport) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const formatPassportStatus = (status) => {
   const normalized = normalizePassportStatus(status);
-  if (normalized === "in_revision") return "In Revision";
+  if (normalized === "inRevision") return "In Revision";
   if (normalized === "obsolete") return "Obsolete";
   return normalized
     .split("_")

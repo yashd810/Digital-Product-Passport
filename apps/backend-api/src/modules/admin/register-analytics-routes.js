@@ -83,32 +83,32 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
   app.get("/api/admin/analytics", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const companiesRes = await pool.query(
-        `SELECT id, company_name AS "companyName"
+        `SELECT id, "companyName" AS "companyName"
          FROM companies
-         ORDER BY company_name`
+         ORDER BY "companyName"`
       );
       const accessRes = await pool.query(`
-        SELECT cpa.company_id AS "companyId",
+        SELECT cpa."companyId" AS "companyId",
                pt."typeName" AS "typeName",
                pt."displayName" AS "displayName",
                pt."productCategory" AS "productCategory",
                pt."productIcon" AS "productIcon"
-        FROM company_passport_access cpa
-        JOIN passport_types pt ON pt.id = cpa.passport_type_id
+        FROM "companyPassportAccess" cpa
+        JOIN "passportTypes" pt ON pt.id = cpa."passportTypeId"
       `);
 
       const archivedRes = await pool.query(
-        `SELECT COUNT(DISTINCT "dppId") FROM passport_archives WHERE ${ARCHIVED_HISTORY_FILTER_SQL}`
+        `SELECT COUNT(DISTINCT "dppId") FROM "passportArchives" WHERE ${ARCHIVED_HISTORY_FILTER_SQL}`
       );
       const archivedByCoRes = await pool.query(
         `SELECT "companyId", COUNT(DISTINCT "dppId") AS count
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE ${ARCHIVED_HISTORY_FILTER_SQL}
          GROUP BY "companyId"`
       );
       const archivedByTypeRes = await pool.query(
         `SELECT "companyId", "passportType", COUNT(DISTINCT "dppId") AS count
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE ${ARCHIVED_HISTORY_FILTER_SQL}
          GROUP BY "companyId", "passportType"`
       );
@@ -156,14 +156,14 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
 
             compStats.totalPassports += stats.total;
             compStats.draftCount += stats.draft;
-            compStats.inReviewCount += stats.in_review;
+            compStats.inReviewCount += stats.inReview;
             compStats.releasedCount += stats.released;
             compStats.revisedCount += stats.revised;
             compStats.obsoleteCount += stats.obsolete;
 
             overall.totalPassports += stats.total;
             overall.draftCount += stats.draft;
-            overall.inReviewCount += stats.in_review;
+            overall.inReviewCount += stats.inReview;
             overall.releasedCount += stats.released;
             overall.revisedCount += stats.revised;
             overall.obsoleteCount += stats.obsolete;
@@ -245,10 +245,10 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
                pt."displayName" AS "displayName",
                pt."productCategory" AS "productCategory",
                pt."productIcon" AS "productIcon",
-               cpa.granted_at AS "grantedAt"
-        FROM company_passport_access cpa
-        JOIN passport_types pt ON pt.id = cpa.passport_type_id
-        WHERE cpa.company_id = $1
+               cpa."grantedAt" AS "grantedAt"
+        FROM "companyPassportAccess" cpa
+        JOIN "passportTypes" pt ON pt.id = cpa."passportTypeId"
+        WHERE cpa."companyId" = $1
       `, [companyId]);
 
       let totalPassports = 0;
@@ -283,7 +283,7 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
             draftCount: stats.draft,
             releasedCount: stats.released,
             revisedCount: stats.revised,
-            inReviewCount: stats.in_review,
+            inReviewCount: stats.inReview,
             obsoleteCount: stats.obsolete
           });
 
@@ -294,7 +294,7 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
             [companyId, trendStart.toISOString()]
           );
           const monthlyRes = await pool.query(
-            `SELECT date_trunc('month', "createdAt") AS month_bucket, COUNT(*) AS count
+            `SELECT date_trunc('month', "createdAt") AS "monthBucket", COUNT(*) AS count
              FROM ${tableName}
              WHERE "companyId" = $1 AND "deletedAt" IS NULL AND "createdAt" >= $2
              GROUP BY 1 ORDER BY 1`,
@@ -314,7 +314,7 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
 
           trendSeriesMap[productCategory].baseline += parseInt(baselineRes.rows[0]?.count || 0, 10);
           monthlyRes.rows.forEach((row) => {
-            const key = new Date(row.month_bucket).toISOString().slice(0, 7);
+            const key = new Date(row.monthBucket).toISOString().slice(0, 7);
             trendSeriesMap[productCategory].monthlyCounts[key] =
               (trendSeriesMap[productCategory].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
           });
@@ -324,15 +324,15 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       }
 
       const scanRes = await pool.query(
-        `SELECT COUNT(DISTINCT (pse."passportDppId", pse."viewerUserId")) FROM passport_scan_events pse
-         JOIN passport_registry pr ON pr."dppId" = pse."passportDppId"
+        `SELECT COUNT(DISTINCT (pse."passportDppId", pse."viewerUserId")) FROM "passportScanEvents" pse
+         JOIN "passportRegistry" pr ON pr."dppId" = pse."passportDppId"
          WHERE pr."companyId" = $1 AND pse."viewerUserId" IS NOT NULL`,
         [companyId]
       );
       const scanStats = parseInt(scanRes.rows[0]?.count || 0, 10) || 0;
       const archivedRes = await pool.query(
         `SELECT COUNT(DISTINCT "dppId")
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE "companyId" = $1
            AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
         [companyId]
@@ -365,12 +365,12 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
                 "createdAt" AS "createdAt",
                 "lastLoginAt" AS "lastLoginAt"
          FROM users
-         WHERE "companyId" = $1 AND role != 'super_admin'
+         WHERE "companyId" = $1 AND role != 'superAdmin'
          ORDER BY role, "firstName"`,
         [companyId]
       );
       const company = await pool.query(
-        `SELECT company_name AS "companyName"
+        `SELECT "companyName" AS "companyName"
          FROM companies
          WHERE id = $1`,
         [companyId]

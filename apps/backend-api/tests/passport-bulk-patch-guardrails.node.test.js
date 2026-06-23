@@ -25,11 +25,11 @@ test("bulk patch accepts schema fields and explicit editable built-ins", () => {
 
 test("bulk patch rejects system-managed and policy-owned fields", () => {
   const invalidKeys = getInvalidBulkPatchFieldKeys({
-    passportPolicyKey: "client_profile",
-    contentSpecificationIds: ["client_spec"],
-    carrierPolicyKey: "client_carrier",
-    economicOperatorId: "client_operator",
-    facilityId: "client_facility",
+    passportPolicyKey: "clientProfile",
+    contentSpecificationIds: ["clientSpec"],
+    carrierPolicyKey: "clientCarrier",
+    economicOperatorId: "clientOperator",
+    facilityId: "clientFacility",
     releaseStatus: "released",
     versionNumber: 99,
     updatedAt: "2030-01-01T00:00:00.000Z",

@@ -65,12 +65,12 @@ function DashboardLayout({ user, companyId, onLogout }) {
   const handleThemeToggle = () => {
     const next = currentTheme === "dark" ? "light" : "dark";
     setCurrentTheme(next);
-    localStorage.setItem(`dpp_theme_${user?.id}`, next);
+    localStorage.setItem(`dppTheme:${user?.id}`, next);
     applyTheme(next);
   };
 
-  const isEditor = user?.role === "editor" || user?.role === "company_admin" || user?.role === "super_admin";
-  const isAdmin  = user?.role === "company_admin" || user?.role === "super_admin";
+  const isEditor = user?.role === "editor" || user?.role === "companyAdmin" || user?.role === "superAdmin";
+  const isAdmin  = user?.role === "companyAdmin" || user?.role === "superAdmin";
   const companySlug = resolveDashboardCompanySlug({
     companySlug: routeCompanySlug,
     companyName: user?.companyName,

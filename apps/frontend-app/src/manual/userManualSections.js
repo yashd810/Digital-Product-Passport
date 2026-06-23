@@ -594,7 +594,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           title: "Understand dashboard session and optional bearer tokens",
           items: [
             "Log in through the app as normal. Under the hood, the backend uses `POST /api/auth/login`.",
-            "If your account has two-factor authentication enabled, the backend returns a short-lived `pre_auth_token`. You then complete `POST /api/auth/verify-otp` with the email code.",
+            "If your account has two-factor authentication enabled, the backend returns a short-lived `preAuthToken`. You then complete `POST /api/auth/verify-otp` with the email code.",
             "After login, the backend sets the session cookie. The dashboard then calls protected APIs with `credentials: include`, so normal users do not paste tokens into the UI.",
             "If you are already signed in and need a bearer token for testing or integration work, the Security page uses `POST /api/users/me/token` to issue one that can be sent as `Authorization: Bearer <token>`.",
           ],

@@ -86,7 +86,7 @@ async function ensureSuperAdmin() {
   });
   const passwordHash = await passwordService.hashPassword(adminPassword);
 
-  console.log(`Ensuring super_admin user: ${adminEmail}`);
+  console.log(`Ensuring superAdmin user: ${adminEmail}`);
   if (loadedEnvFile) {
     console.log(`Loaded DB environment from: ${loadedEnvFile}`);
   }
@@ -107,11 +107,11 @@ async function ensureSuperAdmin() {
        "createdAt",
        "updatedAt"
      )
-     VALUES ($1, $2, $3, $4, NULL, 'super_admin', true, $5, 'local', false, 1, NOW(), NOW())
+     VALUES ($1, $2, $3, $4, NULL, 'superAdmin', true, $5, 'local', false, 1, NOW(), NOW())
      ON CONFLICT (email) DO UPDATE
        SET "passwordHash" = EXCLUDED."passwordHash",
            "pepperVersion" = EXCLUDED."pepperVersion",
-           role = 'super_admin',
+           role = 'superAdmin',
            "companyId" = NULL,
            "isActive" = true,
            "authSource" = 'local',
@@ -126,9 +126,9 @@ async function ensureSuperAdmin() {
   console.log(`Super admin ready: ${admin.email} (id: ${admin.id}, active: ${admin.isActive})`);
 
   const countResult = await pool.query(
-    "SELECT COUNT(*)::int AS count FROM users WHERE role = 'super_admin' AND \"isActive\" = true"
+    "SELECT COUNT(*)::int AS count FROM users WHERE role = 'superAdmin' AND \"isActive\" = true"
   );
-  console.log(`Active super_admin users: ${countResult.rows[0]?.count || 0}`);
+  console.log(`Active superAdmin users: ${countResult.rows[0]?.count || 0}`);
 }
 
 ensureSuperAdmin()

@@ -260,7 +260,7 @@ function LineChart({ labels, series }) {
   );
 }
 
-const ACTION_ICONS = { create:"✨", update:"📝", delete:"🗑️", release:"🚀", revise:"🔄", SUBMIT_REVIEW:"📤", submit_review:"📤" };
+const ACTION_ICONS = { create:"✨", update:"📝", delete:"🗑️", release:"🚀", revise:"🔄", SUBMIT_REVIEW:"📤", submitReview:"📤" };
 function timeAgo(d) {
   const s=Math.floor((Date.now()-new Date(d))/1000);
   if(s<60)return"just now"; if(s<3600)return`${Math.floor(s/60)}m ago`;
@@ -306,7 +306,9 @@ function Overview({ companyId }) {
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/analytics`,{ headers:{ ...authHeaders() } });
       if(r.ok) setAnalytics(normalizeOverviewAnalyticsPayload(await r.json()));
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to load overview analytics", error);
+    }
   };
   const fetchActivity = async () => {
     try {
@@ -315,7 +317,9 @@ function Overview({ companyId }) {
         const data = await r.json();
         setActivity(normalizeActivityRows(Array.isArray(data) ? data.slice(0, 5) : []));
       }
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to load overview activity", error);
+    }
   };
   const normalizedTrend = normalizeTrendToCurrentYear(analytics?.trend, currentYear, currentMonthIndex);
 
@@ -361,7 +365,7 @@ function Overview({ companyId }) {
       openAnalyticsPrintReport({
         title: "Company Analytics Report",
         subtitle: `Generated on ${now.toLocaleDateString()} for your company analytics overview.`,
-        filename: `analytics_report_${now.getTime()}`,
+        filename: `analyticsReport-${now.getTime()}`,
         stats: summaryStats,
         chartCards: [
           {

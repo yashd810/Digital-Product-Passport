@@ -202,12 +202,12 @@ function AdminCreatePassportType() {
             confidentiality: normalizedField.confidentiality || "public",
             updateAuthority: normalizedField.updateAuthority && normalizedField.updateAuthority.length > 0
               ? normalizedField.updateAuthority
-              : ["economic_operator"],
+              : ["economicOperator"],
           };
           const fi18n = Object.fromEntries(
-            Object.entries(normalizedField.label_i18n || {}).filter(([, v]) => v?.trim())
+            Object.entries(normalizedField.labelI18n || {}).filter(([, v]) => v?.trim())
           );
-          if (Object.keys(fi18n).length > 0) base.label_i18n = fi18n;
+          if (Object.keys(fi18n).length > 0) base.labelI18n = fi18n;
           if (normalizedField.required) base.required = true;
           if (normalizedField.displayRole) base.displayRole = normalizedField.displayRole;
           if (normalizedField.summaryRole) base.summaryRole = normalizedField.summaryRole;
@@ -221,8 +221,8 @@ function AdminCreatePassportType() {
           if (normalizedField.sourceModuleFieldKey) base.sourceModuleFieldKey = normalizedField.sourceModuleFieldKey;
           if (normalizedField.type === "table") {
             const tableColumns = serializeTableColumns(normalizedField);
-            base.table_cols = tableColumns.length;
-            base.table_columns = tableColumns;
+            base.tableColumnCount = tableColumns.length;
+            base.tableColumns = tableColumns;
           }
           if (normalizedField.dynamic) base.dynamic = true;
           if (normalizedField.composition) {
@@ -243,9 +243,9 @@ function AdminCreatePassportType() {
         }),
       };
       const si18n = Object.fromEntries(
-        Object.entries(sec.label_i18n || {}).filter(([, v]) => v?.trim())
+        Object.entries(sec.labelI18n || {}).filter(([, v]) => v?.trim())
       );
-      if (Object.keys(si18n).length > 0) cleanSec.label_i18n = si18n;
+      if (Object.keys(si18n).length > 0) cleanSec.labelI18n = si18n;
       return cleanSec;
     });
 
@@ -279,8 +279,8 @@ function AdminCreatePassportType() {
     const restored = (draft.sections || []).map(sec => rekeySection({
       ...sec,
       localId:   Math.random().toString(36).slice(2),
-      label_i18n: sec.label_i18n || {},
-      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
+      labelI18n: sec.labelI18n || {},
+      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), labelI18n: f.labelI18n || {} })),
     }));
     setSystemHeader(normalizeSystemPassportHeader(draft.systemHeader));
     if (restored.length > 0) setSections(syncSectionsWithSemanticModel(restored, nextSemanticModelKey));
@@ -291,8 +291,8 @@ function AdminCreatePassportType() {
     if (!draftEnabled || !resumeDraftRequested) return;
     fetchWithAuth(DRAFT_API, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
-      .then(row => { if (row?.draft_json) applyDraft(row.draft_json); })
-      .catch(() => {});
+      .then(row => { if (row?.draftJson) applyDraft(row.draftJson); })
+      .catch((error) => console.warn("Ignored async error", error));
   }, [draftEnabled, resumeDraftRequested]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save draft 1.5s after any change (create mode only)
@@ -305,8 +305,8 @@ function AdminCreatePassportType() {
       fetchWithAuth(DRAFT_API, {
         method: "PUT",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ draft_json: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
-      }).catch(() => {});
+        body: JSON.stringify({ draftJson: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
+      }).catch((error) => console.warn("Ignored async error", error));
     }, 1500);
     return () => clearTimeout(autoSaveTimer.current);
   }, [draftEnabled, displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -322,14 +322,14 @@ function AdminCreatePassportType() {
     fetchWithAuth(DRAFT_API, {
       method: "PUT",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ draft_json: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
+      body: JSON.stringify({ draftJson: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
     })
       .then(r => r.ok ? (
         setSuccess("Draft saved successfully!"),
         setDraftSaved(true),
         setTimeout(() => setDraftSaved(false), 2000)
       ) : null)
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   };
 
   const handleCSVImport = (e) => {
@@ -384,8 +384,8 @@ function AdminCreatePassportType() {
     const editSections = (ed.fieldsJson?.sections || []).map(sec => rekeySection({
       ...sec,
       localId:   Math.random().toString(36).slice(2),
-      label_i18n: sec.label_i18n || {},
-      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
+      labelI18n: sec.labelI18n || {},
+      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), labelI18n: f.labelI18n || {} })),
     }));
     setSystemHeader(normalizeSystemPassportHeader(ed.fieldsJson?.systemHeader));
     if (editSections.length > 0) setSections(syncSectionsWithSemanticModel(editSections, nextSemanticModelKey));
@@ -407,8 +407,8 @@ function AdminCreatePassportType() {
     const clonedSections = (cd.fieldsJson?.sections || []).map(sec => rekeySection({
       ...sec,
       localId:   Math.random().toString(36).slice(2),
-      label_i18n: sec.label_i18n || {},
-      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), label_i18n: f.label_i18n || {} })),
+      labelI18n: sec.labelI18n || {},
+      fields: (sec.fields || []).map(f => ({ ...f, localId: Math.random().toString(36).slice(2), labelI18n: f.labelI18n || {} })),
     }));
     setSystemHeader(normalizeSystemPassportHeader(cd.fieldsJson?.systemHeader));
     if (clonedSections.length > 0) setSections(syncSectionsWithSemanticModel(clonedSections, nextSemanticModelKey));
@@ -585,13 +585,13 @@ function AdminCreatePassportType() {
           }
           // Switching TO table: preserve explicit module columns only.
           if (canonicalPatch.type === "table" && f.type !== "table") {
-            updated.table_columns = normalizeTableColumns(updated);
-            updated.table_cols = updated.table_columns.length;
+            updated.tableColumns = normalizeTableColumns(updated);
+            updated.tableColumnCount = updated.tableColumns.length;
           }
           // Switching AWAY from table: clear config
           if ("type" in canonicalPatch && canonicalPatch.type !== "table") {
-            delete updated.table_cols;
-            delete updated.table_columns;
+            delete updated.tableColumnCount;
+            delete updated.tableColumns;
             delete updated.compositionLabelColumnKey;
             delete updated.compositionValueColumnKey;
           }
@@ -722,8 +722,8 @@ function AdminCreatePassportType() {
           });
           const nextField = {
             ...f,
-            table_columns: columns,
-            table_cols: columns.length,
+            tableColumns: columns,
+            tableColumnCount: columns.length,
           };
           if (keyReplacement) {
             if (nextField.compositionLabelColumnKey === keyReplacement.from) {
@@ -763,7 +763,7 @@ function AdminCreatePassportType() {
               _semanticSearch: `${selected.key} - ${selected.label}`,
             };
           });
-          return { ...f, table_columns: columns, table_cols: columns.length };
+          return { ...f, tableColumns: columns, tableColumnCount: columns.length };
         }),
       };
     }));
@@ -793,7 +793,7 @@ function AdminCreatePassportType() {
               _semanticOpen: true,
             };
           });
-          return { ...f, table_columns: columns, table_cols: columns.length };
+          return { ...f, tableColumns: columns, tableColumnCount: columns.length };
         }),
       };
     }));
@@ -808,7 +808,7 @@ function AdminCreatePassportType() {
           const columns = normalizeTableColumns(f).map((column, index) =>
             index === columnIndex ? { ...column, _semanticOpen: isOpen } : column
           );
-          return { ...f, table_columns: columns, table_cols: columns.length };
+          return { ...f, tableColumns: columns, tableColumnCount: columns.length };
         }),
       };
     }));
@@ -830,7 +830,7 @@ function AdminCreatePassportType() {
             delete nextColumn.semanticId;
             return nextColumn;
           });
-          return { ...f, table_columns: columns, table_cols: columns.length };
+          return { ...f, tableColumns: columns, tableColumnCount: columns.length };
         }),
       };
     }));
@@ -991,7 +991,7 @@ function AdminCreatePassportType() {
       }
 
       setSuccess(`${editMode ? "Passport type updated successfully!" : "Passport type created successfully!"}`);
-      if (draftEnabled) fetchWithAuth(DRAFT_API, { method: "DELETE", headers: authHeaders() }).catch(() => {});
+      if (draftEnabled) fetchWithAuth(DRAFT_API, { method: "DELETE", headers: authHeaders() }).catch((error) => console.warn("Ignored async error", error));
       setError("");
       setInvalidFields([]);
       if (!editMode) {
@@ -1255,9 +1255,9 @@ function AdminCreatePassportType() {
                           <span className="acpt-i18n-flag">{l.flag} {l.name}</span>
                           <input
                             type="text"
-                            value={(section.label_i18n || {})[l.code] || ""}
+                            value={(section.labelI18n || {})[l.code] || ""}
                             onChange={e => updateSection(section.localId, {
-                              label_i18n: { ...(section.label_i18n || {}), [l.code]: e.target.value },
+                              labelI18n: { ...(section.labelI18n || {}), [l.code]: e.target.value },
                             })}
                             placeholder={`"${section.label || "Section"}" in ${l.name}`}
                             className="acpt-i18n-input"
@@ -1289,7 +1289,7 @@ function AdminCreatePassportType() {
                       );
                       const semanticSearchValue = getSemanticSearchDisplayValue(field, semanticTermCatalog);
                       const accessSummary = summarizeSelectedValues(field.access || ["public"], ACCESS_LEVEL_LABELS, "Select access");
-                      const updateAuthoritySummary = summarizeSelectedValues(field.updateAuthority || ["economic_operator"], UPDATE_AUTHORITY_LABELS, "Select authority");
+                      const updateAuthoritySummary = summarizeSelectedValues(field.updateAuthority || ["economicOperator"], UPDATE_AUTHORITY_LABELS, "Select authority");
                       const accessDropdownId = `${section.localId}:${field.localId}:access`;
                       const updateDropdownId = `${section.localId}:${field.localId}:authority`;
                       const tableColumnsForField = field.type === "table" ? normalizeTableColumns(field) : [];
@@ -1332,9 +1332,9 @@ function AdminCreatePassportType() {
                                 <span className="acpt-i18n-flag">{l.flag} {l.name}</span>
                                 <input
                                   type="text"
-                                  value={(field.label_i18n || {})[l.code] || ""}
+                                  value={(field.labelI18n || {})[l.code] || ""}
                                   onChange={e => updateField(section.localId, field.localId, {
-                                    label_i18n: { ...(field.label_i18n || {}), [l.code]: e.target.value },
+                                    labelI18n: { ...(field.labelI18n || {}), [l.code]: e.target.value },
                                   })}
                                   placeholder={`"${field.label || "Field"}" in ${l.name}`}
                                   className="acpt-i18n-input"
@@ -1489,7 +1489,7 @@ function AdminCreatePassportType() {
                             onToggle={() => setOpenGovernanceDropdown((current) => current === updateDropdownId ? null : updateDropdownId)}
                           >
                             {UPDATE_AUTHORITIES.map(level => {
-                              const currentAuthorities = field.updateAuthority || ["economic_operator"];
+                              const currentAuthorities = field.updateAuthority || ["economicOperator"];
                               const isChecked = currentAuthorities.includes(level.value);
                               return (
                                 <label key={level.value} className="acpt-access-check">
@@ -1501,7 +1501,7 @@ function AdminCreatePassportType() {
                                         ? [...new Set([...currentAuthorities, level.value])]
                                         : currentAuthorities.filter(a => a !== level.value);
                                       updateField(section.localId, field.localId, {
-                                        updateAuthority: next.length ? next : ["economic_operator"],
+                                        updateAuthority: next.length ? next : ["economicOperator"],
                                       });
                                     }}
                                   />

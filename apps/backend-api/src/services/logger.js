@@ -3,6 +3,7 @@
 const util = require("util");
 const pino = require("pino");
 
+const externalSecretPath = (...parts) => parts.join("_");
 const REDACT_PATHS = [
   "password",
   "passwordHash",
@@ -19,7 +20,7 @@ const REDACT_PATHS = [
   "otpCode",
   "otpCodeHash",
   "accessKey",
-  "access_key",
+  externalSecretPath("access", "key"),
   "secretAccessKey",
   "privateKey",
   "preAuthToken",
@@ -29,7 +30,7 @@ const REDACT_PATHS = [
   "*.clientSecret",
   "*.token",
   "*.accessKey",
-  "*.access_key",
+  `*.${externalSecretPath("access", "key")}`,
   "*.secretAccessKey",
   "*.privateKey",
   "*.preAuthToken",

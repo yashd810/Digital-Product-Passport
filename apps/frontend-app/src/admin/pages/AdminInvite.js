@@ -31,8 +31,9 @@ function AdminInvite() {
         } else if (data.length > 0) {
           setInviteCompanyId(String(data[0].id));
         }
-      } catch {}
-      finally { setLoadingCompanies(false); }
+      } catch (error) {
+        console.warn("Failed to load companies for invite form", error);
+      } finally { setLoadingCompanies(false); }
     })();
   }, [location.state]);
 

@@ -16,13 +16,13 @@ function createResponse() {
 function createUseCaseHarness() {
   let capturedUpdateData = null;
   const editable = {
-    tableName: "battery_passports",
+    tableName: "medicalDevicePassports",
     typeDef: {
-      typeName: "batteryPassportV1",
-      productCategory: "Battery",
-      semanticModelKey: "battery_dictionary_v1",
+      typeName: "medicalDevicePassportV1",
+      productCategory: "Medical Device",
+      semanticModelKey: "medicalDeviceDictionaryV1",
       fieldsJson: {
-        sourceModule: "battery:v1",
+        sourceModule: "medical-device:v1",
         sections: [{
           fields: [
             { key: "manufacturer", type: "text" },
@@ -32,16 +32,16 @@ function createUseCaseHarness() {
     },
     passport: {
       id: 101,
-      dppId: "dpp_patch_test",
-      lineageId: "dpp_patch_test",
+      dppId: "dppPatchTest",
+      lineageId: "dppPatchTest",
       companyId: 7,
-      passportType: "batteryPassportV1",
+      passportType: "medicalDevicePassportV1",
       releaseStatus: "draft",
       granularity: "item",
-      internalAliasId: "BAT-PATCH-001",
-      uniqueProductIdentifier: "did:web:example.test:did:battery-passport-v1:item:bat-patch-001",
-      passportPolicyKey: "wrong_profile",
-      contentSpecificationIds: JSON.stringify(["wrong_spec"]),
+      internalAliasId: "MD-PATCH-001",
+      uniqueProductIdentifier: "did:web:example.test:did:medical-device-passport-v1:item:md-patch-001",
+      passportPolicyKey: "wrongProfile",
+      contentSpecificationIds: JSON.stringify(["wrongSpec"]),
       manufacturer: "Original Manufacturer",
     },
   };
@@ -53,8 +53,8 @@ function createUseCaseHarness() {
     normalizePassportRequestBody: (body) => body || {},
     normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
     resolveEditablePassportByDppId: async () => editable,
-    isEditablePassportStatus: (status) => status === "draft" || status === "in_revision",
-    getCompanyNameMap: async () => new Map([["7", "Acme Batteries"]]),
+    isEditablePassportStatus: (status) => status === "draft" || status === "inRevision",
+    getCompanyNameMap: async () => new Map([["7", "Acme Devices"]]),
     archivePassportSnapshot: async () => {},
     updatePassportRowById: async ({ data }) => {
       capturedUpdateData = data;
@@ -68,14 +68,14 @@ function createUseCaseHarness() {
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId, uniqueProductIdentifier }) => ({
         internalAliasIdInput: rawProductId,
-        productIdentifierDid: uniqueProductIdentifier || `did:web:example.test:did:battery-passport-v1:item:${rawProductId}`,
+        productIdentifierDid: uniqueProductIdentifier || `did:web:example.test:did:medical-device-passport-v1:item:${rawProductId}`,
       }),
       extractBusinessProductIdentifier: () => null,
     },
     complianceService: {
       resolvePassportPolicyMetadata: () => ({
-        key: "batteryDppV1",
-        contentSpecificationIds: ["Battery_dictionary_v1"],
+        key: "medicalDeviceDppV1",
+        contentSpecificationIds: ["medicalDeviceDictionaryV1"],
       }),
     },
     SYSTEM_PASSPORT_FIELDS: new Set(["dppId", "lineageId", "releaseStatus"]),
@@ -119,23 +119,23 @@ test("standards PATCH reconciles policy-owned fields from the passport type", as
   const { getCapturedUpdateData, updateDpp } = createUseCaseHarness();
   const result = await updateDpp({
     req: {
-      params: { dppId: "dpp_patch_test" },
+      params: { dppId: "dppPatchTest" },
       query: {},
       body: {
-        passportPolicyKey: "client_supplied_profile",
-        contentSpecificationIds: ["client_supplied_spec"],
+        passportPolicyKey: "clientSuppliedProfile",
+        contentSpecificationIds: ["clientSuppliedSpec"],
       },
-      user: { userId: 9, companyId: 7, role: "company_admin" },
+      user: { userId: 9, companyId: 7, role: "companyAdmin" },
     },
     res: createResponse(),
   });
 
   assert.equal(result.statusCode, 200);
   assert.deepEqual(getCapturedUpdateData(), {
-    passportPolicyKey: "batteryDppV1",
-    contentSpecificationIds: JSON.stringify(["Battery_dictionary_v1"]),
+    passportPolicyKey: "medicalDeviceDppV1",
+    contentSpecificationIds: JSON.stringify(["medicalDeviceDictionaryV1"]),
   });
   assert.deepEqual(result.body.updatedFields, ["passportPolicyKey", "contentSpecificationIds"]);
-  assert.equal(result.body.passport.fields.passportPolicyKey, "batteryDppV1");
-  assert.equal(result.body.passport.fields.contentSpecificationIds, JSON.stringify(["Battery_dictionary_v1"]));
+  assert.equal(result.body.passport.fields.passportPolicyKey, "medicalDeviceDppV1");
+  assert.equal(result.body.passport.fields.contentSpecificationIds, JSON.stringify(["medicalDeviceDictionaryV1"]));
 });

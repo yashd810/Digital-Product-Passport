@@ -37,7 +37,7 @@ function getRowIdentifier(row) {
 function isRowEditable(row) {
   if (row?.isEditable === true || row?.isEditable === "true") return true;
   if (!row?.dppId) return true;
-  return ["draft", "in_revision"].includes(normalizeText(row?.releaseStatus));
+  return ["draft", "inRevision"].includes(normalizeText(row?.releaseStatus));
 }
 
 function getRowStatus(row) {
@@ -191,7 +191,7 @@ function PassportDataManagementPage({ companyId, user }) {
   const [serialPaste, setSerialPaste] = useState("");
   const [jsonPaste, setJsonPaste] = useState("");
 
-  const canManagePassportData = ["editor", "company_admin", "super_admin"].includes(user?.role);
+  const canManagePassportData = ["editor", "companyAdmin", "superAdmin"].includes(user?.role);
   const showReadOnlyNotice = Boolean(user?.role) && !canManagePassportData;
   const apiBase = `${API}/api/companies/${companyId}/passport-data-management`;
 
@@ -231,7 +231,7 @@ function PassportDataManagementPage({ companyId, user }) {
   const previewDetailByRow = useMemo(() => {
     const map = new Map();
     (preview?.details || []).forEach((detail) => {
-      const rowIndex = Number(detail.rowIndex ?? detail.row_index);
+      const rowIndex = Number(detail.rowIndex);
       if (Number.isFinite(rowIndex)) map.set(rowIndex - 1, detail);
     });
     return map;
@@ -824,9 +824,9 @@ function PassportDataManagementPage({ companyId, user }) {
                 <option value="editable">Editable only</option>
                 <option value="locked">Locked only</option>
                 <option value="draft">Draft</option>
-                <option value="in_revision">In revision</option>
+                <option value="inRevision">In revision</option>
                 <option value="released">Released</option>
-                <option value="in_review">In review</option>
+                <option value="inReview">In review</option>
                 <option value="new">New</option>
               </select>
             </label>
@@ -1022,7 +1022,7 @@ function PassportDataManagementPage({ companyId, user }) {
                 <div key={job.id} className="pdm-job-row">
                   <div>
                     <strong>{job.name}</strong>
-                    <span>{job.passportType || job.passport_type} / {job.sourceKind || job.source_kind}</span>
+                  <span>{job.passportType} / {job.sourceKind}</span>
                   </div>
                   <button type="button" className="pdm-mini-btn" onClick={() => runJob(job.id)} disabled={!canManagePassportData || busy}>Run</button>
                 </div>
@@ -1035,7 +1035,7 @@ function PassportDataManagementPage({ companyId, user }) {
               {runs.slice(0, 5).map((run) => (
                 <div key={run.id} className="pdm-run-row">
                   <strong>{run.status}</strong>
-                  <span>{run.passportType || run.passport_type || "Passport data"} / {new Date(run.createdAt || run.created_at).toLocaleString()}</span>
+                  <span>{run.passportType || "Passport data"} / {new Date(run.createdAt).toLocaleString()}</span>
                 </div>
               ))}
             </div>

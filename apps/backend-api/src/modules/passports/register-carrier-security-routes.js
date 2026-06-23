@@ -2,6 +2,7 @@ function registerCarrierSecurityRoutes(app, deps) {
   const {
     pool,
     crypto,
+    logger,
     authenticateToken,
     checkCompanyAccess,
     requireEditor,
@@ -41,11 +42,11 @@ function registerCarrierSecurityRoutes(app, deps) {
         return res.status(400).json({ error: "QR code must be an HTTP(S) URL or data:image payload" });
       }
 
-      const reg = await pool.query(`SELECT "companyId" FROM passport_registry WHERE "dppId" = $1`, [req.params.dppId]);
+      const reg = await pool.query(`SELECT "companyId" FROM "passportRegistry" WHERE "dppId" = $1`, [req.params.dppId]);
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found in registry" });
 
       const passportCompanyId = String(reg.rows[0].companyId);
-      if (req.user.role !== "super_admin" && String(req.user.companyId) !== passportCompanyId) {
+      if (req.user.role !== "superAdmin" && String(req.user.companyId) !== passportCompanyId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -109,7 +110,8 @@ function registerCarrierSecurityRoutes(app, deps) {
         qrCode,
         ...buildCarrierAuthenticityResponseFields(nextCarrierAuthenticity),
       });
-    } catch {
+    } catch (error) {
+      logger?.error?.({ err: error, dppId: req.params?.dppId }, "Failed to save QR code");
       res.status(500).json({ error: "Failed to save QR code" });
     }
   });
@@ -117,7 +119,7 @@ function registerCarrierSecurityRoutes(app, deps) {
   app.get("/api/passports/:dppId/qrcode", publicReadRateLimit, async (req, res) => {
     try {
       const { dppId } = req.params;
-      const reg = await pool.query(`SELECT "passportType" FROM passport_registry WHERE "dppId" = $1`, [dppId]);
+      const reg = await pool.query(`SELECT "passportType" FROM "passportRegistry" WHERE "dppId" = $1`, [dppId]);
       if (!reg.rows.length) return res.status(404).json({ error: "QR code not found" });
 
       const { passportType } = reg.rows[0];
@@ -143,7 +145,7 @@ function registerCarrierSecurityRoutes(app, deps) {
     try {
       const { companyId, dppId } = req.params;
       const reg = await pool.query(
-        `SELECT "companyId", "passportType" FROM passport_registry WHERE "dppId" = $1 LIMIT 1`,
+        `SELECT "companyId", "passportType" FROM "passportRegistry" WHERE "dppId" = $1 LIMIT 1`,
         [dppId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
@@ -180,9 +182,9 @@ function registerCarrierSecurityRoutes(app, deps) {
       await recordPassportSecurityEvent({
         dppId,
         companyId,
-        eventType: "data_carrier_verification",
+        eventType: "dataCarrierVerification",
         severity: "info",
-        source: "authenticated_user",
+        source: "authenticatedUser",
         details: record,
       });
 
@@ -200,14 +202,17 @@ function registerCarrierSecurityRoutes(app, deps) {
           placementCheckCount: record.placementChecks.length,
           evidenceUriCount: record.evidenceUris.length,
         }
-      ).catch(() => {});
+      ).catch((error) => {
+        logger?.warn?.({ err: error, dppId, companyId }, "Failed to record data-carrier verification audit");
+      });
 
       res.status(201).json({
         success: true,
         verification: record,
         ...buildCarrierAuthenticityResponseFields(nextCarrierAuthenticity),
       });
-    } catch {
+    } catch (error) {
+      logger?.error?.({ err: error, dppId: req.params?.dppId, companyId: req.params?.companyId }, "Failed to record data-carrier verification");
       res.status(500).json({ error: "Failed to record data-carrier verification" });
     }
   });
@@ -219,7 +224,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       const { dppId } = req.params;
       const { userAgent, referrer, userId } = req.body || {};
 
-      const reg = await pool.query(`SELECT "passportType" FROM passport_registry WHERE "dppId" = $1`, [dppId]);
+      const reg = await pool.query(`SELECT "passportType" FROM "passportRegistry" WHERE "dppId" = $1`, [dppId]);
       if (!reg.rows.length) return res.json({ success: true });
 
       const tbl = getTable(reg.rows[0].passportType);
@@ -238,9 +243,9 @@ function registerCarrierSecurityRoutes(app, deps) {
         await recordPassportSecurityEvent({
           dppId,
           companyId: check.rows[0]?.companyId || null,
-          eventType: "unexpected_scan_referrer",
+          eventType: "unexpectedScanReferrer",
           severity: "warning",
-          source: "scan_monitor",
+          source: "scanMonitor",
           details: {
             trustedHost,
             observedReferrerHost,
@@ -251,7 +256,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       }
 
       await pool.query(
-        `INSERT INTO passport_scan_events ("passportDppId", "viewerUserId", "userAgent", referrer)
+        `INSERT INTO "passportScanEvents" ("passportDppId", "viewerUserId", "userAgent", referrer)
          VALUES ($1,$2,$3,$4)
          ON CONFLICT ("passportDppId", "viewerUserId") WHERE "viewerUserId" IS NOT NULL DO NOTHING`,
         [dppId, parsedUserId, userAgent || null, referrer || null]
@@ -266,12 +271,12 @@ function registerCarrierSecurityRoutes(app, deps) {
     try {
       const { dppId } = req.params;
       const total = await pool.query(
-        `SELECT COUNT(DISTINCT "viewerUserId") FROM passport_scan_events WHERE "passportDppId" = $1 AND "viewerUserId" IS NOT NULL`,
+        `SELECT COUNT(DISTINCT "viewerUserId") FROM "passportScanEvents" WHERE "passportDppId" = $1 AND "viewerUserId" IS NOT NULL`,
         [dppId]
       );
       const byDay = await pool.query(
         `SELECT DATE("scannedAt") AS day, COUNT(DISTINCT "viewerUserId") AS count
-         FROM passport_scan_events WHERE "passportDppId" = $1 AND "viewerUserId" IS NOT NULL
+         FROM "passportScanEvents" WHERE "passportDppId" = $1 AND "viewerUserId" IS NOT NULL
          GROUP BY DATE("scannedAt") ORDER BY day DESC LIMIT 30`,
         [dppId]
       );
@@ -285,7 +290,7 @@ function registerCarrierSecurityRoutes(app, deps) {
     try {
       const { dppId } = req.params;
       const {
-        category = "suspicious_carrier",
+        category = "suspiciousCarrier",
         severity = "warning",
         notes = "",
         suspectedUrl = "",
@@ -296,7 +301,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       } = req.body || {};
 
       const reg = await pool.query(
-        `SELECT "companyId", "passportType" FROM passport_registry WHERE "dppId" = $1 LIMIT 1`,
+        `SELECT "companyId", "passportType" FROM "passportRegistry" WHERE "dppId" = $1 LIMIT 1`,
         [dppId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
@@ -305,9 +310,9 @@ function registerCarrierSecurityRoutes(app, deps) {
       await recordPassportSecurityEvent({
         dppId,
         companyId: passportCompanyId,
-        eventType: String(category || "suspicious_carrier").trim().slice(0, 80),
+        eventType: String(category || "suspiciousCarrier").trim().slice(0, 80),
         severity: String(severity || "warning").trim().slice(0, 32) || "warning",
-        source: "public_report",
+        source: "publicReport",
         details: {
           notes: String(notes || "").slice(0, 2000),
           suspectedUrl: String(suspectedUrl || "").slice(0, 2000),
@@ -322,7 +327,7 @@ function registerCarrierSecurityRoutes(app, deps) {
         passportCompanyId,
         null,
         "REPORT_SUSPICIOUS_CARRIER",
-        "passport_security_events",
+        "passportSecurityEvents",
         dppId,
         null,
         {
@@ -333,10 +338,13 @@ function registerCarrierSecurityRoutes(app, deps) {
           observedHost,
           expectedHost,
         }
-      ).catch(() => {});
+      ).catch((error) => {
+        logger?.warn?.({ err: error, dppId, passportCompanyId }, "Failed to record suspicious carrier report audit");
+      });
 
       res.status(201).json({ success: true });
-    } catch {
+    } catch (error) {
+      logger?.error?.({ err: error, dppId: req.params?.dppId }, "Failed to record security report");
       res.status(500).json({ error: "Failed to record security report" });
     }
   });
@@ -346,7 +354,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       const { companyId, dppId } = req.params;
       const rows = await pool.query(
         `SELECT id, "passportDppId", "companyId", "eventType", severity, source, details, "createdAt"
-         FROM passport_security_events
+         FROM "passportSecurityEvents"
          WHERE "companyId" = $1 AND "passportDppId" = $2
          ORDER BY "createdAt" DESC
          LIMIT 100`,
@@ -363,7 +371,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       const { dppId } = req.params;
       const r = await pool.query(
         `SELECT DISTINCT ON ("fieldKey") "fieldKey", value, "updatedAt"
-         FROM passport_dynamic_values WHERE "passportDppId" = $1 ORDER BY "fieldKey", "updatedAt" DESC`,
+         FROM "passportDynamicValues" WHERE "passportDppId" = $1 ORDER BY "fieldKey", "updatedAt" DESC`,
         [dppId]
       );
       const values = {};
@@ -379,7 +387,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       const { dppId, fieldKey } = req.params;
       const limit = Math.min(parseInt(req.query.limit, 10) || 500, 2000);
       const r = await pool.query(
-        `SELECT value, "updatedAt" FROM passport_dynamic_values WHERE "passportDppId" = $1 AND "fieldKey" = $2 ORDER BY "updatedAt" ASC LIMIT $3`,
+        `SELECT value, "updatedAt" FROM "passportDynamicValues" WHERE "passportDppId" = $1 AND "fieldKey" = $2 ORDER BY "updatedAt" ASC LIMIT $3`,
         [dppId, fieldKey, limit]
       );
       res.json({ history: r.rows.map((row) => ({ value: row.value, updatedAt: row.updatedAt })) });
@@ -395,7 +403,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       if (!deviceKey) return res.status(401).json({ error: "x-device-key header required" });
 
       const reg = await pool.query(
-        `SELECT "deviceApiKeyHash" FROM passport_registry WHERE "dppId" = $1`,
+        `SELECT "deviceApiKeyHash" FROM "passportRegistry" WHERE "dppId" = $1`,
         [dppId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
@@ -423,7 +431,7 @@ function registerCarrierSecurityRoutes(app, deps) {
           else storedValue = String(value);
         }
         await pool.query(
-          `INSERT INTO passport_dynamic_values ("passportDppId", "fieldKey", value, "updatedAt") VALUES ($1, $2, $3, NOW())`,
+          `INSERT INTO "passportDynamicValues" ("passportDppId", "fieldKey", value, "updatedAt") VALUES ($1, $2, $3, NOW())`,
           [dppId, fieldKey, storedValue]
         );
       }
@@ -439,7 +447,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       const { dppId } = req.params;
       const r = await pool.query(
         `SELECT "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
-         FROM passport_registry
+         FROM "passportRegistry"
          WHERE "dppId" = $1 AND "companyId" = $2`,
         [dppId, req.params.companyId]
       );
@@ -460,9 +468,8 @@ function registerCarrierSecurityRoutes(app, deps) {
       const { dppId } = req.params;
       const material = createDeviceKeyMaterial();
       const r = await pool.query(
-        `UPDATE passport_registry
-         SET "deviceApiKey" = NULL,
-             "deviceApiKeyHash" = $1,
+        `UPDATE "passportRegistry"
+         SET "deviceApiKeyHash" = $1,
              "deviceApiKeyPrefix" = $2,
              "deviceKeyLastRotatedAt" = NOW()
          WHERE "dppId" = $3 AND "companyId" = $4
@@ -470,7 +477,7 @@ function registerCarrierSecurityRoutes(app, deps) {
         [material.hash, material.prefix, dppId, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-      await logAudit(req.params.companyId, req.user.userId, "ROTATE_DEVICE_KEY", "passport_registry", dppId, null, { keyPrefix: material.prefix });
+      await logAudit(req.params.companyId, req.user.userId, "ROTATE_DEVICE_KEY", "passportRegistry", dppId, null, { keyPrefix: material.prefix });
       res.json({
         deviceKey: material.rawKey,
         keyPrefix: r.rows[0].deviceApiKeyPrefix,
@@ -494,7 +501,7 @@ function registerCarrierSecurityRoutes(app, deps) {
 
       for (const [fieldKey, value] of entries) {
         await pool.query(
-          `INSERT INTO passport_dynamic_values ("passportDppId", "fieldKey", value, "updatedAt") VALUES ($1, $2, $3, NOW())`,
+          `INSERT INTO "passportDynamicValues" ("passportDppId", "fieldKey", value, "updatedAt") VALUES ($1, $2, $3, NOW())`,
           [dppId, fieldKey, value === null || value === undefined ? null : String(value)]
         );
       }

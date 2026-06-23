@@ -131,19 +131,19 @@ module.exports = function registerAuthRoutes(app, {
 
       const tokenRow = await pool.query(
         `SELECT it.*,
-                c.company_name AS "companyName",
-                c.asset_management_enabled AS "assetManagementEnabled",
-                c.economic_operator_identifier AS "economicOperatorIdentifier",
-                c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
-         FROM invite_tokens it
-         LEFT JOIN companies c ON c.id = it.company_id
-         WHERE it.token = $1 AND it.used = false AND it.expires_at > NOW()`,
+                c."companyName" AS "companyName",
+                c."assetManagementEnabled" AS "assetManagementEnabled",
+                c."economicOperatorIdentifier" AS "economicOperatorIdentifier",
+                c."economicOperatorIdentifierScheme" AS "economicOperatorIdentifierScheme"
+         FROM "inviteTokens" it
+         LEFT JOIN companies c ON c.id = it."companyId"
+         WHERE it.token = $1 AND it.used = false AND it."expiresAt" > NOW()`,
         [token]
       );
       if (!tokenRow.rows.length)
         return res.status(400).json({ error: "Invalid or expired invitation link. Please ask for a new invite." });
       const invite = tokenRow.rows[0];
-      if ((invite.approval_status || "approved") !== "approved") {
+      if ((invite.approvalStatus || "approved") !== "approved") {
         return res.status(400).json({ error: "This invitation is awaiting super admin approval." });
       }
 
@@ -152,8 +152,8 @@ module.exports = function registerAuthRoutes(app, {
         return res.status(400).json({ error: "This email is already registered" });
 
       const { hash, pepperVersion } = await hashPassword(password);
-      const role = invite.role_to_assign || "editor";
-      const assignedCompanyId = role === "super_admin" ? null : invite.company_id;
+      const role = invite.roleToAssign || "editor";
+      const assignedCompanyId = role === "superAdmin" ? null : invite.companyId;
       const result = await pool.query(
         `INSERT INTO users (email, "passwordHash", "firstName", "lastName", "companyId", role, "pepperVersion")
          VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -166,7 +166,7 @@ module.exports = function registerAuthRoutes(app, {
                    "sessionVersion" AS "sessionVersion"`,
         [invite.email, hash, firstName, lastName, assignedCompanyId, role, pepperVersion]
       );
-      await pool.query("UPDATE invite_tokens SET used = true WHERE token = $1", [token]);
+      await pool.query("UPDATE \"inviteTokens\" SET used = true WHERE token = $1", [token]);
 
       const u = result.rows[0];
       const sessionToken = generateToken(u);
@@ -193,23 +193,23 @@ module.exports = function registerAuthRoutes(app, {
       const { token } = req.query;
       if (!token) return res.status(400).json({ error: "Token is required" });
       const row = await pool.query(
-        `SELECT it.email, it.expires_at, it.used, it.role_to_assign, it.approval_status, c.company_name AS "companyName"
-         FROM invite_tokens it LEFT JOIN companies c ON c.id = it.company_id WHERE it.token = $1`,
+        `SELECT it.email, it."expiresAt", it.used, it."roleToAssign", it."approvalStatus", c."companyName" AS "companyName"
+         FROM "inviteTokens" it LEFT JOIN companies c ON c.id = it."companyId" WHERE it.token = $1`,
         [token]
       );
       if (!row.rows.length) return res.status(404).json({ valid: false, error: "Invitation not found." });
       const invite = row.rows[0];
       if (invite.used)    return res.status(400).json({ valid: false, error: "This invitation has already been used." });
-      if (new Date(invite.expires_at) < new Date()) return res.status(400).json({ valid: false, error: "This invitation has expired." });
-      if ((invite.approval_status || "approved") !== "approved") {
+      if (new Date(invite.expiresAt) < new Date()) return res.status(400).json({ valid: false, error: "This invitation has expired." });
+      if ((invite.approvalStatus || "approved") !== "approved") {
         return res.status(400).json({ valid: false, error: "This invitation is awaiting super admin approval." });
       }
       res.json({
         valid: true,
         email: invite.email,
         companyName: invite.companyName || null,
-        roleToAssign: invite.role_to_assign || null,
-        expiresAt: invite.expires_at,
+        roleToAssign: invite.roleToAssign || null,
+        expiresAt: invite.expiresAt,
       });
     } catch (e) { res.status(500).json({ valid: false, error: "Failed to validate invitation" }); }
   });
@@ -223,10 +223,10 @@ module.exports = function registerAuthRoutes(app, {
       // Per-email lockout: max 5 failures in 15 minutes
       const lockKey = `login-lockout:${String(email).trim().toLowerCase()}`;
       const lockRow = await pool.query(
-        "SELECT count, reset_at FROM request_rate_limits WHERE bucket_key = $1",
+        "SELECT count, \"resetAt\" FROM \"requestRateLimits\" WHERE \"bucketKey\" = $1",
         [lockKey]
       );
-      if (lockRow.rows.length && lockRow.rows[0].count >= 5 && new Date() < new Date(lockRow.rows[0].reset_at)) {
+      if (lockRow.rows.length && lockRow.rows[0].count >= 5 && new Date() < new Date(lockRow.rows[0].resetAt)) {
         return res.status(429).json({ error: "Account temporarily locked due to too many failed attempts. Please try again later." });
       }
 
@@ -243,10 +243,10 @@ module.exports = function registerAuthRoutes(app, {
                 u."otpCodeHash" AS "otpCodeHash",
                 u."otpExpiresAt" AS "otpExpiresAt",
                 u."ssoOnly" AS "ssoOnly",
-                c.company_name AS "companyName",
-                c.asset_management_enabled AS "assetManagementEnabled",
-                c.economic_operator_identifier AS "economicOperatorIdentifier",
-                c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
+                c."companyName" AS "companyName",
+                c."assetManagementEnabled" AS "assetManagementEnabled",
+                c."economicOperatorIdentifier" AS "economicOperatorIdentifier",
+                c."economicOperatorIdentifierScheme" AS "economicOperatorIdentifierScheme"
          FROM users u
          LEFT JOIN companies c ON c.id = u."companyId"
          WHERE u.email = $1 AND u."isActive" = true`,
@@ -262,14 +262,16 @@ module.exports = function registerAuthRoutes(app, {
         // Increment lockout counter
         const resetAt = new Date(Date.now() + 15 * 60 * 1000);
         await pool.query(
-          `INSERT INTO request_rate_limits (bucket_key, count, reset_at, updated_at)
+          `INSERT INTO "requestRateLimits" ("bucketKey", count, "resetAt", "updatedAt")
            VALUES ($1, 1, $2, NOW())
-           ON CONFLICT (bucket_key) DO UPDATE
-           SET count = CASE WHEN request_rate_limits.reset_at <= NOW() THEN 1 ELSE request_rate_limits.count + 1 END,
-               reset_at = CASE WHEN request_rate_limits.reset_at <= NOW() THEN $2 ELSE request_rate_limits.reset_at END,
-               updated_at = NOW()`,
+           ON CONFLICT ("bucketKey") DO UPDATE
+           SET count = CASE WHEN "requestRateLimits"."resetAt" <= NOW() THEN 1 ELSE "requestRateLimits".count + 1 END,
+               "resetAt" = CASE WHEN "requestRateLimits"."resetAt" <= NOW() THEN $2 ELSE "requestRateLimits"."resetAt" END,
+               "updatedAt" = NOW()`,
           [lockKey, resetAt]
-        ).catch(() => {});
+        ).catch((error) => {
+          logger.warn({ err: error, email }, "Failed to increment login lockout counter");
+        });
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
@@ -281,11 +283,15 @@ module.exports = function registerAuthRoutes(app, {
                "updatedAt" = NOW()
            WHERE id = $3`,
           [passwordCheck.nextHash, passwordCheck.pepperVersion, u.id]
-        ).catch(() => {});
+        ).catch((error) => {
+          logger.warn({ err: error, userId: u.id }, "Failed to upgrade password hash after login");
+        });
       }
 
       // Clear lockout on successful login
-      await pool.query("DELETE FROM request_rate_limits WHERE bucket_key = $1", [lockKey]).catch(() => {});
+      await pool.query("DELETE FROM \"requestRateLimits\" WHERE \"bucketKey\" = $1", [lockKey]).catch((error) => {
+        logger.warn({ err: error, email }, "Failed to clear login lockout counter");
+      });
 
       if (u.twoFactorEnabled) {
         const otp     = generateOtpCode();
@@ -300,11 +306,13 @@ module.exports = function registerAuthRoutes(app, {
           logger.error("OTP email failed:", emailErr.message);
           return res.status(500).json({ error: "Failed to send verification code. Please try again." });
         }
-        const preAuthToken = jwt.sign({ userId: u.id, pre_auth: true }, JWT_SECRET, { expiresIn: "10m" });
+        const preAuthToken = jwt.sign({ userId: u.id, preAuth: true }, JWT_SECRET, { expiresIn: "10m" });
         return res.json({ requiresTwoFactor: true, preAuthToken });
       }
 
-      await pool.query('UPDATE users SET "lastLoginAt" = NOW() WHERE id = $1', [u.id]).catch(() => {});
+      await pool.query('UPDATE users SET "lastLoginAt" = NOW() WHERE id = $1', [u.id]).catch((error) => {
+        logger.warn({ err: error, userId: u.id }, "Failed to update password login timestamp");
+      });
       const sessionToken = generateToken(u, undefined, undefined, undefined, undefined, {
         mfaVerifiedAt: new Date().toISOString(),
         amr: ["pwd", "otp"]
@@ -328,7 +336,7 @@ module.exports = function registerAuthRoutes(app, {
       let payload;
       try { payload = jwt.verify(preAuthToken, JWT_SECRET); }
       catch { return res.status(401).json({ error: "Session expired. Please log in again." }); }
-      if (!payload.pre_auth) return res.status(401).json({ error: "Invalid session token" });
+      if (!payload.preAuth) return res.status(401).json({ error: "Invalid session token" });
 
       const result = await pool.query(
         `SELECT u.id,
@@ -340,10 +348,10 @@ module.exports = function registerAuthRoutes(app, {
                 u."lastLoginAt" AS "lastLoginAt",
                 u."otpCodeHash" AS "otpCodeHash",
                 u."otpExpiresAt" AS "otpExpiresAt",
-                c.company_name AS "companyName",
-                c.asset_management_enabled AS "assetManagementEnabled",
-                c.economic_operator_identifier AS "economicOperatorIdentifier",
-                c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
+                c."companyName" AS "companyName",
+                c."assetManagementEnabled" AS "assetManagementEnabled",
+                c."economicOperatorIdentifier" AS "economicOperatorIdentifier",
+                c."economicOperatorIdentifierScheme" AS "economicOperatorIdentifierScheme"
          FROM users u
          LEFT JOIN companies c ON c.id = u."companyId"
          WHERE u.id = $1 AND u."isActive" = true`,
@@ -398,14 +406,19 @@ module.exports = function registerAuthRoutes(app, {
         .filter(Boolean);
       const candidateTokens = [...new Set([bearerToken, ...cookieTokens].filter(Boolean))];
       for (const token of candidateTokens) {
+        let payload;
         try {
-          const payload = jwt.verify(token, JWT_SECRET);
-          await pool.query(
-            'UPDATE users SET "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $1',
-            [payload.userId]
-          );
-          break;
-        } catch {}
+          payload = jwt.verify(token, JWT_SECRET);
+        } catch (_error) {
+          continue;
+        }
+        await pool.query(
+          'UPDATE users SET "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $1',
+          [payload.userId]
+        ).catch((error) => {
+          logger.warn({ err: error, userId: payload.userId }, "Failed to revoke session version during logout");
+        });
+        break;
       }
     } finally {
       clearAuthCookie(res);
@@ -452,7 +465,7 @@ module.exports = function registerAuthRoutes(app, {
       let payload;
       try { payload = jwt.verify(preAuthToken, JWT_SECRET); }
       catch { return res.status(401).json({ error: "Session expired. Please log in again." }); }
-      if (!payload.pre_auth) return res.status(401).json({ error: "Invalid session" });
+      if (!payload.preAuth) return res.status(401).json({ error: "Invalid session" });
 
       const result = await pool.query('SELECT * FROM users WHERE id = $1 AND "isActive" = true', [payload.userId]);
       if (!result.rows.length) return res.status(401).json({ error: "User not found" });
@@ -481,7 +494,7 @@ module.exports = function registerAuthRoutes(app, {
       const tokenHash = hashOpaqueToken(token);
       const exp   = new Date(Date.now() + 60 * 60 * 1000);
       await pool.query(
-        "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1,$2,$3)",
+        "INSERT INTO \"passwordResetTokens\" (\"userId\", token, \"expiresAt\") VALUES ($1,$2,$3)",
         [u.rows[0].id, tokenHash, exp]
       );
       const resetUrl = `${process.env.APP_URL || "http://localhost:3000"}/reset-password?token=${token}`;
@@ -502,7 +515,7 @@ module.exports = function registerAuthRoutes(app, {
       const submittedToken = String(req.query.token || "");
       const submittedHash = hashOpaqueToken(submittedToken);
       const r = await pool.query(
-        "SELECT id FROM password_reset_tokens WHERE token = ANY($1::text[]) AND used = false AND expires_at > NOW()",
+        "SELECT id FROM \"passwordResetTokens\" WHERE token = ANY($1::text[]) AND used = false AND \"expiresAt\" > NOW()",
         [[submittedToken, submittedHash]]
       );
       res.json({ valid: r.rows.length > 0 });
@@ -517,7 +530,7 @@ module.exports = function registerAuthRoutes(app, {
       if (passwordPolicyError) return res.status(400).json({ error: passwordPolicyError });
       const tokenHash = hashOpaqueToken(token);
       const r = await pool.query(
-        "SELECT user_id FROM password_reset_tokens WHERE token = ANY($1::text[]) AND used = false AND expires_at > NOW()",
+        "SELECT \"userId\" FROM \"passwordResetTokens\" WHERE token = ANY($1::text[]) AND used = false AND \"expiresAt\" > NOW()",
         [[token, tokenHash]]
       );
       if (!r.rows.length) return res.status(400).json({ error: "Invalid or expired token" });
@@ -529,9 +542,9 @@ module.exports = function registerAuthRoutes(app, {
              "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
              "updatedAt" = NOW()
          WHERE id = $3`,
-        [hash, pepperVersion, r.rows[0].user_id]
+        [hash, pepperVersion, r.rows[0].userId]
       );
-      await pool.query("UPDATE password_reset_tokens SET used = true WHERE token = ANY($1::text[])", [[token, tokenHash]]);
+      await pool.query("UPDATE \"passwordResetTokens\" SET used = true WHERE token = ANY($1::text[])", [[token, tokenHash]]);
       res.json({ success: true });
     } catch (e) {
       logger.error("Reset password error:", e.message);
@@ -551,12 +564,12 @@ module.exports = function registerAuthRoutes(app, {
       if (existing.rows.length) return res.status(400).json({ error: "This email is already registered" });
 
       await pool.query(
-        `UPDATE invite_tokens SET expires_at = NOW()
-         WHERE email = $1 AND company_id = $2 AND used = false AND expires_at > NOW()`,
+        `UPDATE "inviteTokens" SET "expiresAt" = NOW()
+         WHERE email = $1 AND "companyId" = $2 AND used = false AND "expiresAt" > NOW()`,
         [inviteeEmail, companyId]
       );
 
-      const company = await pool.query('SELECT company_name AS "companyName" FROM companies WHERE id = $1', [companyId]);
+      const company = await pool.query('SELECT "companyName" AS "companyName" FROM companies WHERE id = $1', [companyId]);
       if (!company.rows.length) return res.status(404).json({ error: "Company not found" });
       const companyName = company.rows[0].companyName;
 
@@ -567,11 +580,11 @@ module.exports = function registerAuthRoutes(app, {
 
       const tokenValue = uuidv4();
       const expiresAt  = new Date(Date.now() + 48 * 60 * 60 * 1000);
-      const finalRole  = (req.user.role === "company_admin" || req.user.role === "super_admin")
+      const finalRole  = (req.user.role === "companyAdmin" || req.user.role === "superAdmin")
         ? (roleToAssign || "editor") : "viewer";
 
       await pool.query(
-        `INSERT INTO invite_tokens (token, email, company_id, invited_by, expires_at, role_to_assign)
+        `INSERT INTO "inviteTokens" (token, email, "companyId", "invitedBy", "expiresAt", "roleToAssign")
          VALUES ($1,$2,$3,$4,$5,$6)`,
         [tokenValue, inviteeEmail, companyId, req.user.userId, expiresAt, finalRole]
       );
@@ -611,8 +624,8 @@ module.exports = function registerAuthRoutes(app, {
                 u."authSource" AS "authSource", u."ssoOnly" AS "ssoOnly",
                 u."preferredLanguage" AS "preferredLanguage", u."defaultReviewerId" AS "defaultReviewerId",
                 u."defaultApproverId" AS "defaultApproverId", u."createdAt" AS "createdAt", u."lastLoginAt" AS "lastLoginAt",
-                u."twoFactorEnabled" AS "twoFactorEnabled", c.company_name AS "companyName", c.asset_management_enabled AS "assetManagementEnabled",
-                c.economic_operator_identifier AS "economicOperatorIdentifier", c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
+                u."twoFactorEnabled" AS "twoFactorEnabled", c."companyName" AS "companyName", c."assetManagementEnabled" AS "assetManagementEnabled",
+                c."economicOperatorIdentifier" AS "economicOperatorIdentifier", c."economicOperatorIdentifierScheme" AS "economicOperatorIdentifierScheme"
          FROM users u
          LEFT JOIN companies c ON c.id = u."companyId"
          WHERE u.id = $1`,
@@ -707,7 +720,7 @@ module.exports = function registerAuthRoutes(app, {
         amr: mfaEnabled ? ["pwd", "otp"] : ["pwd"]
       });
       setAuthCookie(res, freshToken);
-      res.json({ success: true, min_password_length: PASSWORD_MIN_LENGTH });
+      res.json({ success: true, minPasswordLength: PASSWORD_MIN_LENGTH });
     } catch { res.status(500).json({ error: "Failed" }); }
   });
 
@@ -717,9 +730,9 @@ module.exports = function registerAuthRoutes(app, {
       const r = await pool.query(
         `SELECT u.id, u.email, u."firstName" AS "firstName", u."lastName" AS "lastName", u.role, u."jobTitle" AS "jobTitle", u."avatarUrl" AS "avatarUrl",
                 u."isActive" AS "isActive", u."createdAt" AS "createdAt",
-                (SELECT COUNT(*) FROM passport_registry pr WHERE pr."companyId" = u."companyId" AND pr."passportType" IS NOT NULL) AS "passportCount"
+                (SELECT COUNT(*) FROM "passportRegistry" pr WHERE pr."companyId" = u."companyId" AND pr."passportType" IS NOT NULL) AS "passportCount"
          FROM users u
-         WHERE u."companyId" = $1 AND u.role != 'super_admin'
+         WHERE u."companyId" = $1 AND u.role != 'superAdmin'
          ORDER BY u.role, u."firstName"`,
         [req.params.companyId]
       );
@@ -729,10 +742,10 @@ module.exports = function registerAuthRoutes(app, {
 
   app.patch("/api/companies/:companyId/users/:userId", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      if (req.user.role !== "company_admin" && req.user.role !== "super_admin")
+      if (req.user.role !== "companyAdmin" && req.user.role !== "superAdmin")
         return res.status(403).json({ error: "Admin only" });
       const { role } = req.body;
-      if (!["company_admin","editor","viewer"].includes(role))
+      if (!["companyAdmin","editor","viewer"].includes(role))
         return res.status(400).json({ error: "Invalid role" });
       const updated = await pool.query('UPDATE users SET role = $1, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $2 AND "companyId" = $3 RETURNING id, role, "sessionVersion" AS "sessionVersion", "isActive" AS "isActive"',
         [role, req.params.userId, req.params.companyId]);
@@ -746,7 +759,7 @@ module.exports = function registerAuthRoutes(app, {
         { role, sessionVersion: updated.rows[0]?.sessionVersion || null },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "company_admin",
+          audience: "companyAdmin",
         }
       );
       await replicateAccessControlEventToBackup({
@@ -756,35 +769,44 @@ module.exports = function registerAuthRoutes(app, {
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
         affectedUserId: req.params.userId,
-        revocationMode: "role_change",
+        revocationMode: "roleChange",
         metadata: { role },
-      }).catch(() => {});
+      }).catch((error) => {
+        logger.warn({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to replicate user role change event");
+      });
       res.json({ success: true });
-    } catch { res.status(500).json({ error: "Failed" }); }
+    } catch (error) {
+      logger.error({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to change user role");
+      res.status(500).json({ error: "Failed" });
+    }
   });
 
   app.patch("/api/companies/:companyId/users/:userId/deactivate", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      if (req.user.role !== "company_admin" && req.user.role !== "super_admin")
+      if (req.user.role !== "companyAdmin" && req.user.role !== "superAdmin")
         return res.status(403).json({ error: "Admin only" });
       const deactivated = await pool.query('UPDATE users SET "isActive" = false, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $1 AND "companyId" = $2 RETURNING id, role, "sessionVersion" AS "sessionVersion", "isActive" AS "isActive"',
         [req.params.userId, req.params.companyId]);
       await pool.query(
-        `UPDATE user_access_audiences
-         SET is_active = false,
-             updated_at = NOW()
-         WHERE user_id = $1
-           AND (company_id = $2 OR company_id IS NULL)`,
+        `UPDATE "userAccessAudiences"
+         SET "isActive" = false,
+             "updatedAt" = NOW()
+        WHERE "userId" = $1
+          AND ("companyId" = $2 OR "companyId" IS NULL)`,
         [req.params.userId, req.params.companyId]
-      ).catch(() => {});
+      ).catch((error) => {
+        logger.warn({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to deactivate delegated user audiences");
+      });
       await pool.query(
-        `UPDATE passport_access_grants
-         SET is_active = false,
-             updated_at = NOW()
-         WHERE grantee_user_id = $1
-           AND company_id = $2`,
+        `UPDATE "passportAccessGrants"
+         SET "isActive" = false,
+             "updatedAt" = NOW()
+         WHERE "granteeUserId" = $1
+           AND "companyId" = $2`,
         [req.params.userId, req.params.companyId]
-      ).catch(() => {});
+      ).catch((error) => {
+        logger.warn({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to deactivate passport access grants for user");
+      });
       await logAudit(
         req.params.companyId,
         req.user.userId,
@@ -795,7 +817,7 @@ module.exports = function registerAuthRoutes(app, {
         { isActive: false, sessionVersion: deactivated.rows[0]?.sessionVersion || null },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "company_admin",
+          audience: "companyAdmin",
         }
       );
       await replicateAccessControlEventToBackup({
@@ -811,14 +833,19 @@ module.exports = function registerAuthRoutes(app, {
           revokedDelegatedAudiences: true,
           revokedPassportGrants: true,
         },
-      }).catch(() => {});
+      }).catch((error) => {
+        logger.warn({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to replicate user deactivation event");
+      });
       res.json({ success: true });
-    } catch { res.status(500).json({ error: "Failed" }); }
+    } catch (error) {
+      logger.error({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to deactivate user");
+      res.status(500).json({ error: "Failed" });
+    }
   });
 
   app.post("/api/companies/:companyId/users/:userId/revoke-sessions", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
-      if (req.user.role !== "company_admin" && req.user.role !== "super_admin")
+      if (req.user.role !== "companyAdmin" && req.user.role !== "superAdmin")
         return res.status(403).json({ error: "Admin only" });
       const reason = req.body?.reason || "User sessions revoked";
       const updated = await pool.query(
@@ -841,7 +868,7 @@ module.exports = function registerAuthRoutes(app, {
         { sessionVersion: updated.rows[0].sessionVersion, reason },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "company_admin",
+          audience: "companyAdmin",
         }
       );
       await replicateAccessControlEventToBackup({
@@ -854,7 +881,9 @@ module.exports = function registerAuthRoutes(app, {
         revocationMode: "emergency",
         reason,
         metadata: { sessionVersion: updated.rows[0].sessionVersion },
-      }).catch(() => {});
+      }).catch((error) => {
+        logger.warn({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to replicate user session revocation event");
+      });
 
       res.json({
         success: true,
@@ -862,7 +891,8 @@ module.exports = function registerAuthRoutes(app, {
         emergency: true,
         sessionVersion: updated.rows[0].sessionVersion,
       });
-    } catch {
+    } catch (error) {
+      logger.error({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to revoke user sessions");
       res.status(500).json({ error: "Failed to revoke user sessions" });
     }
   });

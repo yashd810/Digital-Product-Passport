@@ -14,7 +14,7 @@ async function insertPassportRegistry({
   deviceKeyLastRotatedAt = null,
 }) {
   return client.query(
-    `INSERT INTO passport_registry
+    `INSERT INTO "passportRegistry"
        ("dppId", "lineageId", "companyId", "passportType",
         "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
         "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt")

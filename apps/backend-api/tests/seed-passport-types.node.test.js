@@ -17,8 +17,8 @@ function createMockPool() {
   const calls = [];
   let passportTypeId = 100;
   const companies = [
-    { id: 7, companyName: "Northwind Textiles" },
-    { id: 8, companyName: "Battery Works" },
+    { id: 7, companyName: "Northwind Devices" },
+    { id: 8, companyName: "Sensor Works" },
   ];
 
   return {
@@ -27,7 +27,7 @@ function createMockPool() {
       calls.push({ sql, params });
       const normalizedSql = String(sql).replace(/\s+/g, " ").trim();
 
-      if (normalizedSql.includes("FROM companies") && normalizedSql.includes("WHERE is_active = TRUE")) {
+      if (normalizedSql.includes("FROM companies") && normalizedSql.includes("WHERE \"isActive\" = TRUE")) {
         return { rows: companies };
       }
 
@@ -36,11 +36,11 @@ function createMockPool() {
         return { rows: companies.filter((company) => ids.includes(company.id)) };
       }
 
-      if (normalizedSql.startsWith("INSERT INTO product_categories")) {
+      if (normalizedSql.startsWith("INSERT INTO \"productCategories\"")) {
         return { rows: [] };
       }
 
-      if (normalizedSql.startsWith("INSERT INTO passport_types")) {
+      if (normalizedSql.startsWith("INSERT INTO \"passportTypes\"")) {
         passportTypeId += 1;
         return {
           rows: [{
@@ -51,13 +51,13 @@ function createMockPool() {
         };
       }
 
-      if (normalizedSql.startsWith("INSERT INTO company_passport_access")) {
+      if (normalizedSql.startsWith("INSERT INTO \"companyPassportAccess\"")) {
         return {
           rows: [{
             id: Number(`${params[0]}${params[1]}`),
-            company_id: params[0],
-            passport_type_id: params[1],
-            access_revoked: false,
+            companyId: params[0],
+            passportTypeId: params[1],
+            accessRevoked: false,
           }],
         };
       }
@@ -67,15 +67,88 @@ function createMockPool() {
   };
 }
 
+function createSystemHeader() {
+  return {
+    section: { key: "passportHeader", label: "Passport Header" },
+    fieldMappings: [
+      { slotKey: "digitalProductPassportId", sourceType: "managed", managedKey: "internalManagedDigitalProductPassportId" },
+      { slotKey: "uniqueProductIdentifier", sourceType: "managed", managedKey: "internalManagedUniqueProductIdentifier" },
+      { slotKey: "internalAliasId", sourceType: "managed", managedKey: "internalManagedInternalAliasId" },
+      { slotKey: "granularity", sourceType: "managed", managedKey: "internalManagedGranularity" },
+      { slotKey: "dppSchemaVersion", sourceType: "managed", managedKey: "internalManagedDppSchemaVersion" },
+      { slotKey: "dppStatus", sourceType: "managed", managedKey: "internalManagedDppStatus" },
+      { slotKey: "lastUpdate", sourceType: "managed", managedKey: "internalManagedLastUpdate" },
+      { slotKey: "economicOperatorId", sourceType: "managed", managedKey: "internalManagedEconomicOperatorId" },
+      { slotKey: "facilityId", sourceType: "managed", managedKey: "internalManagedFacilityId" },
+      { slotKey: "contentSpecificationIds", sourceType: "managed", managedKey: "internalManagedContentSpecificationIds" },
+      { slotKey: "subjectDid", sourceType: "managed", managedKey: "internalManagedSubjectDid" },
+      { slotKey: "dppDid", sourceType: "managed", managedKey: "internalManagedDppDid" },
+      { slotKey: "companyDid", sourceType: "managed", managedKey: "internalManagedCompanyDid" },
+    ],
+    fieldKeys: [],
+  };
+}
+
+function createMedicalDeviceModule() {
+  return {
+    moduleKey: "medical-device:v1",
+    typeName: "medicalDevicePassportV1",
+    displayName: "Medical Device Passport v1",
+    productCategory: "Medical Device",
+    productIcon: "MD",
+    semanticModelKey: "medicalDeviceDictionaryV1",
+    identity: {
+      businessIdentifierField: "modelIdentifier",
+    },
+    systemHeader: createSystemHeader(),
+    passportPolicy: {
+      key: "medicalDeviceDppV1",
+      displayName: "Medical Device Passport Policy v1",
+      contentSpecificationIds: ["medicalDeviceDictionaryV1"],
+    },
+    sections: [{
+      key: "deviceIdentity",
+      label: "Device Identity",
+      fields: [
+        {
+          key: "modelIdentifier",
+          label: "Model Identifier",
+          type: "text",
+          semanticId: "https://example.test/dictionary/medical-device/v1/terms/model-identifier",
+          elementIdPath: "deviceIdentity.modelIdentifier",
+          objectType: "SingleValuedDataElement",
+          valueDataType: "String",
+        },
+      ],
+    }],
+  };
+}
+
+function writeModuleFile(modulesDir, fileName = "medical-device-v1.js") {
+  fs.writeFileSync(
+    path.join(modulesDir, fileName),
+    `"use strict";\n\nmodule.exports = ${JSON.stringify(createMedicalDeviceModule(), null, 2)};\n`
+  );
+}
+
+async function withTempModules(callback) {
+  const modulesDir = fs.mkdtempSync(path.join(os.tmpdir(), "seed-passport-modules-"));
+  try {
+    return await callback(modulesDir);
+  } finally {
+    fs.rmSync(modulesDir, { recursive: true, force: true });
+  }
+}
+
 test("parseOptions supports explicit company access targets", () => {
   assert.deepEqual(parseOptions([
-    "--module=textile:v1",
+    "--module=medical-device:v1",
     "--company-id=7,8",
     "--skip-storage",
   ]), {
     dryRun: false,
     skipStorage: true,
-    requestedModule: "textile:v1",
+    requestedModule: "medical-device:v1",
     companyIds: [7, 8],
     grantAllActiveCompanies: false,
   });
@@ -88,88 +161,69 @@ test("parseOptions rejects ambiguous company access targets", () => {
   );
 });
 
-test("dry run reports the selected module and access plan without requiring a pool", async () => {
+test("dry run with an empty module registry reports zero selected modules", async () => withTempModules(async (modulesDir) => {
   const result = await runSeed({
     pool: null,
-    options: parseOptions(["--dry-run", "--module=textile:v1", "--company-id=7"]),
+    options: {
+      ...parseOptions(["--dry-run", "--company-id=7"]),
+      modulesDir,
+    },
+  });
+
+  assert.equal(result.dryRun, true);
+  assert.equal(result.selected, 0);
+  assert.deepEqual(result.accessPlan.companyIds, [7]);
+  assert.deepEqual(result.modules, []);
+}));
+
+test("seed script can discover and select an arbitrary future module file", async () => withTempModules(async (modulesDir) => {
+  writeModuleFile(modulesDir);
+
+  const selected = getSelectedModules("medical-device:v1", { modulesDir });
+  assert.equal(selected.length, 1);
+  assert.equal(selected[0].moduleKey, "medical-device:v1");
+  assert.equal(selected[0].fieldsJson.passportPolicy.key, "medicalDeviceDppV1");
+
+  const result = await runSeed({
+    pool: null,
+    options: {
+      ...parseOptions(["--dry-run", "--module=medical-device:v1"]),
+      modulesDir,
+    },
   });
 
   assert.equal(result.dryRun, true);
   assert.equal(result.selected, 1);
-  assert.deepEqual(result.accessPlan.companyIds, [7]);
-  assert.equal(result.modules[0].moduleKey, "textile:v1");
-});
+  assert.equal(result.modules[0].productCategory, "Medical Device");
+}));
 
-test("seed script can discover and select an arbitrary future module file", async () => {
-  const modulesDir = fs.mkdtempSync(path.join(os.tmpdir(), "seed-passport-modules-"));
-  fs.writeFileSync(path.join(modulesDir, "medical-device-v1.js"), `
-    "use strict";
-
-    module.exports = {
-      moduleKey: "medical-device:v1",
-      typeName: "medicalDevicePassportV1",
-      displayName: "Medical Device Passport v1",
-      productCategory: "Medical Device",
-      productIcon: "MD",
-      semanticModelKey: "medical_device_dictionary_v1",
-      identity: {
-        businessIdentifierField: "modelIdentifier",
-      },
-      systemHeader: {
-        section: { key: "passportHeader", label: "Passport Header" },
-        fieldMappings: [
-          { slotKey: "digitalProductPassportId", sourceType: "managed", managedKey: "internalManagedDigitalProductPassportId" },
-          { slotKey: "uniqueProductIdentifier", sourceType: "managed", managedKey: "internalManagedUniqueProductIdentifier" },
-          { slotKey: "internalAliasId", sourceType: "managed", managedKey: "internalManagedInternalAliasId" },
-          { slotKey: "granularity", sourceType: "managed", managedKey: "internalManagedGranularity" },
-          { slotKey: "dppSchemaVersion", sourceType: "managed", managedKey: "internalManagedDppSchemaVersion" },
-          { slotKey: "dppStatus", sourceType: "managed", managedKey: "internalManagedDppStatus" },
-          { slotKey: "lastUpdate", sourceType: "managed", managedKey: "internalManagedLastUpdate" },
-          { slotKey: "economicOperatorId", sourceType: "managed", managedKey: "internalManagedEconomicOperatorId" },
-          { slotKey: "facilityId", sourceType: "managed", managedKey: "internalManagedFacilityId" },
-          { slotKey: "contentSpecificationIds", sourceType: "managed", managedKey: "internalManagedContentSpecificationIds" },
-          { slotKey: "subjectDid", sourceType: "managed", managedKey: "internalManagedSubjectDid" },
-          { slotKey: "dppDid", sourceType: "managed", managedKey: "internalManagedDppDid" },
-          { slotKey: "companyDid", sourceType: "managed", managedKey: "internalManagedCompanyDid" },
-        ],
-        fieldKeys: [],
-      },
-      passportPolicy: {
-        key: "medicalDeviceDppV1",
-        displayName: "Medical Device Passport Policy v1",
-        contentSpecificationIds: ["Medical_Device_dictionary_v1"],
-      },
-      sections: [{
-        key: "deviceIdentity",
-        label: "Device Identity",
-        fields: [
-          { key: "modelIdentifier", label: "Model Identifier", type: "text" },
-        ],
-      }],
-    };
-  `);
-
-  try {
-    const selected = getSelectedModules("medical-device:v1", { modulesDir });
-    assert.equal(selected.length, 1);
-    assert.equal(selected[0].moduleKey, "medical-device:v1");
-    assert.equal(selected[0].fieldsJson.passportPolicy.key, "medicalDeviceDppV1");
-
-    const result = await runSeed({
+test("requested missing module still fails clearly", async () => withTempModules(async (modulesDir) => {
+  await assert.rejects(
+    () => runSeed({
       pool: null,
       options: {
-        ...parseOptions(["--dry-run", "--module=medical-device:v1"]),
+        ...parseOptions(["--dry-run", "--module=missing:v1"]),
         modulesDir,
       },
-    });
+    }),
+    /No passport type module found for missing:v1/
+  );
+}));
 
-    assert.equal(result.dryRun, true);
-    assert.equal(result.selected, 1);
-    assert.equal(result.modules[0].productCategory, "Medical Device");
-  } finally {
-    fs.rmSync(modulesDir, { recursive: true, force: true });
-  }
-});
+test("empty non-dry seed run is a safe no-op", async () => withTempModules(async (modulesDir) => {
+  const result = await runSeed({
+    pool: createMockPool(),
+    options: {
+      ...parseOptions(["--skip-storage"]),
+      modulesDir,
+    },
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.seeded, 0);
+  assert.equal(result.accessGranted, 0);
+  assert.deepEqual(result.results, []);
+}));
 
 test("resolveCompaniesForAccess rejects missing explicit company IDs", async () => {
   const pool = createMockPool();
@@ -182,28 +236,32 @@ test("resolveCompaniesForAccess rejects missing explicit company IDs", async () 
 test("grantCompanyAccess mirrors admin access upsert behavior", async () => {
   const pool = createMockPool();
   const grants = await grantCompanyAccess(pool, {
-    companies: [{ id: 7, companyName: "Northwind Textiles" }],
-    passportTypes: [{ id: 101, moduleKey: "textile:v1", typeName: "textilePassportV1" }],
+    companies: [{ id: 7, companyName: "Northwind Devices" }],
+    passportTypes: [{ id: 101, moduleKey: "medical-device:v1", typeName: "medicalDevicePassportV1" }],
   });
 
   assert.equal(grants.length, 1);
   assert.equal(grants[0].companyId, 7);
-  assert.equal(grants[0].typeName, "textilePassportV1");
+  assert.equal(grants[0].typeName, "medicalDevicePassportV1");
   assert.ok(pool.calls.some((call) =>
-    call.sql.includes("ON CONFLICT (company_id, passport_type_id) DO UPDATE SET access_revoked = FALSE")
+    call.sql.includes("ON CONFLICT (\"companyId\", \"passportTypeId\") DO UPDATE SET \"accessRevoked\" = FALSE")
   ));
 });
 
-test("runSeed can seed a module and grant access to selected companies", async () => {
+test("runSeed can seed a module and grant access to selected companies", async () => withTempModules(async (modulesDir) => {
+  writeModuleFile(modulesDir);
   const pool = createMockPool();
   const result = await runSeed({
     pool,
-    options: parseOptions(["--module=textile:v1", "--company-id=7", "--skip-storage"]),
+    options: {
+      ...parseOptions(["--module=medical-device:v1", "--company-id=7", "--skip-storage"]),
+      modulesDir,
+    },
   });
 
   assert.equal(result.success, true);
   assert.equal(result.seeded, 1);
   assert.equal(result.accessGranted, 1);
-  assert.equal(result.results[0].typeName, "textilePassportV1");
+  assert.equal(result.results[0].typeName, "medicalDevicePassportV1");
   assert.equal(result.accessGrants[0].companyId, 7);
-});
+}));

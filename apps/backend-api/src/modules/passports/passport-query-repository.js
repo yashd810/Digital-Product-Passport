@@ -74,7 +74,7 @@ function createPassportQueryRepository({
     }
     const archiveRes = await pool.query(
       `SELECT "dppId", "lineageId", "internalAliasId"
-       FROM passport_archives
+       FROM "passportArchives"
        WHERE "dppId" = $1
          AND "passportType" = $2${archiveCompanyFilter}
        ORDER BY "versionNumber" DESC, "archivedAt" DESC
@@ -88,10 +88,10 @@ function createPassportQueryRepository({
     const uniqueCompanyIds = [...new Set((companyIds || []).filter(Boolean).map((value) => String(value)))];
     if (!uniqueCompanyIds.length) return new Map();
     const result = await pool.query(
-      "SELECT id, company_name FROM companies WHERE id = ANY($1::int[])",
+      "SELECT id, \"companyName\" FROM companies WHERE id = ANY($1::int[])",
       [uniqueCompanyIds.map((value) => Number.parseInt(value, 10)).filter(Number.isFinite)]
     );
-    return new Map(result.rows.map((row) => [String(row.id), row.company_name || ""]));
+    return new Map(result.rows.map((row) => [String(row.id), row.companyName || ""]));
   }
 
   async function getPassportVersionsByLineage({ lineageId, passportType, companyId = null }) {
@@ -119,7 +119,7 @@ function createPassportQueryRepository({
     }
     const archiveRes = await pool.query(
       `SELECT "dppId", "lineageId", "companyId", "passportType", "versionNumber", "modelName", "internalAliasId", "productIdentifierDid", "releaseStatus", "archivedAt", "rowData"
-       FROM passport_archives
+       FROM "passportArchives"
        WHERE "lineageId" = $1
          AND "passportType" = $2${archiveCompanyFilter}
        ORDER BY "versionNumber" DESC, "archivedAt" DESC`,
@@ -163,7 +163,7 @@ function createPassportQueryRepository({
 
     if (!resolvedPassportType) {
       const regRes = await pool.query(
-        `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 AND "companyId" = $2`,
+        `SELECT "passportType" FROM "passportRegistry" WHERE "dppId" = $1 AND "companyId" = $2`,
         [dppId, companyId]
       );
       if (regRes.rows.length) resolvedPassportType = regRes.rows[0].passportType;
@@ -172,7 +172,7 @@ function createPassportQueryRepository({
     if (!resolvedPassportType) {
       const archiveTypeRes = await pool.query(
         `SELECT "passportType"
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE "dppId" = $1 AND "companyId" = $2
          ORDER BY "versionNumber" DESC, "archivedAt" DESC
          LIMIT 1`,
@@ -218,7 +218,7 @@ function createPassportQueryRepository({
     }
     const archiveRes = await pool.query(
       `SELECT pa."rowData"
-       FROM passport_archives pa
+       FROM "passportArchives" pa
        WHERE pa."dppId" = $1 AND pa."companyId" = $2 AND pa."passportType" = $3${archiveVersionSql}
        ORDER BY pa."versionNumber" DESC, pa."archivedAt" DESC
        LIMIT 1`,
@@ -241,7 +241,7 @@ function createPassportQueryRepository({
     if (!normalizedDppId) return { passport: null, archived: false };
 
     const reg = await pool.query(
-      `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 LIMIT 1`,
+      `SELECT "passportType" FROM "passportRegistry" WHERE "dppId" = $1 LIMIT 1`,
       [normalizedDppId]
     );
     if (!reg.rows.length) return { passport: null, archived: false };
@@ -269,8 +269,8 @@ function createPassportQueryRepository({
       `SELECT pa."rowData",
               pa."versionNumber",
               phv."isPublic" AS "isPublic"
-       FROM passport_archives pa
-       LEFT JOIN passport_history_visibility phv
+       FROM "passportArchives" pa
+       LEFT JOIN "passportHistoryVisibility" phv
          ON phv."passportDppId" = pa."dppId"
         AND phv."versionNumber" = pa."versionNumber"
        WHERE pa."dppId" = $1
@@ -320,7 +320,7 @@ function createPassportQueryRepository({
       ? 'pa."internalAliasId" = ANY($1::text[])'
       : '(pa."internalAliasId" = ANY($1::text[]) OR pa."productIdentifierDid" = ANY($1::text[]))';
 
-    const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM passport_types ORDER BY "typeName"');
+    const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM "passportTypes" ORDER BY "typeName"');
     const matches = [];
 
     for (const { typeName } of ptRows.rows) {
@@ -384,8 +384,8 @@ function createPassportQueryRepository({
                 pa."versionNumber",
                 pa."rowData",
                 phv."isPublic" AS "isPublic"
-         FROM passport_archives pa
-         LEFT JOIN passport_history_visibility phv
+         FROM "passportArchives" pa
+         LEFT JOIN "passportHistoryVisibility" phv
            ON phv."passportDppId" = pa."dppId"
           AND phv."versionNumber" = pa."versionNumber"
          WHERE ${archiveMatchSql}
@@ -428,7 +428,7 @@ function createPassportQueryRepository({
     if (!normalizedDppId) return { passport: null, archived: false };
 
     const reg = await pool.query(
-      `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 LIMIT 1`,
+      `SELECT "passportType" FROM "passportRegistry" WHERE "dppId" = $1 LIMIT 1`,
       [normalizedDppId]
     );
     if (!reg.rows.length) return { passport: null, archived: false };
@@ -455,7 +455,7 @@ function createPassportQueryRepository({
         const passport = { ...normalizePassportRow(liveRes.rows[0]), passportType };
         const visibilityRes = await pool.query(
           `SELECT "isPublic"
-           FROM passport_history_visibility
+           FROM "passportHistoryVisibility"
            WHERE "passportDppId" = $1 AND "versionNumber" = $2
            LIMIT 1`,
           [passport.dppId, versionNumber]
@@ -469,8 +469,8 @@ function createPassportQueryRepository({
       const archiveRes = await pool.query(
         `SELECT pa."rowData",
                 phv."isPublic" AS "isPublic"
-         FROM passport_archives pa
-         LEFT JOIN passport_history_visibility phv
+         FROM "passportArchives" pa
+         LEFT JOIN "passportHistoryVisibility" phv
            ON phv."passportDppId" = pa."dppId"
           AND phv."versionNumber" = pa."versionNumber"
          WHERE pa."lineageId" = $1
@@ -491,7 +491,7 @@ function createPassportQueryRepository({
       const passport = { ...normalizePassportRow(rowData), passportType, archived: true };
       const visibilityRes = await pool.query(
         `SELECT "isPublic"
-         FROM passport_history_visibility
+         FROM "passportHistoryVisibility"
          WHERE "passportDppId" = $1 AND "versionNumber" = $2
          LIMIT 1`,
         [passport.dppId, versionNumber]
@@ -513,7 +513,7 @@ function createPassportQueryRepository({
       internalAliasId: normalizedProductId,
     }) || [normalizedProductId];
 
-    const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM passport_types ORDER BY "typeName"');
+    const ptRows = await pool.query('SELECT "typeName" AS "typeName" FROM "passportTypes" ORDER BY "typeName"');
     const liveMatches = [];
 
     for (const { typeName } of ptRows.rows) {
@@ -556,7 +556,7 @@ function createPassportQueryRepository({
     for (const { typeName } of ptRows.rows) {
       const archiveRes = await pool.query(
         `SELECT "rowData"
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE "companyId" = $1
            AND "passportType" = $2
            AND ("internalAliasId" = ANY($3::text[]) OR "productIdentifierDid" = ANY($3::text[]))

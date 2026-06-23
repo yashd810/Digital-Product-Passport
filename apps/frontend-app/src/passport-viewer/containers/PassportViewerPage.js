@@ -24,7 +24,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Viewer state
-  const [lang,             setLang]             = useState(() => localStorage.getItem("dpp_lang") || "en");
+  const [lang,             setLang]             = useState(() => localStorage.getItem("dppLang") || "en");
   const [passport,         setPassport]         = useState(null);
   const [companyData,      setCompanyData]      = useState(null);
   const [typeDef,          setTypeDef]          = useState(null);
@@ -160,7 +160,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       .then((d) => {
         if (d) setCompanyData(d);
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [isPreviewMode, previewCompanyId]);
 
   useEffect(() => {
@@ -181,7 +181,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           internalAliasId: passport.internalAliasId,
           companyName: companyData?.companyName,
           manufacturerName: passport.manufacturer,
-          manufacturedBy: passport.manufactured_by,
+          manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
           granularity: passport.granularity || "item",
         });
@@ -195,7 +195,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
               passport.passportType,
               generatedBundle.carrierAuthenticity
             );
-          } catch {}
+          } catch (error) {
+            console.warn("Failed to save generated QR code", error);
+          }
         }
       } catch (e) {
         setQrCode(null);
@@ -204,7 +206,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         setQrLoading(false);
       }
     })();
-  }, [companyData?.companyName, passport?.dppId, passport?.manufactured_by, passport?.manufacturer, passport?.modelName, passport?.passportType, passport?.internalAliasId]);
+  }, [companyData?.companyName, passport?.dppId, passport?.manufacturedBy, passport?.manufacturer, passport?.modelName, passport?.passportType, passport?.internalAliasId]);
 
   // Fetch + poll dynamic field values every 30 s
   useEffect(() => {
@@ -213,7 +215,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       fetchWithAuth(`${API}/api/passports/${passport.dppId}/dynamic-values`)
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.values) setDynamicValues(d.values); })
-        .catch(() => {});
+        .catch((error) => console.warn("Ignored async error", error));
     fetchDynamic();
     const timer = setInterval(fetchDynamic, 30000);
     return () => clearInterval(timer);
@@ -225,7 +227,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     fetchWithAuth(`${API}/api/passports/${passport.dppId}/signature`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setSigVerification(d); })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [passport?.dppId, passport?.releaseStatus]);
 
   useEffect(() => {
@@ -234,7 +236,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     fetchWithAuth(`${API}/api/public/dpp/${passport.dppId}/verification-bundle.json`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d) setVerificationBundle(d); })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [passport?.dppId, passport?.releaseStatus]);
 
   // Fetch access-key metadata for logged-in company users.
@@ -245,7 +247,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     })
       .then(r => r.ok ? r.json() : null)
       .then((d) => { if (d) setPassportAccessKeyMeta(d); })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [passport?.dppId, passport?.companyId, isLoggedIn]);
 
   const handleRegenerateAccessKey = async () => {
@@ -301,21 +303,21 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const canonicalPublicPath = buildPublicPassportPath({
     companyName: companyData?.companyName,
     manufacturerName: passport?.manufacturer,
-    manufacturedBy: passport?.manufactured_by,
+    manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     internalAliasId: passport?.internalAliasId,
   });
   const canonicalTechnicalPath = buildTechnicalPassportPath({
     companyName: companyData?.companyName,
     manufacturerName: passport?.manufacturer,
-    manufacturedBy: passport?.manufactured_by,
+    manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     internalAliasId: passport?.internalAliasId,
   });
   const canonicalInactivePath = buildInactivePassportPath({
     companyName: companyData?.companyName,
     manufacturerName: passport?.manufacturer,
-    manufacturedBy: passport?.manufactured_by,
+    manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     internalAliasId: passport?.internalAliasId,
     versionNumber,
@@ -323,7 +325,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const canonicalInactiveTechnicalPath = buildInactiveTechnicalPassportPath({
     companyName: companyData?.companyName,
     manufacturerName: passport?.manufacturer,
-    manufacturedBy: passport?.manufactured_by,
+    manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     internalAliasId: passport?.internalAliasId,
     versionNumber,
@@ -331,7 +333,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const canonicalPreviewPath = buildPreviewPassportPath({
     companyName: companyData?.companyName,
     manufacturerName: passport?.manufacturer,
-    manufacturedBy: passport?.manufactured_by,
+    manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     internalAliasId: passport?.internalAliasId,
     previewId: passport?.dppId,
@@ -339,7 +341,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const canonicalPreviewTechnicalPath = buildPreviewTechnicalPassportPath({
     companyName: companyData?.companyName,
     manufacturerName: passport?.manufacturer,
-    manufacturedBy: passport?.manufactured_by,
+    manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
     internalAliasId: passport?.internalAliasId,
     previewId: passport?.dppId,

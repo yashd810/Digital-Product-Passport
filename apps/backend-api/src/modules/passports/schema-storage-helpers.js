@@ -16,14 +16,35 @@ function createSchemaStorageHelpers({
   LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS,
   IN_REVISION_STATUSES_SQL,
 }) {
+  function unquoteSqlIdentifier(identifier) {
+    return String(identifier || "").replace(/^"|"$/g, "").replace(/""/g, "\"");
+  }
+
+  function buildDbIndexName(...parts) {
+    const normalized = parts
+      .join(" ")
+      .replace(/[^A-Za-z0-9]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .map((part, index) => {
+        const lower = part.toLowerCase();
+        if (index === 0) return lower;
+        return `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
+      })
+      .join("");
+    const safe = normalized || "passportIndex";
+    return quoteSqlIdentifier(safe.slice(0, 60));
+  }
+
   async function getLiveTableColumnMap(tableName) {
+    const rawTableName = unquoteSqlIdentifier(tableName);
     const columns = await pool.query(
-      `SELECT column_name, data_type
+      `SELECT column_name AS "columnName", data_type AS "dataType"
        FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = $1`,
-      [tableName]
+      [rawTableName]
     );
-    return new Map(columns.rows.map((row) => [row.column_name, row.data_type]));
+    return new Map(columns.rows.map((row) => [row.columnName, row.dataType]));
   }
 
   async function getLatestCompanyPassports({ companyId, passportType }) {
@@ -40,7 +61,7 @@ function createSchemaStorageHelpers({
       const normalized = normalizePassportRow(row);
       return {
         ...normalized,
-        is_editable: isEditablePassportStatus(normalized.releaseStatus),
+        isEditable: isEditablePassportStatus(normalized.releaseStatus),
       };
     });
   }
@@ -136,7 +157,7 @@ function createSchemaStorageHelpers({
     if (liveCount > 0) return true;
 
     const archivedCount = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM passport_archives WHERE \"passportType\" = $1",
+      "SELECT COUNT(*)::int AS count FROM \"passportArchives\" WHERE \"passportType\" = $1",
       [typeName]
     ).then((result) => Number(result.rows[0]?.count) || 0).catch(() => 0);
     return archivedCount > 0;
@@ -150,9 +171,9 @@ function createSchemaStorageHelpers({
     changeSummary = {},
     createdBy = null,
   }) {
-    const typeRes = await pool.query('SELECT id FROM passport_types WHERE "typeName" = $1', [typeName]).catch(() => ({ rows: [] }));
+    const typeRes = await pool.query('SELECT id FROM "passportTypes" WHERE "typeName" = $1', [typeName]).catch(() => ({ rows: [] }));
     await pool.query(
-      `INSERT INTO passport_type_schema_events
+      `INSERT INTO "passportTypeSchemaEvents"
          ("passportTypeId", "typeName", "tableName", "schemaVersion", "eventType", "changeSummary", "createdBy")
        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
       [
@@ -169,7 +190,7 @@ function createSchemaStorageHelpers({
 
   function buildQueryableIndexName(tableName, fieldKey) {
     const digest = nodeCrypto.createHash("sha1").update(`${tableName}:${fieldKey}`).digest("hex").slice(0, 10);
-    return `idx_${digest}_${fieldKey}`.slice(0, 60);
+    return buildDbIndexName("idx", digest, fieldKey);
   }
 
   async function ensureQueryableFieldIndex({ tableName, field }) {
@@ -183,14 +204,15 @@ function createSchemaStorageHelpers({
     return indexName;
   }
 
-  async function createPassportTable(typeName, { createdBy = null, eventType = "create_or_reconcile_table" } = {}) {
+  async function createPassportTable(typeName, { createdBy = null, eventType = "createOrReconcileTable" } = {}) {
     const tableName = getTable(typeName);
+    const rawTableName = unquoteSqlIdentifier(tableName);
     const typeRes = await pool.query(
-      'SELECT "fieldsJson" AS "fieldsJson" FROM passport_types WHERE "typeName" = $1',
+      'SELECT "fieldsJson" AS "fieldsJson" FROM "passportTypes" WHERE "typeName" = $1',
       [typeName]
     );
     if (!typeRes.rows.length)
-      throw new Error(`Passport type '${typeName}' not found in passport_types`);
+      throw new Error(`Passport type '${typeName}' not found in passportTypes`);
 
     const sections = typeRes.rows[0].fieldsJson?.sections || [];
     const ddlCols = [];
@@ -230,13 +252,12 @@ function createSchemaStorageHelpers({
       )
     `);
 
-    await pool.query(`ALTER TABLE ${tableName} DROP CONSTRAINT IF EXISTS ${tableName}_guid_key`);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_dpp_id_version_unique ON ${tableName}("dppId", "versionNumber") WHERE "deletedAt" IS NULL`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_company ON ${tableName}("companyId")`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_dpp_id ON ${tableName}("dppId") WHERE "deletedAt" IS NULL`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_lineage ON ${tableName}("lineageId") WHERE "deletedAt" IS NULL`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_status ON ${tableName}("releaseStatus") WHERE "deletedAt" IS NULL`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_${tableName}_product_identifier_did ON ${tableName}("companyId", "uniqueProductIdentifier") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ${buildDbIndexName(rawTableName, "dpp", "version", "unique")} ON ${tableName}("dppId", "versionNumber") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ${buildDbIndexName(rawTableName, "company")} ON ${tableName}("companyId")`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ${buildDbIndexName(rawTableName, "dpp")} ON ${tableName}("dppId") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ${buildDbIndexName(rawTableName, "lineage")} ON ${tableName}("lineageId") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ${buildDbIndexName(rawTableName, "status")} ON ${tableName}("releaseStatus") WHERE "deletedAt" IS NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS ${buildDbIndexName(rawTableName, "product", "identifier", "did")} ON ${tableName}("companyId", "uniqueProductIdentifier") WHERE "deletedAt" IS NULL`);
 
     for (const [columnName, columnDefinition] of LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS) {
       await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(columnName)} ${columnDefinition}`);
@@ -256,7 +277,7 @@ function createSchemaStorageHelpers({
 
     await recordPassportTypeSchemaEvent({
       typeName,
-      tableName,
+      tableName: rawTableName,
       schemaVersion: getTypeSchemaVersion(typeRes.rows[0].fieldsJson),
       eventType,
       changeSummary: { ensuredColumns: addedColumns, indexedColumns },
@@ -267,26 +288,27 @@ function createSchemaStorageHelpers({
   async function migratePassportStorageToSchemaKeys({ apply = false, includeArchives = true } = {}) {
     const typeRows = await pool.query(
       `SELECT "typeName" AS "typeName", "fieldsJson" AS "fieldsJson"
-       FROM passport_types
+       FROM "passportTypes"
        ORDER BY "typeName"`
     );
     const results = [];
 
     for (const typeRow of typeRows.rows) {
       const tableName = getTable(typeRow.typeName);
+      const rawTableName = unquoteSqlIdentifier(tableName);
       const tableExists = await pool.query(
         `SELECT 1
          FROM information_schema.tables
          WHERE table_schema = 'public' AND table_name = $1
          LIMIT 1`,
-        [tableName]
+        [rawTableName]
       ).then((result) => result.rows.length > 0);
 
       if (!tableExists) {
         results.push({
           typeName: typeRow.typeName,
-          tableName,
-          status: "skipped_missing_table",
+          tableName: rawTableName,
+          status: "skippedMissingTable",
           columnRenames: [],
           archiveKeyUpdates: [],
         });
@@ -301,7 +323,7 @@ function createSchemaStorageHelpers({
       results.push({
         typeName: typeRow.typeName,
         tableName,
-        status: missingExactColumns.length ? "missing_exact_columns" : "ok",
+        status: missingExactColumns.length ? "missingExactColumns" : "ok",
         missingExactColumns,
         columnRenames: [],
         archiveKeyUpdates: [],
@@ -319,25 +341,26 @@ function createSchemaStorageHelpers({
   }
 
   async function validatePassportTypeStorage({ repair = false } = {}) {
-    const typeRows = await pool.query('SELECT id, "typeName" AS "typeName", "fieldsJson" AS "fieldsJson" FROM passport_types ORDER BY "typeName"');
+    const typeRows = await pool.query('SELECT id, "typeName" AS "typeName", "fieldsJson" AS "fieldsJson" FROM "passportTypes" ORDER BY "typeName"');
     const results = [];
 
     for (const typeRow of typeRows.rows) {
       const tableName = getTable(typeRow.typeName);
+      const rawTableName = unquoteSqlIdentifier(tableName);
       const tableExists = await pool.query(
         `SELECT 1
          FROM information_schema.tables
          WHERE table_schema = 'public' AND table_name = $1
          LIMIT 1`,
-        [tableName]
+        [rawTableName]
       ).then((result) => result.rows.length > 0);
 
       if (!tableExists) {
         if (repair) {
           await createPassportTable(typeRow.typeName);
-          results.push({ typeName: typeRow.typeName, tableName, status: "repaired_missing_table", issues: [] });
+          results.push({ typeName: typeRow.typeName, tableName: rawTableName, status: "repairedMissingTable", issues: [] });
         } else {
-          results.push({ typeName: typeRow.typeName, tableName, status: "failed", issues: [{ type: "missing_table" }] });
+          results.push({ typeName: typeRow.typeName, tableName: rawTableName, status: "failed", issues: [{ type: "missingTable" }] });
         }
         continue;
       }
@@ -351,27 +374,27 @@ function createSchemaStorageHelpers({
         const actualDataType = columnMap.get(field.key);
         const expectedDataType = getPassportFieldDataType(field);
         if (!actualDataType) {
-          issues.push({ type: "missing_column", field: field.key, expectedDataType });
+          issues.push({ type: "missingColumn", field: field.key, expectedDataType });
           continue;
         }
         const normalizedActual = actualDataType === "boolean" ? "boolean" : actualDataType === "jsonb" ? "jsonb" : "text";
         if (normalizedActual !== expectedDataType) {
-          issues.push({ type: "column_type_mismatch", field: field.key, expectedDataType, actualDataType });
+          issues.push({ type: "columnTypeMismatch", field: field.key, expectedDataType, actualDataType });
         }
       }
 
       for (const columnName of columnMap.keys()) {
         if (LIVE_PASSPORT_SYSTEM_COLUMNS.has(columnName) || expectedFieldKeys.has(columnName)) continue;
-        issues.push({ type: "extra_column", field: columnName });
+        issues.push({ type: "extraColumn", field: columnName });
       }
 
-      if (repair && issues.some((issue) => issue.type === "missing_column")) {
+      if (repair && issues.some((issue) => issue.type === "missingColumn")) {
         await createPassportTable(typeRow.typeName);
       }
 
       results.push({
         typeName: typeRow.typeName,
-        tableName,
+        tableName: rawTableName,
         schemaVersion: getTypeSchemaVersion(typeRow.fieldsJson),
         status: issues.length ? "failed" : "ok",
         issues,
@@ -379,7 +402,7 @@ function createSchemaStorageHelpers({
     }
 
     return {
-      success: results.every((result) => result.status === "ok" || result.status === "repaired_missing_table"),
+      success: results.every((result) => result.status === "ok" || result.status === "repairedMissingTable"),
       checked: results.length,
       results,
     };
@@ -399,7 +422,7 @@ function createSchemaStorageHelpers({
         COUNT(CASE WHEN "releaseStatus" = 'draft'     THEN 1 END) AS draft,
         COUNT(CASE WHEN "releaseStatus" = 'released'  THEN 1 END) AS released,
         COUNT(CASE WHEN "releaseStatus" IN ${IN_REVISION_STATUSES_SQL} THEN 1 END) AS revised,
-        COUNT(CASE WHEN "releaseStatus" = 'in_review' THEN 1 END) AS in_review,
+        COUNT(CASE WHEN "releaseStatus" = 'inReview' THEN 1 END) AS inReview,
         COUNT(CASE WHEN "releaseStatus" = 'obsolete'  THEN 1 END) AS obsolete
       FROM ${tableName}
       WHERE "deletedAt" IS NULL${companyFilter}
@@ -410,7 +433,7 @@ function createSchemaStorageHelpers({
       draft: parseInt(row.draft),
       released: parseInt(row.released),
       revised: parseInt(row.revised),
-      in_review: parseInt(row.in_review),
+      inReview: parseInt(row.inReview),
       obsolete: parseInt(row.obsolete),
     };
   }

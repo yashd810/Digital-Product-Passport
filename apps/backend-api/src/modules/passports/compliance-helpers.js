@@ -58,16 +58,16 @@ function createComplianceHelpers({
   async function getCompanyDppPolicy(companyId) {
     const result = await pool.query(
       `SELECT c.id,
-              COALESCE(p.default_granularity, 'item') AS "defaultGranularity",
-              COALESCE(p.allow_granularity_override, false) AS "allowGranularityOverride",
-              COALESCE(p.mint_model_dids, true) AS "mintModelDids",
-              COALESCE(p.mint_item_dids, true) AS "mintItemDids",
-              COALESCE(p.mint_facility_dids, false) AS "mintFacilityDids",
-              COALESCE(p.vc_issuance_enabled, true) AS "vcIssuanceEnabled",
-              COALESCE(p.jsonld_export_enabled, true) AS "jsonldExportEnabled",
-              COALESCE(p.semantic_dictionary_enabled, true) AS "semanticDictionaryEnabled"
+              COALESCE(p."defaultGranularity", 'item') AS "defaultGranularity",
+              COALESCE(p."allowGranularityOverride", false) AS "allowGranularityOverride",
+              COALESCE(p."mintModelDids", true) AS "mintModelDids",
+              COALESCE(p."mintItemDids", true) AS "mintItemDids",
+              COALESCE(p."mintFacilityDids", false) AS "mintFacilityDids",
+              COALESCE(p."vcIssuanceEnabled", true) AS "vcIssuanceEnabled",
+              COALESCE(p."jsonldExportEnabled", true) AS "jsonldExportEnabled",
+              COALESCE(p."semanticDictionaryEnabled", true) AS "semanticDictionaryEnabled"
        FROM companies c
-       LEFT JOIN company_dpp_policies p ON p.company_id = c.id
+       LEFT JOIN "companyDppPolicies" p ON p."companyId" = c.id
        WHERE c.id = $1
        LIMIT 1`,
       [companyId]
@@ -86,12 +86,12 @@ function createComplianceHelpers({
   async function loadCompanySerializationContext(companyId) {
     const result = await pool.query(
       `SELECT c.id,
-              c.company_name AS "companyName",
-              c.did_slug AS "didSlug",
-              COALESCE(p.default_granularity, 'item') AS "dppGranularity",
-              COALESCE(p.default_granularity, 'item') AS "defaultGranularity"
+              c."companyName" AS "companyName",
+              c."didSlug" AS "didSlug",
+              COALESCE(p."defaultGranularity", 'item') AS "dppGranularity",
+              COALESCE(p."defaultGranularity", 'item') AS "defaultGranularity"
        FROM companies c
-       LEFT JOIN company_dpp_policies p ON p.company_id = c.id
+       LEFT JOIN "companyDppPolicies" p ON p."companyId" = c.id
        WHERE c.id = $1
        LIMIT 1`,
       [companyId]

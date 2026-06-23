@@ -2,7 +2,7 @@
 
 const { rewriteRepositoryLinksDeep } = require("../repository/repository-file-links");
 
-const IN_REVISION_STATUS = "in_revision";
+const IN_REVISION_STATUS = "inRevision";
 
 const SYSTEM_PASSPORT_FIELDS = new Set([
   "id",
@@ -40,6 +40,25 @@ const SYSTEM_PASSPORT_FIELDS = new Set([
 
 const EDITABLE_PASSPORT_STATUSES = new Set(["draft", IN_REVISION_STATUS]);
 
+const parseJsonOrFallback = (value, fallback = value) => {
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return fallback;
+  }
+};
+
+const quoteSqlIdentifier = (value) => {
+  const identifier = String(value || "").trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+    throw new Error(`Invalid SQL identifier: ${identifier}`);
+  }
+  return `"${identifier.replace(/"/g, "\"\"")}"`;
+};
+
+const joinQuotedSqlIdentifiers = (identifiers = []) =>
+  identifiers.map((identifier) => quoteSqlIdentifier(identifier)).join(", ");
+
 const toStorageSlug = (typeName) =>
   String(typeName || "")
     .trim()
@@ -49,12 +68,21 @@ const toStorageSlug = (typeName) =>
     .replace(/^_+|_+$/g, "")
     .toLowerCase();
 
+const toCamelIdentifier = (value) => {
+  const parts = String(value || "").split("_").filter(Boolean);
+  return parts.map((part, index) => {
+    const lower = part.toLowerCase();
+    if (index === 0) return lower;
+    return `${lower.charAt(0).toUpperCase()}${lower.slice(1)}`;
+  }).join("");
+};
+
 const getTable = (typeName) => {
   if (!typeName) throw new Error("typeName is required for table lookup");
   const safe = toStorageSlug(typeName);
   if (!safe) throw new Error("typeName must contain at least one alphanumeric character");
   const identifierSafeSlug = /^[a-z]/.test(safe) ? safe : `type_${safe}`;
-  return `${identifierSafeSlug}_passports`;
+  return quoteSqlIdentifier(`${toCamelIdentifier(identifierSafeSlug)}Passports`);
 };
 
 const normalizeReleaseStatus = (status) => status;
@@ -127,17 +155,6 @@ const mapPassportTypeRow = (row = {}) => ({
   updatedAt: row.updatedAt ?? null,
 });
 
-const quoteSqlIdentifier = (value) => {
-  const identifier = String(value || "").trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
-    throw new Error(`Invalid SQL identifier: ${identifier}`);
-  }
-  return `"${identifier.replace(/"/g, "\"\"")}"`;
-};
-
-const joinQuotedSqlIdentifiers = (identifiers = []) =>
-  identifiers.map((identifier) => quoteSqlIdentifier(identifier)).join(", ");
-
 const getDisplayName = (rowData = {}) => {
   const explicitName = typeof rowData.createdByName === "string" ? rowData.createdByName.trim() : "";
   if (explicitName) return explicitName;
@@ -171,21 +188,15 @@ const normalizePassportRow = (row, schema) => {
 
     for (const key of jsonbFields) {
       if (typeof rowData[key] === "string" && rowData[key]) {
-        try {
-          rowData[key] = JSON.parse(rowData[key]);
-        } catch {}
+        rowData[key] = parseJsonOrFallback(rowData[key]);
       }
     }
   } else {
     for (const [key, value] of Object.entries(rowData)) {
       if (typeof value === "string" && value && value.trim().startsWith("{")) {
-        try {
-          rowData[key] = JSON.parse(value);
-        } catch {}
+        rowData[key] = parseJsonOrFallback(value);
       } else if (typeof value === "string" && value && value.trim().startsWith("[")) {
-        try {
-          rowData[key] = JSON.parse(value);
-        } catch {}
+        rowData[key] = parseJsonOrFallback(value);
       }
     }
   }
@@ -391,7 +402,9 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
   let pathname = rawPath;
   try {
     pathname = new URL(rawPath, didService?.getPublicOrigin?.() || "http://localhost").pathname || rawPath;
-  } catch {}
+  } catch (_error) {
+    pathname = rawPath;
+  }
 
   const currentMatch = pathname.match(/^\/dpp\/([^/]+)\/([^/]+)\/([^/]+)$/i);
   const inactiveMatch = pathname.match(/^\/dpp\/inactive\/([^/]+)\/([^/]+)\/([^/]+)\/([^/]+)$/i);
@@ -406,8 +419,8 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
 
   const companyRows = await pool.query(
     `SELECT id,
-            company_name AS "companyName",
-            did_slug AS "didSlug"
+            "companyName" AS "companyName",
+            "didSlug" AS "didSlug"
      FROM companies
      ORDER BY id ASC`
   );
@@ -422,7 +435,7 @@ async function resolvePublicPathToSubjects({ pool, publicPath, getTable, didServ
   for (const company of matchingCompanies) {
     const registryRows = await pool.query(
       `SELECT "dppId", "passportType"
-       FROM passport_registry
+       FROM "passportRegistry"
        WHERE "companyId" = $1
        ORDER BY "createdAt" DESC`,
       [company.id]
@@ -652,12 +665,10 @@ const coerceAssetFieldValue = (fieldDef, rawValue) => {
         : { ok: false, error: `Expected table rows as objects for ${fieldDef?.label || fieldDef?.key}` };
     }
     if (typeof rawValue === "string") {
-      try {
-        const parsed = JSON.parse(rawValue);
-        if (Array.isArray(parsed) && parsed.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
-          return { ok: true, value: parsed };
-        }
-      } catch {}
+      const parsed = parseJsonOrFallback(rawValue, null);
+      if (Array.isArray(parsed) && parsed.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
+        return { ok: true, value: parsed };
+      }
     }
     return { ok: false, error: `Expected table rows as a JSON array of objects for ${fieldDef?.label || fieldDef?.key}` };
   }

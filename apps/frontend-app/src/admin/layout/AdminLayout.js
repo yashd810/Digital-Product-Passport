@@ -23,7 +23,7 @@ function AdminLayout({ user, onLogout }) {
   const handleThemeToggle = () => {
     const next = currentTheme === "dark" ? "light" : "dark";
     setCurrentTheme(next);
-    localStorage.setItem(`dpp_theme_${user?.id}`, next);
+    localStorage.setItem(`dppTheme:${user?.id}`, next);
     applyTheme(next);
   };
 

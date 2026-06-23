@@ -21,16 +21,16 @@ const HEADER_SLOT_DEFINITIONS = [
 
 const sample = {
   module: {
-    family: "electronics",
+    family: "example-product",
     version: "v1",
-    moduleKey: "electronics:v1",
-    typeName: "electronicsPassportV1",
-    displayName: "Electronics Passport v1",
-    productCategory: "Electronics",
-    productIcon: "EL",
-    semanticModelKey: "electronics_dictionary_v1",
-    passportPolicyKey: "electronicsDppV1",
-    defaultCarrierPolicyKey: "web_public_entry_v1",
+    moduleKey: "example-product:v1",
+    typeName: "exampleProductPassportV1",
+    displayName: "Example Product Passport v1",
+    productCategory: "Example Product",
+    productIcon: "EX",
+    semanticModelKey: "exampleProductDictionaryV1",
+    passportPolicyKey: "exampleProductDppV1",
+    defaultCarrierPolicyKey: "webPublicEntryV1",
     systemHeaderFieldAssignments: {
       digitalProductPassportId: "__managed__:internalManagedDigitalProductPassportId",
       uniqueProductIdentifier: "__managed__:internalManagedUniqueProductIdentifier",
@@ -47,15 +47,15 @@ const sample = {
       companyDid: "__managed__:internalManagedCompanyDid",
     },
     baseUrl: "https://www.claros-dpp.online",
-    dictionaryName: "Electronics Dictionary",
-    dictionaryDescription: "Internal electronics passport dictionary used for Digital Product Passport implementations.",
+    dictionaryName: "Example Product Dictionary",
+    dictionaryDescription: "Starter dictionary for a new Digital Product Passport module.",
   },
   roles: {
-    businessIdentifierField: "productModelIdentifier",
+    businessIdentifierField: "modelIdentifier",
     summaryRoles: {
-      productModelIdentifier: "card1",
-      ratedPower: "card2",
-      electronicsCategory: "card3",
+      modelIdentifier: "card1",
+      performanceScore: "card2",
+      productCategoryDetail: "card3",
     },
     lifecycleRoles: {},
     compositionFieldKey: "",
@@ -64,15 +64,15 @@ const sample = {
   },
   sections: [
     {
-      key: "electronicsIdentity",
-      label: "Electronics Identity",
+      key: "productIdentity",
+      label: "Product Identity",
       fields: [
         {
-          fieldKey: "electronicsCategory",
-          fieldLabel: "Electronics Category",
+          fieldKey: "productCategoryDetail",
+          fieldLabel: "Product Category Detail",
           fieldType: "text",
-          semanticSlug: "electronics-category",
-          definition: "Classifies the electronics product category used for requirement and reporting policies.",
+          semanticSlug: "product-category-detail",
+          definition: "Classifies the product category used for requirement and reporting policies.",
           dataType: "string",
           categoryKey: "product-identification",
           categoryLabel: "Product Identification",
@@ -80,11 +80,11 @@ const sample = {
           accessRights: "public",
         },
         {
-          fieldKey: "productModelIdentifier",
-          fieldLabel: "Product Model Identifier",
+          fieldKey: "modelIdentifier",
+          fieldLabel: "Model Identifier",
           fieldType: "text",
-          semanticSlug: "product-model-identifier",
-          definition: "Identifies the electronics product model that the passport describes.",
+          semanticSlug: "model-identifier",
+          definition: "Identifies the product model that the passport describes.",
           dataType: "string",
           categoryKey: "product-identification",
           categoryLabel: "Product Identification",
@@ -106,21 +106,21 @@ const sample = {
       ],
     },
     {
-      key: "technicalCharacteristics",
-      label: "Technical Characteristics",
+      key: "performanceCharacteristics",
+      label: "Performance Characteristics",
       fields: [
         {
-          fieldKey: "ratedPower",
-          fieldLabel: "Rated Power",
+          fieldKey: "performanceScore",
+          fieldLabel: "Performance Score",
           fieldType: "text",
-          semanticSlug: "rated-power",
-          definition: "Declared rated power for the electronics product.",
+          semanticSlug: "performance-score",
+          definition: "Declared performance score for the product.",
           dataType: "number",
-          categoryKey: "technical-characteristics",
-          categoryLabel: "Technical Characteristics",
-          unitKey: "watt",
-          unitLabel: "Watt",
-          unitSymbol: "W",
+          categoryKey: "performance-characteristics",
+          categoryLabel: "Performance Characteristics",
+          unitKey: "percent",
+          unitLabel: "Percent",
+          unitSymbol: "%",
           accessRights: "public",
         },
       ],
@@ -198,7 +198,7 @@ function createBlankSpec() {
       productIcon: "",
       semanticModelKey: "",
       passportPolicyKey: "",
-      defaultCarrierPolicyKey: "web_public_entry_v1",
+      defaultCarrierPolicyKey: "webPublicEntryV1",
       systemHeaderFieldAssignments: Object.fromEntries(
         HEADER_SLOT_DEFINITIONS.map((slot) => [slot.slotKey, `__managed__:${slot.managedKey}`])
       ),
@@ -582,12 +582,6 @@ function unitKeyFromLabel(value) {
   return slug || "none";
 }
 
-function snakeCaseFromValue(value) {
-  return splitWords(value)
-    .map((word) => word.toLowerCase())
-    .join("_");
-}
-
 function trackManualInput(input) {
   if (!input || input.dataset.manualBound === "true") return;
   input.dataset.manualBound = "true";
@@ -623,7 +617,6 @@ function bindDerivedInput(input, computeValue, sources = []) {
 function maybeAutoModuleValues() {
   const family = getFormValue("family");
   const version = getFormValue("version") || "v1";
-  const familySnake = snakeCaseFromValue(family);
   const familyCamel = camelCaseFromWords(family);
   const versionPascal = pascalCaseFromWords(version);
   const title = titleCase(family);
@@ -632,7 +625,7 @@ function maybeAutoModuleValues() {
   autoFillInput($("#typeName"), familyCamel && versionPascal ? `${familyCamel}Passport${versionPascal}` : "");
   autoFillInput($("#displayName"), title && version ? `${title} Passport ${version}` : "");
   autoFillInput($("#productCategory"), title);
-  autoFillInput($("#semanticModelKey"), familySnake && version ? `${familySnake}_dictionary_${version}` : "");
+  autoFillInput($("#semanticModelKey"), familyCamel && versionPascal ? `${familyCamel}Dictionary${versionPascal}` : "");
   autoFillInput($("#passportPolicyKey"), familyCamel && versionPascal ? `${familyCamel}Dpp${versionPascal}` : "");
   autoFillInput($("#dictionaryName"), title ? `${title} Dictionary` : "");
 }
@@ -1135,8 +1128,8 @@ function addField(sectionNode, data = {}) {
   node.addEventListener("input", () => applySectionFilters(sectionNode));
   node.addEventListener("change", () => applySectionFilters(sectionNode));
 
-  (data.tableColumns || data.table_columns || []).forEach((column) => addTableColumn(node, column));
-  if ((data.tableColumns || data.table_columns || []).length === 0) {
+  (data.tableColumns || []).forEach((column) => addTableColumn(node, column));
+  if ((data.tableColumns || []).length === 0) {
     syncTableConfigVisibility(node);
   } else {
     const panel = $("[data-table-config]", node);
@@ -1295,7 +1288,7 @@ function downloadFieldsCsvTemplate() {
   const templateRows = [
     {
       fieldLabel: "Manufacturer Name",
-      sectionLabel: "Electronics Identity",
+      sectionLabel: "Product Identity",
       fieldType: "text",
       definition: "Name of the manufacturer responsible for placing the product on the market.",
       categoryLabel: "Product Identification",

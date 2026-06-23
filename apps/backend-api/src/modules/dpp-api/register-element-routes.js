@@ -131,10 +131,10 @@ module.exports = function registerElementRoutes(app, deps) {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
       const requestedElementIdPath = decodeURIComponent(req.params.elementIdPath || "");
-      const companyId = req.user.role === "super_admin" ?
+      const companyId = req.user.role === "superAdmin" ?
         req.query.companyId ? Number.parseInt(req.query.companyId, 10) : null :
         Number.parseInt(req.user.companyId, 10);
-      if (req.query.companyId && !Number.isFinite(companyId) && req.user.role === "super_admin") {
+      if (req.query.companyId && !Number.isFinite(companyId) && req.user.role === "superAdmin") {
         return res.status(400).json({ error: "Invalid companyId" });
       }
       if (!parseDppIdentifier(dppId)) {
@@ -149,7 +149,7 @@ module.exports = function registerElementRoutes(app, deps) {
       if (!editable?.passport) {
         return res.status(404).json({ error: "Editable passport not found. Create or revise a draft before updating elements." });
       }
-      if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
+      if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
         return res.status(403).json({ error: "Forbidden" });
       }
       if (!isEditablePassportStatus(editable.passport.releaseStatus)) {

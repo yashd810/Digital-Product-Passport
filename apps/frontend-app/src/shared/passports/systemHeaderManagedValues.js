@@ -26,7 +26,7 @@ export function resolveManagedSystemHeaderValue(managedKey, {
     typeDef?.fieldsJson?.passportPolicy?.contentSpecificationIds
     || typeDef?.passportPolicy?.contentSpecificationIds
     || null;
-  const canonicalSubjects = passport?.linked_data?.canonical_subjects || {};
+  const canonicalSubjects = passport?.linkedData?.canonicalSubjects || {};
   const resolvedCompanyDid = passport?.companyDid || canonicalSubjects.companyDid || null;
   const resolvedFacilityDid = passport?.facilityDid || canonicalSubjects.facilityDid || null;
   const resolvedSubjectDid = passport?.subjectDid || canonicalSubjects.subjectDid || null;

@@ -22,9 +22,9 @@ These live in `apps/backend-api/scripts/`.
 | `check-js-style.js` | style consistency checks |
 | `check-module-boundaries.js` | verifies backend layering rules |
 | `check-passport-storage.js` | checks or repairs passport storage consistency |
-| `repair-passport-signatures.js` | repairs or refreshes signature-related state |
 | `db-backup-object-storage.js` | backup/object storage operations |
-| `migrate-*-camelcase.js` | one-time or targeted field/schema migration helpers |
+
+The fresh database path uses camelCase tables, columns, API fields, and generated schema keys. See `docs/development/camel-case-policy.md` before adding new persistence or payload fields.
 
 ## Local Tool
 

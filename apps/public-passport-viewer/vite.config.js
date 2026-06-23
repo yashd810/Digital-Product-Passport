@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { defineConfig, transformWithEsbuild } from "vite";
+import { defineConfig, transformWithOxc } from "vite";
 import react from "@vitejs/plugin-react";
 
 const localFrontendSrc = path.resolve(__dirname, "./frontend-app/src");
@@ -19,13 +19,21 @@ export default defineConfig({
       enforce: "pre",
       async transform(code, id) {
         const isJsSource =
-          id.match(/\/src\/.*\.[mc]?jsx?$/) ||
-          (id.startsWith(frontendSrc) && id.match(/\.[mc]?jsx?$/));
+          id.match(/\/src\/.*\.js$/) ||
+          (id.startsWith(frontendSrc) && id.match(/\.js$/));
         if (!isJsSource) return null;
-        return transformWithEsbuild(code, id, { loader: "jsx" });
+        return transformWithOxc(code, id, {
+          lang: "jsx",
+          jsx: {
+            runtime: "automatic",
+            importSource: "react",
+          },
+        });
       },
     },
-    react(),
+    react({
+      include: /\.(js|jsx|mjs|cjs|ts|tsx)$/,
+    }),
   ],
   resolve: {
     alias: [
@@ -49,15 +57,8 @@ export default defineConfig({
       ],
     },
   },
-  optimizeDeps: {
-    esbuildOptions: {
-      loader: {
-        ".js": "jsx",
-      },
-    },
-  },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;

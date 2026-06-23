@@ -22,7 +22,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d) setDeviceKeyMeta(d); })
-      .catch(() => {})
+      .catch((error) => console.warn("Ignored async error", error))
       .finally(() => setLoading(false));
 
     fetchWithAuth(`${API}/api/passport-types/${passportType}`)
@@ -32,7 +32,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
         const sections = d.fieldsJson?.sections || [];
         setDynFields(sections.flatMap((section) => section.fields || []).filter((field) => field.dynamic));
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
 
     fetchWithAuth(`${API}/api/passports/${passport.dppId}/dynamic-values`)
       .then((r) => r.ok ? r.json() : null)
@@ -43,7 +43,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
           setManualVals(vals);
         }
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [companyId, passport.dppId, passportType]);
 
   useEffect(() => {
@@ -71,8 +71,9 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
           lastRotatedAt: d.lastRotatedAt || new Date().toISOString(),
         });
       }
-    } catch {}
-    finally { setRegenerating(false); }
+    } catch (error) {
+      console.warn("Failed to regenerate device key", error);
+    } finally { setRegenerating(false); }
   };
 
   const handleSaveManual = async () => {

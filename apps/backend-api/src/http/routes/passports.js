@@ -120,7 +120,7 @@ module.exports = function registerPassportRoutes(app, {
     client: params.client || pool,
   });
 
-  const ARCHIVED_HISTORY_REASON_SQL = `('before_archive_delete','before_bulk_archive_delete','before_delete','before_bulk_delete')`;
+  const ARCHIVED_HISTORY_REASON_SQL = `('beforeArchiveDelete','beforeBulkArchiveDelete','beforeDelete','beforeBulkDelete')`;
   const ARCHIVED_HISTORY_FILTER_SQL = `("snapshotReason" IN ${ARCHIVED_HISTORY_REASON_SQL})`;
   const {
     buildApiKeyFieldWriteDecision,
@@ -153,6 +153,7 @@ module.exports = function registerPassportRoutes(app, {
     recordPassportSecurityEvent,
   } = createCarrierSecurityHelpers({
     pool,
+    logger,
     normalizeReleaseStatus,
     buildCurrentPublicPassportPath,
     buildPreviewPassportPath,

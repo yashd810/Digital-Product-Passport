@@ -47,12 +47,12 @@ test("import guardrails allow schema fields and explicit import controls", () =>
 test("import guardrails reject managed fields even if the passport schema exposes them", () => {
   const typeSchema = createTypeSchema();
   const fields = {
-    passportPolicyKey: "client_profile",
-    contentSpecificationIds: ["client_spec"],
-    carrierPolicyKey: "client_policy",
-    economicOperatorId: "client_operator",
+    passportPolicyKey: "clientProfile",
+    contentSpecificationIds: ["clientSpec"],
+    carrierPolicyKey: "clientPolicy",
+    economicOperatorId: "clientOperator",
     economicOperatorIdentifierScheme: "GLN",
-    facilityId: "client_facility",
+    facilityId: "clientFacility",
     uniqueProductIdentifier: "did:example:client",
     releaseStatus: "released",
     versionNumber: 99,

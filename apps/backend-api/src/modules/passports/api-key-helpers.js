@@ -2,10 +2,10 @@ function createApiKeyHelpers({ accessRightsService, crypto }) {
   const ALLOWED_API_KEY_SCOPES = new Set(["dpp:read", "dpp:update", "dpp:history:read", "dpp:element:read", "*"]);
   const API_KEY_PREFIX_LENGTH = 16;
   const API_KEY_ALLOWED_OPERATOR_TYPES = new Set(
-    [...accessRightsService.VALID_AUDIENCES].filter((audience) => audience !== "consumers" && audience !== "legitimate_interest")
+    [...accessRightsService.VALID_AUDIENCES].filter((audience) => audience !== "consumers" && audience !== "legitimateInterest")
   );
   const API_KEY_ACCESS_MODES = new Set(["read", "update"]);
-  const API_KEY_CONFIDENTIALITY_LEVELS = ["public", "restricted", "confidential", "trade_secret", "regulated"];
+  const API_KEY_CONFIDENTIALITY_LEVELS = ["public", "restricted", "confidential", "tradeSecret", "regulated"];
   const API_KEY_CONFIDENTIALITY_RANK = new Map(
     API_KEY_CONFIDENTIALITY_LEVELS.map((level, index) => [level, index])
   );
@@ -26,7 +26,7 @@ function createApiKeyHelpers({ accessRightsService, crypto }) {
 
   function normalizeApiKeyOperatorType(value) {
     const normalized = String(value || "").trim();
-    return normalized || "economic_operator";
+    return normalized || "economicOperator";
   }
 
   function parseApiKeyOperatorType(value) {
@@ -74,7 +74,7 @@ function flattenTypeFields(typeDef) {
   }
 
   function getApiKeyAudiences(apiKey) {
-    return new Set(accessRightsService.expandAudienceAssignments([apiKey?.operatorType || "economic_operator"]));
+    return new Set(accessRightsService.expandAudienceAssignments([apiKey?.operatorType || "economicOperator"]));
   }
 
   function isConfidentialityAllowedForApiKey(fieldConfidentiality, maxConfidentiality) {
@@ -103,9 +103,7 @@ function flattenTypeFields(typeDef) {
   function buildApiKeyFieldWriteDecision(field, apiKey) {
     const updateAuthority = Array.isArray(field?.updateAuthority) && field.updateAuthority.length
       ? field.updateAuthority
-      : (Array.isArray(field?.update_authority) && field.update_authority.length
-        ? field.update_authority
-        : ["economic_operator"]);
+      : ["economicOperator"];
     const confidentiality = String(field?.confidentiality || "public").trim().toLowerCase() || "public";
     const audiences = getApiKeyAudiences(apiKey);
     const matchedAuthority = updateAuthority.find((audience) => audiences.has(audience)) || null;
@@ -135,7 +133,7 @@ function flattenTypeFields(typeDef) {
     return {
       keyPrefix: String(rawKey || "").slice(0, API_KEY_PREFIX_LENGTH),
       keySalt,
-      hashAlgorithm: "hmac_sha256",
+      hashAlgorithm: "hmacSha256",
       keyHash: crypto.createHmac("sha256", keySalt).update(String(rawKey || "")).digest("hex"),
     };
   }

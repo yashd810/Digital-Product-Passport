@@ -115,7 +115,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     if (!companyId || !user?.id) return;
 
     try {
-      const raw = localStorage.getItem(`passport_pins_${companyId}_${user.id}`);
+      const raw = localStorage.getItem(`passportPins:${companyId}_${user.id}`);
       setPinnedGuids(new Set(raw ? JSON.parse(raw) : []));
     } catch {
       setPinnedGuids(new Set());
@@ -125,14 +125,16 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   const togglePin = useCallback((dppId) => {
     if (!companyId || !user?.id) return;
 
-    const storageKey = `passport_pins_${companyId}_${user.id}`;
+    const storageKey = `passportPins:${companyId}_${user.id}`;
     setPinnedGuids((prev) => {
       const next = new Set(prev);
       if (next.has(dppId)) next.delete(dppId);
       else next.add(dppId);
       try {
         localStorage.setItem(storageKey, JSON.stringify([...next]));
-      } catch {}
+      } catch (error) {
+        console.warn("Failed to persist pinned passports", error);
+      }
       return next;
     });
     setOpenMenuId(null);
@@ -156,7 +158,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then((response) => response.ok ? response.json() : [])
       .then((data) => setAllPassportTypes(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [companyId]);
 
   const fetchPassports = useCallback(async () => {

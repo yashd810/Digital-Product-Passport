@@ -7,16 +7,16 @@ import "../../../shared/styles/Dashboard.css";
 const API = import.meta.env.VITE_API_URL || "";
 
 const NOTIF_ICONS = {
-  passport_released:    "🚀",
-  passport_revised:     "🔄",
-  workflow_review:      "🔍",
-  workflow_approval:    "📋",
-  workflow_approved:    "✅",
-  workflow_rejected:    "❌",
-  workflow_submitted:   "📤",
-  document_expiring:    "⏰",
-  team_invite:          "✉️",
-  comment_added:        "💬",
+  passportReleased:    "🚀",
+  passportRevised:     "🔄",
+  workflowReview:      "🔍",
+  workflowApproval:    "📋",
+  workflowApproved:    "✅",
+  workflowRejected:    "❌",
+  workflowSubmitted:   "📤",
+  documentExpiring:    "⏰",
+  teamInvite:          "✉️",
+  commentAdded:        "💬",
   default:              "🔔",
 };
 

@@ -67,9 +67,9 @@ function registerPublicApiV1Routes(app, deps) {
         count: r.rows.length,
         limit: cap,
         offset: off,
-        operator_type: req.apiKey.operatorType || "economic_operator",
-        access_mode: req.apiKey.accessMode || "read",
-        max_confidentiality: req.apiKey.maxConfidentiality || "regulated",
+        operatorType: req.apiKey.operatorType || "economicOperator",
+        accessMode: req.apiKey.accessMode || "read",
+        maxConfidentiality: req.apiKey.maxConfidentiality || "regulated",
         passports: r.rows.map((row) => {
           const normalized = { ...normalizePassportRow(row, typeSchema), passportType: typeSchema.typeName };
           return sanitizePassportForApiKey(normalized, typeSchema, req.apiKey);
@@ -87,7 +87,7 @@ function registerPublicApiV1Routes(app, deps) {
       const companyId = req.apiKey.companyId;
 
       const reg = await pool.query(
-        "SELECT \"passportType\" FROM passport_registry WHERE \"dppId\" = $1 AND \"companyId\" = $2",
+        "SELECT \"passportType\" FROM \"passportRegistry\" WHERE \"dppId\" = $1 AND \"companyId\" = $2",
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
@@ -122,7 +122,7 @@ function registerPublicApiV1Routes(app, deps) {
 
       const companyId = req.apiKey.companyId;
       const reg = await pool.query(
-        "SELECT \"passportType\" FROM passport_registry WHERE \"dppId\" = $1 AND \"companyId\" = $2",
+        "SELECT \"passportType\" FROM \"passportRegistry\" WHERE \"dppId\" = $1 AND \"companyId\" = $2",
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
@@ -175,8 +175,8 @@ function registerPublicApiV1Routes(app, deps) {
         passport: current.rows[0],
         passportType: resolvedPassportType,
         archivedBy: null,
-        actorIdentifier: `api_key:${req.apiKey.keyId}`,
-        snapshotReason: "before_api_key_update",
+        actorIdentifier: `apiKey:${req.apiKey.keyId}`,
+        snapshotReason: "beforeApiKeyUpdate",
       });
 
       const updateResult = await updatePassportRowById({
@@ -194,8 +194,8 @@ function registerPublicApiV1Routes(app, deps) {
           passport: updateResult.updatedRow,
           passportType: resolvedPassportType,
           archivedBy: null,
-          actorIdentifier: `api_key:${req.apiKey.keyId}`,
-          snapshotReason: "after_api_key_update",
+          actorIdentifier: `apiKey:${req.apiKey.keyId}`,
+          snapshotReason: "afterApiKeyUpdate",
         });
       }
 
@@ -207,14 +207,14 @@ function registerPublicApiV1Routes(app, deps) {
         dppId,
         null,
         {
-          fields_updated: updateFields,
-          api_key_id: req.apiKey.keyId,
-          operator_type: req.apiKey.operatorType || "economic_operator",
-          access_mode: req.apiKey.accessMode || "update",
+          fieldsUpdated: updateFields,
+          apiKeyId: req.apiKey.keyId,
+          operatorType: req.apiKey.operatorType || "economicOperator",
+          accessMode: req.apiKey.accessMode || "update",
         },
         {
-          actorIdentifier: `api_key:${req.apiKey.keyId}`,
-          audience: req.apiKey.operatorType || "economic_operator",
+          actorIdentifier: `apiKey:${req.apiKey.keyId}`,
+          audience: req.apiKey.operatorType || "economicOperator",
         }
       );
 

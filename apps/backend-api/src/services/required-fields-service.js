@@ -22,14 +22,14 @@ function flattenSchemaFields(typeDef) {
 
 function normalizePassportTypeDefinition(typeDef) {
   if (!typeDef) return null;
-  const fieldsJson = typeDef.fieldsJson || typeDef.fields_json || {};
+  const fieldsJson = typeDef.fieldsJson || {};
   return {
     ...typeDef,
-    typeName: typeDef.typeName || typeDef.type_name || null,
-    displayName: typeDef.displayName || typeDef.display_name || null,
-    productCategory: typeDef.productCategory || typeDef.product_category || null,
-    semanticModelKey: typeDef.semanticModelKey || typeDef.semantic_model_key || null,
-    passportPolicy: typeDef.passportPolicy || typeDef.passport_policy || fieldsJson.passportPolicy || null,
+    typeName: typeDef.typeName || null,
+    displayName: typeDef.displayName || null,
+    productCategory: typeDef.productCategory || null,
+    semanticModelKey: typeDef.semanticModelKey || null,
+    passportPolicy: typeDef.passportPolicy || fieldsJson.passportPolicy || null,
     fieldsJson,
   };
 }
@@ -101,7 +101,7 @@ module.exports = function createRequiredFieldsService({
   async function loadPassportTypeDefinition(passportType) {
     const result = await pool.query(
       `SELECT id, "typeName" AS "typeName", "displayName" AS "displayName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson"
-       FROM passport_types
+       FROM "passportTypes"
        WHERE "typeName" = $1
        LIMIT 1`,
       [passportType]
@@ -202,7 +202,7 @@ module.exports = function createRequiredFieldsService({
 
   async function evaluatePassport(passport, passportType = null, providedTypeDef = null) {
     const basePassport = passport || {};
-    const requestedPassportType = passportType || basePassport.passportType || basePassport.passport_type || "";
+    const requestedPassportType = passportType || basePassport.passportType || basePassport.passportType || "";
     const resolvedTypeDef = normalizePassportTypeDefinition(providedTypeDef)
       || await loadPassportTypeDefinition(requestedPassportType);
 

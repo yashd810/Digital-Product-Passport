@@ -3,12 +3,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const createRequiredFieldsService = require("../src/services/required-fields-service");
-const { getPassportTypeModule } = require("../src/passport-modules");
 
 function createMockPool(typeDef) {
   return {
     async query(sql, params = []) {
-      if (sql.includes("FROM passport_types")) {
+      if (sql.includes("FROM \"passportTypes\"")) {
         return {
           rows: typeDef && params[0] === typeDef.typeName ? [typeDef] : [],
         };
@@ -19,39 +18,15 @@ function createMockPool(typeDef) {
   };
 }
 
-function createRequiredFieldsServiceForModule(moduleKey) {
-  const passportType = getPassportTypeModule(moduleKey);
+function createFixturePassportType() {
   return {
-    passportType,
-    service: createRequiredFieldsService({
-      pool: createMockPool(passportType),
-    }),
-  };
-}
-
-test("passport policy metadata is resolved from the selected module", () => {
-  const { service, passportType } = createRequiredFieldsServiceForModule("textile:v1");
-
-  const policy = service.resolvePassportPolicyMetadata({
-    passportType: passportType.typeName,
-    typeDef: passportType,
-    granularity: "batch",
-  });
-
-  assert.equal(policy.key, "textileDppV1");
-  assert.deepEqual(policy.contentSpecificationIds, ["Textile_dictionary_v1"]);
-  assert.equal(policy.defaultCarrierPolicyKey, "web_public_entry_v1");
-  assert.equal(policy.granularity, "batch");
-});
-
-test("required-field evaluation is governed by passport type required flags", async () => {
-  const typeDef = {
-    typeName: "customRequiredPassportV1",
-    displayName: "Custom Required Passport v1",
-    semanticModelKey: "custom_dictionary_v1",
+    typeName: "medicalDevicePassportV1",
+    displayName: "Medical Device Passport v1",
+    semanticModelKey: "medicalDeviceDictionaryV1",
     passportPolicy: {
-      key: "customRequiredDppV1",
-      contentSpecificationIds: ["Custom_dictionary_v1"],
+      key: "medicalDeviceDppV1",
+      contentSpecificationIds: ["medicalDeviceDictionaryV1"],
+      defaultCarrierPolicyKey: "webPublicEntryV1",
     },
     fieldsJson: {
       sections: [{
@@ -59,11 +34,33 @@ test("required-field evaluation is governed by passport type required flags", as
         label: "Identity",
         fields: [
           { key: "modelIdentifier", label: "Model Identifier", type: "text", required: true },
-          { key: "serialNumber", label: "Serial Number", type: "text", required: true },
+          { key: "udi", label: "Unique Device Identifier", type: "text", required: true },
         ],
       }],
     },
   };
+}
+
+test("passport policy metadata is resolved from the selected passport type definition", () => {
+  const passportType = createFixturePassportType();
+  const service = createRequiredFieldsService({
+    pool: createMockPool(passportType),
+  });
+
+  const policy = service.resolvePassportPolicyMetadata({
+    passportType: passportType.typeName,
+    typeDef: passportType,
+    granularity: "batch",
+  });
+
+  assert.equal(policy.key, "medicalDeviceDppV1");
+  assert.deepEqual(policy.contentSpecificationIds, ["medicalDeviceDictionaryV1"]);
+  assert.equal(policy.defaultCarrierPolicyKey, "webPublicEntryV1");
+  assert.equal(policy.granularity, "batch");
+});
+
+test("required-field evaluation is governed by passport type required flags", async () => {
+  const typeDef = createFixturePassportType();
   const service = createRequiredFieldsService({
     pool: createMockPool(typeDef),
   });
@@ -74,8 +71,8 @@ test("required-field evaluation is governed by passport type required flags", as
     modelIdentifier: "MODEL-X1",
   }, typeDef.typeName, typeDef);
 
-  assert.equal(result.policy.key, "customRequiredDppV1");
-  assert.equal(result.semanticModelKey, "custom_dictionary_v1");
+  assert.equal(result.policy.key, "medicalDeviceDppV1");
+  assert.equal(result.semanticModelKey, "medicalDeviceDictionaryV1");
   assert.equal(result.category.ruleCoverage.length, 0);
   assert.ok(
     result.requiredFieldIssues.some((issue) => issue.code === "REQUIRED_FIELD_MISSING"),
@@ -86,18 +83,19 @@ test("required-field evaluation is governed by passport type required flags", as
 });
 
 test("complete required fields allow release without category rules", async () => {
-  const { service, passportType } = createRequiredFieldsServiceForModule("textile:v1");
+  const typeDef = createFixturePassportType();
+  const service = createRequiredFieldsService({
+    pool: createMockPool(typeDef),
+  });
 
   const result = await service.evaluatePassport({
-    passportType: passportType.typeName,
+    passportType: typeDef.typeName,
     granularity: "item",
-    productModelIdentifier: "STYLE-2026-LINEN-01",
-    countryOfOrigin: "SE",
-    fiberComposition: "70% organic cotton, 30% recycled polyester",
-    recycledContentPercentage: "30",
-  }, passportType.typeName, passportType);
+    modelIdentifier: "MODEL-X1",
+    udi: "UDI-001",
+  }, typeDef.typeName, typeDef);
 
-  assert.equal(result.policy.key, "textileDppV1");
+  assert.equal(result.policy.key, "medicalDeviceDppV1");
   assert.deepEqual(result.requiredFieldIssues, []);
   assert.deepEqual(result.category.ruleCoverage, []);
   assert.equal(result.workflowReleaseAllowed, true);

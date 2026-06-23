@@ -175,7 +175,9 @@ function CSVImportGuide({ user, companyId, activeTab }) {
               body: JSON.stringify({ passportType, ...passportData }),
             });
             if (response.ok) successCount++;
-          } catch {}
+          } catch (error) {
+            console.warn("Failed to create passport from CSV row", error);
+          }
         }
         setCreateSuccess(`Successfully created ${successCount} passport(s)!`);
         setTimeout(() => navigate(passportListPath), 2000);
@@ -315,7 +317,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                   <tbody>
                     <tr><td className="field-name">internalAliasId</td><td>SKU-001</td><td>SKU-002</td></tr>
                     <tr><td className="field-name">modelName</td><td>Model A</td><td>Model B</td></tr>
-                    <tr><td className="field-name">electronicsCategory</td><td>Consumer Electronics</td><td>Industrial Electronics</td></tr>
+                    <tr><td className="field-name">productCategoryDetail</td><td>Medical Device</td><td>Industrial Sensor</td></tr>
                   </tbody>
                 </table>
               </div>

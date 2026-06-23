@@ -56,7 +56,7 @@ function createWorkflowHelpers({
       passport: pRes.rows[0],
       passportType,
       archivedBy: userId,
-      snapshotReason: "before_submit_review",
+      snapshotReason: "beforeSubmitReview",
     }));
 
     const client = await pool.connect();
@@ -64,16 +64,16 @@ function createWorkflowHelpers({
     try {
       await client.query("BEGIN");
       await client.query(
-        `UPDATE ${tableName} SET "releaseStatus" = 'in_review', "updatedAt" = NOW()
+        `UPDATE ${tableName} SET "releaseStatus" = 'inReview', "updatedAt" = NOW()
          WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
         [dppId]
       );
 
       wfRes = await client.query(
-        `INSERT INTO passport_workflow
+        `INSERT INTO "passportWorkflow"
            ("passportDppId", "passportType", "companyId", "submittedBy", "reviewerId", "approverId",
             "reviewStatus", "approvalStatus", "overallStatus", "previousReleaseStatus")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'in_progress',$9)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'inProgress',$9)
          RETURNING id`,
         [
           dppId,
@@ -89,7 +89,9 @@ function createWorkflowHelpers({
       );
       await client.query("COMMIT");
     } catch (error) {
-      await client.query("ROLLBACK").catch(() => {});
+      await client.query("ROLLBACK").catch((rollbackError) => {
+        logger.error({ err: rollbackError, dppId, passportType, companyId }, "Failed to roll back workflow submission transaction");
+      });
       throw error;
     } finally {
       client.release();
@@ -107,7 +109,7 @@ function createWorkflowHelpers({
         passport: updatedRes.rows[0],
         passportType,
         archivedBy: userId,
-        snapshotReason: "after_submit_review",
+        snapshotReason: "afterSubmitReview",
       }));
     }
 
@@ -117,7 +119,7 @@ function createWorkflowHelpers({
     if (resolvedReviewerId) {
       await runBestEffort("Workflow reviewer notification error", async () => createNotification(
         resolvedReviewerId,
-        "workflow_review",
+        "workflowReview",
         `Review requested: ${passport.internalAliasId}`,
         `v${passport.versionNumber} needs your review`,
         dppId,
@@ -159,7 +161,7 @@ function createWorkflowHelpers({
     if (resolvedApproverId && !resolvedReviewerId) {
       await runBestEffort("Workflow approver notification error", async () => createNotification(
         resolvedApproverId,
-        "workflow_approval",
+        "workflowApproval",
         `Approval requested: ${passport.internalAliasId}`,
         `v${passport.versionNumber} needs your approval`,
         dppId,
@@ -170,7 +172,7 @@ function createWorkflowHelpers({
     await runBestEffort("Workflow submit audit error", async () => logAudit(companyId, userId, "SUBMIT_REVIEW", tableName, dppId, null, {
       reviewerId: resolvedReviewerId,
       approverId: resolvedApproverId,
-      status: "in_review",
+      status: "inReview",
     }));
 
     return { workflowId: wfRes.rows[0].id };

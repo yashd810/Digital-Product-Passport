@@ -29,7 +29,7 @@ function registerPassportSupportRoutes(app, deps) {
       if (typeof isPublic !== "boolean") return res.status(400).json({ error: "isPublic must be true or false." });
 
       const reg = await pool.query(
-        `SELECT "passportType" FROM passport_registry WHERE "dppId" = $1 AND "companyId" = $2`,
+        `SELECT "passportType" FROM "passportRegistry" WHERE "dppId" = $1 AND "companyId" = $2`,
         [dppId, companyId]
       );
       if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
@@ -53,7 +53,7 @@ function registerPassportSupportRoutes(app, deps) {
 
       const existingVisibilityRes = await pool.query(
         `SELECT "isPublic"
-         FROM passport_history_visibility
+         FROM "passportHistoryVisibility"
          WHERE "passportDppId" = $1 AND "versionNumber" = $2`,
         [versionRow.dppId, parsedVersion]
       );
@@ -62,7 +62,7 @@ function registerPassportSupportRoutes(app, deps) {
         : isPublicHistoryStatus(versionRow.releaseStatus);
 
       await pool.query(
-        `INSERT INTO passport_history_visibility ("passportDppId", "versionNumber", "isPublic", "updatedBy", "createdAt", "updatedAt")
+        `INSERT INTO "passportHistoryVisibility" ("passportDppId", "versionNumber", "isPublic", "updatedBy", "createdAt", "updatedAt")
          VALUES ($1,$2,$3,$4,NOW(),NOW())
          ON CONFLICT ("passportDppId", "versionNumber")
          DO UPDATE SET "isPublic" = EXCLUDED."isPublic", "updatedBy" = EXCLUDED."updatedBy", "updatedAt" = NOW()`,
@@ -128,23 +128,25 @@ function registerPassportSupportRoutes(app, deps) {
         const appUrl = process.env.APP_URL || "http://localhost:3001";
         const publicFileUrl = `${appUrl}/public-files/${publicId}`;
         await pool.query(
-          `INSERT INTO passport_attachments
+          `INSERT INTO "passportAttachments"
              ("publicId", "companyId", "passportDppId", "fieldKey", "filePath", "storageKey", "storageProvider", "fileUrl", "mimeType", "sizeBytes", "isPublic")
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false)
            ON CONFLICT ("publicId") DO NOTHING`,
-          [
-            publicId,
-            companyId,
+        [
+          publicId,
+          companyId,
             dppId,
             fieldKey,
             stored.path || null,
             stored.storageKey || null,
             stored.provider || null,
             fileUrl,
-            req.file.mimetype || "application/octet-stream",
-            req.file.size || null,
-          ]
-        ).catch(() => {});
+          req.file.mimetype || "application/octet-stream",
+          req.file.size || null,
+        ]
+        ).catch((error) => {
+          logger.warn({ err: error, dppId, fieldKey, publicId }, "Failed to record passport attachment metadata");
+        });
 
         await pool.query(
           `UPDATE ${tableName} SET ${fieldKey} = $1, "updatedAt" = NOW() WHERE id = $2`,
@@ -172,10 +174,10 @@ function registerPassportSupportRoutes(app, deps) {
           pt."productIcon" AS "productIcon",
           pt."semanticModelKey" AS "semanticModelKey",
           pt."fieldsJson" AS "fieldsJson",
-          (NOT cpa.access_revoked) AS "accessGranted"
-        FROM passport_types pt
-        JOIN company_passport_access cpa ON pt.id = cpa.passport_type_id
-        WHERE cpa.company_id = $1
+          (NOT cpa."accessRevoked") AS "accessGranted"
+        FROM "passportTypes" pt
+        JOIN "companyPassportAccess" cpa ON pt.id = cpa."passportTypeId"
+        WHERE cpa."companyId" = $1
         ORDER BY pt."productCategory", pt."displayName"
       `, [req.params.companyId]);
       res.json(r.rows.map(mapPassportTypeRow));

@@ -82,17 +82,17 @@ function createAuditServiceHelpers({ pool, logger }) {
       const createdAt = options.createdAt || new Date().toISOString();
       const hashVersion = 2;
       const previousHashRes = await pool.query(
-        `SELECT event_hash
-         FROM audit_logs
+        `SELECT "eventHash"
+         FROM "auditLogs"
          WHERE (
-           ($1::int IS NULL AND company_id IS NULL)
-           OR company_id = $1
+           ($1::int IS NULL AND "companyId" IS NULL)
+           OR "companyId" = $1
          )
          ORDER BY id DESC
          LIMIT 1`,
         [companyId || null]
       ).catch(() => ({ rows: [] }));
-      const previousEventHash = previousHashRes.rows[0]?.event_hash || null;
+      const previousEventHash = previousHashRes.rows[0]?.eventHash || null;
       const actorIdentifier =
         options.actorIdentifier
         || options.globallyUniqueOperatorId
@@ -117,9 +117,9 @@ function createAuditServiceHelpers({ pool, logger }) {
       const eventHash = computeHashChainValue(previousEventHash, payload);
 
       await pool.query(
-        `INSERT INTO audit_logs (
-           company_id,user_id,action,table_name,record_id,old_values,new_values,
-           actor_identifier,audience,previous_event_hash,event_hash,created_at,hash_version
+        `INSERT INTO "auditLogs" (
+           "companyId","userId",action,"tableName","recordId","oldValues","newValues",
+           "actorIdentifier",audience,"previousEventHash","eventHash","createdAt","hashVersion"
          )
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
@@ -145,12 +145,12 @@ function createAuditServiceHelpers({ pool, logger }) {
 
   async function verifyAuditLogChain(companyId = null) {
     const result = await pool.query(
-      `SELECT id, company_id, user_id, action, table_name, record_id, old_values, new_values,
-              actor_identifier, audience, previous_event_hash, event_hash, created_at, hash_version
-       FROM audit_logs
+      `SELECT id, "companyId", "userId", action, "tableName", "recordId", "oldValues", "newValues",
+              "actorIdentifier", audience, "previousEventHash", "eventHash", "createdAt", "hashVersion"
+       FROM "auditLogs"
        WHERE (
-         ($1::int IS NULL AND company_id IS NULL)
-         OR company_id = $1
+         ($1::int IS NULL AND "companyId" IS NULL)
+         OR "companyId" = $1
        )
        ORDER BY id ASC`,
       [companyId || null]
@@ -160,34 +160,34 @@ function createAuditServiceHelpers({ pool, logger }) {
     const failures = [];
 
     for (const row of result.rows) {
-      const hashVersion = Number.parseInt(row.hash_version, 10) || 1;
+      const hashVersion = Number.parseInt(row.hashVersion, 10) || 1;
       const payload = buildHashPayloadVersion({
         hashVersion,
-        createdAt: row.created_at || null,
-        companyId: row.company_id || null,
-        userId: row.user_id || null,
+        createdAt: row.createdAt || null,
+        companyId: row.companyId || null,
+        userId: row.userId || null,
         action: row.action,
-        tableName: row.table_name || null,
-        recordId: row.record_id || null,
-        oldData: row.old_values || null,
-        newData: row.new_values || null,
-        actorIdentifier: row.actor_identifier || null,
+        tableName: row.tableName || null,
+        recordId: row.recordId || null,
+        oldData: row.oldValues || null,
+        newData: row.newValues || null,
+        actorIdentifier: row.actorIdentifier || null,
         audience: row.audience || null,
       });
       const expectedHash = computeHashChainValue(previousHash, payload);
 
-      if (row.previous_event_hash !== previousHash || row.event_hash !== expectedHash) {
+      if (row.previousEventHash !== previousHash || row.eventHash !== expectedHash) {
         failures.push({
           id: row.id,
           hashVersion,
           expectedPreviousEventHash: previousHash,
-          storedPreviousEventHash: row.previous_event_hash,
+          storedPreviousEventHash: row.previousEventHash,
           expectedEventHash: expectedHash,
-          storedEventHash: row.event_hash,
+          storedEventHash: row.eventHash,
         });
       }
 
-      previousHash = row.event_hash || expectedHash;
+      previousHash = row.eventHash || expectedHash;
     }
 
     return {
@@ -201,14 +201,14 @@ function createAuditServiceHelpers({ pool, logger }) {
   async function buildAuditLogRootSummary(companyId = null) {
     const integrity = await verifyAuditLogChain(companyId);
     const aggregate = await pool.query(
-      `SELECT COUNT(*)::int AS log_count,
-              MIN(id) AS first_log_id,
-              MAX(id) AS latest_log_id,
-              MAX(created_at) AS latest_created_at
-       FROM audit_logs
+      `SELECT COUNT(*)::int AS "logCount",
+              MIN(id) AS "firstLogId",
+              MAX(id) AS "latestLogId",
+              MAX("createdAt") AS "latestCreatedAt"
+       FROM "auditLogs"
        WHERE (
-         ($1::int IS NULL AND company_id IS NULL)
-         OR company_id = $1
+         ($1::int IS NULL AND "companyId" IS NULL)
+         OR "companyId" = $1
        )`,
       [companyId || null]
     );
@@ -219,25 +219,25 @@ function createAuditServiceHelpers({ pool, logger }) {
       verified: integrity.verified,
       failures: integrity.failures,
       checkedEntries: integrity.checkedEntries,
-      logCount: Number.parseInt(row.log_count, 10) || 0,
-      firstLogId: row.first_log_id ? Number.parseInt(row.first_log_id, 10) : null,
-      latestLogId: row.latest_log_id ? Number.parseInt(row.latest_log_id, 10) : null,
-      latestCreatedAt: row.latest_created_at || null,
+      logCount: Number.parseInt(row.logCount, 10) || 0,
+      firstLogId: row.firstLogId ? Number.parseInt(row.firstLogId, 10) : null,
+      latestLogId: row.latestLogId ? Number.parseInt(row.latestLogId, 10) : null,
+      latestCreatedAt: row.latestCreatedAt || null,
       latestEventHash: integrity.latestEventHash || null,
     };
   }
 
   async function listAuditLogAnchors(companyId = null) {
     const result = await pool.query(
-      `SELECT id, company_id, log_count, first_log_id, latest_log_id, root_event_hash,
-              previous_anchor_hash, anchor_hash, anchor_type, anchor_reference,
-              notes, metadata_json, anchored_by, anchored_at, created_at
-       FROM audit_log_anchors
+      `SELECT id, "companyId", "logCount", "firstLogId", "latestLogId", "rootEventHash",
+              "previousAnchorHash", "anchorHash", "anchorType", "anchorReference",
+              notes, "metadataJson", "anchoredBy", "anchoredAt", "createdAt"
+       FROM "auditLogAnchors"
        WHERE (
-         ($1::int IS NULL AND company_id IS NULL)
-         OR company_id = $1
+         ($1::int IS NULL AND "companyId" IS NULL)
+         OR "companyId" = $1
        )
-       ORDER BY anchored_at DESC, id DESC`,
+       ORDER BY "anchoredAt" DESC, id DESC`,
       [companyId || null]
     ).catch(() => ({ rows: [] }));
     return result.rows;
@@ -246,32 +246,32 @@ function createAuditServiceHelpers({ pool, logger }) {
   async function anchorAuditLogRoot({
     companyId = null,
     anchoredBy = null,
-    anchorType = "internal_record",
+    anchorType = "internalRecord",
     anchorReference = null,
     notes = null,
     metadata = {},
   } = {}) {
     const summary = await buildAuditLogRootSummary(companyId);
     const previousAnchorRes = await pool.query(
-      `SELECT anchor_hash
-       FROM audit_log_anchors
+      `SELECT "anchorHash"
+       FROM "auditLogAnchors"
        WHERE (
-         ($1::int IS NULL AND company_id IS NULL)
-         OR company_id = $1
+         ($1::int IS NULL AND "companyId" IS NULL)
+         OR "companyId" = $1
        )
        ORDER BY id DESC
        LIMIT 1`,
       [companyId || null]
     ).catch(() => ({ rows: [] }));
 
-    const previousAnchorHash = previousAnchorRes.rows[0]?.anchor_hash || null;
+    const previousAnchorHash = previousAnchorRes.rows[0]?.anchorHash || null;
     const anchorPayload = {
       companyId: companyId || null,
       logCount: summary.logCount,
       firstLogId: summary.firstLogId,
       latestLogId: summary.latestLogId,
       rootEventHash: summary.latestEventHash || null,
-      anchorType: anchorType || "internal_record",
+      anchorType: anchorType || "internalRecord",
       anchorReference: anchorReference || null,
       notes: notes || null,
       metadata: metadata && typeof metadata === "object" ? metadata : {},
@@ -281,10 +281,10 @@ function createAuditServiceHelpers({ pool, logger }) {
     const anchorHash = computeHashChainValue(previousAnchorHash, anchorPayload);
 
     const result = await pool.query(
-      `INSERT INTO audit_log_anchors (
-         company_id, log_count, first_log_id, latest_log_id, root_event_hash,
-         previous_anchor_hash, anchor_hash, anchor_type, anchor_reference,
-         notes, metadata_json, anchored_by, anchored_at
+      `INSERT INTO "auditLogAnchors" (
+         "companyId", "logCount", "firstLogId", "latestLogId", "rootEventHash",
+         "previousAnchorHash", "anchorHash", "anchorType", "anchorReference",
+         notes, "metadataJson", "anchoredBy", "anchoredAt"
        )
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,NOW())
        RETURNING *`,
@@ -296,7 +296,7 @@ function createAuditServiceHelpers({ pool, logger }) {
         summary.latestEventHash || null,
         previousAnchorHash,
         anchorHash,
-        anchorType || "internal_record",
+        anchorType || "internalRecord",
         anchorReference || null,
         notes || null,
         JSON.stringify(metadata && typeof metadata === "object" ? metadata : {}),

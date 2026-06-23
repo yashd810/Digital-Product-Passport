@@ -6,28 +6,28 @@ import "../../../shared/styles/Dashboard.css";
 const API = import.meta.env.VITE_API_URL || "";
 
 const NOTIF_ICONS = {
-  passport_released:  "🚀",
-  passport_revised:   "🔄",
-  workflow_review:    "🔍",
-  workflow_approval:  "📋",
-  workflow_approved:  "✅",
-  workflow_rejected:  "❌",
-  workflow_submitted: "📤",
-  document_expiring:  "⏰",
-  team_invite:        "✉️",
-  comment_added:      "💬",
+  passportReleased:  "🚀",
+  passportRevised:   "🔄",
+  workflowReview:    "🔍",
+  workflowApproval:  "📋",
+  workflowApproved:  "✅",
+  workflowRejected:  "❌",
+  workflowSubmitted: "📤",
+  documentExpiring:  "⏰",
+  teamInvite:        "✉️",
+  commentAdded:      "💬",
   default:            "🔔",
 };
 
 const TYPE_LABELS = {
-  passport_released:  "Released",
-  passport_revised:   "Revised",
-  workflow_review:    "Review Requested",
-  workflow_approval:  "Approval Requested",
-  workflow_approved:  "Approved",
-  workflow_rejected:  "Rejected",
-  workflow_submitted: "Submitted",
-  team_invite:        "Team Invite",
+  passportReleased:  "Released",
+  passportRevised:   "Revised",
+  workflowReview:    "Review Requested",
+  workflowApproval:  "Approval Requested",
+  workflowApproved:  "Approved",
+  workflowRejected:  "Rejected",
+  workflowSubmitted: "Submitted",
+  teamInvite:        "Team Invite",
   default:            "Notification",
 };
 
@@ -53,7 +53,7 @@ function StatusPill({ status }) {
     approved:  { label: "Approved",  cls: "nwf-pill-approved" },
     rejected:  { label: "Rejected",  cls: "nwf-pill-rejected" },
     skipped:   { label: "Skipped",   cls: "nwf-pill-skipped"  },
-    in_progress: { label: "In Progress", cls: "nwf-pill-pending" },
+    inProgress: { label: "In Progress", cls: "nwf-pill-pending" },
   };
   const s = map[status] || { label: status, cls: "nwf-pill-skipped" };
   return <span className={`nwf-pill ${s.cls}`}>{s.label}</span>;
@@ -73,8 +73,9 @@ export default function NotificationsPage() {
           headers: authHeaders(),
         });
         if (r.ok) setNotifs(await r.json());
-      } catch {}
-      finally { setLoading(false); }
+      } catch (error) {
+        console.warn("Failed to load notifications", error);
+      } finally { setLoading(false); }
     })();
   }, []);
 

@@ -76,17 +76,17 @@ export const PASSPORT_VIEWER_THEME = {
 };
 
 export const DEFAULT_COMPANY_BRANDING = {
-  primary_color: "#0db5b0",
-  secondary_color: "#132840",
-  accent_color: "#dce8f0",
-  background_gradient: "linear-gradient(135deg, #0b1826 0%, #132840 52%, #17304a 100%)",
-  viewer_variant: "classic",
-  consumer_variant: "classic",
-  public_page_title: "",
-  public_tagline: "",
-  company_website: "",
-  footer_text: "",
-  support_link: "",
+  primaryColor: "#0db5b0",
+  secondaryColor: "#132840",
+  accentColor: "#dce8f0",
+  backgroundGradient: "linear-gradient(135deg, #0b1826 0%, #132840 52%, #17304a 100%)",
+  viewerVariant: "classic",
+  consumerVariant: "classic",
+  publicPageTitle: "",
+  publicTagline: "",
+  companyWebsite: "",
+  footerText: "",
+  supportLink: "",
 };
 
 const CONSUMER_BASE = {
@@ -103,41 +103,6 @@ export const CONSUMER_PAGE_THEMES = {
     tagline: "Verified product identity, compliance data, and lifecycle transparency.",
     heroPattern: "passport",
   },
-  battery: {
-    ...CONSUMER_BASE,
-    icon: "⚡",
-    headline: "Battery Product Passport",
-    tagline: "Compliance-ready battery data from carbon footprint to circularity.",
-    heroPattern: "battery",
-  },
-  textile: {
-    ...CONSUMER_BASE,
-    icon: "🧵",
-    headline: "Textile Product Passport",
-    tagline: "Trace fibres, care data, and recyclability in one verified passport.",
-    heroPattern: "textile",
-  },
-  steel: {
-    ...CONSUMER_BASE,
-    icon: "🏗️",
-    headline: "Construction Product Passport",
-    tagline: "Structured performance, safety, and sustainability data for the built environment.",
-    heroPattern: "steel",
-  },
-  toys: {
-    ...CONSUMER_BASE,
-    icon: "🧸",
-    headline: "Toy Product Passport",
-    tagline: "Safety, materials, and product transparency presented in a trusted public view.",
-    heroPattern: "toys",
-  },
-  construction: {
-    ...CONSUMER_BASE,
-    icon: "🏢",
-    headline: "Construction Product Passport",
-    tagline: "Performance and circularity documentation in a regulator-ready format.",
-    heroPattern: "construction",
-  },
 };
 
 export function normalizeCompanyBranding(branding) {
@@ -148,16 +113,16 @@ export function normalizeCompanyBranding(branding) {
 export function getViewerBrandTheme(branding) {
   const b = normalizeCompanyBranding(branding);
   return {
-    variant: b.viewer_variant,
-    title: b.public_page_title,
-    companyWebsite: b.company_website,
-    footerText: b.footer_text,
-    supportLink: b.support_link,
+    variant: b.viewerVariant,
+    title: b.publicPageTitle,
+    companyWebsite: b.companyWebsite,
+    footerText: b.footerText,
+    supportLink: b.supportLink,
     style: {
-      "--brand-primary": b.primary_color,
-      "--brand-secondary": b.secondary_color,
-      "--brand-accent": b.accent_color,
-      "--brand-gradient": b.background_gradient,
+      "--brand-primary": b.primaryColor,
+      "--brand-secondary": b.secondaryColor,
+      "--brand-accent": b.accentColor,
+      "--brand-gradient": b.backgroundGradient,
     },
   };
 }
@@ -174,29 +139,28 @@ export function applyTheme(themeKey) {
 }
 
 export function getStoredTheme(userId) {
-  return localStorage.getItem(`dpp_theme_${userId}`) || "dark";
+  return localStorage.getItem(`dppTheme:${userId}`) || "dark";
 }
 
 export function setStoredTheme(userId, themeKey) {
-  localStorage.setItem(`dpp_theme_${userId}`, themeKey);
+  localStorage.setItem(`dppTheme:${userId}`, themeKey);
 }
 
 export const getConsumerTheme = (passportType, branding) => {
-  const themeKey = String(passportType || "passport").trim().toLowerCase();
-  const base = CONSUMER_PAGE_THEMES[themeKey] || CONSUMER_PAGE_THEMES.passport;
+  const base = CONSUMER_PAGE_THEMES.passport;
   const b = normalizeCompanyBranding(branding);
   return {
     ...base,
-    accentColor: b.primary_color || base.accentColor,
+    accentColor: b.primaryColor || base.accentColor,
     cardBg: "rgba(220,232,240,0.2)",
-    gradient: b.background_gradient || base.gradient,
-    headline: b.public_page_title || base.headline,
-    tagline: b.public_tagline || base.tagline,
-    companyWebsite: b.company_website,
-    footerText: b.footer_text,
-    supportLink: b.support_link,
-    variant: b.consumer_variant,
-    secondaryColor: b.secondary_color,
-    accentSurface: b.accent_color,
+    gradient: b.backgroundGradient || base.gradient,
+    headline: b.publicPageTitle || base.headline,
+    tagline: b.publicTagline || base.tagline,
+    companyWebsite: b.companyWebsite,
+    footerText: b.footerText,
+    supportLink: b.supportLink,
+    variant: b.consumerVariant,
+    secondaryColor: b.secondaryColor,
+    accentSurface: b.accentColor,
   };
 };

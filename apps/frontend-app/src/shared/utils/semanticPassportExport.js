@@ -65,7 +65,7 @@ function buildInlineContext(typeDef = null) {
         inlineContext[field.key] = { "@id": field.semanticId };
       }
       if (field?.type === "table") {
-        for (const column of (field.table_columns || [])) {
+        for (const column of (field.tableColumns || [])) {
           if (column?.key && column.semanticId) {
             inlineContext[column.key] = { "@id": column.semanticId };
           }

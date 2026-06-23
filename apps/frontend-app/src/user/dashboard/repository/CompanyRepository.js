@@ -69,8 +69,9 @@ function SymbolsTab({ companyId }) {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols${qs}`);
       if (r.ok) setSymbols(await r.json());
-    } catch {}
-    finally { setLoading(false); }
+    } catch (error) {
+      console.warn("Failed to load repository symbols", error);
+    } finally { setLoading(false); }
   }, [companyId, currentFolder]);
 
   useEffect(() => { fetchSymbols(); }, [fetchSymbols]);

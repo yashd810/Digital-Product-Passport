@@ -60,15 +60,17 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
     // Persist public key to DB so it survives key rotation look-ups
     await pool.query(
-      `INSERT INTO passport_signing_keys (key_id, public_key, algorithm, algorithm_version)
-       VALUES ($1, $2, $3, $4) ON CONFLICT (key_id) DO NOTHING`,
+      `INSERT INTO "passportSigningKeys" ("keyId", "publicKey", algorithm, "algorithmVersion")
+       VALUES ($1, $2, $3, $4) ON CONFLICT ("keyId") DO NOTHING`,
       [
       _signingKey.keyId,
       _signingKey.publicKey,
       _signingKey.algorithmVersion,
       _signingKey.algorithmVersion]
 
-    ).catch(() => {});
+    ).catch((error) => {
+      logger.warn({ err: error, keyId: _signingKey.keyId }, "[Signing] Failed to persist public signing key");
+    });
   }
 
   function canonicalJSON(val) {
@@ -99,7 +101,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
       trustFramework: normalizeOptionalText(process.env.SIGNING_TRUST_FRAMEWORK)
         || "Platform-managed JWS/VC proof; configure a certificate or electronic seal profile for formal external trust-list validation.",
       keyRetentionPolicy: normalizeOptionalText(process.env.SIGNING_KEY_RETENTION_POLICY)
-        || "Historical public keys are retained in passport_signing_keys so previously issued signatures remain verifiable after rotation.",
+        || "Historical public keys are retained in passportSigningKeys so previously issued signatures remain verifiable after rotation.",
     };
   }
 
@@ -127,15 +129,15 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
     if (!companyId) return null;
     const result = await pool.query(
       `SELECT c.id,
-              c.company_name AS "companyName",
-              c.did_slug AS "didSlug",
-              COALESCE(p.default_granularity, 'model') AS "defaultGranularity",
-              COALESCE(p.vc_issuance_enabled, true) AS "vcIssuanceEnabled",
-              COALESCE(p.mint_model_dids, true) AS "mintModelDids",
-              COALESCE(p.mint_item_dids, true) AS "mintItemDids",
-              COALESCE(p.mint_facility_dids, false) AS "mintFacilityDids"
+              c."companyName" AS "companyName",
+              c."didSlug" AS "didSlug",
+              COALESCE(p."defaultGranularity", 'model') AS "defaultGranularity",
+              COALESCE(p."vcIssuanceEnabled", true) AS "vcIssuanceEnabled",
+              COALESCE(p."mintModelDids", true) AS "mintModelDids",
+              COALESCE(p."mintItemDids", true) AS "mintItemDids",
+              COALESCE(p."mintFacilityDids", false) AS "mintFacilityDids"
        FROM companies c
-       LEFT JOIN company_dpp_policies p ON p.company_id = c.id
+       LEFT JOIN "companyDppPolicies" p ON p."companyId" = c.id
        WHERE c.id = $1
        LIMIT 1`,
       [companyId]
@@ -325,17 +327,17 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
 
   async function verifyPassportSignature(dppId, versionNumber) {
     const sigRow = await pool.query(
-      "SELECT * FROM passport_signatures WHERE \"passportDppId\" = $1 AND \"versionNumber\" = $2",
+      "SELECT * FROM \"passportSignatures\" WHERE \"passportDppId\" = $1 AND \"versionNumber\" = $2",
       [dppId, versionNumber]
     );
     if (!sigRow.rows.length) return { status: "unsigned" };
     const sig = sigRow.rows[0];
 
     const keyRow = await pool.query(
-      "SELECT public_key, algorithm, algorithm_version FROM passport_signing_keys WHERE key_id = $1", [sig.signingKeyId]
+      "SELECT \"publicKey\", algorithm, \"algorithmVersion\" FROM \"passportSigningKeys\" WHERE \"keyId\" = $1", [sig.signingKeyId]
     );
-    if (!keyRow.rows.length) return { status: "key_missing", signedAt: sig.signedAt, keyId: sig.signingKeyId };
-    const publicKeyPem = keyRow.rows[0].public_key;
+    if (!keyRow.rows.length) return { status: "keyMissing", signedAt: sig.signedAt, keyId: sig.signingKeyId };
+    const publicKeyPem = keyRow.rows[0].publicKey;
 
     if (sig.vcJson) {
       try {
@@ -361,7 +363,7 @@ module.exports = function createSigningService({ pool, crypto, canonicalizeJson,
         }
 
         const algorithmVersion = resolveAlgorithmVersion({
-          storedAlgorithmVersion: keyRow.rows[0].algorithm_version,
+          storedAlgorithmVersion: keyRow.rows[0].algorithmVersion,
           storedAlgorithm: keyRow.rows[0].algorithm || sig.algorithm,
           headerAlgorithm: headerObj.alg,
           publicKeyPem

@@ -6,7 +6,7 @@ async function storePassportSignature(pool, {
   sigData
 }) {
   const insertResult = await pool.query(
-    `INSERT INTO passport_signatures (
+    `INSERT INTO "passportSignatures" (
       "passportDppId",
       "versionNumber",
       "dataHash",
@@ -34,7 +34,7 @@ async function storePassportSignature(pool, {
 
   const existingResult = await pool.query(
     `SELECT id
-     FROM passport_signatures
+     FROM "passportSignatures"
      WHERE "passportDppId" = $1
        AND "versionNumber" = $2`,
     [passportDppId, versionNumber]
@@ -44,7 +44,7 @@ async function storePassportSignature(pool, {
 
 async function resolveReleaseCompanyName(pool, companyId) {
   const result = await pool.query(
-    `SELECT COALESCE(NULLIF(legal_name, ''), company_name) AS companyname
+    `SELECT COALESCE(NULLIF("legalName", ''), "companyName") AS companyname
      FROM companies
      WHERE id = $1`,
     [companyId]
@@ -65,7 +65,7 @@ async function storeDppReleaseRecord(pool, {
 }) {
   const companyname = await resolveReleaseCompanyName(pool, companyId);
   const result = await pool.query(
-    `INSERT INTO dpp_release_records (
+    `INSERT INTO "dppReleaseRecords" (
       "dppId",
       companyname,
       "releasedByUserId",

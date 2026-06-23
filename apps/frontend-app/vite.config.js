@@ -1,4 +1,4 @@
-import { defineConfig, transformWithEsbuild } from 'vite';
+import { defineConfig, transformWithOxc } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
@@ -8,14 +8,18 @@ export default defineConfig({
       enforce: 'pre',
       async transform(code, id) {
         if (!id.match(/\/src\/.*\.js$/)) return null;
-        return transformWithEsbuild(code, id, {
-          loader: 'jsx',
-          jsx: 'automatic',
-          jsxImportSource: 'react',
+        return transformWithOxc(code, id, {
+          lang: 'jsx',
+          jsx: {
+            runtime: 'automatic',
+            importSource: 'react',
+          },
         });
       },
     },
-    react(),
+    react({
+      include: /\.(js|jsx|mjs|cjs|ts|tsx)$/,
+    }),
   ],
   server: {
     host: 'localhost',
@@ -40,17 +44,8 @@ export default defineConfig({
       },
     },
   },
-  optimizeDeps: {
-    esbuildOptions: {
-      jsx: 'automatic',
-      jsxImportSource: 'react',
-      loader: {
-        '.js': 'jsx',
-      },
-    },
-  },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return;

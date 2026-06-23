@@ -114,16 +114,17 @@ function registerUpdateRoutes(app, deps) {
       const params = [companyId];
       let filterSql = "";
       const filterObj = filter || {};
-      const statusFilter = String(filterObj.status || "editable").toLowerCase();
+      const statusFilter = String(filterObj.status || "editable").trim();
+      const normalizedStatusFilter = statusFilter.toLowerCase();
 
-      if (statusFilter === "all_editable" || statusFilter === "editable" || statusFilter === "draft") {
+      if (normalizedStatusFilter === "alleditable" || normalizedStatusFilter === "editable" || normalizedStatusFilter === "draft") {
         filterSql += ` AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
-      } else if (statusFilter === "draft_only") {
+      } else if (normalizedStatusFilter === "draftonly") {
         filterSql += ` AND "releaseStatus" = 'draft'`;
-      } else if (statusFilter === "in_revision") {
+      } else if (normalizedStatusFilter === "inrevision") {
         filterSql += ` AND "releaseStatus" IN ${IN_REVISION_STATUSES_SQL}`;
       } else {
-        return res.status(400).json({ error: `Invalid status filter "${statusFilter}". Use: editable, draft_only, in_revision` });
+        return res.status(400).json({ error: `Invalid status filter "${statusFilter}". Use: editable, draftOnly, inRevision` });
       }
 
       if (filterObj.productIdLike) {
@@ -149,8 +150,8 @@ function registerUpdateRoutes(app, deps) {
       );
       const matchCount = parseInt(countRes.rows[0].cnt, 10);
       if (matchCount === 0) return res.json({ summary: { matched: 0, updated: 0 }, message: "No passports matched the filter" });
-      if (matchCount > 1000 && !req.body.confirm_large_update) {
-        return res.status(400).json({ error: `This will update ${matchCount} passports. Send confirm_large_update: true to proceed.`, matched: matchCount });
+      if (matchCount > 1000 && !req.body.confirmLargeUpdate) {
+        return res.status(400).json({ error: `This will update ${matchCount} passports. Send confirmLargeUpdate: true to proceed.`, matched: matchCount });
       }
 
       const updateKeys = getWritablePassportColumns(update);
@@ -171,7 +172,7 @@ function registerUpdateRoutes(app, deps) {
         passportType: typeSchema.typeName,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "before_bulk_update_all",
+        snapshotReason: "beforeBulkUpdateAll",
       });
 
       const updateRes = await pool.query(
@@ -187,16 +188,16 @@ function registerUpdateRoutes(app, deps) {
         passportType: typeSchema.typeName,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "after_bulk_update_all",
+        snapshotReason: "afterBulkUpdateAll",
       });
 
       await logAudit(companyId, userId, "BULK_UPDATE_ALL", tableName, null, null, {
         filter: filterObj,
-        fields_updated: updateKeys,
+        fieldsUpdated: updateKeys,
         count: updatedGuids.length,
       });
 
-      res.json({ summary: { matched: matchCount, updated: updatedGuids.length, fields_updated: updateKeys }, dppIds: updatedGuids });
+      res.json({ summary: { matched: matchCount, updated: updatedGuids.length, fieldsUpdated: updateKeys }, dppIds: updatedGuids });
     } catch (error) {
       logger.error("Bulk update all error:", error.message);
       return handleRouteError(res, error, "Bulk update all failed");
@@ -249,7 +250,7 @@ function registerUpdateRoutes(app, deps) {
       if (createPassportTable) {
         await createPassportTable(typeSchema.typeName, {
           createdBy: userId,
-          eventType: "runtime_bulk_patch_reconcile_table",
+          eventType: "runtimeBulkPatchReconcileTable",
         });
       }
       const tableName = getTable(typeSchema.typeName);
@@ -362,7 +363,7 @@ function registerUpdateRoutes(app, deps) {
             passportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
-            snapshotReason: "before_bulk_patch_update",
+            snapshotReason: "beforeBulkPatchUpdate",
           });
 
           const updateResult = await updatePassportRowById({ tableName, rowId, userId, data: fields, includeUpdatedRow: true });
@@ -378,11 +379,11 @@ function registerUpdateRoutes(app, deps) {
               passportType,
               archivedBy: userId,
               actorIdentifier: getActorIdentifier(req.user),
-              snapshotReason: "after_bulk_patch_update",
+              snapshotReason: "afterBulkPatchUpdate",
             });
           }
 
-          await logAudit(companyId, userId, "UPDATE", tableName, matchedGuid, null, { source: "bulk_patch", fields_updated: updateCols });
+          await logAudit(companyId, userId, "UPDATE", tableName, matchedGuid, null, { source: "bulkPatch", fieldsUpdated: updateCols });
           details.push({ dppId: matchedGuid, internalAliasId: normalizedProductId || undefined, status: "updated", fieldsUpdated: updateCols });
           updated += 1;
         } catch (error) {

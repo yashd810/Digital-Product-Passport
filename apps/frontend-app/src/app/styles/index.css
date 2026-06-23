@@ -288,7 +288,7 @@ select option:checked {
 
 .status-tone.review,
 .status-tone.in_review,
-.status-tone.submitted_for_review,
+.status-tone.submittedForReview,
 .status-badge.in_review,
 .mini-badge.review {
   background: var(--status-review-bg);
@@ -311,11 +311,11 @@ select option:checked {
 .mini-badge.revised,
 .diff-status.revised,
 .intro-status-badge.revised,
-.status-tone.in_revision,
-.status-badge.in_revision,
-.mini-badge.in_revision,
-.diff-status.in_revision,
-.intro-status-badge.in_revision {
+.status-tone.inRevision,
+.status-badge.inRevision,
+.mini-badge.inRevision,
+.diff-status.inRevision,
+.intro-status-badge.inRevision {
   background: var(--status-revised-bg);
   color: var(--status-revised-text);
   border-color: var(--status-revised-border);

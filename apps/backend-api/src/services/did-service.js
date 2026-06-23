@@ -207,7 +207,9 @@ function createDidService(options = {}) {
     let pathname = candidate;
     try {
       pathname = new URL(candidate, publicOrigin || "http://localhost").pathname || "";
-    } catch {}
+    } catch (_error) {
+      // Treat malformed public URLs as already-normalized path input.
+    }
 
     if (pathname === "/.well-known/did.json") return [platformDid];
 

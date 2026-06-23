@@ -46,12 +46,12 @@ module.exports = function createAssetService({
   async function getCompanyDppPolicy(companyId) {
     const result = await pool.query(
       `SELECT c.id,
-              COALESCE(p.default_granularity, 'item') AS "defaultGranularity",
-              COALESCE(p.allow_granularity_override, false) AS "allowGranularityOverride",
-              COALESCE(p.mint_model_dids, true) AS "mintModelDids",
-              COALESCE(p.mint_item_dids, true) AS "mintItemDids"
+              COALESCE(p."defaultGranularity", 'item') AS "defaultGranularity",
+              COALESCE(p."allowGranularityOverride", false) AS "allowGranularityOverride",
+              COALESCE(p."mintModelDids", true) AS "mintModelDids",
+              COALESCE(p."mintItemDids", true) AS "mintItemDids"
        FROM companies c
-       LEFT JOIN company_dpp_policies p ON p.company_id = c.id
+       LEFT JOIN "companyDppPolicies" p ON p."companyId" = c.id
        WHERE c.id = $1
        LIMIT 1`,
       [companyId]
@@ -110,7 +110,7 @@ module.exports = function createAssetService({
 
   async function insertPassportRegistry({ client = pool, dppId, lineageId, companyId, passportType }) {
     await client.query(
-      `INSERT INTO passport_registry ("dppId", "lineageId", "companyId", "passportType")
+      `INSERT INTO "passportRegistry" ("dppId", "lineageId", "companyId", "passportType")
        VALUES ($1, $2, $3, $4)
        ON CONFLICT ("dppId") DO NOTHING`,
       [dppId, lineageId, companyId, passportType]
@@ -231,7 +231,11 @@ module.exports = function createAssetService({
       const response = await fetch(parsedUrl, requestInit);
       const text = await response.text();
       let parsedPayload = text;
-      try {parsedPayload = text ? JSON.parse(text) : null;} catch {}
+      try {
+        parsedPayload = text ? JSON.parse(text) : null;
+      } catch (error) {
+        logger.debug({ err: error }, "Asset source response was not JSON; using raw response text");
+      }
 
       if (!response.ok) {
         throw new Error(`ERP/API request failed (${response.status})`);
@@ -614,7 +618,7 @@ module.exports = function createAssetService({
     };
   }
 
-  async function executeAssetPush({ companyId, generatedPayload, source = "asset_management", userId = null }) {
+  async function executeAssetPush({ companyId, generatedPayload, source = "assetManagement", userId = null }) {
     const passportType = generatedPayload?.passportType;
     const records = Array.isArray(generatedPayload?.records) ? generatedPayload.records : [];
     if (!passportType) throw new Error("generated payload is missing passportType");
@@ -655,7 +659,7 @@ module.exports = function createAssetService({
           if (typeof createPassportTable === "function") {
             await createPassportTable(passportType, {
               createdBy: userId,
-              eventType: "runtime_create_reconcile_table",
+              eventType: "runtimeCreateReconcileTable",
             });
           }
 
@@ -753,7 +757,7 @@ module.exports = function createAssetService({
               passportType,
               archivedBy: userId,
               actorIdentifier: userId ? `user:${userId}` : null,
-              snapshotReason: "after_asset_create",
+              snapshotReason: "afterAssetCreate",
             });
           }
 
@@ -835,7 +839,7 @@ module.exports = function createAssetService({
         if (dynamicEntries.length) {
           for (const [fieldKey, value] of dynamicEntries) {
             await pool.query(
-              `INSERT INTO passport_dynamic_values ("passportDppId", "fieldKey", value, "updatedAt")
+              `INSERT INTO "passportDynamicValues" ("passportDppId", "fieldKey", value, "updatedAt")
                VALUES ($1, $2, $3, NOW())`,
               [matchedGuid, fieldKey, toDynamicStoredValue(value)]
             );
@@ -844,7 +848,7 @@ module.exports = function createAssetService({
             companyId,
             userId,
             "ASSET_DYNAMIC_PUSH",
-            "passport_dynamic_values",
+            "passportDynamicValues",
             matchedGuid,
             null,
             { source, fieldsUpdated: dynamicEntries.map(([fieldKey]) => fieldKey) }
@@ -888,10 +892,10 @@ module.exports = function createAssetService({
     generatedJson
   }) {
     const inserted = await pool.query(
-      `INSERT INTO asset_management_runs
-         (job_id, company_id, passport_type, trigger_type, source_kind, status, summary_json, request_json, generated_json)
+      `INSERT INTO "assetManagementRuns"
+         ("jobId", "companyId", "passportType", "triggerType", "sourceKind", status, "summaryJson", "requestJson", "generatedJson")
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, created_at AS "createdAt"`,
+       RETURNING id, "createdAt" AS "createdAt"`,
       [
       jobId,
       companyId,
@@ -923,8 +927,8 @@ module.exports = function createAssetService({
   };
 
   async function resolveAssetJobRecords(job) {
-    if (job.source_kind === "api") {
-      const fetched = await fetchAssetSourceRecords(job.source_config || {});
+    if (job.sourceKind === "api") {
+      const fetched = await fetchAssetSourceRecords(job.sourceConfig || {});
       return {
         records: fetched.records,
         sourceMeta: {
@@ -936,9 +940,9 @@ module.exports = function createAssetService({
     }
 
     return {
-      records: Array.isArray(job.records_json) ? job.records_json : [],
+      records: Array.isArray(job.recordsJson) ? job.recordsJson : [],
       sourceMeta: {
-        stored_records: Array.isArray(job.records_json) ? job.records_json.length : 0
+        storedRecords: Array.isArray(job.recordsJson) ? job.recordsJson.length : 0
       }
     };
   }
@@ -948,43 +952,43 @@ module.exports = function createAssetService({
   let assetSchedulerBusy = false;
 
   async function runAssetManagementJob(job, triggerType = "manual", userId = null) {
-    const options = isPlainObject(job.options_json) ? job.options_json : {};
+    const options = isPlainObject(job.optionsJson) ? job.optionsJson : {};
     try {
-      await assertAssetManagementEnabled(job.company_id);
+      await assertAssetManagementEnabled(job.companyId);
       const resolved = await resolveAssetJobRecords(job);
       const prepared = await prepareAssetPayload({
-        companyId: job.company_id,
-        passportType: job.passport_type,
+        companyId: job.companyId,
+        passportType: job.passportType,
         records: resolved.records,
         options
       });
       const pushResult = await executeAssetPush({
-        companyId: job.company_id,
+        companyId: job.companyId,
         generatedPayload: prepared.generatedPayload,
-        source: `asset_job:${job.id || "manual"}`,
+        source: `assetJob:${job.id || "manual"}`,
         userId
       });
 
       const status = pushResult.summary.failed ?
       pushResult.summary.passportsCreated || pushResult.summary.passportsUpdated || pushResult.summary.dynamicFieldsPushed ? "partial" : "failed" :
       "success";
-      const nextRunAt = job.is_active ?
+      const nextRunAt = job.isActive ?
       resolveAssetJobNextRunAt({
-        startAt: job.start_at || prepared.generatedAt,
-        intervalMinutes: job.interval_minutes,
+        startAt: job.startAt || prepared.generatedAt,
+        intervalMinutes: job.intervalMinutes,
         from: new Date()
       }) :
       null;
 
       if (job.id) {
         await pool.query(
-          `UPDATE asset_management_jobs
-           SET last_run_at = NOW(),
-               last_status = $2,
-               last_summary = $3,
-               next_run_at = $4,
-               is_active = $5,
-               updated_at = NOW()
+          `UPDATE "assetManagementJobs"
+           SET "lastRunAt" = NOW(),
+               "lastStatus" = $2,
+               "lastSummary" = $3,
+               "nextRunAt" = $4,
+               "isActive" = $5,
+               "updatedAt" = NOW()
            WHERE id = $1`,
           [
           job.id,
@@ -998,10 +1002,10 @@ module.exports = function createAssetService({
 
       const run = await recordAssetRun({
         jobId: job.id || null,
-        companyId: job.company_id,
-        passportType: job.passport_type,
+        companyId: job.companyId,
+        passportType: job.passportType,
         triggerType,
-        sourceKind: job.source_kind,
+        sourceKind: job.sourceKind,
         status,
         summary: pushResult.summary,
         requestJson: {
@@ -1018,23 +1022,23 @@ module.exports = function createAssetService({
         result: pushResult
       };
     } catch (error) {
-      const nextRunAt = job.is_active ?
+      const nextRunAt = job.isActive ?
       resolveAssetJobNextRunAt({
-        startAt: job.start_at || new Date(),
-        intervalMinutes: job.interval_minutes,
+        startAt: job.startAt || new Date(),
+        intervalMinutes: job.intervalMinutes,
         from: new Date()
       }) :
       null;
 
       if (job.id) {
         await pool.query(
-          `UPDATE asset_management_jobs
-           SET last_run_at = NOW(),
-               last_status = 'failed',
-               last_summary = $2,
-               next_run_at = $3,
-               is_active = $4,
-               updated_at = NOW()
+          `UPDATE "assetManagementJobs"
+           SET "lastRunAt" = NOW(),
+               "lastStatus" = 'failed',
+               "lastSummary" = $2,
+               "nextRunAt" = $3,
+               "isActive" = $4,
+               "updatedAt" = NOW()
            WHERE id = $1`,
           [
           job.id,
@@ -1047,10 +1051,10 @@ module.exports = function createAssetService({
 
       const run = await recordAssetRun({
         jobId: job.id || null,
-        companyId: job.company_id,
-        passportType: job.passport_type,
+        companyId: job.companyId,
+        passportType: job.passportType,
         triggerType,
-        sourceKind: job.source_kind,
+        sourceKind: job.sourceKind,
         status: "failed",
         summary: { error: error.message },
         requestJson: { options },
@@ -1071,11 +1075,11 @@ module.exports = function createAssetService({
     try {
       const dueJobs = await pool.query(
         `SELECT *
-         FROM asset_management_jobs
-         WHERE is_active = true
-           AND next_run_at IS NOT NULL
-           AND next_run_at <= NOW()
-         ORDER BY next_run_at ASC
+         FROM "assetManagementJobs"
+         WHERE "isActive" = true
+           AND "nextRunAt" IS NOT NULL
+           AND "nextRunAt" <= NOW()
+         ORDER BY "nextRunAt" ASC
          LIMIT 10`
       );
 

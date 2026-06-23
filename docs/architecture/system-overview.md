@@ -49,14 +49,7 @@ Current product module files live in:
 - [apps/backend-api/src/passport-modules/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/passport-modules/index.js:1)
 - `apps/backend-api/src/passport-modules/*.js`
 
-Current built-in modules:
-
-- battery
-- textile
-- electronics
-- appliance
-
-That means the app is not “the battery app”. Battery is just one current module.
+Fresh deployments intentionally start without seeded product modules. Add generated module files and semantic resources only for the product areas you want to support.
 
 ## Where Most Changes Usually Land
 

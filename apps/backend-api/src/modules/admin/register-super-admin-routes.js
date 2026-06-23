@@ -71,7 +71,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     const recipientsRes = await pool.query(
       `SELECT email, "firstName" AS "firstName", "lastName" AS "lastName"
        FROM users
-       WHERE role = 'super_admin' AND "isActive" = true`
+       WHERE role = 'superAdmin' AND "isActive" = true`
     );
 
     if (!recipientsRes.rows.length) return;
@@ -132,18 +132,18 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       const result = await pool.query(
         `SELECT it.id,
                 it.email,
-                it.approval_status AS "approvalStatus",
-                it.expires_at AS "expiresAt",
-                it.created_at AS "createdAt",
+                it."approvalStatus" AS "approvalStatus",
+                it."expiresAt" AS "expiresAt",
+                it."createdAt" AS "createdAt",
                 inviter.id AS "invitedBy",
                 inviter.email AS "invitedByEmail"
-         FROM invite_tokens it
-         LEFT JOIN users inviter ON inviter.id = it.invited_by
-         WHERE it.role_to_assign = 'super_admin'
+         FROM "inviteTokens" it
+         LEFT JOIN users inviter ON inviter.id = it."invitedBy"
+         WHERE it."roleToAssign" = 'superAdmin'
            AND it.used = false
-           AND it.expires_at > NOW()
-           AND COALESCE(it.approval_status, 'approved') = 'pending'
-         ORDER BY it.created_at DESC`
+           AND it."expiresAt" > NOW()
+           AND COALESCE(it."approvalStatus", 'approved') = 'pending'
+         ORDER BY it."createdAt" DESC`
       );
       res.json(result.rows.map(buildPendingInviteResponse));
     } catch (error) {
@@ -156,7 +156,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     try {
       const result = await pool.query(
         `SELECT id, email, "firstName" AS "firstName", "lastName" AS "lastName", "isActive" AS "isActive", "createdAt" AS "createdAt", "lastLoginAt" AS "lastLoginAt"
-         FROM users WHERE role = 'super_admin'
+         FROM users WHERE role = 'superAdmin'
          ORDER BY "isActive" DESC, "createdAt" ASC`
       );
       res.json(result.rows.map(buildSuperAdminResponse));
@@ -174,12 +174,12 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       if (existing.rows.length) return res.status(400).json({ error: "This email is already registered" });
 
       await pool.query(
-        `UPDATE invite_tokens
-         SET expires_at = NOW()
+        `UPDATE "inviteTokens"
+         SET "expiresAt" = NOW()
          WHERE email = $1
-           AND role_to_assign = 'super_admin'
+           AND "roleToAssign" = 'superAdmin'
            AND used = false
-           AND expires_at > NOW()`,
+           AND "expiresAt" > NOW()`,
         [inviteeEmail]
       );
 
@@ -191,10 +191,10 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
       const insertResult = await pool.query(
-        `INSERT INTO invite_tokens (
-           token, email, company_id, invited_by, expires_at, role_to_assign, approval_status
+        `INSERT INTO "inviteTokens" (
+           token, email, "companyId", "invitedBy", "expiresAt", "roleToAssign", "approvalStatus"
          )
-         VALUES ($1, $2, NULL, $3, $4, 'super_admin', 'pending')
+         VALUES ($1, $2, NULL, $3, $4, 'superAdmin', 'pending')
          RETURNING id`,
         [tokenValue, inviteeEmail, req.user.userId, expiresAt]
       );
@@ -261,16 +261,16 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
         `SELECT it.id,
                 it.token,
                 it.email,
-                it.expires_at AS "expiresAt",
-                it.approval_status AS "approvalStatus",
+                it."expiresAt" AS "expiresAt",
+                it."approvalStatus" AS "approvalStatus",
                 it.used,
                 inviter.email AS "invitedByEmail",
                 inviter."firstName" AS "inviterFirstName",
                 inviter."lastName" AS "inviterLastName"
-         FROM invite_tokens it
-         LEFT JOIN users inviter ON inviter.id = it.invited_by
+         FROM "inviteTokens" it
+         LEFT JOIN users inviter ON inviter.id = it."invitedBy"
          WHERE it.id = $1
-           AND it.role_to_assign = 'super_admin'`,
+           AND it."roleToAssign" = 'superAdmin'`,
         [inviteId]
       );
       if (!inviteRes.rows.length) return res.status(404).json({ error: "Invite request not found" });
@@ -305,11 +305,11 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       });
 
       await pool.query(
-        `UPDATE invite_tokens
-         SET approval_status = 'approved',
-             approved_by = $1,
-             approved_at = NOW(),
-             invite_email_sent_at = NOW()
+        `UPDATE "inviteTokens"
+         SET "approvalStatus" = 'approved',
+             "approvedBy" = $1,
+             "approvedAt" = NOW(),
+             "inviteEmailSentAt" = NOW()
          WHERE id = $2`,
         [req.user.userId, inviteId]
       );
@@ -318,7 +318,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
         null,
         req.user.userId,
         "APPROVE_SUPER_ADMIN_INVITE",
-        "invite_tokens",
+        "inviteTokens",
         inviteId,
         null,
         { inviteeEmail: invite.email }
@@ -335,13 +335,13 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
     try {
       const { inviteId } = req.params;
       const result = await pool.query(
-        `UPDATE invite_tokens
-         SET approval_status = 'declined',
-             expires_at = NOW()
+        `UPDATE "inviteTokens"
+         SET "approvalStatus" = 'declined',
+             "expiresAt" = NOW()
          WHERE id = $1
-           AND role_to_assign = 'super_admin'
+           AND "roleToAssign" = 'superAdmin'
            AND used = false
-           AND COALESCE(approval_status, 'approved') = 'pending'
+           AND COALESCE("approvalStatus", 'approved') = 'pending'
          RETURNING id, email`,
         [inviteId]
       );
@@ -351,7 +351,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
         null,
         req.user.userId,
         "DECLINE_SUPER_ADMIN_INVITE",
-        "invite_tokens",
+        "inviteTokens",
         inviteId,
         null,
         { inviteeEmail: result.rows[0].email }
@@ -371,16 +371,16 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       if (typeof active !== "boolean") return res.status(400).json({ error: "active must be true or false" });
 
       const targetRes = await pool.query(
-        'SELECT id, email, "isActive" AS "isActive" FROM users WHERE id = $1 AND role = \'super_admin\'', [userId]
+        'SELECT id, email, "isActive" AS "isActive" FROM users WHERE id = $1 AND role = \'superAdmin\'', [userId]
       );
       if (!targetRes.rows.length) return res.status(404).json({ error: "Super admin not found" });
 
       if (!active) {
         const countRes = await pool.query(
-          'SELECT COUNT(*)::int AS count FROM users WHERE role = \'super_admin\' AND "isActive" = true'
+          'SELECT COUNT(*)::int AS count FROM users WHERE role = \'superAdmin\' AND "isActive" = true'
         );
         const activeCount = countRes.rows[0]?.count || 0;
-        if (activeCount <= 1 && targetRes.rows[0].is_active) {
+        if (activeCount <= 1 && targetRes.rows[0].isActive) {
           return res.status(400).json({ error: "At least one active super admin must remain" });
         }
       }
@@ -390,7 +390,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
          SET "isActive" = $1,
              "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
              "updatedAt" = NOW()
-         WHERE id = $2 AND role = 'super_admin'
+         WHERE id = $2 AND role = 'superAdmin'
          RETURNING id, email, "firstName" AS "firstName", "lastName" AS "lastName", "isActive" AS "isActive", "createdAt" AS "createdAt", "lastLoginAt" AS "lastLoginAt"`,
         [active, userId]
       );
@@ -398,7 +398,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       await logAudit(
         null, req.user.userId,
         active ? "RESTORE_SUPER_ADMIN_ACCESS" : "REVOKE_SUPER_ADMIN_ACCESS",
-        "users", null, { user_id: userId }, { active }
+        "users", null, { userId: userId }, { active }
       );
 
       res.json({

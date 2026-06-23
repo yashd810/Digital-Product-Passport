@@ -15,7 +15,7 @@ const OVERVIEW_BAR_COLORS = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55
 const OVERVIEW_LINE_COLORS = ["#14b8a6", "#38bdf8", "#f59e0b", "#f472b6", "#a78bfa", "#22c55e"];
 
 const ROLES = [
-  { key: "company_admin", label: "Admin" },
+  { key: "companyAdmin", label: "Admin" },
   { key: "editor", label: "Editor" },
   { key: "viewer", label: "Viewer" },
 ];

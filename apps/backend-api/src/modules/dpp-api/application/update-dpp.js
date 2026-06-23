@@ -24,6 +24,7 @@ function updateDppUseCase(deps) {
     buildMutationPassportPayload,
     getActorIdentifier,
     replicatePassportToBackup,
+    logger,
     buildDppIdentifierFields,
     setDppMergePatchHeaders,
     isSupportedPatchContentType,
@@ -35,7 +36,7 @@ function updateDppUseCase(deps) {
   } = deps;
 
   function resolvePolicyOwnedPatchFields({ editable, granularity }) {
-    const passportType = editable.passport.passportType || editable.passport.passport_type || editable.typeDef?.typeName || editable.typeDef?.type_name;
+    const passportType = editable.passport.passportType || editable.passport.passportType || editable.typeDef?.typeName || editable.typeDef?.typeName;
     const policy = complianceService.resolvePassportPolicyMetadata({
       passportType,
       typeDef: editable.typeDef,
@@ -65,7 +66,7 @@ function updateDppUseCase(deps) {
 
     const editable = await resolveEditablePassportByDppId(dppId);
     if (!editable?.passport) return { statusCode: 404, body: { error: "Editable passport not found" } };
-    if (req.user.role !== "super_admin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
+    if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
       return { statusCode: 403, body: { error: "Forbidden" } };
     }
     if (!isEditablePassportStatus(editable.passport.releaseStatus)) {
@@ -222,7 +223,7 @@ function updateDppUseCase(deps) {
       passportType: editable.passport.passportType,
       archivedBy: req.user.userId,
       actorIdentifier: getActorIdentifier(req.user),
-      snapshotReason: "before_standards_patch",
+      snapshotReason: "beforeStandardsPatch",
     });
 
     const updateResult = await updatePassportRowById({
@@ -241,7 +242,7 @@ function updateDppUseCase(deps) {
         passportType: editable.passport.passportType,
         archivedBy: req.user.userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "after_standards_patch",
+        snapshotReason: "afterStandardsPatch",
       });
     }
 
@@ -255,15 +256,17 @@ function updateDppUseCase(deps) {
     );
 
     await logAudit(editable.passport.companyId, req.user.userId, "PATCH_DPP", editable.tableName, editable.passport.dppId, null, {
-      fields_updated: updatedFields,
+      fieldsUpdated: updatedFields,
     });
     await replicatePassportToBackup({
       passport: updatedPassport,
       typeDef: editable.typeDef,
       companyName,
-      reason: "standards_patch",
-      snapshotScope: "editable_draft",
-    }).catch(() => {});
+      reason: "standardsPatch",
+      snapshotScope: "editableDraft",
+    }).catch((error) => {
+      logger?.warn?.({ err: error, dppId: updatedPassport?.dppId, reason: "standardsPatch" }, "Failed to replicate standards patch to backup");
+    });
 
     return {
       statusCode: 200,

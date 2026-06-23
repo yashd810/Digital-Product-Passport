@@ -5,7 +5,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 const API = import.meta.env.VITE_API_URL || "";
 
 const ROLES = [
-  { key: "company_admin", label: "Admin",  desc: "Full access — manage team, all passports",    badge: "role-admin"  },
+  { key: "companyAdmin", label: "Admin",  desc: "Full access — manage team, all passports",    badge: "role-admin"  },
   { key: "editor",        label: "Editor", desc: "Create, edit, release passports; invite viewers", badge: "role-editor" },
   { key: "viewer",        label: "Viewer", desc: "Read-only access to all passports",            badge: "role-viewer" },
 ];
@@ -30,7 +30,7 @@ function ManageTeam({ user, companyId }) {
   const [showFilters,  setShowFilters]  = useState(false);
   const alertRef = useRef(null);
 
-  const isAdmin = user?.role === "company_admin" || user?.role === "super_admin";
+  const isAdmin = user?.role === "companyAdmin" || user?.role === "superAdmin";
 
   const teamColumns = useMemo(() => ([
     { key: "member", type: "string", getValue: (m) => `${m.firstName || ""} ${m.lastName || ""} ${m.email || ""}`.trim() },
@@ -225,7 +225,7 @@ function ManageTeam({ user, companyId }) {
             <tbody>
               {filteredMembers.map(m => {
                 const isSelf = m.id === user?.id;
-                const isSuperAdmin = m.role === "super_admin";
+                const isSuperAdmin = m.role === "superAdmin";
                 return (
                   <tr key={m.id} className={isSelf ? "self-row" : ""}>
                     <td>

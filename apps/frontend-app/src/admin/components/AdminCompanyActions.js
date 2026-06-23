@@ -112,14 +112,14 @@ function AdminCompanyActions({
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Failed to load company DPP policy");
       setPolicyForm({
-        default_granularity: data.default_granularity || "item",
-        allow_granularity_override: !!data.allow_granularity_override,
-        mint_model_dids: !!data.mint_model_dids,
-        mint_item_dids: !!data.mint_item_dids,
-        mint_facility_dids: !!data.mint_facility_dids,
-        vc_issuance_enabled: !!data.vc_issuance_enabled,
-        jsonld_export_enabled: !!data.jsonld_export_enabled,
-        semantic_dictionary_enabled: !!data.semantic_dictionary_enabled,
+        defaultGranularity: data.defaultGranularity || "item",
+        allowGranularityOverride: !!data.allowGranularityOverride,
+        mintModelDids: !!data.mintModelDids,
+        mintItemDids: !!data.mintItemDids,
+        mintFacilityDids: !!data.mintFacilityDids,
+        vcIssuanceEnabled: !!data.vcIssuanceEnabled,
+        jsonldExportEnabled: !!data.jsonldExportEnabled,
+        semanticDictionaryEnabled: !!data.semanticDictionaryEnabled,
       });
     } catch (error) {
       setPolicyError(error.message || "Failed to load company DPP policy");
@@ -345,8 +345,8 @@ function AdminCompanyActions({
                   <label htmlFor={`defaultGranularity-${policyTarget.id}`}>Default Granularity</label>
                   <select
                     id={`defaultGranularity-${policyTarget.id}`}
-                    value={policyForm?.default_granularity || "item"}
-                    onChange={(event) => handlePolicyFieldChange("default_granularity", event.target.value)}
+                    value={policyForm?.defaultGranularity || "item"}
+                    onChange={(event) => handlePolicyFieldChange("defaultGranularity", event.target.value)}
                     disabled={policySaving}
                   >
                     <option value="item">Item</option>
@@ -356,13 +356,13 @@ function AdminCompanyActions({
                 </div>
 
                 {[
-                  ["allow_granularity_override", "Allow granularity override"],
-                  ["mint_model_dids", "Mint model DIDs"],
-                  ["mint_item_dids", "Mint item DIDs"],
-                  ["mint_facility_dids", "Mint facility DIDs"],
-                  ["vc_issuance_enabled", "Enable VC issuance"],
-                  ["jsonld_export_enabled", "Enable JSON-LD export"],
-                  ["semantic_dictionary_enabled", "Enable semantic dictionaries"],
+                  ["allowGranularityOverride", "Allow granularity override"],
+                  ["mintModelDids", "Mint model DIDs"],
+                  ["mintItemDids", "Mint item DIDs"],
+                  ["mintFacilityDids", "Mint facility DIDs"],
+                  ["vcIssuanceEnabled", "Enable VC issuance"],
+                  ["jsonldExportEnabled", "Enable JSON-LD export"],
+                  ["semanticDictionaryEnabled", "Enable semantic dictionaries"],
                 ].map(([field, label]) => (
                   <label key={field} className="checkbox-label admin-checkbox-spaced">
                     <input

@@ -224,7 +224,7 @@ function AdminAnalytics() {
       openAnalyticsPrintReport({
         title: "System-Wide Analytics Report",
         subtitle: `Generated on ${now.toLocaleDateString()} with the light export theme for clearer printed PDFs.`,
-        filename: `system_wide_analytics_${now.getTime()}`,
+        filename: `systemWideAnalytics-${now.getTime()}`,
         stats: summaryStats,
         chartCards: [
           {

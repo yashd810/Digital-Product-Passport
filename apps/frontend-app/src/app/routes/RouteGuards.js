@@ -10,6 +10,6 @@ export function ProtectedRoute({ isAuthenticated, authReady, children }) {
 export function AdminRoute({ isAuthenticated, user, authReady, children }) {
   if (!authReady) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role !== "super_admin") return <Navigate to={buildUserDashboardHomePath({ user })} replace />;
+  if (user?.role !== "superAdmin") return <Navigate to={buildUserDashboardHomePath({ user })} replace />;
   return children;
 }

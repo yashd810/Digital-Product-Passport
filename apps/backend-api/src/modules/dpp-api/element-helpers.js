@@ -293,7 +293,9 @@ function createElementHelpers({
       if (stableDppId) {
         dppId = dppIdentity.dppDid(granularity, stableDppId);
       }
-    } catch {}
+    } catch (_error) {
+      dppId = null;
+    }
 
     return {
       productIdentifier: passport?.productIdentifierDid || derivedProductIdentifier || null,

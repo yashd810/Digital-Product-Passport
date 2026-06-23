@@ -735,7 +735,7 @@ components:
         lastUpdate:
           type: string
           format: date-time
-          description: Canonical standards-facing timestamp for the latest DPP update. Internal database fields may be named `updated_at`; inputs using `lastUpdated` should be mapped to this field at the API boundary.
+          description: Canonical standards-facing timestamp for the latest DPP update.
         economicOperatorId:
           type: string
           description: Economic operator identifier responsible for the DPP.
@@ -810,23 +810,23 @@ components:
       properties:
         id:
           type: integer
-        passport_guid:
+        passportGuid:
           type: string
           format: uuid
-        company_id:
+        companyId:
           type: integer
-        product_identifier:
+        productIdentifier:
           type: string
         dppId:
           type: string
-        registry_name:
+        registryName:
           type: string
         status:
           type: string
-        registered_at:
+        registeredAt:
           type: string
           format: date-time
-        updated_at:
+        updatedAt:
           type: string
           format: date-time
     RegistryPayload:

@@ -186,6 +186,7 @@ function App() {
           <Route path="repository/symbols" element={<CompanyRepository user={user} companyId={companyId} activeTab="symbols" />} />
           <Route path="archived"        element={<ArchivedPassports user={user} companyId={companyId} />} />
           <Route path="manual"          element={<ManualCenter mode="user" user={user} companyId={companyId} />} />
+          <Route path="dictionary" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />
@@ -213,7 +214,7 @@ function App() {
           <Route path="company/:companyId/access"    element={<CompanyAccess />} />
           <Route path="company/:companyId/edit"      element={<AdminEditCompanyPage />} />
           <Route path="analytics/:companySlug"        element={<AdminCompanyAnalytics />} />
-          <Route path="dictionary" element={<Navigate to="dictionary/battery/v1" replace />} />
+          <Route path="dictionary" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
           <Route path="dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />
@@ -231,6 +232,7 @@ function App() {
           </ProtectedRoute>
         } />
 
+        <Route path="/dictionary" element={<DictionaryBrowserPage />} />
         <Route path="/dictionary/:family/:version" element={<DictionaryBrowserPage />} />
         <Route path="/dictionary/:family/:version/terms/:slug" element={<DictionaryBrowserPage />} />
         <Route path="/dictionary/:family/:version/*" element={<DictionaryBrowserPage />} />

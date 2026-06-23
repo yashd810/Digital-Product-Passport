@@ -54,7 +54,7 @@ export function ViewerDomainIndicator({ compact = false }) {
 function buildSuspiciousCarrierReportPayload(carrierAuthenticity) {
   if (typeof window === "undefined") return {};
   return {
-    category: "suspicious_carrier",
+    category: "suspiciousCarrier",
     severity: "warning",
     observedHost: window.location.host || "",
     expectedHost: carrierAuthenticity?.trustedViewerHost || "",
@@ -100,7 +100,7 @@ export function TrustedEntryPanel({
         <div className="trusted-entry-card">
           <span className="trusted-entry-label">Carrier protection</span>
           <strong>{carrierAuthenticity?.carrierAuthenticationMethod || "Verified HTTPS viewer"}</strong>
-          <p className="trusted-entry-copy">{carrierAuthenticity?.carrierSecurityStatus || "trusted_public_entry"}</p>
+          <p className="trusted-entry-copy">{carrierAuthenticity?.carrierSecurityStatus || "trustedPublicEntry"}</p>
         </div>
         <div className="trusted-entry-card">
           <span className="trusted-entry-label">Counterfeit risk</span>
@@ -687,7 +687,7 @@ export function ViewerLangSelector({ lang, setLang }) {
         <button
           key={l.code}
           type="button"
-          onClick={() => { setLang(l.code); localStorage.setItem("dpp_lang", l.code); }}
+          onClick={() => { setLang(l.code); localStorage.setItem("dppLang", l.code); }}
           aria-pressed={lang === l.code}
           className={`viewer-lang-btn${lang === l.code ? " active" : ""}`}>
           {l.flag} {l.code.toUpperCase()}
@@ -707,7 +707,7 @@ export function SignatureBadge({ verification }) {
     tampered:    { icon: "⚠️", label: "Data Tampered", tone: "danger" },
     invalid:     { icon: "❌", label: "Invalid Signature", tone: "danger" },
     unsigned:    { icon: "🔓", label: "Not Signed", tone: "warning" },
-    key_missing: { icon: "🔑", label: "Key Not Found", tone: "warning" },
+    keyMissing: { icon: "🔑", label: "Key Not Found", tone: "warning" },
   }[status] || { icon: "❓", label: status, tone: "neutral" };
 
   const ts = signedAt ? new Date(signedAt).toLocaleDateString() : null;
@@ -728,7 +728,7 @@ export function ScanBadge({ dppId }) {
     fetchWithAuth(`${API}/api/passports/${dppId}/scan-stats`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d && d.total > 0) setCount(d.total); })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [dppId]);
   if (!count) return null;
   return (

@@ -118,7 +118,7 @@ const JWT_SECRET             = process.env.JWT_SECRET || "change-me-in-productio
 const JWT_EXPIRY             = "7d";
 const PEPPER                 = process.env.PEPPER_V1  || "change-this-pepper-in-production";
 const CURRENT_PEPPER_VERSION = 1;
-const SESSION_COOKIE_NAME    = process.env.SESSION_COOKIE_NAME || "dpp_session";
+const SESSION_COOKIE_NAME    = process.env.SESSION_COOKIE_NAME || "dppSession";
 const COOKIE_SECURE          = IS_PRODUCTION ? process.env.COOKIE_SECURE !== "false" : process.env.COOKIE_SECURE === "true";
 const COOKIE_SAME_SITE       = process.env.COOKIE_SAME_SITE || (IS_PRODUCTION ? "None" : "lax");
 const COOKIE_DOMAIN          = process.env.COOKIE_DOMAIN || "";
@@ -136,29 +136,29 @@ const ASSET_IGNORED_SYSTEM_COLUMNS = new Set([
 const ASSET_MATCH_FIELDS = new Set(["dppId", "matchDppId", "guid", "matchGuid", "internalAliasId", "matchProductId", "nextProductId"]);
 const ASSET_ERP_PRESETS = [
   {
-    key: "generic_rest", label: "Generic REST",
+    key: "genericRest", label: "Generic REST",
     description: "Generic JSON API returning an array or records path.",
-    sourceConfig: { method: "GET", recordPath: "data.items", fieldMap: { dppId: "dppId", internal_alias_id: "internalAliasId", model_name: "modelName" } },
+    sourceConfig: { method: "GET", recordPath: "data.items", fieldMap: { dppId: "dppId", internalAliasId: "internalAliasId", modelName: "modelName" } },
   },
   {
-    key: "sap_s4hana_material", label: "SAP S/4HANA Material Feed",
+    key: "sapS4hanaMaterial", label: "SAP S/4HANA Material Feed",
     description: "Typical material master style mapping for SAP integrations.",
     sourceConfig: { method: "GET", recordPath: "d.results", fieldMap: { Material: "internalAliasId", ProductUUID: "dppId", ProductDescription: "modelName", Plant: "facility" } },
   },
   {
-    key: "microsoft_bc_items", label: "Business Central Items",
+    key: "microsoftBcItems", label: "Business Central Items",
     description: "Business Central item sync using OData-style responses.",
     sourceConfig: { method: "GET", recordPath: "value", fieldMap: { id: "dppId", number: "internalAliasId", displayName: "modelName", inventoryPostingGroup: "category" } },
   },
   {
-    key: "netsuite_restlet", label: "NetSuite Restlet",
+    key: "netsuiteRestlet", label: "NetSuite Restlet",
     description: "NetSuite restlet payload with items array.",
     sourceConfig: { method: "POST", recordPath: "items", fieldMap: { internalId: "dppId", itemId: "internalAliasId", displayName: "modelName", location: "facility" } },
   },
   {
-    key: "siemens_teamcenter_items", label: "Siemens Teamcenter Items",
+    key: "siemensTeamcenterItems", label: "Siemens Teamcenter Items",
     description: "Teamcenter item feed with product ID matching and optional GUID mapping.",
-    sourceConfig: { method: "GET", recordPath: "items", fieldMap: { item_id: "internalAliasId", uid: "dppId", object_name: "modelName" } },
+    sourceConfig: { method: "GET", recordPath: "items", fieldMap: { itemId: "internalAliasId", uid: "dppId", objectName: "modelName" } },
   },
 ];
 
@@ -263,7 +263,7 @@ const rateLimitMaintenanceTimer = startRateLimitMaintenance(pool);
 
 async function getCompanyAssetSettings(companyId) {
   const result = await pool.query(
-    `SELECT id, company_name, is_active, asset_management_enabled, asset_management_revoked_at
+    `SELECT id, "companyName", "isActive", "assetManagementEnabled", "assetManagementRevokedAt"
      FROM companies WHERE id = $1`,
     [companyId]
   );
@@ -273,13 +273,13 @@ async function getCompanyAssetSettings(companyId) {
 async function assertAssetManagementEnabled(companyId) {
   const company = await getCompanyAssetSettings(companyId);
   if (!company) { const e = new Error("Company not found"); e.statusCode = 404; throw e; }
-  if (company.is_active === false) { const e = new Error("Company is inactive"); e.statusCode = 403; throw e; }
+  if (company.isActive === false) { const e = new Error("Company is inactive"); e.statusCode = 403; throw e; }
   return company;
 }
 
 async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
   const normalizedType = String(passportType || "").trim();
-  if (!normalizedType) { const e = new Error("passport_type is required"); e.statusCode = 400; throw e; }
+  if (!normalizedType) { const e = new Error("passportType is required"); e.statusCode = 400; throw e; }
   const result = await pool.query(
     `SELECT pt.id,
             pt."typeName" AS "typeName",
@@ -289,9 +289,9 @@ async function assertCompanyAssetPassportTypeAccess(companyId, passportType) {
             pt."semanticModelKey" AS "semanticModelKey",
             pt."fieldsJson" AS "fieldsJson",
             pt."isActive" AS "isActive"
-     FROM passport_types pt
-     JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
-     WHERE cpa.company_id = $1 AND cpa.access_revoked = false AND pt."isActive" = true AND pt."typeName" = $2
+     FROM "passportTypes" pt
+     JOIN "companyPassportAccess" cpa ON cpa."passportTypeId" = pt.id
+     WHERE cpa."companyId" = $1 AND cpa."accessRevoked" = false AND pt."isActive" = true AND pt."typeName" = $2
      LIMIT 1`,
     [companyId, normalizedType]
   );
@@ -446,17 +446,17 @@ const isPathInsideBase = (targetPath, baseDir) => {
 async function verifySchemaReady() {
   await pool.query(`
     SELECT pr."dppId", pr."companyId", pr."passportType"
-    FROM passport_registry pr
+    FROM "passportRegistry" pr
     LIMIT 1
   `);
   await pool.query(`
-    SELECT legal_name, customer_trust_level, verification_status
+    SELECT "legalName", "customerTrustLevel", "verificationStatus"
     FROM companies
     LIMIT 1
   `);
   await pool.query(`
     SELECT id
-    FROM schema_migrations
+    FROM "schemaMigrations"
     LIMIT 1
   `);
 }

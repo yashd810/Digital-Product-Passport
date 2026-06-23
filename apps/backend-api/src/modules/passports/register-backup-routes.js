@@ -31,7 +31,7 @@ function registerBackupRoutes(app, deps) {
       const provider = await backupProviderService.upsertProvider({
         companyId: req.params.companyId,
         providerKey: req.body?.providerKey,
-        providerType: req.body?.providerType || "oci_object_storage",
+        providerType: req.body?.providerType || "ociObjectStorage",
         displayName: req.body?.displayName || "OCI Object Storage Backup",
         objectPrefix: req.body?.objectPrefix || "backup-provider",
         publicBaseUrl: req.body?.publicBaseUrl || null,
@@ -44,7 +44,7 @@ function registerBackupRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "UPSERT_BACKUP_PROVIDER",
-        "backup_service_providers",
+        "backupServiceProviders",
         null,
         null,
         { providerKey: provider.providerKey, providerType: provider.providerType }
@@ -64,9 +64,9 @@ function registerBackupRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "REVOKE_BACKUP_PROVIDER",
-        "backup_service_providers",
+        "backupServiceProviders",
         null,
-        { provider_key: req.params.providerKey },
+        { providerKey: req.params.providerKey },
         { revoked: true }
       );
       res.json({ success: true, provider });
@@ -145,7 +145,7 @@ function registerBackupRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "ACTIVATE_BACKUP_PUBLIC_HANDOVER",
-        "backup_public_handovers",
+        "backupPublicHandovers",
         req.params.dppId,
         null,
         {
@@ -199,7 +199,7 @@ function registerBackupRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "DEACTIVATE_BACKUP_PUBLIC_HANDOVER",
-        "backup_public_handovers",
+        "backupPublicHandovers",
         req.params.dppId,
         null,
         {
@@ -238,15 +238,15 @@ function registerBackupRoutes(app, deps) {
       const result = await replicatePassportToBackup({
         passport: { ...currentPassport, passportType },
         passportType,
-        reason: "manual_replication",
-        snapshotScope: req.body?.snapshotScope || "released_current",
+        reason: "manualReplication",
+        snapshotScope: req.body?.snapshotScope || "releasedCurrent",
       });
 
       await logAudit(
         req.params.companyId,
         req.user.userId,
         "REPLICATE_PASSPORT_BACKUP",
-        "passport_backup_replications",
+        "passportBackupReplications",
         req.params.dppId,
         null,
         { passportType, resultCount: result.results?.length || 0 }
@@ -275,7 +275,7 @@ function registerBackupRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "VERIFY_PASSPORT_BACKUP",
-        "passport_backup_replications",
+        "passportBackupReplications",
         req.params.dppId,
         null,
         {

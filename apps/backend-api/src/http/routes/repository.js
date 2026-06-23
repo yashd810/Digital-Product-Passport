@@ -22,12 +22,12 @@ module.exports = function registerRepositoryRoutes(app, {
   storageService,
 }) {
   const appBaseUrlFromRequest = (req) => `${req.protocol}://${req.get("host")}`;
-  const getCompanyId = (row) => row?.companyId || row?.company_id || null;
-  const getStorageKey = (row) => row?.storageKey || row?.storage_key || "";
-  const getFilePath = (row) => row?.filePath || row?.file_path || "";
-  const getFileUrl = (row) => row?.fileUrl || row?.file_url || null;
+  const getCompanyId = (row) => row?.companyId || row?.companyId || null;
+  const getStorageKey = (row) => row?.storageKey || row?.storageKey || "";
+  const getFilePath = (row) => row?.filePath || row?.filePath || "";
+  const getFileUrl = (row) => row?.fileUrl || row?.fileUrl || null;
   const hasStorageProviderMismatch = (row) => {
-    const rowProvider = String(row?.storageProvider || row?.storage_provider || "").trim().toLowerCase();
+    const rowProvider = String(row?.storageProvider || row?.storageProvider || "").trim().toLowerCase();
     const activeProvider = String(storageService?.provider || storageService?.name || "").trim().toLowerCase();
     return Boolean(rowProvider && activeProvider && rowProvider !== activeProvider);
   };
@@ -48,19 +48,19 @@ module.exports = function registerRepositoryRoutes(app, {
   const withResolvedFileUrl = (req, row) => ({
     id: row.id,
     companyId: getCompanyId(row),
-    parentId: row.parentId ?? row.parent_id ?? null,
+    parentId: row.parentId ?? row.parentId ?? null,
     name: row.name || "",
     type: row.type || "",
     fileUrl: repositoryFileUrl(req, row),
     storageKey: getStorageKey(row) || null,
     filePath: getFilePath(row) || null,
-    mimeType: row.mimeType ?? row.mime_type ?? null,
-    sizeBytes: row.sizeBytes ?? row.size_bytes ?? null,
-    createdAt: row.createdAt ?? row.created_at ?? null,
+    mimeType: row.mimeType ?? row.mimeType ?? null,
+    sizeBytes: row.sizeBytes ?? row.sizeBytes ?? null,
+    createdAt: row.createdAt ?? row.createdAt ?? null,
   });
 
   const setRepositoryFileHeaders = (res, row) => {
-    const mimeType = row.mimeType || row.mime_type || "application/octet-stream";
+    const mimeType = row.mimeType || row.mimeType || "application/octet-stream";
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Cache-Control", "private, max-age=300");
@@ -78,9 +78,9 @@ module.exports = function registerRepositoryRoutes(app, {
       const { companyId } = req.params;
       const parentId = req.query.parentId ? parseInt(req.query.parentId, 10) : null;
       const r = await pool.query(
-        `SELECT id, company_id AS "companyId", parent_id AS "parentId", name, type, file_url AS "fileUrl", storage_key AS "storageKey", file_path AS "filePath", mime_type AS "mimeType", size_bytes AS "sizeBytes", created_at AS "createdAt"
-         FROM company_repository
-         WHERE company_id = $1 AND repository_scope = 'files' AND parent_id IS NOT DISTINCT FROM $2
+        `SELECT id, "companyId" AS "companyId", "parentId" AS "parentId", name, type, "fileUrl" AS "fileUrl", "storageKey" AS "storageKey", "filePath" AS "filePath", "mimeType" AS "mimeType", "sizeBytes" AS "sizeBytes", "createdAt" AS "createdAt"
+         FROM "companyRepository"
+         WHERE "companyId" = $1 AND "repositoryScope" = 'files' AND "parentId" IS NOT DISTINCT FROM $2
          ORDER BY type DESC, name ASC`,
         [companyId, parentId]
       );
@@ -94,8 +94,8 @@ module.exports = function registerRepositoryRoutes(app, {
     try {
       const scope = req.query.scope === "symbols" ? "symbols" : "files";
       const r = await pool.query(
-        `SELECT id, parent_id AS "parentId", name, type FROM company_repository
-         WHERE company_id = $1 AND repository_scope = $2 ORDER BY type DESC, name ASC`,
+        `SELECT id, "parentId" AS "parentId", name, type FROM "companyRepository"
+         WHERE "companyId" = $1 AND "repositoryScope" = $2 ORDER BY type DESC, name ASC`,
         [req.params.companyId, scope]
       );
       res.json(r.rows);
@@ -110,8 +110,8 @@ module.exports = function registerRepositoryRoutes(app, {
       if (!name?.trim()) return res.status(400).json({ error: "Folder name required" });
 
       const dup = await pool.query(
-        `SELECT id FROM company_repository
-         WHERE company_id = $1 AND repository_scope = 'files' AND parent_id IS NOT DISTINCT FROM $2 AND name = $3`,
+        `SELECT id FROM "companyRepository"
+         WHERE "companyId" = $1 AND "repositoryScope" = 'files' AND "parentId" IS NOT DISTINCT FROM $2 AND name = $3`,
         [req.params.companyId, parentId || null, name.trim()]
       );
       if (dup.rows.length) {
@@ -119,7 +119,7 @@ module.exports = function registerRepositoryRoutes(app, {
       }
 
       const r = await pool.query(
-        `INSERT INTO company_repository (company_id, parent_id, name, type, repository_scope, created_by)
+        `INSERT INTO "companyRepository" ("companyId", "parentId", name, type, "repositoryScope", "createdBy")
          VALUES ($1, $2, $3, 'folder', 'files', $4) RETURNING *`,
         [req.params.companyId, parentId || null, name.trim(), req.user.userId]
       );
@@ -150,8 +150,8 @@ module.exports = function registerRepositoryRoutes(app, {
         const name = displayName?.trim() || req.file.originalname;
 
         const r = await pool.query(
-          `INSERT INTO company_repository
-             (company_id, parent_id, name, type, repository_scope, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, created_by)
+          `INSERT INTO "companyRepository"
+             ("companyId", "parentId", name, type, "repositoryScope", "filePath", "storageKey", "storageProvider", "fileUrl", "mimeType", "sizeBytes", "createdBy")
            VALUES ($1, $2, $3, 'file', 'files', $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
           [
             companyId,
@@ -184,8 +184,8 @@ module.exports = function registerRepositoryRoutes(app, {
       const { sourceUrl, name, parentId } = req.body;
       if (!sourceUrl || !name?.trim()) return res.status(400).json({ error: "sourceUrl and name required" });
       const r = await pool.query(
-        `INSERT INTO company_repository
-           (company_id, parent_id, name, type, repository_scope, file_url, mime_type, created_by)
+        `INSERT INTO "companyRepository"
+           ("companyId", "parentId", name, type, "repositoryScope", "fileUrl", "mimeType", "createdBy")
          VALUES ($1, $2, $3, 'file', 'files', $4, 'application/pdf', $5) RETURNING *`,
         [req.params.companyId, parentId || null, name.trim(), sourceUrl, req.user.userId]
       );
@@ -200,8 +200,8 @@ module.exports = function registerRepositoryRoutes(app, {
       const { name } = req.body;
       if (!name?.trim()) return res.status(400).json({ error: "Name required" });
       const r = await pool.query(
-        `UPDATE company_repository SET name = $1, updated_at = NOW()
-         WHERE id = $2 AND company_id = $3 RETURNING *`,
+        `UPDATE "companyRepository" SET name = $1, "updatedAt" = NOW()
+         WHERE id = $2 AND "companyId" = $3 RETURNING *`,
         [name.trim(), req.params.itemId, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Item not found" });
@@ -214,7 +214,7 @@ module.exports = function registerRepositoryRoutes(app, {
   app.delete("/api/companies/:companyId/repository/:itemId", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const item = await pool.query(
-        "SELECT * FROM company_repository WHERE id = $1 AND company_id = $2",
+        "SELECT * FROM \"companyRepository\" WHERE id = $1 AND \"companyId\" = $2",
         [req.params.itemId, req.params.companyId]
       );
       if (!item.rows.length) return res.status(404).json({ error: "Item not found" });
@@ -222,7 +222,7 @@ module.exports = function registerRepositoryRoutes(app, {
 
       if (row.type === "folder") {
         const children = await pool.query(
-          "SELECT id FROM company_repository WHERE parent_id = $1",
+          "SELECT id FROM \"companyRepository\" WHERE \"parentId\" = $1",
           [row.id]
         );
         if (children.rows.length) {
@@ -241,7 +241,7 @@ module.exports = function registerRepositoryRoutes(app, {
         await storageService.deleteStoredFile({ storageKey });
       }
 
-      await pool.query("DELETE FROM company_repository WHERE id = $1", [row.id]);
+      await pool.query("DELETE FROM \"companyRepository\" WHERE id = $1", [row.id]);
       res.json({ success: true });
     } catch {
       res.status(500).json({ error: "Failed to delete" });
@@ -254,19 +254,19 @@ module.exports = function registerRepositoryRoutes(app, {
       const parentId = req.query.parentId ? parseInt(req.query.parentId, 10) : null;
       const r = flat
         ? await pool.query(
-            `SELECT id, company_id, parent_id, name, type, mime_type, file_url, storage_key, file_path, size_bytes, created_at
-             FROM company_repository
-             WHERE company_id = $1 AND repository_scope = 'symbols' AND type = 'file' AND mime_type LIKE 'image/%'
+            `SELECT id, "companyId", "parentId", name, type, "mimeType", "fileUrl", "storageKey", "filePath", "sizeBytes", "createdAt"
+             FROM "companyRepository"
+             WHERE "companyId" = $1 AND "repositoryScope" = 'symbols' AND type = 'file' AND "mimeType" LIKE 'image/%'
              ORDER BY name ASC`,
             [req.params.companyId]
           )
         : await pool.query(
-            `SELECT id, company_id, parent_id, name, type, mime_type, file_url, storage_key, file_path, size_bytes, created_at
-             FROM company_repository
-             WHERE company_id = $1
-               AND repository_scope = 'symbols'
-               AND parent_id IS NOT DISTINCT FROM $2
-               AND (type = 'folder' OR mime_type LIKE 'image/%')
+            `SELECT id, "companyId", "parentId", name, type, "mimeType", "fileUrl", "storageKey", "filePath", "sizeBytes", "createdAt"
+             FROM "companyRepository"
+             WHERE "companyId" = $1
+               AND "repositoryScope" = 'symbols'
+               AND "parentId" IS NOT DISTINCT FROM $2
+               AND (type = 'folder' OR "mimeType" LIKE 'image/%')
              ORDER BY type DESC, name ASC`,
             [req.params.companyId, parentId]
           );
@@ -282,8 +282,8 @@ module.exports = function registerRepositoryRoutes(app, {
       if (!name?.trim()) return res.status(400).json({ error: "Folder name required" });
 
       const dup = await pool.query(
-        `SELECT id FROM company_repository
-         WHERE company_id = $1 AND repository_scope = 'symbols' AND parent_id IS NOT DISTINCT FROM $2 AND name = $3`,
+        `SELECT id FROM "companyRepository"
+         WHERE "companyId" = $1 AND "repositoryScope" = 'symbols' AND "parentId" IS NOT DISTINCT FROM $2 AND name = $3`,
         [req.params.companyId, parentId || null, name.trim()]
       );
       if (dup.rows.length) {
@@ -291,7 +291,7 @@ module.exports = function registerRepositoryRoutes(app, {
       }
 
       const r = await pool.query(
-        `INSERT INTO company_repository (company_id, parent_id, name, type, repository_scope, created_by)
+        `INSERT INTO "companyRepository" ("companyId", "parentId", name, type, "repositoryScope", "createdBy")
          VALUES ($1, $2, $3, 'folder', 'symbols', $4) RETURNING *`,
         [req.params.companyId, parentId || null, name.trim(), req.user.userId]
       );
@@ -321,8 +321,8 @@ module.exports = function registerRepositoryRoutes(app, {
           contentType: req.file.mimetype,
         });
         const r = await pool.query(
-          `INSERT INTO company_repository
-             (company_id, parent_id, name, type, repository_scope, file_path, storage_key, storage_provider, file_url, mime_type, size_bytes, created_by)
+          `INSERT INTO "companyRepository"
+             ("companyId", "parentId", name, type, "repositoryScope", "filePath", "storageKey", "storageProvider", "fileUrl", "mimeType", "sizeBytes", "createdBy")
            VALUES ($1, $2, $3, 'file', 'symbols', $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
           [
             companyId,
@@ -358,9 +358,9 @@ module.exports = function registerRepositoryRoutes(app, {
 
         const item = await pool.query(
           `SELECT *
-           FROM company_repository
+           FROM "companyRepository"
            WHERE id = $1
-             AND company_id = $2
+             AND "companyId" = $2
              AND type = 'file'
            LIMIT 1`,
           [resolved.itemId, resolved.companyId]
@@ -406,9 +406,9 @@ module.exports = function registerRepositoryRoutes(app, {
 
         const item = await pool.query(
           `SELECT *
-           FROM company_repository
+           FROM "companyRepository"
            WHERE id = $1
-             AND company_id = $2
+             AND "companyId" = $2
              AND type = 'file'
            LIMIT 1`,
           [resolved.itemId, resolved.companyId]

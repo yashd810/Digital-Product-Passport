@@ -57,7 +57,9 @@ export function useSessionAuth() {
   const handleLogout = async () => {
     try {
       await fetchWithAuth(`${API}/api/auth/logout`, { method: "POST", credentials: "include" });
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to notify server during logout", error);
+    }
 
     setIsAuthenticated(false);
     setUser(null);

@@ -55,7 +55,7 @@ function createCanonicalPassportSerializer({
     if (normalized === "invalid") return "Invalid";
     if (normalized === "obsolete") return "Inactive";
     if (normalized === "inactive") return "Inactive";
-    if (["draft", "in_review", "in_revision"].includes(normalized)) return "Inactive";
+    if (["draft", "inReview", "inRevision"].includes(normalized)) return "Inactive";
     return "Invalid";
   }
 
@@ -161,32 +161,31 @@ function createCanonicalPassportSerializer({
     return rawValue;
   }
 
-  function readTypeValue(typeDef, camelKey, snakeKey = null) {
+  function readTypeValue(typeDef, camelKey) {
     if (!typeDef || typeof typeDef !== "object") return null;
     if (typeDef[camelKey] !== undefined) return typeDef[camelKey];
-    if (snakeKey && typeDef[snakeKey] !== undefined) return typeDef[snakeKey];
     return null;
   }
 
   function getFieldsJson(typeDef) {
-    return readTypeValue(typeDef, "fieldsJson", "fields_json") || {};
+    return readTypeValue(typeDef, "fieldsJson") || {};
   }
 
   function getProductCategory(typeDef, options = {}) {
-    return options.productCategory || readTypeValue(typeDef, "productCategory", "product_category") || null;
+    return options.productCategory || readTypeValue(typeDef, "productCategory") || null;
   }
 
   function getSemanticModelKey(typeDef, options = {}) {
     return normalizeText(
       options.semanticModelKey
-      || readTypeValue(typeDef, "semanticModelKey", "semantic_model_key")
+      || readTypeValue(typeDef, "semanticModelKey")
       || getFieldsJson(typeDef)?.semanticModelKey
       || ""
     );
   }
 
   function getTypeName(typeDef) {
-    return readTypeValue(typeDef, "typeName", "type_name") || "";
+    return readTypeValue(typeDef, "typeName") || "";
   }
 
   function getSemanticModelByKey(modelKey) {
@@ -752,8 +751,8 @@ function createCanonicalPassportSerializer({
   }
 
   function getTableColumnDefinitions(fieldDef) {
-    if (fieldDef?.type !== "table" || !Array.isArray(fieldDef.table_columns)) return [];
-    return fieldDef.table_columns
+    if (fieldDef?.type !== "table" || !Array.isArray(fieldDef.tableColumns)) return [];
+    return fieldDef.tableColumns
       .map(normalizeTableColumnDefinition)
       .filter(Boolean);
   }

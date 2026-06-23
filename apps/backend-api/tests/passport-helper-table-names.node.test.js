@@ -5,6 +5,6 @@ const test = require("node:test");
 const { getTable } = require("../src/shared/passports/passport-helpers");
 
 test("passport storage table names always start with a valid identifier character", () => {
-  assert.equal(getTable("electronicsPassportV1"), "electronics_passport_v1_passports");
-  assert.equal(getTable("123Passport"), "type_123_passport_passports");
+  assert.equal(getTable("medicalDevicePassportV1"), "\"medicalDevicePassportV1Passports\"");
+  assert.equal(getTable("123Passport"), "\"type123PassportPassports\"");
 });

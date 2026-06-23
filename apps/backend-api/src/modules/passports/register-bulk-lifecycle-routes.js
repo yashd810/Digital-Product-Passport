@@ -59,7 +59,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       if (!uniqueGuids.length) return res.status(400).json({ error: "No valid passport GUIDs were provided." });
 
       const registryRes = await pool.query(
-        `SELECT "dppId", "passportType" FROM passport_registry WHERE "companyId" = $1 AND "dppId" = ANY($2::text[])`,
+        `SELECT "dppId", "passportType" FROM "passportRegistry" WHERE "companyId" = $1 AND "dppId" = ANY($2::text[])`,
         [companyId, uniqueGuids]
       );
 
@@ -74,7 +74,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       const batchPassportType = passportTypes.length === 1 ? passportTypes[0] : null;
 
       const batchRes = await pool.query(
-        `INSERT INTO passport_revision_batches
+        `INSERT INTO "passportRevisionBatches"
            ("companyId", "passportType", "requestedBy", "scopeType", "scopeMeta", "revisionNote", "changesJson",
             "submitToWorkflow", "reviewerId", "approverId", "totalTargeted")
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, "createdAt"`,
@@ -96,7 +96,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
       for (const [passportType, dppIds] of Object.entries(groupedItems)) {
         const tableName = getTable(passportType);
-        const typeRes = await pool.query('SELECT "fieldsJson" AS "fieldsJson", "displayName" AS "displayName" FROM passport_types WHERE "typeName" = $1', [passportType]);
+        const typeRes = await pool.query('SELECT "fieldsJson" AS "fieldsJson", "displayName" AS "displayName" FROM "passportTypes" WHERE "typeName" = $1', [passportType]);
         const sections = typeRes.rows[0]?.fieldsJson?.sections || [];
         const schemaFieldsByKey = new Map(sections.flatMap((section) => section.fields || []).map((field) => [field.key, field]));
         schemaFieldsByKey.set("modelName", { key: "modelName", label: "Model Name", type: "text" });
@@ -114,7 +114,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
         for (const dppId of dppIds) {
           const insertBatchItem = async (status, message, sourceVersion = null, newVersion = null) => {
             await pool.query(
-              `INSERT INTO passport_revision_batch_items
+              `INSERT INTO "passportRevisionBatchItems"
                  ("batchId", "passportDppId", "passportType", "sourceVersionNumber", "newVersionNumber", status, message)
                VALUES ($1,$2,$3,$4,$5,$6,$7)`,
               [batch.id, dppId, passportType, sourceVersion, newVersion, status, message || null]
@@ -139,7 +139,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           const blocker = blockerRes.rows[0];
           if (blocker) {
             const blockerStatus = normalizeReleaseStatus(blocker.releaseStatus);
-            const message = blockerStatus === "in_review"
+            const message = blockerStatus === "inReview"
               ? "A revision is already in workflow for this passport."
               : "An editable revision already exists for this passport.";
             details.push({ dppId, passportType, status: "skipped", sourceVersionNumber: source.versionNumber, message });
@@ -183,7 +183,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             const sourceRegistry = await pool.query(
               `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
                       "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
-               FROM passport_registry
+               FROM "passportRegistry"
                WHERE "dppId" = $1 AND "companyId" = $2
                LIMIT 1`,
               [dppId, companyId]
@@ -207,7 +207,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
               passportType,
               archivedBy: userId,
               actorIdentifier: getActorIdentifier(req.user),
-              snapshotReason: "after_bulk_revise_create",
+              snapshotReason: "afterBulkReviseCreate",
             });
 
             let detailStatus = submitToWorkflow ? "submitted" : "revised";
@@ -227,7 +227,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
             await logAudit(companyId, userId, "BULK_REVISE", tableName, newGuid,
               { versionNumber: sourceVersion, releaseStatus: source.releaseStatus },
-              { versionNumber: newVersion, releaseStatus: submitToWorkflow ? "in_review" : IN_REVISION_STATUS, batchId: batch.id, revisionNote: revisionNote || null, fieldsUpdated: Object.keys(mappedChanges) }
+              { versionNumber: newVersion, releaseStatus: submitToWorkflow ? "inReview" : IN_REVISION_STATUS, batchId: batch.id, revisionNote: revisionNote || null, fieldsUpdated: Object.keys(mappedChanges) }
             );
 
             details.push({ dppId: newGuid, passportType, status: detailStatus, sourceVersionNumber: sourceVersion, newVersionNumber: newVersion, message: detailMessage });
@@ -243,7 +243,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
       }
 
       await pool.query(
-        `UPDATE passport_revision_batches SET "revisedCount"=$1, "skippedCount"=$2, "failedCount"=$3, "updatedAt"=NOW() WHERE id=$4`,
+        `UPDATE "passportRevisionBatches" SET "revisedCount"=$1, "skippedCount"=$2, "failedCount"=$3, "updatedAt"=NOW() WHERE id=$4`,
         [revised, skipped, failed, batch.id]
       );
 
@@ -306,7 +306,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             passportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
-            snapshotReason: "before_bulk_release",
+            snapshotReason: "beforeBulkRelease",
           });
           const result = await pool.query(
             `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
@@ -325,10 +325,10 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             passportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
-            snapshotReason: "after_bulk_release",
+            snapshotReason: "afterBulkRelease",
           });
 
-          const typeRes = await pool.query('SELECT * FROM passport_types WHERE "typeName" = $1', [passportType]);
+          const typeRes = await pool.query('SELECT * FROM "passportTypes" WHERE "typeName" = $1', [passportType]);
           const sigData = await signPassport({ ...releasedRow, passportType }, typeRes.rows[0] || null);
           if (sigData) {
             await recordSignedDppRelease(pool, {
@@ -340,28 +340,28 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
               sigData,
               releaseNote: item?.releaseNote || null,
             });
-            await logAudit(companyId, userId, "SIGN_PASSPORT", "passport_signatures", dppId, null, {
+            await logAudit(companyId, userId, "SIGN_PASSPORT", "passportSignatures", dppId, null, {
               versionNumber: releasedRow.versionNumber,
-              signing_key_id: sigData.keyId,
-              signature_algorithm: sigData.signatureAlgorithm,
-              source: "bulk_release",
+              signingKeyId: sigData.keyId,
+              signatureAlgorithm: sigData.signatureAlgorithm,
+              source: "bulkRelease",
             }, {
               actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || req.user.email || `user:${req.user.userId}`,
-              audience: "economic_operator",
+              audience: "economicOperator",
             });
           }
 
           await markOlderVersionsObsolete(tableName, dppId, releasedRow.versionNumber, passportType);
-          await logAudit(companyId, userId, "RELEASE", tableName, dppId, { releaseStatus: "draft_or_in_revision" }, { releaseStatus: "released" });
+          await logAudit(companyId, userId, "RELEASE", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
           details.push({
             dppId,
             status: "released",
             version: releasedRow.versionNumber,
             compliance,
             verificationStatus: compliance?.blockingIssues?.length
-              ? "released_with_issues"
+              ? "releasedWithIssues"
               : compliance?.completeness?.missingFields?.length
-                ? "released_with_missing_fields"
+                ? "releasedWithMissingFields"
                 : "ready",
           });
           released += 1;
@@ -418,7 +418,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             passportType,
             archivedBy: userId,
             actorIdentifier: getActorIdentifier(req.user),
-            snapshotReason: "before_bulk_archive_delete",
+            snapshotReason: "beforeBulkArchiveDelete",
           });
           await pool.query(
             `UPDATE ${tableName} SET "deletedAt" = NOW() WHERE "lineageId" = $1 AND "companyId" = $2 AND "deletedAt" IS NULL`,
@@ -428,11 +428,13 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             await replicatePassportToBackup({
               passport: { ...row, passportType },
               passportType,
-              reason: "bulk_archive",
-              snapshotScope: "archived_history",
-            }).catch(() => {});
+              reason: "bulkArchive",
+              snapshotScope: "archivedHistory",
+            }).catch((error) => {
+              logger.warn({ err: error, dppId: row.dppId, passportType, reason: "bulkArchive" }, "Failed to replicate bulk archive to backup");
+            });
           }
-          await logAudit(companyId, userId, "ARCHIVE", tableName, dppId, null, { versions_archived: rows.rows.length });
+          await logAudit(companyId, userId, "ARCHIVE", tableName, dppId, null, { versionsArchived: rows.rows.length });
           archived += 1;
         } catch {
           skipped += 1;
@@ -459,7 +461,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
         try {
           const contextRes = await pool.query(
             `SELECT "lineageId", "passportType"
-             FROM passport_archives
+             FROM "passportArchives"
              WHERE ("dppId" = $1 OR "lineageId" = $1)
                AND "companyId" = $2
                AND ${ARCHIVED_HISTORY_FILTER_SQL}
@@ -473,7 +475,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           const lineageId = contextRes.rows[0].lineageId;
           const archiveRows = await pool.query(
             `SELECT *
-             FROM passport_archives
+             FROM "passportArchives"
              WHERE "lineageId" = $1
                AND "companyId" = $2
                AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
@@ -487,13 +489,13 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           const tableName = getTable(passportType);
           await pool.query(`UPDATE ${tableName} SET "deletedAt" = NULL WHERE "lineageId" = $1 AND "companyId" = $2`, [lineageId, companyId]);
           await pool.query(
-            `DELETE FROM passport_archives
+            `DELETE FROM "passportArchives"
              WHERE "lineageId" = $1
                AND "companyId" = $2
                AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
             [lineageId, companyId]
           );
-          await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versions_restored: archiveRows.rows.length });
+          await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versionsRestored: archiveRows.rows.length });
           restored += 1;
         } catch {
           skipped += 1;

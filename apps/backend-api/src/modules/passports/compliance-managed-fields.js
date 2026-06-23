@@ -26,8 +26,8 @@ function createComplianceManagedFieldHelpers({
 
   async function loadCompanyComplianceIdentity(companyId) {
     const result = await pool.query(
-      `SELECT economic_operator_identifier AS "economicOperatorIdentifier",
-              economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
+      `SELECT "economicOperatorIdentifier" AS "economicOperatorIdentifier",
+              "economicOperatorIdentifierScheme" AS "economicOperatorIdentifierScheme"
        FROM companies
        WHERE id = $1
        LIMIT 1`,
@@ -38,11 +38,11 @@ function createComplianceManagedFieldHelpers({
 
   async function validateExplicitFacilityId({ companyId, facilityId }) {
     const result = await pool.query(
-      `SELECT facility_identifier
-       FROM company_facilities
-       WHERE company_id = $1
-         AND facility_identifier = $2
-         AND is_active = true
+      `SELECT "facilityIdentifier"
+       FROM "companyFacilities"
+       WHERE "companyId" = $1
+         AND "facilityIdentifier" = $2
+         AND "isActive" = true
        LIMIT 1`,
       [companyId, facilityId]
     ).catch(() => ({ rows: [] }));
@@ -69,15 +69,15 @@ function createComplianceManagedFieldHelpers({
     if (!allowDefaultFacility) return null;
 
     const defaultFacilityRes = await pool.query(
-      `SELECT facility_identifier
-       FROM company_facilities
-       WHERE company_id = $1
-         AND is_active = true
-       ORDER BY updated_at DESC, id DESC`,
+      `SELECT "facilityIdentifier"
+       FROM "companyFacilities"
+       WHERE "companyId" = $1
+         AND "isActive" = true
+       ORDER BY "updatedAt" DESC, id DESC`,
       [companyId]
     ).catch(() => ({ rows: [] }));
     if (defaultFacilityRes.rows.length === 1) {
-      return defaultFacilityRes.rows[0].facility_identifier || null;
+      return defaultFacilityRes.rows[0].facilityIdentifier || null;
     }
     return null;
   }

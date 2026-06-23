@@ -272,7 +272,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
     fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols?flat=true`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : [])
       .then(setSymbols)
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [companyId]);
 
   // Pre-fill values when editing or cloning into a new template.
@@ -602,8 +602,9 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates`, { headers: authHeaders() });
       if (r.ok) setTemplates(await r.json());
-    } catch {}
-    finally { setLoading(false); }
+    } catch (error) {
+      console.warn("Failed to load templates", error);
+    } finally { setLoading(false); }
   }, [companyId]);
 
   useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
@@ -612,7 +613,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
     fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setPassportTypes)
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [companyId]);
 
   // Load template for editing when routed to edit view
@@ -636,8 +637,8 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
       if (!r.ok) throw new Error("Failed to load template");
       const cloneTemplate = await r.json();
       navigate(newTemplatePath, { state: { cloneTemplate } });
-    } catch {
-      // Keep the list stable if the clone source cannot be fetched.
+    } catch (error) {
+      console.warn("Failed to load template for cloning", error);
     }
   };
 
@@ -645,7 +646,9 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
     try {
       const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
       if (r.ok) setBulkModal(await r.json());
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to load template for bulk creation", error);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -656,8 +659,9 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
         method: "DELETE", headers: authHeaders(),
       });
       setTemplates(prev => prev.filter(t => t.id !== id));
-    } catch {}
-    finally { setDeleting(null); }
+    } catch (error) {
+      console.warn("Failed to delete template", error);
+    } finally { setDeleting(null); }
   };
 
   const handleSaved = () => {
@@ -774,9 +778,9 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
                       </div>
                     </div>
 
-                    {parseInt(t.model_field_count) > 0 && (
+                    {parseInt(t.modelFieldCount) > 0 && (
                       <div className="tmpl-card-model-count">
-                        📌 {t.model_field_count} model data field{t.model_field_count !== "1" ? "s" : ""}
+                        📌 {t.modelFieldCount} model data field{Number(t.modelFieldCount) !== 1 ? "s" : ""}
                       </div>
                     )}
 

@@ -34,9 +34,9 @@ module.exports = function registerApiKeyRoutes(app, deps) {
   app.get("/api/companies/:companyId/api-keys", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT id, name, key_prefix AS "keyPrefix", scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality",
-                expires_at AS "expiresAt", created_at AS "createdAt", last_used_at AS "lastUsedAt", is_active AS "isActive"
-         FROM api_keys WHERE company_id = $1 ORDER BY created_at DESC`,
+        `SELECT id, name, "keyPrefix" AS "keyPrefix", scopes, "operatorType" AS "operatorType", "accessMode" AS "accessMode", "maxConfidentiality" AS "maxConfidentiality",
+                "expiresAt" AS "expiresAt", "createdAt" AS "createdAt", "lastUsedAt" AS "lastUsedAt", "isActive" AS "isActive"
+         FROM "apiKeys" WHERE "companyId" = $1 ORDER BY "createdAt" DESC`,
         [req.params.companyId]
       );
       res.json(result.rows.map(mapApiKeyRow));
@@ -72,7 +72,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       }
 
       const count = await pool.query(
-        "SELECT COUNT(*) FROM api_keys WHERE company_id = $1 AND is_active = true",
+        "SELECT COUNT(*) FROM \"apiKeys\" WHERE \"companyId\" = $1 AND \"isActive\" = true",
         [req.params.companyId]
       );
       if (parseInt(count.rows[0].count, 10) >= 10) {
@@ -83,12 +83,12 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       const keyRecord = buildApiKeyHashRecord(rawKey);
 
       const result = await pool.query(
-        `INSERT INTO api_keys (
-           company_id, name, key_hash, key_prefix, key_salt, hash_algorithm, scopes,
-           operator_type, access_mode, max_confidentiality, expires_at, created_by
+        `INSERT INTO "apiKeys" (
+           "companyId", name, "keyHash", "keyPrefix", "keySalt", "hashAlgorithm", scopes,
+           "operatorType", "accessMode", "maxConfidentiality", "expiresAt", "createdBy"
          )
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-         RETURNING id, name, key_prefix AS "keyPrefix", scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality", expires_at AS "expiresAt", created_at AS "createdAt"`,
+         RETURNING id, name, "keyPrefix" AS "keyPrefix", scopes, "operatorType" AS "operatorType", "accessMode" AS "accessMode", "maxConfidentiality" AS "maxConfidentiality", "expiresAt" AS "expiresAt", "createdAt" AS "createdAt"`,
         [
           req.params.companyId,
           name.trim(),
@@ -115,7 +115,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
   app.delete("/api/companies/:companyId/api-keys/:keyId", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const result = await pool.query(
-        'UPDATE api_keys SET is_active = false, updated_at = NOW() WHERE id = $1 AND company_id = $2 RETURNING id, company_id AS "companyId", name, scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality", expires_at AS "expiresAt", is_active AS "isActive"',
+        'UPDATE "apiKeys" SET "isActive" = false, "updatedAt" = NOW() WHERE id = $1 AND "companyId" = $2 RETURNING id, "companyId" AS "companyId", name, scopes, "operatorType" AS "operatorType", "accessMode" AS "accessMode", "maxConfidentiality" AS "maxConfidentiality", "expiresAt" AS "expiresAt", "isActive" AS "isActive"',
         [req.params.keyId, req.params.companyId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Key not found" });
@@ -124,13 +124,13 @@ module.exports = function registerApiKeyRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "REVOKE_API_KEY",
-        "api_keys",
+        "apiKeys",
         String(req.params.keyId),
         result.rows[0],
         { revoked: true },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "company_admin",
+          audience: "companyAdmin",
         }
       );
 
@@ -146,7 +146,9 @@ module.exports = function registerApiKeyRoutes(app, deps) {
           scopes: result.rows[0].scopes || [],
           keyName: result.rows[0].name || null,
         },
-      }).catch(() => {});
+      }).catch((error) => {
+        logger.warn({ err: error, companyId: req.params.companyId, apiKeyId: req.params.keyId }, "Failed to replicate API key revocation event");
+      });
 
       res.json({ success: true });
     } catch {
@@ -158,11 +160,11 @@ module.exports = function registerApiKeyRoutes(app, deps) {
     try {
       const reason = req.body?.reason || "API key access revoked";
       const result = await pool.query(
-        `UPDATE api_keys
-         SET is_active = false,
-             updated_at = NOW()
-         WHERE id = $1 AND company_id = $2
-         RETURNING id, company_id AS "companyId", name, scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality", expires_at AS "expiresAt", is_active AS "isActive"`,
+        `UPDATE "apiKeys"
+         SET "isActive" = false,
+             "updatedAt" = NOW()
+         WHERE id = $1 AND "companyId" = $2
+         RETURNING id, "companyId" AS "companyId", name, scopes, "operatorType" AS "operatorType", "accessMode" AS "accessMode", "maxConfidentiality" AS "maxConfidentiality", "expiresAt" AS "expiresAt", "isActive" AS "isActive"`,
         [req.params.keyId, req.params.companyId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Key not found" });
@@ -171,13 +173,13 @@ module.exports = function registerApiKeyRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "REVOKE_API_KEY",
-        "api_keys",
+        "apiKeys",
         String(req.params.keyId),
         result.rows[0],
         { revoked: true, reason },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "company_admin",
+          audience: "companyAdmin",
         }
       );
 
@@ -194,7 +196,9 @@ module.exports = function registerApiKeyRoutes(app, deps) {
           scopes: result.rows[0].scopes || [],
           keyName: result.rows[0].name || null,
         },
-      }).catch(() => {});
+      }).catch((error) => {
+        logger.warn({ err: error, companyId: req.params.companyId, apiKeyId: req.params.keyId }, "Failed to replicate API key revocation event");
+      });
 
       res.json({ success: true, revoked: true, emergency: false, apiKey: result.rows[0] });
     } catch {
@@ -207,12 +211,12 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       const reason = req.body?.reason || "Emergency API key revocation";
       const effectiveAt = new Date().toISOString();
       const result = await pool.query(
-        `UPDATE api_keys
-         SET is_active = false,
-             expires_at = NOW(),
-             updated_at = NOW()
-         WHERE id = $1 AND company_id = $2
-         RETURNING id, company_id AS "companyId", name, scopes, operator_type AS "operatorType", access_mode AS "accessMode", max_confidentiality AS "maxConfidentiality", expires_at AS "expiresAt", is_active AS "isActive"`,
+        `UPDATE "apiKeys"
+         SET "isActive" = false,
+             "expiresAt" = NOW(),
+             "updatedAt" = NOW()
+         WHERE id = $1 AND "companyId" = $2
+         RETURNING id, "companyId" AS "companyId", name, scopes, "operatorType" AS "operatorType", "accessMode" AS "accessMode", "maxConfidentiality" AS "maxConfidentiality", "expiresAt" AS "expiresAt", "isActive" AS "isActive"`,
         [req.params.keyId, req.params.companyId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Key not found" });
@@ -221,13 +225,13 @@ module.exports = function registerApiKeyRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "EMERGENCY_REVOKE_API_KEY",
-        "api_keys",
+        "apiKeys",
         String(req.params.keyId),
         result.rows[0],
-        { revoked: true, emergency: true, reason, effective_at: effectiveAt },
+        { revoked: true, emergency: true, reason, effectiveAt },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-          audience: "company_admin",
+          audience: "companyAdmin",
         }
       );
 
@@ -245,7 +249,9 @@ module.exports = function registerApiKeyRoutes(app, deps) {
           scopes: result.rows[0].scopes || [],
           keyName: result.rows[0].name || null,
         },
-      }).catch(() => {});
+      }).catch((error) => {
+        logger.warn({ err: error, companyId: req.params.companyId, apiKeyId: req.params.keyId }, "Failed to replicate emergency API key revocation event");
+      });
 
       res.json({
         success: true,

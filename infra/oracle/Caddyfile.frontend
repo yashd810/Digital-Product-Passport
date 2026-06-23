@@ -24,7 +24,7 @@ claros-dpp.online, www.claros-dpp.online {
 	import production_tls_policy
 	import security_headers
 	@dictionaryArtifacts {
-		path /dictionary/battery/v1/context.jsonld /dictionary/battery/v1/catalog.jsonld /dictionary/battery/v1/manifest.json /dictionary/battery/v1/category-rules.json /dictionary/battery/v1/categories /dictionary/battery/v1/units /dictionary/battery/v1/field-map /dictionary/battery/v1/terms*
+		path_regexp ^/dictionary/[^/]+/[^/]+/(context\.jsonld|catalog\.jsonld|manifest\.json|categories|units|terms(?:/.*)?)$
 	}
 	reverse_proxy @dictionaryArtifacts https://api.claros-dpp.online {
 		header_up Host api.claros-dpp.online

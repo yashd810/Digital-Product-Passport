@@ -106,7 +106,7 @@ function registerSupportRoutes(app, deps) {
                 "mimeType",
                 "filePath",
                 "storageKey"
-         FROM passport_attachments
+         FROM "passportAttachments"
          WHERE "publicId" = $1`,
         [publicId]
       );

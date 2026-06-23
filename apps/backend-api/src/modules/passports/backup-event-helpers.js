@@ -27,7 +27,7 @@ function createBackupEventHelpers({
     passportType = null,
     companyName = "",
     reason = "manual",
-    snapshotScope = "released_current",
+    snapshotScope = "releasedCurrent",
   }) {
     if (!backupProviderService || !passport?.dppId || !passport?.companyId) {
       return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };

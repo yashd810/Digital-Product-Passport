@@ -141,7 +141,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
           if (row) {
             results.push({ ...normalizePassportRow(row, typeSchema), passportType: typeSchema.typeName, _status: "found" });
           } else {
-            results.push({ dppId: dppId || undefined, internalAliasId: internalAliasId || undefined, _status: "not_found" });
+            results.push({ dppId: dppId || undefined, internalAliasId: internalAliasId || undefined, _status: "notFound" });
           }
         } catch (error) {
           results.push({ dppId: dppId || undefined, internalAliasId: internalAliasId || undefined, _status: "error", error: error.message });
@@ -165,7 +165,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       if (!passportType) return res.status(400).json({ error: "passportType is required" });
 
       const typeResult = await pool.query(
-        'SELECT "fieldsJson" AS "fieldsJson", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey" FROM passport_types WHERE "typeName" = $1',
+        'SELECT "fieldsJson" AS "fieldsJson", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey" FROM "passportTypes" WHERE "typeName" = $1',
         [passportType]
       );
       if (!typeResult.rows.length) return res.status(404).json({ error: "Passport type not found" });
@@ -185,7 +185,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         statusSql = "";
       } else if (statusFilter === "released") {
         statusSql = ' AND "releaseStatus" = \'released\'';
-      } else if (statusFilter === "in_revision") {
+      } else if (statusFilter === "inRevision") {
         statusSql = ` AND "releaseStatus" IN ${IN_REVISION_STATUSES_SQL}`;
       } else {
         statusSql = ` AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
@@ -255,7 +255,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       const { search, passportType } = req.query;
 
       let query = `SELECT pa.*, u.email AS "archivedByEmail", u."firstName" AS "archivedByFirstName", u."lastName" AS "archivedByLastName"
-                   FROM passport_archives pa
+                   FROM "passportArchives" pa
                LEFT JOIN users u ON u.id = pa."archivedBy"
                WHERE pa."companyId" = $1
                  AND ${ARCHIVED_HISTORY_FILTER_SQL}`;
@@ -276,25 +276,25 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
         SELECT
           sub.*,
           COALESCE(phv."isPublic", sub."releaseStatus" IN ('released', 'obsolete')) AS "isPublic",
-          public_version."versionNumber" AS "publicVersionNumber"
+          publicVersion."versionNumber" AS "publicVersionNumber"
         FROM (${query}) sub
-        LEFT JOIN passport_history_visibility phv
+        LEFT JOIN "passportHistoryVisibility" phv
           ON phv."passportDppId" = sub."dppId"
          AND phv."versionNumber" = sub."versionNumber"
         LEFT JOIN LATERAL (
-          SELECT pa_public."versionNumber"
-          FROM passport_archives pa_public
-          LEFT JOIN passport_history_visibility phv_public
-            ON phv_public."passportDppId" = pa_public."dppId"
-           AND phv_public."versionNumber" = pa_public."versionNumber"
-          WHERE pa_public."lineageId" = sub."lineageId"
-            AND pa_public."companyId" = sub."companyId"
-            AND ${ARCHIVED_HISTORY_FILTER_SQL.replaceAll("\"snapshotReason\"", "pa_public.\"snapshotReason\"")}
-            AND pa_public."releaseStatus" IN ('released', 'obsolete')
-            AND COALESCE(phv_public."isPublic", true) = true
-          ORDER BY pa_public."versionNumber" DESC, pa_public."archivedAt" DESC
+          SELECT paPublic."versionNumber"
+          FROM "passportArchives" paPublic
+          LEFT JOIN "passportHistoryVisibility" phvPublic
+            ON phvPublic."passportDppId" = paPublic."dppId"
+           AND phvPublic."versionNumber" = paPublic."versionNumber"
+          WHERE paPublic."lineageId" = sub."lineageId"
+            AND paPublic."companyId" = sub."companyId"
+            AND ${ARCHIVED_HISTORY_FILTER_SQL.replaceAll("\"snapshotReason\"", "paPublic.\"snapshotReason\"")}
+            AND paPublic."releaseStatus" IN ('released', 'obsolete')
+            AND COALESCE(phvPublic."isPublic", true) = true
+          ORDER BY paPublic."versionNumber" DESC, paPublic."archivedAt" DESC
           LIMIT 1
-        ) public_version ON true
+        ) publicVersion ON true
         ORDER BY sub."lineageId", sub."versionNumber" DESC, sub."archivedAt" DESC
       `;
 
@@ -322,7 +322,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       // Get passport type schema for normalization
       const typeDef = await pool.query(
         `SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson"
-         FROM passport_types
+         FROM "passportTypes"
          WHERE "typeName" = $1
          LIMIT 1`,
         [resolved.passport.passportType || passportType]

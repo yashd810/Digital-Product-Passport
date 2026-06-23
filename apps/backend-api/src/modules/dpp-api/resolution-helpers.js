@@ -82,14 +82,14 @@ function createResolutionHelpers({
     editableOnly = false,
     atDate = null
   } = {}) {
-    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM passport_types ORDER BY "typeName"');
+    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM "passportTypes" ORDER BY "typeName"');
     const matches = [];
 
     for (const typeRow of typeRows.rows) {
       const tableName = getTable(typeRow.typeName);
       const liveParams = [stableId];
       const statusSql = editableOnly ?
-        `"releaseStatus" IN ('draft', 'in_revision')` :
+        `"releaseStatus" IN ('draft', 'inRevision')` :
         versionNumber !== null && versionNumber !== undefined ?
           `"releaseStatus" IN ('released', 'obsolete')` :
           `"releaseStatus" = 'released'`;
@@ -126,7 +126,7 @@ function createResolutionHelpers({
       }
       const archiveRes = await pool.query(
         `SELECT "archivedAt", "productIdentifierDid", "rowData"
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE ("lineageId" = $1 OR "dppId"::text = $1)
            AND "passportType" = $2
            AND ${versionNumber !== null && versionNumber !== undefined ? `"releaseStatus" IN ('released', 'obsolete')` : `"releaseStatus" = 'released'`}${archiveVersionSql}
@@ -237,7 +237,7 @@ function createResolutionHelpers({
     );
     const archiveRes = await pool.query(
       `SELECT "productIdentifierDid", "archivedAt", "rowData"
-       FROM passport_archives
+       FROM "passportArchives"
        WHERE "companyId" = $2
          AND "passportType" = $3
          AND ("internalAliasId" = ANY($1::text[]) OR "productIdentifierDid" = ANY($1::text[]))
@@ -272,7 +272,7 @@ function createResolutionHelpers({
 
     const [companyNameMap, typeRes] = await Promise.all([
       getCompanyNameMap([companyId]),
-      pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM passport_types WHERE "typeName" = $1', [passportType])]
+      pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM "passportTypes" WHERE "typeName" = $1', [passportType])]
     );
 
     return {
@@ -296,7 +296,7 @@ function createResolutionHelpers({
       internalAliasId: parsed.internalAliasId,
       granularity: parsed.granularity || "item"
     }) || [parsed.internalAliasId];
-    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM passport_types ORDER BY "typeName"');
+    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM "passportTypes" ORDER BY "typeName"');
 
     const matches = [];
     for (const typeRow of typeRows.rows) {
@@ -306,7 +306,7 @@ function createResolutionHelpers({
          FROM ${tableName}
          WHERE "companyId" = $2
            AND ("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))
-           AND "releaseStatus" IN ('draft', 'in_revision')
+           AND "releaseStatus" IN ('draft', 'inRevision')
            AND "deletedAt" IS NULL
          ORDER BY "versionNumber" DESC, "updatedAt" DESC
          LIMIT 1`,
@@ -336,7 +336,7 @@ function createResolutionHelpers({
       return resolveEditablePassportByDppId(productIdentifier);
     }
 
-    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM passport_types ORDER BY "typeName"');
+    const typeRows = await pool.query('SELECT "typeName" AS "typeName", "productCategory" AS "productCategory", "semanticModelKey" AS "semanticModelKey", "fieldsJson" AS "fieldsJson" FROM "passportTypes" ORDER BY "typeName"');
     const matches = [];
 
     for (const typeRow of typeRows.rows) {
@@ -358,7 +358,7 @@ function createResolutionHelpers({
         `SELECT *
          FROM ${tableName}
          WHERE ("internalAliasId" = ANY($1::text[]) OR "uniqueProductIdentifier" = ANY($1::text[]))${companySql}
-           AND "releaseStatus" IN ('draft', 'in_revision')
+           AND "releaseStatus" IN ('draft', 'inRevision')
            AND "deletedAt" IS NULL
          ORDER BY "versionNumber" DESC, "updatedAt" DESC
          LIMIT 1`,

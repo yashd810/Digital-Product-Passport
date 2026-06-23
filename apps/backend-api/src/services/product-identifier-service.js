@@ -14,7 +14,7 @@ function createProductIdentifierService({ didService, pool = null }) {
   }
 
   function getBusinessIdentifierField(typeDef = null) {
-    const fieldsJson = typeDef?.fieldsJson || typeDef?.fields_json || typeDef || {};
+    const fieldsJson = typeDef?.fieldsJson || typeDef?.fieldsJson || typeDef || {};
     return normalizeRawProductId(fieldsJson?.identity?.businessIdentifierField || "");
   }
 
@@ -124,7 +124,7 @@ function createProductIdentifierService({ didService, pool = null }) {
   function getIdentifierPersistencePolicy({ companyId = null } = {}) {
     return {
       companyId: companyId !== null && companyId !== undefined ? Number.parseInt(companyId, 10) || null : null,
-      selectedGlobalIdentifierScheme: "did_web_product_identifier",
+      selectedGlobalIdentifierScheme: "didWebProductIdentifier",
       uniqueProductIdentifierField: "uniqueProductIdentifier",
       localProductIdField: "internalAliasId",
       dppRecordIdentifierField: "dppId",
@@ -141,20 +141,20 @@ function createProductIdentifierService({ didService, pool = null }) {
         inPlaceGranularityReassignmentAllowed: false,
       },
       granularityChangePolicy: {
-        mode: "linked_new_identifier_required",
+        mode: "linkedNewIdentifierRequired",
         linkageField: "lineageId",
         note: "Granularity changes must mint a new identifier linked through the shared lineageId rather than reassigning an existing identifier in place.",
       },
       resolutionContinuity: {
-        activeSource: "live_passport_or_public_route",
-        archiveSource: "passport_archives",
-        economicOperatorInactiveSource: "backup_public_handover_when_activated",
+        activeSource: "livePassportOrPublicRoute",
+        archiveSource: "passportArchives",
+        economicOperatorInactiveSource: "backupPublicHandoverWhenActivated",
       },
       operationalDependencies: [
-        "did_web_domain_continuity",
-        "public_origin_continuity",
-        "backup_provider_verification",
-        "archive_retention",
+        "didWebDomainContinuity",
+        "publicOriginContinuity",
+        "backupProviderVerification",
+        "archiveRetention",
       ],
     };
   }
@@ -197,7 +197,7 @@ function createProductIdentifierService({ didService, pool = null }) {
     if (!client) throw new Error("A database client is required to record identifier lineage");
 
     const result = await client.query(
-      `INSERT INTO product_identifier_lineage
+      `INSERT INTO "productIdentifierLineage"
          ("companyId", "lineageId", "previousPassportDppId", "replacementPassportDppId",
           "previousIdentifier", "replacementIdentifier", "previousInternalAliasId",
           "replacementInternalAliasId", "previousGranularity", "replacementGranularity",
@@ -255,7 +255,7 @@ function createProductIdentifierService({ didService, pool = null }) {
 
     const result = await client.query(
       `SELECT *
-       FROM product_identifier_lineage
+       FROM "productIdentifierLineage"
        WHERE ${filters.join(" AND ")}
        ORDER BY "createdAt" ASC, id ASC`,
       params

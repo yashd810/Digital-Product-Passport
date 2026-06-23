@@ -37,7 +37,7 @@ function Landing({ isAuthenticated, user, onLogout }) {
                 <button onClick={() => navigate(dashboardHomePath)} className="lp-nav-btn">
                   Dashboard
                 </button>
-                {user?.role === "super_admin" && (
+                {user?.role === "superAdmin" && (
                   <button onClick={() => navigate("/admin")} className="lp-nav-btn lp-nav-admin">
                     Admin Panel
                   </button>
@@ -65,7 +65,7 @@ function Landing({ isAuthenticated, user, onLogout }) {
         <div className="lp-hero-bg" aria-hidden="true" />
         <div className="lp-hero-grid" aria-hidden="true" />
         <div className="lp-hero-inner">
-          <div className="lp-hero-eyebrow">EU ESPR · Battery Regulation · Circularity</div>
+          <div className="lp-hero-eyebrow">EU DPP readiness · Governed schemas · Circularity</div>
           <h1 className="lp-hero-title">
             Digital Product Passports,<br/>
             <span className="lp-hl">Built for Compliance.</span>
@@ -88,7 +88,7 @@ function Landing({ isAuthenticated, user, onLogout }) {
               <button onClick={() => navigate(dashboardHomePath)} className="lp-btn lp-btn-primary">
                 Go to Dashboard →
               </button>
-              {user?.role === "super_admin" && (
+              {user?.role === "superAdmin" && (
                 <button onClick={() => navigate("/admin")} className="lp-btn lp-btn-outline">
                   Admin Panel
                 </button>
@@ -127,17 +127,17 @@ function Landing({ isAuthenticated, user, onLogout }) {
       {/* ── PASSPORT TYPES ── */}
       <section className="lp-section" aria-labelledby="lp-types-title">
         <div className="lp-container">
-          <span className="lp-eyebrow">Supported Regulations</span>
+          <span className="lp-eyebrow">Configurable Passport Types</span>
           <h2 className="lp-section-title" id="lp-types-title">
-            Passport types <span className="lp-hl">built for EU mandates</span>
+            Passport structures <span className="lp-hl">built around your products</span>
           </h2>
           <div className="lp-types-grid">
             {[
-              { icon: "⚡", title: "Battery",       reg: "EU Battery Regulation 2027" },
-              { icon: "🧵", title: "Textile",       reg: "Textile DPP 2026" },
-              { icon: "🏗️", title: "Steel",         reg: "ESPR — Industrial Materials" },
-              { icon: "🎮", title: "Toys",          reg: "ESPR — Consumer Products" },
-              { icon: "🏢", title: "Construction",  reg: "ESPR — Building Materials" },
+              { icon: "🧩", title: "Custom Schemas", reg: "Define sections, fields, tables, and governance rules." },
+              { icon: "🏷️", title: "Product Identity", reg: "Support model, batch, item, and internal alias identifiers." },
+              { icon: "📎", title: "Evidence", reg: "Connect files, certificates, symbols, and repository records." },
+              { icon: "🔎", title: "Public Viewer", reg: "Publish clear passport views with QR-ready access." },
+              { icon: "🛡️", title: "Controlled Access", reg: "Separate public, restricted, and regulated field audiences." },
             ].map(t => (
               <div key={t.title} className="lp-type-card">
                 <div className="lp-type-icon" aria-hidden="true">{t.icon}</div>

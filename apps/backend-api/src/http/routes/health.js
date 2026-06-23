@@ -14,13 +14,13 @@ module.exports = function registerHealthRoutes(app, { pool, storageService }) {
         status: "OK",
         architecture: "dynamic-per-company-tables",
         database: "connected",
-        storage: "not_checked",
+        storage: "notChecked",
       });
     } catch (_err) {
       res.status(503).json({
         status: "UNAVAILABLE",
         database: "disconnected",
-        storage: "not_checked",
+        storage: "notChecked",
         error: "Database connection failed",
       });
     }
@@ -45,7 +45,7 @@ module.exports = function registerHealthRoutes(app, { pool, storageService }) {
     }
 
     const probeBody = Buffer.from(JSON.stringify({
-      type: "storage_probe",
+      type: "storageProbe",
       timestamp: new Date().toISOString(),
       nonce: crypto.randomUUID(),
     }), "utf8");

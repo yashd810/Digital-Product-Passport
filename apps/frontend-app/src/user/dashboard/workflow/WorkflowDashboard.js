@@ -12,8 +12,8 @@ import "../../../admin/styles/AdminDashboard.css";
 const API = import.meta.env.VITE_API_URL || "";
 
 const STATUS_MAP = {
-  submitted_for_review:    { label:"In Review",   icon:"🔍" },
-  submitted_for_approval:  { label:"In Approval", icon:"📋" },
+  submittedForReview:    { label:"In Review",   icon:"🔍" },
+  submittedForApproval:  { label:"In Approval", icon:"📋" },
   released:                { label:"Released",    icon:"✅" },
   rejected:                { label:"Rejected",    icon:"❌" },
 };
@@ -82,7 +82,7 @@ function VerificationCheckerNotice({ verification, compliance }) {
         <span className={`wf-checker-status ${verification?.status || "unknown"}`}>
           {verification?.status === "ready"
             ? "Ready"
-            : verification?.status === "missing_required_fields"
+            : verification?.status === "missingRequiredFields"
               ? "Missing required fields"
               : "Not run yet"}
         </span>
@@ -138,11 +138,11 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     .then(r => r.json())
     .then(data => {
       const eligible = data.filter(u =>
-        (u.role === "editor" || u.role === "company_admin") && u.id !== user?.id
+        (u.role === "editor" || u.role === "companyAdmin") && u.id !== user?.id
       );
       setTeamUsers(eligible);
     })
-    .catch(() => {});
+    .catch((error) => console.warn("Ignored async error", error));
 
     // Pre-fill from user defaults
     fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
@@ -151,7 +151,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
       if (d.defaultReviewerId) setReviewerId(String(d.defaultReviewerId));
       if (d.defaultApproverId) setApproverId(String(d.defaultApproverId));
     })
-    .catch(() => {});
+    .catch((error) => console.warn("Ignored async error", error));
   }, [companyId, user?.id]);
 
   const runVerificationCheck = useCallback(async () => {
@@ -212,7 +212,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
             compliance: d.compliance,
             verification: {
               status: d.compliance?.completeness?.missingMandatoryFields?.length
-                  ? "missing_required_fields"
+                  ? "missingRequiredFields"
                   : "ready",
               passedChecks: [],
               completenessPercentage: d.compliance?.completeness?.percentage ?? 0,
@@ -535,8 +535,8 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
         </td>
         <td><WorkflowBadge status={
           wf.overallStatus === "rejected" ? "rejected" :
-          wf.reviewStatus === "pending" ? "submitted_for_review" :
-          wf.approvalStatus === "pending" ? "submitted_for_approval" :
+          wf.reviewStatus === "pending" ? "submittedForReview" :
+          wf.approvalStatus === "pending" ? "submittedForApproval" :
           "released"
         } /></td>
         <td className="small-text">
@@ -589,8 +589,8 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     { key: "modelName", type: "string", getValue: (wf) => getWorkflowModelName(wf) },
     { key: "status", type: "string", getValue: (wf) => (
       wf.overallStatus === "rejected" ? "rejected" :
-      wf.reviewStatus === "pending" ? "submitted_for_review" :
-      wf.approvalStatus === "pending" ? "submitted_for_approval" :
+      wf.reviewStatus === "pending" ? "submittedForReview" :
+      wf.approvalStatus === "pending" ? "submittedForApproval" :
       "released"
     ) },
     { key: "reviewerName", type: "string", getValue: (wf) => wf.reviewerName || "" },

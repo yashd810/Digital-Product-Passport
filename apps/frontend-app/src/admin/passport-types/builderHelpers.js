@@ -5,52 +5,52 @@ export const TRANS_LANGS = LANGUAGES.filter((language) => language.code !== "en"
 export const ACCESS_LEVELS = [
   { value: "public",              label: "Public" },
   { value: "consumers",           label: "Consumers" },
-  { value: "economic_operator",   label: "Economic Operators" },
+  { value: "economicOperator",   label: "Economic Operators" },
   { value: "manufacturer",        label: "Manufacturers" },
-  { value: "authorized_representative", label: "Authorized Representatives" },
+  { value: "authorizedRepresentative", label: "Authorized Representatives" },
   { value: "importer",            label: "Importers" },
   { value: "distributor",         label: "Distributors" },
   { value: "dealer",              label: "Dealers" },
-  { value: "fulfilment_service_provider", label: "Fulfilment Service Providers" },
-  { value: "delegated_operator",  label: "Delegated Operators" },
-  { value: "professional_repairer", label: "Professional Repairers" },
-  { value: "independent_operator", label: "Independent Operators" },
+  { value: "fulfilmentServiceProvider", label: "Fulfilment Service Providers" },
+  { value: "delegatedOperator",  label: "Delegated Operators" },
+  { value: "professionalRepairer", label: "Professional Repairers" },
+  { value: "independentOperator", label: "Independent Operators" },
   { value: "recycler",            label: "Recyclers" },
-  { value: "notified_bodies",     label: "Notified Bodies" },
-  { value: "market_surveillance", label: "Market Surveillance Authorities" },
-  { value: "customs_authority",   label: "Customs Authorities" },
-  { value: "eu_commission",       label: "The EU Commission" },
-  { value: "main_dpp_service_provider", label: "Main DPP Service Providers" },
-  { value: "backup_dpp_service_provider", label: "Back-up DPP Service Providers" },
-  { value: "legitimate_interest", label: "Person with Legitimate Interest" },
+  { value: "notifiedBodies",     label: "Notified Bodies" },
+  { value: "marketSurveillance", label: "Market Surveillance Authorities" },
+  { value: "customsAuthority",   label: "Customs Authorities" },
+  { value: "euCommission",       label: "The EU Commission" },
+  { value: "mainDppServiceProvider", label: "Main DPP Service Providers" },
+  { value: "backupDppServiceProvider", label: "Back-up DPP Service Providers" },
+  { value: "legitimateInterest", label: "Person with Legitimate Interest" },
 ];
 
 export const CONFIDENTIALITY_LEVELS = [
   { value: "public", label: "Public" },
   { value: "restricted", label: "Restricted" },
   { value: "confidential", label: "Confidential" },
-  { value: "trade_secret", label: "Trade Secret" },
+  { value: "tradeSecret", label: "Trade Secret" },
   { value: "regulated", label: "Regulated" },
 ];
 
 export const UPDATE_AUTHORITIES = [
-  { value: "economic_operator", label: "Economic Operators" },
+  { value: "economicOperator", label: "Economic Operators" },
   { value: "manufacturer", label: "Manufacturers" },
-  { value: "authorized_representative", label: "Authorized Representatives" },
+  { value: "authorizedRepresentative", label: "Authorized Representatives" },
   { value: "importer", label: "Importers" },
   { value: "distributor", label: "Distributors" },
   { value: "dealer", label: "Dealers" },
-  { value: "fulfilment_service_provider", label: "Fulfilment Service Providers" },
-  { value: "delegated_operator", label: "Delegated Operators" },
-  { value: "professional_repairer", label: "Professional Repairers" },
-  { value: "independent_operator", label: "Independent Operators" },
+  { value: "fulfilmentServiceProvider", label: "Fulfilment Service Providers" },
+  { value: "delegatedOperator", label: "Delegated Operators" },
+  { value: "professionalRepairer", label: "Professional Repairers" },
+  { value: "independentOperator", label: "Independent Operators" },
   { value: "recycler", label: "Recyclers" },
-  { value: "notified_bodies", label: "Notified Bodies" },
-  { value: "market_surveillance", label: "Market Surveillance Authorities" },
-  { value: "customs_authority", label: "Customs Authorities" },
-  { value: "eu_commission", label: "The EU Commission" },
-  { value: "main_dpp_service_provider", label: "Main DPP Service Providers" },
-  { value: "backup_dpp_service_provider", label: "Back-up DPP Service Providers" },
+  { value: "notifiedBodies", label: "Notified Bodies" },
+  { value: "marketSurveillance", label: "Market Surveillance Authorities" },
+  { value: "customsAuthority", label: "Customs Authorities" },
+  { value: "euCommission", label: "The EU Commission" },
+  { value: "mainDppServiceProvider", label: "Main DPP Service Providers" },
+  { value: "backupDppServiceProvider", label: "Back-up DPP Service Providers" },
   { value: "system", label: "System" },
 ];
 
@@ -342,7 +342,7 @@ export function buildProductCategoryOptions({
     addCategory({
       name: type.productCategory,
       icon: type.productIcon,
-      source: "passport_type",
+      source: "passportType",
     });
   }
 
@@ -497,7 +497,7 @@ export const parseCSV = (text) => {
         fieldType: validTypes.has(rawType) ? rawType : "text",
         access: parseGovernanceList(row[accessIndex], ACCESS_LEVELS, ["public"]),
         confidentiality: parseGovernanceList(row[confidentialityIndex], CONFIDENTIALITY_LEVELS, ["public"])[0] || "public",
-        updateAuthority: parseGovernanceList(row[updateAuthorityIndex], UPDATE_AUTHORITIES, ["economic_operator"]),
+        updateAuthority: parseGovernanceList(row[updateAuthorityIndex], UPDATE_AUTHORITIES, ["economicOperator"]),
       };
     });
 };
@@ -525,7 +525,7 @@ export const buildSectionsFromCSV = (rows) => {
       type,
       access: Array.isArray(access) && access.length ? access : ["public"],
       confidentiality: confidentiality || "public",
-      updateAuthority: Array.isArray(updateAuthority) && updateAuthority.length ? updateAuthority : ["economic_operator"],
+      updateAuthority: Array.isArray(updateAuthority) && updateAuthority.length ? updateAuthority : ["economicOperator"],
     })),
   }));
 };
@@ -533,23 +533,23 @@ export const buildSectionsFromCSV = (rows) => {
 export const downloadTemplate = () => {
   const csv = [
     "Field Label,Section,Type,Access,Confidentiality,Update Authority",
-    "Manufacturer,General,text,manufacturer|market_surveillance,regulated,economic_operator|market_surveillance",
-    "Model Number,General,text,public,public,economic_operator",
-    "Internal Alias ID,General,text,public,public,economic_operator",
-    "Weight (kg),Technical Specifications,text,public,public,economic_operator",
-    "Dimensions,Technical Specifications,text,public,public,economic_operator",
-    "Material Composition,Technical Specifications,textarea,public,public,economic_operator",
-    "Is Recyclable,Sustainability,boolean,public,public,economic_operator",
-    "Manufacture Date,General,date,public,public,economic_operator",
-    "Product URL,General,url,public,public,economic_operator",
-    "Recycled Content (%),Sustainability,text,public,public,economic_operator",
-    "Carbon Footprint,Sustainability,text,legitimate_interest,restricted,economic_operator",
-    "Compliance Certificate,Compliance Documents,file,notified_bodies|market_surveillance,regulated,economic_operator|notified_bodies",
+    "Manufacturer,General,text,manufacturer|marketSurveillance,regulated,economicOperator|marketSurveillance",
+    "Model Number,General,text,public,public,economicOperator",
+    "Internal Alias ID,General,text,public,public,economicOperator",
+    "Weight (kg),Technical Specifications,text,public,public,economicOperator",
+    "Dimensions,Technical Specifications,text,public,public,economicOperator",
+    "Material Composition,Technical Specifications,textarea,public,public,economicOperator",
+    "Is Recyclable,Sustainability,boolean,public,public,economicOperator",
+    "Manufacture Date,General,date,public,public,economicOperator",
+    "Product URL,General,url,public,public,economicOperator",
+    "Recycled Content (%),Sustainability,text,public,public,economicOperator",
+    "Carbon Footprint,Sustainability,text,legitimateInterest,restricted,economicOperator",
+    "Compliance Certificate,Compliance Documents,file,notifiedBodies|marketSurveillance,regulated,economicOperator|notifiedBodies",
   ].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const anchor = document.createElement("a");
   anchor.href = URL.createObjectURL(blob);
-  anchor.download = "passport_type_template.csv";
+  anchor.download = "passport-type-template.csv";
   anchor.click();
   URL.revokeObjectURL(anchor.href);
 };
@@ -559,7 +559,7 @@ export function newSection(label = "") {
     localId: Math.random().toString(36).slice(2),
     key: toSlug(label),
     label,
-    label_i18n: {},
+    labelI18n: {},
     fields: [],
   };
 }
@@ -569,10 +569,10 @@ export function newField(label = "") {
     localId: Math.random().toString(36).slice(2),
     key: toFieldKey(label),
     label,
-    label_i18n: {},
+    labelI18n: {},
     type: "text",
     access: ["public"],
     confidentiality: "public",
-    updateAuthority: ["economic_operator"],
+    updateAuthority: ["economicOperator"],
   };
 }

@@ -119,6 +119,14 @@ function getSelectedModules(requestedModule = "", options = {}) {
   );
 }
 
+function buildAccessPlan(options = {}) {
+  return {
+    requested: Boolean(options.companyIds?.length || options.grantAllActiveCompanies),
+    companyIds: options.companyIds || [],
+    grantAllActiveCompanies: Boolean(options.grantAllActiveCompanies),
+  };
+}
+
 function validateDefinition(definition) {
   const missing = ["moduleKey", "typeName", "displayName", "productCategory", "fieldsJson"]
     .filter((key) => !definition[key]);
@@ -137,10 +145,10 @@ function validateDefinition(definition) {
 async function resolveCompaniesForAccess(pool, { companyIds = [], grantAllActiveCompanies = false } = {}) {
   if (grantAllActiveCompanies) {
     const result = await pool.query(
-      `SELECT id, company_name AS "companyName"
+      `SELECT id, "companyName" AS "companyName"
          FROM companies
-        WHERE is_active = TRUE
-        ORDER BY company_name`
+        WHERE "isActive" = TRUE
+        ORDER BY "companyName"`
     );
     return result.rows;
   }
@@ -148,10 +156,10 @@ async function resolveCompaniesForAccess(pool, { companyIds = [], grantAllActive
   if (!companyIds.length) return [];
 
   const result = await pool.query(
-    `SELECT id, company_name AS "companyName"
+    `SELECT id, "companyName" AS "companyName"
        FROM companies
       WHERE id = ANY($1::int[])
-      ORDER BY company_name`,
+      ORDER BY "companyName"`,
     [companyIds]
   );
   const foundIds = new Set(result.rows.map((row) => Number(row.id)));
@@ -164,12 +172,12 @@ async function resolveCompaniesForAccess(pool, { companyIds = [], grantAllActive
 
 async function upsertPassportType(pool, definition) {
   await pool.query(
-    "INSERT INTO product_categories (name, icon) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
+    "INSERT INTO \"productCategories\" (name, icon) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING",
     [definition.productCategory, definition.productIcon || "📋"]
   );
 
   const result = await pool.query(
-    `INSERT INTO passport_types
+    `INSERT INTO "passportTypes"
        ("typeName", "displayName", "productCategory", "productIcon", "semanticModelKey", "fieldsJson", "createdBy")
      VALUES ($1, $2, $3, $4, $5, $6::jsonb, NULL)
      ON CONFLICT ("typeName") DO UPDATE
@@ -199,10 +207,10 @@ async function grantCompanyAccess(pool, { companies = [], passportTypes = [] } =
   for (const company of companies) {
     for (const passportType of passportTypes) {
       const result = await pool.query(
-        `INSERT INTO company_passport_access (company_id, passport_type_id, access_revoked)
+        `INSERT INTO "companyPassportAccess" ("companyId", "passportTypeId", "accessRevoked")
          VALUES ($1, $2, FALSE)
-         ON CONFLICT (company_id, passport_type_id) DO UPDATE SET access_revoked = FALSE
-         RETURNING id, company_id, passport_type_id, access_revoked`,
+         ON CONFLICT ("companyId", "passportTypeId") DO UPDATE SET "accessRevoked" = FALSE
+         RETURNING id, "companyId", "passportTypeId", "accessRevoked"`,
         [company.id, passportType.id]
       );
 
@@ -223,9 +231,25 @@ async function runSeed({ pool, options }) {
     modulesDir: options.modulesDir,
   });
   if (!modules.length) {
-    throw new Error(options.requestedModule
-      ? `No passport type module found for ${options.requestedModule}`
-      : "No passport type modules are registered");
+    if (options.requestedModule) {
+      throw new Error(`No passport type module found for ${options.requestedModule}`);
+    }
+    if (options.dryRun) {
+      return {
+        dryRun: true,
+        selected: 0,
+        accessPlan: buildAccessPlan(options),
+        modules: [],
+      };
+    }
+    return {
+      success: true,
+      seeded: 0,
+      accessGranted: 0,
+      results: [],
+      accessGrants: [],
+      message: "No passport type modules are registered.",
+    };
   }
 
   modules.forEach(validateDefinition);
@@ -234,11 +258,7 @@ async function runSeed({ pool, options }) {
     return {
       dryRun: true,
       selected: modules.length,
-      accessPlan: {
-        requested: Boolean(options.companyIds.length || options.grantAllActiveCompanies),
-        companyIds: options.companyIds,
-        grantAllActiveCompanies: options.grantAllActiveCompanies,
-      },
+      accessPlan: buildAccessPlan(options),
       modules,
     };
   }
@@ -252,7 +272,7 @@ async function runSeed({ pool, options }) {
     let storage = "skipped";
     if (storageService) {
       await storageService.createPassportTable(definition.typeName, {
-        eventType: "passport_module_seed_reconcile_table",
+        eventType: "passportModuleSeedReconcileTable",
       });
       storage = "reconciled";
     }

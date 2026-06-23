@@ -1,21 +1,21 @@
 "use strict";
 
 const FIELD_MAPPINGS = [
-  { canonical: "carrierSecurityStatus", snake: "carrier_security_status", camel: "carrierSecurityStatus" },
-  { canonical: "carrierAuthenticationMethod", snake: "carrier_authentication_method", camel: "carrierAuthenticationMethod" },
-  { canonical: "carrierVerificationInstructions", snake: "carrier_verification_instructions", camel: "carrierVerificationInstructions" },
-  { canonical: "signedCarrierPayload", snake: "signed_carrier_payload", camel: "signedCarrierPayload" },
-  { canonical: "issuerCertificateId", snake: "issuer_certificate_id", camel: "issuerCertificateId" },
-  { canonical: "carrierCompatibilityProfiles", snake: "carrier_compatibility_profiles", camel: "carrierCompatibilityProfiles" },
-  { canonical: "physicalCarrierSecurityFeatures", snake: "physical_carrier_security_features", camel: "physicalCarrierSecurityFeatures" },
-  { canonical: "trustedViewerOrigin", snake: "trusted_viewer_origin", camel: "trustedViewerOrigin" },
-  { canonical: "trustedViewerHost", snake: "trusted_viewer_host", camel: "trustedViewerHost" },
-  { canonical: "counterfeitRiskLevel", snake: "counterfeit_risk_level", camel: "counterfeitRiskLevel" },
-  { canonical: "antiCounterfeitInstructions", snake: "anti_counterfeit_instructions", camel: "antiCounterfeitInstructions" },
-  { canonical: "safetyWarnings", snake: "safety_warnings", camel: "safetyWarnings" },
-  { canonical: "qrPrintSpecification", snake: "qr_print_specification", camel: "qrPrintSpecification" },
-  { canonical: "dataCarrierPlacementRules", snake: "data_carrier_placement_rules", camel: "dataCarrierPlacementRules" },
-  { canonical: "dataCarrierVerificationEvidence", snake: "data_carrier_verification_evidence", camel: "dataCarrierVerificationEvidence" },
+  { canonical: "carrierSecurityStatus" },
+  { canonical: "carrierAuthenticationMethod" },
+  { canonical: "carrierVerificationInstructions" },
+  { canonical: "signedCarrierPayload" },
+  { canonical: "issuerCertificateId" },
+  { canonical: "carrierCompatibilityProfiles" },
+  { canonical: "physicalCarrierSecurityFeatures" },
+  { canonical: "trustedViewerOrigin" },
+  { canonical: "trustedViewerHost" },
+  { canonical: "counterfeitRiskLevel" },
+  { canonical: "antiCounterfeitInstructions" },
+  { canonical: "safetyWarnings" },
+  { canonical: "qrPrintSpecification" },
+  { canonical: "dataCarrierPlacementRules" },
+  { canonical: "dataCarrierVerificationEvidence" },
 ];
 
 function isPlainObject(value) {
@@ -34,7 +34,7 @@ function parseJsonLikeString(value) {
   if (!["{", "["].includes(normalized[0])) return normalized;
   try {
     return JSON.parse(normalized);
-  } catch {
+  } catch (_error) {
     return normalized;
   }
 }
@@ -109,7 +109,7 @@ function validateQrPrintSpecification(value) {
   const qualityChecks = Array.isArray(value.qualityChecks) ? value.qualityChecks : [];
   const failedChecks = qualityChecks
     .filter((check) => isPlainObject(check) && check.passed === false)
-    .map((check) => normalizeOptionalText(check.key) || "quality_check");
+    .map((check) => normalizeOptionalText(check.key) || "qualityCheck");
   if (failedChecks.length) {
     errors.push(`qrPrintSpecification has failed quality checks: ${failedChecks.join(", ")}`);
   }
@@ -124,7 +124,7 @@ function parseStoredCarrierAuthenticity(value) {
   try {
     const parsed = JSON.parse(value);
     return isPlainObject(parsed) ? parsed : null;
-  } catch {
+  } catch (_error) {
     return null;
   }
 }
@@ -135,7 +135,7 @@ function normalizeCarrierAuthenticityMetadata(value) {
 
   const normalized = {};
   for (const field of FIELD_MAPPINGS) {
-    const rawValue = source[field.canonical] ?? source[field.snake] ?? source[field.camel];
+    const rawValue = source[field.canonical];
     if (rawValue === undefined) continue;
 
     if (field.canonical === "carrierCompatibilityProfiles") {
@@ -195,10 +195,8 @@ function extractCarrierAuthenticityMutation(source = {}) {
     return { provided: false, clear: false, updates: {}, signCarrierPayload: false };
   }
 
-  const nestedProvided =
-    Object.prototype.hasOwnProperty.call(source, "carrier_authenticity")
-    || Object.prototype.hasOwnProperty.call(source, "carrierAuthenticity");
-  const nestedValue = source.carrier_authenticity ?? source.carrierAuthenticity;
+  const nestedProvided = Object.prototype.hasOwnProperty.call(source, "carrierAuthenticity");
+  const nestedValue = source.carrierAuthenticity;
   const clear = nestedProvided && nestedValue === null;
 
   const updates = {};
@@ -207,21 +205,13 @@ function extractCarrierAuthenticityMutation(source = {}) {
   const nestedSource = isPlainObject(nestedValue) ? nestedValue : {};
 
   for (const field of FIELD_MAPPINGS) {
-    const hasDirectSnake = Object.prototype.hasOwnProperty.call(source, field.snake);
-    const hasDirectCamel = Object.prototype.hasOwnProperty.call(source, field.camel);
-    const hasNestedSnake = Object.prototype.hasOwnProperty.call(nestedSource, field.snake);
-    const hasNestedCamel = Object.prototype.hasOwnProperty.call(nestedSource, field.camel);
+    const hasDirectCanonical = Object.prototype.hasOwnProperty.call(source, field.canonical);
     const hasNestedCanonical = Object.prototype.hasOwnProperty.call(nestedSource, field.canonical);
-    const hasField = hasDirectSnake || hasDirectCamel || hasNestedSnake || hasNestedCamel || hasNestedCanonical;
+    const hasField = hasDirectCanonical || hasNestedCanonical;
     if (!hasField) continue;
 
     provided = true;
-    let rawValue;
-    if (hasDirectSnake) rawValue = source[field.snake];
-    else if (hasDirectCamel) rawValue = source[field.camel];
-    else if (hasNestedSnake) rawValue = nestedSource[field.snake];
-    else if (hasNestedCamel) rawValue = nestedSource[field.camel];
-    else rawValue = nestedSource[field.canonical];
+    const rawValue = hasDirectCanonical ? source[field.canonical] : nestedSource[field.canonical];
 
     if (field.canonical === "carrierCompatibilityProfiles") {
       updates[field.canonical] = normalizeStringArray(rawValue, { compatibilityProfiles: true });
@@ -256,7 +246,7 @@ function extractCarrierAuthenticityMutation(source = {}) {
     updates[field.canonical] = normalizeOptionalText(rawValue);
   }
 
-  const signCarrierPayloadRaw = source.sign_carrier_payload ?? source.signCarrierPayload;
+  const signCarrierPayloadRaw = source.signCarrierPayload;
   const signCarrierPayload =
     signCarrierPayloadRaw === true
     || String(signCarrierPayloadRaw || "").trim().toLowerCase() === "true";

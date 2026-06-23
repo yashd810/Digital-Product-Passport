@@ -139,8 +139,8 @@ function TemplatePicker({ templates, onSelect, onCancel }) {
             <div>
               <div className="ch-tmpl-item-name">{t.name}</div>
               {t.description && <div className="ch-tmpl-item-desc">{t.description}</div>}
-              {parseInt(t.model_field_count) > 0 && (
-                <div className="ch-tmpl-item-meta">📌 {t.model_field_count} model data field{t.model_field_count !== "1" ? "s" : ""}</div>
+              {parseInt(t.modelFieldCount) > 0 && (
+                <div className="ch-tmpl-item-meta">📌 {t.modelFieldCount} model data field{Number(t.modelFieldCount) !== 1 ? "s" : ""}</div>
               )}
             </div>
             <span className="ch-method-arrow">→</span>
@@ -181,7 +181,7 @@ export default function CreateHub({ user, companyId }) {
           if (match) { setSelectedType(match); setStep("method"); }
         }
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [companyId, preselectedType]);
 
   // Load templates when type is selected
@@ -284,8 +284,8 @@ export default function CreateHub({ user, companyId }) {
                   <div>
                     <div className="ch-tmpl-chosen-name">{chosenTemplate.name}</div>
                     {chosenTemplate.description && <div className="ch-tmpl-chosen-desc">{chosenTemplate.description}</div>}
-                    {parseInt(chosenTemplate.model_field_count) > 0 && (
-                      <div className="ch-tmpl-chosen-meta">📌 {chosenTemplate.model_field_count} model data fields will be pre-filled and locked</div>
+                    {parseInt(chosenTemplate.modelFieldCount) > 0 && (
+                      <div className="ch-tmpl-chosen-meta">📌 {chosenTemplate.modelFieldCount} model data fields will be pre-filled and locked</div>
                     )}
                   </div>
                   <button className="ch-change-btn" style={{ marginLeft: "auto" }} onClick={() => setSubStep("template-pick")}>Change</button>

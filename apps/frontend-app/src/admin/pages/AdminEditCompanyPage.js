@@ -41,14 +41,14 @@ function buildEditForm(company = {}) {
 
 function buildPolicyForm(policy = {}) {
   return {
-    default_granularity: policy.default_granularity || "item",
-    allow_granularity_override: !!policy.allow_granularity_override,
-    mint_model_dids: !!policy.mint_model_dids,
-    mint_item_dids: !!policy.mint_item_dids,
-    mint_facility_dids: !!policy.mint_facility_dids,
-    vc_issuance_enabled: !!policy.vc_issuance_enabled,
-    jsonld_export_enabled: !!policy.jsonld_export_enabled,
-    semantic_dictionary_enabled: !!policy.semantic_dictionary_enabled,
+    defaultGranularity: policy.defaultGranularity || "item",
+    allowGranularityOverride: !!policy.allowGranularityOverride,
+    mintModelDids: !!policy.mintModelDids,
+    mintItemDids: !!policy.mintItemDids,
+    mintFacilityDids: !!policy.mintFacilityDids,
+    vcIssuanceEnabled: !!policy.vcIssuanceEnabled,
+    jsonldExportEnabled: !!policy.jsonldExportEnabled,
+    semanticDictionaryEnabled: !!policy.semanticDictionaryEnabled,
   };
 }
 
@@ -366,8 +366,8 @@ function AdminEditCompanyPage() {
               <label htmlFor="defaultGranularity">Default Granularity</label>
               <select
                 id="defaultGranularity"
-                value={policyForm?.default_granularity || "item"}
-                onChange={(event) => handlePolicyFieldChange("default_granularity", event.target.value)}
+                value={policyForm?.defaultGranularity || "item"}
+                onChange={(event) => handlePolicyFieldChange("defaultGranularity", event.target.value)}
                 disabled={policySaving}
               >
                 <option value="item">Item</option>
@@ -377,13 +377,13 @@ function AdminEditCompanyPage() {
             </div>
 
             {[
-              ["allow_granularity_override", "Allow granularity override"],
-              ["mint_model_dids", "Mint model DIDs"],
-              ["mint_item_dids", "Mint item DIDs"],
-              ["mint_facility_dids", "Mint facility DIDs"],
-              ["vc_issuance_enabled", "Enable VC issuance"],
-              ["jsonld_export_enabled", "Enable JSON-LD export"],
-              ["semantic_dictionary_enabled", "Enable semantic dictionaries"],
+              ["allowGranularityOverride", "Allow granularity override"],
+              ["mintModelDids", "Mint model DIDs"],
+              ["mintItemDids", "Mint item DIDs"],
+              ["mintFacilityDids", "Mint facility DIDs"],
+              ["vcIssuanceEnabled", "Enable VC issuance"],
+              ["jsonldExportEnabled", "Enable JSON-LD export"],
+              ["semanticDictionaryEnabled", "Enable semantic dictionaries"],
             ].map(([field, label]) => (
               <label key={field} className="checkbox-label admin-checkbox-spaced">
                 <input

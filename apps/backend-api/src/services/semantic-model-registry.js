@@ -104,9 +104,7 @@ function normalizeTermsSource(termsSource, { manifest, basePath, categories, uni
     const term = { ...(rawTerm || {}) };
     const slug = term.slug ? String(term.slug) : "";
     const internalKey = term.internalKey
-      || term.internal_key
       || term.elementId
-      || term.element_id
       || term.fieldKey;
     const number = term.number ?? term.id ?? index + 1;
     const iri = term.iri
@@ -133,9 +131,7 @@ function normalizeTermsSource(termsSource, { manifest, basePath, categories, uni
     delete term.termIri;
     delete term.attributeName;
     delete term.sourceAttributeName;
-    delete term.internal_key;
     delete term.elementId;
-    delete term.element_id;
     delete term.accessRights;
     delete term.staticOrDynamic;
     delete term.updateRequirement;
@@ -145,7 +141,6 @@ function normalizeTermsSource(termsSource, { manifest, basePath, categories, uni
     delete term.sourceRegulationReference;
     delete term.regulationReferences;
     delete term.dinDkeSpec99100Chapter;
-    delete term.batteryCategoryRequirements;
     delete term.componentGranularity;
     delete term.sourceWorkbookRow;
     delete term.shortDefinition;

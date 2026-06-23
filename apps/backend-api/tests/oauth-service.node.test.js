@@ -118,7 +118,7 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
   const pool = {
     async query(sql, params) {
       queries.push({ sql, params });
-      if (sql.includes("FROM user_identities")) return { rows: [] };
+      if (sql.includes("FROM \"userIdentities\"")) return { rows: [] };
       if (sql.includes("FROM users") && sql.includes("WHERE email = $1")) {
         return {
           rows: [{
@@ -183,5 +183,5 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
 
   assert.equal(cookieToken, "session-token");
   assert.match(redirectUrl, /^https:\/\/app\.example\/oauth\/callback\?next=/);
-  assert.ok(queries.some(({ sql }) => sql.includes("INSERT INTO user_identities")));
+  assert.ok(queries.some(({ sql }) => sql.includes("INSERT INTO \"userIdentities\"")));
 });

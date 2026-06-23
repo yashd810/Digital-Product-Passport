@@ -47,14 +47,14 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null)
         sourceModuleKey,
         sourceModuleFieldKey: field.key,
       };
-      if (field.type === "table" && Array.isArray(field.table_columns)) {
-        nextField.table_columns = field.table_columns.map((column) => ({
+      if (field.type === "table" && Array.isArray(field.tableColumns)) {
+        nextField.tableColumns = field.tableColumns.map((column) => ({
           ...column,
           canonicalLocked: true,
           sourceModuleKey,
           sourceModuleColumnKey: column.key,
         }));
-        nextField.table_cols = nextField.table_columns.length;
+        nextField.tableColumnCount = nextField.tableColumns.length;
       }
       return nextField;
     }),
@@ -133,10 +133,10 @@ function getPassportTypeModule(moduleKeyOrTypeName, options = {}) {
 }
 
 function getPassportPolicyForPassportType(moduleKeyOrTypeName, typeDef = null, options = {}) {
-  const sourceModule = typeDef?.fieldsJson?.sourceModule || typeDef?.fields_json?.sourceModule || null;
+  const sourceModule = typeDef?.fieldsJson?.sourceModule || typeDef?.fieldsJson?.sourceModule || null;
   const resolvedModule = getPassportTypeModule(sourceModule, options)
     || getPassportTypeModule(moduleKeyOrTypeName, options)
-    || getPassportTypeModule(typeDef?.typeName || typeDef?.type_name, options);
+    || getPassportTypeModule(typeDef?.typeName || typeDef?.typeName, options);
   if (resolvedModule?.passportPolicy) return clone(resolvedModule.passportPolicy);
   return null;
 }

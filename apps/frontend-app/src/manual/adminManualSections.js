@@ -22,11 +22,11 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
   const typesCount = adminPassportTypes.length;
   const categoriesCount = categories.length;
   const firstCompanyAccessRoute = firstCompany ? `/admin/company/${firstCompany.id}/access` : "";
-  const firstCompanyAnalyticsSlug = firstCompany?.company_name
-    ? firstCompany.company_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+  const firstCompanyAnalyticsSlug = firstCompany?.companyName
+    ? firstCompany.companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
     : "";
   const firstCompanyAnalyticsRoute = firstCompanyAnalyticsSlug ? `/admin/analytics/${firstCompanyAnalyticsSlug}` : "";
-  const firstTypeFieldsRoute = firstType ? `/admin/passport-types/${encodeURIComponent(firstType.typeName || firstType.type_name)}/fields` : "";
+  const firstTypeFieldsRoute = firstType ? `/admin/passport-types/${encodeURIComponent(firstType.typeName)}/fields` : "";
 
   return [
     {
@@ -47,7 +47,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         ],
       },
       facts: [
-        { label: "Current role", value: user?.role === "super_admin" ? "Super Admin" : prettifyName(user?.role) },
+        { label: "Current role", value: user?.role === "superAdmin" ? "Super Admin" : prettifyName(user?.role) },
         { label: "Live company count", value: companiesCount ? `${companiesCount} companies` : "No companies fetched yet" },
         { label: "Live passport-type count", value: typesCount ? `${typesCount} passport types` : "No passport types fetched yet" },
         { label: "Live category count", value: categoriesCount ? `${categoriesCount} product categories` : "No categories fetched yet" },
@@ -185,16 +185,16 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Understand operator identity",
           items: [
-            "The company stores economic_operator_identifier and economicOperatorIdentifierScheme.",
+            "The company stores economicOperatorIdentifier and economicOperatorIdentifierScheme.",
             "Authenticated user responses include actor/operator identity fields when the company identity exists.",
             "Standards APIs can also accept economicOperatorId/economicOperatorId and facilityId/facilityId in create or patch payloads.",
-            "Audit logs can record actor_identifier and audience, so operator-driven actions remain traceable.",
+            "Audit logs can record actorIdentifier and audience, so operator-driven actions remain traceable.",
           ],
         },
         {
           title: "Handle facilities and DID resolution",
           items: [
-            "Managed facilities are stored in company_facilities and must match a known active facility identifier before standards APIs accept them.",
+            "Managed facilities are stored in companyFacilities and must match a known active facility identifier before standards APIs accept them.",
             "Facility DID documents are public at `/did/facility/:stableId/did.json`.",
             "Only canonical company-slug and stable-ID DID routes are supported.",
             "Browser requests to `/resolve?did=...` can redirect to public passport pages; API-style requests redirect to DID documents.",
@@ -291,7 +291,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Category features", value: "Create category, choose icon, and delete when no longer needed" },
         { label: "Type actions", value: "Preview registered modules, view fields, edit metadata, clone, activate/deactivate, and delete" },
-        { label: "Production pattern", value: "Stable product lines should be added as versioned backend passport modules, then seeded into passport_types" },
+        { label: "Production pattern", value: "Stable product lines should be added as versioned backend passport modules, then seeded into passportTypes" },
         { label: "Custom pattern", value: "The admin builder remains available for custom/internal types and controlled schema experiments" },
         { label: "Catalog grouping", value: "Types are displayed underneath productCategory product categories" },
         { label: "Live example type", value: getPassportTypeLabel(firstType) || "First available type" },
@@ -308,7 +308,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Use modules for stable product categories",
           items: [
-            "Add production product families as files under `apps/backend-api/src/passport-modules/`, for example appliance, textile, or a future medical-device module.",
+            "Add production product families as files under `apps/backend-api/src/passport-modules/`, for example medical-device, industrial-sensor, or another module generated from your own schema.",
             "Keep each module versioned with a stable moduleKey, typeName, semanticModelKey, passportPolicy, sections, and fields.",
             "Seed modules with `npm run seed:passport-types` or `npm run bootstrap:passport-modules` so the database catalog and runtime tables match the code definition.",
             "Create a new module/version for breaking regulatory or semantic changes instead of mutating an old production type that already has passports.",
@@ -660,8 +660,8 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       summary: "This section is intentionally deeper than the rest of the manual. It gives you the operational backend picture behind the UI so you can understand what data the platform stores, which API families drive each area, and how major product flows connect end to end.",
       facts: [
         { label: "Core tables", value: "30+ named tables in the current public schema, plus generated `<type>_passports` tables" },
-        { label: "Catalog pattern", value: "Passport types define fields in `passport_types`, then runtime records live in type-specific passport tables" },
-        { label: "Key registry", value: "`passport_registry` connects DPP ID, company, passport type, and the hashed metadata for public access keys and device keys" },
+        { label: "Catalog pattern", value: "Passport types define fields in `passportTypes`, then runtime records live in type-specific passport tables" },
+        { label: "Key registry", value: "`passportRegistry` connects DPP ID, company, passport type, and the hashed metadata for public access keys and device keys" },
         { label: "API families", value: `${BACKEND_API_FAMILIES.length} major endpoint families mapped in this manual` },
       ],
       journeys: [

@@ -200,7 +200,7 @@ module.exports = function registerDppApiRoutes(app, {
     typeDef,
     companyName = "",
     reason = "manual",
-    snapshotScope = "released_current"
+    snapshotScope = "releasedCurrent"
   }) {
     const passportDppId = passport?.dppId || null;
     if (!backupProviderService || !passportDppId || !passport?.companyId) {
@@ -267,10 +267,10 @@ module.exports = function registerDppApiRoutes(app, {
 
     await archivePassportSnapshot({
       passport: editable.passport,
-      passportType: editable.passport.passport_type,
+      passportType: editable.passport.passportType,
       archivedBy: user.userId,
       actorIdentifier: getActorIdentifier(user),
-      snapshotReason: "before_patch_element",
+      snapshotReason: "beforePatchElement",
     });
 
     const updateResult = await updatePassportRowById({
@@ -283,10 +283,10 @@ module.exports = function registerDppApiRoutes(app, {
     if (updateResult?.updatedRow) {
       await archivePassportSnapshot({
         passport: updateResult.updatedRow,
-        passportType: editable.passport.passport_type,
+        passportType: editable.passport.passportType,
         archivedBy: user.userId,
         actorIdentifier: getActorIdentifier(user),
-        snapshotReason: "after_patch_element",
+        snapshotReason: "afterPatchElement",
       });
     }
 
@@ -300,7 +300,7 @@ module.exports = function registerDppApiRoutes(app, {
       { [targetColumn]: storedValue },
       {
         actorIdentifier: user.actorIdentifier || user.email || `user:${user.userId}`,
-        audience: writeDecision.matchedAuthority || "economic_operator"
+        audience: writeDecision.matchedAuthority || "economicOperator"
       }
     );
 

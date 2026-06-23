@@ -38,11 +38,11 @@ export function BulkReviseModal({
       .then((r) => r.ok ? r.json() : [])
       .then((data) => {
         const eligible = (Array.isArray(data) ? data : []).filter((member) =>
-          (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id
+          (member.role === "editor" || member.role === "companyAdmin") && member.id !== user?.id
         );
         setTeamUsers(eligible);
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
 
     fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
@@ -50,7 +50,7 @@ export function BulkReviseModal({
         if (data?.defaultReviewerId) setReviewerId(String(data.defaultReviewerId));
         if (data?.defaultApproverId) setApproverId(String(data.defaultApproverId));
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [companyId, user?.id]);
 
   const selectedSourcePassports = useMemo(

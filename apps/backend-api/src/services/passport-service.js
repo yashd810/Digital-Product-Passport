@@ -14,9 +14,9 @@ const { createPassportQueryRepository } = require("../modules/passports/passport
 const { createSchemaStorageHelpers } = require("../modules/passports/schema-storage-helpers");
 const { createWorkflowHelpers } = require("../modules/passports/workflow-helpers");
 
-const IN_REVISION_STATUSES_SQL       = `('in_revision')`;
-const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','in_revision')`;
-const REVISION_BLOCKING_STATUSES_SQL = `('draft','in_revision','in_review')`;
+const IN_REVISION_STATUSES_SQL       = `('inRevision')`;
+const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','inRevision')`;
+const REVISION_BLOCKING_STATUSES_SQL = `('draft','inRevision','inReview')`;
 const EDIT_SESSION_TIMEOUT_HOURS     = 12;
 const EDIT_SESSION_TIMEOUT_SQL       = `${EDIT_SESSION_TIMEOUT_HOURS} hours`;
 module.exports = function createPassportService({
@@ -70,7 +70,7 @@ module.exports = function createPassportService({
     if (!normalizedInput) return null;
     const typeRes = await pool.query(
       `SELECT "typeName" AS "typeName", "displayName" AS "displayName", "fieldsJson" AS "fieldsJson"
-       FROM passport_types
+       FROM "passportTypes"
        WHERE "typeName" = $1 OR LOWER("displayName") = LOWER($1)
        LIMIT 1`,
       [normalizedInput]
@@ -178,11 +178,11 @@ module.exports = function createPassportService({
   async function stripRestrictedFieldsForPublicView(passport, passportType) {
     if (!passport || !passportType) return passport;
     const sanitized = { ...passport };
-    delete sanitized.company_id;
+    delete sanitized.companyId;
     delete sanitized.companyId;
     try {
       const typeRes = await pool.query(
-        'SELECT "fieldsJson" AS "fieldsJson" FROM passport_types WHERE "typeName" = $1',
+        'SELECT "fieldsJson" AS "fieldsJson" FROM "passportTypes" WHERE "typeName" = $1',
         [passportType]
       );
       if (!typeRes.rows.length) return sanitized;

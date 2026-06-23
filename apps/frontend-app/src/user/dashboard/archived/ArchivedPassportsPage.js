@@ -95,9 +95,9 @@ function ArchivedPassports({ user, companyId }) {
     const payload = await response.json().catch(() => null);
     const history = Array.isArray(payload?.history) ? payload.history : [];
     const matchingEntry = history.find((entry) => Number(entry.versionNumber ?? entry.versionNumber) === Number(publicVersionNumber));
-    const resolvedPath = matchingEntry?.is_current
-      ? matchingEntry?.public_path
-      : matchingEntry?.inactive_path;
+    const resolvedPath = matchingEntry?.isCurrent
+      ? matchingEntry?.publicPath
+      : matchingEntry?.inactivePath;
 
     if (resolvedPath) {
       setHistoryPathCache((prev) => ({ ...prev, [cacheKey]: resolvedPath }));
@@ -131,7 +131,7 @@ function ArchivedPassports({ user, companyId }) {
     fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(d => setPassportTypes(Array.isArray(d) ? d : []))
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [companyId]);
 
   // Row and bulk actions

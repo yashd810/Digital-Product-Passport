@@ -89,13 +89,13 @@ function buildClonePrefill(record, sections) {
     "updatedAt",
     "releaseStatus",
     "versionNumber",
-    "archived_at",
-    "released_at",
+    "archivedAt",
+    "releasedAt",
     "deletedAt",
     "elements",
     "fields",
-    "linked_data",
-    "company_profile",
+    "linkedData",
+    "companyProfile",
     "digitalProductPassportId",
     "uniqueProductIdentifier",
     "subjectDid",
@@ -155,7 +155,6 @@ const NON_EDITABLE_FORM_KEYS = new Set([
   "elements",
   "fields",
   "linkedData",
-  "company_profile",
   "companyProfile",
   "firstName",
   "lastName",
@@ -163,20 +162,20 @@ const NON_EDITABLE_FORM_KEYS = new Set([
 
 const RESERVED_SYSTEM_FIELD_KEYS = new Set([
   "carrierAuthenticity",
-  "carrier_security_status",
-  "carrier_authentication_method",
-  "carrier_verification_instructions",
-  "signed_carrier_payload",
-  "issuer_certificate_id",
-  "carrier_compatibility_profiles",
-  "physical_carrier_security_features",
-  "trusted_viewer_origin",
-  "trusted_viewer_host",
-  "counterfeit_risk_level",
-  "anti_counterfeit_instructions",
-  "safety_warnings",
-  "qr_print_specification",
-  "sign_carrier_payload",
+  "carrierSecurityStatus",
+  "carrierAuthenticationMethod",
+  "carrierVerificationInstructions",
+  "signedCarrierPayload",
+  "issuerCertificateId",
+  "carrierCompatibilityProfiles",
+  "physicalCarrierSecurityFeatures",
+  "trustedViewerOrigin",
+  "trustedViewerHost",
+  "counterfeitRiskLevel",
+  "antiCounterfeitInstructions",
+  "safetyWarnings",
+  "qrPrintSpecification",
+  "signCarrierPayload",
 ]);
 
 const NON_PERSISTED_PAYLOAD_KEYS = new Set([
@@ -385,7 +384,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/repository/symbols?flat=true`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setSymbols)
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [effectiveCompanyId]);
 
   useEffect(() => {
@@ -417,7 +416,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
           return next;
         });
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [effectiveCompanyId]);
 
   // Load passport type definition from the server; fall back to static config only if needed.
@@ -482,7 +481,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         setFormData(vals);
         setModelDataKeys(modelKeys);
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [mode, templateId, effectiveCompanyId]);
 
   useEffect(() => {
@@ -531,7 +530,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       setSuccess("Passport cloned. Update the copied values and save as a new passport.");
     };
 
-    hydrateClone().catch(() => {});
+    hydrateClone().catch((error) => console.warn("Ignored async error", error));
   }, [mode, location.state, loadingType, activePassportType, SECTIONS, sectionKeys.length, effectiveCompanyId]);
 
   useEffect(() => {
@@ -652,7 +651,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       "economicOperatorIdentifierScheme",
       "facilityId",
       "granularity",
-      "product_image",
+      "productImage",
     ]);
     const hasSchemaKeys = schemaFieldKeys.size > 0;
     const allowedKeys = new Set([...schemaFieldKeys, ...managedEditableKeys]);
@@ -704,8 +703,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   };
 
   const renderProductImagePicker = () => {
-    const linkedUrl = typeof formData.product_image === "string" && formData.product_image.startsWith("http")
-      ? formData.product_image
+    const linkedUrl = typeof formData.productImage === "string" && formData.productImage.startsWith("http")
+      ? formData.productImage
       : null;
     const disabled = isSaving || (mode === "edit" && isLoading);
 
@@ -721,7 +720,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                 type="button"
                 className="file-clear-btn"
                 disabled={disabled}
-                onClick={() => handleField("product_image", "")}
+                onClick={() => handleField("productImage", "")}
               >
                 ✕ Remove
               </button>
@@ -731,7 +730,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               type="button"
               className="file-upload-label"
               disabled={disabled}
-              onClick={() => setRepoPicker("product_image")}
+              onClick={() => setRepoPicker("productImage")}
             >
               <span className="file-placeholder">🖼 Link Product Image from Repository</span>
             </button>
@@ -741,7 +740,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               type="button"
               className="file-upload-label file-replace-label"
               disabled={disabled}
-              onClick={() => setRepoPicker("product_image")}
+              onClick={() => setRepoPicker("productImage")}
             >
               <span className="file-placeholder">↺ Change</span>
             </button>
@@ -752,18 +751,18 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
               className="file-link-input"
               placeholder="Or paste a repository image link here…"
               disabled={disabled}
-              data-field-key="product_image"
+              data-field-key="productImage"
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text").trim();
                 if (text.startsWith("http")) {
                   e.preventDefault();
-                  handleField("product_image", text);
+                  handleField("productImage", text);
                 }
               }}
               onBlur={(e) => {
                 const text = e.target.value.trim();
                 if (text.startsWith("http")) {
-                  handleField("product_image", text);
+                  handleField("productImage", text);
                   e.target.value = "";
                 }
               }}
@@ -771,7 +770,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
                 if (e.key === "Enter") {
                   const text = e.target.value.trim();
                   if (text.startsWith("http")) {
-                    handleField("product_image", text);
+                    handleField("productImage", text);
                     e.target.value = "";
                   }
                 }
@@ -812,7 +811,9 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         method: "DELETE",
         headers: authHeaders(),
       });
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to release edit presence", error);
+    }
     sessionActiveRef.current = false;
   };
 
@@ -896,13 +897,13 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   useEffect(() => {
     if (mode !== "edit" || !dppId || !activePassportType || !effectiveCompanyId || isLoading) return;
 
-    refreshEditPresence("POST").catch(() => {});
+    refreshEditPresence("POST").catch((error) => console.warn("Ignored async error", error));
 
     const handleActivity = () => {
       lastInteractionRef.current = Date.now();
       if (sessionExpired) {
         setSessionExpired(false);
-        refreshEditPresence("POST").catch(() => {});
+        refreshEditPresence("POST").catch((error) => console.warn("Ignored async error", error));
       }
     };
 
@@ -921,7 +922,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         }
         return;
       }
-      refreshEditPresence("POST").catch(() => {});
+      refreshEditPresence("POST").catch((error) => console.warn("Ignored async error", error));
     }, EDIT_HEARTBEAT_MS);
 
     window.addEventListener("pointerdown", handleActivity);

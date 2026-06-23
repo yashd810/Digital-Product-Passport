@@ -18,7 +18,7 @@ export function PassportListFiltersBar({
         <option value="">All Statuses</option>
         <option value="draft">Draft</option>
         <option value="released">Released</option>
-        <option value="in_revision">In Revision</option>
+        <option value="inRevision">In Revision</option>
         <option value="obsolete">Obsolete</option>
       </select>
       {(searchText || filterStatus) && (

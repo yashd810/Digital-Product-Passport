@@ -40,7 +40,7 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
       const { companyId, dppId } = req.params;
       const reg = await pool.query(
         `SELECT "passportType"
-         FROM passport_registry
+         FROM "passportRegistry"
          WHERE "dppId" = $1 AND "companyId" = $2`,
         [dppId, companyId]
       );
@@ -59,7 +59,7 @@ module.exports = function registerHistoryReadRoutes(app, deps) {
       const { companyId, dppId } = req.params;
       const reg = await pool.query(
         `SELECT "passportType", "lineageId"
-         FROM passport_registry
+         FROM "passportRegistry"
          WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
         [dppId, companyId]

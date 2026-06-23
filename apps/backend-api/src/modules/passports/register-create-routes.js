@@ -65,7 +65,7 @@ module.exports = function registerCreateRoutes(app, deps) {
       if (createPassportTable) {
         await createPassportTable(typeSchema.typeName, {
           createdBy: userId,
-          eventType: "runtime_create_reconcile_table",
+          eventType: "runtimeCreateReconcileTable",
         });
       }
 
@@ -81,7 +81,7 @@ module.exports = function registerCreateRoutes(app, deps) {
         tableName,
         item: normalizedBody,
         companyPolicy,
-        snapshotReason: "after_create",
+        snapshotReason: "afterCreate",
       });
 
       res.status(201).json({ success: true, passport: created.passport });
@@ -127,7 +127,7 @@ module.exports = function registerCreateRoutes(app, deps) {
             tableName,
             item,
             companyPolicy,
-            snapshotReason: "after_bulk_create",
+            snapshotReason: "afterBulkCreate",
             isBulk: true,
           });
           results.push({

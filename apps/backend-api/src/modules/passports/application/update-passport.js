@@ -76,7 +76,7 @@ function updateEditablePassportUseCase(deps) {
     if (createPassportTable) {
       await createPassportTable(typeSchema.typeName, {
         createdBy: userId,
-        eventType: "runtime_patch_reconcile_table",
+        eventType: "runtimePatchReconcileTable",
       });
     }
     const tableName = getTable(typeSchema.typeName);
@@ -238,7 +238,7 @@ function updateEditablePassportUseCase(deps) {
       passportType: typeSchema.typeName,
       archivedBy: userId,
       actorIdentifier: getActorIdentifier(req.user),
-      snapshotReason: "before_update",
+      snapshotReason: "beforeUpdate",
     });
 
     const updateResult = await updatePassportRowById({ tableName, rowId, userId, data: fields, includeUpdatedRow: true });
@@ -251,7 +251,7 @@ function updateEditablePassportUseCase(deps) {
         passportType: typeSchema.typeName,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "after_update",
+        snapshotReason: "afterUpdate",
       });
     }
 

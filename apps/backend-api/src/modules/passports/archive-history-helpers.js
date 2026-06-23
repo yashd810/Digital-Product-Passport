@@ -31,7 +31,7 @@ function createArchiveHistoryHelpers({
     passportType,
     archivedBy = null,
     actorIdentifier = null,
-    snapshotReason = "state_snapshot",
+    snapshotReason = "stateSnapshot",
     client = pool,
   }) {
     const rowData = buildArchiveSnapshotRow(passport);
@@ -42,7 +42,7 @@ function createArchiveHistoryHelpers({
     if (!dppId || !lineageId) return null;
 
     await client.query(
-      `INSERT INTO passport_archives
+      `INSERT INTO "passportArchives"
          ("dppId", "lineageId", "companyId", "passportType", "versionNumber", "modelName",
           "internalAliasId", "productIdentifierDid", "releaseStatus", "rowData", "archivedBy",
           "actorIdentifier", "snapshotReason")
@@ -60,7 +60,7 @@ function createArchiveHistoryHelpers({
         JSON.stringify(rowData),
         archivedBy || null,
         actorIdentifier || null,
-        snapshotReason || "state_snapshot",
+        snapshotReason || "stateSnapshot",
       ]
     );
 
@@ -72,7 +72,7 @@ function createArchiveHistoryHelpers({
     passportType,
     archivedBy = null,
     actorIdentifier = null,
-    snapshotReason = "state_snapshot",
+    snapshotReason = "stateSnapshot",
     client = pool,
   }) {
     if (!Array.isArray(passports) || !passports.length || !passportType) return 0;
@@ -118,7 +118,7 @@ function createArchiveHistoryHelpers({
     publicOnly = false,
   }) {
     const typeRes = await pool.query(
-      'SELECT "displayName" AS "displayName", "fieldsJson" AS "fieldsJson" FROM passport_types WHERE "typeName" = $1',
+      'SELECT "displayName" AS "displayName", "fieldsJson" AS "fieldsJson" FROM "passportTypes" WHERE "typeName" = $1',
       [passportType]
     );
     const typeRow = typeRes.rows[0] || null;
@@ -159,7 +159,7 @@ function createArchiveHistoryHelpers({
     const visibilityRes = versionDppIds.length
       ? await pool.query(
           `SELECT "passportDppId", "versionNumber", "isPublic"
-           FROM passport_history_visibility
+           FROM "passportHistoryVisibility"
            WHERE "passportDppId" = ANY($1::text[])`,
           [versionDppIds]
         )
@@ -252,7 +252,7 @@ function createArchiveHistoryHelpers({
 
   async function clearExpiredEditSessions(editSessionTimeoutSql) {
     await pool.query(
-      `DELETE FROM passport_edit_sessions
+      `DELETE FROM "passportEditSessions"
        WHERE "lastActivityAt" < NOW() - INTERVAL '${editSessionTimeoutSql}'`
     );
   }
@@ -272,7 +272,7 @@ function createArchiveHistoryHelpers({
          u."firstName" AS "firstName",
          u."lastName" AS "lastName",
          u.email
-       FROM passport_edit_sessions pes
+       FROM "passportEditSessions" pes
        JOIN users u ON u.id = pes."userId"
        WHERE pes."passportDppId" = $1
          AND pes."lastActivityAt" >= NOW() - INTERVAL '${editSessionTimeoutSql}'
@@ -309,7 +309,7 @@ function createArchiveHistoryHelpers({
         await archivePassportSnapshots({
           passports: affectedRes.rows,
           passportType: resolvedPassportType,
-          snapshotReason: "before_mark_obsolete",
+          snapshotReason: "beforeMarkObsolete",
         });
       }
       await pool.query(
@@ -335,7 +335,7 @@ function createArchiveHistoryHelpers({
         await archivePassportSnapshots({
           passports: updatedRes.rows,
           passportType: resolvedPassportType,
-          snapshotReason: "after_mark_obsolete",
+          snapshotReason: "afterMarkObsolete",
         });
       }
     } catch (e) {

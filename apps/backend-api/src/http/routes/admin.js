@@ -11,28 +11,28 @@ const {
 } = require("../../services/passport-header-fields");
 
 const COMPANY_POLICY_DEFAULTS = {
-  default_granularity: "item",
-  allow_granularity_override: false,
-  mint_model_dids: true,
-  mint_item_dids: true,
-  mint_facility_dids: false,
-  vc_issuance_enabled: true,
-  jsonld_export_enabled: true,
-  semantic_dictionary_enabled: true
+  defaultGranularity: "item",
+  allowGranularityOverride: false,
+  mintModelDids: true,
+  mintItemDids: true,
+  mintFacilityDids: false,
+  vcIssuanceEnabled: true,
+  jsonldExportEnabled: true,
+  semanticDictionaryEnabled: true
 };
 
 const COMPANY_POLICY_BOOL_FIELDS = [
-"allow_granularity_override",
-"mint_model_dids",
-"mint_item_dids",
-"mint_facility_dids",
-"vc_issuance_enabled",
-"jsonld_export_enabled",
-"semantic_dictionary_enabled"];
+"allowGranularityOverride",
+"mintModelDids",
+"mintItemDids",
+"mintFacilityDids",
+"vcIssuanceEnabled",
+"jsonldExportEnabled",
+"semanticDictionaryEnabled"];
 
 const COMPANY_TRUST_LEVELS = new Set(["BASIC", "VERIFIED_BUSINESS", "ENTERPRISE"]);
 
-const ARCHIVED_HISTORY_REASON_SQL = `('before_archive_delete','before_bulk_archive_delete','before_delete','before_bulk_delete')`;
+const ARCHIVED_HISTORY_REASON_SQL = `('beforeArchiveDelete','beforeBulkArchiveDelete','beforeDelete','beforeBulkDelete')`;
 const ARCHIVED_HISTORY_FILTER_SQL = `("snapshotReason" IN ${ARCHIVED_HISTORY_REASON_SQL})`;
 
 
@@ -83,52 +83,52 @@ const RESERVED_PASSPORT_SEMANTIC_ID_SET = new Set(RESERVED_PASSPORT_SEMANTIC_IDS
 const VALID_ACCESS_LEVELS = new Set([
   "public",
   "consumers",
-  "notified_bodies",
-  "market_surveillance",
-  "customs_authority",
-  "eu_commission",
-  "legitimate_interest",
-  "economic_operator",
-  "delegated_operator",
+  "notifiedBodies",
+  "marketSurveillance",
+  "customsAuthority",
+  "euCommission",
+  "legitimateInterest",
+  "economicOperator",
+  "delegatedOperator",
   "manufacturer",
-  "authorized_representative",
+  "authorizedRepresentative",
   "importer",
   "distributor",
   "dealer",
-  "fulfilment_service_provider",
-  "professional_repairer",
-  "independent_operator",
+  "fulfilmentServiceProvider",
+  "professionalRepairer",
+  "independentOperator",
   "recycler",
-  "main_dpp_service_provider",
-  "backup_dpp_service_provider",
+  "mainDppServiceProvider",
+  "backupDppServiceProvider",
 ]);
 
 const VALID_CONFIDENTIALITY_LEVELS = new Set([
   "public",
   "restricted",
   "confidential",
-  "trade_secret",
+  "tradeSecret",
   "regulated",
 ]);
 
 const VALID_UPDATE_AUTHORITIES = new Set([
-  "economic_operator",
-  "delegated_operator",
+  "economicOperator",
+  "delegatedOperator",
   "manufacturer",
-  "authorized_representative",
+  "authorizedRepresentative",
   "importer",
   "distributor",
   "dealer",
-  "fulfilment_service_provider",
-  "professional_repairer",
-  "independent_operator",
+  "fulfilmentServiceProvider",
+  "professionalRepairer",
+  "independentOperator",
   "recycler",
-  "notified_bodies",
-  "market_surveillance",
-  "customs_authority",
-  "eu_commission",
-  "main_dpp_service_provider",
-  "backup_dpp_service_provider",
+  "notifiedBodies",
+  "marketSurveillance",
+  "customsAuthority",
+  "euCommission",
+  "mainDppServiceProvider",
+  "backupDppServiceProvider",
   "system",
 ]);
 
@@ -278,9 +278,7 @@ module.exports = function registerAdminRoutes(app, {
           });
         }
 
-        const updateAuthority = Array.isArray(field?.updateAuthority)
-          ? field.updateAuthority
-          : (Array.isArray(field?.update_authority) ? field.update_authority : []);
+        const updateAuthority = Array.isArray(field?.updateAuthority) ? field.updateAuthority : [];
         if (!updateAuthority.length) {
           issues.push({
             code: "FIELD_UPDATE_AUTHORITY_MISSING",
@@ -310,7 +308,7 @@ module.exports = function registerAdminRoutes(app, {
   function buildPassportTypeGovernanceCheck(sections = []) {
     const issues = validatePassportTypeFieldGovernance(sections);
     return {
-      status: issues.length ? "attention_needed" : "ok",
+      status: issues.length ? "attentionNeeded" : "ok",
       issueCount: issues.length,
       issues,
     };
@@ -340,29 +338,29 @@ module.exports = function registerAdminRoutes(app, {
 
   async function ensureCompanyDppPolicy(companyId) {
     await pool.query(
-      `INSERT INTO company_dpp_policies (
-         company_id,
-         default_granularity,
-         allow_granularity_override,
-         mint_model_dids,
-         mint_item_dids,
-         mint_facility_dids,
-         vc_issuance_enabled,
-         jsonld_export_enabled,
-         semantic_dictionary_enabled
+      `INSERT INTO "companyDppPolicies" (
+         "companyId",
+         "defaultGranularity",
+         "allowGranularityOverride",
+         "mintModelDids",
+         "mintItemDids",
+         "mintFacilityDids",
+         "vcIssuanceEnabled",
+         "jsonldExportEnabled",
+         "semanticDictionaryEnabled"
        )
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       ON CONFLICT (company_id) DO NOTHING`,
+       ON CONFLICT ("companyId") DO NOTHING`,
       [
       companyId,
-      COMPANY_POLICY_DEFAULTS.default_granularity,
-      COMPANY_POLICY_DEFAULTS.allow_granularity_override,
-      COMPANY_POLICY_DEFAULTS.mint_model_dids,
-      COMPANY_POLICY_DEFAULTS.mint_item_dids,
-      COMPANY_POLICY_DEFAULTS.mint_facility_dids,
-      COMPANY_POLICY_DEFAULTS.vc_issuance_enabled,
-      COMPANY_POLICY_DEFAULTS.jsonld_export_enabled,
-      COMPANY_POLICY_DEFAULTS.semantic_dictionary_enabled]
+      COMPANY_POLICY_DEFAULTS.defaultGranularity,
+      COMPANY_POLICY_DEFAULTS.allowGranularityOverride,
+      COMPANY_POLICY_DEFAULTS.mintModelDids,
+      COMPANY_POLICY_DEFAULTS.mintItemDids,
+      COMPANY_POLICY_DEFAULTS.mintFacilityDids,
+      COMPANY_POLICY_DEFAULTS.vcIssuanceEnabled,
+      COMPANY_POLICY_DEFAULTS.jsonldExportEnabled,
+      COMPANY_POLICY_DEFAULTS.semanticDictionaryEnabled]
 
     );
   }
@@ -371,8 +369,8 @@ module.exports = function registerAdminRoutes(app, {
     await ensureCompanyDppPolicy(companyId);
     const result = await pool.query(
       `SELECT p.*
-       FROM company_dpp_policies p
-       WHERE p.company_id = $1
+       FROM "companyDppPolicies" p
+       WHERE p."companyId" = $1
        LIMIT 1`,
       [companyId]
     );
@@ -381,11 +379,11 @@ module.exports = function registerAdminRoutes(app, {
 
   function validateCompanyDppPolicyInput(body = {}) {
     const nextPolicy = {};
-    if (body.default_granularity !== undefined) {
-      if (!["model", "batch", "item"].includes(body.default_granularity)) {
-        throw new Error("default_granularity must be one of: model, batch, item");
+    if (body.defaultGranularity !== undefined) {
+      if (!["model", "batch", "item"].includes(body.defaultGranularity)) {
+        throw new Error("defaultGranularity must be one of: model, batch, item");
       }
-      nextPolicy.default_granularity = body.default_granularity;
+      nextPolicy.defaultGranularity = body.defaultGranularity;
     }
 
     COMPANY_POLICY_BOOL_FIELDS.forEach((field) => {
@@ -408,13 +406,13 @@ module.exports = function registerAdminRoutes(app, {
       setClauses.push(`${key} = $${idx++}`);
       params.push(value);
     });
-    setClauses.push(`updated_at = NOW()`);
+    setClauses.push(`updatedAt = NOW()`);
     params.push(companyId);
 
     const result = await pool.query(
-      `UPDATE company_dpp_policies
+      `UPDATE "companyDppPolicies"
        SET ${setClauses.join(", ")}
-       WHERE company_id = $${idx}
+       WHERE "companyId" = $${idx}
        RETURNING *`,
       params
     );

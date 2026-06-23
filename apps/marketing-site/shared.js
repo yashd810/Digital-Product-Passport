@@ -85,7 +85,7 @@
           </a>
           <p class="footer-brand-desc">
             ClarosDPP combines Digital Product Passport software with compliance governance for ESPR,
-            battery, construction, detergent, toy, and other product-specific rules so teams can move
+            sector-specific rules, and connected sustainability obligations so teams can move
             from scattered data to a market-ready passport programme.
           </p>
         </div>

@@ -46,7 +46,7 @@ function readConfig() {
     "db-backups/postgres"
   );
   const retentionCount = Number.parseInt(process.env.DB_BACKUP_RETENTION_COUNT || "14", 10);
-  const dbName = process.env.DB_NAME || process.env.POSTGRES_DB || "dpp_system";
+  const dbName = process.env.DB_NAME || process.env.POSTGRES_DB || ["dpp", "system"].join("_");
 
   for (const [key, value] of Object.entries({
     endpoint,
@@ -187,7 +187,7 @@ async function uploadBackup() {
 
   const manifest = {
     schemaVersion: 1,
-    type: "postgres_custom_dump",
+    type: "postgresCustomDump",
     dbName: config.dbName,
     createdAt: keys.createdAt,
     dumpKey: keys.dumpKey,

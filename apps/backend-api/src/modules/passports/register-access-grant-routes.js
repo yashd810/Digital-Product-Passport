@@ -2,6 +2,7 @@ function registerAccessGrantRoutes(app, deps) {
   const {
     pool,
     accessRightsService,
+    logger,
     authenticateToken,
     checkCompanyAccess,
     checkCompanyAdmin,
@@ -10,12 +11,12 @@ function registerAccessGrantRoutes(app, deps) {
   } = deps;
 
   function canViewGrantCompany(req, companyId) {
-    return req.user?.role === "super_admin" || String(req.user?.companyId) === String(companyId);
+    return req.user?.role === "superAdmin" || String(req.user?.companyId) === String(companyId);
   }
 
   function canManageGrantCompany(req, companyId) {
-    return req.user?.role === "super_admin" || (
-      req.user?.role === "company_admin" &&
+    return req.user?.role === "superAdmin" || (
+      req.user?.role === "companyAdmin" &&
       String(req.user?.companyId) === String(companyId)
     );
   }
@@ -88,7 +89,7 @@ function registerAccessGrantRoutes(app, deps) {
   async function resolvePassportGrantTarget(dppId) {
     const result = await pool.query(
       `SELECT "dppId", "lineageId", "companyId", "passportType"
-       FROM passport_registry
+       FROM "passportRegistry"
        WHERE "dppId" = $1
        LIMIT 1`,
       [dppId]
@@ -101,8 +102,8 @@ function registerAccessGrantRoutes(app, deps) {
       `SELECT pag.*,
               pr."lineageId",
               pr."passportType"
-       FROM passport_access_grants pag
-       LEFT JOIN passport_registry pr ON pr."dppId" = pag."passportDppId"
+       FROM "passportAccessGrants" pag
+       LEFT JOIN "passportRegistry" pr ON pr."dppId" = pag."passportDppId"
        WHERE pag.id = $1
        LIMIT 1`,
       [grantId]
@@ -152,8 +153,8 @@ function registerAccessGrantRoutes(app, deps) {
                 pr."passportType", pr."lineageId",
                 grantee.email AS "granteeEmail", grantee."firstName" AS "granteeFirstName", grantee."lastName" AS "granteeLastName",
                 grantor.email AS "grantorEmail"
-         FROM passport_access_grants pag
-         LEFT JOIN passport_registry pr ON pr."dppId" = pag."passportDppId"
+         FROM "passportAccessGrants" pag
+         LEFT JOIN "passportRegistry" pr ON pr."dppId" = pag."passportDppId"
          LEFT JOIN users grantee ON grantee.id = pag."granteeUserId"
          LEFT JOIN users grantor ON grantor.id = pag."grantedBy"
          WHERE pag."companyId" = $1
@@ -188,7 +189,7 @@ function registerAccessGrantRoutes(app, deps) {
       }
 
       const result = await pool.query(
-        `INSERT INTO passport_access_grants (
+        `INSERT INTO "passportAccessGrants" (
            "passportDppId", "companyId", audience, "elementIdPath", "granteeUserId", "grantedBy", reason, "expiresAt", "isActive", "updatedAt"
          )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
@@ -216,7 +217,7 @@ function registerAccessGrantRoutes(app, deps) {
         target.companyId,
         req.user.userId,
         "GRANT_PASSPORT_AUDIENCE",
-        "passport_access_grants",
+        "passportAccessGrants",
         parsed.dppId,
         null,
         {
@@ -293,7 +294,7 @@ function registerAccessGrantRoutes(app, deps) {
 
       values.push(grantId);
       const result = await pool.query(
-        `UPDATE passport_access_grants
+        `UPDATE "passportAccessGrants"
          SET ${updates.join(", ")}
          WHERE id = $${index}
          RETURNING *`,
@@ -304,7 +305,7 @@ function registerAccessGrantRoutes(app, deps) {
         existing.companyId,
         req.user.userId,
         "UPDATE_PASSPORT_ACCESS_GRANT",
-        "passport_access_grants",
+        "passportAccessGrants",
         existing.passportDppId,
         existing,
         result.rows[0],
@@ -335,7 +336,7 @@ function registerAccessGrantRoutes(app, deps) {
       }
 
       const result = await pool.query(
-        `DELETE FROM passport_access_grants
+        `DELETE FROM "passportAccessGrants"
          WHERE id = $1
          RETURNING *`,
         [grantId]
@@ -345,7 +346,7 @@ function registerAccessGrantRoutes(app, deps) {
         existing.companyId,
         req.user.userId,
         "DELETE_PASSPORT_ACCESS_GRANT",
-        "passport_access_grants",
+        "passportAccessGrants",
         existing.passportDppId,
         existing,
         null,
@@ -375,7 +376,7 @@ function registerAccessGrantRoutes(app, deps) {
 
       const reason = req.body?.reason !== undefined ? (req.body.reason || existing.reason || null) : existing.reason;
       const result = await pool.query(
-        `UPDATE passport_access_grants
+        `UPDATE "passportAccessGrants"
          SET "isActive" = false,
              reason = $2,
              "updatedAt" = NOW()
@@ -388,7 +389,7 @@ function registerAccessGrantRoutes(app, deps) {
         existing.companyId,
         req.user.userId,
         "REVOKE_PASSPORT_AUDIENCE",
-        "passport_access_grants",
+        "passportAccessGrants",
         existing.passportDppId,
         existing,
         { ...result.rows[0], revoked: true },
@@ -407,7 +408,9 @@ function registerAccessGrantRoutes(app, deps) {
         elementIdPath: existing.elementIdPath,
         revocationMode: "standard",
         reason,
-      }).catch(() => {});
+      }).catch((error) => {
+        logger?.warn?.({ err: error, companyId: existing.companyId, grantId, eventType: "PASSPORT_ACCESS_GRANT_REVOKED" }, "Failed to replicate access grant revocation event");
+      });
 
       res.json({
         success: true,
@@ -435,7 +438,7 @@ function registerAccessGrantRoutes(app, deps) {
         ? req.body.reason || "Emergency access revocation"
         : existing.reason || "Emergency access revocation";
       const result = await pool.query(
-        `UPDATE passport_access_grants
+        `UPDATE "passportAccessGrants"
          SET "isActive" = false,
              "expiresAt" = NOW(),
              reason = $2,
@@ -449,7 +452,7 @@ function registerAccessGrantRoutes(app, deps) {
         existing.companyId,
         req.user.userId,
         "EMERGENCY_REVOKE_PASSPORT_AUDIENCE",
-        "passport_access_grants",
+        "passportAccessGrants",
         existing.passportDppId,
         existing,
         { ...result.rows[0], revoked: true, emergency: true },
@@ -471,7 +474,9 @@ function registerAccessGrantRoutes(app, deps) {
         metadata: {
           effectiveAt: result.rows[0]?.expiresAt || null,
         },
-      }).catch(() => {});
+      }).catch((error) => {
+        logger?.warn?.({ err: error, companyId: existing.companyId, grantId, eventType: "PASSPORT_ACCESS_GRANT_EMERGENCY_REVOKED" }, "Failed to replicate emergency access grant revocation event");
+      });
 
       res.json({
         success: true,
@@ -487,11 +492,11 @@ function registerAccessGrantRoutes(app, deps) {
   app.get("/api/companies/:companyId/access-audiences/users/:userId", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const result = await pool.query(
-        `SELECT id, audience, reason, expires_at, is_active, created_at, updated_at
-         FROM user_access_audiences
-         WHERE company_id = $1
-           AND user_id = $2
-         ORDER BY audience, created_at DESC`,
+        `SELECT id, audience, reason, "expiresAt", "isActive", "createdAt", "updatedAt"
+         FROM "userAccessAudiences"
+         WHERE "companyId" = $1
+           AND "userId" = $2
+         ORDER BY audience, "createdAt" DESC`,
         [req.params.companyId, req.params.userId]
       );
       res.json(result.rows);
@@ -506,24 +511,24 @@ function registerAccessGrantRoutes(app, deps) {
       if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
         return res.status(400).json({ error: "audience must be a non-public supported audience" });
       }
-      const expiresAt = req.body?.expires_at ? new Date(req.body.expires_at) : null;
+      const expiresAt = req.body?.expiresAt ? new Date(req.body.expiresAt) : null;
       if (expiresAt && Number.isNaN(expiresAt.getTime())) {
-        return res.status(400).json({ error: "expires_at must be a valid ISO timestamp" });
+        return res.status(400).json({ error: "expiresAt must be a valid ISO timestamp" });
       }
 
       const result = await pool.query(
-        `INSERT INTO user_access_audiences (
-           user_id, company_id, audience, granted_by, reason, expires_at, is_active, updated_at
+        `INSERT INTO "userAccessAudiences" (
+           "userId", "companyId", audience, "grantedBy", reason, "expiresAt", "isActive", "updatedAt"
          )
          VALUES ($1, $2, $3, $4, $5, $6, true, NOW())
-         ON CONFLICT (user_id, company_id, audience)
+         ON CONFLICT ("userId", "companyId", audience)
          DO UPDATE SET
-           granted_by = EXCLUDED.granted_by,
+           "grantedBy" = EXCLUDED."grantedBy",
            reason = EXCLUDED.reason,
-           expires_at = EXCLUDED.expires_at,
-           is_active = true,
-           updated_at = NOW()
-         RETURNING id, audience, reason, expires_at, is_active, created_at, updated_at`,
+           "expiresAt" = EXCLUDED."expiresAt",
+           "isActive" = true,
+           "updatedAt" = NOW()
+         RETURNING id, audience, reason, "expiresAt", "isActive", "createdAt", "updatedAt"`,
         [
           req.params.userId,
           req.params.companyId,
@@ -538,10 +543,10 @@ function registerAccessGrantRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "GRANT_USER_AUDIENCE",
-        "user_access_audiences",
+        "userAccessAudiences",
         req.params.userId,
         null,
-        { audience, expires_at: expiresAt ? expiresAt.toISOString() : null },
+        { audience, expiresAt: expiresAt ? expiresAt.toISOString() : null },
         { audience }
       );
 
@@ -559,13 +564,13 @@ function registerAccessGrantRoutes(app, deps) {
       }
 
       const result = await pool.query(
-        `UPDATE user_access_audiences
-         SET is_active = false,
-             updated_at = NOW()
-         WHERE company_id = $1
-           AND user_id = $2
+        `UPDATE "userAccessAudiences"
+         SET "isActive" = false,
+             "updatedAt" = NOW()
+         WHERE "companyId" = $1
+           AND "userId" = $2
            AND audience = $3
-         RETURNING id, audience, user_id, is_active, updated_at`,
+         RETURNING id, audience, "userId", "isActive", "updatedAt"`,
         [req.params.companyId, req.params.userId, audience]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Access audience not found" });
@@ -574,7 +579,7 @@ function registerAccessGrantRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "REVOKE_USER_AUDIENCE",
-        "user_access_audiences",
+        "userAccessAudiences",
         req.params.userId,
         result.rows[0],
         { revoked: true, audience },
@@ -589,7 +594,9 @@ function registerAccessGrantRoutes(app, deps) {
         affectedUserId: req.params.userId,
         audience,
         revocationMode: "standard",
-      }).catch(() => {});
+      }).catch((error) => {
+        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: req.params.userId, eventType: "USER_AUDIENCE_REVOKED" }, "Failed to replicate user audience revocation event");
+      });
 
       res.json({ success: true, accessAudience: result.rows[0] });
     } catch {
@@ -603,21 +610,21 @@ function registerAccessGrantRoutes(app, deps) {
       if (!Number.isFinite(grantId)) return res.status(400).json({ error: "grantId must be a valid integer" });
 
       const existing = await pool.query(
-        `SELECT id, user_id, company_id, audience, granted_by, reason, expires_at, is_active
-         FROM user_access_audiences
-         WHERE id = $1 AND company_id = $2`,
+        `SELECT id, "userId", "companyId", audience, "grantedBy", reason, "expiresAt", "isActive"
+         FROM "userAccessAudiences"
+         WHERE id = $1 AND "companyId" = $2`,
         [grantId, req.params.companyId]
       );
       if (!existing.rows.length) return res.status(404).json({ error: "Access audience grant not found" });
 
       const reason = req.body?.reason || existing.rows[0].reason || "User audience revoked";
       const result = await pool.query(
-        `UPDATE user_access_audiences
-         SET is_active = false,
+        `UPDATE "userAccessAudiences"
+         SET "isActive" = false,
              reason = $2,
-             updated_at = NOW()
+             "updatedAt" = NOW()
          WHERE id = $1
-         RETURNING id, audience, user_id, is_active, updated_at, reason`,
+         RETURNING id, audience, "userId", "isActive", "updatedAt", reason`,
         [grantId, reason]
       );
 
@@ -625,8 +632,8 @@ function registerAccessGrantRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "REVOKE_USER_AUDIENCE",
-        "user_access_audiences",
-        String(existing.rows[0].user_id),
+        "userAccessAudiences",
+        String(existing.rows[0].userId),
         existing.rows[0],
         { ...result.rows[0], revoked: true },
         { audience: existing.rows[0].audience }
@@ -637,11 +644,13 @@ function registerAccessGrantRoutes(app, deps) {
         severity: "high",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-        affectedUserId: existing.rows[0].user_id,
+        affectedUserId: existing.rows[0].userId,
         audience: existing.rows[0].audience,
         revocationMode: "standard",
         reason,
-      }).catch(() => {});
+      }).catch((error) => {
+        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: existing.rows[0].userId, eventType: "USER_AUDIENCE_REVOKED" }, "Failed to replicate user audience revocation event");
+      });
 
       res.json({ success: true, revoked: true, emergency: false, accessAudience: result.rows[0] });
     } catch {
@@ -655,9 +664,9 @@ function registerAccessGrantRoutes(app, deps) {
       if (!Number.isFinite(grantId)) return res.status(400).json({ error: "grantId must be a valid integer" });
 
       const existing = await pool.query(
-        `SELECT id, user_id, company_id, audience, granted_by, reason, expires_at, is_active
-         FROM user_access_audiences
-         WHERE id = $1 AND company_id = $2`,
+        `SELECT id, "userId", "companyId", audience, "grantedBy", reason, "expiresAt", "isActive"
+         FROM "userAccessAudiences"
+         WHERE id = $1 AND "companyId" = $2`,
         [grantId, req.params.companyId]
       );
       if (!existing.rows.length) return res.status(404).json({ error: "Access audience grant not found" });
@@ -665,13 +674,13 @@ function registerAccessGrantRoutes(app, deps) {
       const reason = req.body?.reason || existing.rows[0].reason || "Emergency user audience revocation";
       const effectiveAt = new Date().toISOString();
       const result = await pool.query(
-        `UPDATE user_access_audiences
-         SET is_active = false,
-             expires_at = NOW(),
+        `UPDATE "userAccessAudiences"
+         SET "isActive" = false,
+             "expiresAt" = NOW(),
              reason = $2,
-             updated_at = NOW()
+             "updatedAt" = NOW()
          WHERE id = $1
-         RETURNING id, audience, user_id, is_active, updated_at, expires_at, reason`,
+         RETURNING id, audience, "userId", "isActive", "updatedAt", "expiresAt", reason`,
         [grantId, reason]
       );
 
@@ -680,17 +689,19 @@ function registerAccessGrantRoutes(app, deps) {
          SET "sessionVersion" = COALESCE("sessionVersion", 1) + 1,
              "updatedAt" = NOW()
          WHERE id = $1 AND "companyId" = $2`,
-        [existing.rows[0].user_id, req.params.companyId]
-      ).catch(() => {});
+        [existing.rows[0].userId, req.params.companyId]
+      ).catch((error) => {
+        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: existing.rows[0].userId }, "Failed to revoke user sessions after emergency audience revocation");
+      });
 
       await logAudit(
         req.params.companyId,
         req.user.userId,
         "EMERGENCY_REVOKE_USER_AUDIENCE",
-        "user_access_audiences",
-        String(existing.rows[0].user_id),
+        "userAccessAudiences",
+        String(existing.rows[0].userId),
         existing.rows[0],
-        { ...result.rows[0], revoked: true, emergency: true, effective_at: effectiveAt },
+        { ...result.rows[0], revoked: true, emergency: true, effectiveAt },
         { audience: existing.rows[0].audience }
       );
       await replicateAccessControlEventToBackup({
@@ -699,12 +710,14 @@ function registerAccessGrantRoutes(app, deps) {
         severity: "critical",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
-        affectedUserId: existing.rows[0].user_id,
+        affectedUserId: existing.rows[0].userId,
         audience: existing.rows[0].audience,
         revocationMode: "emergency",
         reason,
         metadata: { effectiveAt, sessionsRevoked: true },
-      }).catch(() => {});
+      }).catch((error) => {
+        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: existing.rows[0].userId, eventType: "USER_AUDIENCE_EMERGENCY_REVOKED" }, "Failed to replicate emergency user audience revocation event");
+      });
 
       res.json({
         success: true,
@@ -724,7 +737,7 @@ function registerAccessGrantRoutes(app, deps) {
         `SELECT pag.id, pag.audience, pag."elementIdPath", pag."granteeUserId", pag."grantedBy", pag.reason,
                 pag."expiresAt", pag."isActive", pag."createdAt", pag."updatedAt",
                 u.email AS "granteeEmail", u."firstName" AS "granteeFirstName", u."lastName" AS "granteeLastName"
-         FROM passport_access_grants pag
+         FROM "passportAccessGrants" pag
          LEFT JOIN users u ON u.id = pag."granteeUserId"
          WHERE pag."companyId" = $1
            AND pag."passportDppId" = $2
@@ -753,7 +766,7 @@ function registerAccessGrantRoutes(app, deps) {
       }
 
       const result = await pool.query(
-        `INSERT INTO passport_access_grants (
+        `INSERT INTO "passportAccessGrants" (
            "passportDppId", "companyId", audience, "elementIdPath", "granteeUserId", "grantedBy", reason, "expiresAt", "isActive", "updatedAt"
          )
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
@@ -781,7 +794,7 @@ function registerAccessGrantRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "GRANT_PASSPORT_AUDIENCE",
-        "passport_access_grants",
+        "passportAccessGrants",
         req.params.dppId,
         null,
         {
@@ -802,7 +815,7 @@ function registerAccessGrantRoutes(app, deps) {
   app.delete("/api/companies/:companyId/passports/:dppId/access-grants/:grantId", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const result = await pool.query(
-        `UPDATE passport_access_grants
+        `UPDATE "passportAccessGrants"
          SET "isActive" = false,
              "updatedAt" = NOW()
          WHERE id = $1
@@ -817,7 +830,7 @@ function registerAccessGrantRoutes(app, deps) {
         req.params.companyId,
         req.user.userId,
         "REVOKE_PASSPORT_AUDIENCE",
-        "passport_access_grants",
+        "passportAccessGrants",
         req.params.dppId,
         result.rows[0],
         { revoked: true },

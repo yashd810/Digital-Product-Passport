@@ -13,7 +13,7 @@ module.exports = function registerUserAccessRoutes(app, deps) {
   app.patch("/api/admin/users/:userId/role", authenticateToken, isSuperAdmin, async (req, res) => {
     try {
       const { role } = req.body;
-      if (!["company_admin", "editor", "viewer"].includes(role)) {
+      if (!["companyAdmin", "editor", "viewer"].includes(role)) {
         return res.status(400).json({ error: "Invalid role" });
       }
       await pool.query(
@@ -34,16 +34,16 @@ module.exports = function registerUserAccessRoutes(app, deps) {
       }
 
       const typeRes = await pool.query(
-        'SELECT "typeName" AS "typeName", "displayName" AS "displayName" FROM passport_types WHERE id = $1',
+        'SELECT "typeName" AS "typeName", "displayName" AS "displayName" FROM "passportTypes" WHERE id = $1',
         [passportTypeId]
       );
       if (!typeRes.rows.length) return res.status(404).json({ error: "Passport type not found" });
       const { typeName, displayName } = typeRes.rows[0];
 
       const result = await pool.query(
-        `INSERT INTO company_passport_access (company_id, passport_type_id, access_revoked)
+        `INSERT INTO "companyPassportAccess" ("companyId", "passportTypeId", "accessRevoked")
          VALUES ($1, $2, FALSE)
-         ON CONFLICT (company_id, passport_type_id) DO UPDATE SET access_revoked = FALSE
+         ON CONFLICT ("companyId", "passportTypeId") DO UPDATE SET "accessRevoked" = FALSE
          RETURNING *`,
         [companyId, passportTypeId]
       );
@@ -63,18 +63,18 @@ module.exports = function registerUserAccessRoutes(app, deps) {
       const { companyId, typeId } = req.params;
 
       const result = await pool.query(
-        `UPDATE company_passport_access SET access_revoked = TRUE
-         WHERE company_id = $1 AND passport_type_id = $2 RETURNING id`,
+        `UPDATE "companyPassportAccess" SET "accessRevoked" = TRUE
+         WHERE "companyId" = $1 AND "passportTypeId" = $2 RETURNING id`,
         [companyId, typeId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Access record not found" });
 
-      const typeRes = await pool.query('SELECT "typeName" AS "typeName" FROM passport_types WHERE id = $1', [typeId]);
+      const typeRes = await pool.query('SELECT "typeName" AS "typeName" FROM "passportTypes" WHERE id = $1', [typeId]);
       if (typeRes.rows.length) {
         const tableName = getTable(typeRes.rows[0].typeName);
         await pool.query(
           `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
-           WHERE "companyId" = $1 AND "releaseStatus" IN ('draft', 'in_revision')`,
+           WHERE "companyId" = $1 AND "releaseStatus" IN ('draft', 'inRevision')`,
           [companyId]
         );
       }

@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { buildDashboardPath } = require("../shared/navigation/dashboard-paths");
+const logger = require("./logger");
 
 const SAFE_ID_TOKEN_ALGORITHMS = new Set([
   "RS256",
@@ -245,9 +246,9 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
 
     const existingIdentity = await pool.query(
       `SELECT u.id, u.email, u."companyId" AS "companyId", u.role, u."firstName" AS "firstName", u."lastName" AS "lastName", u."isActive" AS "isActive", u."sessionVersion" AS "sessionVersion"
-         FROM user_identities ui
-         JOIN users u ON u.id = ui.user_id
-        WHERE ui.provider_key = $1 AND ui.provider_subject = $2
+         FROM "userIdentities" ui
+         JOIN users u ON u.id = ui."userId"
+        WHERE ui."providerKey" = $1 AND ui."providerSubject" = $2
         LIMIT 1`,
       [provider.key, subject]
     );
@@ -255,9 +256,9 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       const user = existingIdentity.rows[0];
       if (!user.isActive) throw new Error("Your account is inactive");
       await pool.query(
-        `UPDATE user_identities
-            SET email = $1, raw_profile = $2, last_login_at = NOW()
-          WHERE provider_key = $3 AND provider_subject = $4`,
+        `UPDATE "userIdentities"
+            SET email = $1, "rawProfile" = $2, "lastLoginAt" = NOW()
+          WHERE "providerKey" = $3 AND "providerSubject" = $4`,
         [email, JSON.stringify(profile), provider.key, subject]
       );
       return user;
@@ -282,7 +283,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       if (!provider.allowCreateUser) {
         throw new Error("No account is linked to this SSO identity yet");
       }
-      if (!provider.defaultCompanyId && provider.defaultRole !== "super_admin") {
+      if (!provider.defaultCompanyId && provider.defaultRole !== "superAdmin") {
         throw new Error("This SSO provider is missing a default company mapping");
       }
       const firstName = profile.given_name || String(profile.name || "").split(" ").filter(Boolean).slice(0, 1).join(" ") || null;
@@ -297,7 +298,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
           randomPassword.hash,
           firstName,
           lastName,
-          provider.defaultRole === "super_admin" ? null : provider.defaultCompanyId,
+          provider.defaultRole === "superAdmin" ? null : provider.defaultCompanyId,
           provider.defaultRole,
           provider.key,
           provider.ssoOnly,
@@ -307,13 +308,13 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     }
 
     await pool.query(
-      `INSERT INTO user_identities (user_id, provider_key, provider_subject, email, raw_profile, created_at, last_login_at)
+      `INSERT INTO "userIdentities" ("userId", "providerKey", "providerSubject", email, "rawProfile", "createdAt", "lastLoginAt")
        VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-       ON CONFLICT (provider_key, provider_subject) DO UPDATE
-          SET user_id = EXCLUDED.user_id,
+       ON CONFLICT ("providerKey", "providerSubject") DO UPDATE
+          SET "userId" = EXCLUDED."userId",
               email = EXCLUDED.email,
-              raw_profile = EXCLUDED.raw_profile,
-              last_login_at = NOW()`,
+              "rawProfile" = EXCLUDED."rawProfile",
+              "lastLoginAt" = NOW()`,
       [user.id, provider.key, subject, email, JSON.stringify(profile)]
     );
 
@@ -368,13 +369,15 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
     await pool.query(
       'UPDATE users SET "lastLoginAt" = NOW(), "updatedAt" = NOW() WHERE id = $1',
       [user.id]
-    ).catch(() => {});
+    ).catch((error) => {
+      logger.warn({ err: error, userId: user.id, providerKey: provider.key }, "Failed to update OAuth last login timestamp");
+    });
 
     const sessionToken = generateToken(user);
     setAuthCookie(res, sessionToken);
 
     const appBase = String(process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "");
-    const defaultRedirectPath = user.role === "super_admin"
+    const defaultRedirectPath = user.role === "superAdmin"
       ? "/admin"
       : buildDashboardPath({ companyId: user.companyId, subpath: "overview" });
     const redirectPath = normalizeRedirectPath(statePayload.redirectTo, defaultRedirectPath);

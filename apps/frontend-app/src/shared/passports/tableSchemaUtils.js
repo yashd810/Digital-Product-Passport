@@ -54,7 +54,7 @@ export function normalizeTableColumn(column, index = 0) {
 export function normalizeTableColumns(fieldOrColumns = {}) {
   const source = Array.isArray(fieldOrColumns)
     ? fieldOrColumns
-    : (Array.isArray(fieldOrColumns?.table_columns) ? fieldOrColumns.table_columns : []);
+    : (Array.isArray(fieldOrColumns?.tableColumns) ? fieldOrColumns.tableColumns : []);
 
   return source.map((column, index) => normalizeTableColumn(column, index));
 }

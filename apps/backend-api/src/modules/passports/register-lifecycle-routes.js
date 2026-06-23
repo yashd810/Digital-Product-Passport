@@ -84,7 +84,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
     return {
       status: missingMandatoryFields.length > 0
-          ? "missing_required_fields"
+          ? "missingRequiredFields"
           : "ready",
       isReleaseReady: true,
       canProceedWithWorkflow: true,
@@ -138,7 +138,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         verification: buildVerificationSummary(compliance),
         compliance,
       });
-    } catch {
+    } catch (error) {
+      logger.error({ err: error, dppId: req.params?.dppId, companyId: req.params?.companyId }, "Verification check error");
       res.status(500).json({ error: "Failed to run verification check" });
     }
   });
@@ -175,7 +176,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         passportType,
         archivedBy: req.user.userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "before_release",
+        snapshotReason: "beforeRelease",
       });
       const result = await pool.query(
         `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
@@ -191,7 +192,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         passportType,
         archivedBy: req.user.userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "after_release",
+        snapshotReason: "afterRelease",
       });
 
       const typeDef = await complianceService.loadPassportTypeDefinition(passportType);
@@ -206,28 +207,32 @@ module.exports = function registerLifecycleRoutes(app, deps) {
           sigData,
           releaseNote: req.body?.releaseNote || null,
         });
-        await logAudit(companyId, req.user.userId, "SIGN_PASSPORT", "passport_signatures", dppId, null, {
+        await logAudit(companyId, req.user.userId, "SIGN_PASSPORT", "passportSignatures", dppId, null, {
           versionNumber: released.versionNumber,
           signingKeyId: sigData.keyId,
           signatureAlgorithm: sigData.signatureAlgorithm,
         }, {
           actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || req.user.email || `user:${req.user.userId}`,
-          audience: "economic_operator",
+          audience: "economicOperator",
         });
       }
 
       await markOlderVersionsObsolete(tableName, dppId, released.versionNumber, passportType);
       await pool.query(
-        "UPDATE passport_attachments SET \"isPublic\" = true WHERE \"passportDppId\" = $1",
+        "UPDATE \"passportAttachments\" SET \"isPublic\" = true WHERE \"passportDppId\" = $1",
         [dppId]
-      ).catch(() => {});
-      await logAudit(companyId, req.user.userId, "RELEASE", tableName, dppId, { releaseStatus: "draft_or_in_revision" }, { releaseStatus: "released" });
+      ).catch((error) => {
+        logger.warn({ err: error, dppId }, "Failed to mark passport attachments public after release");
+      });
+      await logAudit(companyId, req.user.userId, "RELEASE", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
       await replicatePassportToBackup({
         passport: { ...released, passportType },
         passportType,
         reason: "release",
-        snapshotScope: "released_current",
-      }).catch(() => {});
+        snapshotScope: "releasedCurrent",
+      }).catch((error) => {
+        logger.warn({ err: error, dppId, passportType, reason: "release" }, "Failed to replicate released passport to backup");
+      });
 
       res.json({
         success: true,
@@ -286,7 +291,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const sourceRegistry = await pool.query(
         `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
                 "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
-         FROM passport_registry
+         FROM "passportRegistry"
          WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
         [dppId, companyId]
@@ -310,12 +315,13 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         passportType,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "after_revise_create",
+        snapshotReason: "afterReviseCreate",
       });
 
       await logAudit(companyId, userId, "REVISE", tableName, newGuid, { versionNumber: src.versionNumber }, { versionNumber: newVersion });
       res.json({ success: true, dppId: newGuid, newVersion, releaseStatus: IN_REVISION_STATUS });
-    } catch {
+    } catch (error) {
+      logger.error({ err: error, dppId: req.params?.dppId, companyId: req.params?.companyId }, "Revise passport error");
       res.status(500).json({ error: "Failed to revise passport" });
     }
   });
@@ -369,7 +375,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       if (existingByProductId) {
         return res.status(409).json({
           error: `A passport with Internal Alias ID "${requestedProductId}" already exists.`,
-          existing_dpp_id: existingByProductId.dppId,
+          existingDppId: existingByProductId.dppId,
           releaseStatus: normalizeReleaseStatus(existingByProductId.releaseStatus),
         });
       }
@@ -404,7 +410,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const sourceRegistry = await pool.query(
         `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
                 "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
-         FROM passport_registry
+         FROM "passportRegistry"
          WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
         [dppId, companyId]
@@ -434,7 +440,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         replacementLocalProductId: nextIdentifiers.internalAliasId || null,
         previousGranularity: currentGranularity,
         replacementGranularity: requestedGranularity,
-        transitionReason: reason || "granularity_change",
+        transitionReason: reason || "granularityChange",
         createdBy: userId,
       });
 
@@ -443,7 +449,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         passportType,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "after_granularity_transition_create",
+        snapshotReason: "afterGranularityTransitionCreate",
       });
 
       await logAudit(companyId, userId, "TRANSITION_GRANULARITY", tableName, newGuid, {
@@ -538,7 +544,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         passportType,
         archivedBy: userId,
         actorIdentifier: getActorIdentifier(req.user),
-        snapshotReason: "before_archive_delete",
+        snapshotReason: "beforeArchiveDelete",
       });
       await pool.query(
         `UPDATE ${tableName} SET "deletedAt" = NOW() WHERE "lineageId" = $1 AND "companyId" = $2 AND "deletedAt" IS NULL`,
@@ -549,12 +555,14 @@ module.exports = function registerLifecycleRoutes(app, deps) {
           passport: { ...row, passportType },
           passportType,
           reason: "archive",
-          snapshotScope: "archived_history",
-        }).catch(() => {});
+          snapshotScope: "archivedHistory",
+        }).catch((error) => {
+          logger.warn({ err: error, dppId: row.dppId, passportType, reason: "archive" }, "Failed to replicate archived passport to backup");
+        });
       }
 
-      await logAudit(companyId, userId, "ARCHIVE", tableName, dppId, null, { versions_archived: rows.rows.length });
-      res.json({ success: true, versions_archived: rows.rows.length });
+      await logAudit(companyId, userId, "ARCHIVE", tableName, dppId, null, { versionsArchived: rows.rows.length });
+      res.json({ success: true, versionsArchived: rows.rows.length });
     } catch (error) {
       logger.error("Archive error:", error.message);
       res.status(500).json({ error: "Failed to archive passport" });
@@ -568,7 +576,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       const archiveContext = await pool.query(
         `SELECT "lineageId"
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE ("dppId" = $1 OR "lineageId" = $1)
            AND "companyId" = $2
            AND ${ARCHIVED_HISTORY_FILTER_SQL}
@@ -579,7 +587,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       const archiveRows = await pool.query(
         `SELECT *
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE "lineageId" = $1
            AND "companyId" = $2
            AND ${ARCHIVED_HISTORY_FILTER_SQL}
@@ -605,15 +613,15 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         [archiveRows.rows[0].lineageId, companyId]
       );
       await pool.query(
-        `DELETE FROM passport_archives
+        `DELETE FROM "passportArchives"
          WHERE "lineageId" = $1
            AND "companyId" = $2
            AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
         [archiveRows.rows[0].lineageId, companyId]
       );
 
-      await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versions_restored: archiveRows.rows.length });
-      res.json({ success: true, versions_restored: archiveRows.rows.length });
+      await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versionsRestored: archiveRows.rows.length });
+      res.json({ success: true, versionsRestored: archiveRows.rows.length });
     } catch (error) {
       logger.error("Unarchive error:", error.message);
       res.status(500).json({ error: "Failed to unarchive passport" });

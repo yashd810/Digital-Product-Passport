@@ -30,32 +30,31 @@ const DPP_CONTEXT = {
   updatedAt: { "@id": "dpp:updatedAt", "@type": "http://www.w3.org/2001/XMLSchema#dateTime" },
 };
 
-function readTypeValue(typeDef, camelKey, snakeKey = null) {
+function readTypeValue(typeDef, camelKey) {
   if (!typeDef || typeof typeDef !== "object") return null;
   if (typeDef[camelKey] !== undefined) return typeDef[camelKey];
-  if (snakeKey && typeDef[snakeKey] !== undefined) return typeDef[snakeKey];
   return null;
 }
 
 function getFieldsJson(typeDef) {
-  return readTypeValue(typeDef, "fieldsJson", "fields_json") || {};
+  return readTypeValue(typeDef, "fieldsJson") || {};
 }
 
 function normalizeSemanticModelKey(modelKey) {
-  return String(modelKey || "").trim().toLowerCase();
+  return String(modelKey || "").trim();
 }
 
 function getSemanticModelKey(typeDef, options = {}) {
   return normalizeSemanticModelKey(
     options.semanticModelKey
-    || readTypeValue(typeDef, "semanticModelKey", "semantic_model_key")
+    || readTypeValue(typeDef, "semanticModelKey")
     || getFieldsJson(typeDef)?.semanticModelKey
     || ""
   );
 }
 
 function getTypeName(typeDef) {
-  return readTypeValue(typeDef, "typeName", "type_name") || "";
+  return readTypeValue(typeDef, "typeName") || "";
 }
 
 function createSemanticPassportExportService({
@@ -97,7 +96,7 @@ function createSemanticPassportExportService({
       for (const field of (section.fields || [])) {
         addField(field.key, field.semanticId);
         if (field?.type === "table") {
-          for (const column of (field.table_columns || [])) {
+          for (const column of (field.tableColumns || [])) {
             addField(column?.key, column?.semanticId);
           }
         }
@@ -182,7 +181,6 @@ function createSemanticPassportExportService({
         ? {
             passportType: resolvedType || graph[0]?.passportType || null,
             semanticModel: metadata,
-            semantic_model: metadata,
           }
         : {}),
     };

@@ -59,8 +59,8 @@ export function normalizeFieldForSemanticModel(
   };
 
   if (nextField.type === "table") {
-    nextField.table_columns = normalizeTableColumns(nextField);
-    nextField.table_cols = nextField.table_columns.length;
+    nextField.tableColumns = normalizeTableColumns(nextField);
+    nextField.tableColumnCount = nextField.tableColumns.length;
   }
 
   if (!normalizeSemanticModelKey(semanticModelKey) || clearSemanticId) {
@@ -68,7 +68,7 @@ export function normalizeFieldForSemanticModel(
     delete nextField._semanticSearch;
     delete nextField._semanticOpen;
     if (nextField.type === "table") {
-      nextField.table_columns = normalizeTableColumns(nextField).map(
+      nextField.tableColumns = normalizeTableColumns(nextField).map(
         (column) => {
           const nextColumn = { ...column };
           delete nextColumn.semanticId;
@@ -139,7 +139,7 @@ export function rekeyModuleSection(section = {}, sourceModuleKey = "") {
   return {
     ...section,
     localId: Math.random().toString(36).slice(2),
-    label_i18n: section.label_i18n || {},
+    labelI18n: section.labelI18n || {},
     sourceModuleKey,
     fields: (section.fields || []).map((field) => {
       const tableColumns =
@@ -154,7 +154,7 @@ export function rekeyModuleSection(section = {}, sourceModuleKey = "") {
       const nextField = {
         ...field,
         localId: Math.random().toString(36).slice(2),
-        label_i18n: field.label_i18n || {},
+        labelI18n: field.labelI18n || {},
         _keyManual: true,
         canonicalLocked: true,
         sourceModuleKey,
@@ -162,8 +162,8 @@ export function rekeyModuleSection(section = {}, sourceModuleKey = "") {
         required: false,
       };
       if (tableColumns) {
-        nextField.table_columns = tableColumns;
-        nextField.table_cols = tableColumns.length;
+        nextField.tableColumns = tableColumns;
+        nextField.tableColumnCount = tableColumns.length;
       }
       return nextField;
     }),
@@ -191,7 +191,7 @@ export function unlockModuleSection(section = {}) {
       });
       return {
         ...fieldRest,
-        table_columns: tableColumns,
+        tableColumns,
       };
     }),
   };

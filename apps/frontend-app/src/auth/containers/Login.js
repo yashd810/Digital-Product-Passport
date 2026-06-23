@@ -51,7 +51,7 @@ function Login({ setIsAuthenticated, setUser, setCompanyId }) {
     setIsAuthenticated(true);
     setUser(data.user);
     setCompanyId(data.user.companyId || "");
-    if (data.user.role === "super_admin") navigate("/admin");
+    if (data.user.role === "superAdmin") navigate("/admin");
     else navigate(buildUserDashboardHomePath({ user: data.user, companyId: data.user.companyId || "" }));
   };
 

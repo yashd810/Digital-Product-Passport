@@ -12,7 +12,7 @@ The current recommended flow is two-layered:
 - `passport module` = canonical available fields, table columns, semantics, units, and data types
 - `passport type` = a selected subset of module fields, with required/optional rules decided per passport type
 
-That means one module can power many passport types. For example, one `battery:v1` module can be used to create an EV battery type, an industrial battery type, and a portable battery type without duplicating the module.
+That means one module can power many passport types. For example, one `equipmentPassportV1` module can be used to create internal equipment, leased equipment, and serviced equipment passport types without duplicating the module.
 
 ## What The Admin UI Does
 

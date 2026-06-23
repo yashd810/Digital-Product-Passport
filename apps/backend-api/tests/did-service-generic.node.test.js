@@ -14,21 +14,21 @@ function createService() {
 
 test("did service generates and resolves generic product subject DID paths", () => {
   const didService = createService();
-  const did = didService.generateItemDid("textile passport v1", "STYLE-001");
+  const did = didService.generateItemDid("custom passport v1", "ITEM-001");
 
-  assert.equal(did, "did:web:www.example.test:did:textile-passport-v1:item:STYLE-001");
+  assert.equal(did, "did:web:www.example.test:did:custom-passport-v1:item:ITEM-001");
   assert.deepEqual(didService.parseDid(did), {
     method: "web",
     domain: "www.example.test",
-    path: ["did", "textile-passport-v1", "item", "STYLE-001"],
+    path: ["did", "custom-passport-v1", "item", "ITEM-001"],
     entityType: "item",
-    stableId: "STYLE-001",
-    passportType: "textile-passport-v1",
+    stableId: "ITEM-001",
+    passportType: "custom-passport-v1",
     granularity: null,
   });
   assert.equal(
     didService.didToDocumentPath(did),
-    "/did/textile-passport-v1/item/STYLE-001/did.json"
+    "/did/custom-passport-v1/item/ITEM-001/did.json"
   );
 });
 

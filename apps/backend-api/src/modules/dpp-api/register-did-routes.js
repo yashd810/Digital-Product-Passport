@@ -146,7 +146,7 @@ module.exports = function registerDidRoutes(app, deps) {
 
       const reg = await pool.query(
         `SELECT "passportType", "companyId"
-         FROM passport_registry
+         FROM "passportRegistry"
          WHERE "dppId" = $1`,
         [dppId]
       );

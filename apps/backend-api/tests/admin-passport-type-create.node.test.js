@@ -35,7 +35,8 @@ function routePathMatches(routePath, pathToFind) {
 }
 
 function findRouteHandlers(app, method, pathToFind) {
-  const layer = app._router?.stack?.find((entry) =>
+  const stack = app._router?.stack || app.router?.stack || [];
+  const layer = stack.find((entry) =>
     entry.route
     && routePathMatches(entry.route.path, pathToFind)
     && entry.route.methods?.[method]
@@ -50,7 +51,7 @@ async function invokeRoute(app, { method = "post", path, body = {}, params = {} 
     body,
     method: method.toUpperCase(),
     params,
-    user: { userId: 99, role: "super_admin" },
+    user: { userId: 99, role: "superAdmin" },
   };
   const res = createMockResponse();
 
@@ -89,7 +90,7 @@ function createMockPool(calls, { registeredTypes = [] } = {}) {
     async query(sql, params = []) {
       calls.push({ sql, params });
 
-      if (sql.includes("INSERT INTO passport_types")) {
+      if (sql.includes("INSERT INTO \"passportTypes\"")) {
         const fieldsJson = JSON.parse(params[5]);
         return {
           rows: [{
@@ -106,7 +107,7 @@ function createMockPool(calls, { registeredTypes = [] } = {}) {
         };
       }
 
-      if (sql.includes("INSERT INTO product_categories")) {
+      if (sql.includes("INSERT INTO \"productCategories\"")) {
         return {
           rows: [{
             id: 77,
@@ -116,7 +117,7 @@ function createMockPool(calls, { registeredTypes = [] } = {}) {
         };
       }
 
-      if (sql.includes("FROM passport_types") && sql.includes('"typeName" AS "typeName"')) {
+      if (sql.includes("FROM \"passportTypes\"") && sql.includes('"typeName" AS "typeName"')) {
         return { rows: registeredTypes };
       }
 
@@ -125,13 +126,57 @@ function createMockPool(calls, { registeredTypes = [] } = {}) {
   };
 }
 
-function createCatalogApp({ calls, createdTables, audits, registeredTypes = [] }) {
+function createModulePreviewFixture(overrides = {}) {
+  const moduleKey = overrides.moduleKey || "medical-device:v1";
+  const typeName = overrides.typeName || "medicalDevicePassportV1";
+  const semanticModelKey = overrides.semanticModelKey || "medicalDeviceDictionaryV1";
+  const passportPolicyKey = overrides.passportPolicyKey || "medicalDeviceDppV1";
+
+  return {
+    moduleKey,
+    typeName,
+    displayName: overrides.displayName || "Medical Device Passport v1",
+    productCategory: overrides.productCategory || "Medical Device",
+    productIcon: overrides.productIcon || "MD",
+    semanticModelKey,
+    passportPolicy: {
+      key: passportPolicyKey,
+      contentSpecificationIds: [semanticModelKey],
+    },
+    fieldsJson: {
+      sections: [{
+        key: "deviceIdentity",
+        fields: [{
+          key: "modelIdentifier",
+          label: "Model Identifier",
+          type: "text",
+          canonicalLocked: true,
+          sourceModuleKey: moduleKey,
+          sourceModuleFieldKey: "modelIdentifier",
+          semanticId: "https://example.test/dictionary/medical-device/v1/terms/model-identifier",
+          elementIdPath: "deviceIdentity.modelIdentifier",
+          objectType: "SingleValuedDataElement",
+          valueDataType: "String",
+        }],
+      }],
+      sourceModule: moduleKey,
+      identity: { businessIdentifierField: "modelIdentifier" },
+      passportPolicyKey,
+      passportPolicy: {
+        key: passportPolicyKey,
+        contentSpecificationIds: [semanticModelKey],
+      },
+    },
+  };
+}
+
+function createCatalogApp({ calls, createdTables, audits, registeredTypes = [], moduleDefinitions = [] }) {
   const app = express();
   registerCatalogRoutes(app, {
     pool: createMockPool(calls, { registeredTypes }),
     multer,
     authenticateToken: (req, _res, next) => {
-      req.user = { userId: 99, role: "super_admin" };
+      req.user = { userId: 99, role: "superAdmin" };
       next();
     },
     isSuperAdmin: (_req, _res, next) => next(),
@@ -142,7 +187,7 @@ function createCatalogApp({ calls, createdTables, audits, registeredTypes = [] }
     publicReadRateLimit: (_req, _res, next) => next(),
     createPassportTable: async (typeName, metadata) => createdTables.push({ typeName, metadata }),
     passportTypeHasStoredRecords: async () => false,
-    buildPassportTypeSchemaChange: () => ({ changeType: "metadata_only" }),
+    buildPassportTypeSchemaChange: () => ({ changeType: "metadataOnly" }),
     normalizeRequestedPassportTypeSchema: ({ sections, systemHeader, currentSchemaVersion, sourceModule }) => ({
       schemaVersion: currentSchemaVersion,
       systemHeader,
@@ -153,6 +198,7 @@ function createCatalogApp({ calls, createdTables, audits, registeredTypes = [] }
     findReservedPassportHeaderFieldConflicts: () => [],
     validatePassportTypeSections: () => null,
     buildPassportTypeGovernanceCheck: () => ({ issueCount: 0, issues: [] }),
+    getPassportTypeModules: () => moduleDefinitions,
     storageService: {
       saveGlobalSymbol: async () => ({ id: "symbol-1" }),
     },
@@ -173,7 +219,7 @@ test("admin cannot create manual passport type without a registered module sourc
       displayName: "Medical Device Passport v1",
       productCategory: "Medical Device",
       productIcon: "MD",
-      semanticModelKey: "medical_device_dictionary_v1",
+      semanticModelKey: "medicalDeviceDictionaryV1",
       systemHeader: { section: { label: "Passport Header" } },
       sections: [{
         key: "deviceIdentity",
@@ -187,13 +233,18 @@ test("admin cannot create manual passport type without a registered module sourc
 
   assert.equal(response.statusCode, 400);
   assert.equal(response.body.error, "Passport types must be created from a registered passport module.");
-  assert.equal(calls.some((call) => call.sql.includes("INSERT INTO passport_types")), false);
+  assert.equal(calls.some((call) => call.sql.includes("INSERT INTO \"passportTypes\"")), false);
   assert.deepEqual(createdTables, []);
   assert.equal(audits.length, 0);
 });
 
 test("admin can preview registered passport type modules before seeding", async () => {
-  const app = createCatalogApp({ calls: [], createdTables: [], audits: [] });
+  const app = createCatalogApp({
+    calls: [],
+    createdTables: [],
+    audits: [],
+    moduleDefinitions: [createModulePreviewFixture()],
+  });
 
   const response = await invokeRoute(app, {
     method: "get",
@@ -201,24 +252,34 @@ test("admin can preview registered passport type modules before seeding", async 
   });
 
   assert.equal(response.statusCode, 200);
-  const applianceModule = response.body.find((modulePreview) => modulePreview.moduleKey === "appliance:v1");
-  assert.ok(applianceModule, "Expected appliance reference module to be listed");
-  assert.equal(applianceModule.seeded, false);
-  assert.equal(applianceModule.semanticModelKey, "appliance_dictionary_v1");
-  assert.equal(applianceModule.passportPolicyKey, "applianceDppV1");
-  assert.match(applianceModule.seedCommand, /--module=appliance:v1/);
+  const deviceModule = response.body.find((modulePreview) => modulePreview.moduleKey === "medical-device:v1");
+  assert.ok(deviceModule, "Expected injected module fixture to be listed");
+  assert.equal(deviceModule.seeded, false);
+  assert.equal(deviceModule.semanticModelKey, "medicalDeviceDictionaryV1");
+  assert.equal(deviceModule.passportPolicyKey, "medicalDeviceDppV1");
+  assert.match(deviceModule.seedCommand, /--module=medical-device:v1/);
 });
 
 test("admin module preview marks modules as seeded when passport type exists", async () => {
+  const deviceModule = createModulePreviewFixture();
+  const sensorModule = createModulePreviewFixture({
+    moduleKey: "industrial-sensor:v2",
+    typeName: "industrialSensorPassportV2",
+    displayName: "Industrial Sensor Passport v2",
+    productCategory: "Industrial Sensor",
+    semanticModelKey: "industrialSensorDictionaryV2",
+    passportPolicyKey: "industrialSensorDppV2",
+  });
   const app = createCatalogApp({
     calls: [],
     createdTables: [],
     audits: [],
     registeredTypes: [{
       id: 42,
-      typeName: "appliancePassportV1",
+      typeName: "medicalDevicePassportV1",
       isActive: true,
     }],
+    moduleDefinitions: [deviceModule, sensorModule],
   });
 
   const response = await invokeRoute(app, {
@@ -227,11 +288,11 @@ test("admin module preview marks modules as seeded when passport type exists", a
   });
 
   assert.equal(response.statusCode, 200);
-  const applianceModule = response.body.find((modulePreview) => modulePreview.moduleKey === "appliance:v1");
-  assert.equal(applianceModule.seeded, true);
-  assert.equal(applianceModule.seededPassportTypeId, 42);
-  assert.equal(applianceModule.seededIsActive, true);
+  const seededModule = response.body.find((modulePreview) => modulePreview.moduleKey === "medical-device:v1");
+  assert.equal(seededModule.seeded, true);
+  assert.equal(seededModule.seededPassportTypeId, 42);
+  assert.equal(seededModule.seededIsActive, true);
 
-  const textileModule = response.body.find((modulePreview) => modulePreview.moduleKey === "textile:v1");
-  assert.equal(textileModule.seeded, false);
+  const unseededModule = response.body.find((modulePreview) => modulePreview.moduleKey === "industrial-sensor:v2");
+  assert.equal(unseededModule.seeded, false);
 });

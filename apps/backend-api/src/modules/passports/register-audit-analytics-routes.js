@@ -45,9 +45,9 @@ function registerAuditAnalyticsRoutes(app, deps) {
                pt."displayName" AS "displayName",
                pt."productCategory" AS "productCategory",
                pt."productIcon" AS "productIcon"
-        FROM company_passport_access cpa
-        JOIN passport_types pt ON pt.id = cpa.passport_type_id
-        WHERE cpa.company_id = $1
+        FROM "companyPassportAccess" cpa
+        JOIN "passportTypes" pt ON pt.id = cpa."passportTypeId"
+        WHERE cpa."companyId" = $1
       `, [companyId]);
 
       let totalPassports = 0;
@@ -76,7 +76,7 @@ function registerAuditAnalyticsRoutes(app, deps) {
             draftCount: stats.draft,
             releasedCount: stats.released,
             revisedCount: stats.revised,
-            inReviewCount: stats.in_review,
+            inReviewCount: stats.inReview,
             obsoleteCount: stats.obsolete,
           });
 
@@ -86,7 +86,7 @@ function registerAuditAnalyticsRoutes(app, deps) {
             [companyId, trendStart.toISOString()]
           );
           const monthlyRes = await pool.query(
-            `SELECT date_trunc('month', "createdAt") AS month_bucket, COUNT(*) AS count
+            `SELECT date_trunc('month', "createdAt") AS "monthBucket", COUNT(*) AS count
              FROM ${tableName}
              WHERE "companyId" = $1 AND "deletedAt" IS NULL AND "createdAt" >= $2
              GROUP BY 1 ORDER BY 1`,
@@ -103,7 +103,7 @@ function registerAuditAnalyticsRoutes(app, deps) {
           }
           trendSeriesMap[productCategory].baseline += parseInt(baselineRes.rows[0]?.count || 0, 10);
           monthlyRes.rows.forEach((row) => {
-            const key = new Date(row.month_bucket).toISOString().slice(0, 7);
+            const key = new Date(row.monthBucket).toISOString().slice(0, 7);
             trendSeriesMap[productCategory].monthlyCounts[key] = (trendSeriesMap[productCategory].monthlyCounts[key] || 0) + parseInt(row.count || 0, 10);
           });
         } catch (e) {
@@ -112,15 +112,15 @@ function registerAuditAnalyticsRoutes(app, deps) {
       }
 
       const scanRes = await pool.query(
-        `SELECT COUNT(DISTINCT (pse."passportDppId", pse."viewerUserId")) FROM passport_scan_events pse
-         JOIN passport_registry pr ON pr."dppId" = pse."passportDppId"
+        `SELECT COUNT(DISTINCT (pse."passportDppId", pse."viewerUserId")) FROM "passportScanEvents" pse
+         JOIN "passportRegistry" pr ON pr."dppId" = pse."passportDppId"
          WHERE pr."companyId" = $1 AND pse."viewerUserId" IS NOT NULL`,
         [companyId]
       );
       const scanStats = parseInt(scanRes.rows[0].count, 10) || 0;
       const archivedRes = await pool.query(
         `SELECT COUNT(DISTINCT "dppId")
-         FROM passport_archives
+         FROM "passportArchives"
          WHERE "companyId" = $1
            AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
         [companyId]
@@ -155,25 +155,25 @@ function registerAuditAnalyticsRoutes(app, deps) {
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
       const r = await pool.query(
         `SELECT al.id,
-                al.company_id AS "companyId",
-                al.user_id AS "userId",
+                al."companyId" AS "companyId",
+                al."userId" AS "userId",
                 al.action,
-                al.actor_identifier AS "actorIdentifier",
+                al."actorIdentifier" AS "actorIdentifier",
                 al.audience,
-                al.previous_event_hash AS "previousEventHash",
-                al.event_hash AS "eventHash",
-                al.hash_version AS "hashVersion",
-                al.created_at AS "createdAt",
-                al.table_name AS "tableName",
-                al.record_id AS "recordId",
-                al.old_values AS "oldValues",
-                al.new_values AS "newValues",
+                al."previousEventHash" AS "previousEventHash",
+                al."eventHash" AS "eventHash",
+                al."hashVersion" AS "hashVersion",
+                al."createdAt" AS "createdAt",
+                al."tableName" AS "tableName",
+                al."recordId" AS "recordId",
+                al."oldValues" AS "oldValues",
+                al."newValues" AS "newValues",
                 u.email AS "userEmail",
                 u."firstName" AS "userFirstName",
                 u."lastName" AS "userLastName"
-         FROM audit_logs al
-         LEFT JOIN users u ON al.user_id = u.id
-         WHERE al.company_id = $1 ORDER BY al.created_at DESC LIMIT $2`,
+         FROM "auditLogs" al
+         LEFT JOIN users u ON al."userId" = u.id
+         WHERE al."companyId" = $1 ORDER BY al."createdAt" DESC LIMIT $2`,
         [req.params.companyId, limit]
       );
       res.json(r.rows.map(mapAuditLogRow));
@@ -188,25 +188,25 @@ function registerAuditAnalyticsRoutes(app, deps) {
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
       const r = await pool.query(
         `SELECT al.id,
-                al.company_id AS "companyId",
-                al.user_id AS "userId",
+                al."companyId" AS "companyId",
+                al."userId" AS "userId",
                 al.action,
-                al.actor_identifier AS "actorIdentifier",
+                al."actorIdentifier" AS "actorIdentifier",
                 al.audience,
-                al.previous_event_hash AS "previousEventHash",
-                al.event_hash AS "eventHash",
-                al.hash_version AS "hashVersion",
-                al.created_at AS "createdAt",
-                al.table_name AS "tableName",
-                al.record_id AS "recordId",
-                al.old_values AS "oldValues",
-                al.new_values AS "newValues",
+                al."previousEventHash" AS "previousEventHash",
+                al."eventHash" AS "eventHash",
+                al."hashVersion" AS "hashVersion",
+                al."createdAt" AS "createdAt",
+                al."tableName" AS "tableName",
+                al."recordId" AS "recordId",
+                al."oldValues" AS "oldValues",
+                al."newValues" AS "newValues",
                 u.email AS "userEmail",
                 u."firstName" AS "userFirstName",
                 u."lastName" AS "userLastName"
-         FROM audit_logs al
-         LEFT JOIN users u ON al.user_id = u.id
-         WHERE al.company_id = $1 ORDER BY al.created_at DESC LIMIT $2 OFFSET $3`,
+         FROM "auditLogs" al
+         LEFT JOIN users u ON al."userId" = u.id
+         WHERE al."companyId" = $1 ORDER BY al."createdAt" DESC LIMIT $2 OFFSET $3`,
         [req.params.companyId, limit, offset]
       );
       res.json(r.rows.map(withAuditActorAliases).map(mapAuditLogRow));
@@ -250,7 +250,7 @@ function registerAuditAnalyticsRoutes(app, deps) {
   app.post("/api/companies/:companyId/audit-logs/anchors", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const companyId = Number.parseInt(req.params.companyId, 10);
-      const anchorType = String(req.body?.anchorType || "internal_record").trim() || "internal_record";
+      const anchorType = String(req.body?.anchorType || "internalRecord").trim() || "internalRecord";
       const anchorReference = req.body?.anchorReference ?? null;
       const notes = req.body?.notes ?? null;
       const metadata = req.body?.metadata ?? {};
@@ -268,7 +268,9 @@ function registerAuditAnalyticsRoutes(app, deps) {
         actorIdentifier: req.user?.actorIdentifier || req.user?.globallyUniqueOperatorId || req.user?.email || `user:${req.user?.userId}`,
         anchor: anchored.anchor,
         summary: anchored.summary,
-      }).catch(() => {});
+      }).catch((error) => {
+        logger.warn({ err: error, companyId, anchorId: anchored.anchor?.id || null }, "Failed to replicate audit anchor to backup");
+      });
       res.status(201).json(anchored);
     } catch {
       res.status(500).json({ error: "Failed to anchor audit log root" });

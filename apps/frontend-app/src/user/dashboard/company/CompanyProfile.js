@@ -9,7 +9,7 @@ const API = import.meta.env.VITE_API_URL || "";
 function CompanyProfile({ companyId, user }) {
   const { companyId: routeCompanyId } = useParams();
   const resolvedCompanyId = companyId || routeCompanyId;
-  const isSuperAdminView = user?.role === "super_admin" && routeCompanyId;
+  const isSuperAdminView = user?.role === "superAdmin" && routeCompanyId;
 
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);

@@ -25,7 +25,7 @@ function OAuthCallback({ setIsAuthenticated, setUser, setCompanyId }) {
         setUser(data);
         setCompanyId(data.companyId || "");
         const next = requestedNext || (
-          data.role === "super_admin"
+          data.role === "superAdmin"
             ? "/admin"
             : buildUserDashboardHomePath({ user: data, companyId: data.companyId || "" })
         );

@@ -15,7 +15,7 @@ import {
 import { buildPassportJsonLdExport } from "../shared/utils/semanticPassportExport";
 
 describe("frontend modularity helpers", () => {
-  test("consumer theme falls back to a neutral passport theme instead of battery", () => {
+  test("consumer theme falls back to a neutral passport theme", () => {
     const theme = getConsumerTheme("unknown-product-type", {});
 
     expect(theme.headline).toBe("Digital Product Passport");
@@ -23,47 +23,47 @@ describe("frontend modularity helpers", () => {
   });
 
   test("semantic model labels are generated from any model key", () => {
-    expect(formatSemanticModelLabel("appliance_dictionary_v3")).toBe("Appliance Dictionary V3");
-    expect(formatSemanticModelLabel("textile_dictionary_v1")).toBe("Textile Dictionary V1");
+    expect(formatSemanticModelLabel("industrialSensorDictionaryV3")).toBe("Industrial Sensor Dictionary V3");
+    expect(formatSemanticModelLabel("medicalDeviceDictionaryV1")).toBe("Medical Device Dictionary V1");
   });
 
   test("semantic options preserve registered and selected external models", () => {
     const options = buildSemanticModelOptions([
       {
-        semanticModelKey: "appliance_dictionary_v3",
-        name: "Appliance Dictionary",
-        family: "appliance",
+        semanticModelKey: "industrialSensorDictionaryV3",
+        name: "Industrial Sensor Dictionary",
+        family: "industrial-sensor",
         version: "v3",
       },
-    ], "external_future_dictionary_v3");
+    ], "externalFutureDictionaryV3");
 
-    expect(getSemanticModelOption(options, "appliance_dictionary_v3")).toMatchObject({
-      key: "appliance_dictionary_v3",
-      label: "Appliance Dictionary",
+    expect(getSemanticModelOption(options, "industrialSensorDictionaryV3")).toMatchObject({
+      key: "industrialSensorDictionaryV3",
+      label: "Industrial Sensor Dictionary",
       registered: true,
     });
-    expect(getSemanticModelOption(options, "external_future_dictionary_v3")).toMatchObject({
-      key: "external_future_dictionary_v3",
+    expect(getSemanticModelOption(options, "externalFutureDictionaryV3")).toMatchObject({
+      key: "externalFutureDictionaryV3",
       registered: false,
     });
   });
 
   test("passport lists use module business identifier from explicit module metadata", () => {
     const typeDefinitions = [{
-      typeName: "batteryPassportV1",
+      typeName: "medicalDevicePassportV1",
       fieldsJson: {
         identity: {
-          businessIdentifierField: "batterySerialNumber",
+          businessIdentifierField: "udi",
         },
       },
     }];
 
     expect(getPassportSerialNumberForType({
-      passportType: "batteryPassportV1",
-      batterySerialNumber: "BAT-001",
+      passportType: "medicalDevicePassportV1",
+      udi: "UDI-001",
       internalAliasId: "SKU-001",
       uniqueProductIdentifier: "did:web:example:product:001",
-    }, typeDefinitions)).toBe("BAT-001");
+    }, typeDefinitions)).toBe("UDI-001");
 
     expect(getPassportSerialNumberForType({
       passportType: "manualPassportV1",
@@ -72,52 +72,52 @@ describe("frontend modularity helpers", () => {
     }, typeDefinitions)).toBe("");
   });
 
-  test("semantic JSON-LD export includes the selected non-battery model context", () => {
+  test("semantic JSON-LD export includes the selected model context", () => {
     const exported = buildPassportJsonLdExport([
       {
-        dppId: "dpp-appliance-001",
-        passportType: "appliancePassportV3",
-        energyRating: "A",
+        dppId: "dpp-sensor-001",
+        passportType: "industrialSensorPassportV3",
+        serialNumber: "SN-001",
       },
-    ], "appliancePassportV3", {
+    ], "industrialSensorPassportV3", {
       semanticModel: {
-        semanticModelKey: "appliance_dictionary_v3",
-        contextUrl: "https://www.claros-dpp.online/dictionary/appliance/v3/context.jsonld",
-        family: "appliance",
+        semanticModelKey: "industrialSensorDictionaryV3",
+        contextUrl: "https://www.claros-dpp.online/dictionary/industrial-sensor/v3/context.jsonld",
+        family: "industrial-sensor",
         version: "v3",
       },
     });
 
-    expect(exported["@context"]).toContain("https://www.claros-dpp.online/dictionary/appliance/v3/context.jsonld");
+    expect(exported["@context"]).toContain("https://www.claros-dpp.online/dictionary/industrial-sensor/v3/context.jsonld");
     expect(exported.semanticModel).toMatchObject({
-      semanticModelKey: "appliance_dictionary_v3",
-      family: "appliance",
+      semanticModelKey: "industrialSensorDictionaryV3",
+      family: "industrial-sensor",
       version: "v3",
     });
     expect(exported["@graph"][0]).toMatchObject({
-      passportType: "appliancePassportV3",
-      energyRating: "A",
+      passportType: "industrialSensorPassportV3",
+      serialNumber: "SN-001",
     });
   });
 
   test("product category options merge saved and module-derived categories", () => {
     const options = buildProductCategoryOptions({
-      savedCategories: [{ id: 7, name: "Appliance", icon: "AP" }],
+      savedCategories: [{ id: 7, name: "Industrial Sensor", icon: "IS" }],
       passportTypes: [
-        { productCategory: "Appliance", productIcon: "SHOULD_NOT_OVERRIDE" },
+        { productCategory: "Industrial Sensor", productIcon: "SHOULD_NOT_OVERRIDE" },
         { productCategory: "Medical Device", productIcon: "MD" },
       ],
       draftType: { productCategory: "Construction Product", productIcon: "CP" },
     });
 
     expect(options.map((option) => option.name)).toEqual([
-      "Appliance",
       "Construction Product",
+      "Industrial Sensor",
       "Medical Device",
     ]);
-    expect(options.find((option) => option.name === "Appliance")).toMatchObject({
+    expect(options.find((option) => option.name === "Industrial Sensor")).toMatchObject({
       id: 7,
-      icon: "AP",
+      icon: "IS",
       managed: true,
     });
     expect(options.find((option) => option.name === "Medical Device")).toMatchObject({

@@ -80,7 +80,7 @@ function UserProfile({
       });
       if (r.ok) {
         const d = await r.json();
-        setTeamUsers(d.filter(u => u.role === "editor" || u.role === "company_admin"));
+        setTeamUsers(d.filter(u => u.role === "editor" || u.role === "companyAdmin"));
       }
     } catch { }
   };

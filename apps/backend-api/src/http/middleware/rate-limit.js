@@ -10,7 +10,7 @@ const envInt = (name, fallback) => {
 
 /**
  * Factory: returns an Express middleware that rate-limits by a per-request bucket key.
- * Bucket counts are persisted in the request_rate_limits table.
+ * Bucket counts are persisted in the requestRateLimits table.
  */
 const createRateLimiter = (pool, state) => ({ key, limit, windowMs, message }) =>
 async (req, res, next) => {
@@ -26,19 +26,19 @@ async (req, res, next) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO request_rate_limits (bucket_key, count, reset_at, updated_at)
+      `INSERT INTO "requestRateLimits" ("bucketKey", count, "resetAt", "updatedAt")
          VALUES ($1, 1, $2, NOW())
-         ON CONFLICT (bucket_key) DO UPDATE
+         ON CONFLICT ("bucketKey") DO UPDATE
          SET count = CASE
-               WHEN request_rate_limits.reset_at <= $3 THEN 1
-               ELSE request_rate_limits.count + 1
+               WHEN "requestRateLimits"."resetAt" <= $3 THEN 1
+               ELSE "requestRateLimits".count + 1
              END,
-             reset_at = CASE
-               WHEN request_rate_limits.reset_at <= $3 THEN $2
-               ELSE request_rate_limits.reset_at
+             "resetAt" = CASE
+               WHEN "requestRateLimits"."resetAt" <= $3 THEN $2
+               ELSE "requestRateLimits"."resetAt"
              END,
-             updated_at = NOW()
-         RETURNING count, reset_at`,
+             "updatedAt" = NOW()
+         RETURNING count, "resetAt"`,
       [bucketKey, resetAt, nowDate]
     );
 
@@ -67,8 +67,8 @@ async (req, res, next) => {
 
 async function cleanupExpiredRateLimits(pool) {
   const result = await pool.query(
-    `DELETE FROM request_rate_limits
-     WHERE reset_at <= NOW()`
+    `DELETE FROM "requestRateLimits"
+     WHERE "resetAt" <= NOW()`
   );
   return Number(result.rowCount || 0);
 }

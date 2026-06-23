@@ -17,9 +17,9 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
       .then((r) => r.json())
       .then((data) => {
         setTeamUsers(data
-          .filter((member) => (member.role === "editor" || member.role === "company_admin") && member.id !== user?.id));
+          .filter((member) => (member.role === "editor" || member.role === "companyAdmin") && member.id !== user?.id));
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
 
     fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
       .then((r) => r.json())
@@ -27,7 +27,7 @@ export function BulkWorkflowModal({ companyId, user, selectedList, onClose, onDo
         if (d.defaultReviewerId) setReviewerId(String(d.defaultReviewerId));
         if (d.defaultApproverId) setApproverId(String(d.defaultApproverId));
       })
-      .catch(() => {});
+      .catch((error) => console.warn("Ignored async error", error));
   }, [companyId, user?.id]);
 
   const handleSubmit = async () => {

@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const logger = require("./logger");
 
 function normalizeBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -87,7 +88,9 @@ function createLocalStorageService(options) {
     async deleteObject(storageKey) {
       if (!storageKey) return;
       const absolutePath = absolutePathForKey(storageKey);
-      await fs.promises.rm(absolutePath, { force: true }).catch(() => {});
+      await fs.promises.rm(absolutePath, { force: true }).catch((error) => {
+        logger.warn({ err: error, storageKey }, "Failed to delete local storage object");
+      });
     },
     getPublicUrl(storageKey) {
       return publicUrlForKey(storageKey);

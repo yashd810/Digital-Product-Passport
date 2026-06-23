@@ -3,21 +3,21 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 
 const API = import.meta.env.VITE_API_URL || "";
 const OPERATOR_TYPE_OPTIONS = [
-  { value: "economic_operator", label: "Economic Operator" },
+  { value: "economicOperator", label: "Economic Operator" },
   { value: "manufacturer", label: "Manufacturer" },
-  { value: "authorized_representative", label: "Authorized Representative" },
+  { value: "authorizedRepresentative", label: "Authorized Representative" },
   { value: "importer", label: "Importer" },
   { value: "distributor", label: "Distributor" },
   { value: "dealer", label: "Dealer" },
-  { value: "delegated_operator", label: "Delegated Operator" },
-  { value: "professional_repairer", label: "Professional Repairer" },
-  { value: "independent_operator", label: "Independent Operator" },
+  { value: "delegatedOperator", label: "Delegated Operator" },
+  { value: "professionalRepairer", label: "Professional Repairer" },
+  { value: "independentOperator", label: "Independent Operator" },
   { value: "recycler", label: "Recycler" },
-  { value: "market_surveillance", label: "Market Surveillance" },
-  { value: "customs_authority", label: "Customs Authority" },
-  { value: "eu_commission", label: "EU Commission" },
-  { value: "main_dpp_service_provider", label: "Main DPP Service Provider" },
-  { value: "backup_dpp_service_provider", label: "Backup DPP Service Provider" },
+  { value: "marketSurveillance", label: "Market Surveillance" },
+  { value: "customsAuthority", label: "Customs Authority" },
+  { value: "euCommission", label: "EU Commission" },
+  { value: "mainDppServiceProvider", label: "Main DPP Service Provider" },
+  { value: "backupDppServiceProvider", label: "Backup DPP Service Provider" },
   { value: "public", label: "Public" },
 ];
 const ACCESS_MODE_OPTIONS = [
@@ -28,7 +28,7 @@ const CONFIDENTIALITY_OPTIONS = [
   { value: "public", label: "Public" },
   { value: "restricted", label: "Restricted" },
   { value: "confidential", label: "Confidential" },
-  { value: "trade_secret", label: "Trade secret" },
+  { value: "tradeSecret", label: "Trade secret" },
   { value: "regulated", label: "Regulated" },
 ];
 
@@ -38,7 +38,7 @@ function humanizeOption(value, options) {
 
 function SecurityCenter({ user, companyId }) {
   const resolvedCompanyId = companyId || user?.companyId || "";
-  const canManageCompanyKeys = user?.role === "company_admin" || user?.role === "super_admin";
+  const canManageCompanyKeys = user?.role === "companyAdmin" || user?.role === "superAdmin";
 
   const [message, setMessage] = useState({ type: "", text: "" });
 
@@ -50,7 +50,7 @@ function SecurityCenter({ user, companyId }) {
   const [apiKeys, setApiKeys] = useState([]);
   const [loadingKeys, setLoadingKeys] = useState(false);
   const [keyName, setKeyName] = useState("");
-  const [operatorType, setOperatorType] = useState("economic_operator");
+  const [operatorType, setOperatorType] = useState("economicOperator");
   const [accessMode, setAccessMode] = useState("read");
   const [maxConfidentiality, setMaxConfidentiality] = useState("regulated");
   const [generatingKey, setGeneratingKey] = useState(false);
@@ -147,7 +147,7 @@ function SecurityCenter({ user, companyId }) {
         maxConfidentiality: d.maxConfidentiality,
       });
       setKeyName("");
-      setOperatorType("economic_operator");
+      setOperatorType("economicOperator");
       setAccessMode("read");
       setMaxConfidentiality("regulated");
       setCopiedApiKey(false);

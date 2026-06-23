@@ -63,19 +63,19 @@ export function buildQrPrintSpecification({
   const minimumRecommendedWidthPx = Math.ceil(totalModules * 4);
   const qualityChecks = [
     {
-      key: "quiet_zone",
+      key: "quietZone",
       passed: quietZoneModules >= 4,
       value: quietZoneModules,
       requirement: ">= 4 modules",
     },
     {
-      key: "module_pixel_size",
+      key: "modulePixelSize",
       passed: modulePixels >= 4,
       value: Number(modulePixels.toFixed(2)),
       requirement: ">= 4 px per module",
     },
     {
-      key: "print_width",
+      key: "printWidth",
       passed: widthPx >= minimumRecommendedWidthPx,
       value: widthPx,
       requirement: `>= ${minimumRecommendedWidthPx}px source image`,
@@ -88,7 +88,9 @@ export function buildQrPrintSpecification({
     const resolved = new URL(PUBLIC_VIEWER_URL || url, window?.location?.origin || "http://localhost");
     trustedViewerOrigin = resolved.origin;
     trustedViewerHost = resolved.host;
-  } catch {}
+  } catch (error) {
+    console.warn("Failed to resolve trusted viewer URL for QR metadata", error);
+  }
 
   return {
     symbology: "QR_CODE_MODEL_2",
@@ -111,7 +113,7 @@ export function buildQrPrintSpecification({
       orientation: "portrait",
       title: "Digital Product Passport",
       subtitle: trustedViewerHost || "Trusted public viewer",
-      hriPlacement: "below_qr",
+      hriPlacement: "belowQr",
     },
     trustedViewerOrigin,
     trustedViewerHost,
@@ -210,8 +212,8 @@ export const generateQRCodeBundle = async ({
     qrCodeDataUrl: canvas.toDataURL("image/png", 0.95),
     publicUrl: passportLink,
     carrierAuthenticity: {
-      carrierSecurityStatus: "trusted_public_entry",
-      carrierAuthenticationMethod: "verified_https_viewer",
+      carrierSecurityStatus: "trustedPublicEntry",
+      carrierAuthenticationMethod: "verifiedHttpsViewer",
       trustedViewerOrigin: qrPrintSpecification?.trustedViewerOrigin || null,
       trustedViewerHost: qrPrintSpecification?.trustedViewerHost || null,
       counterfeitRiskLevel: String(granularity || "item").toLowerCase() === "item" ? "high" : "medium",
@@ -223,8 +225,8 @@ export const generateQRCodeBundle = async ({
       safetyWarnings,
       qrPrintSpecification,
       dataCarrierPlacementRules: {
-        carrierPlacement: String(granularity || "item").toLowerCase() === "model" ? "packaging_or_documentation" : "product_or_primary_packaging",
-        hriPlacement: "below_qr",
+        carrierPlacement: String(granularity || "item").toLowerCase() === "model" ? "packagingOrDocumentation" : "productOrPrimaryPackaging",
+        hriPlacement: "belowQr",
         quietZonePolicy: "Keep the clear area around the QR code at or above 4 modules on all sides.",
         durabilityPolicy: "Verify the printed carrier against the expected product lifecycle environment before release.",
         scannerTestPolicy: "Test with representative phone and industrial scanners under expected lighting, distance, and angle conditions.",

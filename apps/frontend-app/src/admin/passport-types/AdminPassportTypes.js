@@ -113,7 +113,7 @@ function AdminPassportTypes() {
       if (umbRes.ok) setProductCategories(await umbRes.json());
       if (draftRes.ok) {
         const row = await draftRes.json();
-        setDraftType(row?.draft_json ? { savedAt: row.updatedAt, ...row.draft_json } : null);
+        setDraftType(row?.draftJson ? { savedAt: row.updatedAt, ...row.draftJson } : null);
       } else if (draftRes.status === 404) {
         setDraftType(null);
       }
@@ -284,7 +284,7 @@ function AdminPassportTypes() {
                 type="text"
                 value={newCatName}
                 onChange={e => setNewCatName(e.target.value)}
-                placeholder="Category name, e.g. Appliance"
+                placeholder="Category name, e.g. Medical Device"
                 className="apt-productCategory-name-input"
                 autoFocus
               />

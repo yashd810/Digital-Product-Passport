@@ -57,7 +57,7 @@ module.exports = function registerCompanyRoutes(app, {
     "fieldconfidentiality",
     "updateauthority",
     "updateauthorities",
-    "update_authority",
+    "updateauthority",
     "fieldupdateauthority",
   ]);
 
@@ -149,8 +149,8 @@ module.exports = function registerCompanyRoutes(app, {
     try {
       const r = await pool.query(
         `SELECT id,
-                company_name AS "companyName",
-                company_logo AS "companyLogo"
+                "companyName" AS "companyName",
+                "companyLogo" AS "companyLogo"
          FROM companies
          WHERE id = $1`,
         [req.params.companyId]
@@ -165,8 +165,8 @@ module.exports = function registerCompanyRoutes(app, {
       const companyLogo = req.body?.companyLogo;
       await pool.query(
         `UPDATE companies
-         SET company_logo = $1,
-             updated_at = NOW()
+         SET "companyLogo" = $1,
+             "updatedAt" = NOW()
          WHERE id = $2`,
         [
         companyLogo !== undefined ? companyLogo : null,
@@ -181,11 +181,11 @@ module.exports = function registerCompanyRoutes(app, {
     try {
       const companyRes = await pool.query(
         `SELECT id,
-                company_name AS "companyName",
-                company_logo AS "companyLogo",
-                did_slug AS "didSlug",
-                economic_operator_identifier AS "economicOperatorIdentifier",
-                economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
+                "companyName" AS "companyName",
+                "companyLogo" AS "companyLogo",
+                "didSlug" AS "didSlug",
+                "economicOperatorIdentifier" AS "economicOperatorIdentifier",
+                "economicOperatorIdentifierScheme" AS "economicOperatorIdentifierScheme"
          FROM companies
          WHERE id = $1
          LIMIT 1`,
@@ -195,18 +195,18 @@ module.exports = function registerCompanyRoutes(app, {
 
       const facilitiesRes = await pool.query(
         `SELECT id,
-                company_id AS "companyId",
-                facility_identifier AS "facilityIdentifier",
-                identifier_scheme AS "identifierScheme",
-                display_name AS "displayName",
-                metadata_json AS "metadataJson",
-                is_active AS "isActive",
-                created_by AS "createdBy",
-                created_at AS "createdAt",
-                updated_at AS "updatedAt"
-         FROM company_facilities
-         WHERE company_id = $1
-         ORDER BY updated_at DESC, id DESC`,
+                "companyId" AS "companyId",
+                "facilityIdentifier" AS "facilityIdentifier",
+                "identifierScheme" AS "identifierScheme",
+                "displayName" AS "displayName",
+                "metadataJson" AS "metadataJson",
+                "isActive" AS "isActive",
+                "createdBy" AS "createdBy",
+                "createdAt" AS "createdAt",
+                "updatedAt" AS "updatedAt"
+         FROM "companyFacilities"
+         WHERE "companyId" = $1
+         ORDER BY "updatedAt" DESC, id DESC`,
         [req.params.companyId]
       );
 
@@ -230,9 +230,9 @@ module.exports = function registerCompanyRoutes(app, {
 
       await pool.query(
         `UPDATE companies
-         SET economic_operator_identifier = COALESCE($1, economic_operator_identifier),
-             economic_operator_identifier_scheme = COALESCE($2, economic_operator_identifier_scheme),
-             updated_at = NOW()
+         SET "economicOperatorIdentifier" = COALESCE($1, "economicOperatorIdentifier"),
+             "economicOperatorIdentifierScheme" = COALESCE($2, "economicOperatorIdentifierScheme"),
+             "updatedAt" = NOW()
          WHERE id = $3`,
         [
         economicOperatorIdentifier === undefined ? null : economicOperatorIdentifier,
@@ -270,26 +270,26 @@ module.exports = function registerCompanyRoutes(app, {
       }
 
       const result = await pool.query(
-        `INSERT INTO company_facilities (
-           company_id, facility_identifier, identifier_scheme, display_name, metadata_json, created_by
+        `INSERT INTO "companyFacilities" (
+           "companyId", "facilityIdentifier", "identifierScheme", "displayName", "metadataJson", "createdBy"
          )
          VALUES ($1, $2, $3, $4, $5::jsonb, $6)
-         ON CONFLICT (company_id, identifier_scheme, facility_identifier)
+         ON CONFLICT ("companyId", "identifierScheme", "facilityIdentifier")
          DO UPDATE SET
-           display_name = EXCLUDED.display_name,
-           metadata_json = EXCLUDED.metadata_json,
-           is_active = true,
-           updated_at = NOW()
+           "displayName" = EXCLUDED."displayName",
+           "metadataJson" = EXCLUDED."metadataJson",
+           "isActive" = true,
+           "updatedAt" = NOW()
          RETURNING id,
-                   company_id AS "companyId",
-                   facility_identifier AS "facilityIdentifier",
-                   identifier_scheme AS "identifierScheme",
-                   display_name AS "displayName",
-                   metadata_json AS "metadataJson",
-                   is_active AS "isActive",
-                   created_by AS "createdBy",
-                   created_at AS "createdAt",
-                   updated_at AS "updatedAt"`,
+                   "companyId" AS "companyId",
+                   "facilityIdentifier" AS "facilityIdentifier",
+                   "identifierScheme" AS "identifierScheme",
+                   "displayName" AS "displayName",
+                   "metadataJson" AS "metadataJson",
+                   "isActive" AS "isActive",
+                   "createdBy" AS "createdBy",
+                   "createdAt" AS "createdAt",
+                   "updatedAt" AS "updatedAt"`,
         [
         req.params.companyId,
         facilityIdentifier,
@@ -304,7 +304,7 @@ module.exports = function registerCompanyRoutes(app, {
         req.params.companyId,
         req.user.userId,
         "UPSERT_FACILITY_IDENTIFIER",
-        "company_facilities",
+        "companyFacilities",
         facilityIdentifier,
         null,
         {
@@ -328,22 +328,22 @@ module.exports = function registerCompanyRoutes(app, {
       const { companyId } = req.params;
       const passportTypeFilter = req.query.passportType;
       let q = `SELECT t.id,
-                      t.company_id AS "companyId",
-                      t.passport_type AS "passportType",
+                      t."companyId" AS "companyId",
+                      t."passportType" AS "passportType",
                       t.name,
                       t.description,
-                      t.created_by AS "createdBy",
-                      t.created_at AS "createdAt",
-                      t.updated_at AS "updatedAt",
+                      t."createdBy" AS "createdBy",
+                      t."createdAt" AS "createdAt",
+                      t."updatedAt" AS "updatedAt",
                       u."firstName" AS "firstName",
                       u."lastName" AS "lastName",
-                      (SELECT COUNT(*) FROM passport_template_fields WHERE template_id = t.id AND is_model_data = true) AS "modelFieldCount"
-               FROM passport_templates t
-               LEFT JOIN users u ON u.id = t.created_by
-               WHERE t.company_id = $1`;
+                      (SELECT COUNT(*) FROM "passportTemplateFields" WHERE "templateId" = t.id AND "isModelData" = true) AS "modelFieldCount"
+               FROM "passportTemplates" t
+               LEFT JOIN users u ON u.id = t."createdBy"
+               WHERE t."companyId" = $1`;
       const params = [companyId];
-      if (passportTypeFilter) {q += ` AND t.passport_type = $2`;params.push(passportTypeFilter);}
-      q += ` ORDER BY t.passport_type, t.name`;
+      if (passportTypeFilter) {q += ` AND t.passportType = $2`;params.push(passportTypeFilter);}
+      q += ` ORDER BY t."passportType", t.name`;
       const r = await pool.query(q, params);
       res.json(r.rows.map(mapTemplateRow));
     } catch (e) {logger.error(e);res.status(500).json({ error: "Failed" });}
@@ -354,24 +354,24 @@ module.exports = function registerCompanyRoutes(app, {
       const { companyId, id } = req.params;
       const t = await pool.query(
         `SELECT id,
-                company_id AS "companyId",
-                passport_type AS "passportType",
+                "companyId" AS "companyId",
+                "passportType" AS "passportType",
                 name,
                 description,
-                created_by AS "createdBy",
-                created_at AS "createdAt",
-                updated_at AS "updatedAt"
-         FROM passport_templates
-         WHERE id=$1 AND company_id=$2`,
+                "createdBy" AS "createdBy",
+                "createdAt" AS "createdAt",
+                "updatedAt" AS "updatedAt"
+         FROM "passportTemplates"
+         WHERE id=$1 AND "companyId"=$2`,
         [id, companyId]
       );
       if (!t.rows.length) return res.status(404).json({ error: "Not found" });
       const fields = await pool.query(
-        `SELECT field_key AS "fieldKey",
-                field_value AS "fieldValue",
-                is_model_data AS "isModelData"
-         FROM passport_template_fields
-         WHERE template_id=$1`,
+        `SELECT "fieldKey" AS "fieldKey",
+                "fieldValue" AS "fieldValue",
+                "isModelData" AS "isModelData"
+         FROM "passportTemplateFields"
+         WHERE "templateId"=$1`,
         [id]
       );
       res.json({
@@ -388,16 +388,16 @@ module.exports = function registerCompanyRoutes(app, {
       if (!passportType || !name?.trim()) return res.status(400).json({ error: "passportType and name required" });
 
       const t = await pool.query(
-        `INSERT INTO passport_templates (company_id, passport_type, name, description, created_by)
+        `INSERT INTO "passportTemplates" ("companyId", "passportType", name, description, "createdBy")
          VALUES ($1,$2,$3,$4,$5)
          RETURNING id,
-                   company_id AS "companyId",
-                   passport_type AS "passportType",
+                   "companyId" AS "companyId",
+                   "passportType" AS "passportType",
                    name,
                    description,
-                   created_by AS "createdBy",
-                   created_at AS "createdAt",
-                   updated_at AS "updatedAt"`,
+                   "createdBy" AS "createdBy",
+                   "createdAt" AS "createdAt",
+                   "updatedAt" AS "updatedAt"`,
         [companyId, passportType, name.trim(), description || null, req.user.userId]
       );
       const tmplId = t.rows[0].id;
@@ -406,9 +406,9 @@ module.exports = function registerCompanyRoutes(app, {
         for (const f of fields) {
           if (!f.fieldKey) continue;
           await pool.query(
-            `INSERT INTO passport_template_fields (template_id, field_key, field_value, is_model_data)
-             VALUES ($1,$2,$3,$4) ON CONFLICT (template_id, field_key) DO UPDATE
-             SET field_value=$3, is_model_data=$4`,
+            `INSERT INTO "passportTemplateFields" ("templateId", "fieldKey", "fieldValue", "isModelData")
+             VALUES ($1,$2,$3,$4) ON CONFLICT ("templateId", "fieldKey") DO UPDATE
+             SET "fieldValue"=$3, "isModelData"=$4`,
             [tmplId, f.fieldKey, f.fieldValue ?? null, !!f.isModelData]
           );
         }
@@ -423,43 +423,43 @@ module.exports = function registerCompanyRoutes(app, {
       const { name, description, fields } = req.body;
 
       const existing = await pool.query(
-        "SELECT id FROM passport_templates WHERE id=$1 AND company_id=$2", [id, companyId]
+        "SELECT id FROM \"passportTemplates\" WHERE id=$1 AND \"companyId\"=$2", [id, companyId]
       );
       if (!existing.rows.length) return res.status(404).json({ error: "Not found" });
 
       const updated = await pool.query(
-        `UPDATE passport_templates
-         SET name=$1, description=$2, updated_at=NOW()
+        `UPDATE "passportTemplates"
+         SET name=$1, description=$2, "updatedAt"=NOW()
          WHERE id=$3
          RETURNING id,
-                   company_id AS "companyId",
-                   passport_type AS "passportType",
+                   "companyId" AS "companyId",
+                   "passportType" AS "passportType",
                    name,
                    description,
-                   created_by AS "createdBy",
-                   created_at AS "createdAt",
-                   updated_at AS "updatedAt"`,
+                   "createdBy" AS "createdBy",
+                   "createdAt" AS "createdAt",
+                   "updatedAt" AS "updatedAt"`,
         [name?.trim() || "Untitled", description || null, id]
       );
 
       if (Array.isArray(fields)) {
-        await pool.query("DELETE FROM passport_template_fields WHERE template_id=$1", [id]);
+        await pool.query("DELETE FROM \"passportTemplateFields\" WHERE \"templateId\"=$1", [id]);
         for (const f of fields) {
           if (!f.fieldKey) continue;
           await pool.query(
-            `INSERT INTO passport_template_fields (template_id, field_key, field_value, is_model_data)
+            `INSERT INTO "passportTemplateFields" ("templateId", "fieldKey", "fieldValue", "isModelData")
              VALUES ($1,$2,$3,$4)`,
             [id, f.fieldKey, f.fieldValue ?? null, !!f.isModelData]
           );
         }
       }
       const fieldRows = await pool.query(
-        `SELECT field_key AS "fieldKey",
-                field_value AS "fieldValue",
-                is_model_data AS "isModelData"
-         FROM passport_template_fields
-         WHERE template_id=$1
-         ORDER BY field_key`,
+        `SELECT "fieldKey" AS "fieldKey",
+                "fieldValue" AS "fieldValue",
+                "isModelData" AS "isModelData"
+         FROM "passportTemplateFields"
+         WHERE "templateId"=$1
+         ORDER BY "fieldKey"`,
         [id]
       );
       res.json({
@@ -475,7 +475,7 @@ module.exports = function registerCompanyRoutes(app, {
   app.delete("/api/companies/:companyId/templates/:id", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
     try {
       const { companyId, id } = req.params;
-      await pool.query("DELETE FROM passport_templates WHERE id=$1 AND company_id=$2", [id, companyId]);
+      await pool.query("DELETE FROM \"passportTemplates\" WHERE id=$1 AND \"companyId\"=$2", [id, companyId]);
       res.json({ success: true });
     } catch (e) {res.status(500).json({ error: "Failed" });}
   });
@@ -487,26 +487,26 @@ module.exports = function registerCompanyRoutes(app, {
 
       const tmplRes = await pool.query(
         `SELECT id,
-                company_id AS "companyId",
-                passport_type AS "passportType",
+                "companyId" AS "companyId",
+                "passportType" AS "passportType",
                 name,
                 description,
-                created_by AS "createdBy",
-                created_at AS "createdAt",
-                updated_at AS "updatedAt"
-         FROM passport_templates
-         WHERE id=$1 AND company_id=$2`,
+                "createdBy" AS "createdBy",
+                "createdAt" AS "createdAt",
+                "updatedAt" AS "updatedAt"
+         FROM "passportTemplates"
+         WHERE id=$1 AND "companyId"=$2`,
         [templateId, companyId]
       );
       if (!tmplRes.rows.length) return res.status(404).json({ error: "Template not found" });
       const tmpl = mapTemplateRow(tmplRes.rows[0]);
 
       const fieldRes = await pool.query(
-        `SELECT field_key AS "fieldKey",
-                field_value AS "fieldValue",
-                is_model_data AS "isModelData"
-         FROM passport_template_fields
-         WHERE template_id=$1`,
+        `SELECT "fieldKey" AS "fieldKey",
+                "fieldValue" AS "fieldValue",
+                "isModelData" AS "isModelData"
+         FROM "passportTemplateFields"
+         WHERE "templateId"=$1`,
         [templateId]
       );
       const templateFields = Object.fromEntries(fieldRes.rows.map((f) => [f.fieldKey, f.fieldValue]));
@@ -515,7 +515,7 @@ module.exports = function registerCompanyRoutes(app, {
         `SELECT "fieldsJson" AS "fieldsJson",
                 "productCategory" AS "productCategory",
                 "semanticModelKey" AS "semanticModelKey"
-         FROM passport_types
+         FROM "passportTypes"
          WHERE "typeName"=$1`,
         [tmpl.passportType]
       );
@@ -698,7 +698,7 @@ module.exports = function registerCompanyRoutes(app, {
             }
             const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: updateData, excluded });
             if (!updateCols.length) {skipped++;continue;}
-            await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "csv_upsert" });
+            await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "csvUpsert" });
             details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "updated" });
             updated++;
           } else {
@@ -726,13 +726,13 @@ module.exports = function registerCompanyRoutes(app, {
                   details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped", reason: "no changes detected" });
                   skipped++;continue;
                 }
-                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "csv_upsert", matchedBy: "internalAliasId" });
+                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "csvUpsert", matchedBy: "internalAliasId" });
                 details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "updated" });
                 updated++;continue;
               }
               details.push({
                 dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped",
-                reason: existingStatus === "in_review" ?
+                reason: existingStatus === "inReview" ?
                 "matching passport is in review and cannot be edited" :
                 "matching passport already exists; revise it before importing changes"
               });
@@ -775,7 +775,7 @@ module.exports = function registerCompanyRoutes(app, {
               allVals
             );
             await pool.query(
-              `INSERT INTO passport_registry ("dppId","lineageId","companyId","passportType") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+              `INSERT INTO "passportRegistry" ("dppId","lineageId","companyId","passportType") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
               [newGuid, lineageId, companyId, resolvedPassportType]
             );
             details.push({ dppId: newGuid, internalAliasId: normalizedProductId, modelName, status: "created" });
@@ -898,7 +898,7 @@ module.exports = function registerCompanyRoutes(app, {
               details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "skipped", reason: "no changes detected" });
               skipped++;continue;
             }
-            await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "json_upsert" });
+            await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "jsonUpsert" });
             details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "updated" });
             updated++;
           } else {
@@ -926,13 +926,13 @@ module.exports = function registerCompanyRoutes(app, {
                   details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped", reason: "no changes detected" });
                   skipped++;continue;
                 }
-                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "json_upsert", matchedBy: "internalAliasId" });
+                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "jsonUpsert", matchedBy: "internalAliasId" });
                 details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "updated" });
                 updated++;continue;
               }
               details.push({
                 dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped",
-                reason: existingStatus === "in_review" ?
+                reason: existingStatus === "inReview" ?
                 "matching passport is in review and cannot be edited" :
                 "matching passport already exists; revise it before importing changes"
               });
@@ -975,7 +975,7 @@ module.exports = function registerCompanyRoutes(app, {
               allVals
             );
             await pool.query(
-              `INSERT INTO passport_registry ("dppId","lineageId","companyId","passportType") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+              `INSERT INTO "passportRegistry" ("dppId","lineageId","companyId","passportType") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
               [newGuid, lineageId, companyId, resolvedPassportType]
             );
             details.push({ dppId: newGuid, internalAliasId: normalizedProductId, modelName, status: "created" });

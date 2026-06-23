@@ -183,10 +183,10 @@ module.exports = function registerDictionaryRoutes(app, {
                 pt."typeName" AS "typeName",
                 pt."displayName" AS "displayName",
                 pt."productCategory" AS "productCategory"
-           FROM passport_types pt
-           JOIN company_passport_access cpa ON cpa.passport_type_id = pt.id
-          WHERE cpa.company_id = $1
-            AND cpa.access_revoked = FALSE
+           FROM "passportTypes" pt
+           JOIN "companyPassportAccess" cpa ON cpa."passportTypeId" = pt.id
+          WHERE cpa."companyId" = $1
+            AND cpa."accessRevoked" = FALSE
             AND COALESCE(pt."semanticModelKey", '') <> ''
           ORDER BY pt."semanticModelKey", pt."displayName"`,
         [req.params.companyId]

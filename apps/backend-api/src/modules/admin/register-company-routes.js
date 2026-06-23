@@ -28,22 +28,22 @@ module.exports = function registerCompanyRoutes(app, deps) {
     return {
       id: row.id ?? null,
       country: row.country ?? null,
-      companyName: row.companyName ?? row.company_name ?? null,
-      legalName: row.legalName ?? row.legal_name ?? null,
-      companyRegistrationNumber: row.companyRegistrationNumber ?? row.company_registration_number ?? null,
-      vatNumber: row.vatNumber ?? row.vat_number ?? null,
-      websiteDomain: row.websiteDomain ?? row.website_domain ?? null,
-      customerTrustLevel: row.customerTrustLevel ?? row.customer_trust_level ?? null,
-      verificationStatus: row.verificationStatus ?? row.verification_status ?? null,
-      authorizedContactName: row.authorizedContactName ?? row.authorized_contact_name ?? null,
-      authorizedContactEmail: row.authorizedContactEmail ?? row.authorized_contact_email ?? null,
-      isActive: row.isActive ?? row.is_active ?? null,
-      assetManagementEnabled: row.assetManagementEnabled ?? row.asset_management_enabled ?? null,
-      assetManagementRevokedAt: row.assetManagementRevokedAt ?? row.asset_management_revoked_at ?? null,
+      companyName: row.companyName ?? row.companyName ?? null,
+      legalName: row.legalName ?? row.legalName ?? null,
+      companyRegistrationNumber: row.companyRegistrationNumber ?? row.companyRegistrationNumber ?? null,
+      vatNumber: row.vatNumber ?? row.vatNumber ?? null,
+      websiteDomain: row.websiteDomain ?? row.websiteDomain ?? null,
+      customerTrustLevel: row.customerTrustLevel ?? row.customerTrustLevel ?? null,
+      verificationStatus: row.verificationStatus ?? row.verificationStatus ?? null,
+      authorizedContactName: row.authorizedContactName ?? row.authorizedContactName ?? null,
+      authorizedContactEmail: row.authorizedContactEmail ?? row.authorizedContactEmail ?? null,
+      isActive: row.isActive ?? row.isActive ?? null,
+      assetManagementEnabled: row.assetManagementEnabled ?? row.assetManagementEnabled ?? null,
+      assetManagementRevokedAt: row.assetManagementRevokedAt ?? row.assetManagementRevokedAt ?? null,
       grantedTypeNames: row.grantedTypeNames ?? [],
       grantedTypes: row.grantedTypes ?? [],
-      createdAt: row.createdAt ?? row.created_at ?? null,
-      updatedAt: row.updatedAt ?? row.updated_at ?? null,
+      createdAt: row.createdAt ?? row.createdAt ?? null,
+      updatedAt: row.updatedAt ?? row.updatedAt ?? null,
     };
   }
 
@@ -78,16 +78,16 @@ module.exports = function registerCompanyRoutes(app, deps) {
       }
       const result = await pool.query(
         `INSERT INTO companies (
-          company_name,
-          legal_name,
+          "companyName",
+          "legalName",
           country,
-          company_registration_number,
-          vat_number,
-          website_domain,
-          customer_trust_level,
-          verification_status,
-          authorized_contact_name,
-          authorized_contact_email
+          "companyRegistrationNumber",
+          "vatNumber",
+          "websiteDomain",
+          "customerTrustLevel",
+          "verificationStatus",
+          "authorizedContactName",
+          "authorizedContactEmail"
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
         RETURNING *`,
         [
@@ -121,19 +121,19 @@ module.exports = function registerCompanyRoutes(app, deps) {
       }
       const company = await pool.query(
         `SELECT id,
-                company_name,
-                legal_name,
+                "companyName",
+                "legalName",
                 country,
-                company_registration_number,
-                vat_number,
-                website_domain,
-                customer_trust_level,
-                verification_status,
-                authorized_contact_name,
-                authorized_contact_email,
-                is_active,
-                created_at,
-                updated_at
+                "companyRegistrationNumber",
+                "vatNumber",
+                "websiteDomain",
+                "customerTrustLevel",
+                "verificationStatus",
+                "authorizedContactName",
+                "authorizedContactEmail",
+                "isActive",
+                "createdAt",
+                "updatedAt"
            FROM companies
           WHERE id = $1`,
         [companyId]
@@ -163,16 +163,16 @@ module.exports = function registerCompanyRoutes(app, deps) {
 
       const updated = await pool.query(
         `UPDATE companies
-            SET company_name = $1,
-                legal_name = $2,
+            SET "companyName" = $1,
+                "legalName" = $2,
                 country = $3,
-                company_registration_number = $4,
-                vat_number = $5,
-                website_domain = $6,
-                customer_trust_level = $7,
-                authorized_contact_name = $8,
-                authorized_contact_email = $9,
-                updated_at = NOW()
+                "companyRegistrationNumber" = $4,
+                "vatNumber" = $5,
+                "websiteDomain" = $6,
+                "customerTrustLevel" = $7,
+                "authorizedContactName" = $8,
+                "authorizedContactEmail" = $9,
+                "updatedAt" = NOW()
           WHERE id = $10
           RETURNING *`,
         [
@@ -246,18 +246,18 @@ module.exports = function registerCompanyRoutes(app, deps) {
       const result = await pool.query(`
         SELECT c.*,
           COALESCE(
-            ARRAY_AGG(cpa.passport_type_id) FILTER (WHERE cpa.passport_type_id IS NOT NULL),
+            ARRAY_AGG(cpa."passportTypeId") FILTER (WHERE cpa."passportTypeId" IS NOT NULL),
             '{}'
-          ) AS granted_types,
+          ) AS "grantedTypes",
           COALESCE(
             ARRAY_AGG(DISTINCT pt."displayName" ORDER BY pt."displayName") FILTER (WHERE pt."displayName" IS NOT NULL),
             '{}'
           ) AS "grantedTypeNames"
         FROM companies c
-        LEFT JOIN company_passport_access cpa ON cpa.company_id = c.id
-        LEFT JOIN passport_types pt ON pt.id = cpa.passport_type_id
+        LEFT JOIN "companyPassportAccess" cpa ON cpa."companyId" = c.id
+        LEFT JOIN "passportTypes" pt ON pt.id = cpa."passportTypeId"
         GROUP BY c.id
-        ORDER BY c.created_at DESC
+        ORDER BY c."createdAt" DESC
       `);
       res.json(result.rows.map(mapCompanyRow));
     } catch {
@@ -271,7 +271,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       if (!Number.isFinite(companyId)) return res.status(400).json({ error: "Invalid company ID" });
 
       const company = await pool.query(
-        `SELECT id, company_name
+        `SELECT id, "companyName"
          FROM companies
          WHERE id = $1
          LIMIT 1`,
@@ -281,8 +281,8 @@ module.exports = function registerCompanyRoutes(app, deps) {
 
       const policy = await getCompanyDppPolicy(companyId);
       res.json({
-        company_id: companyId,
-        company_name: company.rows[0].company_name,
+        companyId: companyId,
+        companyName: company.rows[0].companyName,
         ...policy
       });
     } catch (error) {
@@ -316,7 +316,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
         companyId,
         req.user.userId,
         "UPDATE_COMPANY_DPP_POLICY",
-        "company_dpp_policies",
+        "companyDppPolicies",
         String(companyId),
         null,
         updates
@@ -350,7 +350,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       await client.query("BEGIN");
 
       const companyRes = await client.query(
-        "SELECT id, company_name FROM companies WHERE id = $1", [companyId]
+        "SELECT id, \"companyName\" FROM companies WHERE id = $1", [companyId]
       );
       if (!companyRes.rows.length) {
         await client.query("ROLLBACK");
@@ -362,18 +362,18 @@ module.exports = function registerCompanyRoutes(app, deps) {
       const userIds = userRes.rows.map((row) => row.id);
 
       const regRes = await client.query(
-        "SELECT \"dppId\", \"passportType\" FROM passport_registry WHERE \"companyId\" = $1", [companyId]
+        "SELECT \"dppId\", \"passportType\" FROM \"passportRegistry\" WHERE \"companyId\" = $1", [companyId]
       );
       passportDppIds = regRes.rows.map((row) => row.dppId);
       const passportTypes = [...new Set(regRes.rows.map((row) => row.passportType).filter(Boolean))];
 
       if (passportDppIds.length) {
-        await client.query("DELETE FROM passport_dynamic_values WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_signatures WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_scan_events WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_workflow WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_security_events WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
-        await client.query("DELETE FROM passport_edit_sessions WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM \"passportDynamicValues\" WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM \"passportSignatures\" WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM \"passportScanEvents\" WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM \"passportWorkflow\" WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM \"passportSecurityEvents\" WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
+        await client.query("DELETE FROM \"passportEditSessions\" WHERE \"passportDppId\" = ANY($1::text[])", [passportDppIds]);
       }
 
       for (const passportType of passportTypes) {
@@ -381,20 +381,20 @@ module.exports = function registerCompanyRoutes(app, deps) {
         await client.query(`DELETE FROM ${tableName} WHERE "companyId" = $1`, [companyId]);
       }
 
-      await client.query("DELETE FROM passport_registry WHERE \"companyId\" = $1", [companyId]);
-      await client.query("DELETE FROM invite_tokens WHERE company_id = $1", [companyId]);
-      await client.query("DELETE FROM api_keys WHERE company_id = $1", [companyId]);
+      await client.query("DELETE FROM \"passportRegistry\" WHERE \"companyId\" = $1", [companyId]);
+      await client.query("DELETE FROM \"inviteTokens\" WHERE \"companyId\" = $1", [companyId]);
+      await client.query("DELETE FROM \"apiKeys\" WHERE \"companyId\" = $1", [companyId]);
       const repoFiles = await client.query(
-        "SELECT storage_key, file_path FROM company_repository WHERE company_id = $1 AND (storage_key IS NOT NULL OR file_path IS NOT NULL)",
+        "SELECT \"storageKey\", \"filePath\" FROM \"companyRepository\" WHERE \"companyId\" = $1 AND (\"storageKey\" IS NOT NULL OR \"filePath\" IS NOT NULL)",
         [companyId]
       );
-      await client.query("DELETE FROM company_repository WHERE company_id = $1", [companyId]);
-      await client.query("DELETE FROM company_passport_access WHERE company_id = $1", [companyId]);
-      await client.query("DELETE FROM passport_workflow WHERE \"companyId\" = $1", [companyId]);
+      await client.query("DELETE FROM \"companyRepository\" WHERE \"companyId\" = $1", [companyId]);
+      await client.query("DELETE FROM \"companyPassportAccess\" WHERE \"companyId\" = $1", [companyId]);
+      await client.query("DELETE FROM \"passportWorkflow\" WHERE \"companyId\" = $1", [companyId]);
 
       if (userIds.length) {
         await client.query("DELETE FROM notifications WHERE \"userId\" = ANY($1::int[])", [userIds]);
-        await client.query("DELETE FROM password_reset_tokens WHERE user_id = ANY($1::int[])", [userIds]);
+        await client.query("DELETE FROM \"passwordResetTokens\" WHERE \"userId\" = ANY($1::int[])", [userIds]);
       }
 
       await client.query('DELETE FROM users WHERE "companyId" = $1', [companyId]);
@@ -409,7 +409,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
         "companies",
         String(company.id),
         { company },
-        { deletedCompanyId: company.id, deletedCompanyName: company.company_name },
+        { deletedCompanyId: company.id, deletedCompanyName: company.companyName },
         {
           actorIdentifier: req.user?.actorIdentifier || `user:${req.user.userId}`,
           audience: req.user?.role || null,
@@ -417,8 +417,10 @@ module.exports = function registerCompanyRoutes(app, deps) {
       );
 
       await Promise.all(repoFiles.rows.map((row) => storageService.deleteStoredFile({
-        storageKey: row.storage_key
-      }).catch(() => {})));
+        storageKey: row.storageKey
+      }).catch((error) => {
+        logger.warn({ err: error, companyId, storageKey: row.storageKey }, "Failed to delete company repository file from storage");
+      })));
       const repoDir = path.join(REPO_BASE_DIR, String(companyId));
       fs.rmSync(repoDir, { recursive: true, force: true });
       passportDppIds.forEach((dppId) => {
@@ -431,7 +433,11 @@ module.exports = function registerCompanyRoutes(app, deps) {
         deletedCurrentSessionUser: userIds.includes(req.user.userId)
       });
     } catch (error) {
-      try { await client.query("ROLLBACK"); } catch {}
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        logger.error({ err: rollbackError, companyId }, "Failed to roll back company deletion transaction");
+      }
       logger.error("Delete company error:", error.message);
       res.status(500).json({ error: "Failed to delete company" });
     } finally {

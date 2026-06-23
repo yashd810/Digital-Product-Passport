@@ -25,6 +25,7 @@ function createDppUseCase(deps) {
     archivePassportSnapshot,
     logAudit,
     replicatePassportToBackup,
+    logger,
     VALID_GRANULARITIES,
     usesConfiguredGlobalProductIdentifierScheme,
   } = deps;
@@ -32,7 +33,7 @@ function createDppUseCase(deps) {
   return async function createDpp({ req }) {
     const normalizedBody = normalizePassportRequestBody ? normalizePassportRequestBody(req.body) : req.body || {};
     const submittedCompanyId = normalizedBody.companyId;
-    const companyId = req.user.role === "super_admin"
+    const companyId = req.user.role === "superAdmin"
       ? Number.parseInt(submittedCompanyId, 10)
       : Number.parseInt(req.user.companyId, 10);
     if (!Number.isFinite(companyId)) throw Object.assign(new Error("A valid companyId is required"), { statusCode: 400 });
@@ -172,7 +173,7 @@ function createDppUseCase(deps) {
       allValues
     );
     await pool.query(
-      `INSERT INTO passport_registry ("dppId", "lineageId", "companyId", "passportType")
+      `INSERT INTO "passportRegistry" ("dppId", "lineageId", "companyId", "passportType")
        VALUES ($1, $2, $3, $4)
        ON CONFLICT ("dppId") DO NOTHING`,
       [dppId, lineageId, companyId, resolvedPassportType]
@@ -202,15 +203,17 @@ function createDppUseCase(deps) {
       passportType: resolvedPassportType,
       archivedBy: req.user.userId,
       actorIdentifier: deps.getActorIdentifier(req.user),
-      snapshotReason: "after_standards_create",
+      snapshotReason: "afterStandardsCreate",
     });
     await replicatePassportToBackup({
       passport: createdPassport,
       typeDef,
       companyName,
-      reason: "standards_create",
-      snapshotScope: "editable_draft",
-    }).catch(() => {});
+      reason: "standardsCreate",
+      snapshotScope: "editableDraft",
+    }).catch((error) => {
+      logger?.warn?.({ err: error, dppId: createdPassport?.dppId, reason: "standardsCreate" }, "Failed to replicate standards create to backup");
+    });
 
     return {
       statusCode: 201,

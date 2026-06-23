@@ -14,6 +14,15 @@ function buildDictionaryBasePath(pathname, companySlug = "", dictionaryPath) {
   return `/dictionary/${dictionaryPath}`;
 }
 
+function buildDictionaryModelPath(pathname, companySlug = "", model) {
+  if (!model?.family || !model?.version) return "";
+  return buildDictionaryBasePath(
+    pathname,
+    companySlug,
+    `${encodeURIComponent(model.family)}/${encodeURIComponent(model.version)}`
+  );
+}
+
 async function fetchJson(url) {
   const response = await fetchWithAuth(url);
   if (!response.ok) {
@@ -89,6 +98,40 @@ function DetailRow({ label, value, mono = false, empty = "Not specified" }) {
 
 function getDictionaryApiPath(family, version) {
   return `${API}/api/dictionary/${encodeURIComponent(family)}/${encodeURIComponent(version)}`;
+}
+
+function DictionaryModelCard({ model, href }) {
+  return (
+    <article className="dictionary-term-card dictionary-model-card">
+      <div className="dictionary-term-header">
+        <div className="dictionary-term-main">
+          <div className="dictionary-chip-row">
+            <span className="dictionary-chip">{model.family || "dictionary"}</span>
+            {model.version && <span className="dictionary-chip dictionary-chip-muted">{model.version}</span>}
+          </div>
+          <strong className="dictionary-term-title">{model.name || model.semanticModelKey}</strong>
+          <p className="dictionary-term-definition">
+            {model.description || "Semantic model registered in the backend dictionary resources."}
+          </p>
+          <div className="dictionary-term-meta-grid">
+            <div className="dictionary-term-meta-block">
+              <span className="dictionary-term-meta-label">Model key</span>
+              <strong className="dictionary-term-meta-mono">{model.semanticModelKey || model.key}</strong>
+            </div>
+            <div className="dictionary-term-meta-block">
+              <span className="dictionary-term-meta-label">Version</span>
+              <strong>{model.dictionaryVersion || model.version || "n.a."}</strong>
+            </div>
+          </div>
+        </div>
+        {href && (
+          <div className="dictionary-term-side">
+            <Link to={href} className="dictionary-card-link">Open dictionary</Link>
+          </div>
+        )}
+      </div>
+    </article>
+  );
 }
 
 function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath, apiPath }) {
@@ -184,14 +227,19 @@ function DictionaryDetail({ term, categories, unitsByKey, manifest, basePath, ap
 export default function DictionaryBrowserPage() {
   const { companySlug, family, version, slug } = useParams();
   const location = useLocation();
-  const dictionaryPath = `${family}/${version}`;
-  const apiPath = useMemo(() => getDictionaryApiPath(family, version), [family, version]);
-  const basePath = useMemo(
-    () => buildDictionaryBasePath(location.pathname, companySlug, dictionaryPath),
-    [companySlug, dictionaryPath, location.pathname]
+  const isModelListView = !family || !version;
+  const dictionaryPath = isModelListView ? "" : `${family}/${version}`;
+  const apiPath = useMemo(
+    () => (isModelListView ? "" : getDictionaryApiPath(family, version)),
+    [family, isModelListView, version]
   );
-  const isDetailView = Boolean(slug);
+  const basePath = useMemo(
+    () => (isModelListView ? "" : buildDictionaryBasePath(location.pathname, companySlug, dictionaryPath)),
+    [companySlug, dictionaryPath, isModelListView, location.pathname]
+  );
+  const isDetailView = Boolean(slug) && !isModelListView;
 
+  const [models, setModels] = useState([]);
   const [terms, setTerms] = useState([]);
   const [term, setTerm] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -207,6 +255,29 @@ export default function DictionaryBrowserPage() {
     let ignore = false;
     setLoading(true);
     setError(null);
+
+    if (isModelListView) {
+      fetchJson(`${API}/api/semantic-models`)
+        .then((payload) => {
+          if (ignore) return;
+          setModels(Array.isArray(payload) ? payload : []);
+          setTerms([]);
+          setTerm(null);
+          setCategories([]);
+          setUnits([]);
+          setManifest(null);
+          setLoading(false);
+        })
+        .catch((requestError) => {
+          if (ignore) return;
+          setError(requestError.message || "Failed to load semantic dictionaries. Please try again.");
+          setLoading(false);
+        });
+
+      return () => {
+        ignore = true;
+      };
+    }
 
     const requests = isDetailView
       ? Promise.all([
@@ -225,6 +296,7 @@ export default function DictionaryBrowserPage() {
     requests
       .then((payload) => {
         if (ignore) return;
+        setModels([]);
         if (isDetailView) {
           const [singleTerm, nextCategories, nextUnits, nextManifest] = payload;
           setTerm(singleTerm);
@@ -251,7 +323,7 @@ export default function DictionaryBrowserPage() {
     return () => {
       ignore = true;
     };
-  }, [apiPath, isDetailView, slug]);
+  }, [apiPath, isDetailView, isModelListView, slug]);
 
   const unitsByKey = useMemo(
     () => new Map(units.map((unit) => [unit.key, unit])),
@@ -296,6 +368,54 @@ export default function DictionaryBrowserPage() {
     return (
       <section className="dictionary-page dictionary-page-state">
         <div className="dictionary-state-card dictionary-state-card-error">{error}</div>
+      </section>
+    );
+  }
+
+  if (isModelListView) {
+    return (
+      <section className="dictionary-page">
+        <div className="dictionary-hero">
+          <div className="dictionary-hero-main">
+            <div className="dictionary-chip-row">
+              <span className="dictionary-chip">Semantic Dictionaries</span>
+            </div>
+            <h1>Registered Dictionaries</h1>
+            <p className="dictionary-hero-subtitle">
+              Dictionaries appear here after module semantic resources are added under the backend semantics folder.
+            </p>
+            <div className="dictionary-meta-grid">
+              <div className="dictionary-meta-card">
+                <span>Total dictionaries</span>
+                <strong>{models.length}</strong>
+              </div>
+              <div className="dictionary-meta-card">
+                <span>Status</span>
+                <strong>{models.length ? "Ready" : "Empty"}</strong>
+              </div>
+            </div>
+          </div>
+          <aside className="dictionary-hero-side">
+            <div className="dictionary-side-card">
+              <h2>How dictionaries are added</h2>
+              <p>Generate or add module semantic JSON files, then seed the matching passport module when you are ready.</p>
+            </div>
+          </aside>
+        </div>
+
+        {models.length === 0 ? (
+          <div className="dictionary-state-card">No semantic dictionaries are registered yet.</div>
+        ) : (
+          <div className="dictionary-terms-list">
+            {models.map((model) => (
+              <DictionaryModelCard
+                key={model.semanticModelKey || model.key}
+                model={model}
+                href={buildDictionaryModelPath(location.pathname, companySlug, model)}
+              />
+            ))}
+          </div>
+        )}
       </section>
     );
   }

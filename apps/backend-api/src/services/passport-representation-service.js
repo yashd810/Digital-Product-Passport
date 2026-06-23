@@ -47,7 +47,7 @@ module.exports = function createPassportRepresentationService({
     if (normalized === "invalid") return "Invalid";
     if (normalized === "obsolete") return "Inactive";
     if (normalized === "inactive") return "Inactive";
-    if (["draft", "in_review", "in_revision"].includes(normalized)) return "Inactive";
+    if (["draft", "inReview", "inRevision"].includes(normalized)) return "Inactive";
     return "Invalid";
   }
 
@@ -72,12 +72,12 @@ module.exports = function createPassportRepresentationService({
   }
 
   // Build a canonical JTC 18223-style operational DPP payload.
-  // Internal fields (dppId, company_id, etc.) are mapped to the
+  // Internal fields (dppId, companyId, etc.) are mapped to the
   // standard external names. User-defined passport fields are
   // appended with their native types preserved (no String coercion).
   //
   // @param {object} passport  - normalised passport row
-  // @param {object} typeDef   - passport_types row with fieldsJson
+  // @param {object} typeDef   - passportTypes row with fieldsJson
   // @param {object} options
   //   @param {string}  options.companyName  - human-readable company name
   //   @param {string}  options.granularity  - 'model' | 'item' | 'batch' (default: 'model')

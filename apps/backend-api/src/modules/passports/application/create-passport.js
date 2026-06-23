@@ -100,7 +100,7 @@ function createDraftPassportUseCase(deps) {
       throw error;
     }
 
-    const BUILT_IN_EDITABLE_FIELDS = new Set(["product_image"]);
+    const BUILT_IN_EDITABLE_FIELDS = new Set(["productImage"]);
     const invalidFieldKeys = Object.keys(fields).filter(
       (key) => !SYSTEM_PASSPORT_FIELDS.has(key) && !BUILT_IN_EDITABLE_FIELDS.has(key) && !typeSchema.allowedKeys.has(key)
     );

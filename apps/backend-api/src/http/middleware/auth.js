@@ -101,8 +101,8 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
                 u."isActive" AS "isActive",
                 u."sessionVersion" AS "sessionVersion",
                 u."twoFactorEnabled" AS "twoFactorEnabled",
-                c.economic_operator_identifier AS "economicOperatorIdentifier",
-                c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
+                c."economicOperatorIdentifier" AS "economicOperatorIdentifier",
+                c."economicOperatorIdentifierScheme" AS "economicOperatorIdentifierScheme"
          FROM users u
          LEFT JOIN companies c ON c.id = u."companyId"
          WHERE u.id = $1
@@ -122,11 +122,11 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
 
       const audienceRes = await pool.query(
         `SELECT audience
-         FROM user_access_audiences
-         WHERE user_id = $1
-           AND is_active = true
-           AND (company_id IS NULL OR company_id = $2)
-           AND (expires_at IS NULL OR expires_at > NOW())`,
+         FROM "userAccessAudiences"
+         WHERE "userId" = $1
+           AND "isActive" = true
+           AND ("companyId" IS NULL OR "companyId" = $2)
+           AND ("expiresAt" IS NULL OR "expiresAt" > NOW())`,
         [currentUser.id, currentUser.companyId]
       ).catch(() => ({ rows: [] }));
 
@@ -149,11 +149,11 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   };
 
   const isSuperAdmin = (req, res, next) =>
-    req.user.role === "super_admin" ? next()
+    req.user.role === "superAdmin" ? next()
       : res.status(403).json({ error: "Super Admin access required" });
 
   const checkCompanyAccess = (req, res, next) => {
-    if (req.user.role === "super_admin") return next();
+    if (req.user.role === "superAdmin") return next();
     if (String(req.user.companyId) !== String(req.params.companyId))
       return res.status(403).json({ error: "Unauthorised access to this company" });
     next();
@@ -173,8 +173,8 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
   };
 
   const checkCompanyAdmin = (req, res, next) => {
-    if (req.user.role === "super_admin") return next();
-    if (req.user.role !== "company_admin")
+    if (req.user.role === "superAdmin") return next();
+    if (req.user.role !== "companyAdmin")
       return res.status(403).json({ error: "Company admin access required" });
     if (String(req.user.companyId) !== String(req.params.companyId))
       return res.status(403).json({ error: "Unauthorised access to this company" });
@@ -191,44 +191,46 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       if (keyPrefix) {
         const prefixed = await pool.query(
           `SELECT ak.id,
-                  ak.company_id AS "companyId",
+                  ak."companyId" AS "companyId",
                   ak.scopes,
-                  ak.expires_at AS "expiresAt",
-                  ak.key_hash AS "keyHash",
-                  ak.key_salt AS "keySalt",
-                  ak.hash_algorithm AS "hashAlgorithm",
-                  ak.operator_type AS "operatorType",
-                  ak.access_mode AS "accessMode",
-                  ak.max_confidentiality AS "maxConfidentiality",
-                  c.economic_operator_identifier AS "economicOperatorIdentifier",
-                  c.economic_operator_identifier_scheme AS "economicOperatorIdentifierScheme"
-           FROM api_keys ak
-           LEFT JOIN companies c ON c.id = ak.company_id
-           WHERE key_prefix = $1
-             AND ak.is_active = true
-             AND (ak.expires_at IS NULL OR ak.expires_at > NOW())`,
+                  ak."expiresAt" AS "expiresAt",
+                  ak."keyHash" AS "keyHash",
+                  ak."keySalt" AS "keySalt",
+                  ak."hashAlgorithm" AS "hashAlgorithm",
+                  ak."operatorType" AS "operatorType",
+                  ak."accessMode" AS "accessMode",
+                  ak."maxConfidentiality" AS "maxConfidentiality",
+                  c."economicOperatorIdentifier" AS "economicOperatorIdentifier",
+                  c."economicOperatorIdentifierScheme" AS "economicOperatorIdentifierScheme"
+           FROM "apiKeys" ak
+           LEFT JOIN companies c ON c.id = ak."companyId"
+           WHERE "keyPrefix" = $1
+             AND ak."isActive" = true
+             AND (ak."expiresAt" IS NULL OR ak."expiresAt" > NOW())`,
           [keyPrefix]
         );
         matchedRow = prefixed.rows.find((row) => {
-          if (row.hashAlgorithm !== "hmac_sha256" || !row.keySalt) return false;
+          if (row.hashAlgorithm !== "hmacSha256" || !row.keySalt) return false;
           const computed = hashApiKeyWithSalt(key, row.keySalt);
           return computed === row.keyHash;
         }) || null;
       }
 
       if (!matchedRow) return res.status(401).json({ error: "Invalid or revoked API key." });
-      pool.query("UPDATE api_keys SET last_used_at = NOW() WHERE id = $1", [matchedRow.id]).catch(() => {});
+      pool.query("UPDATE \"apiKeys\" SET \"lastUsedAt\" = NOW() WHERE id = $1", [matchedRow.id]).catch((error) => {
+        logger.warn({ err: error, apiKeyId: matchedRow.id }, "Failed to update API key last used timestamp");
+      });
       req.apiKey = {
         keyId: matchedRow.id,
         companyId: String(matchedRow.companyId),
         scopes: normalizeScopes(matchedRow.scopes),
         expiresAt: matchedRow.expiresAt || null,
-        operatorType: matchedRow.operatorType || "economic_operator",
+        operatorType: matchedRow.operatorType || "economicOperator",
         accessMode: matchedRow.accessMode || "read",
         maxConfidentiality: matchedRow.maxConfidentiality || "regulated",
         mfaEnabled: false,
         mfaVerifiedAt: null,
-        authenticationMethods: ["api_key"],
+        authenticationMethods: ["apiKey"],
         ...buildActorIdentity(matchedRow),
       };
       next();

@@ -13,6 +13,59 @@ function writeJson(filePath, payload) {
   fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
+function writeSemanticFixture(resourcesDir, {
+  family = "medical-device",
+  version = "v1",
+  semanticModelKey = "medicalDeviceDictionaryV1",
+  name = "Medical Device Dictionary",
+  termSlug = "udi",
+  termLabel = "Unique device identifier",
+} = {}) {
+  const modelDir = path.join(resourcesDir, family, version);
+  fs.mkdirSync(modelDir, { recursive: true });
+  const baseIri = `https://example.test/dictionary/${family}/${version}`;
+
+  writeJson(path.join(modelDir, "manifest.json"), {
+    semanticModelKey,
+    name,
+    version: "1.0.0",
+    description: `${name} fixture`,
+    baseIri,
+    contextUrl: `${baseIri}/context.jsonld`,
+    termsUrl: `${baseIri}/terms`,
+    catalogUrl: `${baseIri}/catalog.jsonld`,
+  });
+  writeJson(path.join(modelDir, "terms.json"), [
+    {
+      slug: termSlug,
+      label: termLabel,
+      definition: `${termLabel} for the product.`,
+      iri: `${baseIri}/terms/${termSlug}`,
+      category: "identity",
+      dataType: "string",
+      unit: "none",
+    },
+  ]);
+  writeJson(path.join(modelDir, "categories.json"), [
+    { key: "identity", label: "Identity" },
+  ]);
+  writeJson(path.join(modelDir, "units.json"), [
+    { key: "none", label: "No unit", display: "n.a." },
+  ]);
+  writeJson(path.join(modelDir, "context.jsonld"), {
+    "@context": {
+      [termSlug.replace(/-([a-z])/g, (_match, char) => char.toUpperCase())]: `${baseIri}/terms/${termSlug}`,
+    },
+  });
+  writeJson(path.join(modelDir, "catalog.jsonld"), {
+    "@context": { dcat: "http://www.w3.org/ns/dcat#" },
+    "@id": `${baseIri}/catalog`,
+    "@type": "dcat:Catalog",
+  });
+
+  return { modelDir, semanticModelKey };
+}
+
 function createMockResponse() {
   return {
     statusCode: 200,
@@ -46,7 +99,8 @@ function routePathMatches(routePath, pathToFind) {
 }
 
 function findRouteHandlers(app, method, pathToFind) {
-  const layer = app._router?.stack?.find((entry) =>
+  const stack = app._router?.stack || app.router?.stack || [];
+  const layer = stack.find((entry) =>
     entry.route
     && routePathMatches(entry.route.path, pathToFind)
     && entry.route.methods?.[method]
@@ -106,7 +160,7 @@ function createDictionaryApp({ pool = null, registry = createSemanticModelRegist
     semanticModelRegistry: registry,
     publicReadRateLimit: (_req, _res, next) => next(),
     authenticateToken: (req, _res, next) => {
-      req.user = { userId: 1, role: "company_admin" };
+      req.user = { userId: 1, role: "companyAdmin" };
       next();
     },
     checkCompanyAccess: (_req, _res, next) => next(),
@@ -114,40 +168,43 @@ function createDictionaryApp({ pool = null, registry = createSemanticModelRegist
   return app;
 }
 
-test("semantic registry loads the existing battery dictionary generically", () => {
-  const registry = createSemanticModelRegistry();
-  const model = registry.getModel("battery_dictionary_v1");
+test("semantic registry supports an empty resources directory", () => {
+  const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "empty-semantic-models-"));
 
-  assert.ok(model);
-  assert.equal(model.family, "battery");
-  assert.equal(model.version, "v1");
-  assert.equal(registry.getModelByPath("battery", "v1").semanticModelKey, "battery_dictionary_v1");
-  assert.ok(registry.getTerms("battery_dictionary_v1").length > 0);
-  assert.ok(registry.getTermBySlug("battery_dictionary_v1", "dpp-granularity"));
+  try {
+    const registry = createSemanticModelRegistry({ resourcesDir });
+
+    assert.deepEqual(registry.listModels(), []);
+    assert.equal(registry.getModel("missingDictionaryV1"), null);
+    assert.equal(registry.getModelByPath("missing", "v1"), null);
+    assert.deepEqual(registry.getTerms("missingDictionaryV1"), []);
+  } finally {
+    fs.rmSync(resourcesDir, { recursive: true, force: true });
+  }
 });
 
-test("semantic registry loads a new product dictionary without battery-specific code", () => {
+test("semantic registry loads a new product dictionary without category-specific code", () => {
   const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "semantic-models-"));
-  const modelDir = path.join(resourcesDir, "appliance", "v3");
+  const modelDir = path.join(resourcesDir, "custom-product", "v3");
   fs.mkdirSync(modelDir, { recursive: true });
 
   writeJson(path.join(modelDir, "manifest.json"), {
-    semanticModelKey: "appliance_dictionary_v3",
-    name: "Appliance Dictionary",
+    semanticModelKey: "customProductDictionaryV3",
+    name: "Custom Product Dictionary",
     version: "1.0.0",
-    description: "Test appliance dictionary",
+    description: "Test custom product dictionary",
   });
   writeJson(path.join(modelDir, "terms.json"), [
     {
       slug: "energy-rating",
       label: "Energy rating",
       definition: "Energy performance rating for the product.",
-      iri: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
+      iri: "https://example.test/dictionary/custom-product/v3/terms/energy-rating",
     },
   ]);
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
-      energyRating: "https://example.test/dictionary/appliance/v3/terms/energy-rating",
+      energyRating: "https://example.test/dictionary/custom-product/v3/terms/energy-rating",
     },
   });
 
@@ -155,11 +212,11 @@ test("semantic registry loads a new product dictionary without battery-specific 
     const registry = createSemanticModelRegistry({ resourcesDir });
     const [model] = registry.listModels();
 
-    assert.equal(model.semanticModelKey, "appliance_dictionary_v3");
-    assert.equal(model.family, "appliance");
+    assert.equal(model.semanticModelKey, "customProductDictionaryV3");
+    assert.equal(model.family, "custom-product");
     assert.equal(model.version, "v3");
     assert.equal(
-      registry.getTermBySlug("appliance_dictionary_v3", "energy-rating").slug,
+      registry.getTermBySlug("customProductDictionaryV3", "energy-rating").slug,
       "energy-rating"
     );
   } finally {
@@ -169,20 +226,20 @@ test("semantic registry loads a new product dictionary without battery-specific 
 
 test("semantic registry expands compact term sources", () => {
   const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "semantic-models-"));
-  const modelDir = path.join(resourcesDir, "appliance", "v4");
+  const modelDir = path.join(resourcesDir, "custom-product", "v4");
   fs.mkdirSync(modelDir, { recursive: true });
 
   writeJson(path.join(modelDir, "manifest.json"), {
-    semanticModelKey: "appliance_dictionary_v4",
-    name: "Appliance Dictionary",
+    semanticModelKey: "customProductDictionaryV4",
+    name: "Custom Product Dictionary",
     version: "1.0.0",
-    termsUrl: "https://example.test/dictionary/appliance/v4/terms",
+    termsUrl: "https://example.test/dictionary/custom-product/v4/terms",
   });
   writeJson(path.join(modelDir, "categories.json"), [
     { key: "performance", label: "Performance" },
   ]);
   writeJson(path.join(modelDir, "units.json"), [
-    { key: "kwh_per_year", label: "Kilowatt hour per year", symbol: "kWh/year" },
+    { key: "kwhPerYear", label: "Kilowatt hour per year", symbol: "kWh/year" },
   ]);
   writeJson(path.join(modelDir, "terms.json"), [
     {
@@ -190,8 +247,8 @@ test("semantic registry expands compact term sources", () => {
       id: 1,
       specRef: "APP-001",
       slug: "energy-rating",
-      iri: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
-      termIri: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
+      iri: "https://example.test/dictionary/custom-product/v4/terms/energy-rating",
+      termIri: "https://example.test/dictionary/custom-product/v4/terms/energy-rating",
       label: "Energy rating",
       attributeName: "Energy rating",
       definition: "Energy performance rating for the product.",
@@ -202,20 +259,18 @@ test("semantic registry expands compact term sources", () => {
       sourceCategory: "Performance",
       subcategory: "legacy-subcategory",
       sourceSubcategory: "Legacy Subcategory",
-      internal_key: "energyRating",
       elementId: "energyRating",
-      element_id: "energyRating",
       dataType: "string",
       rdfType: ["rdf:Property", "owl:DatatypeProperty", "skos:Concept"],
       domainClassKey: "Performance",
       semanticBinding: {
-        rdfProperty: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
+        rdfProperty: "https://example.test/dictionary/custom-product/v4/terms/energy-rating",
         domain: {
-          iri: "https://example.test/dictionary/appliance/v4/classes/Performance",
+          iri: "https://example.test/dictionary/custom-product/v4/classes/Performance",
           curie: "exampleClass:Performance",
           label: "Performance",
           broaderClass: {
-            iri: "https://example.test/dictionary/appliance/v4/classes/DigitalProductPassport",
+            iri: "https://example.test/dictionary/custom-product/v4/classes/DigitalProductPassport",
             curie: "exampleClass:DigitalProductPassport",
             label: "Digital Product Passport",
           },
@@ -240,14 +295,14 @@ test("semantic registry expands compact term sources", () => {
       category: "performance",
       internalKey: "powerConsumption",
       dataType: "decimal",
-      unit: "kwh_per_year",
+      unit: "kwhPerYear",
     },
   ]);
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
-      energyRating: "https://example.test/dictionary/appliance/v4/terms/energy-rating",
+      energyRating: "https://example.test/dictionary/custom-product/v4/terms/energy-rating",
       powerConsumption: {
-        "@id": "https://example.test/dictionary/appliance/v4/terms/power-consumption",
+        "@id": "https://example.test/dictionary/custom-product/v4/terms/power-consumption",
         "@type": "http://www.w3.org/2001/XMLSchema#decimal",
       },
     },
@@ -255,17 +310,15 @@ test("semantic registry expands compact term sources", () => {
 
   try {
     const registry = createSemanticModelRegistry({ resourcesDir });
-    const energyRating = registry.getTermBySlug("appliance_dictionary_v4", "energy-rating");
-    const powerConsumption = registry.getTermBySlug("appliance_dictionary_v4", "power-consumption");
+    const energyRating = registry.getTermBySlug("customProductDictionaryV4", "energy-rating");
+    const powerConsumption = registry.getTermBySlug("customProductDictionaryV4", "power-consumption");
 
-    assert.equal(energyRating.iri, "https://example.test/dictionary/appliance/v4/terms/energy-rating");
+    assert.equal(energyRating.iri, "https://example.test/dictionary/custom-product/v4/terms/energy-rating");
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "termIri"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "id"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "attributeName"), false);
     assert.equal(energyRating.internalKey, "energyRating");
-    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "internal_key"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "elementId"), false);
-    assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "element_id"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "shortDefinition"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "sourceShortDefinition"), false);
     assert.equal(Object.prototype.hasOwnProperty.call(energyRating, "subcategory"), false);
@@ -286,7 +339,7 @@ test("semantic registry expands compact term sources", () => {
     assert.equal(energyRating.unitDisplay, "n.a.");
     assert.equal(energyRating.categoryLabel, "Performance");
 
-    assert.equal(powerConsumption.iri, "https://example.test/dictionary/appliance/v4/terms/power-consumption");
+    assert.equal(powerConsumption.iri, "https://example.test/dictionary/custom-product/v4/terms/power-consumption");
     assert.deepEqual(powerConsumption.dataType, { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" });
     assert.equal(powerConsumption.range.iri, "http://www.w3.org/2001/XMLSchema#decimal");
     assert.equal(powerConsumption.range.curie, "xsd:decimal");
@@ -297,39 +350,58 @@ test("semantic registry expands compact term sources", () => {
 });
 
 test("dictionary routes serve registered models and canonical artifacts", async () => {
-  const app = createDictionaryApp();
-
-  const modelList = await invokeRoute(app, { path: "/api/semantic-models" });
-  const modelListBody = parseJsonResponse(modelList);
-  assert.equal(modelList.statusCode, 200);
-  assert.ok(modelListBody.some((model) => model.semanticModelKey === "appliance_dictionary_v1"));
-  assert.ok(modelListBody.some((model) => model.semanticModelKey === "battery_dictionary_v1"));
-  assert.ok(modelListBody.some((model) => model.semanticModelKey === "textile_dictionary_v1"));
-
-  const manifest = await invokeRoute(app, {
-    path: "/dictionary/:family/:version/manifest.json",
-    params: { family: "battery", version: "v1" },
+  const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "dictionary-route-models-"));
+  writeSemanticFixture(resourcesDir);
+  writeSemanticFixture(resourcesDir, {
+    family: "industrial-sensor",
+    version: "v2",
+    semanticModelKey: "industrialSensorDictionaryV2",
+    name: "Industrial Sensor Dictionary",
+    termSlug: "serial-number",
+    termLabel: "Serial number",
   });
-  assert.equal(manifest.statusCode, 200);
-  assert.equal(parseJsonResponse(manifest).semanticModelKey, "battery_dictionary_v1");
 
-  const textileManifest = await invokeRoute(app, {
-    path: "/dictionary/:family/:version/manifest.json",
-    params: { family: "textile", version: "v1" },
-  });
-  assert.equal(textileManifest.statusCode, 200);
-  assert.equal(parseJsonResponse(textileManifest).semanticModelKey, "textile_dictionary_v1");
+  try {
+    const app = createDictionaryApp({
+      registry: createSemanticModelRegistry({ resourcesDir }),
+    });
 
-  const terms = await invokeRoute(app, {
-    path: "/api/dictionary/:family/:version/terms",
-    params: { family: "battery", version: "v1" },
-    query: { search: "granularity" },
-  });
-  assert.equal(terms.statusCode, 200);
-  assert.ok(parseJsonResponse(terms).some((term) => term.slug === "dpp-granularity"));
+    const modelList = await invokeRoute(app, { path: "/api/semantic-models" });
+    const modelListBody = parseJsonResponse(modelList);
+    assert.equal(modelList.statusCode, 200);
+    assert.ok(modelListBody.some((model) => model.semanticModelKey === "medicalDeviceDictionaryV1"));
+    assert.ok(modelListBody.some((model) => model.semanticModelKey === "industrialSensorDictionaryV2"));
+
+    const manifest = await invokeRoute(app, {
+      path: "/dictionary/:family/:version/manifest.json",
+      params: { family: "medical-device", version: "v1" },
+    });
+    assert.equal(manifest.statusCode, 200);
+    assert.equal(parseJsonResponse(manifest).semanticModelKey, "medicalDeviceDictionaryV1");
+
+    const terms = await invokeRoute(app, {
+      path: "/api/dictionary/:family/:version/terms",
+      params: { family: "industrial-sensor", version: "v2" },
+      query: { search: "serial" },
+    });
+    assert.equal(terms.statusCode, 200);
+    assert.ok(parseJsonResponse(terms).some((term) => term.slug === "serial-number"));
+  } finally {
+    fs.rmSync(resourcesDir, { recursive: true, force: true });
+  }
 });
 
 test("company semantic models are derived from company passport type access", async () => {
+  const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "company-access-models-"));
+  writeSemanticFixture(resourcesDir);
+  writeSemanticFixture(resourcesDir, {
+    family: "industrial-sensor",
+    version: "v2",
+    semanticModelKey: "industrialSensorDictionaryV2",
+    name: "Industrial Sensor Dictionary",
+    termSlug: "serial-number",
+    termLabel: "Serial number",
+  });
   const calls = [];
   const pool = {
     query: async (sql, params = []) => {
@@ -337,47 +409,55 @@ test("company semantic models are derived from company passport type access", as
       return {
         rows: [
           {
-            semanticModelKey: "battery_dictionary_v1",
-            typeName: "euBatteryPassportV1",
-            displayName: "EU Battery Passport v1",
-            productCategory: "Battery",
+            semanticModelKey: "medicalDeviceDictionaryV1",
+            typeName: "medicalDevicePassportV1",
+            displayName: "Medical Device Passport v1",
+            productCategory: "Medical Device",
           },
           {
-            semanticModelKey: "textile_dictionary_v1",
-            typeName: "euTextilePassportV1",
-            displayName: "EU Textile Passport v1",
-            productCategory: "Textile",
+            semanticModelKey: "industrialSensorDictionaryV2",
+            typeName: "industrialSensorPassportV2",
+            displayName: "Industrial Sensor Passport v2",
+            productCategory: "Industrial Sensor",
           },
         ],
       };
     },
   };
-  const app = createDictionaryApp({ pool });
 
-  const response = await invokeRoute(app, {
-    path: "/api/companies/:companyId/semantic-models",
-    params: { companyId: "7" },
-  });
+  try {
+    const app = createDictionaryApp({
+      pool,
+      registry: createSemanticModelRegistry({ resourcesDir }),
+    });
 
-  assert.equal(response.statusCode, 200);
-  assert.ok(calls[0].sql.includes("company_passport_access"));
-  assert.deepEqual(calls[0].params, ["7"]);
-  assert.deepEqual(response.body.map((model) => ({
-    key: model.semanticModelKey,
-    registered: model.registered,
-    typeName: model.passportTypes[0].typeName,
-  })), [
-    {
-      key: "battery_dictionary_v1",
-      registered: true,
-      typeName: "euBatteryPassportV1",
-    },
-    {
-      key: "textile_dictionary_v1",
-      registered: true,
-      typeName: "euTextilePassportV1",
-    },
-  ]);
+    const response = await invokeRoute(app, {
+      path: "/api/companies/:companyId/semantic-models",
+      params: { companyId: "7" },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.ok(calls[0].sql.includes("companyPassportAccess"));
+    assert.deepEqual(calls[0].params, ["7"]);
+    assert.deepEqual(response.body.map((model) => ({
+      key: model.semanticModelKey,
+      registered: model.registered,
+      typeName: model.passportTypes[0].typeName,
+    })), [
+      {
+        key: "medicalDeviceDictionaryV1",
+        registered: true,
+        typeName: "medicalDevicePassportV1",
+      },
+      {
+        key: "industrialSensorDictionaryV2",
+        registered: true,
+        typeName: "industrialSensorPassportV2",
+      },
+    ]);
+  } finally {
+    fs.rmSync(resourcesDir, { recursive: true, force: true });
+  }
 });
 
 test("company semantic models support arbitrary registered models and grouped passport types", async () => {
@@ -386,7 +466,7 @@ test("company semantic models support arbitrary registered models and grouped pa
   fs.mkdirSync(modelDir, { recursive: true });
 
   writeJson(path.join(modelDir, "manifest.json"), {
-    semanticModelKey: "medical_device_dictionary_v1",
+    semanticModelKey: "medicalDeviceDictionaryV1",
     name: "Medical Device Dictionary",
     version: "1.0.0",
     description: "Test medical device dictionary",
@@ -408,19 +488,19 @@ test("company semantic models support arbitrary registered models and grouped pa
     query: async () => ({
       rows: [
         {
-          semanticModelKey: "medical_device_dictionary_v1",
+          semanticModelKey: "medicalDeviceDictionaryV1",
           typeName: "medicalDevicePassportV1",
           displayName: "Medical Device Passport v1",
           productCategory: "Medical Device",
         },
         {
-          semanticModelKey: "medical_device_dictionary_v1",
+          semanticModelKey: "medicalDeviceDictionaryV1",
           typeName: "implantableDevicePassportV1",
           displayName: "Implantable Device Passport v1",
           productCategory: "Medical Device",
         },
         {
-          semanticModelKey: "external_future_dictionary_v9",
+          semanticModelKey: "externalFutureDictionaryV9",
           typeName: "futureProductPassportV9",
           displayName: "Future Product Passport v9",
           productCategory: "Future Product",
@@ -439,8 +519,8 @@ test("company semantic models support arbitrary registered models and grouped pa
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.length, 2);
-    const medicalModel = response.body.find((model) => model.semanticModelKey === "medical_device_dictionary_v1");
-    const externalModel = response.body.find((model) => model.semanticModelKey === "external_future_dictionary_v9");
+    const medicalModel = response.body.find((model) => model.semanticModelKey === "medicalDeviceDictionaryV1");
+    const externalModel = response.body.find((model) => model.semanticModelKey === "externalFutureDictionaryV9");
 
     assert.equal(medicalModel.registered, true);
     assert.equal(medicalModel.family, "medical-device");

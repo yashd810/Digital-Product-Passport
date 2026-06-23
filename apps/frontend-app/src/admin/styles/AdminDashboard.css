@@ -234,7 +234,7 @@
   background: #f0faf8;
 }
 .analytics-section .mini-badge.revised,
-.analytics-section .mini-badge.in_revision {
+.analytics-section .mini-badge.inRevision {
   background: var(--status-revised-bg);
   color: var(--status-revised-text);
   border: none !important;
@@ -4502,7 +4502,7 @@
   font-size: 11px;
   font-weight: 700;
 }
-.aca-role-pill-company_admin {
+.aca-role-pill-companyAdmin {
   background: #dbeafe;
   color: #1e40af;
 }

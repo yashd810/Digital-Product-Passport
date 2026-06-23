@@ -1608,7 +1608,7 @@
   color: var(--status-released-text);
 }
 .activity-icon-update,
-.activity-icon-submit_review {
+.activity-icon-submitReview {
   background: var(--status-review-bg);
   color: var(--status-review-text);
 }
@@ -1695,7 +1695,7 @@
   background: var(--status-revised-bg);
   color: var(--status-revised-text);
 }
-.activity-badge.submit_review {
+.activity-badge.submitReview {
   background: var(--status-review-bg);
   color: var(--status-review-text);
 }
@@ -2463,20 +2463,20 @@
   border: 1px solid transparent;
 }
 
-.wf-badge.submitted_for_review {
+.wf-badge.submittedForReview {
   background: var(--status-review-bg);
   color: var(--status-review-text);
   border-color: var(--status-review-border);
 }
 
-.wf-badge.submitted_for_approval {
+.wf-badge.submittedForApproval {
   background: var(--status-revised-bg);
   color: var(--status-revised-text);
   border-color: var(--status-revised-border);
 }
 
 .analytics-section .mini-badge.revised,
-.analytics-section .mini-badge.in_revision {
+.analytics-section .mini-badge.inRevision {
   border: none !important;
   border-color: transparent !important;
   outline: none !important;
@@ -2766,14 +2766,14 @@
   border-color: rgba(16, 185, 129, 0.26);
 }
 
-.wf-checker-status.missing_optional_fields {
+.wf-checker-status.missingOptionalFields {
   background: rgba(245, 158, 11, 0.16);
   color: #f9d37a;
   border-color: rgba(245, 158, 11, 0.26);
 }
 
-.wf-checker-status.missing_required_fields,
-.wf-checker-status.issues_found {
+.wf-checker-status.missingRequiredFields,
+.wf-checker-status.issuesFound {
   background: rgba(239, 68, 68, 0.14);
   color: #ffb7b7;
   border-color: rgba(239, 68, 68, 0.26);
@@ -3316,8 +3316,8 @@
   text-transform: capitalize;
   line-height: 1.2;
 }
-.role-chip.role-company_admin,
-.role-chip.role-super_admin {
+.role-chip.role-companyAdmin,
+.role-chip.role-superAdmin {
   background: #dbeafe;
   color: #1e40af;
 }
@@ -5501,18 +5501,18 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
   color: var(--accent);
 }
 
-.nwf-type-workflow_review,
-.nwf-type-workflow_approval {
+.nwf-type-workflowReview,
+.nwf-type-workflowApproval {
   background: rgba(253, 216, 53, 0.15);
   color: #f0ad0a;
 }
 
-.nwf-type-workflow_approved {
+.nwf-type-workflowApproved {
   background: rgba(34, 202, 102, 0.15);
   color: #22ca66;
 }
 
-.nwf-type-workflow_rejected {
+.nwf-type-workflowRejected {
   background: rgba(229, 62, 62, 0.15);
   color: #e53e3e;
 }
@@ -6793,7 +6793,7 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
 }
 
 .diff-status.obsolete,
-.diff-status.in_revision,
+.diff-status.inRevision,
 .diff-status.in_review {
   background: var(--status-review-bg);
   border-color: var(--status-review-border);
@@ -9110,7 +9110,7 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
   border-color: var(--status-review-border);
 }
 
-.pv-history-status.in_revision,
+.pv-history-status.inRevision,
 .pv-history-status.in_review {
   background: var(--status-review-bg);
   color: var(--status-review-text);
