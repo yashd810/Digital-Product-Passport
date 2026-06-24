@@ -36,7 +36,7 @@ const createOauthService       = require("./services/oauth-service");
 const createPasswordService    = require("./services/password-service");
 const logger                   = require("./services/logger");
 const { createTransporter, brandedEmail, sendOtpEmail, renderInfoTable } = require("./services/email");
-const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, PASSWORD_MIN_LENGTH, createAccessKeyMaterial, createDeviceKeyMaterial } = require("./services/security-service");
+const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, passwordMinLength, createAccessKeyMaterial, createDeviceKeyMaterial } = require("./services/security-service");
 const createAuthMiddleware     = require("./http/middleware/auth");
 const { createRateLimiters, startRateLimitMaintenance } = require("./http/middleware/rate-limit");
 const createAssetService       = require("./services/asset-management");
@@ -55,8 +55,8 @@ const { generateDppRecordId }             = require("./services/dpp-record-id");
 global.console = logger.console;
 
 const {
-  IN_REVISION_STATUS,
-  SYSTEM_PASSPORT_FIELDS,
+  inRevisionStatus,
+  systemPassportFields,
   getTable,
   normalizeReleaseStatus, isPublicHistoryStatus, isEditablePassportStatus,
   normalizePassportRow,
@@ -72,33 +72,33 @@ const {
 } = require("./shared/passports/passport-helpers");
 
 // ─── DIRECTORIES ─────────────────────────────────────────────────────────────
-const RUNTIME_PATHS = deriveRuntimePaths(__dirname);
+const runtimePaths = deriveRuntimePaths(__dirname);
 const {
-  localStorageDir: LOCAL_STORAGE_DIR,
-  filesBaseDir: FILES_BASE_DIR,
-  repoBaseDir: REPO_BASE_DIR,
-  uploadsBaseDir: UPLOADS_BASE_DIR,
-  globalSymbolsDir: GLOBAL_SYMBOLS_DIR,
-  passportStoragePrefix: PASSPORT_STORAGE_PREFIX,
-} = RUNTIME_PATHS;
-ensureLocalDirectories(RUNTIME_PATHS);
+  localStorageDir: localStorageDir,
+  filesBaseDir: filesBaseDir,
+  repoBaseDir: repoBaseDir,
+  uploadsBaseDir: uploadsBaseDir,
+  globalSymbolsDir: globalSymbolsDir,
+  passportStoragePrefix: passportStoragePrefix,
+} = runtimePaths;
+ensureLocalDirectories(runtimePaths);
 
 // ─── EXPRESS SETUP ───────────────────────────────────────────────────────────
 const app  = express();
-const PORT = process.env.PORT || 3001;
-const { isProduction: IS_PRODUCTION, runSchemaMigrations: RUN_SCHEMA_MIGRATIONS, allowedOriginSet, cspConnectSrc } = deriveRuntimeFlags(PORT);
+const port = process.env.PORT || 3001;
+const { isProduction: isProduction, runSchemaMigrations: runSchemaMigrations, allowedOriginSet, cspConnectSrc } = deriveRuntimeFlags(port);
 
 // Validate required environment variables in production
-assertRequiredProductionEnvironment({ isProduction: IS_PRODUCTION, logger });
+assertRequiredProductionEnvironment({ isProduction: isProduction, logger });
 configureHttp(app, {
   allowedOriginSet,
   cspConnectSrc,
-  globalSymbolsDir: GLOBAL_SYMBOLS_DIR,
+  globalSymbolsDir: globalSymbolsDir,
   isPlainRecord,
-  isProduction: IS_PRODUCTION,
+  isProduction: isProduction,
   normalizeIncomingDppIdentifiers,
   normalizeOutgoingDppIdentifiers,
-  port: PORT,
+  port: port,
 });
 
 // ─── DATABASE ────────────────────────────────────────────────────────────────
@@ -114,27 +114,27 @@ pool.on("error", (err) => {
 });
 
 // ─── SECRETS + AUTH CONSTANTS ────────────────────────────────────────────────
-const JWT_SECRET             = process.env.JWT_SECRET || "change-me-in-production";
-const JWT_EXPIRY             = "7d";
-const PEPPER                 = process.env.PEPPER_V1  || "change-this-pepper-in-production";
-const CURRENT_PEPPER_VERSION = 1;
-const SESSION_COOKIE_NAME    = process.env.SESSION_COOKIE_NAME || "dppSession";
-const COOKIE_SECURE          = IS_PRODUCTION ? process.env.COOKIE_SECURE !== "false" : process.env.COOKIE_SECURE === "true";
-const COOKIE_SAME_SITE       = process.env.COOKIE_SAME_SITE || (IS_PRODUCTION ? "None" : "lax");
-const COOKIE_DOMAIN          = process.env.COOKIE_DOMAIN || "";
-const ASSET_SOURCE_ALLOWED_HOSTS = new Set(
+const jwtSecret             = process.env.JWT_SECRET || "change-me-in-production";
+const jwtExpiry             = "7d";
+const pepper                 = process.env.PEPPER_V1  || "change-this-pepper-in-production";
+const currentPepperVersion = 1;
+const sessionCookieName    = process.env.SESSION_COOKIE_NAME || "dppSession";
+const cookieSecure          = isProduction ? process.env.COOKIE_SECURE !== "false" : process.env.COOKIE_SECURE === "true";
+const cookieSameSite       = process.env.COOKIE_SAME_SITE || (isProduction ? "None" : "lax");
+const cookieDomain          = process.env.COOKIE_DOMAIN || "";
+const assetSourceAllowedHosts = new Set(
   String(process.env.ASSET_SOURCE_ALLOWED_HOSTS || "")
     .split(",").map(v => v.trim().toLowerCase()).filter(Boolean)
 );
 
-const ASSET_SCHEDULER_INTERVAL_MS = 60 * 1000;
-const ASSET_IGNORED_SYSTEM_COLUMNS = new Set([
+const assetSchedulerIntervalMs = 60 * 1000;
+const assetIgnoredSystemColumns = new Set([
   "id", "companyId", "qrCode", "createdBy", "createdAt", "updatedAt", "updatedBy",
   "deletedAt", "releaseStatus", "versionNumber", "isEditable", "fieldLabel",
   "createdByEmail", "firstName", "lastName",
 ]);
-const ASSET_MATCH_FIELDS = new Set(["dppId", "matchDppId", "guid", "matchGuid", "internalAliasId", "matchProductId", "nextProductId"]);
-const ASSET_ERP_PRESETS = [
+const assetMatchFields = new Set(["dppId", "matchDppId", "guid", "matchGuid", "internalAliasId", "matchProductId", "nextProductId"]);
+const assetErpPresets = [
   {
     key: "genericRest", label: "Generic REST",
     description: "Generic JSON API returning an array or records path.",
@@ -162,25 +162,25 @@ const ASSET_ERP_PRESETS = [
   },
 ];
 
-if (IS_PRODUCTION) {
+if (isProduction) {
   const missing = [];
   if (!process.env.JWT_SECRET) missing.push("JWT_SECRET");
   if (!process.env.PEPPER_V1)  missing.push("PEPPER_V1");
   if (missing.length) throw new Error(`[SECURITY] Missing required production secrets: ${missing.join(", ")}`);
-  if (JWT_SECRET === "change-me-in-production") throw new Error("[SECURITY] JWT_SECRET is still the default value. Set a strong secret before deploying.");
-  if (PEPPER === "change-this-pepper-in-production") throw new Error("[SECURITY] PEPPER_V1 is still the default value. Set a strong secret before deploying.");
+  if (jwtSecret === "change-me-in-production") throw new Error("[SECURITY] JWT_SECRET is still the default value. Set a strong secret before deploying.");
+  if (pepper === "change-this-pepper-in-production") throw new Error("[SECURITY] PEPPER_V1 is still the default value. Set a strong secret before deploying.");
 } else {
   if (!process.env.JWT_SECRET) logger.warn("[SECURITY] JWT_SECRET is not set — using insecure default. Set it in .env before deploying.");
   if (!process.env.PEPPER_V1)  logger.warn("[SECURITY] PEPPER_V1 is not set — using insecure default. Set it in .env before deploying.");
 }
 
-assertProductionStorageReadiness({ isProduction: IS_PRODUCTION, logger });
+assertProductionStorageReadiness({ isProduction: isProduction, logger });
 
 // ─── AUTH HELPERS ────────────────────────────────────────────────────────────
 const passwordService = createPasswordService({
   crypto,
-  pepper: PEPPER,
-  currentPepperVersion: CURRENT_PEPPER_VERSION,
+  pepper: pepper,
+  currentPepperVersion: currentPepperVersion,
 });
 const { hashPassword, verifyPassword, verifyPasswordAndUpgrade } = passwordService;
 const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, extraClaims = {}) => {
@@ -196,7 +196,7 @@ const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, ex
     mfaVerifiedAt: extraClaims.mfaVerifiedAt || null,
     amr: Array.isArray(extraClaims.amr) && extraClaims.amr.length ? extraClaims.amr : ["pwd"],
   };
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+  const token = jwt.sign(payload, jwtSecret, { expiresIn: jwtExpiry });
   logger.info({
     userId: payload.userId,
     payload: {
@@ -206,7 +206,7 @@ const generateToken  = (userOrId, email, companyId, role, sessionVersion = 1, ex
       role: payload.role,
       mfaVerifiedAt: payload.mfaVerifiedAt,
     },
-    msg: "[TOKEN_CREATED] JWT payload for token"
+    msg: "[tokenCreated] JWT payload for token"
   });
   return token;
 };
@@ -225,33 +225,33 @@ const serializeCookie = (name, value, options = {}) => {
 };
 
 const authCookieOptions = {
-  httpOnly: true, secure: COOKIE_SECURE, sameSite: COOKIE_SAME_SITE,
-  domain: COOKIE_DOMAIN || undefined, path: "/", maxAge: 7 * 24 * 60 * 60 * 1000,
+  httpOnly: true, secure: cookieSecure, sameSite: cookieSameSite,
+  domain: cookieDomain || undefined, path: "/", maxAge: 7 * 24 * 60 * 60 * 1000,
 };
-const setAuthCookie   = (res, token) => res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE_NAME, token, authCookieOptions));
+const setAuthCookie   = (res, token) => res.setHeader("Set-Cookie", serializeCookie(sessionCookieName, token, authCookieOptions));
 const clearAuthCookie = (res) => res.setHeader(
   "Set-Cookie",
-  serializeCookie(SESSION_COOKIE_NAME, "", { ...authCookieOptions, maxAge: 0, expires: new Date(0) })
+  serializeCookie(sessionCookieName, "", { ...authCookieOptions, maxAge: 0, expires: new Date(0) })
 );
 
 // ─── SHARED SERVICES ────────────────────────────────────────────────────────
 const cache = createCacheService();
 const storageService = createStorageService({
-  localStorageDir: LOCAL_STORAGE_DIR,
-  filesBaseDir: FILES_BASE_DIR,
-  repoBaseDir: REPO_BASE_DIR,
-  uploadsBaseDir: UPLOADS_BASE_DIR,
-  serverBaseUrl: process.env.SERVER_URL || `http://localhost:${PORT}`,
+  localStorageDir: localStorageDir,
+  filesBaseDir: filesBaseDir,
+  repoBaseDir: repoBaseDir,
+  uploadsBaseDir: uploadsBaseDir,
+  serverBaseUrl: process.env.SERVER_URL || `http://localhost:${port}`,
 });
 const oauthService = createOauthService({
-  jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache, hashPassword,
+  jwt, pool, jwtSecret, generateToken, setAuthCookie, cache, hashPassword,
 });
 
 // ─── AUTH MIDDLEWARE ─────────────────────────────────────────────────────────
 const {
   authenticateToken, isSuperAdmin, checkCompanyAccess,
   requireEditor, requireDraftEditor, checkCompanyAdmin, authenticateApiKey, requireApiKeyScope,
-} = createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, SESSION_COOKIE_NAME });
+} = createAuthMiddleware({ jwt, crypto, pool, jwtSecret, sessionCookieName });
 
 // ─── RATE LIMITERS ───────────────────────────────────────────────────────────
 const {
@@ -336,7 +336,7 @@ const validateSymbolUpload = createUploadSignatureValidator(
 const didService = createDidService({
   didDomain: process.env.DID_WEB_DOMAIN || "www.claros-dpp.online",
   publicOrigin: process.env.PUBLIC_APP_URL || process.env.APP_URL || "http://localhost:3000",
-  apiOrigin: process.env.SERVER_URL || `http://localhost:${PORT}`,
+  apiOrigin: process.env.SERVER_URL || `http://localhost:${port}`,
 });
 const productIdentifierService = createProductIdentifierService({ didService, pool });
 const semanticModelRegistry = createSemanticModelRegistry();
@@ -388,7 +388,7 @@ const backupProviderService = createBackupProviderService({
 const passportService = createPassportService({
   pool,
   getTable, normalizePassportRow, normalizeReleaseStatus, isPublicHistoryStatus, isEditablePassportStatus,
-  normalizeInternalAliasIdValue, generateInternalAliasIdValue, IN_REVISION_STATUS, SYSTEM_PASSPORT_FIELDS,
+  normalizeInternalAliasIdValue, generateInternalAliasIdValue, inRevisionStatus, systemPassportFields,
   getWritablePassportColumns, getStoredPassportValues, toStoredPassportValue,
   quoteSqlIdentifier, joinQuotedSqlIdentifiers,
   coerceBulkFieldValue, comparableHistoryFieldValue, formatHistoryFieldValue, getHistoryFieldDefs,
@@ -398,8 +398,8 @@ const passportService = createPassportService({
 });
 
 const {
-  IN_REVISION_STATUSES_SQL, EDITABLE_RELEASE_STATUSES_SQL, REVISION_BLOCKING_STATUSES_SQL,
-  EDIT_SESSION_TIMEOUT_HOURS, EDIT_SESSION_TIMEOUT_SQL,
+  inRevisionStatusesSql, editableReleaseStatusesSql, revisionBlockingStatusesSql,
+  editSessionTimeoutHours, editSessionTimeoutSql,
   logAudit, createNotification,
   verifyAuditLogChain,
   buildAuditLogRootSummary,
@@ -426,8 +426,8 @@ const assetService = createAssetService({
   generateInternalAliasIdValue, generateDppRecordId, productIdentifierService, createPassportTable, archivePassportSnapshot,
   isPlainObject, getValueAtPath, normalizeAssetHeaders, coerceAssetFieldValue,
   comparableHistoryFieldValue, toDynamicStoredValue, getAssetFieldMap,
-  EDITABLE_RELEASE_STATUSES_SQL, ASSET_MATCH_FIELDS, ASSET_IGNORED_SYSTEM_COLUMNS,
-  ASSET_SCHEDULER_INTERVAL_MS, ASSET_SOURCE_ALLOWED_HOSTS,
+  editableReleaseStatusesSql, assetMatchFields, assetIgnoredSystemColumns,
+  assetSchedulerIntervalMs, assetSourceAllowedHosts,
 });
 const {
   fetchAssetSourceRecords, prepareAssetPayload, executeAssetPush,
@@ -463,11 +463,11 @@ async function verifySchemaReady() {
 
 const startup = pool.query("SELECT NOW()")
   .then(async () => {
-    if (RUN_SCHEMA_MIGRATIONS) {
+    if (runSchemaMigrations) {
       await initDb(pool, {
         getTable,
         createPassportTable,
-        IN_REVISION_STATUS,
+        inRevisionStatus,
       });
       logger.info("[DB] Initialized successfully");
     } else {
@@ -491,21 +491,21 @@ registerAppRoutes(app, {
   crypto,
   jwt,
   multer,
-  JWT_SECRET,
-  PASSWORD_MIN_LENGTH,
-  SESSION_COOKIE_NAME,
-  ASSET_ERP_PRESETS,
-  ASSET_MATCH_FIELDS,
-  GLOBAL_SYMBOLS_DIR,
-  REPO_BASE_DIR,
-  FILES_BASE_DIR,
-  IN_REVISION_STATUS,
-  IN_REVISION_STATUSES_SQL,
-  EDITABLE_RELEASE_STATUSES_SQL,
-  REVISION_BLOCKING_STATUSES_SQL,
-  EDIT_SESSION_TIMEOUT_HOURS,
-  EDIT_SESSION_TIMEOUT_SQL,
-  SYSTEM_PASSPORT_FIELDS,
+  jwtSecret,
+  passwordMinLength,
+  sessionCookieName,
+  assetErpPresets,
+  assetMatchFields,
+  globalSymbolsDir,
+  repoBaseDir,
+  filesBaseDir,
+  inRevisionStatus,
+  inRevisionStatusesSql,
+  editableReleaseStatusesSql,
+  revisionBlockingStatusesSql,
+  editSessionTimeoutHours,
+  editSessionTimeoutSql,
+  systemPassportFields,
   authRateLimit,
   otpRateLimit,
   passwordResetRateLimit,
@@ -639,8 +639,8 @@ registerSupportRoutes(app, {
   path,
   logger,
   storageService,
-  LOCAL_STORAGE_DIR,
-  FILES_BASE_DIR,
+  localStorageDir,
+  filesBaseDir,
   normalizeStorageRequestKey,
   isPassportStorageKey,
   publicReadRateLimit,
@@ -651,11 +651,11 @@ registerSupportRoutes(app, {
 
 let httpServer = null;
 let isShuttingDown = false;
-const SHUTDOWN_TIMEOUT_MS = Number.parseInt(process.env.SHUTDOWN_TIMEOUT_MS || "10000", 10);
+const shutdownTimeoutMs = Number.parseInt(process.env.SHUTDOWN_TIMEOUT_MS || "10000", 10);
 
 startup.then(() => {
-  httpServer = app.listen(PORT, () => {
-    logger.info(`[Server] Listening on port ${PORT}`);
+  httpServer = app.listen(port, () => {
+    logger.info(`[Server] Listening on port ${port}`);
   });
 });
 
@@ -678,12 +678,12 @@ async function closeHttpServer() {
       resolve();
     };
     timeout = setTimeout(() => {
-      logger.warn({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, "Forcing HTTP connections closed during shutdown");
+      logger.warn({ timeoutMs: shutdownTimeoutMs }, "Forcing HTTP connections closed during shutdown");
       if (typeof httpServer.closeAllConnections === "function") {
         httpServer.closeAllConnections();
       }
       finish();
-    }, SHUTDOWN_TIMEOUT_MS);
+    }, shutdownTimeoutMs);
     timeout.unref?.();
     httpServer.close(finish);
   }).finally(() => {

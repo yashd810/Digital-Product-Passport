@@ -159,7 +159,7 @@ function createValidationMiddleware(schemas = {}) {
     } catch (error) {
       if (error instanceof RequestValidationError) {
         return res.status(400).json({
-          error: "VALIDATION_ERROR",
+          error: "validationError",
           detail: error.issues[0]?.message || error.message,
           issues: error.issues,
         });

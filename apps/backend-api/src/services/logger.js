@@ -4,7 +4,7 @@ const util = require("util");
 const pino = require("pino");
 
 const externalSecretPath = (...parts) => parts.join("_");
-const REDACT_PATHS = [
+const redactPaths = [
   "password",
   "passwordHash",
   "secret",
@@ -43,7 +43,7 @@ const REDACT_PATHS = [
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
   redact: {
-    paths: REDACT_PATHS,
+    paths: redactPaths,
     censor: "[Redacted]",
   },
   timestamp: pino.stdTimeFunctions.isoTime,

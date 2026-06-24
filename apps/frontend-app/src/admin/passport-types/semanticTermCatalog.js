@@ -1,4 +1,4 @@
-const NO_SEMANTIC_MODEL_OPTION = {
+const noSemanticModelOption = {
   key: "",
   label: "Semantic model required",
   description: "Select a passport module so its semantic model can be applied.",
@@ -42,7 +42,7 @@ export function buildSemanticModelOptions(models = [], selectedModelKey = "") {
 
 export function getSemanticModelOption(options = [], modelKey = "") {
   const normalized = normalizeSemanticModelKey(modelKey);
-  return options.find((option) => option.key === normalized) || options[0] || NO_SEMANTIC_MODEL_OPTION;
+  return options.find((option) => option.key === normalized) || options[0] || noSemanticModelOption;
 }
 
 export function formatSemanticModelLabel(modelKey) {

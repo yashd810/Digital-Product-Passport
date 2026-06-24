@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../shared/styles/CreatePass.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 /**
  * Modal to browse the company repository and pick a file.
@@ -24,7 +24,7 @@ function RepositoryPicker({ companyId, onSelect, onClose }) {
     setLoading(true); setError("");
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository${qs}`);
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository${qs}`);
       if (!r.ok) throw new Error();
       setItems(await r.json());
     } catch { setError("Failed to load repository"); }

@@ -4,7 +4,7 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 
 function OAuthCallback({ setIsAuthenticated, setUser, setCompanyId }) {
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "";
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState("");
@@ -13,7 +13,7 @@ function OAuthCallback({ setIsAuthenticated, setUser, setCompanyId }) {
   useEffect(() => {
     (async () => {
       try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/api/users/me`, {
+        const response = await fetchWithAuth(`${apiBaseUrl}/api/users/me`, {
           credentials: "include",
         });
         const data = await response.json().catch(() => ({}));
@@ -34,7 +34,7 @@ function OAuthCallback({ setIsAuthenticated, setUser, setCompanyId }) {
         setError(err.message || "SSO login failed");
       }
     })();
-  }, [API_BASE_URL, navigate, requestedNext, setCompanyId, setIsAuthenticated, setUser]);
+  }, [apiBaseUrl, navigate, requestedNext, setCompanyId, setIsAuthenticated, setUser]);
 
   return (
     <div className="auth-container">

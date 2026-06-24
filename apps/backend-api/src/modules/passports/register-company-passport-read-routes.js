@@ -20,10 +20,10 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
     productIdentifierService,
     isFullRepresentationRequest,
     loadCompanySerializationContext,
-    IN_REVISION_STATUS,
-    IN_REVISION_STATUSES_SQL,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    inRevisionStatus,
+    inRevisionStatusesSql,
+    editableReleaseStatusesSql,
+    archivedHistoryFilterSql,
   } = deps;
 
   app.get("/api/companies/:companyId/passports", authenticateToken, checkCompanyAccess, async (req, res) => {
@@ -48,8 +48,8 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
 
       if (status) {
         const normalizedStatus = normalizeReleaseStatus(status);
-        if (normalizedStatus === IN_REVISION_STATUS) {
-          query += ` AND p."releaseStatus" IN ${IN_REVISION_STATUSES_SQL}`;
+        if (normalizedStatus === inRevisionStatus) {
+          query += ` AND p."releaseStatus" IN ${inRevisionStatusesSql}`;
         } else {
           query += ` AND p."releaseStatus" = $${index++}`;
           params.push(normalizedStatus);
@@ -186,9 +186,9 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
       } else if (statusFilter === "released") {
         statusSql = ' AND "releaseStatus" = \'released\'';
       } else if (statusFilter === "inRevision") {
-        statusSql = ` AND "releaseStatus" IN ${IN_REVISION_STATUSES_SQL}`;
+        statusSql = ` AND "releaseStatus" IN ${inRevisionStatusesSql}`;
       } else {
-        statusSql = ` AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
+        statusSql = ` AND "releaseStatus" IN ${editableReleaseStatusesSql}`;
       }
 
       const passportResult = await pool.query(
@@ -258,7 +258,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
                    FROM "passportArchives" pa
                LEFT JOIN users u ON u.id = pa."archivedBy"
                WHERE pa."companyId" = $1
-                 AND ${ARCHIVED_HISTORY_FILTER_SQL}`;
+                 AND ${archivedHistoryFilterSql}`;
       const params = [companyId];
       let index = 2;
 
@@ -289,7 +289,7 @@ module.exports = function registerCompanyPassportReadRoutes(app, deps) {
            AND phvPublic."versionNumber" = paPublic."versionNumber"
           WHERE paPublic."lineageId" = sub."lineageId"
             AND paPublic."companyId" = sub."companyId"
-            AND ${ARCHIVED_HISTORY_FILTER_SQL.replaceAll("\"snapshotReason\"", "paPublic.\"snapshotReason\"")}
+            AND ${archivedHistoryFilterSql.replaceAll("\"snapshotReason\"", "paPublic.\"snapshotReason\"")}
             AND paPublic."releaseStatus" IN ('released', 'obsolete')
             AND COALESCE(phvPublic."isPublic", true) = true
           ORDER BY paPublic."versionNumber" DESC, paPublic."archivedAt" DESC

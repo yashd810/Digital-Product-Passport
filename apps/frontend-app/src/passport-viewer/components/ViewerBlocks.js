@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { LANGUAGES, translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
+import { languages, translateFieldValue, translateSchemaLabel } from "../../app/providers/i18n";
 import { DynamicChart } from "./DynamicChart";
 import { PieChart, parseCompositionFromTable } from "./PieChart";
 import { formatPassportStatus, getPassportActivityState } from "../../passports/utils/passportStatus";
@@ -7,11 +7,11 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeSystemPassportHeader, resolveSystemHeaderEntries } from "../../admin/passport-types/builderHelpers";
 import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
 import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
-import { ACCESS_LABEL_MAP, appendUnitToDisplayValue, renderTextBlock, isHeroSummaryField, getFieldPresentation, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
+import { accessLabelMap, appendUnitToDisplayValue, renderTextBlock, isHeroSummaryField, getFieldPresentation, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
 import { getMarketingContactUrl } from "../utils/QRcode";
 
-const API = import.meta.env.VITE_API_URL || "";
-const PUBLIC_VIEWER_URL = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
+const publicViewerUrl = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
 
 function getDomainIndicatorState() {
   if (typeof window === "undefined") {
@@ -21,7 +21,7 @@ function getDomainIndicatorState() {
   const currentHost = window.location.host || "";
   let expectedHost = "";
   try {
-    expectedHost = PUBLIC_VIEWER_URL ? new URL(PUBLIC_VIEWER_URL).host : "";
+    expectedHost = publicViewerUrl ? new URL(publicViewerUrl).host : "";
   } catch {
     expectedHost = "";
   }
@@ -292,7 +292,7 @@ export function Footer({ brandTheme }) {
 export function LockedFieldCell({ field, onUnlock }) {
   const who = (field.access || [])
     .filter(a => a !== "public")
-    .map(a => ACCESS_LABEL_MAP[a] || a)
+    .map(a => accessLabelMap[a] || a)
     .join(", ");
   return (
     <button type="button" className="locked-field-btn" onClick={onUnlock}>
@@ -336,7 +336,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     if (!history[fieldKey]) {
       setHistory(p => ({ ...p, [fieldKey]: { data: [], loading: true } }));
       try {
-        const r = await fetchWithAuth(`${API}/api/passports/${passport.dppId}/dynamic-values/${fieldKey}/history?limit=500`);
+        const r = await fetchWithAuth(`${api}/api/passports/${passport.dppId}/dynamic-values/${fieldKey}/history?limit=500`);
         const d = r.ok ? await r.json() : null;
         setHistory(p => ({ ...p, [fieldKey]: { data: d?.history || [], loading: false } }));
       } catch {
@@ -683,7 +683,7 @@ export function PassportTabRail({ tabs, activeSectionKey, onSelect }) {
 export function ViewerLangSelector({ lang, setLang }) {
   return (
     <div className="viewer-lang-selector" role="group" aria-label="Passport language selector">
-      {LANGUAGES.map(l => (
+      {languages.map(l => (
         <button
           key={l.code}
           type="button"
@@ -725,7 +725,7 @@ export function SignatureBadge({ verification }) {
 export function ScanBadge({ dppId }) {
   const [count, setCount] = useState(null);
   useEffect(() => {
-    fetchWithAuth(`${API}/api/passports/${dppId}/scan-stats`)
+    fetchWithAuth(`${api}/api/passports/${dppId}/scan-stats`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d && d.total > 0) setCount(d.total); })
       .catch((error) => console.warn("Ignored async error", error));
@@ -785,7 +785,7 @@ export function PrintView({ passport, companyData, sections }) {
                   // Non-public fields appear redacted in print unless already unlocked
                   const who = access
                     .filter(a => a !== "public")
-                    .map(a => ACCESS_LABEL_MAP[a] || a)
+                    .map(a => accessLabelMap[a] || a)
                     .join(", ");
                   display = (
                     <span className="print-restricted-note">

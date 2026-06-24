@@ -14,13 +14,13 @@ function updateDppUseCase(deps) {
     findExistingPassportByInternalAliasId,
     productIdentifierService,
     complianceService,
-    SYSTEM_PASSPORT_FIELDS,
+    systemPassportFields,
     getWritablePassportColumns,
     toStoredPassportValue,
     extractCarrierAuthenticityMutation,
     applyCarrierAuthenticityMutation,
     extractExplicitFacilityId,
-    VALID_GRANULARITIES,
+    validGranularities,
     buildMutationPassportPayload,
     getActorIdentifier,
     replicatePassportToBackup,
@@ -31,7 +31,7 @@ function updateDppUseCase(deps) {
     parseDppIdentifier,
     serializePolicyDefaultValue,
     resolveManagedFacilityId,
-    MERGE_PATCH_CONTENT_TYPE,
+    mergePatchContentType,
     usesConfiguredGlobalProductIdentifierScheme,
   } = deps;
 
@@ -55,7 +55,7 @@ function updateDppUseCase(deps) {
         statusCode: 415,
         body: {
           error: "Unsupported Media Type",
-          supportedContentTypes: ["application/json", MERGE_PATCH_CONTENT_TYPE],
+          supportedContentTypes: ["application/json", mergePatchContentType],
         },
       };
     }
@@ -94,7 +94,7 @@ function updateDppUseCase(deps) {
     let nextGranularity = String(editable.passport.granularity || "item").trim().toLowerCase();
     if (granularity !== undefined) {
       const requestedGranularity = String(granularity || "").trim().toLowerCase();
-      if (!VALID_GRANULARITIES.has(requestedGranularity)) {
+      if (!validGranularities.has(requestedGranularity)) {
         return { statusCode: 400, body: { error: "granularity must be one of: model, batch, item" } };
       }
       if (requestedGranularity !== nextGranularity) {
@@ -112,7 +112,7 @@ function updateDppUseCase(deps) {
           return {
             statusCode: 409,
             body: {
-              error: "GRANULARITY_CHANGE_REQUIRES_NEW_IDENTIFIER",
+              error: "granularityChangeRequiresNewIdentifier",
               detail: "Released DPP granularity cannot be changed in place. Create a linked successor identifier instead.",
               currentGranularity: nextGranularity,
               requestedGranularity,
@@ -124,7 +124,7 @@ function updateDppUseCase(deps) {
     }
 
     const invalidFieldKeys = Object.keys(fields).filter((key) =>
-      !SYSTEM_PASSPORT_FIELDS.has(key)
+      !systemPassportFields.has(key)
       && !editable.typeDef?.fieldsJson?.sections?.some((section) => (section.fields || []).some((field) => field.key === key))
     );
     if (invalidFieldKeys.length) {
@@ -255,7 +255,7 @@ function updateDppUseCase(deps) {
       req.query.representation ?? requestedRepresentation
     );
 
-    await logAudit(editable.passport.companyId, req.user.userId, "PATCH_DPP", editable.tableName, editable.passport.dppId, null, {
+    await logAudit(editable.passport.companyId, req.user.userId, "patchDpp", editable.tableName, editable.passport.dppId, null, {
       fieldsUpdated: updatedFields,
     });
     await replicatePassportToBackup({

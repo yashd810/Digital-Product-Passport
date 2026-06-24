@@ -27,12 +27,12 @@ function createProductIdentifierService() {
   };
 }
 
-function createMedicalDeviceTypeDef() {
+function createExampleProductTypeDef() {
   return {
-    typeName: "medicalDevicePassportV1",
-    displayName: "Medical Device Passport v1",
-    productCategory: "Medical Device",
-    semanticModelKey: "medicalDeviceDictionaryV1",
+    typeName: "exampleProductPassportV1",
+    displayName: "Example Product Passport v1",
+    productCategory: "Example Product",
+    semanticModelKey: "exampleProductDictionaryV1",
     fieldsJson: {
       sections: [{
         key: "deviceIdentity",
@@ -41,7 +41,7 @@ function createMedicalDeviceTypeDef() {
             key: "deviceMaterial",
             label: "Device Material",
             type: "text",
-            semanticId: "https://www.claros-dpp.online/dictionary/medical-device/v1/terms/device-material",
+            semanticId: "https://www.claros-dpp.online/dictionary/example-product/v1/terms/device-material",
             objectType: "SingleValuedDataElement",
             valueDataType: "String",
           },
@@ -49,7 +49,7 @@ function createMedicalDeviceTypeDef() {
             key: "sterilizationCycles",
             label: "Sterilization Cycles",
             type: "text",
-            semanticId: "https://www.claros-dpp.online/dictionary/medical-device/v1/terms/sterilization-cycles",
+            semanticId: "https://www.claros-dpp.online/dictionary/example-product/v1/terms/sterilization-cycles",
             objectType: "SingleValuedDataElement",
             valueDataType: "Integer",
           },
@@ -65,17 +65,17 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
     productIdentifierService: createProductIdentifierService(),
     semanticModelRegistry: createSemanticModelRegistry(),
   });
-  const typeDef = createMedicalDeviceTypeDef();
+  const typeDef = createExampleProductTypeDef();
   const passport = {
-    passportType: "medicalDevicePassportV1",
+    passportType: "exampleProductPassportV1",
     dppId: "MD-DPP-001",
     lineageId: "MD-LINEAGE-001",
     companyId: 42,
     internalAliasId: "DEVICE-001",
     releaseStatus: "released",
     updatedAt: "2026-06-02T08:00:00.000Z",
-    contentSpecificationIds: ["medicalDeviceDictionaryV1"],
-    economicOperatorId: "EORI-MEDICAL-001",
+    contentSpecificationIds: ["exampleProductDictionaryV1"],
+    economicOperatorId: "EORI-EXAMPLE-001",
     deviceMaterial: "Surgical steel",
     sterilizationCycles: "12",
   };
@@ -85,7 +85,7 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
       id: 42,
       companyName: "Nordic Devices",
       didSlug: "nordic-devices",
-      economicOperatorIdentifier: "EORI-MEDICAL-001",
+      economicOperatorIdentifier: "EORI-EXAMPLE-001",
     },
   });
 
@@ -98,14 +98,14 @@ test("canonical serializer resolves terms from explicit semantic field metadata"
       id: 42,
       companyName: "Nordic Devices",
       didSlug: "nordic-devices",
-      economicOperatorIdentifier: "EORI-MEDICAL-001",
+      economicOperatorIdentifier: "EORI-EXAMPLE-001",
     },
   });
   const cyclesElement = expanded.elements.find((element) => element.elementId === "sterilizationCycles");
 
   assert.equal(
     cyclesElement.dictionaryReference,
-    "https://www.claros-dpp.online/dictionary/medical-device/v1/terms/sterilization-cycles"
+    "https://www.claros-dpp.online/dictionary/example-product/v1/terms/sterilization-cycles"
   );
   assert.equal(cyclesElement.valueDataType, "Integer");
   assert.equal(cyclesElement.value, "12");

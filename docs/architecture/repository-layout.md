@@ -15,7 +15,6 @@ If you are trying to understand “where the real connection lives,” start fro
 │   ├── frontend-app/
 │   ├── public-passport-viewer/
 │   └── marketing-site/
-├── data/
 ├── docker/
 ├── docs/
 ├── infra/

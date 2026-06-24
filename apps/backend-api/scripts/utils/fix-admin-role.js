@@ -13,7 +13,7 @@ const path = require("path");
 const { Pool } = require("pg");
 const createPasswordService = require("../../src/services/password-service");
 
-const DEFAULT_ADMIN_EMAIL = "digitalproductpass@gmail.com";
+const defaultAdminEmail = "digitalproductpass@gmail.com";
 
 function stripQuotes(value) {
   const trimmed = String(value || "").trim();
@@ -77,7 +77,7 @@ function createTemporaryPassword() {
 }
 
 async function ensureSuperAdmin() {
-  const adminEmail = String(process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+  const adminEmail = String(process.env.ADMIN_EMAIL || defaultAdminEmail).trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD || createTemporaryPassword();
   const passwordService = createPasswordService({
     crypto,

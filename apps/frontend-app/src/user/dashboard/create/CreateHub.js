@@ -5,7 +5,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 // ── Inline bulk create modal (reused from PassportList / TemplatesPage) ──
 function BulkModal({ passportType, typeLabel, companyId, templateId, templateName, onClose, onDone }) {
@@ -22,13 +22,13 @@ function BulkModal({ passportType, typeLabel, companyId, templateId, templateNam
     try {
       let prefill = {};
       if (templateId) {
-        const tr = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${templateId}`, { headers: authHeaders() });
+        const tr = await fetchWithAuth(`${api}/api/companies/${companyId}/templates/${templateId}`, { headers: authHeaders() });
         if (tr.ok) {
           const tmpl = await tr.json();
           for (const f of tmpl.fields || []) { if (f.fieldValue) prefill[f.fieldKey] = f.fieldValue; }
         }
       }
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/bulk`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -172,7 +172,7 @@ export default function CreateHub({ user, companyId }) {
 
   // Load passport types
   useEffect(() => {
-    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(types => {
         setPassportTypes(types);
@@ -188,7 +188,7 @@ export default function CreateHub({ user, companyId }) {
   const loadTemplates = useCallback((type) => {
     if (!type) return;
     setLoadingTemplates(true);
-    fetchWithAuth(`${API}/api/companies/${companyId}/templates?passportType=${type.typeName}`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${companyId}/templates?passportType=${type.typeName}`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setTemplates)
       .catch(() => setTemplates([]))

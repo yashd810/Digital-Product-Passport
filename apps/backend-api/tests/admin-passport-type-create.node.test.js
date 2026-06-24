@@ -127,16 +127,16 @@ function createMockPool(calls, { registeredTypes = [] } = {}) {
 }
 
 function createModulePreviewFixture(overrides = {}) {
-  const moduleKey = overrides.moduleKey || "medical-device:v1";
-  const typeName = overrides.typeName || "medicalDevicePassportV1";
-  const semanticModelKey = overrides.semanticModelKey || "medicalDeviceDictionaryV1";
-  const passportPolicyKey = overrides.passportPolicyKey || "medicalDeviceDppV1";
+  const moduleKey = overrides.moduleKey || "example-product:v1";
+  const typeName = overrides.typeName || "exampleProductPassportV1";
+  const semanticModelKey = overrides.semanticModelKey || "exampleProductDictionaryV1";
+  const passportPolicyKey = overrides.passportPolicyKey || "exampleProductDppV1";
 
   return {
     moduleKey,
     typeName,
-    displayName: overrides.displayName || "Medical Device Passport v1",
-    productCategory: overrides.productCategory || "Medical Device",
+    displayName: overrides.displayName || "Example Product Passport v1",
+    productCategory: overrides.productCategory || "Example Product",
     productIcon: overrides.productIcon || "MD",
     semanticModelKey,
     passportPolicy: {
@@ -153,7 +153,7 @@ function createModulePreviewFixture(overrides = {}) {
           canonicalLocked: true,
           sourceModuleKey: moduleKey,
           sourceModuleFieldKey: "modelIdentifier",
-          semanticId: "https://example.test/dictionary/medical-device/v1/terms/model-identifier",
+          semanticId: "https://example.test/dictionary/example-product/v1/terms/model-identifier",
           elementIdPath: "deviceIdentity.modelIdentifier",
           objectType: "SingleValuedDataElement",
           valueDataType: "String",
@@ -215,11 +215,11 @@ test("admin cannot create manual passport type without a registered module sourc
   const response = await invokeRoute(app, {
     path: "/api/admin/passport-types",
     body: {
-      typeName: "medicalDevicePassportV1",
-      displayName: "Medical Device Passport v1",
-      productCategory: "Medical Device",
+      typeName: "exampleProductPassportV1",
+      displayName: "Example Product Passport v1",
+      productCategory: "Example Product",
       productIcon: "MD",
-      semanticModelKey: "medicalDeviceDictionaryV1",
+      semanticModelKey: "exampleProductDictionaryV1",
       systemHeader: { section: { label: "Passport Header" } },
       sections: [{
         key: "deviceIdentity",
@@ -252,23 +252,23 @@ test("admin can preview registered passport type modules before seeding", async 
   });
 
   assert.equal(response.statusCode, 200);
-  const deviceModule = response.body.find((modulePreview) => modulePreview.moduleKey === "medical-device:v1");
+  const deviceModule = response.body.find((modulePreview) => modulePreview.moduleKey === "example-product:v1");
   assert.ok(deviceModule, "Expected injected module fixture to be listed");
   assert.equal(deviceModule.seeded, false);
-  assert.equal(deviceModule.semanticModelKey, "medicalDeviceDictionaryV1");
-  assert.equal(deviceModule.passportPolicyKey, "medicalDeviceDppV1");
-  assert.match(deviceModule.seedCommand, /--module=medical-device:v1/);
+  assert.equal(deviceModule.semanticModelKey, "exampleProductDictionaryV1");
+  assert.equal(deviceModule.passportPolicyKey, "exampleProductDppV1");
+  assert.match(deviceModule.seedCommand, /--module=example-product:v1/);
 });
 
 test("admin module preview marks modules as seeded when passport type exists", async () => {
   const deviceModule = createModulePreviewFixture();
   const sensorModule = createModulePreviewFixture({
-    moduleKey: "industrial-sensor:v2",
-    typeName: "industrialSensorPassportV2",
-    displayName: "Industrial Sensor Passport v2",
-    productCategory: "Industrial Sensor",
-    semanticModelKey: "industrialSensorDictionaryV2",
-    passportPolicyKey: "industrialSensorDppV2",
+    moduleKey: "alternate-product:v2",
+    typeName: "alternateProductPassportV2",
+    displayName: "Alternate Product Passport v2",
+    productCategory: "Alternate Product",
+    semanticModelKey: "alternateProductDictionaryV2",
+    passportPolicyKey: "alternateProductDppV2",
   });
   const app = createCatalogApp({
     calls: [],
@@ -276,7 +276,7 @@ test("admin module preview marks modules as seeded when passport type exists", a
     audits: [],
     registeredTypes: [{
       id: 42,
-      typeName: "medicalDevicePassportV1",
+      typeName: "exampleProductPassportV1",
       isActive: true,
     }],
     moduleDefinitions: [deviceModule, sensorModule],
@@ -288,11 +288,11 @@ test("admin module preview marks modules as seeded when passport type exists", a
   });
 
   assert.equal(response.statusCode, 200);
-  const seededModule = response.body.find((modulePreview) => modulePreview.moduleKey === "medical-device:v1");
+  const seededModule = response.body.find((modulePreview) => modulePreview.moduleKey === "example-product:v1");
   assert.equal(seededModule.seeded, true);
   assert.equal(seededModule.seededPassportTypeId, 42);
   assert.equal(seededModule.seededIsActive, true);
 
-  const unseededModule = response.body.find((modulePreview) => modulePreview.moduleKey === "industrial-sensor:v2");
+  const unseededModule = response.body.find((modulePreview) => modulePreview.moduleKey === "alternate-product:v2");
   assert.equal(unseededModule.seeded, false);
 });

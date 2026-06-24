@@ -4,7 +4,7 @@ import CompanyLogoUpload from "./CompanyLogoUpload";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function CompanyProfile({ companyId, user }) {
   const { companyId: routeCompanyId } = useParams();
@@ -27,7 +27,7 @@ function CompanyProfile({ companyId, user }) {
     try {
       setBackupPolicy(null);
       setContinuityEvidence(null);
-      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`, {
         headers: authHeaders(),
       });
       if (r.ok) {
@@ -37,7 +37,7 @@ function CompanyProfile({ companyId, user }) {
       }
 
       if (isSuperAdminView) {
-        const adminBase = `${API}/api/admin/companies/${resolvedCompanyId}`;
+        const adminBase = `${api}/api/admin/companies/${resolvedCompanyId}`;
         const [policyRes, evidenceRes] = await Promise.all([
           fetchWithAuth(`${adminBase}/backup-policy`, {
             headers: authHeaders(),
@@ -65,7 +65,7 @@ function CompanyProfile({ companyId, user }) {
       setSavingProfile(true);
       setMessage({ type: "", text: "" });
 
-      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

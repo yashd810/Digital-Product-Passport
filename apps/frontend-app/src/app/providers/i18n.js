@@ -353,7 +353,7 @@ export function I18nProvider({ children }) {
 
 export const useI18n = () => useContext(I18nContext);
 
-export const LANGUAGES = [
+export const languages = [
   { code: "en", name: "English",  flag: "🇬🇧" },
   { code: "sv", name: "Svenska",  flag: "🇸🇪" },
   { code: "de", name: "Deutsch",  flag: "🇩🇪" },

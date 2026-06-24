@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { useI18n } from "../../app/providers/i18n";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import {
-  PASSWORD_MIN_LENGTH,
-  PASSWORD_REQUIREMENT_TEXT,
+  passwordMinLength,
+  passwordRequirementText,
   validatePasswordPolicy,
 } from "../../auth/utils/passwordPolicy";
 import "../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function UserProfile({
   user,
@@ -54,7 +54,7 @@ function UserProfile({
 
   const fetchProfile = async () => {
     try {
-      const r = await fetchWithAuth(`${API}/api/users/me`, {
+      const r = await fetchWithAuth(`${api}/api/users/me`, {
         headers: { ...authHeaders() },
       });
       if (!r.ok) throw new Error();
@@ -75,7 +75,7 @@ function UserProfile({
   const fetchTeam = async () => {
     if (!companyId) return;
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/users`, {
         headers: { ...authHeaders() },
       });
       if (r.ok) {
@@ -109,7 +109,7 @@ function UserProfile({
         defaultReviewerId: defReviewer ? parseInt(defReviewer) : null,
         defaultApproverId: defApprover ? parseInt(defApprover) : null,
       };
-      const r = await fetchWithAuth(`${API}/api/users/me`, {
+      const r = await fetchWithAuth(`${api}/api/users/me`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(body),
@@ -139,7 +139,7 @@ function UserProfile({
     }
     setSavingPw(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/users/me/password`, {
+      const r = await fetchWithAuth(`${api}/api/users/me/password`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ currentPassword: curPw, newPassword: newPw }),
@@ -164,7 +164,7 @@ function UserProfile({
     }
     setSaving2FA(true);
     try {
-      const response = await fetchWithAuth(`${API}/api/users/me/2fa`, {
+      const response = await fetchWithAuth(`${api}/api/users/me/2fa`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ enable: !twoFaEnabled, currentPassword: twoFaPassword }),
@@ -299,10 +299,10 @@ function UserProfile({
               <div className="form-row-2">
                 <div className="form-group">
                   <label>{t("newPassword")}</label>
-                  <input type="password" value={newPw} placeholder={`Min. ${PASSWORD_MIN_LENGTH} characters`} disabled={savingPw}
-                    onChange={e => setNewPw(e.target.value)} required minLength={PASSWORD_MIN_LENGTH} />
+                  <input type="password" value={newPw} placeholder={`Min. ${passwordMinLength} characters`} disabled={savingPw}
+                    onChange={e => setNewPw(e.target.value)} required minLength={passwordMinLength} />
                   <span style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
-                    {PASSWORD_REQUIREMENT_TEXT}
+                    {passwordRequirementText}
                   </span>
                 </div>
                 <div className="form-group">

@@ -6,13 +6,13 @@ const {
   assertRequiredProductionEnvironment,
 } = require("../src/bootstrap/runtime-config");
 
-const REQUIRED_PRODUCTION_ENV = {
+const requiredProductionEnv = {
   JWT_SECRET: "test-jwt-secret",
   PEPPER_V1: "test-pepper",
   DB_HOST: "db.example.internal",
   DB_USER: "dpp",
   DB_PASSWORD: "test-password",
-  DB_NAME: "dpp_system",
+  DB_NAME: "dppSystem",
   APP_URL: "https://app.example.com",
   SERVER_URL: "https://api.example.com",
   ALLOWED_ORIGINS: "https://app.example.com,https://viewer.example.com",
@@ -20,9 +20,9 @@ const REQUIRED_PRODUCTION_ENV = {
 
 function withEnv(overrides, fn) {
   const previous = {};
-  const keys = new Set([...Object.keys(REQUIRED_PRODUCTION_ENV), ...Object.keys(overrides)]);
+  const keys = new Set([...Object.keys(requiredProductionEnv), ...Object.keys(overrides)]);
   for (const key of keys) previous[key] = process.env[key];
-  Object.assign(process.env, REQUIRED_PRODUCTION_ENV, overrides);
+  Object.assign(process.env, requiredProductionEnv, overrides);
   for (const [key, value] of Object.entries(overrides)) {
     if (value === undefined) delete process.env[key];
   }

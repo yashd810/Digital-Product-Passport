@@ -11,7 +11,7 @@ function createDppUseCase(deps) {
     findExistingPassportByInternalAliasId,
     productIdentifierService,
     complianceService,
-    SYSTEM_PASSPORT_FIELDS,
+    systemPassportFields,
     getWritablePassportColumns,
     joinQuotedSqlIdentifiers,
     toStoredPassportValue,
@@ -26,7 +26,7 @@ function createDppUseCase(deps) {
     logAudit,
     replicatePassportToBackup,
     logger,
-    VALID_GRANULARITIES,
+    validGranularities,
     usesConfiguredGlobalProductIdentifierScheme,
   } = deps;
 
@@ -53,7 +53,7 @@ function createDppUseCase(deps) {
     }
 
     const requestedGranularity = String(normalizedBody.granularity || "item").trim().toLowerCase() || "item";
-    if (!VALID_GRANULARITIES.has(requestedGranularity)) {
+    if (!validGranularities.has(requestedGranularity)) {
       throw Object.assign(new Error("granularity must be one of: model, batch, item"), { statusCode: 400 });
     }
 
@@ -101,7 +101,7 @@ function createDppUseCase(deps) {
     void granularity;
 
     const invalidFieldKeys = Object.keys(fields).filter((key) =>
-      !SYSTEM_PASSPORT_FIELDS.has(key) && !typeSchema.allowedKeys.has(key)
+      !systemPassportFields.has(key) && !typeSchema.allowedKeys.has(key)
     );
     if (invalidFieldKeys.length) {
       const error = new Error("Unknown passport field(s) in request body");
@@ -192,7 +192,7 @@ function createDppUseCase(deps) {
       req.query.representation ?? requestedRepresentation
     );
 
-    await logAudit(companyId, req.user.userId, "CREATE_DPP", tableName, dppId, null, {
+    await logAudit(companyId, req.user.userId, "createDpp", tableName, dppId, null, {
       passportType: resolvedPassportType,
       internalAliasId: storedProductIdentifiers.internalAliasIdInput,
       uniqueProductIdentifier: storedProductIdentifiers.productIdentifierDid,

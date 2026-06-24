@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "";
-const OPERATOR_TYPE_OPTIONS = [
+const api = import.meta.env.VITE_API_URL || "";
+const operatorTypeOptions = [
   { value: "economicOperator", label: "Economic Operator" },
   { value: "manufacturer", label: "Manufacturer" },
   { value: "authorizedRepresentative", label: "Authorized Representative" },
@@ -20,11 +20,11 @@ const OPERATOR_TYPE_OPTIONS = [
   { value: "backupDppServiceProvider", label: "Backup DPP Service Provider" },
   { value: "public", label: "Public" },
 ];
-const ACCESS_MODE_OPTIONS = [
+const accessModeOptions = [
   { value: "read", label: "Read only" },
   { value: "update", label: "Read and update" },
 ];
-const CONFIDENTIALITY_OPTIONS = [
+const confidentialityOptions = [
   { value: "public", label: "Public" },
   { value: "restricted", label: "Restricted" },
   { value: "confidential", label: "Confidential" },
@@ -75,7 +75,7 @@ function SecurityCenter({ user, companyId }) {
     if (bearerToken && !forceRefresh) return;
     setLoadingBearerToken(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/users/me/token`, {
+      const r = await fetchWithAuth(`${api}/api/users/me/token`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
       });
@@ -110,7 +110,7 @@ function SecurityCenter({ user, companyId }) {
   const fetchApiKeys = async () => {
     setLoadingKeys(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/api-keys`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/api-keys`, {
         headers: authHeaders(),
       });
       if (!r.ok) throw new Error("Failed to fetch company API keys");
@@ -127,7 +127,7 @@ function SecurityCenter({ user, companyId }) {
     if (!keyName.trim()) return;
     setGeneratingKey(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/api-keys`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/api-keys`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
@@ -164,7 +164,7 @@ function SecurityCenter({ user, companyId }) {
     if (!window.confirm(`Revoke "${name}"? Any integrations using it will stop working immediately.`)) return;
     setRevokingId(keyId);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/api-keys/${keyId}`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/api-keys/${keyId}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -179,17 +179,17 @@ function SecurityCenter({ user, companyId }) {
     }
   };
 
-  const bearerExample = `curl -X GET ${API}/api/users/me \\
-  -H "Authorization: Bearer YOUR_TOKEN_HERE"`;
+  const bearerExample = `curl -X GET ${api}/api/users/me \\
+  -H "Authorization: Bearer yourTokenHere"`;
 
-  const companyApiExample = `curl -X GET ${API}/api/v1/passports?status=released \\
-  -H "X-API-Key: YOUR_COMPANY_API_KEY_HERE"`;
+  const companyApiExample = `curl -X GET ${api}/api/v1/passports?status=released \\
+  -H "X-API-Key: yourCompanyApiKeyHere"`;
 
   return (
     <div className="profile-page">
       <div className="profile-header">
         <h2 className="profile-title">Security</h2>
-        <p className="profile-sub">Manage bearer tokens, company API keys, and integration access from one place.</p>
+        <p className="profile-sub">Manage bearer tokens, company api keys, and integration access from one place.</p>
       </div>
 
       {message.text && (
@@ -202,8 +202,8 @@ function SecurityCenter({ user, companyId }) {
         <div className="profile-card">
           <h4 className="card-section-title">🔑 Bearer Token</h4>
           <p className="profile-helper-text">
-            Use this token for authenticated internal API calls in the <code>Authorization: Bearer &lt;token&gt;</code> header.
-            It is separate from the company <code>X-API-Key</code> and should not be shared with external read-only consumers.
+            Use this token for authenticated internal api calls in the <code>Authorization: Bearer &lt;token&gt;</code> header.
+            It is separate from the company <code>X-api-Key</code> and should not be shared with external read-only consumers.
           </p>
           <p className="profile-helper-text">
             Bearer tokens are optional. They are only generated when you explicitly request one below.
@@ -257,10 +257,10 @@ function SecurityCenter({ user, companyId }) {
         </div>
 
         <div className="profile-card">
-          <h4 className="card-section-title">🏢 Company API Keys</h4>
+          <h4 className="card-section-title">🏢 Company api Keys</h4>
           <p className="profile-helper-text">
-            Company API keys are used for external operator integrations on <code>/api/v1/passports</code>.
-            Send them in the <code>X-API-Key</code> header. Each key can represent one operator, be read-only or update-enabled, and be capped to a maximum confidentiality level.
+            Company api keys are used for external operator integrations on <code>/api/v1/passports</code>.
+            Send them in the <code>X-api-Key</code> header. Each key can represent one operator, be read-only or update-enabled, and be capped to a maximum confidentiality level.
           </p>
 
           {!resolvedCompanyId && (
@@ -269,7 +269,7 @@ function SecurityCenter({ user, companyId }) {
 
           {resolvedCompanyId && !canManageCompanyKeys && (
             <div className="alert alert-error dashboard-alert-spaced">
-              Company API key management is available to company admins. Your account can still use the bearer token above for authenticated internal APIs.
+              Company api key management is available to company admins. Your account can still use the bearer token above for authenticated internal APIs.
             </div>
           )}
 
@@ -284,7 +284,7 @@ function SecurityCenter({ user, companyId }) {
                     This is the only time this key will be shown. Copy it now.
                   </p>
                   <p className="security-key-reveal-meta">
-                    {humanizeOption(newKey.operatorType, OPERATOR_TYPE_OPTIONS)} · {humanizeOption(newKey.accessMode, ACCESS_MODE_OPTIONS)} · Up to {humanizeOption(newKey.maxConfidentiality, CONFIDENTIALITY_OPTIONS)}
+                    {humanizeOption(newKey.operatorType, operatorTypeOptions)} · {humanizeOption(newKey.accessMode, accessModeOptions)} · Up to {humanizeOption(newKey.maxConfidentiality, confidentialityOptions)}
                   </p>
                   <div className="security-key-reveal-actions">
                     <code className="security-key-reveal-code">
@@ -328,7 +328,7 @@ function SecurityCenter({ user, companyId }) {
                       disabled={generatingKey}
                       className="token-input"
                     >
-                      {OPERATOR_TYPE_OPTIONS.map((option) => (
+                      {operatorTypeOptions.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
                     </select>
@@ -341,7 +341,7 @@ function SecurityCenter({ user, companyId }) {
                       disabled={generatingKey}
                       className="token-input"
                     >
-                      {ACCESS_MODE_OPTIONS.map((option) => (
+                      {accessModeOptions.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
                     </select>
@@ -354,7 +354,7 @@ function SecurityCenter({ user, companyId }) {
                       disabled={generatingKey}
                       className="token-input"
                     >
-                      {CONFIDENTIALITY_OPTIONS.map((option) => (
+                      {confidentialityOptions.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
                     </select>
@@ -371,9 +371,9 @@ function SecurityCenter({ user, companyId }) {
               </form>
 
               {loadingKeys ? (
-                <p className="profile-helper-text">Loading company API keys...</p>
+                <p className="profile-helper-text">Loading company api keys...</p>
               ) : apiKeys.length === 0 ? (
-                <p className="profile-helper-text">No company API keys yet.</p>
+                <p className="profile-helper-text">No company api keys yet.</p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {apiKeys.map((key) => (
@@ -396,7 +396,7 @@ function SecurityCenter({ user, companyId }) {
                           {key.keyPrefix}...
                         </div>
                         <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>
-                          {humanizeOption(key.operatorType, OPERATOR_TYPE_OPTIONS)} · {humanizeOption(key.accessMode, ACCESS_MODE_OPTIONS)} · Up to {humanizeOption(key.maxConfidentiality, CONFIDENTIALITY_OPTIONS)}
+                          {humanizeOption(key.operatorType, operatorTypeOptions)} · {humanizeOption(key.accessMode, accessModeOptions)} · Up to {humanizeOption(key.maxConfidentiality, confidentialityOptions)}
                         </div>
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text-secondary)", textAlign: "right" }}>

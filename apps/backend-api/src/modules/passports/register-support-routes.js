@@ -16,7 +16,7 @@ function registerPassportSupportRoutes(app, deps) {
     getPassportLineageContext,
     normalizePassportRow,
     isPublicHistoryStatus,
-    EDITABLE_RELEASE_STATUSES_SQL,
+    editableReleaseStatusesSql,
   } = deps;
 
   app.patch("/api/companies/:companyId/passports/:dppId/history/:versionNumber", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
@@ -72,7 +72,7 @@ function registerPassportSupportRoutes(app, deps) {
       await logAudit(
         companyId,
         req.user.userId,
-        "UPDATE_HISTORY_VISIBILITY",
+        "updateHistoryVisibility",
         tableName,
         dppId,
         { versionNumber: parsedVersion, isPublic: previousVisibility },
@@ -116,7 +116,7 @@ function registerPassportSupportRoutes(app, deps) {
 
         const row = await pool.query(
           `SELECT id FROM ${tableName}
-           WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+           WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
            ORDER BY "versionNumber" DESC LIMIT 1`,
           [dppId]
         );
@@ -152,10 +152,10 @@ function registerPassportSupportRoutes(app, deps) {
           `UPDATE ${tableName} SET ${fieldKey} = $1, "updatedAt" = NOW() WHERE id = $2`,
           [publicFileUrl, row.rows[0].id]
         );
-        await logAudit(companyId, req.user.userId, "UPLOAD", tableName, dppId, null, { fieldKey, publicFileUrl });
+        await logAudit(companyId, req.user.userId, "upload", tableName, dppId, null, { fieldKey, publicFileUrl });
         res.json({ success: true, url: publicFileUrl, fieldKey });
       } catch (e) {
-        if (e.code === "STORAGE_DISABLED") {
+        if (e.code === "storageDisabled") {
           return res.status(503).json({ error: e.message });
         }
         if (e.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "File too large. Max 20 MB." });

@@ -3,7 +3,7 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
-const HEADER_SLOT_DEFINITIONS = [
+const headerSlotDefinitions = [
   { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
   { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
   { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId" },
@@ -128,7 +128,7 @@ const sample = {
   ],
 };
 
-const FIELDS_CSV_COLUMNS = [
+const fieldsCsvColumns = [
   "fieldLabel",
   "sectionLabel",
   "fieldType",
@@ -143,17 +143,17 @@ const FIELDS_CSV_COLUMNS = [
   "tableColumns",
 ];
 
-const FIELD_TYPE_OPTIONS = new Set(["text", "textarea", "boolean", "date", "url", "file", "symbol", "table"]);
-const DATA_TYPE_OPTIONS = new Set(["string", "number", "integer", "boolean", "date", "datetime", "uri"]);
-const ACCESS_RIGHTS_OPTIONS = new Set(["public", "restricted"]);
-const OBJECT_TYPE_OPTIONS = new Set([
+const fieldTypeOptions = new Set(["text", "textarea", "boolean", "date", "url", "file", "symbol", "table"]);
+const dataTypeOptions = new Set(["string", "number", "integer", "boolean", "date", "datetime", "uri"]);
+const accessRightsOptions = new Set(["public", "restricted"]);
+const objectTypeOptions = new Set([
   "SingleValuedDataElement",
   "MultiValuedDataElement",
   "DataElementCollection",
   "RelatedResource",
   "MultiLanguageDataElement",
 ]);
-const VALUE_DATA_TYPE_OPTIONS = new Set([
+const valueDataTypeOptions = new Set([
   "String",
   "Boolean",
   "Integer",
@@ -166,8 +166,8 @@ const VALUE_DATA_TYPE_OPTIONS = new Set([
   "Object",
 ]);
 
-const DRAFT_STORAGE_KEY = "passport-module-generator:draft:v1";
-const SESSION_STORAGE_KEY = "passport-module-generator:session:v1";
+const draftStorageKey = "passport-module-generator:draft:v1";
+const sessionStorageKey = "passport-module-generator:session:v1";
 let sessionSaveTimer = null;
 
 function setMessage(text, type = "info") {
@@ -200,7 +200,7 @@ function createBlankSpec() {
       passportPolicyKey: "",
       defaultCarrierPolicyKey: "webPublicEntryV1",
       systemHeaderFieldAssignments: Object.fromEntries(
-        HEADER_SLOT_DEFINITIONS.map((slot) => [slot.slotKey, `__managed__:${slot.managedKey}`])
+        headerSlotDefinitions.map((slot) => [slot.slotKey, `__managed__:${slot.managedKey}`])
       ),
       baseUrl: "https://www.claros-dpp.online",
       dictionaryName: "",
@@ -245,7 +245,7 @@ function loadJsonStorage(storage, key) {
 
 function saveSessionNow() {
   try {
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(readWorkspaceState()));
+    sessionStorage.setItem(sessionStorageKey, JSON.stringify(readWorkspaceState()));
   } catch {
     // Ignore local browser storage failures.
   }
@@ -468,8 +468,8 @@ function getFieldsCsvRowsFromSpec(spec = readSpec()) {
 
 function buildFieldsCsvContent(rows = []) {
   const lines = [
-    FIELDS_CSV_COLUMNS.join(","),
-    ...rows.map((row) => FIELDS_CSV_COLUMNS.map((column) => csvEscape(row[column] || "")).join(",")),
+    fieldsCsvColumns.join(","),
+    ...rows.map((row) => fieldsCsvColumns.map((column) => csvEscape(row[column] || "")).join(",")),
   ];
   return `${lines.join("\n")}\n`;
 }
@@ -485,7 +485,7 @@ function readFieldsCsvRows(text) {
     }
   }
 
-  const unsupported = header.filter((column) => column && !FIELDS_CSV_COLUMNS.includes(column));
+  const unsupported = header.filter((column) => column && !fieldsCsvColumns.includes(column));
   if (unsupported.length) {
     throw new Error(`CSV contains unsupported columns: ${unsupported.join(", ")}. Use the fixed local-tool template only.`);
   }
@@ -503,8 +503,8 @@ function readFieldsCsvRows(text) {
         skippedRowCount += 1;
         continue;
       }
-      const fieldType = normalizeCsvOption(entry.fieldType, FIELD_TYPE_OPTIONS, "text");
-      const dataType = normalizeCsvOption(entry.dataType, DATA_TYPE_OPTIONS, defaultDataTypeForFieldType(fieldType));
+      const fieldType = normalizeCsvOption(entry.fieldType, fieldTypeOptions, "text");
+      const dataType = normalizeCsvOption(entry.dataType, dataTypeOptions, defaultDataTypeForFieldType(fieldType));
       const tableColumnsSource = entry.tableColumns || "";
       const tableColumns = fieldType === "table"
         ? parseJsonCell(tableColumnsSource, `CSV row ${rowIndex + 2} tableColumns`, [])
@@ -524,7 +524,7 @@ function readFieldsCsvRows(text) {
           dataType,
           unitLabel: entry.unitLabel || "",
           unitSymbol: entry.unitSymbol || "",
-          accessRights: normalizeCsvOption(entry.accessRights, ACCESS_RIGHTS_OPTIONS, "public"),
+          accessRights: normalizeCsvOption(entry.accessRights, accessRightsOptions, "public"),
           queryable: parseBooleanCell(entry.queryable),
           indexed: parseBooleanCell(entry.indexed),
           tableColumns,
@@ -871,7 +871,7 @@ function renderSystemHeaderFields(fields) {
   );
   container.innerHTML = "";
 
-  for (const slot of HEADER_SLOT_DEFINITIONS) {
+  for (const slot of headerSlotDefinitions) {
     const row = document.createElement("label");
     row.className = "presentation-row";
     const text = document.createElement("span");
@@ -1248,7 +1248,7 @@ function loadSpec(spec) {
 
 function saveDraft() {
   try {
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(readWorkspaceState()));
+    localStorage.setItem(draftStorageKey, JSON.stringify(readWorkspaceState()));
     setMessage("Saved draft locally in this browser.", "success");
   } catch {
     setMessage("Could not save draft in this browser.", "error");
@@ -1256,7 +1256,7 @@ function saveDraft() {
 }
 
 function loadDraft() {
-  const state = loadJsonStorage(localStorage, DRAFT_STORAGE_KEY);
+  const state = loadJsonStorage(localStorage, draftStorageKey);
   if (!state) {
     setMessage("No saved draft found in this browser.", "error");
     return;
@@ -1266,7 +1266,7 @@ function loadDraft() {
 }
 
 function restoreSession() {
-  const state = loadJsonStorage(sessionStorage, SESSION_STORAGE_KEY);
+  const state = loadJsonStorage(sessionStorage, sessionStorageKey);
   if (!state) {
     setMessage("No saved session found for this browser tab.", "error");
     return;
@@ -1276,7 +1276,7 @@ function restoreSession() {
 }
 
 function clearAll() {
-  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  sessionStorage.removeItem(sessionStorageKey);
   loadSpec(createBlankSpec());
   setCheckboxValue("overwrite", false);
   clearMessage();
@@ -1452,7 +1452,7 @@ document.addEventListener("input", queueSessionSave, true);
 document.addEventListener("change", queueSessionSave, true);
 setupWorkspaceNavigation();
 setupModuleAutoFill();
-const restoredSession = loadJsonStorage(sessionStorage, SESSION_STORAGE_KEY);
+const restoredSession = loadJsonStorage(sessionStorage, sessionStorageKey);
 loadSpec(restoredSession?.spec || sample);
 setCheckboxValue("overwrite", restoredSession?.overwrite);
 setActiveStep(restoredSession?.activeStep || "module");

@@ -17,7 +17,7 @@ module.exports = function registerRepositoryRoutes(app, {
   repoSymbolUpload,
   validateRepositoryPdfUpload,
   validateRepositorySymbolUpload,
-  REPO_BASE_DIR,
+  repoBaseDir,
   isPathInsideBase,
   storageService,
 }) {
@@ -168,7 +168,7 @@ module.exports = function registerRepositoryRoutes(app, {
         );
         res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
       } catch (e) {
-        if (e.code === "STORAGE_DISABLED") {
+        if (e.code === "storageDisabled") {
           return res.status(503).json({ error: e.message });
         }
         if (e.code === "LIMIT_FILE_SIZE") {
@@ -233,7 +233,7 @@ module.exports = function registerRepositoryRoutes(app, {
         const storageKey = getStorageKey(row);
         if (filePath && !storageKey) {
           const safeFilePath = path.resolve(filePath);
-          if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR)) {
+          if (!isPathInsideBase(safeFilePath, repoBaseDir)) {
             logger.error("[repository-delete] Refusing to delete file outside repository root:", safeFilePath);
             return res.status(400).json({ error: "Stored file path is invalid" });
           }
@@ -339,7 +339,7 @@ module.exports = function registerRepositoryRoutes(app, {
         );
         res.status(201).json(withResolvedFileUrl(req, r.rows[0]));
       } catch (e) {
-        if (e.code === "STORAGE_DISABLED") {
+        if (e.code === "storageDisabled") {
           return res.status(503).json({ error: e.message });
         }
         logger.error("Company symbol upload error:", e.message);
@@ -382,7 +382,7 @@ module.exports = function registerRepositoryRoutes(app, {
         const filePath = getFilePath(row);
         if (filePath) {
           const safeFilePath = path.resolve(filePath);
-          if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR) || !fs.existsSync(safeFilePath)) {
+          if (!isPathInsideBase(safeFilePath, repoBaseDir) || !fs.existsSync(safeFilePath)) {
             return res.status(404).json({ error: "File not found" });
           }
           return res.sendFile(safeFilePath);
@@ -430,7 +430,7 @@ module.exports = function registerRepositoryRoutes(app, {
         const filePath = getFilePath(row);
         if (filePath) {
           const safeFilePath = path.resolve(filePath);
-          if (!isPathInsideBase(safeFilePath, REPO_BASE_DIR) || !fs.existsSync(safeFilePath)) {
+          if (!isPathInsideBase(safeFilePath, repoBaseDir) || !fs.existsSync(safeFilePath)) {
             return res.status(404).json({ error: "File not found" });
           }
           return res.sendFile(safeFilePath);

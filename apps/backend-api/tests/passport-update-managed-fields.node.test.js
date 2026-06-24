@@ -11,11 +11,11 @@ function createHarness() {
     dppId: "dppRegularPatchTest",
     lineageId: "dppRegularPatchTest",
     companyId: 7,
-    passportType: "medicalDevicePassportV1",
+    passportType: "exampleProductPassportV1",
     releaseStatus: "draft",
     granularity: "item",
     internalAliasId: "MD-REGULAR-001",
-    uniqueProductIdentifier: "did:web:example.test:did:medical-device-passport-v1:item:md-regular-001",
+    uniqueProductIdentifier: "did:web:example.test:did:example-product-passport-v1:item:md-regular-001",
     passportPolicyKey: "wrongProfile",
     contentSpecificationIds: JSON.stringify(["wrongSpec"]),
     carrierPolicyKey: "wrongCarrier",
@@ -31,18 +31,18 @@ function createHarness() {
     },
     normalizePassportRequestBody: (body) => body || {},
     getPassportTypeSchema: async () => ({
-      typeName: "medicalDevicePassportV1",
+      typeName: "exampleProductPassportV1",
       allowedKeys: new Set(["manufacturer"]),
     }),
     createPassportTable: async () => {},
-    getTable: () => "medicalDevicePassports",
-    VALID_GRANULARITIES: new Set(["model", "batch", "item"]),
-    EDITABLE_RELEASE_STATUSES_SQL: "('draft', 'inRevision')",
+    getTable: () => "exampleProductPassports",
+    validGranularities: new Set(["model", "batch", "item"]),
+    editableReleaseStatusesSql: "('draft', 'inRevision')",
     hasReleasedLineageVersion: async () => false,
     normalizeInternalAliasIdValue: (value) => String(value || "").trim(),
     buildStoredProductIdentifiers: ({ internalAliasId }) => ({
       internalAliasId,
-      uniqueProductIdentifier: `did:web:example.test:did:medical-device-passport-v1:item:${internalAliasId}`,
+      uniqueProductIdentifier: `did:web:example.test:did:example-product-passport-v1:item:${internalAliasId}`,
     }),
     findExistingPassportByInternalAliasId: async () => null,
     normalizeReleaseStatus: (status) => status,
@@ -52,8 +52,8 @@ function createHarness() {
     buildCarrierAuthenticityStorageValue: (value) => value ? JSON.stringify(value) : null,
     extractCarrierAuthenticityMutation: () => ({ provided: false }),
     buildComplianceManagedFields: async () => ({
-      passportPolicyKey: "medicalDeviceDppV1",
-      contentSpecificationIds: JSON.stringify(["medicalDeviceDictionaryV1"]),
+      passportPolicyKey: "exampleProductDppV1",
+      contentSpecificationIds: JSON.stringify(["exampleProductDictionaryV1"]),
       carrierPolicyKey: "webPublicEntryV1",
       economicOperatorId: "EORI-ACME-001",
       economicOperatorIdentifierScheme: "EORI",
@@ -89,7 +89,7 @@ test("regular passport update reconciles policy-owned fields from managed policy
       },
       user: { userId: 9, companyId: 7, role: "companyAdmin" },
       body: {
-        passportType: "medicalDevicePassportV1",
+        passportType: "exampleProductPassportV1",
         passportPolicyKey: "clientSuppliedProfile",
         contentSpecificationIds: ["clientSuppliedSpec"],
       },
@@ -97,8 +97,8 @@ test("regular passport update reconciles policy-owned fields from managed policy
   });
 
   assert.equal(result.success, true);
-  assert.equal(getCapturedUpdateData().passportPolicyKey, "medicalDeviceDppV1");
-  assert.equal(getCapturedUpdateData().contentSpecificationIds, JSON.stringify(["medicalDeviceDictionaryV1"]));
-  assert.equal(result.passport.passportPolicyKey, "medicalDeviceDppV1");
-  assert.equal(result.passport.contentSpecificationIds, JSON.stringify(["medicalDeviceDictionaryV1"]));
+  assert.equal(getCapturedUpdateData().passportPolicyKey, "exampleProductDppV1");
+  assert.equal(getCapturedUpdateData().contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
+  assert.equal(result.passport.passportPolicyKey, "exampleProductDppV1");
+  assert.equal(result.passport.contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
 });

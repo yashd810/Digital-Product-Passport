@@ -14,10 +14,10 @@ function writeJson(filePath, payload) {
 }
 
 function writeSemanticFixture(resourcesDir, {
-  family = "medical-device",
+  family = "example-product",
   version = "v1",
-  semanticModelKey = "medicalDeviceDictionaryV1",
-  name = "Medical Device Dictionary",
+  semanticModelKey = "exampleProductDictionaryV1",
+  name = "Example Product Dictionary",
   termSlug = "udi",
   termLabel = "Unique device identifier",
 } = {}) {
@@ -353,10 +353,10 @@ test("dictionary routes serve registered models and canonical artifacts", async 
   const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "dictionary-route-models-"));
   writeSemanticFixture(resourcesDir);
   writeSemanticFixture(resourcesDir, {
-    family: "industrial-sensor",
+    family: "alternate-product",
     version: "v2",
-    semanticModelKey: "industrialSensorDictionaryV2",
-    name: "Industrial Sensor Dictionary",
+    semanticModelKey: "alternateProductDictionaryV2",
+    name: "Alternate Product Dictionary",
     termSlug: "serial-number",
     termLabel: "Serial number",
   });
@@ -369,19 +369,19 @@ test("dictionary routes serve registered models and canonical artifacts", async 
     const modelList = await invokeRoute(app, { path: "/api/semantic-models" });
     const modelListBody = parseJsonResponse(modelList);
     assert.equal(modelList.statusCode, 200);
-    assert.ok(modelListBody.some((model) => model.semanticModelKey === "medicalDeviceDictionaryV1"));
-    assert.ok(modelListBody.some((model) => model.semanticModelKey === "industrialSensorDictionaryV2"));
+    assert.ok(modelListBody.some((model) => model.semanticModelKey === "exampleProductDictionaryV1"));
+    assert.ok(modelListBody.some((model) => model.semanticModelKey === "alternateProductDictionaryV2"));
 
     const manifest = await invokeRoute(app, {
       path: "/dictionary/:family/:version/manifest.json",
-      params: { family: "medical-device", version: "v1" },
+      params: { family: "example-product", version: "v1" },
     });
     assert.equal(manifest.statusCode, 200);
-    assert.equal(parseJsonResponse(manifest).semanticModelKey, "medicalDeviceDictionaryV1");
+    assert.equal(parseJsonResponse(manifest).semanticModelKey, "exampleProductDictionaryV1");
 
     const terms = await invokeRoute(app, {
       path: "/api/dictionary/:family/:version/terms",
-      params: { family: "industrial-sensor", version: "v2" },
+      params: { family: "alternate-product", version: "v2" },
       query: { search: "serial" },
     });
     assert.equal(terms.statusCode, 200);
@@ -395,10 +395,10 @@ test("company semantic models are derived from company passport type access", as
   const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "company-access-models-"));
   writeSemanticFixture(resourcesDir);
   writeSemanticFixture(resourcesDir, {
-    family: "industrial-sensor",
+    family: "alternate-product",
     version: "v2",
-    semanticModelKey: "industrialSensorDictionaryV2",
-    name: "Industrial Sensor Dictionary",
+    semanticModelKey: "alternateProductDictionaryV2",
+    name: "Alternate Product Dictionary",
     termSlug: "serial-number",
     termLabel: "Serial number",
   });
@@ -409,16 +409,16 @@ test("company semantic models are derived from company passport type access", as
       return {
         rows: [
           {
-            semanticModelKey: "medicalDeviceDictionaryV1",
-            typeName: "medicalDevicePassportV1",
-            displayName: "Medical Device Passport v1",
-            productCategory: "Medical Device",
+            semanticModelKey: "exampleProductDictionaryV1",
+            typeName: "exampleProductPassportV1",
+            displayName: "Example Product Passport v1",
+            productCategory: "Example Product",
           },
           {
-            semanticModelKey: "industrialSensorDictionaryV2",
-            typeName: "industrialSensorPassportV2",
-            displayName: "Industrial Sensor Passport v2",
-            productCategory: "Industrial Sensor",
+            semanticModelKey: "alternateProductDictionaryV2",
+            typeName: "alternateProductPassportV2",
+            displayName: "Alternate Product Passport v2",
+            productCategory: "Alternate Product",
           },
         ],
       };
@@ -445,14 +445,14 @@ test("company semantic models are derived from company passport type access", as
       typeName: model.passportTypes[0].typeName,
     })), [
       {
-        key: "medicalDeviceDictionaryV1",
+        key: "exampleProductDictionaryV1",
         registered: true,
-        typeName: "medicalDevicePassportV1",
+        typeName: "exampleProductPassportV1",
       },
       {
-        key: "industrialSensorDictionaryV2",
+        key: "alternateProductDictionaryV2",
         registered: true,
-        typeName: "industrialSensorPassportV2",
+        typeName: "alternateProductPassportV2",
       },
     ]);
   } finally {
@@ -462,25 +462,25 @@ test("company semantic models are derived from company passport type access", as
 
 test("company semantic models support arbitrary registered models and grouped passport types", async () => {
   const resourcesDir = fs.mkdtempSync(path.join(os.tmpdir(), "company-semantic-models-"));
-  const modelDir = path.join(resourcesDir, "medical-device", "v1");
+  const modelDir = path.join(resourcesDir, "example-product", "v1");
   fs.mkdirSync(modelDir, { recursive: true });
 
   writeJson(path.join(modelDir, "manifest.json"), {
-    semanticModelKey: "medicalDeviceDictionaryV1",
-    name: "Medical Device Dictionary",
+    semanticModelKey: "exampleProductDictionaryV1",
+    name: "Example Product Dictionary",
     version: "1.0.0",
-    description: "Test medical device dictionary",
+    description: "Test example product dictionary",
   });
   writeJson(path.join(modelDir, "terms.json"), [
     {
       slug: "udi",
       label: "Unique device identifier",
-      iri: "https://example.test/dictionary/medical-device/v1/terms/udi",
+      iri: "https://example.test/dictionary/example-product/v1/terms/udi",
     },
   ]);
   writeJson(path.join(modelDir, "context.jsonld"), {
     "@context": {
-      udi: "https://example.test/dictionary/medical-device/v1/terms/udi",
+      udi: "https://example.test/dictionary/example-product/v1/terms/udi",
     },
   });
 
@@ -488,16 +488,16 @@ test("company semantic models support arbitrary registered models and grouped pa
     query: async () => ({
       rows: [
         {
-          semanticModelKey: "medicalDeviceDictionaryV1",
-          typeName: "medicalDevicePassportV1",
-          displayName: "Medical Device Passport v1",
-          productCategory: "Medical Device",
+          semanticModelKey: "exampleProductDictionaryV1",
+          typeName: "exampleProductPassportV1",
+          displayName: "Example Product Passport v1",
+          productCategory: "Example Product",
         },
         {
-          semanticModelKey: "medicalDeviceDictionaryV1",
+          semanticModelKey: "exampleProductDictionaryV1",
           typeName: "implantableDevicePassportV1",
           displayName: "Implantable Device Passport v1",
-          productCategory: "Medical Device",
+          productCategory: "Example Product",
         },
         {
           semanticModelKey: "externalFutureDictionaryV9",
@@ -519,14 +519,14 @@ test("company semantic models support arbitrary registered models and grouped pa
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.length, 2);
-    const medicalModel = response.body.find((model) => model.semanticModelKey === "medicalDeviceDictionaryV1");
+    const exampleModel = response.body.find((model) => model.semanticModelKey === "exampleProductDictionaryV1");
     const externalModel = response.body.find((model) => model.semanticModelKey === "externalFutureDictionaryV9");
 
-    assert.equal(medicalModel.registered, true);
-    assert.equal(medicalModel.family, "medical-device");
-    assert.equal(medicalModel.passportTypes.length, 2);
-    assert.deepEqual(medicalModel.passportTypes.map((type) => type.typeName), [
-      "medicalDevicePassportV1",
+    assert.equal(exampleModel.registered, true);
+    assert.equal(exampleModel.family, "example-product");
+    assert.equal(exampleModel.passportTypes.length, 2);
+    assert.deepEqual(exampleModel.passportTypes.map((type) => type.typeName), [
+      "exampleProductPassportV1",
       "implantableDevicePassportV1",
     ]);
     assert.equal(externalModel.registered, false);

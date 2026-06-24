@@ -15,7 +15,7 @@ import {
 import PublicPassportPortal from "../components/PublicPassportPortal";
 import "../styles/PassportViewer.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const { internalAliasId, versionNumber, previewId } = useParams();
@@ -59,10 +59,10 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   const passportEndpoint = (
     isPreviewMode
-      ? `${API}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
+      ? `${api}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
       : versionNumber
-        ? `${API}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
-        : `${API}/api/passports/by-product/${encodedProductId}`
+        ? `${api}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
+        : `${api}/api/passports/by-product/${encodedProductId}`
   );
 
   const fetchPassportRecord = useCallback(async ({ applyState = false } = {}) => {
@@ -74,7 +74,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       setPassport(data);
       if (data?.companyProfile) setCompanyData(data.companyProfile);
       if (isPreviewMode && resolvedCompanyId) {
-        const profileRes = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`);
+        const profileRes = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`);
         if (profileRes?.ok) setCompanyData(await profileRes.json());
       }
     }
@@ -84,10 +84,10 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   const fetchPublicHistoryPayload = useCallback(async (passportData) => {
     const endpoints = [
       passportData?.internalAliasId
-        ? `${API}/api/passports/by-product/${encodeURIComponent(passportData.internalAliasId)}/history`
+        ? `${api}/api/passports/by-product/${encodeURIComponent(passportData.internalAliasId)}/history`
         : null,
       passportData?.dppId
-        ? `${API}/api/passports/${encodeURIComponent(passportData.dppId)}/history`
+        ? `${api}/api/passports/${encodeURIComponent(passportData.dppId)}/history`
         : null,
     ].filter(Boolean);
 
@@ -132,9 +132,9 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         // 2. Fetch company branding in parallel with type definition
         const [profileRes, typeRes, historyPayload] = await Promise.all([
           isPreviewMode && resolvedCompanyId
-            ? fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/profile`)
+            ? fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`)
             : Promise.resolve(null),
-          fetchWithAuth(`${API}/api/passport-types/${data.passportType}`),
+          fetchWithAuth(`${api}/api/passport-types/${data.passportType}`),
           fetchPublicHistoryPayload(data),
         ]);
 
@@ -155,7 +155,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   useEffect(() => {
     if (!isPreviewMode || !previewCompanyId) return;
-    fetchWithAuth(`${API}/api/companies/${previewCompanyId}/profile`)
+    fetchWithAuth(`${api}/api/companies/${previewCompanyId}/profile`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d) setCompanyData(d);
@@ -164,7 +164,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   }, [isPreviewMode, previewCompanyId]);
 
   useEffect(() => {
-    fetchWithAuth(`${API}/api/users/me`, {
+    fetchWithAuth(`${api}/api/users/me`, {
       headers: authHeaders(),
     })
       .then(r => setIsLoggedIn(r.ok))
@@ -212,7 +212,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   useEffect(() => {
     if (!passport?.dppId || isInactiveView) return;
     const fetchDynamic = () =>
-      fetchWithAuth(`${API}/api/passports/${passport.dppId}/dynamic-values`)
+      fetchWithAuth(`${api}/api/passports/${passport.dppId}/dynamic-values`)
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.values) setDynamicValues(d.values); })
         .catch((error) => console.warn("Ignored async error", error));
@@ -224,7 +224,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   // Fetch signature verification for released passports
   useEffect(() => {
     if (!passport?.dppId || !isReleasedPassportStatus(passport?.releaseStatus)) return;
-    fetchWithAuth(`${API}/api/passports/${passport.dppId}/signature`)
+    fetchWithAuth(`${api}/api/passports/${passport.dppId}/signature`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setSigVerification(d); })
       .catch((error) => console.warn("Ignored async error", error));
@@ -233,7 +233,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   useEffect(() => {
     if (!passport?.dppId) return;
     if (!isReleasedPassportStatus(passport?.releaseStatus) && !isObsoletePassportStatus(passport?.releaseStatus)) return;
-    fetchWithAuth(`${API}/api/public/dpp/${passport.dppId}/verification-bundle.json`)
+    fetchWithAuth(`${api}/api/public/dpp/${passport.dppId}/verification-bundle.json`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d) setVerificationBundle(d); })
       .catch((error) => console.warn("Ignored async error", error));
@@ -242,7 +242,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   // Fetch access-key metadata for logged-in company users.
   useEffect(() => {
     if (!isLoggedIn || !passport?.dppId || !passport?.companyId) return;
-    fetchWithAuth(`${API}/api/companies/${passport.companyId}/passports/${passport.dppId}/access-key`, {
+    fetchWithAuth(`${api}/api/companies/${passport.companyId}/passports/${passport.dppId}/access-key`, {
       headers: authHeaders(),
     })
       .then(r => r.ok ? r.json() : null)
@@ -255,7 +255,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     if (!window.confirm("Issue a new passport access key? The previous key will stop working immediately.")) return;
     setAccessKeyBusy(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${passport.companyId}/passports/${passport.dppId}/access-key/regenerate`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${passport.companyId}/passports/${passport.dppId}/access-key/regenerate`, {
         method: "POST",
         headers: authHeaders(),
       });
@@ -281,7 +281,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     setUnlocking(true);
     setAccessError("");
     try {
-      const r = await fetchWithAuth(`${API}/api/passports/${passport.dppId}/unlock`, {
+      const r = await fetchWithAuth(`${api}/api/passports/${passport.dppId}/unlock`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ accessKey: accessKeyInput.trim() }),

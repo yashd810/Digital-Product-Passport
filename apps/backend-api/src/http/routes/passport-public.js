@@ -37,14 +37,14 @@ module.exports = function registerPassportPublicRoutes(app, {
   productIdentifierService,
   semanticModelRegistry
 }) {
-  const API_ORIGIN = didService.getApiOrigin();
-  const DID_DOMAIN = didService.getDidDomain();
-  const PLATFORM_DID = didService.getPlatformDid();
-  const CANONICAL_DPP_CONTEXT_URL = `https://${DID_DOMAIN}/contexts/dpp/v1`;
+  const apiOrigin = didService.getApiOrigin();
+  const didDomain = didService.getDidDomain();
+  const platformDid = didService.getPlatformDid();
+  const canonicalDppContextUrl = `https://${didDomain}/contexts/dpp/v1`;
 
   function securePublicRepositoryLinks(value) {
     return rewriteRepositoryLinksForSignedAccessDeep(value, {
-      appBaseUrl: API_ORIGIN,
+      appBaseUrl: apiOrigin,
     });
   }
 
@@ -55,7 +55,7 @@ module.exports = function registerPassportPublicRoutes(app, {
   const getVersionNumber = (passport, fallback = null) => passport?.versionNumber ?? fallback;
   const getReleaseStatus = (passport, fallback = null) => passport?.releaseStatus || fallback;
 
-  const DPP_CONTEXT_RESPONSE = {
+  const dppContextResponse = {
     "@context": {
       "@version": 1.1,
       dpp: "https://schema.digitalproductpassport.eu/ns/dpp#",
@@ -226,9 +226,9 @@ module.exports = function registerPassportPublicRoutes(app, {
     const publicKey = crypto.createPublicKey(signingKey.publicKey);
     const publicKeyJwk = publicKey.export({ format: "jwk" });
     return [{
-      id: `${PLATFORM_DID}#key-1`,
+      id: `${platformDid}#key-1`,
       type: "JsonWebKey2020",
-      controller: PLATFORM_DID,
+      controller: platformDid,
       publicKeyJwk: { ...publicKeyJwk, kid: signingKey.keyId }
     }];
   }
@@ -237,7 +237,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     return {
       "@context": ["https://www.w3.org/ns/did/v1"],
       id,
-      controller: PLATFORM_DID,
+      controller: platformDid,
       verificationMethod: buildVerificationMethod(),
       ...(service.length ? { service } : {})
     };
@@ -335,7 +335,7 @@ module.exports = function registerPassportPublicRoutes(app, {
       semanticContexts.push(contextValue);
     };
 
-    pushContext(CANONICAL_DPP_CONTEXT_URL);
+    pushContext(canonicalDppContextUrl);
     exportedContexts.forEach(pushContext);
 
     res.setHeader("Content-Type", "application/ld+json");
@@ -486,7 +486,7 @@ module.exports = function registerPassportPublicRoutes(app, {
     const signatureUrl = didService.buildApiUrl(`/api/public/dpp/${passportDppId}/signature.json`);
     const canonicalDppJsonUrl = didService.buildApiUrl(`/api/public/dpp/${passportDppId}.json`);
     const verificationBundleUrl = didService.buildApiUrl(`/api/public/dpp/${passportDppId}/verification-bundle.json`);
-    const didDocumentUrl = `https://${DID_DOMAIN}/.well-known/did.json`;
+    const didDocumentUrl = `https://${didDomain}/.well-known/did.json`;
     const verificationStatus = resolveVerificationStatus(verifyResult);
     const dppDataUnchanged = verifyResult?.status === "valid";
 
@@ -494,13 +494,13 @@ module.exports = function registerPassportPublicRoutes(app, {
       dppId: passportDppId,
       companyId: company?.id ?? getCompanyId(passport) ?? null,
       companyName: company?.companyName || signatureRow?.companyName || "",
-      trustLevel: company?.customerTrustLevel || "BASIC",
+      trustLevel: company?.customerTrustLevel || "basic",
       releasedBy: signatureRow?.releasedByEmail || null,
       releasedAt: signatureRow?.releaseRecordReleasedAt || verifyResult?.releasedAt || signatureRow?.signatureReleasedAt || null,
       dppHash: verifyResult?.dataHash || signatureRow?.dataHash || null,
       signature: signatureRow?.signature || null,
       algorithm: verifyResult?.algorithm || signatureRow?.algorithm || "ES256",
-      signedBy: PLATFORM_DID,
+      signedBy: platformDid,
       publicKeyUrl: didDocumentUrl,
       didDocumentUrl,
       verificationStatus,
@@ -837,14 +837,14 @@ module.exports = function registerPassportPublicRoutes(app, {
         });
         res.setHeader("Content-Type", "application/ld+json");
         return res.json({
-          "@context": [`${API_ORIGIN}/contexts/dpp/v1`, ...(exported?.["@context"] || []).slice(1)],
+          "@context": [`${apiOrigin}/contexts/dpp/v1`, ...(exported?.["@context"] || []).slice(1)],
           ...(exported?.["@graph"]?.[0] || basePayload)
         });
       }
 
       res.json(basePayload);
     } catch (error) {
-      if (error.code === "AMBIGUOUS_PRODUCT_ID") {
+      if (error.code === "ambiguousProductId") {
         return res.status(409).json({ error: error.message });
       }
       logger.error({ err: error, internalAliasId: req.params.internalAliasId, version: req.query.version || null }, "GET /api/passports/by-product/:internalAliasId failed");
@@ -868,7 +868,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
       res.json(historyPayload);
     } catch (error) {
-      if (error.code === "AMBIGUOUS_PRODUCT_ID") {
+      if (error.code === "ambiguousProductId") {
         return res.status(409).json({ error: error.message });
       }
       res.status(500).json({ error: "Failed to fetch passport history" });
@@ -997,7 +997,7 @@ module.exports = function registerPassportPublicRoutes(app, {
         await logAudit(
           companyId,
           null,
-          "VERIFY_SIGNATURE_FAILURE",
+          "verifySignatureFailure",
           "passportSignatures",
           dppId,
           null,
@@ -1108,10 +1108,10 @@ module.exports = function registerPassportPublicRoutes(app, {
       );
       const trustMetadata = typeof signingService?.getSigningTrustMetadata === "function" ?
       signingService.getSigningTrustMetadata() :
-      { issuerDid: PLATFORM_DID };
+      { issuerDid: platformDid };
       res.json({
         ...result.rows[0],
-        issuerDid: trustMetadata.issuerDid || PLATFORM_DID,
+        issuerDid: trustMetadata.issuerDid || platformDid,
         trustMetadata,
         historicalKeys: historicalKeys.rows.map((row) => ({
           keyId: row.keyId,
@@ -1120,8 +1120,8 @@ module.exports = function registerPassportPublicRoutes(app, {
         })),
         verification: {
           verificationMethod: "JsonWebSignature2020 detached JWS proof",
-          verificationEndpoint: `${API_ORIGIN}/api/passports/{dppId}/signature`,
-          didDocument: `https://${DID_DOMAIN}/.well-known/did.json`,
+          verificationEndpoint: `${apiOrigin}/api/passports/{dppId}/signature`,
+          didDocument: `https://${didDomain}/.well-known/did.json`,
           oldKeysRetained: true
         }
       });
@@ -1138,7 +1138,7 @@ module.exports = function registerPassportPublicRoutes(app, {
         return res.status(503).json({ error: "Signing key not loaded" });
       }
       res.setHeader("Content-Type", "application/did+ld+json");
-      return res.json(buildDidDocument({ id: PLATFORM_DID }));
+      return res.json(buildDidDocument({ id: platformDid }));
     } catch (error) {
       logger.error("DID document error:", error.message);
       return res.status(500).json({ error: "Failed to generate DID document" });
@@ -1232,7 +1232,7 @@ module.exports = function registerPassportPublicRoutes(app, {
   app.get("/resolve", publicReadRateLimit, async (req, res) => {
     try {
       const did = String(req.query.did || "").trim();
-      if (!did.startsWith(`${PLATFORM_DID}`)) {
+      if (!did.startsWith(`${platformDid}`)) {
         return res.status(400).json({ error: "Invalid DID" });
       }
 
@@ -1296,7 +1296,7 @@ module.exports = function registerPassportPublicRoutes(app, {
 
   app.get("/contexts/dpp/v1", publicReadRateLimit, (_req, res) => {
     res.setHeader("Content-Type", "application/ld+json");
-    res.json(DPP_CONTEXT_RESPONSE);
+    res.json(dppContextResponse);
   });
 
   // ─── UNLOCK ──────────────────────────────────────────────────────────────

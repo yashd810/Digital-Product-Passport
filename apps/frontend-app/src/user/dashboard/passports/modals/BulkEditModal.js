@@ -4,7 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { isEditablePassportStatus } from "../../../../passports/utils/passportStatus";
 import { parseCsvText } from "../utils/passportListHelpers";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function buildSelectableFields(typeDef) {
   const baseFields = [
@@ -114,7 +114,7 @@ export function BulkEditModal({
     setSubmitting(true);
     setError("");
     try {
-      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports`, {
+      const response = await fetchWithAuth(`${api}/api/companies/${companyId}/passports`, {
         method: "PATCH",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

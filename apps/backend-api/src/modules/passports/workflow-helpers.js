@@ -11,8 +11,8 @@ function createWorkflowHelpers({
   getTable,
   normalizePassportRow,
   normalizeReleaseStatus,
-  IN_REVISION_STATUS,
-  EDITABLE_RELEASE_STATUSES_SQL,
+  inRevisionStatus,
+  editableReleaseStatusesSql,
   archivePassportSnapshot,
   createNotification,
   logAudit,
@@ -44,13 +44,13 @@ function createWorkflowHelpers({
 
     const pRes = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+       WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
        ORDER BY "versionNumber" DESC LIMIT 1`,
       [dppId]
     );
     if (!pRes.rows.length) throw new Error("Editable passport not found");
     const passport = normalizePassportRow(pRes.rows[0]);
-    const previousReleaseStatus = normalizeReleaseStatus(passport.releaseStatus) || IN_REVISION_STATUS;
+    const previousReleaseStatus = normalizeReleaseStatus(passport.releaseStatus) || inRevisionStatus;
 
     await runBestEffort("Workflow archive before submit error", async () => archivePassportSnapshot({
       passport: pRes.rows[0],
@@ -65,7 +65,7 @@ function createWorkflowHelpers({
       await client.query("BEGIN");
       await client.query(
         `UPDATE ${tableName} SET "releaseStatus" = 'inReview', "updatedAt" = NOW()
-         WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`,
+         WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql}`,
         [dppId]
       );
 
@@ -169,7 +169,7 @@ function createWorkflowHelpers({
       ));
     }
 
-    await runBestEffort("Workflow submit audit error", async () => logAudit(companyId, userId, "SUBMIT_REVIEW", tableName, dppId, null, {
+    await runBestEffort("Workflow submit audit error", async () => logAudit(companyId, userId, "submitReview", tableName, dppId, null, {
       reviewerId: resolvedReviewerId,
       approverId: resolvedApproverId,
       status: "inReview",

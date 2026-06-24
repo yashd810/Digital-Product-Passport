@@ -9,7 +9,7 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
     isSuperAdmin,
     queryTableStats,
     getTable,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    archivedHistoryFilterSql,
   } = deps;
 
   const mapCompanyAnalyticsRow = (row = {}) => ({
@@ -98,18 +98,18 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
       `);
 
       const archivedRes = await pool.query(
-        `SELECT COUNT(DISTINCT "dppId") FROM "passportArchives" WHERE ${ARCHIVED_HISTORY_FILTER_SQL}`
+        `SELECT COUNT(DISTINCT "dppId") FROM "passportArchives" WHERE ${archivedHistoryFilterSql}`
       );
       const archivedByCoRes = await pool.query(
         `SELECT "companyId", COUNT(DISTINCT "dppId") AS count
          FROM "passportArchives"
-         WHERE ${ARCHIVED_HISTORY_FILTER_SQL}
+         WHERE ${archivedHistoryFilterSql}
          GROUP BY "companyId"`
       );
       const archivedByTypeRes = await pool.query(
         `SELECT "companyId", "passportType", COUNT(DISTINCT "dppId") AS count
          FROM "passportArchives"
-         WHERE ${ARCHIVED_HISTORY_FILTER_SQL}
+         WHERE ${archivedHistoryFilterSql}
          GROUP BY "companyId", "passportType"`
       );
       const archivedByCompany = {};
@@ -334,7 +334,7 @@ module.exports = function registerAnalyticsRoutes(app, deps) {
         `SELECT COUNT(DISTINCT "dppId")
          FROM "passportArchives"
          WHERE "companyId" = $1
-           AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
+           AND ${archivedHistoryFilterSql}`,
         [companyId]
       );
       const archivedCount = parseInt(archivedRes.rows[0]?.count || 0, 10) || 0;

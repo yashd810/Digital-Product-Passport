@@ -1,6 +1,6 @@
 "use strict";
 
-const VALID_AUDIENCES = new Set([
+const validAudiences = new Set([
 "public",
 "consumers",
 "notifiedBodies",
@@ -23,7 +23,7 @@ const VALID_AUDIENCES = new Set([
 "backupDppServiceProvider"]
 );
 
-const VALID_CONFIDENTIALITY_LEVELS = new Set([
+const validConfidentialityLevels = new Set([
 "public",
 "restricted",
 "confidential",
@@ -31,7 +31,7 @@ const VALID_CONFIDENTIALITY_LEVELS = new Set([
 "regulated"]
 );
 
-const VALID_UPDATE_AUTHORITIES = new Set([
+const validUpdateAuthorities = new Set([
 "economicOperator",
 "delegatedOperator",
 "manufacturer",
@@ -52,7 +52,7 @@ const VALID_UPDATE_AUTHORITIES = new Set([
 "system"]
 );
 
-const AUDIENCE_IMPLICATIONS = new Map([
+const audienceImplications = new Map([
 ["public", ["consumers"]],
 ["economicOperator", [
   "manufacturer",
@@ -76,7 +76,7 @@ function expandAudienceAssignments(values) {
 
   while (queue.length) {
     const current = queue.shift();
-    for (const implied of AUDIENCE_IMPLICATIONS.get(current) || []) {
+    for (const implied of audienceImplications.get(current) || []) {
       if (expanded.has(implied)) continue;
       expanded.add(implied);
       queue.push(implied);
@@ -160,7 +160,7 @@ function defaultUpdateAuthority(fieldDef) {
   const authorities = new Set(["economicOperator"]);
   for (const audience of access) {
     if (audience === "public" || audience === "consumers" || audience === "legitimateInterest") continue;
-    if (VALID_UPDATE_AUTHORITIES.has(audience)) authorities.add(audience);
+    if (validUpdateAuthorities.has(audience)) authorities.add(audience);
   }
   return [...authorities];
 }
@@ -194,7 +194,7 @@ function buildFieldPolicy(typeDef, elementIdPath) {
 function deriveRoleAudiences(user) {
   if (!user) return expandAudienceAssignments(["public"]);
   if (user.role === "superAdmin") {
-    return expandAudienceAssignments([...VALID_AUDIENCES]);
+    return expandAudienceAssignments([...validAudiences]);
   }
   if (["companyAdmin", "editor", "viewer"].includes(String(user.role || ""))) {
     return expandAudienceAssignments(["public", "legitimateInterest", "economicOperator"]);
@@ -288,7 +288,7 @@ module.exports = function createAccessRightsService({ pool }) {
     if (policy.unknown) {
       return {
         allowed: false,
-        reason: "UNKNOWN_ELEMENT_PATH",
+        reason: "unknownElementPath",
         audiences: [],
         confidentiality: "unknown",
         updateAuthority: [],
@@ -315,7 +315,7 @@ module.exports = function createAccessRightsService({ pool }) {
     if (policy.unknown) {
       return {
         allowed: false,
-        reason: "UNKNOWN_ELEMENT_PATH",
+        reason: "unknownElementPath",
         audiences: [],
         confidentiality: "unknown",
         updateAuthority: [],
@@ -324,7 +324,7 @@ module.exports = function createAccessRightsService({ pool }) {
     if (!user?.userId) {
       return {
         allowed: false,
-        reason: "AUTH_REQUIRED",
+        reason: "authRequired",
         audiences: policy.access,
         confidentiality: policy.confidentiality,
         updateAuthority: policy.updateAuthority
@@ -358,7 +358,7 @@ module.exports = function createAccessRightsService({ pool }) {
     if (!sameCompany && matchedAuthority !== "delegatedOperator") {
       return {
         allowed: false,
-        reason: "COMPANY_SCOPE_REQUIRED",
+        reason: "companyScopeRequired",
         audiences: policy.access,
         confidentiality: policy.confidentiality,
         updateAuthority: policy.updateAuthority
@@ -375,9 +375,9 @@ module.exports = function createAccessRightsService({ pool }) {
   }
 
   return {
-    VALID_AUDIENCES,
-    VALID_CONFIDENTIALITY_LEVELS,
-    VALID_UPDATE_AUTHORITIES,
+    validAudiences,
+    validConfidentialityLevels,
+    validUpdateAuthorities,
     expandAudienceAssignments,
     buildFieldPolicy,
     extractRootElementIdPath,

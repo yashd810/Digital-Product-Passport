@@ -5,7 +5,7 @@ function isPlainObject(value) {
 }
 
 function isSimpleIdentifier(value) {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(value || ""));
+  return /^[A-Za-z][A-Za-z0-9]*$/.test(String(value || ""));
 }
 
 function encodeElementPath(segments) {
@@ -111,7 +111,7 @@ function normalizeSupportedElementIdPath(elementIdPath) {
     }
 
     const remainder = expression.slice(index);
-    const keyMatch = remainder.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+    const keyMatch = remainder.match(/^[A-Za-z][A-Za-z0-9]*/);
     if (!keyMatch) {
       return {
         error: "Only simple DPP element paths are supported; full RFC 9535 JSONPath expressions are not supported"

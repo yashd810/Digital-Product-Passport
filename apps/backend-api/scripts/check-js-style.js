@@ -3,16 +3,16 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = path.resolve(__dirname, "..");
-const REPO_ROOT = path.resolve(ROOT, "..", "..");
-const TARGETS = ["Server", "routes", "services", "src", "helpers", "middleware", "tests", "scripts"];
-const EXTRA_TARGETS = [
-  path.join(REPO_ROOT, "apps", "frontend-app", "src"),
-  path.join(REPO_ROOT, "apps", "public-passport-viewer", "src"),
-  path.join(REPO_ROOT, "local-tools", "passport-module-generator"),
+const root = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(root, "..", "..");
+const targets = ["Server", "routes", "services", "src", "helpers", "middleware", "tests", "scripts"];
+const extraTargets = [
+  path.join(repoRoot, "apps", "frontend-app", "src"),
+  path.join(repoRoot, "apps", "public-passport-viewer", "src"),
+  path.join(repoRoot, "local-tools", "passport-module-generator"),
 ];
 const legacyToken = (...parts) => parts.join("_");
-const FORBIDDEN_LEGACY_TOKENS = [
+const forbiddenLegacyTokens = [
   legacyToken("table", "columns"),
   legacyToken("table", "cols"),
   legacyToken("fields", "json"),
@@ -56,6 +56,32 @@ const FORBIDDEN_LEGACY_TOKENS = [
   legacyToken("notified", "bodies"),
   legacyToken("trade", "secret"),
 ];
+const forbiddenAppOwnedTokens = [
+  legacyToken("dpp", ""),
+  legacyToken("pak", ""),
+  legacyToken("dpk", ""),
+  legacyToken("sym", ""),
+  legacyToken("in", "review"),
+];
+const allowedUpperSnakeStringTokens = new Set([
+  "ARRAY_AGG",
+  "CURRENT_TIMESTAMP",
+  "IEC_61406_TRIANGLE",
+  "LIMIT_FILE_SIZE",
+  "QR_CODE_MODEL_2",
+  "TG_OP",
+  "TG_TABLE_NAME",
+]);
+const forbiddenIdentifierPatterns = [
+  {
+    pattern: /\b(?:const|let|var|function)\s+([a-z][A-Za-z0-9]*_[A-Za-z0-9_]*)\b/g,
+    describe: (match) => `declares non-camelCase identifier "${match[1]}"`,
+  },
+  {
+    pattern: /\b(?:const|let|var|function)\s+([A-Z][A-Z0-9_]*)\b|\bexport\s+const\s+([A-Z][A-Z0-9_]*)\b/g,
+    describe: (match) => `declares non-camelCase identifier "${match[1] || match[2]}"`,
+  },
+];
 
 function walk(dir, results = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -69,13 +95,21 @@ function walk(dir, results = []) {
   return results;
 }
 
-const backendFiles = TARGETS.flatMap((target) => {
-  const dir = path.join(ROOT, target);
+const backendFiles = targets.flatMap((target) => {
+  const dir = path.join(root, target);
   return fs.existsSync(dir) ? walk(dir) : [];
 });
-const extraFiles = EXTRA_TARGETS.flatMap((dir) => fs.existsSync(dir) ? walk(dir) : []);
+const extraFiles = extraTargets.flatMap((dir) => fs.existsSync(dir) ? walk(dir) : []);
 const files = backendFiles.concat(extraFiles);
 const legacyScanFiles = files.filter((file) => file !== __filename);
+const envTokens = new Set();
+
+for (const file of legacyScanFiles) {
+  const source = fs.readFileSync(file, "utf8");
+  for (const match of source.matchAll(/\b(?:process\.env|import\.meta\.env)\.([A-Z][A-Z0-9_]+)\b/g)) {
+    envTokens.add(match[1]);
+  }
+}
 
 const violations = [];
 for (const file of files) {
@@ -84,24 +118,46 @@ for (const file of files) {
     const lines = source.split("\n");
     lines.forEach((line, index) => {
       if (/\s+$/.test(line)) {
-        violations.push(`${path.relative(ROOT, file)}:${index + 1} trailing whitespace`);
+        violations.push(`${path.relative(root, file)}:${index + 1} trailing whitespace`);
       }
       if (/\t/.test(line)) {
-        violations.push(`${path.relative(ROOT, file)}:${index + 1} tab indentation`);
+        violations.push(`${path.relative(root, file)}:${index + 1} tab indentation`);
       }
     });
 
     if (!source.endsWith("\n")) {
-      violations.push(`${path.relative(ROOT, file)} missing trailing newline`);
+      violations.push(`${path.relative(root, file)} missing trailing newline`);
     }
   }
 }
 
 for (const file of legacyScanFiles) {
   const source = fs.readFileSync(file, "utf8");
-  for (const token of FORBIDDEN_LEGACY_TOKENS) {
+  for (const token of forbiddenLegacyTokens) {
     if (source.includes(token)) {
-      violations.push(`${path.relative(REPO_ROOT, file)} contains legacy token "${token}"`);
+      violations.push(`${path.relative(repoRoot, file)} contains legacy token "${token}"`);
+    }
+  }
+  for (const token of forbiddenAppOwnedTokens) {
+    if (source.includes(token)) {
+      violations.push(`${path.relative(repoRoot, file)} contains app-owned snake token "${token}"`);
+    }
+  }
+  for (const rule of forbiddenIdentifierPatterns) {
+    for (const match of source.matchAll(rule.pattern)) {
+      violations.push(`${path.relative(repoRoot, file)} ${rule.describe(match)}`);
+    }
+  }
+  for (const match of source.matchAll(/(["`])([A-Z][A-Z0-9]*_[A-Z0-9_]+)\1/g)) {
+    const token = match[2];
+    if (!envTokens.has(token) && !allowedUpperSnakeStringTokens.has(token)) {
+      violations.push(`${path.relative(repoRoot, file)} contains app-owned upper snake string "${token}"`);
+    }
+  }
+  for (const match of source.matchAll(/\[([A-Z][A-Z0-9]*_[A-Z0-9_]+)\]/g)) {
+    const token = match[1];
+    if (!envTokens.has(token) && !allowedUpperSnakeStringTokens.has(token)) {
+      violations.push(`${path.relative(repoRoot, file)} contains app-owned upper snake tag "${token}"`);
     }
   }
 }

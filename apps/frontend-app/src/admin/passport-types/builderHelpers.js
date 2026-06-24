@@ -1,8 +1,8 @@
-import { LANGUAGES } from "../../app/providers/i18n";
+import { languages } from "../../app/providers/i18n";
 
-export const TRANS_LANGS = LANGUAGES.filter((language) => language.code !== "en");
+export const transLangs = languages.filter((language) => language.code !== "en");
 
-export const ACCESS_LEVELS = [
+export const accessLevels = [
   { value: "public",              label: "Public" },
   { value: "consumers",           label: "Consumers" },
   { value: "economicOperator",   label: "Economic Operators" },
@@ -25,7 +25,7 @@ export const ACCESS_LEVELS = [
   { value: "legitimateInterest", label: "Person with Legitimate Interest" },
 ];
 
-export const CONFIDENTIALITY_LEVELS = [
+export const confidentialityLevels = [
   { value: "public", label: "Public" },
   { value: "restricted", label: "Restricted" },
   { value: "confidential", label: "Confidential" },
@@ -33,7 +33,7 @@ export const CONFIDENTIALITY_LEVELS = [
   { value: "regulated", label: "Regulated" },
 ];
 
-export const UPDATE_AUTHORITIES = [
+export const updateAuthorities = [
   { value: "economicOperator", label: "Economic Operators" },
   { value: "manufacturer", label: "Manufacturers" },
   { value: "authorizedRepresentative", label: "Authorized Representatives" },
@@ -54,19 +54,19 @@ export const UPDATE_AUTHORITIES = [
   { value: "system", label: "System" },
 ];
 
-export const ACCESS_LEVEL_LABELS = Object.fromEntries(
-  ACCESS_LEVELS.map((entry) => [entry.value, entry.label])
+export const accessLevelLabels = Object.fromEntries(
+  accessLevels.map((entry) => [entry.value, entry.label])
 );
 
-export const CONFIDENTIALITY_LEVEL_LABELS = Object.fromEntries(
-  CONFIDENTIALITY_LEVELS.map((entry) => [entry.value, entry.label])
+export const confidentialityLevelLabels = Object.fromEntries(
+  confidentialityLevels.map((entry) => [entry.value, entry.label])
 );
 
-export const UPDATE_AUTHORITY_LABELS = Object.fromEntries(
-  UPDATE_AUTHORITIES.map((entry) => [entry.value, entry.label])
+export const updateAuthorityLabels = Object.fromEntries(
+  updateAuthorities.map((entry) => [entry.value, entry.label])
 );
 
-export const FIELD_TYPES = [
+export const fieldTypes = [
   { value: "text",     label: "Text (single line)" },
   { value: "textarea", label: "Text (multi-line)" },
   { value: "boolean",  label: "Yes / No" },
@@ -77,12 +77,12 @@ export const FIELD_TYPES = [
   { value: "symbol",   label: "Symbol (from repository)" },
 ];
 
-export const DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION = {
+export const defaultSystemPassportHeaderSection = {
   key: "passportHeader",
   label: "Passport Header",
 };
 
-export const SYSTEM_HEADER_MANAGED_DEFINITIONS = [
+export const systemHeaderManagedDefinitions = [
   {
     slotKey: "digitalProductPassportId",
     label: "Digital Product Passport ID",
@@ -176,8 +176,8 @@ export const SYSTEM_HEADER_MANAGED_DEFINITIONS = [
   },
 ];
 
-const SYSTEM_HEADER_MANAGED_DEFINITION_BY_KEY = new Map(
-  SYSTEM_HEADER_MANAGED_DEFINITIONS.map((definition) => [definition.managedKey, definition])
+const systemHeaderManagedDefinitionByKey = new Map(
+  systemHeaderManagedDefinitions.map((definition) => [definition.managedKey, definition])
 );
 
 function normalizeSystemHeaderFieldMappings(input = {}) {
@@ -197,7 +197,7 @@ function normalizeSystemHeaderFieldMappings(input = {}) {
 }
 
 export function getSystemHeaderManagedDefinition(managedKey = "") {
-  return SYSTEM_HEADER_MANAGED_DEFINITION_BY_KEY.get(String(managedKey || "").trim()) || null;
+  return systemHeaderManagedDefinitionByKey.get(String(managedKey || "").trim()) || null;
 }
 
 export function normalizeSystemPassportHeader(input = {}) {
@@ -218,8 +218,8 @@ export function normalizeSystemPassportHeader(input = {}) {
   }
   return {
     section: {
-      key: DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.key,
-      label: String(section.label || "").trim() || DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.label,
+      key: defaultSystemPassportHeaderSection.key,
+      label: String(section.label || "").trim() || defaultSystemPassportHeaderSection.label,
     },
     fieldMappings,
     fieldKeys,
@@ -291,7 +291,7 @@ export function resolveSystemHeaderEntries(sections = [], systemHeader = {}) {
   }).filter(Boolean);
 }
 
-export const ICON_PRESETS = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🔋","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
+export const iconPresets = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
 
 export function normalizeProductCategoryName(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
@@ -495,9 +495,9 @@ export const parseCSV = (text) => {
         fieldLabel: row[fieldIndex],
         sectionLabel: row[sectionIndex]?.trim() || "General",
         fieldType: validTypes.has(rawType) ? rawType : "text",
-        access: parseGovernanceList(row[accessIndex], ACCESS_LEVELS, ["public"]),
-        confidentiality: parseGovernanceList(row[confidentialityIndex], CONFIDENTIALITY_LEVELS, ["public"])[0] || "public",
-        updateAuthority: parseGovernanceList(row[updateAuthorityIndex], UPDATE_AUTHORITIES, ["economicOperator"]),
+        access: parseGovernanceList(row[accessIndex], accessLevels, ["public"]),
+        confidentiality: parseGovernanceList(row[confidentialityIndex], confidentialityLevels, ["public"])[0] || "public",
+        updateAuthority: parseGovernanceList(row[updateAuthorityIndex], updateAuthorities, ["economicOperator"]),
       };
     });
 };

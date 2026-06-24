@@ -8,7 +8,7 @@ function createBackupEventHelpers({
     if (!result || result.success !== false) return result;
     const message = result.error || result.reason || `${contextLabel} backup replication failed`;
     const error = new Error(message);
-    error.code = result.reason || "BACKUP_PROVIDER_REQUIRED";
+    error.code = result.reason || "backupProviderRequired";
     error.backupResult = result;
     throw error;
   }
@@ -30,12 +30,12 @@ function createBackupEventHelpers({
     snapshotScope = "releasedCurrent",
   }) {
     if (!backupProviderService || !passport?.dppId || !passport?.companyId) {
-      return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
+      return { success: true, skipped: true, reason: "backupServiceUnavailable" };
     }
 
     const resolvedPassportType = passportType || passport.passportType;
     if (!resolvedPassportType) {
-      return { success: true, skipped: true, reason: "PASSPORT_TYPE_REQUIRED" };
+      return { success: true, skipped: true, reason: "passportTypeRequired" };
     }
 
     const typeDef = await complianceService.loadPassportTypeDefinition(resolvedPassportType);
@@ -69,7 +69,7 @@ function createBackupEventHelpers({
     metadata = {},
   }) {
     if (!backupProviderService || !companyId || !backupProviderService.replicateAccessControlEvent) {
-      return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
+      return { success: true, skipped: true, reason: "backupServiceUnavailable" };
     }
 
     return assertBackupReplicationResult(await backupProviderService.replicateAccessControlEvent({
@@ -98,7 +98,7 @@ function createBackupEventHelpers({
     summary,
   }) {
     if (!backupProviderService || !companyId || !backupProviderService.replicateAuditAnchorEvent) {
-      return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
+      return { success: true, skipped: true, reason: "backupServiceUnavailable" };
     }
     return assertBackupReplicationResult(await backupProviderService.replicateAuditAnchorEvent({
       companyId,

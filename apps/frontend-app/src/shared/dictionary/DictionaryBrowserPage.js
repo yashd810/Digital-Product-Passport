@@ -4,7 +4,7 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildDashboardPath } from "../../user/dashboard/utils/dashboardRoutes";
 import "./DictionaryBrowserPage.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function buildDictionaryBasePath(pathname, companySlug = "", dictionaryPath) {
   if (pathname.startsWith("/admin/")) return `/admin/dictionary/${dictionaryPath}`;
@@ -97,7 +97,7 @@ function DetailRow({ label, value, mono = false, empty = "Not specified" }) {
 }
 
 function getDictionaryApiPath(family, version) {
-  return `${API}/api/dictionary/${encodeURIComponent(family)}/${encodeURIComponent(version)}`;
+  return `${api}/api/dictionary/${encodeURIComponent(family)}/${encodeURIComponent(version)}`;
 }
 
 function DictionaryModelCard({ model, href }) {
@@ -257,7 +257,7 @@ export default function DictionaryBrowserPage() {
     setError(null);
 
     if (isModelListView) {
-      fetchJson(`${API}/api/semantic-models`)
+      fetchJson(`${api}/api/semantic-models`)
         .then((payload) => {
           if (ignore) return;
           setModels(Array.isArray(payload) ? payload : []);

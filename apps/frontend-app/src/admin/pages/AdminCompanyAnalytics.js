@@ -4,17 +4,17 @@ import { PieChart } from "../../passport-viewer/components/PieChart";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../shared/table/tableControls";
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
-import { STATUS_COLORS } from "../../shared/utils/statusColors";
+import { statusColors } from "../../shared/utils/statusColors";
 import AdminCompanyActions from "../components/AdminCompanyActions";
 import { buildCompanyAnalyticsPath, slugifyCompanyName as slugify } from "../utils/companyRoutes";
 import "../styles/AdminDashboard.css";
 import "../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
-const OVERVIEW_BAR_COLORS = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e"];
-const OVERVIEW_LINE_COLORS = ["#14b8a6", "#38bdf8", "#f59e0b", "#f472b6", "#a78bfa", "#22c55e"];
+const api = import.meta.env.VITE_API_URL || "";
+const overviewBarColors = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e"];
+const overviewLineColors = ["#14b8a6", "#38bdf8", "#f59e0b", "#f472b6", "#a78bfa", "#22c55e"];
 
-const ROLES = [
+const roles = [
   { key: "companyAdmin", label: "Admin" },
   { key: "editor", label: "Editor" },
   { key: "viewer", label: "Viewer" },
@@ -52,7 +52,7 @@ function normalizeAdminAnalyticsPayload(payload) {
 }
 
 function RolePill({ role }) {
-  const match = ROLES.find((item) => item.key === role) || { label: role };
+  const match = roles.find((item) => item.key === role) || { label: role };
   return (
     <span className={`aca-role-pill aca-role-pill-${role || "default"}`}>
       {match.label}
@@ -86,7 +86,7 @@ function BarChart({ data, height = 120 }) {
               width={barW}
               height={barHeight}
               rx={4}
-              fill={item.color || OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length]}
+              fill={item.color || overviewBarColors[index % overviewBarColors.length]}
               opacity="0.9"
             />
             <text x={groupCenter} y={labelY} textAnchor="middle" className="overview-bar-chart-label">
@@ -111,14 +111,14 @@ function LineChart({ labels, series }) {
     return null;
   }
 
-  const W = 480;
-  const H = 180;
+  const w = 480;
+  const h = 180;
   const leftPad = 40;
   const rightPad = 14;
   const topPad = 14;
   const bottomPad = 30;
-  const innerW = W - leftPad - rightPad;
-  const innerH = H - topPad - bottomPad;
+  const innerW = w - leftPad - rightPad;
+  const innerH = h - topPad - bottomPad;
 
   const allValues = series.flatMap((item) => item.values || []);
   const rawMax = Math.max(...allValues, 1);
@@ -140,10 +140,10 @@ function LineChart({ labels, series }) {
 
   return (
     <div className="overview-line-chart-wrap" onMouseLeave={() => setHoveredCol(null)}>
-      <svg className="overview-line-chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
+      <svg className="overview-line-chart" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet">
         <defs>
           {series.map((item, index) => {
-            const color = item.color || OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length];
+            const color = item.color || overviewLineColors[index % overviewLineColors.length];
             return (
               <linearGradient key={index} id={`admin-ovlcg-${index}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={color} stopOpacity="0.15" />
@@ -159,7 +159,7 @@ function LineChart({ labels, series }) {
           const label = value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${value}`;
           return (
             <g key={index}>
-              <line x1={leftPad} y1={y} x2={W - rightPad} y2={y} className="overview-line-chart-grid" />
+              <line x1={leftPad} y1={y} x2={w - rightPad} y2={y} className="overview-line-chart-grid" />
               <text x={leftPad - 5} y={y + 4} textAnchor="end" className="overview-line-chart-tick">
                 {label}
               </text>
@@ -168,7 +168,7 @@ function LineChart({ labels, series }) {
         })}
 
         {labels.map((label, index) => (
-          <text key={index} x={getLabelX(index)} y={H - 8} textAnchor="middle" className="overview-line-chart-label">
+          <text key={index} x={getLabelX(index)} y={h - 8} textAnchor="middle" className="overview-line-chart-label">
             {label}
           </text>
         ))}
@@ -183,7 +183,7 @@ function LineChart({ labels, series }) {
         })}
 
         {series.map((item, index) => {
-          const color = item.color || OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length];
+          const color = item.color || overviewLineColors[index % overviewLineColors.length];
           const values = item.values || [];
           if (!values.length) return null;
           const points = values.map((value, pointIndex) => `${getX(pointIndex, index)},${getY(value)}`).join(" ");
@@ -219,7 +219,7 @@ function LineChart({ labels, series }) {
             x1={getLabelX(hoveredCol)}
             y1={topPad}
             x2={getLabelX(hoveredCol)}
-            y2={H - bottomPad}
+            y2={h - bottomPad}
             stroke="rgba(184,204,217,0.3)"
             strokeWidth="1"
             strokeDasharray="3 3"
@@ -231,7 +231,7 @@ function LineChart({ labels, series }) {
         <div className="overview-line-tooltip">
           <div className="olt-label">{labels[hoveredCol]}</div>
           {series.map((item, index) => {
-            const color = item.color || OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length];
+            const color = item.color || overviewLineColors[index % overviewLineColors.length];
             const value = (item.values || [])[hoveredCol] ?? 0;
             return (
               <div key={index} className="olt-row">
@@ -252,7 +252,7 @@ function LineChart({ labels, series }) {
           <div key={index} className="overview-line-legend-item">
             <span
               className="overview-line-legend-swatch"
-              style={{ backgroundColor: item.color || OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length] }}
+              style={{ backgroundColor: item.color || overviewLineColors[index % overviewLineColors.length] }}
             />
             <span className="overview-line-legend-name">
               {item.productIcon ? `${item.productIcon} ` : ""}
@@ -294,10 +294,10 @@ function AdminCompanyAnalytics() {
     setError("");
     try {
       const [analyticsResponse, companyResponse] = await Promise.all([
-        fetchWithAuth(`${API}/api/admin/companies/${id}/analytics`, {
+        fetchWithAuth(`${api}/api/admin/companies/${id}/analytics`, {
           headers: authHeaders(),
         }),
-        fetchWithAuth(`${API}/api/admin/companies/${id}`, {
+        fetchWithAuth(`${api}/api/admin/companies/${id}`, {
           headers: authHeaders(),
         }),
       ]);
@@ -334,7 +334,7 @@ function AdminCompanyAnalytics() {
 
     setLoading(true);
     setError("");
-    fetchWithAuth(`${API}/api/admin/companies`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/admin/companies`, { headers: authHeaders() })
       .then((response) => response.json())
       .then((companies) => {
         if (cancelled) return;
@@ -371,7 +371,7 @@ function AdminCompanyAnalytics() {
   const handleRoleChange = async (userId) => {
     setSaving(true);
     try {
-      const response = await fetchWithAuth(`${API}/api/admin/users/${userId}/role`, {
+      const response = await fetchWithAuth(`${api}/api/admin/users/${userId}/role`, {
         method: "PATCH",
         headers: authHeaders({
           "Content-Type": "application/json",
@@ -415,19 +415,19 @@ function AdminCompanyAnalytics() {
         { label: "QR Scans", value: data.scanStats || 0, tone: "scans" },
       ];
       const statusChartItems = [
-        { label: "Draft",       value: totalDraft,       color: STATUS_COLORS.draft },
-        { label: "In Review",   value: totalInReview,    color: STATUS_COLORS.review },
-        { label: "Released",    value: totalReleased,    color: STATUS_COLORS.released },
-        { label: "In Revision", value: totalInRevision,  color: STATUS_COLORS.revised },
+        { label: "Draft",       value: totalDraft,       color: statusColors.draft },
+        { label: "In Review",   value: totalInReview,    color: statusColors.review },
+        { label: "Released",    value: totalReleased,    color: statusColors.released },
+        { label: "In Revision", value: totalInRevision,  color: statusColors.revised },
       ].filter((item) => item.value > 0);
       const typeChartData = (data.analytics || []).map((item, index) => ({
         label: item.displayName || item.passportType,
         value: parseInt(item.total || 0, 10),
-        color: OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length],
+        color: overviewBarColors[index % overviewBarColors.length],
       }));
       const trendSeries = (data.trend?.series || []).map((series, index) => ({
         ...series,
-        color: OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length],
+        color: overviewLineColors[index % overviewLineColors.length],
       }));
 
       const safeCompanyName = companyName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -540,20 +540,20 @@ function AdminCompanyAnalytics() {
   const totalScans       = data.scanStats || 0;
   const archivedCount    = data.archivedCount || 0;
   const statusChartItems = [
-    { label: "Draft",       value: totalDraft,       color: STATUS_COLORS.draft },
-    { label: "In Review",   value: totalInReview,    color: STATUS_COLORS.review },
-    { label: "Released",    value: totalReleased,    color: STATUS_COLORS.released },
-    { label: "In Revision", value: totalInRevision,  color: STATUS_COLORS.revised },
+    { label: "Draft",       value: totalDraft,       color: statusColors.draft },
+    { label: "In Review",   value: totalInReview,    color: statusColors.review },
+    { label: "Released",    value: totalReleased,    color: statusColors.released },
+    { label: "In Revision", value: totalInRevision,  color: statusColors.revised },
   ].filter((item) => item.value > 0);
   const typeChartData = (data.analytics || []).map((item, index) => ({
     label: item.displayName || item.passportType,
     shortLabel: item.productCategory || item.displayName || item.passportType,
     value: parseInt(item.total || 0, 10),
-    color: OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length],
+    color: overviewBarColors[index % overviewBarColors.length],
   }));
   const trendChartData = (data.trend?.series || []).map((series, index) => ({
     ...series,
-    color: OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length],
+    color: overviewLineColors[index % overviewLineColors.length],
   }));
   const currentCompany = companyRecord || data.company || { id: companyId, companyName: `Company ${companyId}` };
 
@@ -809,7 +809,7 @@ function AdminCompanyAnalytics() {
                       {editUserId === user.id ? (
                         <div className="aca-role-editor">
                           <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="aca-role-select">
-                            {ROLES.map((role) => (
+                            {roles.map((role) => (
                               <option key={role.key} value={role.key}>{role.label}</option>
                             ))}
                           </select>

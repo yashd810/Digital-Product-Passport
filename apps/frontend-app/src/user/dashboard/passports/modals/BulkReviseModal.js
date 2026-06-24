@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 import { dedupeLatestReleasedPassports } from "../utils/passportListHelpers";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 export function BulkReviseModal({
   companyId,
@@ -32,7 +32,7 @@ export function BulkReviseModal({
   const getVersionNumber = (passport) => passport?.versionNumber;
 
   useEffect(() => {
-    fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
+    fetchWithAuth(`${api}/api/companies/${companyId}/users`, {
       headers: authHeaders(),
     })
       .then((r) => r.ok ? r.json() : [])
@@ -44,7 +44,7 @@ export function BulkReviseModal({
       })
       .catch((error) => console.warn("Ignored async error", error));
 
-    fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/users/me`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.defaultReviewerId) setReviewerId(String(data.defaultReviewerId));
@@ -221,7 +221,7 @@ export function BulkReviseModal({
 
     setSubmitting(true);
     try {
-      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-revise`, {
+      const response = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/bulk-revise`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

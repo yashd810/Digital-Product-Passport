@@ -1,4 +1,4 @@
-const LIGHT_REPORT_STYLES = `
+const lightReportStyles = `
   :root {
     --bg: #f4f8fb;
     --panel: #ffffff;
@@ -220,8 +220,8 @@ const polarToCartesian = (cx, cy, radius, angle) => {
 
 export function renderPieChartSvg(items = []) {
   if (!items.length) return "";
-  const W = 360;
-  const H = 220;
+  const svgWidth = 360;
+  const svgHeight = 220;
   const cx = 110;
   const cy = 110;
   const radius = 70;
@@ -244,7 +244,7 @@ export function renderPieChartSvg(items = []) {
   }).join("");
 
   return `
-    <svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg class="chart-svg" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       ${slices}
     </svg>
   `;
@@ -441,7 +441,7 @@ export function openAnalyticsPrintReport({
       <head>
         <title>${escapeHtml(title)}</title>
         <meta charset="utf-8" />
-        <style>${LIGHT_REPORT_STYLES}</style>
+        <style>${lightReportStyles}</style>
       </head>
       <body>
         <div class="report">

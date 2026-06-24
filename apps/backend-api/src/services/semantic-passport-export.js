@@ -2,7 +2,7 @@
 
 const createSemanticModelRegistry = require("./semantic-model-registry");
 
-const DPP_CONTEXT = {
+const dppContext = {
   "@version": 1.1,
   dpp: "https://schema.digitalproductpassport.eu/ns/dpp#",
   DigitalProductPassport: "dpp:DigitalProductPassport",
@@ -148,7 +148,7 @@ function createSemanticPassportExportService({
   function buildPassportJsonLdContext(typeDef, passportType = null, options = {}) {
     const resolvedType = String(passportType || getTypeName(typeDef) || "").trim();
     const model = resolveSemanticModel({ passportType: resolvedType, typeDef, options });
-    const contexts = [DPP_CONTEXT];
+    const contexts = [dppContext];
     if (!model) return contexts;
 
     contexts.push(model.contextUrl);
@@ -164,7 +164,7 @@ function createSemanticPassportExportService({
     const resolvedType = String(passportType || passports[0]?.passportType || getTypeName(typeDef) || "").trim();
     const graph = passports.map((passport) => sanitizePassport(passport, resolvedType));
     const model = resolveSemanticModel({ passportType: resolvedType, typeDef, options });
-    const contexts = [DPP_CONTEXT];
+    const contexts = [dppContext];
 
     if (model) {
       contexts.push(model.contextUrl);

@@ -68,7 +68,7 @@ function buildRepositoryFilePublicUrl({ appBaseUrl, companyId, itemId }) {
   return joinUrl(appBaseUrl, buildRepositoryFilePublicPath({ companyId, itemId }));
 }
 
-const OPAQUE_REPOSITORY_FILE_ROUTE = /\/repository-files\/([^/?#]+)(?:[/?#].*)?$/i;
+const opaqueRepositoryFileRoute = /\/repository-files\/([^/?#]+)(?:[/?#].*)?$/i;
 
 function buildRepositoryFileAccessPayload({ companyId, itemId, expiresAt }) {
   return JSON.stringify({
@@ -133,7 +133,7 @@ function parseRepositoryFileReference(value) {
     pathname = trimmed;
   }
 
-  const opaqueMatch = pathname.match(OPAQUE_REPOSITORY_FILE_ROUTE);
+  const opaqueMatch = pathname.match(opaqueRepositoryFileRoute);
   if (!opaqueMatch) return null;
   return decodeRepositoryFileToken(opaqueMatch[1]);
 }

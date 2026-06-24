@@ -2,8 +2,8 @@
 
 const crypto = require("crypto");
 
-const PASSWORD_MIN_LENGTH = Math.max(10, Number.parseInt(process.env.PASSWORD_MIN_LENGTH || "12", 10) || 12);
-const COMMON_WEAK_PASSWORDS = new Set([
+const passwordMinLength = Math.max(10, Number.parseInt(process.env.PASSWORD_MIN_LENGTH || "12", 10) || 12);
+const commonWeakPasswords = new Set([
   "password",
   "password123",
   "12345678",
@@ -17,8 +17,8 @@ const COMMON_WEAK_PASSWORDS = new Set([
 
 function validatePasswordPolicy(password) {
   const value = String(password || "");
-  if (value.length < PASSWORD_MIN_LENGTH) {
-    return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+  if (value.length < passwordMinLength) {
+    return `Password must be at least ${passwordMinLength} characters`;
   }
   if (/\s/.test(value)) {
     return "Password must not contain whitespace";
@@ -35,7 +35,7 @@ function validatePasswordPolicy(password) {
   if (!/[^A-Za-z0-9]/.test(value)) {
     return "Password must include at least one symbol";
   }
-  if (COMMON_WEAK_PASSWORDS.has(value.toLowerCase())) {
+  if (commonWeakPasswords.has(value.toLowerCase())) {
     return "Password is too common. Choose a more unique password";
   }
   return null;
@@ -70,7 +70,7 @@ function generateOpaqueSecret(prefix, size = 24) {
 }
 
 function createAccessKeyMaterial() {
-  const rawKey = generateOpaqueSecret("pak_", 24);
+  const rawKey = generateOpaqueSecret("pak", 24);
   return {
     rawKey,
     hash: hashSecret(rawKey),
@@ -80,7 +80,7 @@ function createAccessKeyMaterial() {
 }
 
 function createDeviceKeyMaterial() {
-  const rawKey = generateOpaqueSecret("dpk_", 32);
+  const rawKey = generateOpaqueSecret("dpk", 32);
   return {
     rawKey,
     hash: hashSecret(rawKey),
@@ -90,7 +90,7 @@ function createDeviceKeyMaterial() {
 }
 
 module.exports = {
-  PASSWORD_MIN_LENGTH,
+  passwordMinLength,
   validatePasswordPolicy,
   hashSecret,
   hashOtpCode,

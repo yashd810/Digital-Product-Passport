@@ -29,17 +29,17 @@ module.exports = function registerLifecycleRoutes(app, deps) {
     loadLatestLivePassport,
     reconcileManagedReleaseFields,
     evaluateCompliance,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    REVISION_BLOCKING_STATUSES_SQL,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    editableReleaseStatusesSql,
+    revisionBlockingStatusesSql,
+    archivedHistoryFilterSql,
     markOlderVersionsObsolete,
     complianceService,
     signPassport,
     recordSignedDppRelease,
     getActorIdentifier,
-    IN_REVISION_STATUS,
+    inRevisionStatus,
     submitPassportToWorkflow,
-    VALID_GRANULARITIES,
+    validGranularities,
   } = deps;
 
   const companyDppParamsSchema = {
@@ -157,7 +157,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         companyId,
         dppId,
         passportType,
-        releaseStatusSql: EDITABLE_RELEASE_STATUSES_SQL,
+        releaseStatusSql: editableReleaseStatusesSql,
       });
       if (!currentPassport) return res.status(404).json({ error: "Passport not found or already released" });
 
@@ -180,7 +180,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       });
       const result = await pool.query(
         `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
-         WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}
+         WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql}
          RETURNING *`,
         [dppId, companyId]
       );
@@ -207,7 +207,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
           sigData,
           releaseNote: req.body?.releaseNote || null,
         });
-        await logAudit(companyId, req.user.userId, "SIGN_PASSPORT", "passportSignatures", dppId, null, {
+        await logAudit(companyId, req.user.userId, "signPassport", "passportSignatures", dppId, null, {
           versionNumber: released.versionNumber,
           signingKeyId: sigData.keyId,
           signatureAlgorithm: sigData.signatureAlgorithm,
@@ -224,7 +224,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       ).catch((error) => {
         logger.warn({ err: error, dppId }, "Failed to mark passport attachments public after release");
       });
-      await logAudit(companyId, req.user.userId, "RELEASE", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
+      await logAudit(companyId, req.user.userId, "release", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
       await replicatePassportToBackup({
         passport: { ...released, passportType },
         passportType,
@@ -266,7 +266,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       const src = current.rows[0];
       const dup = await pool.query(
-        `SELECT id FROM ${tableName} WHERE "lineageId" = $1 AND "releaseStatus" IN ${REVISION_BLOCKING_STATUSES_SQL} AND "deletedAt" IS NULL`,
+        `SELECT id FROM ${tableName} WHERE "lineageId" = $1 AND "releaseStatus" IN ${revisionBlockingStatusesSql} AND "deletedAt" IS NULL`,
         [src.lineageId]
       );
       if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
@@ -277,7 +277,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const cols = Object.keys(src).filter((key) => !excluded.has(key));
       const vals = cols.map((key) => {
         if (key === "versionNumber") return newVersion;
-        if (key === "releaseStatus") return IN_REVISION_STATUS;
+        if (key === "releaseStatus") return inRevisionStatus;
         if (key === "createdBy") return userId;
         if (key === "deletedAt") return null;
         return src[key];
@@ -318,8 +318,8 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         snapshotReason: "afterReviseCreate",
       });
 
-      await logAudit(companyId, userId, "REVISE", tableName, newGuid, { versionNumber: src.versionNumber }, { versionNumber: newVersion });
-      res.json({ success: true, dppId: newGuid, newVersion, releaseStatus: IN_REVISION_STATUS });
+      await logAudit(companyId, userId, "revise", tableName, newGuid, { versionNumber: src.versionNumber }, { versionNumber: newVersion });
+      res.json({ success: true, dppId: newGuid, newVersion, releaseStatus: inRevisionStatus });
     } catch (error) {
       logger.error({ err: error, dppId: req.params?.dppId, companyId: req.params?.companyId }, "Revise passport error");
       res.status(500).json({ error: "Failed to revise passport" });
@@ -337,7 +337,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
 
       if (!passportType) return res.status(400).json({ error: "passportType required in body" });
       const requestedGranularity = String(granularity || "").trim().toLowerCase();
-      if (!VALID_GRANULARITIES.has(requestedGranularity)) {
+      if (!validGranularities.has(requestedGranularity)) {
         return res.status(400).json({ error: "granularity must be one of: model, batch, item" });
       }
 
@@ -355,7 +355,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       }
 
       const dup = await pool.query(
-        `SELECT id FROM ${tableName} WHERE "lineageId" = $1 AND "releaseStatus" IN ${REVISION_BLOCKING_STATUSES_SQL} AND "deletedAt" IS NULL`,
+        `SELECT id FROM ${tableName} WHERE "lineageId" = $1 AND "releaseStatus" IN ${revisionBlockingStatusesSql} AND "deletedAt" IS NULL`,
         [src.lineageId]
       );
       if (dup.rows.length) return res.status(409).json({ error: "An editable revision already exists." });
@@ -393,7 +393,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const cols = Object.keys(src).filter((key) => !excluded.has(key));
       const vals = cols.map((key) => {
         if (key === "versionNumber") return newVersion;
-        if (key === "releaseStatus") return IN_REVISION_STATUS;
+        if (key === "releaseStatus") return inRevisionStatus;
         if (key === "createdBy") return userId;
         if (key === "deletedAt") return null;
         if (key === "granularity") return requestedGranularity;
@@ -452,7 +452,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         snapshotReason: "afterGranularityTransitionCreate",
       });
 
-      await logAudit(companyId, userId, "TRANSITION_GRANULARITY", tableName, newGuid, {
+      await logAudit(companyId, userId, "transitionGranularity", tableName, newGuid, {
         previousGranularity: currentGranularity,
         previousIdentifier: src.productIdentifierDid || src.internalAliasId,
       }, {
@@ -561,7 +561,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         });
       }
 
-      await logAudit(companyId, userId, "ARCHIVE", tableName, dppId, null, { versionsArchived: rows.rows.length });
+      await logAudit(companyId, userId, "archive", tableName, dppId, null, { versionsArchived: rows.rows.length });
       res.json({ success: true, versionsArchived: rows.rows.length });
     } catch (error) {
       logger.error("Archive error:", error.message);
@@ -579,7 +579,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
          FROM "passportArchives"
          WHERE ("dppId" = $1 OR "lineageId" = $1)
            AND "companyId" = $2
-           AND ${ARCHIVED_HISTORY_FILTER_SQL}
+           AND ${archivedHistoryFilterSql}
          ORDER BY "versionNumber" DESC LIMIT 1`,
         [dppId, companyId]
       );
@@ -590,7 +590,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
          FROM "passportArchives"
          WHERE "lineageId" = $1
            AND "companyId" = $2
-           AND ${ARCHIVED_HISTORY_FILTER_SQL}
+           AND ${archivedHistoryFilterSql}
          ORDER BY "versionNumber" ASC`,
         [archiveContext.rows[0].lineageId, companyId]
       );
@@ -616,11 +616,11 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         `DELETE FROM "passportArchives"
          WHERE "lineageId" = $1
            AND "companyId" = $2
-           AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
+           AND ${archivedHistoryFilterSql}`,
         [archiveRows.rows[0].lineageId, companyId]
       );
 
-      await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versionsRestored: archiveRows.rows.length });
+      await logAudit(companyId, userId, "unarchive", tableName, dppId, null, { versionsRestored: archiveRows.rows.length });
       res.json({ success: true, versionsRestored: archiveRows.rows.length });
     } catch (error) {
       logger.error("Unarchive error:", error.message);

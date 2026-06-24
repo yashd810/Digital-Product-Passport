@@ -3,7 +3,7 @@
 function createArchiveHistoryHelpers({
   pool,
   logger,
-  SYSTEM_PASSPORT_FIELDS,
+  systemPassportFields,
   getWritablePassportColumns,
   getStoredPassportValues,
   quoteSqlIdentifier,
@@ -91,7 +91,7 @@ function createArchiveHistoryHelpers({
     return count;
   }
 
-  async function updatePassportRowById({ tableName, rowId, userId, data, excluded = SYSTEM_PASSPORT_FIELDS, includeUpdatedRow = false }) {
+  async function updatePassportRowById({ tableName, rowId, userId, data, excluded = systemPassportFields, includeUpdatedRow = false }) {
     const updateCols = getWritablePassportColumns(data, excluded);
     if (!updateCols.length) return [];
 

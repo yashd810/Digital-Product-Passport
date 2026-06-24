@@ -6,7 +6,7 @@ import "../styles/Landing.css";
 
 function Login({ setIsAuthenticated, setUser, setCompanyId }) {
   const navigate = useNavigate();
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "";
 
   // Step 1: credentials
   const [email, setEmail] = useState("");
@@ -28,11 +28,11 @@ function Login({ setIsAuthenticated, setUser, setCompanyId }) {
   }, []);
 
   useEffect(() => {
-    fetchWithAuth(`${API_BASE_URL}/api/auth/sso/providers`, { credentials: "include" })
+    fetchWithAuth(`${apiBaseUrl}/api/auth/sso/providers`, { credentials: "include" })
       .then((response) => response.json())
       .then((data) => setSsoProviders(Array.isArray(data.providers) ? data.providers : []))
       .catch(() => setSsoProviders([]));
-  }, [API_BASE_URL]);
+  }, [apiBaseUrl]);
 
   const startCooldown = () => {
     setResendCooldown(60);
@@ -60,7 +60,7 @@ function Login({ setIsAuthenticated, setUser, setCompanyId }) {
     setError("");
     setIsLoading(true);
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetchWithAuth(`${apiBaseUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -89,7 +89,7 @@ function Login({ setIsAuthenticated, setUser, setCompanyId }) {
     setError("");
     setIsLoading(true);
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/verify-otp`, {
+      const response = await fetchWithAuth(`${apiBaseUrl}/api/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -109,7 +109,7 @@ function Login({ setIsAuthenticated, setUser, setCompanyId }) {
     if (resendCooldown > 0) return;
     setError("");
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/resend-otp`, {
+      const response = await fetchWithAuth(`${apiBaseUrl}/api/auth/resend-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -125,7 +125,7 @@ function Login({ setIsAuthenticated, setUser, setCompanyId }) {
 
   const startSso = (providerKey) => {
     const next = new URLSearchParams(window.location.search).get("next") || "";
-    const target = `${API_BASE_URL}/api/auth/sso/${providerKey}/start${next ? `?next=${encodeURIComponent(next)}` : ""}`;
+    const target = `${apiBaseUrl}/api/auth/sso/${providerKey}/start${next ? `?next=${encodeURIComponent(next)}` : ""}`;
     window.location.assign(target);
   };
 

@@ -11,10 +11,10 @@ function createSchemaStorageHelpers({
   isEditablePassportStatus,
   quoteSqlIdentifier,
   joinQuotedSqlIdentifiers,
-  SYSTEM_PASSPORT_COLUMN_MAPPINGS,
-  LIVE_PASSPORT_SYSTEM_COLUMNS,
-  LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS,
-  IN_REVISION_STATUSES_SQL,
+  systemPassportColumnMappings,
+  livePassportSystemColumns,
+  livePassportSystemColumnDefinitions,
+  inRevisionStatusesSql,
 }) {
   function unquoteSqlIdentifier(identifier) {
     return String(identifier || "").replace(/^"|"$/g, "").replace(/""/g, "\"");
@@ -259,7 +259,7 @@ function createSchemaStorageHelpers({
     await pool.query(`CREATE INDEX IF NOT EXISTS ${buildDbIndexName(rawTableName, "status")} ON ${tableName}("releaseStatus") WHERE "deletedAt" IS NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS ${buildDbIndexName(rawTableName, "product", "identifier", "did")} ON ${tableName}("companyId", "uniqueProductIdentifier") WHERE "deletedAt" IS NULL`);
 
-    for (const [columnName, columnDefinition] of LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS) {
+    for (const [columnName, columnDefinition] of livePassportSystemColumnDefinitions) {
       await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${quoteSqlIdentifier(columnName)} ${columnDefinition}`);
     }
 
@@ -384,7 +384,7 @@ function createSchemaStorageHelpers({
       }
 
       for (const columnName of columnMap.keys()) {
-        if (LIVE_PASSPORT_SYSTEM_COLUMNS.has(columnName) || expectedFieldKeys.has(columnName)) continue;
+        if (livePassportSystemColumns.has(columnName) || expectedFieldKeys.has(columnName)) continue;
         issues.push({ type: "extraColumn", field: columnName });
       }
 
@@ -421,7 +421,7 @@ function createSchemaStorageHelpers({
         COUNT(*)                                              AS total,
         COUNT(CASE WHEN "releaseStatus" = 'draft'     THEN 1 END) AS draft,
         COUNT(CASE WHEN "releaseStatus" = 'released'  THEN 1 END) AS released,
-        COUNT(CASE WHEN "releaseStatus" IN ${IN_REVISION_STATUSES_SQL} THEN 1 END) AS revised,
+        COUNT(CASE WHEN "releaseStatus" IN ${inRevisionStatusesSql} THEN 1 END) AS revised,
         COUNT(CASE WHEN "releaseStatus" = 'inReview' THEN 1 END) AS inReview,
         COUNT(CASE WHEN "releaseStatus" = 'obsolete'  THEN 1 END) AS obsolete
       FROM ${tableName}

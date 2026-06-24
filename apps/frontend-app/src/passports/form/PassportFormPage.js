@@ -23,9 +23,9 @@ import RepositoryPicker from "./components/RepositoryPicker";
 import SymbolRepositoryPicker from "./components/SymbolRepositoryPicker";
 import "../../shared/styles/CreatePass.css";
 
-const API = import.meta.env.VITE_API_URL || "";
-const EDIT_SESSION_TIMEOUT_MS = 12 * 60 * 60 * 1000;
-const EDIT_HEARTBEAT_MS = 60 * 1000;
+const api = import.meta.env.VITE_API_URL || "";
+const editSessionTimeoutMs = 12 * 60 * 60 * 1000;
+const editHeartbeatMs = 60 * 1000;
 function getFieldInputPrompt(field) {
   const baseLabel = String(field?.label || field?.key || "value").toLowerCase();
   const unitLabel = getFieldUnitLabel(field);
@@ -120,14 +120,14 @@ function buildClonePrefill(record, sections) {
 
 function generateDraftLocalPassportId() {
   if (typeof globalThis !== "undefined" && globalThis.crypto?.randomUUID) {
-    return `dpp_${globalThis.crypto.randomUUID()}`;
+    return `dppId${globalThis.crypto.randomUUID()}`;
   }
   const randomPart = Math.random().toString(36).slice(2, 10);
   const timestampPart = Date.now().toString(36);
-  return `dpp_${timestampPart}${randomPart}`;
+  return `dppId${timestampPart}${randomPart}`;
 }
 
-const NON_EDITABLE_FORM_KEYS = new Set([
+const nonEditableFormKeys = new Set([
   "id",
   "dppId",
   "companyId",
@@ -160,7 +160,7 @@ const NON_EDITABLE_FORM_KEYS = new Set([
   "lastName",
 ]);
 
-const RESERVED_SYSTEM_FIELD_KEYS = new Set([
+const reservedSystemFieldKeys = new Set([
   "carrierAuthenticity",
   "carrierSecurityStatus",
   "carrierAuthenticationMethod",
@@ -178,7 +178,7 @@ const RESERVED_SYSTEM_FIELD_KEYS = new Set([
   "signCarrierPayload",
 ]);
 
-const NON_PERSISTED_PAYLOAD_KEYS = new Set([
+const nonPersistedPayloadKeys = new Set([
   "digitalProductPassportId",
   "uniqueProductIdentifier",
   "internalAliasId",
@@ -220,8 +220,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const [systemHeader,    setSystemHeader]    = useState(() => normalizeSystemPassportHeader());
   const [complianceContext, setComplianceContext] = useState({ company: null, facilities: [] });
 
-  const SECTIONS    = dynamicSections || {};
-  const sectionKeys = Object.keys(SECTIONS);
+  const sections    = dynamicSections || {};
+  const sectionKeys = Object.keys(sections);
 
   const [expanded,       setExpanded]       = useState({});
   const [modelName,      setModelName]      = useState("");
@@ -329,13 +329,13 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   };
 
   const hydrateFromPassportRecord = (data, { allowDraftRestore = false } = {}) => {
-    const keyMap = buildSchemaFieldKeyMap(SECTIONS);
+    const keyMap = buildSchemaFieldKeyMap(sections);
     const flattenedData = {
       ...(data || {}),
       ...(data?.fields && typeof data.fields === "object" ? data.fields : {}),
       ...extractFieldValuesFromElements(data?.elements, keyMap),
     };
-    const alignedData = alignRecordToSchemaKeys(flattenedData, SECTIONS);
+    const alignedData = alignRecordToSchemaKeys(flattenedData, sections);
     const restored = allowDraftRestore ? restoreLocalDraft(alignedData) : false;
     if (!restored) {
       setModelName(alignedData?.modelName || "");
@@ -350,7 +350,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       modelName: normalizePersistedComparisonValue(alignedData?.modelName || ""),
       internalAliasId: normalizePersistedComparisonValue(alignedData?.internalAliasId || ""),
       ...Object.fromEntries(
-        Object.entries(canonicalizeRecordToSchemaKeys(alignedData || {}, SECTIONS)).map(([key, value]) => [
+        Object.entries(canonicalizeRecordToSchemaKeys(alignedData || {}, sections)).map(([key, value]) => [
           key,
           normalizePersistedComparisonValue(value),
         ])
@@ -361,7 +361,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   };
 
   const fetchPassportRecord = async ({ allowDraftRestore = false } = {}) => {
-    const baseUrl = `${API}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${activePassportType}`;
+    const baseUrl = `${api}/api/companies/${effectiveCompanyId}/passports/${dppId}?passportType=${activePassportType}`;
     const [rawResponse, fullResponse] = await Promise.all([
       fetchWithAuth(baseUrl, { headers: authHeaders() }),
       fetchWithAuth(`${baseUrl}&representation=full`, { headers: authHeaders() }),
@@ -381,7 +381,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   // Load symbols from company repository
   useEffect(() => {
     if (!effectiveCompanyId) return;
-    fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/repository/symbols?flat=true`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/repository/symbols?flat=true`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setSymbols)
       .catch((error) => console.warn("Ignored async error", error));
@@ -389,7 +389,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
   useEffect(() => {
     if (!effectiveCompanyId) return;
-    fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/compliance-identity`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/compliance-identity`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (!data) return;
@@ -423,7 +423,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   useEffect(() => {
     if (!activePassportType) return;
     setLoadingType(true);
-    fetchWithAuth(`${API}/api/passport-types/${activePassportType}`)
+    fetchWithAuth(`${api}/api/passport-types/${activePassportType}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fieldsJson?.sections) {
@@ -466,7 +466,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   // Load template pre-fill on create mode
   useEffect(() => {
     if (mode !== "create" || !templateId || !effectiveCompanyId) return;
-    fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/templates/${templateId}`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/templates/${templateId}`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(tmpl => {
         if (!tmpl) return;
@@ -497,7 +497,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
       if (cloneSource?.dppId && effectiveCompanyId) {
         try {
-          const baseUrl = `${API}/api/companies/${effectiveCompanyId}/passports/${cloneSource.dppId}?passportType=${cloneSource.passportType || activePassportType}`;
+          const baseUrl = `${api}/api/companies/${effectiveCompanyId}/passports/${cloneSource.dppId}?passportType=${cloneSource.passportType || activePassportType}`;
           const [rawResponse, fullResponse] = await Promise.all([
             fetchWithAuth(baseUrl, { headers: authHeaders() }),
             fetchWithAuth(`${baseUrl}&representation=full`, { headers: authHeaders() }),
@@ -515,7 +515,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
       if (!source) return;
 
       const { modelName: nextModelName, internalAliasId: nextProductId, formData: nextFormData } =
-        buildClonePrefill(source, SECTIONS);
+        buildClonePrefill(source, sections);
 
       setModelName(nextModelName);
       setInternalAliasId(nextProductId);
@@ -531,7 +531,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     };
 
     hydrateClone().catch((error) => console.warn("Ignored async error", error));
-  }, [mode, location.state, loadingType, activePassportType, SECTIONS, sectionKeys.length, effectiveCompanyId]);
+  }, [mode, location.state, loadingType, activePassportType, sections, sectionKeys.length, effectiveCompanyId]);
 
   useEffect(() => {
     if (mode !== "edit" || !dppId || !activePassportType) return;
@@ -606,7 +606,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
   const getRequiredMissingFields = () => {
     const currentFormData = formDataRef.current || {};
-    const fields = Object.values(SECTIONS || {})
+    const fields = Object.values(sections || {})
       .flatMap((section) => Array.isArray(section?.fields) ? section.fields : []);
     return fields.filter((field) => {
       if (!field?.required) return false;
@@ -629,7 +629,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     fd.append("file", file); fd.append("fieldKey", key); fd.append("passportType", activePassportType);
     setUploadProgress(p => ({ ...p, [key]: "uploading" }));
     const r = await fetchWithAuth(
-      `${API}/api/companies/${effectiveCompanyId}/passports/${guidToUse}/upload`,
+      `${api}/api/companies/${effectiveCompanyId}/passports/${guidToUse}/upload`,
       { method:"POST", headers: authHeaders(), body:fd }
     );
     if (!r.ok) throw new Error("Upload failed");
@@ -639,12 +639,12 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   };
 
   const buildPersistedBody = ({ onlyDirty = false } = {}) => {
-    const canonicalFormData = canonicalizeRecordToSchemaKeys(formDataRef.current, SECTIONS); // ← Use ref instead of state
+    const canonicalFormData = canonicalizeRecordToSchemaKeys(formDataRef.current, sections); // ← Use ref instead of state
     const schemaFieldKeys = new Set(
-      Object.values(SECTIONS || {})
+      Object.values(sections || {})
         .flatMap((section) => Array.isArray(section?.fields) ? section.fields : [])
         .map((field) => field?.key)
-        .filter((key) => key && !RESERVED_SYSTEM_FIELD_KEYS.has(key))
+        .filter((key) => key && !reservedSystemFieldKeys.has(key))
     );
     const managedEditableKeys = new Set([
       "economicOperatorId",
@@ -658,9 +658,9 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
     const cleanData = Object.fromEntries(
       Object.entries(canonicalFormData)
         .filter(([key]) => {
-          if (NON_EDITABLE_FORM_KEYS.has(key)) return false;
-          if (NON_PERSISTED_PAYLOAD_KEYS.has(key)) return false;
-          if (RESERVED_SYSTEM_FIELD_KEYS.has(key)) return false;
+          if (nonEditableFormKeys.has(key)) return false;
+          if (nonPersistedPayloadKeys.has(key)) return false;
+          if (reservedSystemFieldKeys.has(key)) return false;
           if (hasSchemaKeys) {
             if (!allowedKeys.has(key)) return false;
           }
@@ -794,7 +794,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
           method,
           headers: authHeaders(),
         };
-    const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports/${dppId}/edit-session`, init);
+    const r = await fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/passports/${dppId}/edit-session`, init);
     if (!r.ok) throw new Error("Failed to update edit presence");
     const data = await r.json();
     if (mountedRef.current) {
@@ -807,7 +807,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   const releaseEditPresence = async () => {
     if (mode !== "edit" || !dppId || !effectiveCompanyId || !sessionActiveRef.current) return;
     try {
-      await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports/${dppId}/edit-session`, {
+      await fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/passports/${dppId}/edit-session`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -837,7 +837,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         if (mountedRef.current) setAutoSaveState("saved");
         return true;
       }
-      const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports/${dppId}`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/passports/${dppId}`, {
         method:"PATCH",
         headers: authHeaders({ "Content-Type":"application/json" }),
         body: JSON.stringify(body),
@@ -909,7 +909,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
     const heartbeat = setInterval(async () => {
       const inactiveFor = Date.now() - lastInteractionRef.current;
-      if (inactiveFor >= EDIT_SESSION_TIMEOUT_MS) {
+      if (inactiveFor >= editSessionTimeoutMs) {
         await releaseEditPresence();
         if (mountedRef.current) {
           setSessionExpired(true);
@@ -923,7 +923,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
         return;
       }
       refreshEditPresence("POST").catch((error) => console.warn("Ignored async error", error));
-    }, EDIT_HEARTBEAT_MS);
+    }, editHeartbeatMs);
 
     window.addEventListener("pointerdown", handleActivity);
     window.addEventListener("keydown", handleActivity);
@@ -957,7 +957,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
           throw new Error(`Required fields need values: ${missingRequiredFields.map((field) => field.label || field.key).join(", ")}`);
         }
         const body = buildPersistedBody();
-        const r = await fetchWithAuth(`${API}/api/companies/${effectiveCompanyId}/passports`, {
+        const r = await fetchWithAuth(`${api}/api/companies/${effectiveCompanyId}/passports`, {
           method:"POST", headers:authHeaders({"Content-Type":"application/json"}),
           body: JSON.stringify(body),
         });
@@ -1237,7 +1237,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
 
   const renderPassportHeaderSection = () => {
     const section = systemHeader?.section || {};
-    const entries = resolveSystemHeaderEntries(Object.values(SECTIONS), systemHeader)
+    const entries = resolveSystemHeaderEntries(Object.values(sections), systemHeader)
       .filter((entry) => entry.sourceType === "managed" || entry.field?.key !== "internalAliasId");
     if (!entries.length) return null;
 
@@ -1450,10 +1450,10 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
             {renderPassportHeaderSection()}
 
             {sectionKeys.map(sk => {
-              const section = SECTIONS[sk];
+              const section = sections[sk];
               const sectionContentId = `passport-section-${sk}`;
               const visibleFields = section.fields
-                .filter((field) => field?.key && !RESERVED_SYSTEM_FIELD_KEYS.has(field.key))
+                .filter((field) => field?.key && !reservedSystemFieldKeys.has(field.key))
                 .filter(shouldShowFieldForTemplateFilter);
               return (
                 <div key={sk} className="form-section">

@@ -33,8 +33,8 @@ The normal journey looks like this:
 
 | Layer | Current implementation |
 | --- | --- |
-| Dashboard UI | React 18, React Router, Vite |
-| Public viewer | React 18, React Router, Vite |
+| Dashboard UI | React 19, React Router, Vite |
+| Public viewer | React 19, React Router, Vite |
 | Backend | Node.js, Express |
 | Database | PostgreSQL |
 | Files | Local filesystem in dev, storage abstraction for other providers |

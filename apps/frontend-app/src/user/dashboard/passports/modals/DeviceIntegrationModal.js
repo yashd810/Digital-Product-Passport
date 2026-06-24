@@ -2,7 +2,7 @@ import React, { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 export function DeviceIntegrationModal({ passport, passportType, companyId, onClose }) {
   const [deviceKey, setDeviceKey] = useState(null);
@@ -19,13 +19,13 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
   const dialogDescriptionId = useId();
 
   useEffect(() => {
-    fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${companyId}/passports/${passport.dppId}/device-key`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d) setDeviceKeyMeta(d); })
       .catch((error) => console.warn("Ignored async error", error))
       .finally(() => setLoading(false));
 
-    fetchWithAuth(`${API}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${api}/api/passport-types/${passportType}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (!d) return;
@@ -34,7 +34,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
       })
       .catch((error) => console.warn("Ignored async error", error));
 
-    fetchWithAuth(`${API}/api/passports/${passport.dppId}/dynamic-values`)
+    fetchWithAuth(`${api}/api/passports/${passport.dppId}/dynamic-values`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (d?.values) {
@@ -58,7 +58,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     if (!window.confirm("Regenerate the device key? The old key will stop working immediately.")) return;
     setRegenerating(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}/device-key/regenerate`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/${passport.dppId}/device-key/regenerate`, {
         method: "POST",
         headers: authHeaders(),
       });
@@ -80,7 +80,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     setSaving(true);
     setSaveMsg("");
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${passport.dppId}/dynamic-values`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/${passport.dppId}/dynamic-values`, {
         method: "PATCH",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(manualVals),
@@ -139,7 +139,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
             Issue a device key, review the push endpoint, and override dynamic field values for this passport.
           </p>
           <section className="device-section">
-            <h4 className="device-section-title">Device API Key</h4>
+            <h4 className="device-section-title">Device api Key</h4>
             <p className="device-section-desc">
               Your IoT device uses this key to push live values. Send it in the <code>x-device-key</code> header.
             </p>

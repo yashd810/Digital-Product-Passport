@@ -27,8 +27,8 @@ function updateEditablePassportUseCase(deps) {
     getPassportTypeSchema,
     createPassportTable,
     getTable,
-    VALID_GRANULARITIES,
-    EDITABLE_RELEASE_STATUSES_SQL,
+    validGranularities,
+    editableReleaseStatusesSql,
     hasReleasedLineageVersion,
     normalizeInternalAliasIdValue,
     buildStoredProductIdentifiers,
@@ -68,7 +68,7 @@ function updateEditablePassportUseCase(deps) {
     const requestedPassportType = passportType;
     const typeSchema = await getPassportTypeSchema(requestedPassportType);
     if (!typeSchema) throw Object.assign(new Error("Passport type not found"), { statusCode: 404 });
-    const BUILT_IN_EDITABLE_FIELDS = new Set([
+    const builtInEditableFields = new Set([
       "modelName",
       "internalAliasId",
       "productImage",
@@ -83,13 +83,13 @@ function updateEditablePassportUseCase(deps) {
 
     const current = await pool.query(
       `SELECT * FROM ${tableName}
-       WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL LIMIT 1`,
+       WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL LIMIT 1`,
       [dppId]
     );
     if (!current.rows.length) throw Object.assign(new Error("Passport not found or not editable."), { statusCode: 404 });
 
     for (const key of Object.keys(fields)) {
-      if (!typeSchema.allowedKeys.has(key) && !BUILT_IN_EDITABLE_FIELDS.has(key)) {
+      if (!typeSchema.allowedKeys.has(key) && !builtInEditableFields.has(key)) {
         delete fields[key];
       }
     }
@@ -107,7 +107,7 @@ function updateEditablePassportUseCase(deps) {
 
     if (granularity !== undefined) {
       const requestedGranularity = String(granularity || "").trim().toLowerCase();
-      if (!VALID_GRANULARITIES.has(requestedGranularity)) {
+      if (!validGranularities.has(requestedGranularity)) {
         throw Object.assign(new Error("granularity must be one of: model, batch, item"), { statusCode: 400 });
       }
       if (requestedGranularity !== currentGranularity) {
@@ -119,7 +119,7 @@ function updateEditablePassportUseCase(deps) {
         if (lineageAlreadyReleased) {
           const error = new Error("Released DPP granularity cannot be changed in place. Use the granularity transition workflow to mint a linked successor identifier.");
           error.statusCode = 409;
-          error.code = "GRANULARITY_CHANGE_REQUIRES_NEW_IDENTIFIER";
+          error.code = "granularityChangeRequiresNewIdentifier";
           throw error;
         }
         fields.granularity = requestedGranularity;
@@ -255,7 +255,7 @@ function updateEditablePassportUseCase(deps) {
       });
     }
 
-    await logAudit(companyId, userId, "UPDATE", tableName, dppId, null, { fieldsUpdated: updateFields });
+    await logAudit(companyId, userId, "update", tableName, dppId, null, { fieldsUpdated: updateFields });
     return {
       success: true,
       passport: updateResult.updatedRow

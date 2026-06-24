@@ -417,7 +417,7 @@ function createPassportQueryRepository({
     if (!matches.length) return { passport: null, archived: false };
     if (matches.length > 1) {
       const error = new Error(`Multiple released passports share product identifier "${normalizedProductId}".`);
-      error.code = "AMBIGUOUS_PRODUCT_ID";
+      error.code = "ambiguousProductId";
       throw error;
     }
     return matches[0];
@@ -547,7 +547,7 @@ function createPassportQueryRepository({
 
     if (liveMatches.length > 1) {
       const error = new Error(`Multiple passports in company "${companyId}" share product identifier "${normalizedProductId}".`);
-      error.code = "AMBIGUOUS_PRODUCT_ID";
+      error.code = "ambiguousProductId";
       throw error;
     }
     if (liveMatches.length === 1) return liveMatches[0];
@@ -577,7 +577,7 @@ function createPassportQueryRepository({
 
     if (archiveMatches.length > 1) {
       const error = new Error(`Multiple archived passports in company "${companyId}" share product identifier "${normalizedProductId}".`);
-      error.code = "AMBIGUOUS_PRODUCT_ID";
+      error.code = "ambiguousProductId";
       throw error;
     }
     return archiveMatches[0] || { passport: null, archived: false };

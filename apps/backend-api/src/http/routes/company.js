@@ -11,7 +11,7 @@ const {
   createComplianceManagedFieldHelpers,
 } = require("../../modules/passports/compliance-managed-fields");
 const {
-  IMPORT_MANAGED_FIELD_KEYS,
+  importManagedFieldKeys,
   buildManagedImportErrorMessage,
   getInvalidImportFieldKeys,
   getManagedImportFieldKeys,
@@ -39,15 +39,15 @@ module.exports = function registerCompanyRoutes(app, {
   getWritablePassportColumns,
   getStoredPassportValues,
   logAudit,
-  EDITABLE_RELEASE_STATUSES_SQL,
-  SYSTEM_PASSPORT_FIELDS,
+  editableReleaseStatusesSql,
+  systemPassportFields,
   buildSemanticPassportJsonExport,
   buildExpandedPassportPayload,
   productIdentifierService,
   complianceService,
   accessRightsService
 }) {
-  const GOVERNANCE_IMPORT_TOKENS = new Set([
+  const governanceImportTokens = new Set([
     "access",
     "audience",
     "audiences",
@@ -71,8 +71,8 @@ module.exports = function registerCompanyRoutes(app, {
   function isSchemaGovernanceKey(rawKey, typeSchema) {
     const key = String(rawKey || "").trim();
     if (!key) return false;
-    if (typeSchema?.allowedKeys?.has?.(key) || SYSTEM_PASSPORT_FIELDS.has(key)) return false;
-    return GOVERNANCE_IMPORT_TOKENS.has(normalizeGovernanceToken(key));
+    if (typeSchema?.allowedKeys?.has?.(key) || systemPassportFields.has(key)) return false;
+    return governanceImportTokens.has(normalizeGovernanceToken(key));
   }
 
   function buildGovernanceImportErrorMessage(keys = []) {
@@ -81,7 +81,7 @@ module.exports = function registerCompanyRoutes(app, {
 
   function createImportExcludedFieldSet(extraFields = []) {
     return new Set([
-      ...IMPORT_MANAGED_FIELD_KEYS,
+      ...importManagedFieldKeys,
       ...extraFields,
     ]);
   }
@@ -244,7 +244,7 @@ module.exports = function registerCompanyRoutes(app, {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "UPDATE_COMPLIANCE_IDENTITY",
+        "updateComplianceIdentity",
         "companies",
         req.params.companyId,
         null,
@@ -303,7 +303,7 @@ module.exports = function registerCompanyRoutes(app, {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "UPSERT_FACILITY_IDENTIFIER",
+        "upsertFacilityIdentifier",
         "companyFacilities",
         facilityIdentifier,
         null,
@@ -526,7 +526,7 @@ module.exports = function registerCompanyRoutes(app, {
       const tableName = getTable(tmpl.passportType);
       const passRes = await pool.query(
         `SELECT * FROM ${tableName}
-         WHERE "companyId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+         WHERE "companyId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
          ORDER BY "createdAt" DESC`,
         [companyId]
       );
@@ -665,7 +665,7 @@ module.exports = function registerCompanyRoutes(app, {
         try {
           if (incomingGuid) {
             const existing = await pool.query(
-              `SELECT id FROM ${tableName} WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL`,
+              `SELECT id FROM ${tableName} WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL`,
               [incomingGuid, companyId]
             );
             if (!existing.rows.length) {
@@ -698,7 +698,7 @@ module.exports = function registerCompanyRoutes(app, {
             }
             const updateCols = await updatePassportRowById({ tableName, rowId, userId, data: updateData, excluded });
             if (!updateCols.length) {skipped++;continue;}
-            await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "csvUpsert" });
+            await logAudit(companyId, userId, "update", tableName, incomingGuid, null, { source: "csvUpsert" });
             details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "updated" });
             updated++;
           } else {
@@ -726,7 +726,7 @@ module.exports = function registerCompanyRoutes(app, {
                   details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped", reason: "no changes detected" });
                   skipped++;continue;
                 }
-                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "csvUpsert", matchedBy: "internalAliasId" });
+                await logAudit(companyId, userId, "update", tableName, existingByProductId.dppId, null, { source: "csvUpsert", matchedBy: "internalAliasId" });
                 details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "updated" });
                 updated++;continue;
               }
@@ -863,7 +863,7 @@ module.exports = function registerCompanyRoutes(app, {
           }
           if (incomingGuid) {
             const existing = await pool.query(
-              `SELECT id FROM ${tableName} WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL`,
+              `SELECT id FROM ${tableName} WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL`,
               [incomingGuid, companyId]
             );
             if (!existing.rows.length) {
@@ -898,7 +898,7 @@ module.exports = function registerCompanyRoutes(app, {
               details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "skipped", reason: "no changes detected" });
               skipped++;continue;
             }
-            await logAudit(companyId, userId, "UPDATE", tableName, incomingGuid, null, { source: "jsonUpsert" });
+            await logAudit(companyId, userId, "update", tableName, incomingGuid, null, { source: "jsonUpsert" });
             details.push({ dppId: incomingGuid, internalAliasId: normalizedProductId || undefined, status: "updated" });
             updated++;
           } else {
@@ -926,7 +926,7 @@ module.exports = function registerCompanyRoutes(app, {
                   details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "skipped", reason: "no changes detected" });
                   skipped++;continue;
                 }
-                await logAudit(companyId, userId, "UPDATE", tableName, existingByProductId.dppId, null, { source: "jsonUpsert", matchedBy: "internalAliasId" });
+                await logAudit(companyId, userId, "update", tableName, existingByProductId.dppId, null, { source: "jsonUpsert", matchedBy: "internalAliasId" });
                 details.push({ dppId: existingByProductId.dppId, internalAliasId: normalizedProductId, status: "updated" });
                 updated++;continue;
               }

@@ -14,7 +14,7 @@ function createComplianceHelpers({
   normalizeReleaseStatus,
   updatePassportRowById,
 }) {
-  const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
+  const validGranularities = new Set(["model", "batch", "item"]);
 
   function extractBusinessIdentifierSource(source = null, typeDef = null) {
     return productIdentifierService.extractBusinessProductIdentifier?.(source || {}, typeDef) || "";
@@ -109,7 +109,7 @@ function createComplianceHelpers({
       ? null
       : String(requestedGranularity).trim().toLowerCase();
 
-    if (normalizedRequested && !VALID_GRANULARITIES.has(normalizedRequested)) {
+    if (normalizedRequested && !validGranularities.has(normalizedRequested)) {
       const error = new Error("granularity must be one of: model, batch, item");
       error.statusCode = 400;
       throw error;
@@ -234,7 +234,7 @@ function createComplianceHelpers({
   }
 
   return {
-    VALID_GRANULARITIES,
+    validGranularities,
     buildComplianceManagedFields,
     buildStoredProductIdentifiers,
     evaluateCompliance,

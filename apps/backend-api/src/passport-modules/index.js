@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { normalizeSystemPassportHeader, validateSystemPassportHeader } = require("../services/passport-header-fields");
 
-const DEFAULT_MODULES_DIR = __dirname;
+const defaultModulesDir = __dirname;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -105,7 +105,7 @@ function flattenModuleExports(moduleExport) {
 }
 
 function loadPassportTypeModuleDefinitions(options = {}) {
-  const modulesDir = options.modulesDir || DEFAULT_MODULES_DIR;
+  const modulesDir = options.modulesDir || defaultModulesDir;
   if (!fs.existsSync(modulesDir)) return [];
 
   return fs.readdirSync(modulesDir, { withFileTypes: true })

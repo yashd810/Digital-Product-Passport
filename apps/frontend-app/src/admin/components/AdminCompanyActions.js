@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function CompanyKebabMenu({ pos, onClose, children }) {
   const ref = useRef(null);
@@ -106,7 +106,7 @@ function AdminCompanyActions({
       setPolicyTarget({ ...(company || {}), id: companyId, companyName });
       setPolicyError("");
       setPolicyLoading(true);
-      const response = await fetchWithAuth(`${API}/api/admin/companies/${companyId}/dpp-policy`, {
+      const response = await fetchWithAuth(`${api}/api/admin/companies/${companyId}/dpp-policy`, {
         headers: { ...authHeaders() },
       });
       const data = await response.json().catch(() => ({}));
@@ -138,7 +138,7 @@ function AdminCompanyActions({
     if (!policyTarget || !policyForm) return;
     try {
       setPolicySaving(true);
-      const response = await fetchWithAuth(`${API}/api/admin/companies/${policyTarget.id}/dpp-policy`, {
+      const response = await fetchWithAuth(`${api}/api/admin/companies/${policyTarget.id}/dpp-policy`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(policyForm),
@@ -220,7 +220,7 @@ function AdminCompanyActions({
 
     try {
       setIsDeleting(true);
-      const response = await fetchWithAuth(`${API}/api/admin/companies/${deleteTarget.id}`, {
+      const response = await fetchWithAuth(`${api}/api/admin/companies/${deleteTarget.id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ password: deletePassword }),

@@ -46,7 +46,7 @@ module.exports = function registerElementRoutes(app, deps) {
       });
       if (!accessDecision.allowed) {
         return res.status(403).json({
-          error: "DATA_ELEMENT_RESTRICTED",
+          error: "dataElementRestricted",
           audiences: accessDecision.audiences,
           confidentiality: accessDecision.confidentiality
         });
@@ -58,9 +58,9 @@ module.exports = function registerElementRoutes(app, deps) {
 
       return res.json(buildElementEnvelope(result.passport, result.typeDef, normalizedPath, value));
     } catch (e) {
-      if (e.code === "AMBIGUOUS_DPP_ID") {
+      if (e.code === "ambiguousDppId") {
         return res.status(409).json({
-          error: "AMBIGUOUS_DPP_ID",
+          error: "ambiguousDppId",
           message: "Multiple passports match this dppId."
         });
       }
@@ -113,9 +113,9 @@ module.exports = function registerElementRoutes(app, deps) {
         }
       });
     } catch (e) {
-      if (e.code === "AMBIGUOUS_DPP_ID") {
+      if (e.code === "ambiguousDppId") {
         return res.status(409).json({
-          error: "AMBIGUOUS_DPP_ID",
+          error: "ambiguousDppId",
           message: "Multiple passports match this dppId."
         });
       }
@@ -172,7 +172,7 @@ module.exports = function registerElementRoutes(app, deps) {
       });
       return res.status(result.statusCode).json(result.body);
     } catch (e) {
-      if (e.code === "AMBIGUOUS_DPP_ID" || e.code === "AMBIGUOUS_PRODUCT_ID") {
+      if (e.code === "ambiguousDppId" || e.code === "ambiguousProductId") {
         return res.status(409).json({
           error: e.code,
           companyIds: e.companyIds || []

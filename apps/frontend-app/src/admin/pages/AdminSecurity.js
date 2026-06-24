@@ -5,7 +5,7 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import UserProfile from "../../user/profile/UserProfile";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function AdminSecurity({ user }) {
   const location = useLocation();
@@ -58,7 +58,7 @@ function AdminSecurity({ user }) {
   const loadSuperAdmins = async () => {
     try {
       setAdminsLoading(true);
-      const response = await fetchWithAuth(`${API}/api/admin/super-admins`, {
+      const response = await fetchWithAuth(`${api}/api/admin/super-admins`, {
         headers: authHeaders(),
       });
       const data = await response.json();
@@ -88,7 +88,7 @@ function AdminSecurity({ user }) {
     }
     try {
       setInviting(true);
-      const response = await fetchWithAuth(`${API}/api/admin/super-admins/invite`, {
+      const response = await fetchWithAuth(`${api}/api/admin/super-admins/invite`, {
         method: "POST",
         headers: authHeaders({
           "Content-Type": "application/json",
@@ -109,7 +109,7 @@ function AdminSecurity({ user }) {
   const handleApproveInvite = async (inviteId) => {
     try {
       setApprovingInviteId(inviteId);
-      const response = await fetchWithAuth(`${API}/api/admin/super-admins/invite-requests/${inviteId}/approve`, {
+      const response = await fetchWithAuth(`${api}/api/admin/super-admins/invite-requests/${inviteId}/approve`, {
         method: "POST",
         headers: authHeaders({
           "Content-Type": "application/json",
@@ -128,7 +128,7 @@ function AdminSecurity({ user }) {
   const handleDeclineInvite = async (inviteId) => {
     try {
       setApprovingInviteId(inviteId);
-      const response = await fetchWithAuth(`${API}/api/admin/super-admins/invite-requests/${inviteId}/decline`, {
+      const response = await fetchWithAuth(`${api}/api/admin/super-admins/invite-requests/${inviteId}/decline`, {
         method: "POST",
         headers: authHeaders({
           "Content-Type": "application/json",
@@ -169,7 +169,7 @@ function AdminSecurity({ user }) {
 
     try {
       setTogglingId(admin.id);
-      const response = await fetchWithAuth(`${API}/api/admin/super-admins/${admin.id}/access`, {
+      const response = await fetchWithAuth(`${api}/api/admin/super-admins/${admin.id}/access`, {
         method: "PATCH",
         headers: authHeaders({
           "Content-Type": "application/json",

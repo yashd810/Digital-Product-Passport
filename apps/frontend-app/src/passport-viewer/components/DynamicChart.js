@@ -2,11 +2,11 @@ import React from "react";
 import "../styles/PassportViewer.css";
 
 // SVG canvas dimensions
-const W   = 520;
-const H   = 220;
-const PAD = { top: 18, right: 18, bottom: 46, left: 52 };
-const IW  = W - PAD.left - PAD.right;   // inner width
-const IH  = H - PAD.top  - PAD.bottom;  // inner height
+const w   = 520;
+const h   = 220;
+const pad = { top: 18, right: 18, bottom: 46, left: 52 };
+const iw  = w - pad.left - pad.right;   // inner width
+const ih  = h - pad.top  - pad.bottom;  // inner height
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,11 +74,11 @@ function LineChart({ points }) {
   const yLo      = dataMin - pad;
   const yHi      = dataMax + pad;
 
-  const toX = t  => ((t - xMin) / (xMax - xMin || 1)) * IW + PAD.left;
-  const toY = v  => IH - ((v - yLo) / (yHi - yLo)) * IH + PAD.top;
+  const toX = t  => ((t - xMin) / (xMax - xMin || 1)) * iw + pad.left;
+  const toY = v  => ih - ((v - yLo) / (yHi - yLo)) * ih + pad.top;
 
   const polyPts  = points.map(p => `${toX(p.ts)},${toY(p.num)}`).join(" ");
-  const areaPts  = `${toX(xMin)},${PAD.top + IH} ${polyPts} ${toX(xMax)},${PAD.top + IH}`;
+  const areaPts  = `${toX(xMin)},${pad.top + ih} ${polyPts} ${toX(xMax)},${pad.top + ih}`;
 
   const yTicks   = niceTicks(yLo, yHi, 5);
   const xCount   = Math.min(6, points.length);
@@ -88,11 +88,11 @@ function LineChart({ points }) {
         Math.round(i * (points.length - 1) / (xCount - 1)));
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="dyn-chart-svg">
+    <svg viewBox={`0 0 ${w} ${h}`} className="dyn-chart-svg">
       {/* Horizontal grid */}
       {yTicks.map((t, i) => (
         <line key={i}
-          x1={PAD.left} x2={PAD.left + IW}
+          x1={pad.left} x2={pad.left + iw}
           y1={toY(t)} y2={toY(t)}
           stroke="#e8f2f0" strokeWidth="1" />
       ))}
@@ -114,26 +114,26 @@ function LineChart({ points }) {
       ))}
 
       {/* Y axis */}
-      <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + IH}
+      <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + ih}
         stroke="#b0ccc8" strokeWidth="1.5" />
       {yTicks.map((t, i) => (
         <text key={i}
-          x={PAD.left - 7} y={toY(t)}
+          x={pad.left - 7} y={toY(t)}
           textAnchor="end" dominantBaseline="middle"
           className="dyn-axis-label">{fmtNum(t)}</text>
       ))}
 
       {/* X axis */}
-      <line x1={PAD.left} y1={PAD.top + IH} x2={PAD.left + IW} y2={PAD.top + IH}
+      <line x1={pad.left} y1={pad.top + ih} x2={pad.left + iw} y2={pad.top + ih}
         stroke="#b0ccc8" strokeWidth="1.5" />
       {xIdxs.map((idx, i) => {
         const p = points[idx];
         const x = toX(p.ts);
         return (
           <g key={i}>
-            <line x1={x} x2={x} y1={PAD.top + IH} y2={PAD.top + IH + 4}
+            <line x1={x} x2={x} y1={pad.top + ih} y2={pad.top + ih + 4}
               stroke="#b0ccc8" strokeWidth="1" />
-            <text x={x} y={PAD.top + IH + 16}
+            <text x={x} y={pad.top + ih + 16}
               textAnchor="middle" className="dyn-axis-label">
               {fmtTime(new Date(p.ts), spanMins)}
             </text>
@@ -164,24 +164,24 @@ function NumericHistogram({ nums }) {
   });
 
   const maxCount = Math.max(...buckets.map(b => b.count), 1);
-  const barW     = IW / nBuckets;
+  const barW     = iw / nBuckets;
   const yTicks   = niceTicks(0, maxCount, 4).filter(t => t >= 0);
-  const toY      = v => IH - (v / maxCount) * IH + PAD.top;
+  const toY      = v => ih - (v / maxCount) * ih + pad.top;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="dyn-chart-svg">
+    <svg viewBox={`0 0 ${w} ${h}`} className="dyn-chart-svg">
       {/* Grid */}
       {yTicks.map((t, i) => (
         <line key={i}
-          x1={PAD.left} x2={PAD.left + IW}
+          x1={pad.left} x2={pad.left + iw}
           y1={toY(t)} y2={toY(t)}
           stroke="#e8f2f0" strokeWidth="1" />
       ))}
 
       {/* Bars */}
       {buckets.map((b, i) => {
-        const x    = PAD.left + i * barW;
-        const barH = (b.count / maxCount) * IH;
+        const x    = pad.left + i * barW;
+        const barH = (b.count / maxCount) * ih;
         const y    = toY(b.count);
         return (
           <g key={i}>
@@ -193,7 +193,7 @@ function NumericHistogram({ nums }) {
                 {b.count}
               </text>
             )}
-            <text x={x + barW / 2} y={PAD.top + IH + 14}
+            <text x={x + barW / 2} y={pad.top + ih + 14}
               textAnchor="middle" className="dyn-axis-label">
               {fmtNum(b.lo)}
             </text>
@@ -202,20 +202,20 @@ function NumericHistogram({ nums }) {
       })}
 
       {/* Y axis */}
-      <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + IH}
+      <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + ih}
         stroke="#b0ccc8" strokeWidth="1.5" />
       {yTicks.map((t, i) => (
         <text key={i}
-          x={PAD.left - 7} y={toY(t)}
+          x={pad.left - 7} y={toY(t)}
           textAnchor="end" dominantBaseline="middle"
           className="dyn-axis-label">{fmtNum(t)}</text>
       ))}
 
       {/* X axis */}
-      <line x1={PAD.left} y1={PAD.top + IH} x2={PAD.left + IW} y2={PAD.top + IH}
+      <line x1={pad.left} y1={pad.top + ih} x2={pad.left + iw} y2={pad.top + ih}
         stroke="#b0ccc8" strokeWidth="1.5" />
       {/* X axis label */}
-      <text x={PAD.left + IW / 2} y={PAD.top + IH + 36}
+      <text x={pad.left + iw / 2} y={pad.top + ih + 36}
         textAnchor="middle" className="dyn-axis-label dyn-axis-title">
         Value buckets
       </text>
@@ -228,15 +228,15 @@ function CategoryHistogram({ entries }) {
   entries.forEach(e => { freq[e.raw] = (freq[e.raw] || 0) + 1; });
   const cats     = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 12);
   const maxCount = Math.max(...cats.map(c => c[1]), 1);
-  const barW     = IW / cats.length;
-  const toY      = v => IH - (v / maxCount) * IH + PAD.top;
+  const barW     = iw / cats.length;
+  const toY      = v => ih - (v / maxCount) * ih + pad.top;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="dyn-chart-svg">
+    <svg viewBox={`0 0 ${w} ${h}`} className="dyn-chart-svg">
       {/* Bars */}
       {cats.map(([cat, count], i) => {
-        const x    = PAD.left + i * barW;
-        const barH = (count / maxCount) * IH;
+        const x    = pad.left + i * barW;
+        const barH = (count / maxCount) * ih;
         const y    = toY(count);
         return (
           <g key={i}>
@@ -246,7 +246,7 @@ function CategoryHistogram({ entries }) {
               textAnchor="middle" className="dyn-axis-label dyn-bar-count">
               {count}
             </text>
-            <text x={x + barW / 2} y={PAD.top + IH + 14}
+            <text x={x + barW / 2} y={pad.top + ih + 14}
               textAnchor="middle" className="dyn-axis-label"
               style={{ fontSize: Math.max(7, Math.min(10, 90 / cats.length)) }}>
               {cat.length > 9 ? cat.slice(0, 8) + "…" : cat}
@@ -256,9 +256,9 @@ function CategoryHistogram({ entries }) {
       })}
 
       {/* Axes */}
-      <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + IH}
+      <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + ih}
         stroke="#b0ccc8" strokeWidth="1.5" />
-      <line x1={PAD.left} y1={PAD.top + IH} x2={PAD.left + IW} y2={PAD.top + IH}
+      <line x1={pad.left} y1={pad.top + ih} x2={pad.left + iw} y2={pad.top + ih}
         stroke="#b0ccc8" strokeWidth="1.5" />
     </svg>
   );

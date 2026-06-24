@@ -5,24 +5,24 @@ import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 import "../styles/AdminDashboard.css";
 import "../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const INITIAL_COMPANY_FORM = {
+const initialCompanyForm = {
   companyName: "",
   legalName: "",
   country: "",
   companyRegistrationNumber: "",
   vatNumber: "",
   websiteDomain: "",
-  customerTrustLevel: "BASIC",
+  customerTrustLevel: "basic",
   authorizedContactName: "",
   authorizedContactEmail: "",
 };
 
-const TRUST_LEVEL_OPTIONS = [
-  { value: "BASIC", label: "Small supplier - Basic" },
-  { value: "VERIFIED_BUSINESS", label: "Medium supplier - Verified business" },
-  { value: "ENTERPRISE", label: "Big customer - Enterprise" },
+const trustLevelOptions = [
+  { value: "basic", label: "Small supplier - Basic" },
+  { value: "verifiedBusiness", label: "Medium supplier - Verified business" },
+  { value: "enterprise", label: "Big customer - Enterprise" },
 ];
 
 function buildEditForm(company = {}) {
@@ -33,7 +33,7 @@ function buildEditForm(company = {}) {
     companyRegistrationNumber: company.companyRegistrationNumber || "",
     vatNumber: company.vatNumber || "",
     websiteDomain: company.websiteDomain || "",
-    customerTrustLevel: company.customerTrustLevel || "BASIC",
+    customerTrustLevel: company.customerTrustLevel || "basic",
     authorizedContactName: company.authorizedContactName || "",
     authorizedContactEmail: company.authorizedContactEmail || "",
   };
@@ -58,7 +58,7 @@ function AdminEditCompanyPage() {
   const { companyId } = useParams();
 
   const [company, setCompany] = useState(location.state?.company || null);
-  const [editForm, setEditForm] = useState(buildEditForm(location.state?.company || INITIAL_COMPANY_FORM));
+  const [editForm, setEditForm] = useState(buildEditForm(location.state?.company || initialCompanyForm));
   const [loading, setLoading] = useState(!location.state?.company);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -94,7 +94,7 @@ function AdminEditCompanyPage() {
       try {
         setLoading(true);
         setError("");
-        const response = await fetchWithAuth(`${API}/api/admin/companies/${companyId}`, {
+        const response = await fetchWithAuth(`${api}/api/admin/companies/${companyId}`, {
           headers: { ...authHeaders() },
         });
         const data = await response.json().catch(() => ({}));
@@ -124,7 +124,7 @@ function AdminEditCompanyPage() {
       try {
         setPolicyLoading(true);
         setPolicyError("");
-        const response = await fetchWithAuth(`${API}/api/admin/companies/${companyId}/dpp-policy`, {
+        const response = await fetchWithAuth(`${api}/api/admin/companies/${companyId}/dpp-policy`, {
           headers: { ...authHeaders() },
         });
         const data = await response.json().catch(() => ({}));
@@ -164,7 +164,7 @@ function AdminEditCompanyPage() {
     try {
       setSaving(true);
       setError("");
-      const response = await fetchWithAuth(`${API}/api/admin/companies/${companyId}`, {
+      const response = await fetchWithAuth(`${api}/api/admin/companies/${companyId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
@@ -199,7 +199,7 @@ function AdminEditCompanyPage() {
     try {
       setPolicySaving(true);
       setPolicyError("");
-      const response = await fetchWithAuth(`${API}/api/admin/companies/${companyId}/dpp-policy`, {
+      const response = await fetchWithAuth(`${api}/api/admin/companies/${companyId}/dpp-policy`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(policyForm),
@@ -315,7 +315,7 @@ function AdminEditCompanyPage() {
                 onChange={(event) => handleEditFormChange("customerTrustLevel", event.target.value)}
                 disabled={saving}
               >
-                {TRUST_LEVEL_OPTIONS.map((option) => (
+                {trustLevelOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>

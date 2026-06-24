@@ -2,16 +2,16 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { applyTableControls, getNextSortDirection, sortIndicator } from "../../../shared/table/tableControls";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const ROLES = [
+const roles = [
   { key: "companyAdmin", label: "Admin",  desc: "Full access — manage team, all passports",    badge: "role-admin"  },
   { key: "editor",        label: "Editor", desc: "Create, edit, release passports; invite viewers", badge: "role-editor" },
   { key: "viewer",        label: "Viewer", desc: "Read-only access to all passports",            badge: "role-viewer" },
 ];
 
 function RoleBadge({ role }) {
-  const info = ROLES.find(r => r.key === role) || { label: role, badge: "role-viewer" };
+  const info = roles.find(r => r.key === role) || { label: role, badge: "role-viewer" };
   return <span className={`team-badge ${info.badge}`}>{info.label}</span>;
 }
 
@@ -54,7 +54,7 @@ function ManageTeam({ user, companyId }) {
   const fetchMembers = async () => {
     setLoading(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/users`, {
         headers: { ...authHeaders() },
       });
       if (!r.ok) throw new Error();
@@ -86,7 +86,7 @@ function ManageTeam({ user, companyId }) {
     const roleToSend = isAdmin ? inviteRole : "viewer";
     setInviteLoading(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/invite`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ inviteeEmail: inviteEmail.trim(), roleToAssign: roleToSend }),
@@ -105,7 +105,7 @@ function ManageTeam({ user, companyId }) {
   // Change role
   const handleRoleChange = async (userId) => {
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/users/${userId}`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ role: editRole }),
@@ -123,7 +123,7 @@ function ManageTeam({ user, companyId }) {
   const handleDeactivate = async (userId, name) => {
     if (!window.confirm(`Deactivate ${name}? They will no longer be able to log in.`)) return;
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/users/${userId}/deactivate`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/users/${userId}/deactivate`, {
         method: "PATCH",
         headers: { ...authHeaders() },
       });
@@ -150,7 +150,7 @@ function ManageTeam({ user, companyId }) {
 
       {/* Role legend */}
       <div className="role-legend">
-        {ROLES.map(r => (
+        {roles.map(r => (
           <div key={r.key} className="legend-item">
             <span className={`team-badge ${r.badge}`}>{r.label}</span>
             <span className="legend-desc">{r.desc}</span>
@@ -177,7 +177,7 @@ function ManageTeam({ user, companyId }) {
             <select value={inviteRole} disabled={inviteLoading}
               onChange={e => setInviteRole(e.target.value)}
               className="invite-role-select">
-              {ROLES.map(r => (
+              {roles.map(r => (
                 <option key={r.key} value={r.key}>{r.label}</option>
               ))}
             </select>
@@ -251,7 +251,7 @@ function ManageTeam({ user, companyId }) {
                         <div className="role-edit">
                           <select value={editRole} onChange={e => setEditRole(e.target.value)}
                             className="role-select-inline">
-                            {ROLES.map(r => (
+                            {roles.map(r => (
                               <option key={r.key} value={r.key}>{r.label}</option>
                             ))}
                           </select>

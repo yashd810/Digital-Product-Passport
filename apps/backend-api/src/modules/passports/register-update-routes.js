@@ -5,9 +5,9 @@ const { createValidationMiddleware } = require("../../shared/validation/request-
 const { quoteSqlIdentifier } = require("../../shared/passports/passport-helpers");
 const { updateEditablePassportUseCase } = require("./application/update-passport");
 
-const BULK_PATCH_BUILT_IN_EDITABLE_FIELDS = new Set(["internalAliasId", "modelName"]);
+const bulkPatchBuiltInEditableFields = new Set(["internalAliasId", "modelName"]);
 
-function getInvalidBulkPatchFieldKeys(fields = {}, typeSchema, builtInCols = BULK_PATCH_BUILT_IN_EDITABLE_FIELDS) {
+function getInvalidBulkPatchFieldKeys(fields = {}, typeSchema, builtInCols = bulkPatchBuiltInEditableFields) {
   return Object.keys(fields || {}).filter((key) =>
     !typeSchema?.allowedKeys?.has?.(key) && !builtInCols.has(key)
   );
@@ -34,9 +34,9 @@ function registerUpdateRoutes(app, deps) {
     archivePassportSnapshots,
     getActorIdentifier,
     logAudit,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    IN_REVISION_STATUSES_SQL,
-    VALID_GRANULARITIES,
+    editableReleaseStatusesSql,
+    inRevisionStatusesSql,
+    validGranularities,
     hasReleasedLineageVersion,
     buildStoredProductIdentifiers,
     findExistingPassportByInternalAliasId,
@@ -118,11 +118,11 @@ function registerUpdateRoutes(app, deps) {
       const normalizedStatusFilter = statusFilter.toLowerCase();
 
       if (normalizedStatusFilter === "alleditable" || normalizedStatusFilter === "editable" || normalizedStatusFilter === "draft") {
-        filterSql += ` AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}`;
+        filterSql += ` AND "releaseStatus" IN ${editableReleaseStatusesSql}`;
       } else if (normalizedStatusFilter === "draftonly") {
         filterSql += ` AND "releaseStatus" = 'draft'`;
       } else if (normalizedStatusFilter === "inrevision") {
-        filterSql += ` AND "releaseStatus" IN ${IN_REVISION_STATUSES_SQL}`;
+        filterSql += ` AND "releaseStatus" IN ${inRevisionStatusesSql}`;
       } else {
         return res.status(400).json({ error: `Invalid status filter "${statusFilter}". Use: editable, draftOnly, inRevision` });
       }
@@ -191,7 +191,7 @@ function registerUpdateRoutes(app, deps) {
         snapshotReason: "afterBulkUpdateAll",
       });
 
-      await logAudit(companyId, userId, "BULK_UPDATE_ALL", tableName, null, null, {
+      await logAudit(companyId, userId, "bulkUpdateAll", tableName, null, null, {
         filter: filterObj,
         fieldsUpdated: updateKeys,
         count: updatedGuids.length,
@@ -285,7 +285,7 @@ function registerUpdateRoutes(app, deps) {
           let currentRow = null;
           if (incomingGuid) {
             const byGuid = await pool.query(
-              `SELECT * FROM ${tableName} WHERE "dppId"=$1 AND "companyId"=$2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL`,
+              `SELECT * FROM ${tableName} WHERE "dppId"=$1 AND "companyId"=$2 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL`,
               [incomingGuid, companyId]
             );
             if (byGuid.rows.length) {
@@ -383,7 +383,7 @@ function registerUpdateRoutes(app, deps) {
             });
           }
 
-          await logAudit(companyId, userId, "UPDATE", tableName, matchedGuid, null, { source: "bulkPatch", fieldsUpdated: updateCols });
+          await logAudit(companyId, userId, "update", tableName, matchedGuid, null, { source: "bulkPatch", fieldsUpdated: updateCols });
           details.push({ dppId: matchedGuid, internalAliasId: normalizedProductId || undefined, status: "updated", fieldsUpdated: updateCols });
           updated += 1;
         } catch (error) {

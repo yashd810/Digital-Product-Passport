@@ -79,7 +79,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
         return res.status(400).json({ error: "Maximum of 10 active API keys per company" });
       }
 
-      const rawKey = `dpp_${require("crypto").randomBytes(20).toString("hex")}`;
+      const rawKey = `dppKey${require("crypto").randomBytes(20).toString("hex")}`;
       const keyRecord = buildApiKeyHashRecord(rawKey);
 
       const result = await pool.query(
@@ -123,7 +123,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "REVOKE_API_KEY",
+        "revokeApiKey",
         "apiKeys",
         String(req.params.keyId),
         result.rows[0],
@@ -136,7 +136,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
 
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "API_KEY_REVOKED",
+        eventType: "apiKeyRevoked",
         severity: "high",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -172,7 +172,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "REVOKE_API_KEY",
+        "revokeApiKey",
         "apiKeys",
         String(req.params.keyId),
         result.rows[0],
@@ -185,7 +185,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
 
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "API_KEY_REVOKED",
+        eventType: "apiKeyRevoked",
         severity: "high",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -224,7 +224,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "EMERGENCY_REVOKE_API_KEY",
+        "emergencyRevokeApiKey",
         "apiKeys",
         String(req.params.keyId),
         result.rows[0],
@@ -237,7 +237,7 @@ module.exports = function registerApiKeyRoutes(app, deps) {
 
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "API_KEY_EMERGENCY_REVOKED",
+        eventType: "apiKeyEmergencyRevoked",
         severity: "critical",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,

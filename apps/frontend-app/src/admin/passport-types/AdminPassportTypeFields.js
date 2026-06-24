@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
-  ACCESS_LEVEL_LABELS,
-  CONFIDENTIALITY_LEVEL_LABELS,
-  UPDATE_AUTHORITY_LABELS,
+  accessLevelLabels,
+  confidentialityLevelLabels,
+  updateAuthorityLabels,
   normalizeSystemPassportHeader,
   resolveSystemHeaderEntries,
 } from "./builderHelpers";
@@ -11,7 +11,7 @@ import { formatSemanticModelLabel } from "./semanticTermCatalog";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 const getSemanticModelLabel = formatSemanticModelLabel;
 
@@ -30,7 +30,7 @@ function AdminPassportTypeFields() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetchWithAuth(`${API}/api/passport-types/${typeName}`);
+        const res = await fetchWithAuth(`${api}/api/passport-types/${typeName}`);
         if (!res.ok) throw new Error("Passport type not found");
         const data = await res.json();
         setTypeDef({ ...data, typeName });
@@ -128,9 +128,9 @@ function AdminPassportTypeFields() {
                       <td>{field.label}</td>
                       <td><code>{field.key}</code></td>
                       <td><span className={`apt-fv-type apt-fv-type-${field.type}`}>{field.type}</span></td>
-                      <td>{describeList(field.access, ACCESS_LEVEL_LABELS)}</td>
-                      <td>{CONFIDENTIALITY_LEVEL_LABELS[field.confidentiality] || field.confidentiality || "—"}</td>
-                      <td>{describeList(field.updateAuthority, UPDATE_AUTHORITY_LABELS)}</td>
+                      <td>{describeList(field.access, accessLevelLabels)}</td>
+                      <td>{confidentialityLevelLabels[field.confidentiality] || field.confidentiality || "—"}</td>
+                      <td>{describeList(field.updateAuthority, updateAuthorityLabels)}</td>
                     </tr>
                   ))}
                 </tbody>

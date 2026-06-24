@@ -4,9 +4,9 @@ const nodeCrypto = require("crypto");
 const logger = require("./logger");
 const { normalizeSystemPassportHeader } = require("./passport-header-fields");
 const {
-  LIVE_PASSPORT_SYSTEM_COLUMNS,
-  LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS,
-  SYSTEM_PASSPORT_COLUMN_MAPPINGS,
+  livePassportSystemColumns,
+  livePassportSystemColumnDefinitions,
+  systemPassportColumnMappings,
 } = require("../shared/passports/system-passport-columns");
 const { createAuditServiceHelpers } = require("../modules/passports/audit-service-helpers");
 const { createArchiveHistoryHelpers } = require("../modules/passports/archive-history-helpers");
@@ -14,11 +14,11 @@ const { createPassportQueryRepository } = require("../modules/passports/passport
 const { createSchemaStorageHelpers } = require("../modules/passports/schema-storage-helpers");
 const { createWorkflowHelpers } = require("../modules/passports/workflow-helpers");
 
-const IN_REVISION_STATUSES_SQL       = `('inRevision')`;
-const EDITABLE_RELEASE_STATUSES_SQL  = `('draft','inRevision')`;
-const REVISION_BLOCKING_STATUSES_SQL = `('draft','inRevision','inReview')`;
-const EDIT_SESSION_TIMEOUT_HOURS     = 12;
-const EDIT_SESSION_TIMEOUT_SQL       = `${EDIT_SESSION_TIMEOUT_HOURS} hours`;
+const inRevisionStatusesSql       = `('inRevision')`;
+const editableReleaseStatusesSql  = `('draft','inRevision')`;
+const revisionBlockingStatusesSql = `('draft','inRevision','inReview')`;
+const editSessionTimeoutHours     = 12;
+const editSessionTimeoutSql       = `${editSessionTimeoutHours} hours`;
 module.exports = function createPassportService({
   pool,
   // pure helpers (from passport-helpers.js)
@@ -29,8 +29,8 @@ module.exports = function createPassportService({
   isEditablePassportStatus,
   normalizeInternalAliasIdValue,
   generateInternalAliasIdValue,
-  IN_REVISION_STATUS,
-  SYSTEM_PASSPORT_FIELDS,
+  inRevisionStatus,
+  systemPassportFields,
   getWritablePassportColumns,
   getStoredPassportValues,
   quoteSqlIdentifier,
@@ -118,7 +118,7 @@ module.exports = function createPassportService({
   } = createArchiveHistoryHelpers({
     pool,
     logger,
-    SYSTEM_PASSPORT_FIELDS,
+    systemPassportFields,
     getWritablePassportColumns,
     getStoredPassportValues,
     quoteSqlIdentifier,
@@ -152,10 +152,10 @@ module.exports = function createPassportService({
     isEditablePassportStatus,
     quoteSqlIdentifier,
     joinQuotedSqlIdentifiers,
-    SYSTEM_PASSPORT_COLUMN_MAPPINGS,
-    LIVE_PASSPORT_SYSTEM_COLUMNS,
-    LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS,
-    IN_REVISION_STATUSES_SQL,
+    systemPassportColumnMappings,
+    livePassportSystemColumns,
+    livePassportSystemColumnDefinitions,
+    inRevisionStatusesSql,
   });
   const {
     submitPassportToWorkflow,
@@ -167,8 +167,8 @@ module.exports = function createPassportService({
     getTable,
     normalizePassportRow,
     normalizeReleaseStatus,
-    IN_REVISION_STATUS,
-    EDITABLE_RELEASE_STATUSES_SQL,
+    inRevisionStatus,
+    editableReleaseStatusesSql,
     archivePassportSnapshot,
     createNotification,
     logAudit,
@@ -201,11 +201,11 @@ module.exports = function createPassportService({
 
   // ─── EDIT SESSION HELPERS ────────────────────────────────────────────────
   async function clearExpiredEditSessions() {
-    return clearExpiredEditSessionsBase(EDIT_SESSION_TIMEOUT_SQL);
+    return clearExpiredEditSessionsBase(editSessionTimeoutSql);
   }
 
   async function listActiveEditSessions(passportDppId, currentUserId = null) {
-    return listActiveEditSessionsBase(passportDppId, currentUserId, EDIT_SESSION_TIMEOUT_SQL);
+    return listActiveEditSessionsBase(passportDppId, currentUserId, editSessionTimeoutSql);
   }
 
   // ─── MARK OBSOLETE ────────────────────────────────────────────────────────
@@ -214,11 +214,11 @@ module.exports = function createPassportService({
 
   return {
     // SQL constants (useful for route files to construct queries)
-    IN_REVISION_STATUSES_SQL,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    REVISION_BLOCKING_STATUSES_SQL,
-    EDIT_SESSION_TIMEOUT_HOURS,
-    EDIT_SESSION_TIMEOUT_SQL,
+    inRevisionStatusesSql,
+    editableReleaseStatusesSql,
+    revisionBlockingStatusesSql,
+    editSessionTimeoutHours,
+    editSessionTimeoutSql,
     // functions
     logAudit,
     verifyAuditLogChain,

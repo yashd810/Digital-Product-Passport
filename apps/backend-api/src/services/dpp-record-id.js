@@ -2,26 +2,26 @@
 
 const crypto = require("crypto");
 
-const DPP_RECORD_ID_PREFIX = "dpp_";
-const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const DPP_RECORD_ID_PATTERN = new RegExp(`^${DPP_RECORD_ID_PREFIX}[0-9a-f-]{36}$`, "i");
+const dppRecordIdPrefix = "dppId";
+const uuidV4Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const dppRecordIdPattern = new RegExp(`^${dppRecordIdPrefix}[0-9a-f-]{36}$`, "i");
 
 function generateDppRecordId() {
-  return `${DPP_RECORD_ID_PREFIX}${crypto.randomUUID()}`;
+  return `${dppRecordIdPrefix}${crypto.randomUUID()}`;
 }
 
 function isDppRecordId(value) {
   const candidate = String(value || "").trim();
   if (!candidate) return false;
-  if (DPP_RECORD_ID_PATTERN.test(candidate)) return true;
-  const rawUuid = candidate.startsWith(DPP_RECORD_ID_PREFIX)
-    ? candidate.slice(DPP_RECORD_ID_PREFIX.length)
+  if (dppRecordIdPattern.test(candidate)) return true;
+  const rawUuid = candidate.startsWith(dppRecordIdPrefix)
+    ? candidate.slice(dppRecordIdPrefix.length)
     : candidate;
-  return UUID_V4_PATTERN.test(rawUuid);
+  return uuidV4Pattern.test(rawUuid);
 }
 
 module.exports = {
-  DPP_RECORD_ID_PREFIX,
+  dppRecordIdPrefix,
   generateDppRecordId,
   isDppRecordId,
 };

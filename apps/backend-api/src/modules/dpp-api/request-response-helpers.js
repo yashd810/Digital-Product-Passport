@@ -16,7 +16,7 @@ function createRequestResponseHelpers({
   buildExpandedPassportPayload,
   dppIdentity,
 }) {
-  const STANDARD_RESULT_CODE_BY_HTTP = new Map([
+  const standardResultCodeByHttp = new Map([
     [200, "Success"],
     [201, "SuccessCreated"],
     [202, "SuccessAccepted"],
@@ -38,7 +38,7 @@ function createRequestResponseHelpers({
   }
 
   function getStandardResultCode(httpStatus) {
-    return STANDARD_RESULT_CODE_BY_HTTP.get(Number(httpStatus)) || (
+    return standardResultCodeByHttp.get(Number(httpStatus)) || (
       Number(httpStatus) >= 500 ? "ServerInternalError" :
       Number(httpStatus) >= 400 ? "ClientErrorBadRequest" :
       Number(httpStatus) >= 200 ? "Success" :

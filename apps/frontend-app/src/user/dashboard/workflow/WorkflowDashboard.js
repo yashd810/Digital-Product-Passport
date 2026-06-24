@@ -9,9 +9,9 @@ import { extractComplianceError } from "../../../shared/utils/complianceErrors";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../admin/styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const STATUS_MAP = {
+const statusMap = {
   submittedForReview:    { label:"In Review",   icon:"🔍" },
   submittedForApproval:  { label:"In Approval", icon:"📋" },
   released:                { label:"Released",    icon:"✅" },
@@ -27,7 +27,7 @@ const getWorkflowReleaseStatus = (wf) => wf?.releaseStatus || "";
 const getWorkflowCreatedAt = (wf) => wf?.createdAt || "";
 
 function WorkflowBadge({ status }) {
-  const s = STATUS_MAP[status] || { label: status, icon:"📄" };
+  const s = statusMap[status] || { label: status, icon:"📄" };
   return (
     <span className={`wf-badge ${status || "default"}`}>
       {s.icon} {s.label}
@@ -132,7 +132,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
 
   useEffect(() => {
     // Load eligible users (editors + admins)
-    fetchWithAuth(`${API}/api/companies/${companyId}/users`, {
+    fetchWithAuth(`${api}/api/companies/${companyId}/users`, {
       headers: authHeaders()
     })
     .then(r => r.json())
@@ -145,7 +145,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     .catch((error) => console.warn("Ignored async error", error));
 
     // Pre-fill from user defaults
-    fetchWithAuth(`${API}/api/users/me`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/users/me`, { headers: authHeaders() })
     .then(r => r.json())
     .then(d => {
       if (d.defaultReviewerId) setReviewerId(String(d.defaultReviewerId));
@@ -160,7 +160,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
     try {
       const params = new URLSearchParams({ passportType: getWorkflowPassportType(passport) });
       const response = await fetchWithAuth(
-        `${API}/api/companies/${companyId}/passports/${passport.dppId}/verification-check?${params.toString()}`,
+        `${api}/api/companies/${companyId}/passports/${passport.dppId}/verification-check?${params.toString()}`,
         { headers: authHeaders() }
       );
       const data = await response.json().catch(() => ({}));
@@ -189,7 +189,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
       if (hasWorkflow) {
         // Submit to workflow
         const r = await fetchWithAuth(
-          `${API}/api/companies/${companyId}/passports/${passport.dppId}/submit-review`,
+          `${api}/api/companies/${companyId}/passports/${passport.dppId}/submit-review`,
           {
             method: "POST",
             headers: authHeaders({ "Content-Type":"application/json" }),
@@ -226,7 +226,7 @@ export function ReleaseModal({ passport, companyId, user, onClose, onDone }) {
       } else {
         // Direct release (no workflow)
         const r = await fetchWithAuth(
-          `${API}/api/companies/${companyId}/passports/${passport.dppId}/release`,
+          `${api}/api/companies/${companyId}/passports/${passport.dppId}/release`,
           {
             method: "PATCH",
             headers: authHeaders({ "Content-Type":"application/json" }),
@@ -360,7 +360,7 @@ function ActionModal({ wf, action, companyId, onClose, onDone }) {
         setSubmitting(false);
         return;
       }
-      const r = await fetchWithAuth(`${API}/api/passports/${workflowPassportId}/workflow/${action}`, {
+      const r = await fetchWithAuth(`${api}/api/passports/${workflowPassportId}/workflow/${action}`, {
         method: "POST",
         headers: authHeaders({ "Content-Type":"application/json" }),
         body: JSON.stringify({ comment, passportType: getWorkflowPassportType(wf) }),
@@ -426,10 +426,10 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
     setLoading(true);
     try {
       const [wfRes, blRes] = await Promise.all([
-        fetchWithAuth(`${API}/api/companies/${companyId}/workflow`, {
+        fetchWithAuth(`${api}/api/companies/${companyId}/workflow`, {
           headers: authHeaders()
         }),
-        fetchWithAuth(`${API}/api/users/me/backlog`, {
+        fetchWithAuth(`${api}/api/users/me/backlog`, {
           headers: authHeaders()
         }),
       ]);
@@ -461,7 +461,7 @@ function WorkflowDashboard({ user, companyId, activeTab = "inprogress" }) {
         setTimeout(() => setFlash(""), 4000);
         return;
       }
-      const r = await fetchWithAuth(`${API}/api/passports/${workflowPassportId}/workflow`, {
+      const r = await fetchWithAuth(`${api}/api/passports/${workflowPassportId}/workflow`, {
         method: "DELETE",
         headers: authHeaders()
       });

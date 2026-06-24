@@ -18,8 +18,8 @@ function registerSupportRoutes(app, deps) {
     path,
     logger,
     storageService,
-    LOCAL_STORAGE_DIR,
-    FILES_BASE_DIR,
+    localStorageDir,
+    filesBaseDir,
     normalizeStorageRequestKey,
     isPassportStorageKey,
     publicReadRateLimit,
@@ -35,7 +35,7 @@ function registerSupportRoutes(app, deps) {
         return res.status(404).json({ error: "File not found" });
       }
       next();
-    }, express.static(LOCAL_STORAGE_DIR, {
+    }, express.static(localStorageDir, {
       setHeaders: (res, fp) => {
         res.setHeader("X-Content-Type-Options", "nosniff");
         if (fp.endsWith(".pdf")) {
@@ -123,7 +123,7 @@ function registerSupportRoutes(app, deps) {
 
       if (storageService.isLocal && attachment.filePath) {
         const safePath = path.resolve(attachment.filePath);
-        if (safePath !== FILES_BASE_DIR && !safePath.startsWith(`${FILES_BASE_DIR}${path.sep}`)) {
+        if (safePath !== filesBaseDir && !safePath.startsWith(`${filesBaseDir}${path.sep}`)) {
           return res.status(404).json({ error: "File not found" });
         }
         if (!fs.existsSync(safePath)) return res.status(404).json({ error: "File not found" });

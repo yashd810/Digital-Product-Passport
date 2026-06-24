@@ -10,7 +10,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     checkCompanyAccess,
     requireEditor,
     createAccessKeyMaterial,
-    EDIT_SESSION_TIMEOUT_HOURS,
+    editSessionTimeoutHours,
     stripRestrictedFieldsForPublicView,
     normalizePassportRow,
     getCompanyNameMap,
@@ -121,7 +121,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
         }),
       });
     } catch (error) {
-      if (error.code === "AMBIGUOUS_PRODUCT_ID") return res.status(409).json({ error: error.message });
+      if (error.code === "ambiguousProductId") return res.status(409).json({ error: error.message });
       res.status(500).json({ error: "Failed to fetch passport preview" });
     }
   });
@@ -129,7 +129,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
   app.get("/api/companies/:companyId/passports/:dppId/edit-session", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const editors = await listActiveEditSessions(req.params.dppId, req.user.userId);
-      res.json({ editors, timeoutHours: EDIT_SESSION_TIMEOUT_HOURS, serverTime: new Date().toISOString() });
+      res.json({ editors, timeoutHours: editSessionTimeoutHours, serverTime: new Date().toISOString() });
     } catch {
       res.status(500).json({ error: "Failed to fetch edit session" });
     }
@@ -151,7 +151,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       );
 
       const editors = await listActiveEditSessions(dppId, req.user.userId);
-      res.json({ success: true, editors, timeoutHours: EDIT_SESSION_TIMEOUT_HOURS, lastActivityAt: new Date().toISOString() });
+      res.json({ success: true, editors, timeoutHours: editSessionTimeoutHours, lastActivityAt: new Date().toISOString() });
     } catch {
       res.status(500).json({ error: "Failed to update edit session" });
     }
@@ -205,7 +205,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
       );
       if (!updated.rows.length) return res.status(404).json({ error: "Passport not found" });
 
-      await logAudit(companyId, req.user.userId, "ROTATE_ACCESS_KEY", "passportRegistry", dppId, null, { keyPrefix: material.prefix });
+      await logAudit(companyId, req.user.userId, "rotateAccessKey", "passportRegistry", dppId, null, { keyPrefix: material.prefix });
       res.json({
         accessKey: material.rawKey,
         keyPrefix: updated.rows[0].accessKeyPrefix,

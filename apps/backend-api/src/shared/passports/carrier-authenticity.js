@@ -1,6 +1,6 @@
 "use strict";
 
-const FIELD_MAPPINGS = [
+const fieldMappings = [
   { canonical: "carrierSecurityStatus" },
   { canonical: "carrierAuthenticationMethod" },
   { canonical: "carrierVerificationInstructions" },
@@ -134,7 +134,7 @@ function normalizeCarrierAuthenticityMetadata(value) {
   if (!source) return null;
 
   const normalized = {};
-  for (const field of FIELD_MAPPINGS) {
+  for (const field of fieldMappings) {
     const rawValue = source[field.canonical];
     if (rawValue === undefined) continue;
 
@@ -204,7 +204,7 @@ function extractCarrierAuthenticityMutation(source = {}) {
 
   const nestedSource = isPlainObject(nestedValue) ? nestedValue : {};
 
-  for (const field of FIELD_MAPPINGS) {
+  for (const field of fieldMappings) {
     const hasDirectCanonical = Object.prototype.hasOwnProperty.call(source, field.canonical);
     const hasNestedCanonical = Object.prototype.hasOwnProperty.call(nestedSource, field.canonical);
     const hasField = hasDirectCanonical || hasNestedCanonical;
@@ -280,7 +280,7 @@ function buildCarrierAuthenticityResponseFields(value) {
 }
 
 module.exports = {
-  FIELD_MAPPINGS,
+  fieldMappings,
   parseStoredCarrierAuthenticity,
   normalizeCarrierAuthenticityMetadata,
   validateQrPrintSpecification,

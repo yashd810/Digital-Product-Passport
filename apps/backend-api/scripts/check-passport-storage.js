@@ -8,8 +8,8 @@ require("dotenv").config({
 const { Pool } = require("pg");
 const createPassportService = require("../src/services/passport-service");
 const {
-  IN_REVISION_STATUS,
-  SYSTEM_PASSPORT_FIELDS,
+  inRevisionStatus,
+  systemPassportFields,
   getTable,
   normalizeReleaseStatus,
   isPublicHistoryStatus,
@@ -50,8 +50,8 @@ async function main() {
     isEditablePassportStatus,
     normalizeInternalAliasIdValue,
     generateInternalAliasIdValue,
-    IN_REVISION_STATUS,
-    SYSTEM_PASSPORT_FIELDS,
+    inRevisionStatus,
+    systemPassportFields,
     getWritablePassportColumns,
     getStoredPassportValues,
     quoteSqlIdentifier,

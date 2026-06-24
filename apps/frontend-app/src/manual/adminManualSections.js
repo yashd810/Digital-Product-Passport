@@ -1,17 +1,17 @@
 import {
-  ADMIN_PLATFORM_API_TABLE,
-  ASSET_MANAGEMENT_API_TABLE,
-  ASSET_MANAGEMENT_TERMS_TABLE,
-  API_GETTING_STARTED_FLOWS,
-  BACKEND_API_FAMILIES,
-  BACKEND_OPERATION_FLOWS,
-  COMPANY_WRITE_API_TABLE,
-  CORE_DATABASE_TABLES,
-  DICTIONARY_API_TABLE,
-  GOVERNANCE_SECURITY_API_TABLE,
-  PUBLIC_AND_LIVE_API_TABLE,
-  READ_EXPORT_API_TABLE,
-  SECURITY_KEY_TABLE,
+  adminPlatformApiTable,
+  assetManagementApiTable,
+  assetManagementTermsTable,
+  apiGettingStartedFlows,
+  backendApiFamilies,
+  backendOperationFlows,
+  companyWriteApiTable,
+  coreDatabaseTables,
+  dictionaryApiTable,
+  governanceSecurityApiTable,
+  publicAndLiveApiTable,
+  readExportApiTable,
+  securityKeyTable,
 } from "./manualData";
 import { buildPreview, getCompanyLabel, getPassportTypeLabel, prettifyName } from "./manualSectionHelpers";
 
@@ -308,7 +308,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Use modules for stable product categories",
           items: [
-            "Add production product families as files under `apps/backend-api/src/passport-modules/`, for example medical-device, industrial-sensor, or another module generated from your own schema.",
+            "Add production product families as files under `apps/backend-api/src/passport-modules/`, using module names generated from your own schema.",
             "Keep each module versioned with a stable moduleKey, typeName, semanticModelKey, passportPolicy, sections, and fields.",
             "Seed modules with `npm run seed:passport-types` or `npm run bootstrap:passport-modules` so the database catalog and runtime tables match the code definition.",
             "Create a new module/version for breaking regulatory or semantic changes instead of mutating an old production type that already has passports.",
@@ -456,7 +456,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         { label: "Open dictionary browser", route: "/admin/dictionary", description: "Inspect the dictionary models exposed by active passport type access and semantic resources." },
         { label: "Open Type Builder", route: "/admin/passport-types/new", description: "Apply dictionary mappings while designing a type." },
       ],
-      table: DICTIONARY_API_TABLE,
+      table: dictionaryApiTable,
       tips: [
         "Treat dictionary mapping as part of production schema review. Once companies author data against a type, changing semantic meaning is more sensitive than changing display text.",
       ],
@@ -590,7 +590,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           ],
         },
       ],
-      tables: [SECURITY_KEY_TABLE, GOVERNANCE_SECURITY_API_TABLE],
+      tables: [securityKeyTable, governanceSecurityApiTable],
       warnings: [
         "There is no separate special raw API key just for audiences such as the EU Commission. External read access is handled with company API keys, public viewer unlocks, or logged-in audience grants depending on the use case.",
       ],
@@ -626,7 +626,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           ],
         },
       ],
-      table: ASSET_MANAGEMENT_API_TABLE,
+      table: assetManagementApiTable,
       warnings: [
         "Asset Management should only be enabled for companies that actually need high-volume operational updates.",
         "Because this layer can update many passports in one run, support teams should ask companies to preview first and use stable match keys such as dppId or internalAliasId.",
@@ -645,8 +645,8 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         { label: "Catalog controls", value: "Categories, type CRUD, activation, drafts, and builder operations" },
         { label: "Operator controls", value: "Super-admin invitations, revocation, and restoration" },
       ],
-      table: ADMIN_PLATFORM_API_TABLE,
-      flowCards: API_GETTING_STARTED_FLOWS,
+      table: adminPlatformApiTable,
+      flowCards: apiGettingStartedFlows,
       tips: [
         "When documenting the platform for customers, separate the operator endpoints in this section from the company-facing endpoints in the user manual.",
       ],
@@ -662,7 +662,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         { label: "Core tables", value: "30+ named tables in the current public schema, plus generated `<type>_passports` tables" },
         { label: "Catalog pattern", value: "Passport types define fields in `passportTypes`, then runtime records live in type-specific passport tables" },
         { label: "Key registry", value: "`passportRegistry` connects DPP ID, company, passport type, and the hashed metadata for public access keys and device keys" },
-        { label: "API families", value: `${BACKEND_API_FAMILIES.length} major endpoint families mapped in this manual` },
+        { label: "API families", value: `${backendApiFamilies.length} major endpoint families mapped in this manual` },
       ],
       journeys: [
         {
@@ -674,9 +674,9 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           ],
         },
       ],
-      tableCatalogs: CORE_DATABASE_TABLES,
-      endpointFamilies: BACKEND_API_FAMILIES,
-      flowCards: BACKEND_OPERATION_FLOWS,
+      tableCatalogs: coreDatabaseTables,
+      endpointFamilies: backendApiFamilies,
+      flowCards: backendOperationFlows,
       tips: [
         "If you are troubleshooting a tenant issue, start from the UI screen, then use the matching API family below before jumping into table-level details.",
       ],

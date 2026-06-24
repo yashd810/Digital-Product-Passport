@@ -10,9 +10,9 @@ module.exports = function registerAssetManagementApiRoutes(app, {
   publicReadRateLimit,
   assetWriteRateLimit,
   assetSourceFetchRateLimit,
-  ASSET_ERP_PRESETS,
-  ASSET_MATCH_FIELDS,
-  IN_REVISION_STATUS,
+  assetErpPresets,
+  assetMatchFields,
+  inRevisionStatus,
   assertAssetManagementEnabled,
   assertCompanyAssetPassportTypeAccess,
   getLatestCompanyPassports,
@@ -54,13 +54,13 @@ module.exports = function registerAssetManagementApiRoutes(app, {
       res.json({
         company,
         passportTypes: types.rows,
-        erpPresets: ASSET_ERP_PRESETS,
+        erpPresets: assetErpPresets,
         security: {
           assetKeyRequired: false,
           companyScoped: true,
         },
         assumptions: {
-          editableStatuses: ["draft", IN_REVISION_STATUS],
+          editableStatuses: ["draft", inRevisionStatus],
           dynamicPushesDoNotChangePassportVersions: true,
         },
       });
@@ -87,7 +87,7 @@ module.exports = function registerAssetManagementApiRoutes(app, {
 
       const assetFieldMap = getAssetFieldMap(typeSchema);
       const fields = Array.from(assetFieldMap.values());
-      const allowedKeys = new Set([...assetFieldMap.keys(), ...ASSET_MATCH_FIELDS, "isEditable", "releaseStatus", "versionNumber"]);
+      const allowedKeys = new Set([...assetFieldMap.keys(), ...assetMatchFields, "isEditable", "releaseStatus", "versionNumber"]);
 
       const cleanRows = rows.map(row => {
         const clean = {};

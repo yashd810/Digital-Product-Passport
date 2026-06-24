@@ -15,7 +15,7 @@ import {
   sortPassportsByVersionDesc,
 } from "../utils/passportListHelpers";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 export function usePassportListState({ user, companyId, filterByUser }) {
   const { passportType, productKey, productCategoryKey } = useParams();
@@ -155,7 +155,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
   useEffect(() => {
     if (!companyId) return;
 
-    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then((response) => response.ok ? response.json() : [])
       .then((data) => setAllPassportTypes(Array.isArray(data) ? data : []))
       .catch((error) => console.warn("Ignored async error", error));
@@ -176,7 +176,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
           if (searchText) params.append("search", searchText);
           if (filterStatus) params.append("status", filterStatus);
 
-          const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports?${params}`, {
+          const response = await fetchWithAuth(`${api}/api/companies/${companyId}/passports?${params}`, {
             headers: authHeaders(),
           });
           if (response.ok) {
@@ -189,7 +189,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       };
 
       if (filterByUser) {
-        const typeResponse = await fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, {
+        const typeResponse = await fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, {
           headers: authHeaders(),
         });
         const types = typeResponse.ok ? await typeResponse.json() : [];
@@ -201,7 +201,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       }
 
       if (activeProductCategory) {
-        const typeResponse = await fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, {
+        const typeResponse = await fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, {
           headers: authHeaders(),
         });
         const types = typeResponse.ok ? await typeResponse.json() : [];
@@ -217,7 +217,7 @@ export function usePassportListState({ user, companyId, filterByUser }) {
       if (searchText) params.append("search", searchText);
       if (filterStatus) params.append("status", filterStatus);
 
-      const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports?${params}`, {
+      const response = await fetchWithAuth(`${api}/api/companies/${companyId}/passports?${params}`, {
         headers: authHeaders(),
       });
       if (!response.ok) throw new Error();

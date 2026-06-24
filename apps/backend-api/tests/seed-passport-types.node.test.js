@@ -89,22 +89,22 @@ function createSystemHeader() {
   };
 }
 
-function createMedicalDeviceModule() {
+function createExampleProductModule() {
   return {
-    moduleKey: "medical-device:v1",
-    typeName: "medicalDevicePassportV1",
-    displayName: "Medical Device Passport v1",
-    productCategory: "Medical Device",
+    moduleKey: "example-product:v1",
+    typeName: "exampleProductPassportV1",
+    displayName: "Example Product Passport v1",
+    productCategory: "Example Product",
     productIcon: "MD",
-    semanticModelKey: "medicalDeviceDictionaryV1",
+    semanticModelKey: "exampleProductDictionaryV1",
     identity: {
       businessIdentifierField: "modelIdentifier",
     },
     systemHeader: createSystemHeader(),
     passportPolicy: {
-      key: "medicalDeviceDppV1",
-      displayName: "Medical Device Passport Policy v1",
-      contentSpecificationIds: ["medicalDeviceDictionaryV1"],
+      key: "exampleProductDppV1",
+      displayName: "Example Product Passport Policy v1",
+      contentSpecificationIds: ["exampleProductDictionaryV1"],
     },
     sections: [{
       key: "deviceIdentity",
@@ -114,7 +114,7 @@ function createMedicalDeviceModule() {
           key: "modelIdentifier",
           label: "Model Identifier",
           type: "text",
-          semanticId: "https://example.test/dictionary/medical-device/v1/terms/model-identifier",
+          semanticId: "https://example.test/dictionary/example-product/v1/terms/model-identifier",
           elementIdPath: "deviceIdentity.modelIdentifier",
           objectType: "SingleValuedDataElement",
           valueDataType: "String",
@@ -124,10 +124,10 @@ function createMedicalDeviceModule() {
   };
 }
 
-function writeModuleFile(modulesDir, fileName = "medical-device-v1.js") {
+function writeModuleFile(modulesDir, fileName = "example-product-v1.js") {
   fs.writeFileSync(
     path.join(modulesDir, fileName),
-    `"use strict";\n\nmodule.exports = ${JSON.stringify(createMedicalDeviceModule(), null, 2)};\n`
+    `"use strict";\n\nmodule.exports = ${JSON.stringify(createExampleProductModule(), null, 2)};\n`
   );
 }
 
@@ -142,13 +142,13 @@ async function withTempModules(callback) {
 
 test("parseOptions supports explicit company access targets", () => {
   assert.deepEqual(parseOptions([
-    "--module=medical-device:v1",
+    "--module=example-product:v1",
     "--company-id=7,8",
     "--skip-storage",
   ]), {
     dryRun: false,
     skipStorage: true,
-    requestedModule: "medical-device:v1",
+    requestedModule: "example-product:v1",
     companyIds: [7, 8],
     grantAllActiveCompanies: false,
   });
@@ -179,22 +179,22 @@ test("dry run with an empty module registry reports zero selected modules", asyn
 test("seed script can discover and select an arbitrary future module file", async () => withTempModules(async (modulesDir) => {
   writeModuleFile(modulesDir);
 
-  const selected = getSelectedModules("medical-device:v1", { modulesDir });
+  const selected = getSelectedModules("example-product:v1", { modulesDir });
   assert.equal(selected.length, 1);
-  assert.equal(selected[0].moduleKey, "medical-device:v1");
-  assert.equal(selected[0].fieldsJson.passportPolicy.key, "medicalDeviceDppV1");
+  assert.equal(selected[0].moduleKey, "example-product:v1");
+  assert.equal(selected[0].fieldsJson.passportPolicy.key, "exampleProductDppV1");
 
   const result = await runSeed({
     pool: null,
     options: {
-      ...parseOptions(["--dry-run", "--module=medical-device:v1"]),
+      ...parseOptions(["--dry-run", "--module=example-product:v1"]),
       modulesDir,
     },
   });
 
   assert.equal(result.dryRun, true);
   assert.equal(result.selected, 1);
-  assert.equal(result.modules[0].productCategory, "Medical Device");
+  assert.equal(result.modules[0].productCategory, "Example Product");
 }));
 
 test("requested missing module still fails clearly", async () => withTempModules(async (modulesDir) => {
@@ -237,12 +237,12 @@ test("grantCompanyAccess mirrors admin access upsert behavior", async () => {
   const pool = createMockPool();
   const grants = await grantCompanyAccess(pool, {
     companies: [{ id: 7, companyName: "Northwind Devices" }],
-    passportTypes: [{ id: 101, moduleKey: "medical-device:v1", typeName: "medicalDevicePassportV1" }],
+    passportTypes: [{ id: 101, moduleKey: "example-product:v1", typeName: "exampleProductPassportV1" }],
   });
 
   assert.equal(grants.length, 1);
   assert.equal(grants[0].companyId, 7);
-  assert.equal(grants[0].typeName, "medicalDevicePassportV1");
+  assert.equal(grants[0].typeName, "exampleProductPassportV1");
   assert.ok(pool.calls.some((call) =>
     call.sql.includes("ON CONFLICT (\"companyId\", \"passportTypeId\") DO UPDATE SET \"accessRevoked\" = FALSE")
   ));
@@ -254,7 +254,7 @@ test("runSeed can seed a module and grant access to selected companies", async (
   const result = await runSeed({
     pool,
     options: {
-      ...parseOptions(["--module=medical-device:v1", "--company-id=7", "--skip-storage"]),
+      ...parseOptions(["--module=example-product:v1", "--company-id=7", "--skip-storage"]),
       modulesDir,
     },
   });
@@ -262,6 +262,6 @@ test("runSeed can seed a module and grant access to selected companies", async (
   assert.equal(result.success, true);
   assert.equal(result.seeded, 1);
   assert.equal(result.accessGranted, 1);
-  assert.equal(result.results[0].typeName, "medicalDevicePassportV1");
+  assert.equal(result.results[0].typeName, "exampleProductPassportV1");
   assert.equal(result.accessGrants[0].companyId, 7);
 }));

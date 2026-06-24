@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function AdminInvite() {
   const location = useLocation();
@@ -19,7 +19,7 @@ function AdminInvite() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetchWithAuth(`${API}/api/admin/companies`,
+        const r = await fetchWithAuth(`${api}/api/admin/companies`,
           { headers: authHeaders() });
         const data = await r.json();
         setCompanies(data);
@@ -43,7 +43,7 @@ function AdminInvite() {
     setInviteLoading(true);
     setInviteMsg({ type: "", text: "" });
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${inviteCompanyId}/invite`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${inviteCompanyId}/invite`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ inviteeEmail: inviteEmail.trim() }),

@@ -2,12 +2,12 @@ import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { authHeaders, fetchWithAuth } from "../shared/api/authHeaders";
-import { CORE_DATABASE_TABLES } from "./manualData";
+import { coreDatabaseTables } from "./manualData";
 import { buildAdminSections, buildUserSections, collectSearchTerms, prettifyName } from "./manualBuilders";
 import { ManualSection } from "./manualComponents";
 import "./styles/ManualCenter.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function ManualCenter({ mode = "user", user, companyId }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -36,20 +36,20 @@ function ManualCenter({ mode = "user", user, companyId }) {
             return;
           }
 
-          const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, {
+          const response = await fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, {
             headers: authHeaders(),
           });
           const data = response.ok ? await response.json() : [];
           if (!cancelled) setPassportTypes(Array.isArray(data) ? data : []);
         } else {
           const [companiesResponse, typesResponse, categoriesResponse] = await Promise.all([
-            fetchWithAuth(`${API}/api/admin/companies`, {
+            fetchWithAuth(`${api}/api/admin/companies`, {
               headers: authHeaders(),
             }).catch(() => null),
-            fetchWithAuth(`${API}/api/admin/passport-types`, {
+            fetchWithAuth(`${api}/api/admin/passport-types`, {
               headers: authHeaders(),
             }).catch(() => null),
-            fetchWithAuth(`${API}/api/admin/product-categories`, {
+            fetchWithAuth(`${api}/api/admin/product-categories`, {
               headers: authHeaders(),
             }).catch(() => null),
           ]);

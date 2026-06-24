@@ -1,11 +1,11 @@
 import { translateFieldValue } from "../../app/providers/i18n";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Access-Control Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-export const ACCESS_LABEL_MAP = {
+export const accessLabelMap = {
   consumers:            "Consumers",
   economicOperator:    "Economic Operators",
   manufacturer:         "Manufacturers",
@@ -114,7 +114,7 @@ export function formatIsoDate(value, { dateOnly = false } = {}) {
   });
 }
 
-const PRESENTATION_TONES = {
+const presentationTones = {
   data: { tone: "data", eyebrow: "" },
   specCard: { tone: "data", eyebrow: "" },
   document: { tone: "document", eyebrow: "Evidence file" },
@@ -133,7 +133,7 @@ const PRESENTATION_TONES = {
 
 export function getFieldPresentation(field, raw, isLocked, pieItems) {
   if (isLocked) return { tone: "restricted", eyebrow: "Protected data" };
-  if (pieItems) return PRESENTATION_TONES.compositionChart;
+  if (pieItems) return presentationTones.compositionChart;
   const presentation = String(field?.presentation).trim();
-  return PRESENTATION_TONES[presentation];
+  return presentationTones[presentation];
 }

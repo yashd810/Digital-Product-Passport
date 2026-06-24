@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function RedirectState({ message }) {
   return <div className="loading dashboard-loading-screen">{message}</div>;
@@ -21,8 +21,8 @@ export default function PublicPassportRedirectPage() {
     }
 
     const endpoint = versionNumber
-      ? `${API}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
-      : `${API}/api/passports/by-product/${encodedProductId}`;
+      ? `${api}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
+      : `${api}/api/passports/by-product/${encodedProductId}`;
 
     let cancelled = false;
     setError("");

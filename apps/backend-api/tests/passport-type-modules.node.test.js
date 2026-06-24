@@ -35,16 +35,16 @@ function createSystemHeader() {
 }
 
 function createModuleDefinition(overrides = {}) {
-  const moduleKey = overrides.moduleKey || "medical-device:v1";
-  const typeName = overrides.typeName || "medicalDevicePassportV1";
-  const semanticModelKey = overrides.semanticModelKey || "medicalDeviceDictionaryV1";
-  const passportPolicyKey = overrides.passportPolicyKey || "medicalDeviceDppV1";
+  const moduleKey = overrides.moduleKey || "example-product:v1";
+  const typeName = overrides.typeName || "exampleProductPassportV1";
+  const semanticModelKey = overrides.semanticModelKey || "exampleProductDictionaryV1";
+  const passportPolicyKey = overrides.passportPolicyKey || "exampleProductDppV1";
 
   return {
     moduleKey,
     typeName,
-    displayName: overrides.displayName || "Medical Device Passport v1",
-    productCategory: overrides.productCategory || "Medical Device",
+    displayName: overrides.displayName || "Example Product Passport v1",
+    productCategory: overrides.productCategory || "Example Product",
     productIcon: overrides.productIcon || "MD",
     semanticModelKey,
     identity: {
@@ -53,7 +53,7 @@ function createModuleDefinition(overrides = {}) {
     systemHeader: createSystemHeader(),
     passportPolicy: {
       key: passportPolicyKey,
-      displayName: `${overrides.displayName || "Medical Device Passport"} Policy`,
+      displayName: `${overrides.displayName || "Example Product Passport"} Policy`,
       contentSpecificationIds: [semanticModelKey],
       defaultCarrierPolicyKey: "webPublicEntryV1",
     },
@@ -66,7 +66,7 @@ function createModuleDefinition(overrides = {}) {
             key: "modelIdentifier",
             label: "Model Identifier",
             type: "text",
-            semanticId: "https://example.test/dictionary/medical-device/v1/terms/model-identifier",
+            semanticId: "https://example.test/dictionary/example-product/v1/terms/model-identifier",
             elementIdPath: "deviceIdentity.modelIdentifier",
             objectType: "SingleValuedDataElement",
             valueDataType: "String",
@@ -75,7 +75,7 @@ function createModuleDefinition(overrides = {}) {
             key: "components",
             label: "Components",
             type: "table",
-            semanticId: "https://example.test/dictionary/medical-device/v1/terms/components",
+            semanticId: "https://example.test/dictionary/example-product/v1/terms/components",
             elementIdPath: "deviceIdentity.components",
             objectType: "CollectionDataElement",
             valueDataType: "String",
@@ -84,7 +84,7 @@ function createModuleDefinition(overrides = {}) {
                 key: "componentName",
                 label: "Component Name",
                 type: "text",
-                semanticId: "https://example.test/dictionary/medical-device/v1/terms/component-name",
+                semanticId: "https://example.test/dictionary/example-product/v1/terms/component-name",
                 elementIdPath: "deviceIdentity.components.componentName",
                 objectType: "SingleValuedDataElement",
                 valueDataType: "String",
@@ -120,40 +120,40 @@ test("default passport module registry starts empty for fresh deployments", () =
 });
 
 test("passport type registry discovers arbitrary product modules from files", () => withTempModules((modulesDir) => {
-  writeModuleFile(modulesDir, "medical-device-v1.js", createModuleDefinition());
+  writeModuleFile(modulesDir, "example-product-v1.js", createModuleDefinition());
 
   const rawDefinitions = loadPassportTypeModuleDefinitions({ modulesDir });
   const modules = getPassportTypeModules({ modulesDir });
   const policies = getPassportPolicyCatalog({ modulesDir });
-  const policy = getPassportPolicyForPassportType("medical-device:v1", null, { modulesDir });
+  const policy = getPassportPolicyForPassportType("example-product:v1", null, { modulesDir });
 
   assert.equal(rawDefinitions.length, 1);
   assert.equal(modules.length, 1);
-  assert.equal(modules[0].moduleKey, "medical-device:v1");
-  assert.equal(modules[0].fieldsJson.sourceModule, "medical-device:v1");
-  assert.equal(modules[0].fieldsJson.passportPolicyKey, "medicalDeviceDppV1");
-  assert.equal(modules[0].fieldsJson.passportPolicy.key, "medicalDeviceDppV1");
-  assert.equal(policy.key, "medicalDeviceDppV1");
-  assert.ok(policies.some((definition) => definition.key === "medicalDeviceDppV1"));
+  assert.equal(modules[0].moduleKey, "example-product:v1");
+  assert.equal(modules[0].fieldsJson.sourceModule, "example-product:v1");
+  assert.equal(modules[0].fieldsJson.passportPolicyKey, "exampleProductDppV1");
+  assert.equal(modules[0].fieldsJson.passportPolicy.key, "exampleProductDppV1");
+  assert.equal(policy.key, "exampleProductDppV1");
+  assert.ok(policies.some((definition) => definition.key === "exampleProductDppV1"));
 }));
 
 test("passport policy resolution follows source modules and type names", () => withTempModules((modulesDir) => {
-  writeModuleFile(modulesDir, "medical-device-v1.js", createModuleDefinition());
+  writeModuleFile(modulesDir, "example-product-v1.js", createModuleDefinition());
 
-  const modulePolicy = getPassportPolicyForPassportType("medical-device:v1", null, { modulesDir });
-  const typePolicy = getPassportPolicyForPassportType("medicalDevicePassportV1", null, { modulesDir });
+  const modulePolicy = getPassportPolicyForPassportType("example-product:v1", null, { modulesDir });
+  const typePolicy = getPassportPolicyForPassportType("exampleProductPassportV1", null, { modulesDir });
   const sourceModulePolicy = getPassportPolicyForPassportType("customName", {
-    fieldsJson: { sourceModule: "medical-device:v1" },
-    semanticModelKey: "medicalDeviceDictionaryV1",
+    fieldsJson: { sourceModule: "example-product:v1" },
+    semanticModelKey: "exampleProductDictionaryV1",
   }, { modulesDir });
 
-  assert.equal(modulePolicy.key, "medicalDeviceDppV1");
-  assert.equal(typePolicy.key, "medicalDeviceDppV1");
-  assert.equal(sourceModulePolicy.key, "medicalDeviceDppV1");
+  assert.equal(modulePolicy.key, "exampleProductDppV1");
+  assert.equal(typePolicy.key, "exampleProductDppV1");
+  assert.equal(sourceModulePolicy.key, "exampleProductDppV1");
 }));
 
 test("passport type module fields carry locked canonical source semantics", () => withTempModules((modulesDir) => {
-  writeModuleFile(modulesDir, "medical-device-v1.js", createModuleDefinition());
+  writeModuleFile(modulesDir, "example-product-v1.js", createModuleDefinition());
   const [definition] = getPassportTypeModules({ modulesDir });
 
   for (const section of definition.fieldsJson.sections || []) {

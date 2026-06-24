@@ -3,20 +3,20 @@ import { Link } from "react-router-dom";
 import { PieChart } from "../../passport-viewer/components/PieChart";
 import { openAnalyticsPrintReport, renderClusteredBarChartSvg, renderPieChartSvg } from "../../shared/utils/analyticsPrintExport";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
-import { STATUS_COLORS } from "../../shared/utils/statusColors";
+import { statusColors } from "../../shared/utils/statusColors";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 import "../styles/AdminDashboard.css";
 import "../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
-const ADMIN_BAR_COLORS = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e", "#f97316", "#a855f7"];
-const COMPANY_SERIES = [
-  { key: "draftCount",      label: "Draft",       color: STATUS_COLORS.draft },
-  { key: "inReviewCount",   label: "In Review",   color: STATUS_COLORS.review },
-  { key: "releasedCount",   label: "Released",    color: STATUS_COLORS.released },
-  { key: "revisedCount",    label: "In Revision", color: STATUS_COLORS.revised },
-  { key: "obsoleteCount",   label: "Obsolete",    color: STATUS_COLORS.obsolete },
-  { key: "archivedCount",   label: "Archived",    color: STATUS_COLORS.archived },
+const api = import.meta.env.VITE_API_URL || "";
+const adminBarColors = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e", "#f97316", "#a855f7"];
+const companySeries = [
+  { key: "draftCount",      label: "Draft",       color: statusColors.draft },
+  { key: "inReviewCount",   label: "In Review",   color: statusColors.review },
+  { key: "releasedCount",   label: "Released",    color: statusColors.released },
+  { key: "revisedCount",    label: "In Revision", color: statusColors.revised },
+  { key: "obsoleteCount",   label: "Obsolete",    color: statusColors.obsolete },
+  { key: "archivedCount",   label: "Archived",    color: statusColors.archived },
 ];
 
 function BarChart({ data, height = 120 }) {
@@ -44,7 +44,7 @@ function BarChart({ data, height = 120 }) {
               width={barW}
               height={barHeight}
               rx={4}
-              fill={item.color || ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length]}
+              fill={item.color || adminBarColors[index % adminBarColors.length]}
               opacity="0.92"
             />
             <text x={groupCenter} y={labelY} textAnchor="middle" className="overview-bar-chart-label">
@@ -65,7 +65,7 @@ function BarChart({ data, height = 120 }) {
 function ClusteredCompanyChart({ data, height = 180 }) {
   if (!data?.length) return null;
 
-  const barsPerGroup = COMPANY_SERIES.length;
+  const barsPerGroup = companySeries.length;
   const barGap = 3;
   const barWidth = 8;
   const groupWidth = barsPerGroup * barWidth + (barsPerGroup - 1) * barGap;
@@ -75,25 +75,25 @@ function ClusteredCompanyChart({ data, height = 180 }) {
   const topPad = 18;
   const bottomPad = 36;
   const innerH = height;
-  const H = innerH + topPad + bottomPad;
+  const h = innerH + topPad + bottomPad;
   const totalW = Math.max(
     400,
     leftPad + rightPad + data.length * groupWidth + Math.max(0, data.length - 1) * groupGap
   );
   const maxValue = Math.max(
-    ...data.flatMap((item) => COMPANY_SERIES.map((series) => item[series.key] || 0)),
+    ...data.flatMap((item) => companySeries.map((series) => item[series.key] || 0)),
     1
   );
   const getBarHeight = (value) => Math.max(3, (value / maxValue) * innerH);
 
   return (
     <div className="admin-cluster-chart">
-      <svg className="overview-bar-chart" width="100%" viewBox={`0 0 ${totalW} ${H}`}>
+      <svg className="overview-bar-chart" width="100%" viewBox={`0 0 ${totalW} ${h}`}>
         {data.map((item, groupIndex) => {
           const groupX = leftPad + groupIndex * (groupWidth + groupGap);
           return (
             <g key={item.label}>
-              {COMPANY_SERIES.map((series, seriesIndex) => {
+              {companySeries.map((series, seriesIndex) => {
                 const value = item[series.key] || 0;
                 const bh = getBarHeight(value);
                 const x = groupX + seriesIndex * (barWidth + barGap);
@@ -111,7 +111,7 @@ function ClusteredCompanyChart({ data, height = 180 }) {
               })}
               <text
                 x={groupX + groupWidth / 2}
-                y={H - 8}
+                y={h - 8}
                 textAnchor="middle"
                 className="overview-bar-chart-label"
               >
@@ -122,7 +122,7 @@ function ClusteredCompanyChart({ data, height = 180 }) {
         })}
       </svg>
       <div className="admin-cluster-legend">
-        {COMPANY_SERIES.map((series) => (
+        {companySeries.map((series) => (
           <div key={series.key} className="admin-cluster-legend-item">
             <span className="admin-cluster-legend-swatch" style={{ backgroundColor: series.color }} />
             <span className="admin-cluster-legend-label">{series.label}</span>
@@ -145,7 +145,7 @@ function AdminAnalytics() {
   const loadAnalytics = async () => {
       try {
         setLoading(true);
-        const response = await fetchWithAuth(`${API}/api/admin/analytics`, {
+        const response = await fetchWithAuth(`${api}/api/admin/analytics`, {
           headers: authHeaders(),
         });
         if (!response.ok) throw new Error("Failed to fetch analytics");
@@ -207,7 +207,7 @@ function AdminAnalytics() {
         .map((item, index) => ({
           label: item.productCategory || "Uncategorized",
           value: item.total || 0,
-          color: ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length],
+          color: adminBarColors[index % adminBarColors.length],
         }));
       const companyChartData = (analytics.byCompany || [])
         .filter((item) => (item.totalPassports || 0) > 0)
@@ -235,8 +235,8 @@ function AdminAnalytics() {
           },
           {
             title: "Passport status by company",
-            svg: companyChartData.length ? renderClusteredBarChartSvg(companyChartData, COMPANY_SERIES, { height: 210 }) : "",
-            legendItems: COMPANY_SERIES.map((item) => ({ label: item.label, color: item.color })),
+            svg: companyChartData.length ? renderClusteredBarChartSvg(companyChartData, companySeries, { height: 210 }) : "",
+            legendItems: companySeries.map((item) => ({ label: item.label, color: item.color })),
             emptyText: "No company totals yet",
           },
         ],
@@ -270,7 +270,7 @@ function AdminAnalytics() {
     .map((item, index) => ({
       label: item.productCategory || "Uncategorized",
       value: item.total || 0,
-      color: ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length],
+      color: adminBarColors[index % adminBarColors.length],
     }));
 
   const companyChartData = (analytics.byCompany || [])
@@ -284,7 +284,7 @@ function AdminAnalytics() {
       revisedCount:   item.revisedCount   || 0,
       obsoleteCount:  item.obsoleteCount  || 0,
       archivedCount:  item.archivedCount  || 0,
-      color: ADMIN_BAR_COLORS[index % ADMIN_BAR_COLORS.length],
+      color: adminBarColors[index % adminBarColors.length],
     }));
   const normalizedCompanyFilter = companyFilter.trim().toLowerCase();
   const filteredCompanies = (analytics.byCompany || []).filter((company) =>

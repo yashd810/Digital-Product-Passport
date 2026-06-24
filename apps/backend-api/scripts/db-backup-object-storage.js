@@ -46,7 +46,7 @@ function readConfig() {
     "db-backups/postgres"
   );
   const retentionCount = Number.parseInt(process.env.DB_BACKUP_RETENTION_COUNT || "14", 10);
-  const dbName = process.env.DB_NAME || process.env.POSTGRES_DB || ["dpp", "system"].join("_");
+  const dbName = process.env.DB_NAME || process.env.POSTGRES_DB || "dppSystem";
 
   for (const [key, value] of Object.entries({
     endpoint,

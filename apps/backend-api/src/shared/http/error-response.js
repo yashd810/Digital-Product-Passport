@@ -6,7 +6,7 @@ function sendValidationError(res, error) {
   const issues = Array.isArray(error?.issues) ? error.issues : [];
   const detail = issues[0]?.message || error?.message || "Request validation failed";
   return res.status(400).json({
-    error: "VALIDATION_ERROR",
+    error: "validationError",
     detail,
     issues,
   });

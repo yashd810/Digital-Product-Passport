@@ -192,7 +192,7 @@ module.exports = function createRequiredFieldsService({
 
   function buildRequiredFieldIssues(completeness) {
     return (completeness?.missingMandatoryFields || []).map((field) => createIssue({
-      code: "REQUIRED_FIELD_MISSING",
+      code: "requiredFieldMissing",
       message: `Field "${field.label || field.key}" is required before release.`,
       key: field.key,
       label: field.label || field.key,

@@ -4,9 +4,9 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { formatPassportStatus } from "../utils/passportStatus";
 import "../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const SKIP = new Set([
+const skip = new Set([
   "id", "companyId", "createdAt", "updatedAt", "qrCode", "deletedAt",
   "dppId", "createdBy", "updatedBy", "releaseStatus", "versionNumber",
 ]);
@@ -45,15 +45,15 @@ function VersionDiff({ companyId }) {
     setError("");
 
     Promise.all([
-      fetchWithAuth(`${API}/api/passport-types/${pt}`).then((response) => (response.ok ? response.json() : null)),
-      fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/diff?passportType=${pt}`, {
+      fetchWithAuth(`${api}/api/passport-types/${pt}`).then((response) => (response.ok ? response.json() : null)),
+      fetchWithAuth(`${api}/api/companies/${companyId}/passports/${dppId}/diff?passportType=${pt}`, {
         headers: authHeaders(),
       }).then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Failed to load version comparison");
         return data;
       }),
-      fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/history`, {
+      fetchWithAuth(`${api}/api/companies/${companyId}/passports/${dppId}/history`, {
         headers: authHeaders(),
       }).then(async (response) => {
         const data = await response.json().catch(() => ({}));
@@ -89,7 +89,7 @@ function VersionDiff({ companyId }) {
 
   const sections = typeDef?.fieldsJson?.sections || [];
   const allFields = useMemo(
-    () => sections.flatMap((section) => section.fields || []).filter((field) => !SKIP.has(field.key)),
+    () => sections.flatMap((section) => section.fields || []).filter((field) => !skip.has(field.key)),
     [sections]
   );
 

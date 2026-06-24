@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../shared/styles/CreatePass.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function SymbolRepositoryPicker({ companyId, onSelect, onClose }) {
   const [items, setItems] = useState([]);
@@ -19,7 +19,7 @@ function SymbolRepositoryPicker({ companyId, onSelect, onClose }) {
     setError("");
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols${qs}`);
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/symbols${qs}`);
       if (!r.ok) throw new Error();
       setItems(await r.json());
     } catch {

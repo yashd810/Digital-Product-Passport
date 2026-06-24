@@ -23,23 +23,23 @@ describe("frontend modularity helpers", () => {
   });
 
   test("semantic model labels are generated from any model key", () => {
-    expect(formatSemanticModelLabel("industrialSensorDictionaryV3")).toBe("Industrial Sensor Dictionary V3");
-    expect(formatSemanticModelLabel("medicalDeviceDictionaryV1")).toBe("Medical Device Dictionary V1");
+    expect(formatSemanticModelLabel("equipmentDictionaryV3")).toBe("Equipment Dictionary V3");
+    expect(formatSemanticModelLabel("serviceAssetDictionaryV1")).toBe("Service Asset Dictionary V1");
   });
 
   test("semantic options preserve registered and selected external models", () => {
     const options = buildSemanticModelOptions([
       {
-        semanticModelKey: "industrialSensorDictionaryV3",
-        name: "Industrial Sensor Dictionary",
-        family: "industrial-sensor",
+        semanticModelKey: "equipmentDictionaryV3",
+        name: "Equipment Dictionary",
+        family: "equipment",
         version: "v3",
       },
     ], "externalFutureDictionaryV3");
 
-    expect(getSemanticModelOption(options, "industrialSensorDictionaryV3")).toMatchObject({
-      key: "industrialSensorDictionaryV3",
-      label: "Industrial Sensor Dictionary",
+    expect(getSemanticModelOption(options, "equipmentDictionaryV3")).toMatchObject({
+      key: "equipmentDictionaryV3",
+      label: "Equipment Dictionary",
       registered: true,
     });
     expect(getSemanticModelOption(options, "externalFutureDictionaryV3")).toMatchObject({
@@ -50,20 +50,20 @@ describe("frontend modularity helpers", () => {
 
   test("passport lists use module business identifier from explicit module metadata", () => {
     const typeDefinitions = [{
-      typeName: "medicalDevicePassportV1",
+      typeName: "equipmentPassportV1",
       fieldsJson: {
         identity: {
-          businessIdentifierField: "udi",
+          businessIdentifierField: "serialNumber",
         },
       },
     }];
 
     expect(getPassportSerialNumberForType({
-      passportType: "medicalDevicePassportV1",
-      udi: "UDI-001",
+      passportType: "equipmentPassportV1",
+      serialNumber: "SN-001",
       internalAliasId: "SKU-001",
       uniqueProductIdentifier: "did:web:example:product:001",
-    }, typeDefinitions)).toBe("UDI-001");
+    }, typeDefinitions)).toBe("SN-001");
 
     expect(getPassportSerialNumberForType({
       passportType: "manualPassportV1",
@@ -76,52 +76,52 @@ describe("frontend modularity helpers", () => {
     const exported = buildPassportJsonLdExport([
       {
         dppId: "dpp-sensor-001",
-        passportType: "industrialSensorPassportV3",
+        passportType: "equipmentPassportV3",
         serialNumber: "SN-001",
       },
-    ], "industrialSensorPassportV3", {
+    ], "equipmentPassportV3", {
       semanticModel: {
-        semanticModelKey: "industrialSensorDictionaryV3",
-        contextUrl: "https://www.claros-dpp.online/dictionary/industrial-sensor/v3/context.jsonld",
-        family: "industrial-sensor",
+        semanticModelKey: "equipmentDictionaryV3",
+        contextUrl: "https://www.claros-dpp.online/dictionary/equipment/v3/context.jsonld",
+        family: "equipment",
         version: "v3",
       },
     });
 
-    expect(exported["@context"]).toContain("https://www.claros-dpp.online/dictionary/industrial-sensor/v3/context.jsonld");
+    expect(exported["@context"]).toContain("https://www.claros-dpp.online/dictionary/equipment/v3/context.jsonld");
     expect(exported.semanticModel).toMatchObject({
-      semanticModelKey: "industrialSensorDictionaryV3",
-      family: "industrial-sensor",
+      semanticModelKey: "equipmentDictionaryV3",
+      family: "equipment",
       version: "v3",
     });
     expect(exported["@graph"][0]).toMatchObject({
-      passportType: "industrialSensorPassportV3",
+      passportType: "equipmentPassportV3",
       serialNumber: "SN-001",
     });
   });
 
   test("product category options merge saved and module-derived categories", () => {
     const options = buildProductCategoryOptions({
-      savedCategories: [{ id: 7, name: "Industrial Sensor", icon: "IS" }],
+      savedCategories: [{ id: 7, name: "Equipment", icon: "EQ" }],
       passportTypes: [
-        { productCategory: "Industrial Sensor", productIcon: "SHOULD_NOT_OVERRIDE" },
-        { productCategory: "Medical Device", productIcon: "MD" },
+        { productCategory: "Equipment", productIcon: "shouldNotOverride" },
+        { productCategory: "Service Asset", productIcon: "SA" },
       ],
       draftType: { productCategory: "Construction Product", productIcon: "CP" },
     });
 
     expect(options.map((option) => option.name)).toEqual([
       "Construction Product",
-      "Industrial Sensor",
-      "Medical Device",
+      "Equipment",
+      "Service Asset",
     ]);
-    expect(options.find((option) => option.name === "Industrial Sensor")).toMatchObject({
+    expect(options.find((option) => option.name === "Equipment")).toMatchObject({
       id: 7,
-      icon: "IS",
+      icon: "EQ",
       managed: true,
     });
-    expect(options.find((option) => option.name === "Medical Device")).toMatchObject({
-      icon: "MD",
+    expect(options.find((option) => option.name === "Service Asset")).toMatchObject({
+      icon: "SA",
       managed: false,
     });
   });

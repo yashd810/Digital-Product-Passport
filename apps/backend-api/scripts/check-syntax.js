@@ -4,8 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const ROOT = path.resolve(__dirname, "..");
-const TARGETS = ["Server", "routes", "services", "src", "helpers", "middleware", "tests"];
+const root = path.resolve(__dirname, "..");
+const targets = ["Server", "routes", "services", "src", "helpers", "middleware", "tests"];
 
 function walk(dir, results = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -19,8 +19,8 @@ function walk(dir, results = []) {
   return results;
 }
 
-const files = TARGETS.flatMap((target) => {
-  const dir = path.join(ROOT, target);
+const files = targets.flatMap((target) => {
+  const dir = path.join(root, target);
   return fs.existsSync(dir) ? walk(dir) : [];
 });
 
@@ -35,7 +35,7 @@ for (const file of files) {
 
 if (failures.length) {
   console.error("Syntax check failed for:");
-  failures.forEach((file) => console.error(`- ${path.relative(ROOT, file)}`));
+  failures.forEach((file) => console.error(`- ${path.relative(root, file)}`));
   process.exit(1);
 }
 

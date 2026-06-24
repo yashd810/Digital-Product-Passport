@@ -21,9 +21,9 @@ function TypeKebabMenu({ pos, onClose, children }) {
   );
 }
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const ICON_PRESETS = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🔋","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
+const iconPresets = ["📋","⚡","🧵","🏗️","🎮","🏢","📦","🌿","🛡️","🔬","⚙️","🌊","🔥","🌱"];
 
 const getSemanticModelLabel = formatSemanticModelLabel;
 
@@ -75,7 +75,7 @@ function AdminPassportTypes() {
     if (!deletePassword) return setDeleteError("Password is required.");
     setDeleting(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/admin/passport-types/${deleteTarget.id}`, {
+      const r = await fetchWithAuth(`${api}/api/admin/passport-types/${deleteTarget.id}`, {
         method: "DELETE",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ password: deletePassword }),
@@ -104,9 +104,9 @@ function AdminPassportTypes() {
     try {
       setLoading(true);
       const [typesRes, umbRes, draftRes] = await Promise.all([
-        fetchWithAuth(`${API}/api/admin/passport-types`,       { headers: authHeaders() }),
-        fetchWithAuth(`${API}/api/admin/product-categories`,  { headers: authHeaders() }),
-        fetchWithAuth(`${API}/api/admin/passport-type-draft`,  { headers: authHeaders() }),
+        fetchWithAuth(`${api}/api/admin/passport-types`,       { headers: authHeaders() }),
+        fetchWithAuth(`${api}/api/admin/product-categories`,  { headers: authHeaders() }),
+        fetchWithAuth(`${api}/api/admin/passport-type-draft`,  { headers: authHeaders() }),
       ]);
       if (!typesRes.ok) throw new Error("Failed to fetch passport types");
       setTypes(await typesRes.json());
@@ -131,7 +131,7 @@ function AdminPassportTypes() {
   const handleToggle = async (type) => {
     const action = type.isActive ? "deactivate" : "activate";
     try {
-      const r = await fetchWithAuth(`${API}/api/admin/passport-types/${type.id}/${action}`, {
+      const r = await fetchWithAuth(`${api}/api/admin/passport-types/${type.id}/${action}`, {
         method: "PATCH",
         headers: authHeaders(),
       });
@@ -149,7 +149,7 @@ function AdminPassportTypes() {
     if (!newCatName.trim()) return setCatError("Name is required.");
     setCatSaving(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/admin/product-categories`, {
+      const r = await fetchWithAuth(`${api}/api/admin/product-categories`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ name: newCatName.trim(), icon: newCatIcon }),
@@ -179,7 +179,7 @@ function AdminPassportTypes() {
     if (!deleteCategoryPassword) return setDeleteCategoryError("Password is required.");
     try {
       setDeletingCategory(true);
-      const r = await fetchWithAuth(`${API}/api/admin/product-categories/${deleteCategoryTarget.id}`, {
+      const r = await fetchWithAuth(`${api}/api/admin/product-categories/${deleteCategoryTarget.id}`, {
         method: "DELETE",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ password: deleteCategoryPassword }),
@@ -200,7 +200,7 @@ function AdminPassportTypes() {
   const handleDiscardDraft = async () => {
     try {
       setDiscardingDraft(true);
-      const r = await fetchWithAuth(`${API}/api/admin/passport-type-draft`, {
+      const r = await fetchWithAuth(`${api}/api/admin/passport-type-draft`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -284,7 +284,7 @@ function AdminPassportTypes() {
                 type="text"
                 value={newCatName}
                 onChange={e => setNewCatName(e.target.value)}
-                placeholder="Category name, e.g. Medical Device"
+                placeholder="Category name, e.g. Equipment"
                 className="apt-productCategory-name-input"
                 autoFocus
               />
@@ -296,7 +296,7 @@ function AdminPassportTypes() {
                   className="apt-productCategory-icon-input"
                   maxLength={4}
                 />
-                {ICON_PRESETS.map(ic => (
+                {iconPresets.map(ic => (
                   <button key={ic} type="button"
                     className={`apt-icon-preset-btn ${newCatIcon === ic ? "selected" : ""}`}
                     onClick={() => setNewCatIcon(ic)}>{ic}</button>

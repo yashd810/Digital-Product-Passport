@@ -1,6 +1,6 @@
-export const PASSWORD_MIN_LENGTH = 12;
+export const passwordMinLength = 12;
 
-const COMMON_WEAK_PASSWORDS = new Set([
+const commonWeakPasswords = new Set([
   "password",
   "password123",
   "12345678",
@@ -14,8 +14,8 @@ const COMMON_WEAK_PASSWORDS = new Set([
 
 export function validatePasswordPolicy(password) {
   const value = String(password || "");
-  if (value.length < PASSWORD_MIN_LENGTH) {
-    return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+  if (value.length < passwordMinLength) {
+    return `Password must be at least ${passwordMinLength} characters`;
   }
   if (/\s/.test(value)) {
     return "Password must not contain whitespace";
@@ -32,7 +32,7 @@ export function validatePasswordPolicy(password) {
   if (!/[^A-Za-z0-9]/.test(value)) {
     return "Password must include at least one symbol";
   }
-  if (COMMON_WEAK_PASSWORDS.has(value.toLowerCase())) {
+  if (commonWeakPasswords.has(value.toLowerCase())) {
     return "Password is too common. Choose a more unique password";
   }
   return null;
@@ -43,7 +43,7 @@ export function passwordStrength(password) {
   if (!value) return null;
 
   const checks = [
-    value.length >= PASSWORD_MIN_LENGTH,
+    value.length >= passwordMinLength,
     !/\s/.test(value),
     /[a-z]/.test(value),
     /[A-Z]/.test(value),
@@ -58,5 +58,5 @@ export function passwordStrength(password) {
   return { label: "Strong", color: "#2f855a", pct: 100 };
 }
 
-export const PASSWORD_REQUIREMENT_TEXT =
-  `Use at least ${PASSWORD_MIN_LENGTH} characters with uppercase, lowercase, number, and symbol.`;
+export const passwordRequirementText =
+  `Use at least ${passwordMinLength} characters with uppercase, lowercase, number, and symbol.`;

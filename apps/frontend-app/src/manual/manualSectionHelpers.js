@@ -1,16 +1,16 @@
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../passports/utils/passportRoutes";
 import {
-  ASSET_MANAGEMENT_API_TABLE,
-  ASSET_MANAGEMENT_TERMS_TABLE,
-  ADMIN_PLATFORM_API_TABLE,
-  API_GETTING_STARTED_FLOWS,
-  BACKEND_API_FAMILIES,
-  BACKEND_OPERATION_FLOWS,
-  COMPANY_WRITE_API_TABLE,
-  CORE_DATABASE_TABLES,
-  PUBLIC_AND_LIVE_API_TABLE,
-  READ_EXPORT_API_TABLE,
-  SECURITY_KEY_TABLE,
+  assetManagementApiTable,
+  assetManagementTermsTable,
+  adminPlatformApiTable,
+  apiGettingStartedFlows,
+  backendApiFamilies,
+  backendOperationFlows,
+  companyWriteApiTable,
+  coreDatabaseTables,
+  publicAndLiveApiTable,
+  readExportApiTable,
+  securityKeyTable,
 } from "./manualData";
 
 export function prettifyName(value) {

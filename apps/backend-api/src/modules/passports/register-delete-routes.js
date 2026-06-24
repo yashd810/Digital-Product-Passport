@@ -17,7 +17,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
     archivePassportSnapshot,
     getActorIdentifier,
     logAudit,
-    EDITABLE_RELEASE_STATUSES_SQL,
+    editableReleaseStatusesSql,
   } = deps;
 
   async function hardDeleteDraftPassport(client, { dppId, tableName, companyId = null, rowId = null }) {
@@ -52,7 +52,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
       const tableName = getTable(passportType);
       const existingRes = await pool.query(
         `SELECT * FROM ${tableName}
-         WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+         WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
          LIMIT 1`,
         [dppId]
       );
@@ -65,7 +65,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
             const deleted = await hardDeleteDraftPassport(client, { dppId, tableName });
             await client.query("COMMIT");
             if (!deleted.rows.length) return res.status(404).json({ error: "Passport not found or cannot delete" });
-            await logAudit(companyId, req.user.userId, "HARD_DELETE", tableName, dppId, { dppId }, null);
+            await logAudit(companyId, req.user.userId, "hardDelete", tableName, dppId, { dppId }, null);
             return res.json({ success: true });
           } catch (error) {
             await client.query("ROLLBACK");
@@ -86,12 +86,12 @@ module.exports = function registerDeleteRoutes(app, deps) {
 
       const result = await pool.query(
         `UPDATE ${tableName} SET "deletedAt" = NOW()
-         WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+         WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
          RETURNING "dppId"`,
         [dppId]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport not found or cannot delete a released passport" });
-      await logAudit(companyId, req.user.userId, "DELETE", tableName, dppId, { dppId }, null);
+      await logAudit(companyId, req.user.userId, "delete", tableName, dppId, { dppId }, null);
       res.json({ success: true });
     } catch {
       res.status(500).json({ error: "Failed to delete passport" });
@@ -141,7 +141,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
           if (dppId) {
             const existingRes = await pool.query(
               `SELECT * FROM ${tableName}
-               WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+               WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
                LIMIT 1`,
               [dppId, companyId]
             );
@@ -155,7 +155,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
                   await client.query("COMMIT");
                   if (deletedRow.rows.length) {
                     matchedGuid = deletedRow.rows[0].dppId;
-                    await logAudit(companyId, userId, "BULK_HARD_DELETE", tableName, dppId, { dppId }, null);
+                    await logAudit(companyId, userId, "bulkHardDelete", tableName, dppId, { dppId }, null);
                   }
                 } catch (error) {
                   await client.query("ROLLBACK");
@@ -176,7 +176,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
             if (!matchedGuid) {
               const result = await pool.query(
                 `UPDATE ${tableName} SET "deletedAt" = NOW()
-                 WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+                 WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
                  RETURNING "dppId"`,
                 [dppId, companyId]
               );
@@ -199,7 +199,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
                     await client.query("COMMIT");
                     if (deletedRow.rows.length) {
                       matchedGuid = deletedRow.rows[0].dppId;
-                      await logAudit(companyId, userId, "BULK_HARD_DELETE", tableName, matchedGuid, { internalAliasId }, null);
+                      await logAudit(companyId, userId, "bulkHardDelete", tableName, matchedGuid, { internalAliasId }, null);
                     }
                   } catch (error) {
                     await client.query("ROLLBACK");
@@ -233,7 +233,7 @@ module.exports = function registerDeleteRoutes(app, deps) {
             continue;
           }
 
-          await logAudit(companyId, userId, "DELETE", tableName, matchedGuid, { dppId: matchedGuid }, null);
+          await logAudit(companyId, userId, "delete", tableName, matchedGuid, { dppId: matchedGuid }, null);
           details.push({ dppId: matchedGuid, internalAliasId: internalAliasId || undefined, status: "deleted" });
           deleted += 1;
         } catch (error) {

@@ -317,7 +317,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       await logAudit(
         null,
         req.user.userId,
-        "APPROVE_SUPER_ADMIN_INVITE",
+        "approveSuperAdminInvite",
         "inviteTokens",
         inviteId,
         null,
@@ -350,7 +350,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
       await logAudit(
         null,
         req.user.userId,
-        "DECLINE_SUPER_ADMIN_INVITE",
+        "declineSuperAdminInvite",
         "inviteTokens",
         inviteId,
         null,
@@ -397,7 +397,7 @@ module.exports = function registerSuperAdminRoutes(app, deps) {
 
       await logAudit(
         null, req.user.userId,
-        active ? "RESTORE_SUPER_ADMIN_ACCESS" : "REVOKE_SUPER_ADMIN_ACCESS",
+        active ? "restoreSuperAdminAccess" : "revokeSuperAdminAccess",
         "users", null, { userId: userId }, { active }
       );
 

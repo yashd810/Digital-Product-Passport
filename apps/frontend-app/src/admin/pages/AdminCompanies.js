@@ -4,29 +4,29 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildCompanyAnalyticsPath } from "../utils/companyRoutes";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const INITIAL_COMPANY_FORM = {
+const initialCompanyForm = {
   companyName: "",
   legalName: "",
   country: "",
   companyRegistrationNumber: "",
   vatNumber: "",
   websiteDomain: "",
-  customerTrustLevel: "BASIC",
+  customerTrustLevel: "basic",
   authorizedContactName: "",
   authorizedContactEmail: "",
 };
 
-const TRUST_LEVEL_OPTIONS = [
-  { value: "BASIC", label: "Small supplier - Basic" },
-  { value: "VERIFIED_BUSINESS", label: "Medium supplier - Verified business" },
-  { value: "ENTERPRISE", label: "Big customer - Enterprise" },
+const trustLevelOptions = [
+  { value: "basic", label: "Small supplier - Basic" },
+  { value: "verifiedBusiness", label: "Medium supplier - Verified business" },
+  { value: "enterprise", label: "Big customer - Enterprise" },
 ];
 
 function AdminCompanies() {
   const navigate = useNavigate();
-  const [companyForm, setCompanyForm] = useState(INITIAL_COMPANY_FORM);
+  const [companyForm, setCompanyForm] = useState(initialCompanyForm);
   const [createdCompany, setCreatedCompany] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -35,7 +35,7 @@ function AdminCompanies() {
   const trustMenuRef = useRef(null);
 
   const selectedTrustLevel = useMemo(
-    () => TRUST_LEVEL_OPTIONS.find((option) => option.value === companyForm.customerTrustLevel) || TRUST_LEVEL_OPTIONS[0],
+    () => trustLevelOptions.find((option) => option.value === companyForm.customerTrustLevel) || trustLevelOptions[0],
     [companyForm.customerTrustLevel]
   );
 
@@ -78,7 +78,7 @@ function AdminCompanies() {
     }
 
     try {
-      const response = await fetchWithAuth(`${API}/api/admin/companies`, {
+      const response = await fetchWithAuth(`${api}/api/admin/companies`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
@@ -92,7 +92,7 @@ function AdminCompanies() {
       if (!response.ok) throw new Error(data.error || "Failed to create company");
 
       setCreatedCompany(data.company);
-      setCompanyForm(INITIAL_COMPANY_FORM);
+      setCompanyForm(initialCompanyForm);
       setSuccessMsg(`Created ${data.company.companyName}`);
     } catch (err) {
       setError(err.message || "Failed to create company");
@@ -211,7 +211,7 @@ function AdminCompanies() {
                 </button>
                 {trustMenuOpen && (
                   <div className="admin-select-menu" role="listbox" aria-labelledby="customerTrustLevel">
-                    {TRUST_LEVEL_OPTIONS.map((option) => {
+                    {trustLevelOptions.map((option) => {
                       const selected = option.value === companyForm.customerTrustLevel;
                       return (
                         <button
@@ -285,7 +285,7 @@ function AdminCompanies() {
               </div>
               <div className="company-code-result-item">
                 <span className="company-code-result-label">Identity Level</span>
-                <strong className="company-code-result-value">{createdCompany.customerTrustLevel || "BASIC"}</strong>
+                <strong className="company-code-result-value">{createdCompany.customerTrustLevel || "basic"}</strong>
               </div>
               <div className="company-code-result-item">
                 <span className="company-code-result-label">Verification</span>

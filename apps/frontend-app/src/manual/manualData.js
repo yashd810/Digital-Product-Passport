@@ -1,4 +1,4 @@
-export const CORE_DATABASE_TABLES = [
+export const coreDatabaseTables = [
   {
     title: "Identity, login, and access",
     description: "These tables control who can enter the app, how invites work, and which keys are active.",
@@ -269,7 +269,7 @@ export const CORE_DATABASE_TABLES = [
   },
 ];
 
-export const BACKEND_API_FAMILIES = [
+export const backendApiFamilies = [
   {
     name: "Authentication and account recovery",
     route: "/api/auth/*",
@@ -400,7 +400,7 @@ export const BACKEND_API_FAMILIES = [
   },
 ];
 
-export const BACKEND_OPERATION_FLOWS = [
+export const backendOperationFlows = [
   {
     title: "Company onboarding flow",
     steps: [
@@ -483,7 +483,7 @@ export const BACKEND_OPERATION_FLOWS = [
   },
 ];
 
-export const SECURITY_KEY_TABLE = {
+export const securityKeyTable = {
   title: "Credential types and where each one belongs",
   columns: ["Credential", "How you get it", "How you send it", "What it can do", "Do not use it for"],
   rows: [
@@ -546,7 +546,7 @@ export const SECURITY_KEY_TABLE = {
   ],
 };
 
-export const ASSET_MANAGEMENT_TERMS_TABLE = {
+export const assetManagementTermsTable = {
   title: "Asset Management in simple words",
   columns: ["Part of the tool", "What it does", "What to remember"],
   rows: [
@@ -561,7 +561,7 @@ export const ASSET_MANAGEMENT_TERMS_TABLE = {
   ],
 };
 
-export const API_GETTING_STARTED_FLOWS = [
+export const apiGettingStartedFlows = [
   {
     title: "How a normal company user authenticates",
     steps: [
@@ -600,7 +600,7 @@ export const API_GETTING_STARTED_FLOWS = [
   },
 ];
 
-export const COMPANY_WRITE_API_TABLE = {
+export const companyWriteApiTable = {
   title: "Company write APIs for create, update, release, revise, and bulk work",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What happens"],
   rows: [
@@ -627,7 +627,7 @@ export const COMPANY_WRITE_API_TABLE = {
   ],
 };
 
-export const READ_EXPORT_API_TABLE = {
+export const readExportApiTable = {
   title: "Read, search, compare, and export APIs",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What comes back"],
   rows: [
@@ -650,7 +650,7 @@ export const READ_EXPORT_API_TABLE = {
   ],
 };
 
-export const PUBLIC_AND_LIVE_API_TABLE = {
+export const publicAndLiveApiTable = {
   title: "Public, external read, unlock, verification, and live-data APIs",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it returns or does"],
   rows: [
@@ -690,7 +690,7 @@ export const PUBLIC_AND_LIVE_API_TABLE = {
   ],
 };
 
-export const GOVERNANCE_SECURITY_API_TABLE = {
+export const governanceSecurityApiTable = {
   title: "Governance, controlled access, audit, backup, and operator identity APIs",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it controls"],
   rows: [
@@ -716,7 +716,7 @@ export const GOVERNANCE_SECURITY_API_TABLE = {
   ],
 };
 
-export const DICTIONARY_API_TABLE = {
+export const dictionaryApiTable = {
   title: "Semantic dictionary browser and API",
   columns: ["Action", "Endpoint or route", "Authentication", "What it gives you", "Where it is used"],
   rows: [
@@ -729,7 +729,7 @@ export const DICTIONARY_API_TABLE = {
   ],
 };
 
-export const ASSET_MANAGEMENT_API_TABLE = {
+export const assetManagementApiTable = {
   title: "Asset Management APIs",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it does"],
   rows: [
@@ -747,7 +747,7 @@ export const ASSET_MANAGEMENT_API_TABLE = {
   ],
 };
 
-export const ADMIN_PLATFORM_API_TABLE = {
+export const adminPlatformApiTable = {
   title: "Super-admin API operations that shape the platform",
   columns: ["Action", "Endpoint", "Authentication", "What you send", "What it controls"],
   rows: [

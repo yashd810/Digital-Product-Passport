@@ -21,14 +21,14 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
     logAudit,
     replicatePassportToBackup,
     evaluateCompliance,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    REVISION_BLOCKING_STATUSES_SQL,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    editableReleaseStatusesSql,
+    revisionBlockingStatusesSql,
+    archivedHistoryFilterSql,
     markOlderVersionsObsolete,
     signPassport,
     recordSignedDppRelease,
     getActorIdentifier,
-    IN_REVISION_STATUS,
+    inRevisionStatus,
     submitPassportToWorkflow,
     getPassportLineageContext,
   } = deps;
@@ -102,7 +102,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
         schemaFieldsByKey.set("modelName", { key: "modelName", label: "Model Name", type: "text" });
         schemaFieldsByKey.set("internalAliasId", { key: "internalAliasId", label: "Internal Alias ID", type: "text" });
 
-        const applicableChanges = Object.entries(changes).filter(([key]) => schemaFieldsByKey.has(key) && /^[a-z][A-Za-z0-9_]*$/.test(key));
+        const applicableChanges = Object.entries(changes).filter(([key]) => schemaFieldsByKey.has(key) && /^[a-z][A-Za-z0-9]*$/.test(key));
 
         const releasedRes = await pool.query(
           `SELECT * FROM ${tableName}
@@ -132,7 +132,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
           const blockerRes = await pool.query(
             `SELECT "dppId", "versionNumber", "releaseStatus" FROM ${tableName}
-             WHERE "companyId" = $1 AND "lineageId" = $2 AND "releaseStatus" IN ${REVISION_BLOCKING_STATUSES_SQL} AND "deletedAt" IS NULL
+             WHERE "companyId" = $1 AND "lineageId" = $2 AND "releaseStatus" IN ${revisionBlockingStatusesSql} AND "deletedAt" IS NULL
              ORDER BY "versionNumber" DESC LIMIT 1`,
             [companyId, source.lineageId]
           );
@@ -168,7 +168,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
 
             const values = columns.map((key) => {
               if (key === "versionNumber") return newVersion;
-              if (key === "releaseStatus") return IN_REVISION_STATUS;
+              if (key === "releaseStatus") return inRevisionStatus;
               if (key === "createdBy") return userId;
               if (key === "deletedAt") return null;
               if (Object.prototype.hasOwnProperty.call(mappedChanges, key)) return toStoredPassportValue(mappedChanges[key]);
@@ -225,9 +225,9 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
               }
             }
 
-            await logAudit(companyId, userId, "BULK_REVISE", tableName, newGuid,
+            await logAudit(companyId, userId, "bulkRevise", tableName, newGuid,
               { versionNumber: sourceVersion, releaseStatus: source.releaseStatus },
-              { versionNumber: newVersion, releaseStatus: submitToWorkflow ? "inReview" : IN_REVISION_STATUS, batchId: batch.id, revisionNote: revisionNote || null, fieldsUpdated: Object.keys(mappedChanges) }
+              { versionNumber: newVersion, releaseStatus: submitToWorkflow ? "inReview" : inRevisionStatus, batchId: batch.id, revisionNote: revisionNote || null, fieldsUpdated: Object.keys(mappedChanges) }
             );
 
             details.push({ dppId: newGuid, passportType, status: detailStatus, sourceVersionNumber: sourceVersion, newVersionNumber: newVersion, message: detailMessage });
@@ -289,7 +289,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           const currentRes = await pool.query(
             `SELECT *
              FROM ${tableName}
-             WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+             WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
              LIMIT 1`,
             [dppId, companyId]
           );
@@ -310,7 +310,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           });
           const result = await pool.query(
             `UPDATE ${tableName} SET "releaseStatus" = 'released', "updatedAt" = NOW()
-             WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+             WHERE "dppId" = $1 AND "companyId" = $2 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
              RETURNING *`,
             [dppId, companyId]
           );
@@ -340,7 +340,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
               sigData,
               releaseNote: item?.releaseNote || null,
             });
-            await logAudit(companyId, userId, "SIGN_PASSPORT", "passportSignatures", dppId, null, {
+            await logAudit(companyId, userId, "signPassport", "passportSignatures", dppId, null, {
               versionNumber: releasedRow.versionNumber,
               signingKeyId: sigData.keyId,
               signatureAlgorithm: sigData.signatureAlgorithm,
@@ -352,7 +352,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
           }
 
           await markOlderVersionsObsolete(tableName, dppId, releasedRow.versionNumber, passportType);
-          await logAudit(companyId, userId, "RELEASE", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
+          await logAudit(companyId, userId, "release", tableName, dppId, { releaseStatus: "draftOrInRevision" }, { releaseStatus: "released" });
           details.push({
             dppId,
             status: "released",
@@ -434,7 +434,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
               logger.warn({ err: error, dppId: row.dppId, passportType, reason: "bulkArchive" }, "Failed to replicate bulk archive to backup");
             });
           }
-          await logAudit(companyId, userId, "ARCHIVE", tableName, dppId, null, { versionsArchived: rows.rows.length });
+          await logAudit(companyId, userId, "archive", tableName, dppId, null, { versionsArchived: rows.rows.length });
           archived += 1;
         } catch {
           skipped += 1;
@@ -464,7 +464,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
              FROM "passportArchives"
              WHERE ("dppId" = $1 OR "lineageId" = $1)
                AND "companyId" = $2
-               AND ${ARCHIVED_HISTORY_FILTER_SQL}
+               AND ${archivedHistoryFilterSql}
              ORDER BY "versionNumber" DESC LIMIT 1`,
             [dppId, companyId]
           );
@@ -478,7 +478,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
              FROM "passportArchives"
              WHERE "lineageId" = $1
                AND "companyId" = $2
-               AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
+               AND ${archivedHistoryFilterSql}`,
             [lineageId, companyId]
           );
           if (!archiveRows.rows.length) {
@@ -492,10 +492,10 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             `DELETE FROM "passportArchives"
              WHERE "lineageId" = $1
                AND "companyId" = $2
-               AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
+               AND ${archivedHistoryFilterSql}`,
             [lineageId, companyId]
           );
-          await logAudit(companyId, userId, "UNARCHIVE", tableName, dppId, null, { versionsRestored: archiveRows.rows.length });
+          await logAudit(companyId, userId, "unarchive", tableName, dppId, null, { versionsRestored: archiveRows.rows.length });
           restored += 1;
         } catch {
           skipped += 1;

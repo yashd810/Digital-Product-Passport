@@ -4,7 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 // Proper CSV parser — handles quoted values, embedded commas, and escaped quotes
 function parseCsvRow(line) {
@@ -94,7 +94,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
   // ─────────────────────────────────────────────
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
+      const response = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
       if (!response.ok) { setCreateError("Failed to fetch passport type definition"); return; }
       const passportTypeData = await response.json();
       const sections = passportTypeData.fieldsJson?.sections || [];
@@ -124,7 +124,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
     setIsImporting(true);
     setCreateError("");
     try {
-      const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
+      const typeResponse = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
       if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
       const passportTypeData = await typeResponse.json();
       const sections = passportTypeData.fieldsJson?.sections || [];
@@ -169,7 +169,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
         let successCount = 0;
         for (const passportData of createdPassports) {
           try {
-            const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports`, {
+            const response = await fetchWithAuth(`${api}/api/companies/${companyId}/passports`, {
               method: "POST",
               headers: authHeaders({ "Content-Type": "application/json" }),
               body: JSON.stringify({ passportType, ...passportData }),
@@ -206,7 +206,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       if (passports.some((passport) => passport?.dppId)) {
         throw new Error("Create-only JSON import does not accept dppId. Remove update identifiers and use new internalAliasId values.");
       }
-      const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
+      const typeResponse = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
       if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
       const passportTypeData = await typeResponse.json();
       const allowedJsonKeys = new Set([
@@ -229,7 +229,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
 
       for (const passportData of passports) {
         try {
-          const response = await fetchWithAuth(`${API}/api/companies/${companyId}/passports`, {
+          const response = await fetchWithAuth(`${api}/api/companies/${companyId}/passports`, {
             method: "POST",
             headers: authHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ passportType, ...passportData }),
@@ -317,7 +317,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
                   <tbody>
                     <tr><td className="field-name">internalAliasId</td><td>SKU-001</td><td>SKU-002</td></tr>
                     <tr><td className="field-name">modelName</td><td>Model A</td><td>Model B</td></tr>
-                    <tr><td className="field-name">productCategoryDetail</td><td>Medical Device</td><td>Industrial Sensor</td></tr>
+                    <tr><td className="field-name">productCategoryDetail</td><td>Equipment</td><td>Service Asset</td></tr>
                   </tbody>
                 </table>
               </div>

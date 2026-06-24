@@ -19,9 +19,9 @@ module.exports = function registerCompanyRoutes(app, deps) {
     validateCompanyDppPolicyInput,
     updateCompanyDppPolicy,
     storageService,
-    REPO_BASE_DIR,
-    FILES_BASE_DIR,
-    COMPANY_TRUST_LEVELS,
+    repoBaseDir,
+    filesBaseDir,
+    companyTrustLevels,
   } = deps;
 
   function mapCompanyRow(row = {}) {
@@ -53,7 +53,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       return normalized || null;
     };
     const companyName = String(input.companyName || "").trim();
-    const trustLevel = String(input.customerTrustLevel || "").trim().toUpperCase();
+    const trustLevel = String(input.customerTrustLevel || "").trim();
     return {
       companyName,
       legalName: normalizeText(input.legalName),
@@ -61,7 +61,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       companyRegistrationNumber: normalizeText(input.companyRegistrationNumber),
       vatNumber: normalizeText(input.vatNumber),
       websiteDomain: normalizeText(input.websiteDomain),
-      customerTrustLevel: trustLevel || "BASIC",
+      customerTrustLevel: trustLevel || "basic",
       authorizedContactName: normalizeText(input.authorizedContactName),
       authorizedContactEmail: normalizeText(input.authorizedContactEmail)?.toLowerCase() || null
     };
@@ -73,7 +73,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       if (!companyIdentity.companyName) {
         return res.status(400).json({ error: "Company name required" });
       }
-      if (!COMPANY_TRUST_LEVELS.has(companyIdentity.customerTrustLevel)) {
+      if (!companyTrustLevels.has(companyIdentity.customerTrustLevel)) {
         return res.status(400).json({ error: "Invalid customer trust level" });
       }
       const result = await pool.query(
@@ -157,7 +157,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       if (!companyIdentity.companyName) {
         return res.status(400).json({ error: "Company name required" });
       }
-      if (!COMPANY_TRUST_LEVELS.has(companyIdentity.customerTrustLevel)) {
+      if (!companyTrustLevels.has(companyIdentity.customerTrustLevel)) {
         return res.status(400).json({ error: "Invalid customer trust level" });
       }
 
@@ -315,7 +315,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       await logAudit(
         companyId,
         req.user.userId,
-        "UPDATE_COMPANY_DPP_POLICY",
+        "updateCompanyDppPolicy",
         "companyDppPolicies",
         String(companyId),
         null,
@@ -405,7 +405,7 @@ module.exports = function registerCompanyRoutes(app, deps) {
       await logAudit(
         null,
         req.user.userId,
-        "DELETE_COMPANY",
+        "deleteCompany",
         "companies",
         String(company.id),
         { company },
@@ -421,10 +421,10 @@ module.exports = function registerCompanyRoutes(app, deps) {
       }).catch((error) => {
         logger.warn({ err: error, companyId, storageKey: row.storageKey }, "Failed to delete company repository file from storage");
       })));
-      const repoDir = path.join(REPO_BASE_DIR, String(companyId));
+      const repoDir = path.join(repoBaseDir, String(companyId));
       fs.rmSync(repoDir, { recursive: true, force: true });
       passportDppIds.forEach((dppId) => {
-        fs.rmSync(path.join(FILES_BASE_DIR, String(dppId)), { recursive: true, force: true });
+        fs.rmSync(path.join(filesBaseDir, String(dppId)), { recursive: true, force: true });
       });
 
       res.json({

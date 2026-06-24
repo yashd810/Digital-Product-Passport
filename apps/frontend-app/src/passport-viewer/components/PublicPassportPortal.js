@@ -10,9 +10,9 @@ import { PieChart, parseCompositionFromTable } from "./PieChart";
 import { FileCell, LiveBadge, LockedFieldCell, RefreshableImage, ViewerDomainIndicator } from "./ViewerBlocks";
 import { appendUnitToDisplayValue, formatFieldLabelWithUnit, formatIsoDate, renderTextBlock } from "../utils/viewerHelpers";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const PASSPORT_ICON = (
+const passportIcon = (
   <svg viewBox="0 0 64 64" aria-hidden="true">
     <rect x="14" y="8" width="36" height="48" rx="8" fill="none" stroke="currentColor" strokeWidth="4" />
     <path d="M24 22h16M24 32h16M24 42h10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
@@ -350,7 +350,7 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
     if (!expandedHistory || !isDynamic || historyState.loaded || !passport?.dppId) return;
     let cancelled = false;
     setHistoryState({ loading: true, loaded: false, data: [] });
-    fetchWithAuth(`${API}/api/passports/${passport.dppId}/dynamic-values/${field.key}/history?limit=500`)
+    fetchWithAuth(`${api}/api/passports/${passport.dppId}/dynamic-values/${field.key}/history?limit=500`)
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (cancelled) return;
@@ -576,10 +576,10 @@ export default function PublicPassportPortal({
       setPublicHistoryState({ loading: true, loaded: false, data: [], failed: false });
       const endpoints = [
         passport?.dppId
-          ? `${API}/api/passports/${encodeURIComponent(passport.dppId)}/history`
+          ? `${api}/api/passports/${encodeURIComponent(passport.dppId)}/history`
           : null,
         passport?.internalAliasId
-          ? `${API}/api/passports/by-product/${encodeURIComponent(passport.internalAliasId)}/history`
+          ? `${api}/api/passports/by-product/${encodeURIComponent(passport.internalAliasId)}/history`
           : null,
       ].filter(Boolean);
 
@@ -655,7 +655,7 @@ export default function PublicPassportPortal({
       <nav className="nav" aria-label="Passport sections">
         <div className="nav-inner">
           <a className="brand" href="#portal-top" aria-label="Back to passport top">
-            <div className="logo">{PASSPORT_ICON}</div>
+            <div className="logo">{passportIcon}</div>
             <div>
               <strong>{passportDisplayName}</strong>
               <span>Public digital product passport</span>

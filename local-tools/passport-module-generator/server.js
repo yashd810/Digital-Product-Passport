@@ -5,19 +5,19 @@ const http = require("http");
 const path = require("path");
 const { URL } = require("url");
 
-const PORT = Number.parseInt(process.env.PORT || "5055", 10);
-const APP_DIR = __dirname;
-const REPO_ROOT = path.resolve(APP_DIR, "../..");
-const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const port = Number.parseInt(process.env.PORT || "5055", 10);
+const appDir = __dirname;
+const repoRoot = path.resolve(appDir, "../..");
+const maxBodyBytes = 2 * 1024 * 1024;
 
-const MIME = {
+const mime = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
 };
 
-const HEADER_SLOT_DEFINITIONS = [
+const headerSlotDefinitions = [
   { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", managedKey: "internalManagedDigitalProductPassportId" },
   { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", managedKey: "internalManagedUniqueProductIdentifier" },
   { slotKey: "internalAliasId", label: "Internal Alias ID", managedKey: "internalManagedInternalAliasId" },
@@ -56,7 +56,7 @@ function readBody(req) {
     const chunks = [];
     req.on("data", (chunk) => {
       total += chunk.length;
-      if (total > MAX_BODY_BYTES) {
+      if (total > maxBodyBytes) {
         reject(new Error("Request body is too large"));
         req.destroy();
         return;
@@ -78,13 +78,13 @@ function readBody(req) {
 
 function serveStatic(req, res, pathname) {
   const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-  const filePath = path.resolve(APP_DIR, fileName);
-  if (!filePath.startsWith(APP_DIR) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+  const filePath = path.resolve(appDir, fileName);
+  if (!filePath.startsWith(appDir) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     sendText(res, 404, "Not found");
     return;
   }
   const ext = path.extname(filePath);
-  res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+  res.writeHead(200, { "Content-Type": mime[ext] || "application/octet-stream" });
   fs.createReadStream(filePath).pipe(res);
 }
 
@@ -268,7 +268,7 @@ function inferPresentation(field) {
   return "data";
 }
 
-const OBJECT_TYPES = new Set([
+const objectTypes = new Set([
   "SingleValuedDataElement",
   "MultiValuedDataElement",
   "DataElementCollection",
@@ -276,7 +276,7 @@ const OBJECT_TYPES = new Set([
   "MultiLanguageDataElement",
 ]);
 
-const VALUE_DATA_TYPES = new Set([
+const valueDataTypes = new Set([
   "String",
   "Boolean",
   "Integer",
@@ -291,16 +291,16 @@ const VALUE_DATA_TYPES = new Set([
 
 function normalizeObjectType(value, label) {
   const normalized = clean(value);
-  if (!OBJECT_TYPES.has(normalized)) {
-    throw new Error(`${label} objectType must be one of: ${[...OBJECT_TYPES].join(", ")}`);
+  if (!objectTypes.has(normalized)) {
+    throw new Error(`${label} objectType must be one of: ${[...objectTypes].join(", ")}`);
   }
   return normalized;
 }
 
 function normalizeValueDataType(value, label) {
   const normalized = clean(value);
-  if (!VALUE_DATA_TYPES.has(normalized)) {
-    throw new Error(`${label} valueDataType must be one of: ${[...VALUE_DATA_TYPES].join(", ")}`);
+  if (!valueDataTypes.has(normalized)) {
+    throw new Error(`${label} valueDataType must be one of: ${[...valueDataTypes].join(", ")}`);
   }
   return normalized;
 }
@@ -315,16 +315,6 @@ function jsValue(value) {
   return JSON.stringify(value);
 }
 
-function regulatoryContentSpecificationId(family, version) {
-  const words = String(family || "")
-    .split("-")
-    .map((word) => clean(word))
-    .filter(Boolean)
-    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`);
-  if (!words.length) return "";
-  return `${words.join("_")}_dictionary_${version}`;
-}
-
 function validateSpec(input) {
   const module = input.module || {};
   const roles = input.roles || {};
@@ -335,12 +325,12 @@ function validateSpec(input) {
   const displayName = clean(module.displayName) || `${titleCase(family)} Passport ${version}`;
   const productCategory = clean(module.productCategory) || titleCase(family);
   const productIcon = clean(module.productIcon) || "PT";
-  const semanticModelKey = clean(module.semanticModelKey) || `${family.replace(/-/g, "_")}_dictionary_${version}`;
-  const contentSpecificationId = regulatoryContentSpecificationId(family, version);
+  const semanticModelKey = clean(module.semanticModelKey) || `${camelCase(family)}Dictionary${pascalCase(version)}`;
+  const contentSpecificationId = clean(module.contentSpecificationId) || semanticModelKey;
   const passportPolicyKey = clean(module.passportPolicyKey) || `${camelCase(family)}Dpp${pascalCase(version)}`;
   const defaultCarrierPolicyKey = clean(module.defaultCarrierPolicyKey || "webPublicEntryV1");
   const systemHeaderFieldAssignments = normalizeHeaderAssignments(module.systemHeaderFieldAssignments);
-  const systemHeaderFieldMappings = HEADER_SLOT_DEFINITIONS
+  const systemHeaderFieldMappings = headerSlotDefinitions
     .map((slot) => {
       const selectedValue = clean(systemHeaderFieldAssignments[slot.slotKey]);
       if (!selectedValue) return null;
@@ -718,7 +708,7 @@ function buildCatalog(spec, terms = []) {
     "dcat:service": {
       "@id": `${publicBase}/service`,
       "@type": "dcat:DataService",
-      "dcterms:title": `${dictionaryName} API`,
+      "dcterms:title": `${dictionaryName} api`,
       "dcat:endpointURL": { "@id": dictionaryApiBase },
       "dcat:servesDataset": { "@id": `${publicBase}/dataset` },
     },
@@ -744,7 +734,6 @@ function buildModuleJs(spec) {
     systemHeaderFieldMappings = [],
     systemHeaderFieldKeys = [],
   } = spec.module;
-  const constName = `${family.replace(/[^A-Za-z0-9]/g, "_").toUpperCase()}_${version.toUpperCase()}_SEMANTIC_BASE`;
   const semanticBase = `${baseUrl}/dictionary/${family}/${version}/terms`;
 
   const sectionLines = spec.sections.map((section) => {
@@ -790,7 +779,7 @@ function buildModuleJs(spec) {
 
   return `"use strict";
 
-const ${constName} = ${jsValue(semanticBase)};
+const semanticBaseUrl = ${jsValue(semanticBase)};
 
 const publicFieldDefaults = {
   access: ["public"],
@@ -805,7 +794,7 @@ const restrictedFieldDefaults = {
 };
 
 function term(slug) {
-  return \`${"${" + constName + "}"}/\${slug}\`;
+  return \`${"${semanticBaseUrl}"}/\${slug}\`;
 }
 
 function field({
@@ -939,8 +928,8 @@ function buildArtifacts(input) {
 }
 
 function safeRepoPath(relativePath) {
-  const fullPath = path.resolve(REPO_ROOT, relativePath);
-  if (!fullPath.startsWith(REPO_ROOT)) {
+  const fullPath = path.resolve(repoRoot, relativePath);
+  if (!fullPath.startsWith(repoRoot)) {
     throw new Error(`Refusing to write outside repo: ${relativePath}`);
   }
   return fullPath;
@@ -972,7 +961,7 @@ async function writeArtifacts(input) {
 async function handleApi(req, res, pathname) {
   try {
     if (req.method === "GET" && pathname === "/api/status") {
-      sendJson(res, 200, { repoRoot: REPO_ROOT, port: PORT });
+      sendJson(res, 200, { repoRoot: repoRoot, port: port });
       return;
     }
 
@@ -1009,9 +998,9 @@ const server = http.createServer((req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, "127.0.0.1", () => {
-    console.log(`Passport module generator running at http://127.0.0.1:${PORT}`);
-    console.log(`Repo root: ${REPO_ROOT}`);
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`Passport module generator running at http://127.0.0.1:${port}`);
+    console.log(`Repo root: ${repoRoot}`);
   });
 }
 

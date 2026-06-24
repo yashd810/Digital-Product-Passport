@@ -26,7 +26,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     findExistingPassportByInternalAliasId,
     productIdentifierService,
     complianceService,
-    SYSTEM_PASSPORT_FIELDS,
+    systemPassportFields,
     getWritablePassportColumns,
     toStoredPassportValue,
     extractCarrierAuthenticityMutation,
@@ -37,7 +37,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     generateDppRecordId,
     buildStandardsCreateFields,
     usesConfiguredGlobalProductIdentifierScheme,
-    VALID_GRANULARITIES,
+    validGranularities,
     buildMutationPassportPayload,
     getActorIdentifier,
     replicatePassportToBackup,
@@ -48,7 +48,7 @@ module.exports = function registerMutationRoutes(app, deps) {
     parseDppIdentifier,
     serializePolicyDefaultValue,
     resolveManagedFacilityId,
-    MERGE_PATCH_CONTENT_TYPE,
+    mergePatchContentType,
   } = deps;
 
   const createDpp = createDppUseCase(deps);
@@ -103,8 +103,8 @@ module.exports = function registerMutationRoutes(app, deps) {
       if (e.statusCode) {
         return res.status(e.statusCode).json({ error: e.message });
       }
-      if (e.code === "AMBIGUOUS_DPP_ID") {
-        return res.status(409).json({ error: "AMBIGUOUS_DPP_ID" });
+      if (e.code === "ambiguousDppId") {
+        return res.status(409).json({ error: "ambiguousDppId" });
       }
       logger.error({ err: e }, "[Standards DPP PATCH API]");
       return res.status(500).json({ error: "Failed to update DPP" });
@@ -126,7 +126,7 @@ module.exports = function registerMutationRoutes(app, deps) {
           )
         ) {
           return res.status(409).json({
-            error: "RELEASED_DPP_REQUIRES_ARCHIVE",
+            error: "releasedDppRequiresArchive",
             message: "Released DPPs must use the archive lifecycle action instead of DELETE.",
             archiveEndpoint: `/api/v1/dpps/${encodeURIComponent(dppId)}/archive`,
             ...buildDppIdentifierFields(released.passport)
@@ -202,7 +202,7 @@ module.exports = function registerMutationRoutes(app, deps) {
       }
       if (!deleted.rows.length) return res.status(404).json({ error: "Passport not found or not editable" });
 
-      await logAudit(editable.passport.companyId, req.user.userId, isDraft ? "HARD_DELETE_DPP" : "DELETE_DPP", editable.tableName, editable.passport.dppId, {
+      await logAudit(editable.passport.companyId, req.user.userId, isDraft ? "hardDeleteDpp" : "deleteDpp", editable.tableName, editable.passport.dppId, {
         dppId
       }, null);
 
@@ -211,8 +211,8 @@ module.exports = function registerMutationRoutes(app, deps) {
         ...buildDppIdentifierFields(editable.passport)
       });
     } catch (e) {
-      if (e.code === "AMBIGUOUS_DPP_ID") {
-        return res.status(409).json({ error: "AMBIGUOUS_DPP_ID" });
+      if (e.code === "ambiguousDppId") {
+        return res.status(409).json({ error: "ambiguousDppId" });
       }
       logger.error({ err: e }, "[Standards DPP DELETE API]");
       return res.status(500).json({ error: "Failed to delete DPP" });
@@ -280,7 +280,7 @@ module.exports = function registerMutationRoutes(app, deps) {
       await logAudit(
         released.passport.companyId,
         req.user.userId,
-        "ARCHIVE_DPP",
+        "archiveDpp",
         released.tableName,
         released.passport.dppId,
         { releaseStatus: released.passport.releaseStatus },
@@ -295,8 +295,8 @@ module.exports = function registerMutationRoutes(app, deps) {
         ...buildDppIdentifierFields(released.passport)
       });
     } catch (e) {
-      if (e.code === "AMBIGUOUS_DPP_ID") {
-        return res.status(409).json({ error: "AMBIGUOUS_DPP_ID" });
+      if (e.code === "ambiguousDppId") {
+        return res.status(409).json({ error: "ambiguousDppId" });
       }
       logger.error({ err: e }, "[Standards DPP archive API]");
       return res.status(500).json({ error: "Failed to archive DPP" });
@@ -318,8 +318,8 @@ module.exports = function registerMutationRoutes(app, deps) {
       if (!Number.isFinite(companyId)) {
         return res.status(400).json({ error: "A valid companyId is required" });
       }
-      if (!registryName || !/^[a-z0-9_-]{2,120}$/.test(registryName)) {
-        return res.status(400).json({ error: "registryName must be 2-120 chars using lowercase letters, numbers, underscores, or dashes" });
+      if (!registryName || !/^[a-z][A-Za-z0-9-]{1,119}$/.test(registryName)) {
+        return res.status(400).json({ error: "registryName must be 2-120 chars using camelCase letters, numbers, or dashes" });
       }
 
       const result = await resolveReleasedPassportForIdentifier(productIdentifier, companyId);
@@ -385,9 +385,9 @@ module.exports = function registerMutationRoutes(app, deps) {
         payload: registrationPayload
       });
     } catch (e) {
-      if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+      if (e.code === "ambiguousProductId") {
         return res.status(409).json({
-          error: "AMBIGUOUS_PRODUCT_ID",
+          error: "ambiguousProductId",
           message: "Multiple passports match this identifier. Provide companyId or use the canonical product DID."
         });
       }

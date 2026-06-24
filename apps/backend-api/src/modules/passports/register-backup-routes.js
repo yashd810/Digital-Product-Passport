@@ -43,7 +43,7 @@ function registerBackupRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "UPSERT_BACKUP_PROVIDER",
+        "upsertBackupProvider",
         "backupServiceProviders",
         null,
         null,
@@ -63,7 +63,7 @@ function registerBackupRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "REVOKE_BACKUP_PROVIDER",
+        "revokeBackupProvider",
         "backupServiceProviders",
         null,
         { providerKey: req.params.providerKey },
@@ -144,7 +144,7 @@ function registerBackupRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "ACTIVATE_BACKUP_PUBLIC_HANDOVER",
+        "activateBackupPublicHandover",
         "backupPublicHandovers",
         req.params.dppId,
         null,
@@ -198,7 +198,7 @@ function registerBackupRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "DEACTIVATE_BACKUP_PUBLIC_HANDOVER",
+        "deactivateBackupPublicHandover",
         "backupPublicHandovers",
         req.params.dppId,
         null,
@@ -245,7 +245,7 @@ function registerBackupRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "REPLICATE_PASSPORT_BACKUP",
+        "replicatePassportBackup",
         "passportBackupReplications",
         req.params.dppId,
         null,
@@ -274,7 +274,7 @@ function registerBackupRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "VERIFY_PASSPORT_BACKUP",
+        "verifyPassportBackup",
         "passportBackupReplications",
         req.params.dppId,
         null,

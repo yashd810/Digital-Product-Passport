@@ -6,17 +6,17 @@ const logger = require("../../services/logger");
 module.exports = function registerAuthRoutes(app, {
   pool,
   jwt,
-  JWT_SECRET,
+  jwtSecret,
   hashPassword,
   verifyPassword,
   verifyPasswordAndUpgrade,
   generateToken,
   hashOpaqueToken,
   validatePasswordPolicy,
-  PASSWORD_MIN_LENGTH,
+  passwordMinLength,
   hashOtpCode,
   generateOtpCode,
-  SESSION_COOKIE_NAME,
+  sessionCookieName,
   setAuthCookie,
   clearAuthCookie,
   sendOtpEmail,
@@ -105,7 +105,7 @@ module.exports = function registerAuthRoutes(app, {
     metadata = {},
   }) {
     if (!backupProviderService || !companyId || !backupProviderService.replicateAccessControlEvent) {
-      return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
+      return { success: true, skipped: true, reason: "backupServiceUnavailable" };
     }
     return backupProviderService.replicateAccessControlEvent({
       companyId,
@@ -306,7 +306,7 @@ module.exports = function registerAuthRoutes(app, {
           logger.error("OTP email failed:", emailErr.message);
           return res.status(500).json({ error: "Failed to send verification code. Please try again." });
         }
-        const preAuthToken = jwt.sign({ userId: u.id, preAuth: true }, JWT_SECRET, { expiresIn: "10m" });
+        const preAuthToken = jwt.sign({ userId: u.id, preAuth: true }, jwtSecret, { expiresIn: "10m" });
         return res.json({ requiresTwoFactor: true, preAuthToken });
       }
 
@@ -317,7 +317,7 @@ module.exports = function registerAuthRoutes(app, {
         mfaVerifiedAt: new Date().toISOString(),
         amr: ["pwd", "otp"]
       });
-      logger.info({ userId: u.id, sessionVersion: u.sessionVersion, msg: "[LOGIN_TOKEN] Generated token with session version" });
+      logger.info({ userId: u.id, sessionVersion: u.sessionVersion, msg: "[loginToken] Generated token with session version" });
       setAuthCookie(res, sessionToken);
       res.json({
         success: true,
@@ -334,7 +334,7 @@ module.exports = function registerAuthRoutes(app, {
       if (!preAuthToken || !otp) return res.status(400).json({ error: "Missing required fields" });
 
       let payload;
-      try { payload = jwt.verify(preAuthToken, JWT_SECRET); }
+      try { payload = jwt.verify(preAuthToken, jwtSecret); }
       catch { return res.status(401).json({ error: "Session expired. Please log in again." }); }
       if (!payload.preAuth) return res.status(401).json({ error: "Invalid session token" });
 
@@ -394,9 +394,9 @@ module.exports = function registerAuthRoutes(app, {
       const cookieTokens = String(req.headers.cookie || "")
         .split(";")
         .map((part) => part.trim())
-        .filter((part) => part.startsWith(`${SESSION_COOKIE_NAME}=`))
+        .filter((part) => part.startsWith(`${sessionCookieName}=`))
         .map((part) => {
-          const rawValue = part.slice(`${SESSION_COOKIE_NAME}=`.length);
+          const rawValue = part.slice(`${sessionCookieName}=`.length);
           try {
             return decodeURIComponent(rawValue);
           } catch {
@@ -408,7 +408,7 @@ module.exports = function registerAuthRoutes(app, {
       for (const token of candidateTokens) {
         let payload;
         try {
-          payload = jwt.verify(token, JWT_SECRET);
+          payload = jwt.verify(token, jwtSecret);
         } catch (_error) {
           continue;
         }
@@ -463,7 +463,7 @@ module.exports = function registerAuthRoutes(app, {
       if (!preAuthToken) return res.status(400).json({ error: "Missing token" });
 
       let payload;
-      try { payload = jwt.verify(preAuthToken, JWT_SECRET); }
+      try { payload = jwt.verify(preAuthToken, jwtSecret); }
       catch { return res.status(401).json({ error: "Session expired. Please log in again." }); }
       if (!payload.preAuth) return res.status(401).json({ error: "Invalid session" });
 
@@ -720,7 +720,7 @@ module.exports = function registerAuthRoutes(app, {
         amr: mfaEnabled ? ["pwd", "otp"] : ["pwd"]
       });
       setAuthCookie(res, freshToken);
-      res.json({ success: true, minPasswordLength: PASSWORD_MIN_LENGTH });
+      res.json({ success: true, minPasswordLength: passwordMinLength });
     } catch { res.status(500).json({ error: "Failed" }); }
   });
 
@@ -752,7 +752,7 @@ module.exports = function registerAuthRoutes(app, {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "CHANGE_USER_ROLE",
+        "changeUserRole",
         "users",
         String(req.params.userId),
         null,
@@ -764,7 +764,7 @@ module.exports = function registerAuthRoutes(app, {
       );
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "USER_ROLE_CHANGED",
+        eventType: "userRoleChanged",
         severity: "high",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -810,7 +810,7 @@ module.exports = function registerAuthRoutes(app, {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "DEACTIVATE_USER_ACCESS",
+        "deactivateUserAccess",
         "users",
         String(req.params.userId),
         null,
@@ -822,7 +822,7 @@ module.exports = function registerAuthRoutes(app, {
       );
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "USER_DEACTIVATED",
+        eventType: "userDeactivated",
         severity: "critical",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -861,7 +861,7 @@ module.exports = function registerAuthRoutes(app, {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "REVOKE_USER_SESSIONS",
+        "revokeUserSessions",
         "users",
         String(req.params.userId),
         null,
@@ -873,7 +873,7 @@ module.exports = function registerAuthRoutes(app, {
       );
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "USER_SESSIONS_REVOKED",
+        eventType: "userSessionsRevoked",
         severity: "critical",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,

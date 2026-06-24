@@ -6,7 +6,7 @@ import "../styles/AdminDashboard.css";
 function CompanyAccess() {
   const navigate = useNavigate();
   const { companyId } = useParams();
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "";
   const [companyData,    setCompanyData]    = useState(null);
   const [grantedTypeIds, setGrantedTypeIds] = useState([]);
   const [allTypes,       setAllTypes]       = useState([]);   // all active passport types from DB
@@ -24,10 +24,10 @@ function CompanyAccess() {
 
         // Fetch all active passport types from the dynamic system
         const [typesRes, companiesRes] = await Promise.all([
-          fetchWithAuth(`${API_BASE_URL}/api/admin/passport-types`, {
+          fetchWithAuth(`${apiBaseUrl}/api/admin/passport-types`, {
             headers: authHeaders(),
           }),
-          fetchWithAuth(`${API_BASE_URL}/api/admin/companies`, {
+          fetchWithAuth(`${apiBaseUrl}/api/admin/companies`, {
             headers: authHeaders(),
           }),
         ]);
@@ -62,14 +62,14 @@ function CompanyAccess() {
 
       if (isGranted) {
         const r = await fetchWithAuth(
-          `${API_BASE_URL}/api/admin/company-access/${companyId}/${typeId}`,
+          `${apiBaseUrl}/api/admin/company-access/${companyId}/${typeId}`,
           { method: "DELETE", headers: authHeaders() }
         );
         if (!r.ok) throw new Error("Failed to revoke access");
         setGrantedTypeIds(ids => ids.filter(id => id !== typeId));
         setSuccessMessage(`Revoked: ${displayName}`);
       } else {
-        const r = await fetchWithAuth(`${API_BASE_URL}/api/admin/company-access`, {
+        const r = await fetchWithAuth(`${apiBaseUrl}/api/admin/company-access`, {
           method: "POST",
           headers: authHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ companyId: parseInt(companyId), passportTypeId: parseInt(typeId) }),

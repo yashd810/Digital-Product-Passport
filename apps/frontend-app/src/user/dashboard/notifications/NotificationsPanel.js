@@ -4,9 +4,9 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "../../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const NOTIF_ICONS = {
+const notifIcons = {
   passportReleased:    "🚀",
   passportRevised:     "🔄",
   workflowReview:      "🔍",
@@ -44,7 +44,7 @@ function NotificationsPanel({ user }) {
   const fetchNotifs = async () => {
     setLoading(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/users/me/notifications?limit=25`, {
+      const r = await fetchWithAuth(`${api}/api/users/me/notifications?limit=25`, {
         headers: { ...authHeaders() },
       });
       if (r.ok) {
@@ -76,7 +76,7 @@ function NotificationsPanel({ user }) {
 
   const markAllRead = async () => {
     try {
-      await fetchWithAuth(`${API}/api/users/me/notifications/read-all`, {
+      await fetchWithAuth(`${api}/api/users/me/notifications/read-all`, {
         method: "PATCH",
         headers: { ...authHeaders() },
       });
@@ -87,7 +87,7 @@ function NotificationsPanel({ user }) {
 
   const markRead = async (id) => {
     try {
-      await fetchWithAuth(`${API}/api/users/me/notifications/${id}/read`, {
+      await fetchWithAuth(`${api}/api/users/me/notifications/${id}/read`, {
         method: "PATCH",
         headers: { ...authHeaders() },
       });
@@ -153,7 +153,7 @@ function NotificationsPanel({ user }) {
                   className={`notif-item${n.read ? "" : " unread"}`}
                   onClick={() => handleClick(n)}>
                   <div className="notif-icon">
-                    {NOTIF_ICONS[n.type] || NOTIF_ICONS.default}
+                    {notifIcons[n.type] || notifIcons.default}
                   </div>
                   <div className="notif-content">
                     <div className="notif-title">{n.title}</div>

@@ -12,8 +12,8 @@ const createPassportService = require("../src/services/passport-service");
 const createProductIdentifierService = require("../src/services/product-identifier-service");
 const logger = require("../src/services/logger");
 const {
-  IN_REVISION_STATUS,
-  SYSTEM_PASSPORT_FIELDS,
+  inRevisionStatus,
+  systemPassportFields,
   getTable,
   normalizeReleaseStatus,
   isPublicHistoryStatus,
@@ -58,8 +58,8 @@ async function main() {
     isEditablePassportStatus,
     normalizeInternalAliasIdValue,
     generateInternalAliasIdValue,
-    IN_REVISION_STATUS,
-    SYSTEM_PASSPORT_FIELDS,
+    inRevisionStatus,
+    systemPassportFields,
     getWritablePassportColumns,
     getStoredPassportValues,
     quoteSqlIdentifier,
@@ -78,7 +78,7 @@ async function main() {
   await initDb(pool, {
     getTable,
     createPassportTable: passportService.createPassportTable,
-    IN_REVISION_STATUS,
+    inRevisionStatus,
   });
   logger.info("[DB] Migrations completed successfully");
 }

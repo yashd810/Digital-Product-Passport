@@ -1,6 +1,6 @@
 import { isReleasedPassportStatus } from "../../../../passports/utils/passportStatus";
 
-const BASE_COMPLETENESS_FIELDS = [
+const baseCompletenessFields = [
   { key: "modelName", type: "text" },
 ];
 
@@ -127,8 +127,8 @@ export function calcCompleteness(passport, typeDefinitions = []) {
   const typeFields = pType ? getTypeFields(pType, typeDefinitions) : [];
   const authorFields = typeFields.filter((field) => field.type !== "file" && !field.dynamic);
   const fieldsToMeasure = [
-    ...BASE_COMPLETENESS_FIELDS,
-    ...authorFields.filter((field) => !BASE_COMPLETENESS_FIELDS.some((baseField) => baseField.key === field.key)),
+    ...baseCompletenessFields,
+    ...authorFields.filter((field) => !baseCompletenessFields.some((baseField) => baseField.key === field.key)),
   ];
 
   if (!fieldsToMeasure.length) return null;

@@ -7,7 +7,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath, resolveDashboardCompanySlug } from "../utils/dashboardRoutes";
 import "../../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function formatPassportTypeLabel(passportType) {
   if (!passportType) return "Passport Type";
@@ -40,10 +40,10 @@ function DashboardLayout({ user, companyId, onLogout }) {
   useEffect(() => {
     if (!companyId) { navigate("/login"); return; }
     Promise.all([
-      fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+      fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
         .then(r => r.json())
         .catch(() => []),
-      fetchWithAuth(`${API}/api/companies/${companyId}/semantic-models`, { headers: authHeaders() })
+      fetchWithAuth(`${api}/api/companies/${companyId}/semantic-models`, { headers: authHeaders() })
         .then(r => r.json())
         .catch(() => []),
     ])

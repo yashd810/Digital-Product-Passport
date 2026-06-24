@@ -3,9 +3,9 @@
 const fs = require("fs");
 const path = require("path");
 
-const DEFAULT_RESOURCES_DIR = path.join(__dirname, "../../resources/semantics");
+const defaultResourcesDir = path.join(__dirname, "../../resources/semantics");
 
-const DATA_TYPE_PRESETS = {
+const dataTypePresets = {
   string: { format: "String", jsonType: "string", xsdType: "xsd:string" },
   decimal: { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" },
   number: { format: "Decimal", jsonType: "number", xsdType: "xsd:decimal" },
@@ -46,7 +46,7 @@ function compactObject(value) {
 function normalizeDataType(dataType) {
   if (!dataType) return null;
   if (typeof dataType === "string") {
-    const preset = DATA_TYPE_PRESETS[normalizePathSegment(dataType)];
+    const preset = dataTypePresets[normalizePathSegment(dataType)];
     return preset ? { ...preset } : { format: dataType, jsonType: "string", xsdType: "xsd:string" };
   }
   if (isPlainObject(dataType)) return { ...dataType };
@@ -254,7 +254,7 @@ function buildModel({ resourcesDir, family, version }) {
   };
 }
 
-module.exports = function createSemanticModelRegistry({ resourcesDir = DEFAULT_RESOURCES_DIR } = {}) {
+module.exports = function createSemanticModelRegistry({ resourcesDir = defaultResourcesDir } = {}) {
   const modelsByKey = new Map();
   const modelsByPath = new Map();
 

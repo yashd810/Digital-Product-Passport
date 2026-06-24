@@ -2,14 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import {
-  ACCESS_LEVEL_LABELS,
-  ACCESS_LEVELS,
-  CONFIDENTIALITY_LEVELS,
-  FIELD_TYPES,
-  ICON_PRESETS,
-  TRANS_LANGS,
-  UPDATE_AUTHORITY_LABELS,
-  UPDATE_AUTHORITIES,
+  accessLevelLabels,
+  accessLevels,
+  confidentialityLevels,
+  fieldTypes,
+  iconPresets,
+  transLangs,
+  updateAuthorityLabels,
+  updateAuthorities,
   buildProductCategoryOptions,
   buildSectionsFromCSV,
   downloadTemplate,
@@ -51,7 +51,7 @@ import AdminSelectMenu from "../components/AdminSelectMenu";
 import { TypeIdentityCard } from "./TypeIdentityCard";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function AdminCreatePassportType() {
   const navigate = useNavigate();
@@ -95,7 +95,7 @@ function AdminCreatePassportType() {
   const hasSelectedSemanticModel = Boolean(normalizeSemanticModelKey(semanticModelKey));
 
   // ── Draft / save progress (create mode only, not edit/clone) ──────────────
-  const DRAFT_API = `${API}/api/admin/passport-type-draft`;
+  const draftApi = `${api}/api/admin/passport-type-draft`;
   const draftEnabled = !editMode && !location.state?.cloneData;
   const resumeDraftRequested = Boolean(location.state?.resumeDraft);
   const [draftSaved,  setDraftSaved]  = useState(false); // brief "saved" flash
@@ -127,10 +127,10 @@ function AdminCreatePassportType() {
 
   useEffect(() => {
     Promise.all([
-      fetchWithAuth(`${API}/api/semantic-models`, {
+      fetchWithAuth(`${api}/api/semantic-models`, {
         headers: authHeaders(),
       }),
-      fetchWithAuth(`${API}/api/admin/passport-type-modules`, {
+      fetchWithAuth(`${api}/api/admin/passport-type-modules`, {
         headers: authHeaders(),
       }),
     ])
@@ -159,7 +159,7 @@ function AdminCreatePassportType() {
     setSemanticTermsLoading(true);
     setSemanticTermsError("");
 
-    fetchWithAuth(`${API}/api/semantic-models/${encodeURIComponent(modelKey)}/terms`, {
+    fetchWithAuth(`${api}/api/semantic-models/${encodeURIComponent(modelKey)}/terms`, {
       headers: authHeaders(),
     })
       .then(async (response) => {
@@ -289,7 +289,7 @@ function AdminCreatePassportType() {
   // Load draft only when the user explicitly chooses to continue it
   useEffect(() => {
     if (!draftEnabled || !resumeDraftRequested) return;
-    fetchWithAuth(DRAFT_API, { headers: authHeaders() })
+    fetchWithAuth(draftApi, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(row => { if (row?.draftJson) applyDraft(row.draftJson); })
       .catch((error) => console.warn("Ignored async error", error));
@@ -302,7 +302,7 @@ function AdminCreatePassportType() {
     if (!hasContent || !productCategory.trim()) return;
     clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
-      fetchWithAuth(DRAFT_API, {
+      fetchWithAuth(draftApi, {
         method: "PUT",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ draftJson: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
@@ -319,7 +319,7 @@ function AdminCreatePassportType() {
       return;
     }
     setError("");
-    fetchWithAuth(DRAFT_API, {
+    fetchWithAuth(draftApi, {
       method: "PUT",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ draftJson: { displayName, productCategory, productIcon, semanticModelKey, sourceModuleKey, typeName, typeNameManual, sections, systemHeader } }),
@@ -357,8 +357,8 @@ function AdminCreatePassportType() {
   const [productCategoryOptions, setProductCategoryOptions] = useState([]);
   useEffect(() => {
     Promise.all([
-      fetchWithAuth(`${API}/api/admin/product-categories`, { headers: authHeaders() }),
-      fetchWithAuth(`${API}/api/admin/passport-types`, { headers: authHeaders() }),
+      fetchWithAuth(`${api}/api/admin/product-categories`, { headers: authHeaders() }),
+      fetchWithAuth(`${api}/api/admin/passport-types`, { headers: authHeaders() }),
     ])
       .then(async ([categoryResponse, typeResponse]) => {
         const savedCategories = categoryResponse.ok ? await categoryResponse.json() : [];
@@ -964,8 +964,8 @@ function AdminCreatePassportType() {
     try {
       setSaving(true);
       const url    = editMode
-        ? `${API}/api/admin/passport-types/${editTypeId}`
-        : `${API}/api/admin/passport-types`;
+        ? `${api}/api/admin/passport-types/${editTypeId}`
+        : `${api}/api/admin/passport-types`;
       const method = editMode ? "PATCH" : "POST";
       const r = await fetchWithAuth(url, {
         method,
@@ -991,7 +991,7 @@ function AdminCreatePassportType() {
       }
 
       setSuccess(`${editMode ? "Passport type updated successfully!" : "Passport type created successfully!"}`);
-      if (draftEnabled) fetchWithAuth(DRAFT_API, { method: "DELETE", headers: authHeaders() }).catch((error) => console.warn("Ignored async error", error));
+      if (draftEnabled) fetchWithAuth(draftApi, { method: "DELETE", headers: authHeaders() }).catch((error) => console.warn("Ignored async error", error));
       setError("");
       setInvalidFields([]);
       if (!editMode) {
@@ -1069,7 +1069,7 @@ function AdminCreatePassportType() {
           hasInvalid={hasInvalid}
           setError={setError}
           setInvalidFields={setInvalidFields}
-          iconPresets={ICON_PRESETS}
+          iconPresets={iconPresets}
           semanticModelLocked={!!sourceModuleKey}
         />
 
@@ -1250,7 +1250,7 @@ function AdminCreatePassportType() {
                   </div>
                   {section._i18nOpen && (
                     <div className="acpt-i18n-panel">
-                      {TRANS_LANGS.map(l => (
+                      {transLangs.map(l => (
                         <div key={l.code} className="acpt-i18n-row">
                           <span className="acpt-i18n-flag">{l.flag} {l.name}</span>
                           <input
@@ -1288,8 +1288,8 @@ function AdminCreatePassportType() {
                         field.semanticId || ""
                       );
                       const semanticSearchValue = getSemanticSearchDisplayValue(field, semanticTermCatalog);
-                      const accessSummary = summarizeSelectedValues(field.access || ["public"], ACCESS_LEVEL_LABELS, "Select access");
-                      const updateAuthoritySummary = summarizeSelectedValues(field.updateAuthority || ["economicOperator"], UPDATE_AUTHORITY_LABELS, "Select authority");
+                      const accessSummary = summarizeSelectedValues(field.access || ["public"], accessLevelLabels, "Select access");
+                      const updateAuthoritySummary = summarizeSelectedValues(field.updateAuthority || ["economicOperator"], updateAuthorityLabels, "Select authority");
                       const accessDropdownId = `${section.localId}:${field.localId}:access`;
                       const updateDropdownId = `${section.localId}:${field.localId}:authority`;
                       const tableColumnsForField = field.type === "table" ? normalizeTableColumns(field) : [];
@@ -1327,7 +1327,7 @@ function AdminCreatePassportType() {
                         )}
                         {field._i18nOpen && (
                           <div className="acpt-i18n-panel acpt-i18n-panel-field">
-                            {TRANS_LANGS.map(l => (
+                            {transLangs.map(l => (
                               <div key={l.code} className="acpt-i18n-row">
                                 <span className="acpt-i18n-flag">{l.flag} {l.name}</span>
                                 <input
@@ -1357,7 +1357,7 @@ function AdminCreatePassportType() {
                       <AdminSelectMenu
                         value={field.type}
                         onChange={(nextValue) => updateField(section.localId, field.localId, { type: nextValue })}
-                        options={FIELD_TYPES.map((typeOption) => ({
+                        options={fieldTypes.map((typeOption) => ({
                           value: typeOption.value,
                           label: typeOption.label,
                         }))}
@@ -1430,7 +1430,7 @@ function AdminCreatePassportType() {
                             isOpen={openGovernanceDropdown === accessDropdownId}
                             onToggle={() => setOpenGovernanceDropdown((current) => current === accessDropdownId ? null : accessDropdownId)}
                           >
-                            {ACCESS_LEVELS.map(level => {
+                            {accessLevels.map(level => {
                               const currentAccess = field.access || ["public"];
                               const isPublicChecked = currentAccess.includes("public");
                               const isChecked = currentAccess.includes(level.value);
@@ -1467,7 +1467,7 @@ function AdminCreatePassportType() {
                             <AdminSelectMenu
                               value={field.confidentiality || "public"}
                               onChange={(nextValue) => updateField(section.localId, field.localId, { confidentiality: nextValue })}
-                              options={CONFIDENTIALITY_LEVELS.map((level) => ({
+                              options={confidentialityLevels.map((level) => ({
                                 value: level.value,
                                 label: level.label,
                               }))}
@@ -1488,7 +1488,7 @@ function AdminCreatePassportType() {
                             isOpen={openGovernanceDropdown === updateDropdownId}
                             onToggle={() => setOpenGovernanceDropdown((current) => current === updateDropdownId ? null : updateDropdownId)}
                           >
-                            {UPDATE_AUTHORITIES.map(level => {
+                            {updateAuthorities.map(level => {
                               const currentAuthorities = field.updateAuthority || ["economicOperator"];
                               const isChecked = currentAuthorities.includes(level.value);
                               return (

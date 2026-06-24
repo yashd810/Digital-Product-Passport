@@ -2,14 +2,14 @@ function normalizeList(value) {
   return Array.isArray(value) ? value : [];
 }
 
-const COMPANY_DASHBOARD_HIDDEN_CODES = new Set([
-  "FIELD_ACCESS_MISSING",
-  "FIELD_ACCESS_INVALID",
-  "FIELD_CONFIDENTIALITY_MISSING",
-  "FIELD_CONFIDENTIALITY_INVALID",
-  "FIELD_UPDATE_AUTHORITY_MISSING",
-  "FIELD_UPDATE_AUTHORITY_INVALID",
-  "CONTROLLED_ACCESS_LAYER_MISSING",
+const companyDashboardHiddenCodes = new Set([
+  "fieldAccessMissing",
+  "fieldAccessInvalid",
+  "fieldConfidentialityMissing",
+  "fieldConfidentialityInvalid",
+  "fieldUpdateAuthorityMissing",
+  "fieldUpdateAuthorityInvalid",
+  "controlledAccessLayerMissing",
 ]);
 
 function dedupeBySignature(items) {
@@ -30,14 +30,14 @@ function dedupeBySignature(items) {
 
 export function getComplianceBlockingIssues(compliance) {
   return dedupeBySignature(
-    normalizeList(compliance?.blockingIssues).filter((issue) => !COMPANY_DASHBOARD_HIDDEN_CODES.has(issue?.code))
+    normalizeList(compliance?.blockingIssues).filter((issue) => !companyDashboardHiddenCodes.has(issue?.code))
   );
 }
 
 export function getComplianceMissingFields(compliance) {
   return dedupeBySignature(
     normalizeList(compliance?.completeness?.missingFields).map((field) => ({
-      code: field?.mandatory ? "REQUIRED_FIELD_MISSING" : "OPTIONAL_FIELD_MISSING",
+      code: field?.mandatory ? "requiredFieldMissing" : "optionalFieldMissing",
       key: field?.key || null,
       label: field?.label || field?.key || "Field",
       section: field?.section || null,

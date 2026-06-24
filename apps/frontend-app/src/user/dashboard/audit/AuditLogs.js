@@ -4,7 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 
 function AuditLogs({ companyId }) {
   const navigate = useNavigate();
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "";
 
   const [logs,        setLogs]        = useState([]);
   const [isLoading,   setIsLoading]   = useState(true);
@@ -28,7 +28,7 @@ function AuditLogs({ companyId }) {
       setIsLoading(true);
       setError("");
       const r = await fetchWithAuth(
-        `${API_BASE_URL}/api/companies/${companyId}/audit-logs?limit=1000`,
+        `${apiBaseUrl}/api/companies/${companyId}/audit-logs?limit=1000`,
         { headers: authHeaders() }
       );
       if (!r.ok) throw new Error("Failed to fetch audit logs");

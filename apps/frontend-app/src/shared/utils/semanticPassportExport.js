@@ -1,4 +1,4 @@
-const DPP_CONTEXT = {
+const dppContext = {
   "@version": 1.1,
   dpp: "https://schema.digitalproductpassport.eu/ns/dpp#",
   DigitalProductPassport: "dpp:DigitalProductPassport",
@@ -99,7 +99,7 @@ export function buildPassportJsonLdExport(passports, passportType, options = {})
   const resolvedType = String(passportType || passports[0]?.passportType || "").trim();
   const graph = passports.map((passport) => sanitizePassport(passport, resolvedType));
   const semanticModel = normalizeSemanticModel(options);
-  const contexts = [DPP_CONTEXT];
+  const contexts = [dppContext];
 
   if (semanticModel?.contextUrl && !contexts.includes(semanticModel.contextUrl)) {
     contexts.push(semanticModel.contextUrl);

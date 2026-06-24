@@ -1,13 +1,13 @@
 import {
-  ASSET_MANAGEMENT_API_TABLE,
-  ASSET_MANAGEMENT_TERMS_TABLE,
-  API_GETTING_STARTED_FLOWS,
-  COMPANY_WRITE_API_TABLE,
-  DICTIONARY_API_TABLE,
-  GOVERNANCE_SECURITY_API_TABLE,
-  PUBLIC_AND_LIVE_API_TABLE,
-  READ_EXPORT_API_TABLE,
-  SECURITY_KEY_TABLE,
+  assetManagementApiTable,
+  assetManagementTermsTable,
+  apiGettingStartedFlows,
+  companyWriteApiTable,
+  dictionaryApiTable,
+  governanceSecurityApiTable,
+  publicAndLiveApiTable,
+  readExportApiTable,
+  securityKeyTable,
 } from "./manualData";
 import { buildInactivePassportPath, buildPreviewPassportPath, buildPublicPassportPath } from "../passports/utils/passportRoutes";
 import { buildDashboardPath } from "../user/dashboard/utils/dashboardRoutes";
@@ -552,7 +552,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
       links: [
         { label: "Open available dictionaries", route: dashboardPath("dictionary"), description: "Search the dictionaries exposed by the passport types your company can access." },
       ],
-      table: DICTIONARY_API_TABLE,
+      table: dictionaryApiTable,
       tips: [
         "When a JSON-LD export looks surprising, check the selected dictionary's term field keys and expected unit first. The dictionary is the shared vocabulary behind those exports.",
       ],
@@ -620,7 +620,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           ],
         },
       ],
-      table: SECURITY_KEY_TABLE,
+      table: securityKeyTable,
       links: [
         { label: "Open Security", route: dashboardPath("security"), description: "Manage optional bearer tokens and company API keys in one place." },
         { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Update branding, introduction copy, and public experience settings." },
@@ -698,7 +698,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Open Company Profile", route: dashboardPath("company-profile"), description: "Review company identity and public presentation settings." },
         { label: "Open My Passports", route: dashboardPath("my-passports"), description: "Find DPP IDs, public links, versions, and passport actions." },
       ],
-      table: GOVERNANCE_SECURITY_API_TABLE,
+      table: governanceSecurityApiTable,
       tips: [
         "For regulated integrations, collect the economic-operator identifier scheme, facility identifiers, and intended granularity before bulk creation begins.",
         "Use audience grants for logged-in controlled access. Use passport access keys only for the public viewer unlock case.",
@@ -754,7 +754,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           ],
         },
       ],
-      table: ASSET_MANAGEMENT_TERMS_TABLE,
+      table: assetManagementTermsTable,
       tips: [
         "If your ERP does not store dppId, map a stable ERP field to `internalAliasId` so the tool can find the right passport.",
         "Export a template first when non-technical users need to edit a spreadsheet safely.",
@@ -777,7 +777,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Devices and sensors", value: "Use the passport's own device key" },
         { label: "Public viewers", value: "Usually need no authentication unless restricted fields must be unlocked" },
       ],
-      flowCards: API_GETTING_STARTED_FLOWS,
+      flowCards: apiGettingStartedFlows,
       tips: [
         "Start by deciding whether the caller is a person, an outside read-only partner, a live device, or the Asset Management tool. That choice decides the right credential.",
       ],
@@ -817,7 +817,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           ],
         },
       ],
-      table: COMPANY_WRITE_API_TABLE,
+      table: companyWriteApiTable,
       warnings: [
         "Released passports are not normal editable rows. Use revise first if you need a new editable version.",
         "internalAliasId must stay unique. The backend blocks duplicates.",
@@ -836,7 +836,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Export formats", value: "CSV and JSON-LD from the draft export endpoint" },
         { label: "Matching helper", value: "bulk-fetch lets you ask for many passports by dppId or internalAliasId in one request" },
       ],
-      table: READ_EXPORT_API_TABLE,
+      table: readExportApiTable,
       tips: [
         "Use the export endpoint when non-technical teams need a file. Use the list and bulk-fetch endpoints when another application needs structured data directly.",
       ],
@@ -865,7 +865,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
           ],
         },
       ],
-      table: PUBLIC_AND_LIVE_API_TABLE,
+      table: publicAndLiveApiTable,
       warnings: [
         "Public viewer access and API-key access are not the same thing. A public link does not grant company-wide API access.",
       ],
@@ -883,7 +883,7 @@ export function buildUserSections({ user, companyId, passportTypes }) {
         { label: "Preview behavior", value: "Preview is a dry run. Push is the write action." },
         { label: "Schedule behavior", value: "Scheduled jobs run later on the server and can fetch from an external ERP or API source first" },
       ],
-      table: ASSET_MANAGEMENT_API_TABLE,
+      table: assetManagementApiTable,
       tips: [
         "If you only need normal create or update APIs, use the company passport endpoints. Use Asset Management when the workflow is specifically staging, previewing, and batch-pushing changes.",
       ],

@@ -1,6 +1,6 @@
 "use strict";
 
-const SYSTEM_PASSPORT_COLUMN_MAPPINGS = [
+const systemPassportColumnMappings = [
   { appKey: "dppId", storageKey: "dppId", definition: "TEXT NOT NULL" },
   { appKey: "lineageId", storageKey: "lineageId", definition: "TEXT NOT NULL" },
   { appKey: "companyId", storageKey: "companyId", definition: "INTEGER NOT NULL" },
@@ -26,32 +26,32 @@ const SYSTEM_PASSPORT_COLUMN_MAPPINGS = [
   { appKey: "deletedAt", storageKey: "deletedAt", definition: "TIMESTAMPTZ" },
 ];
 
-const LIVE_PASSPORT_SYSTEM_COLUMNS = new Set(
+const livePassportSystemColumns = new Set(
   [
     "id",
-    ...SYSTEM_PASSPORT_COLUMN_MAPPINGS.map((item) => item.storageKey),
+    ...systemPassportColumnMappings.map((item) => item.storageKey),
   ]
 );
 
-const LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS = SYSTEM_PASSPORT_COLUMN_MAPPINGS.map((item) => [
+const livePassportSystemColumnDefinitions = systemPassportColumnMappings.map((item) => [
   item.storageKey,
   item.definition,
 ]);
 
-const SYSTEM_PASSPORT_STORAGE_TO_APP_KEY = new Map(
-  SYSTEM_PASSPORT_COLUMN_MAPPINGS.flatMap((item) => [
+const systemPassportStorageToAppKey = new Map(
+  systemPassportColumnMappings.flatMap((item) => [
     [item.storageKey, item.appKey],
   ])
 );
 
-const SYSTEM_PASSPORT_APP_TO_STORAGE_KEY = new Map(
-  SYSTEM_PASSPORT_COLUMN_MAPPINGS.map((item) => [item.appKey, item.storageKey])
+const systemPassportAppToStorageKey = new Map(
+  systemPassportColumnMappings.map((item) => [item.appKey, item.storageKey])
 );
 
 module.exports = {
-  SYSTEM_PASSPORT_COLUMN_MAPPINGS,
-  LIVE_PASSPORT_SYSTEM_COLUMNS,
-  LIVE_PASSPORT_SYSTEM_COLUMN_DEFINITIONS,
-  SYSTEM_PASSPORT_STORAGE_TO_APP_KEY,
-  SYSTEM_PASSPORT_APP_TO_STORAGE_KEY,
+  systemPassportColumnMappings,
+  livePassportSystemColumns,
+  livePassportSystemColumnDefinitions,
+  systemPassportStorageToAppKey,
+  systemPassportAppToStorageKey,
 };

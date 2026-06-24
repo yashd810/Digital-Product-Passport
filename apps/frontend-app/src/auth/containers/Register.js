@@ -3,13 +3,13 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildUserDashboardHomePath } from "../../user/dashboard/utils/dashboardRoutes";
 import {
-  PASSWORD_MIN_LENGTH,
-  PASSWORD_REQUIREMENT_TEXT,
+  passwordMinLength,
+  passwordRequirementText,
   validatePasswordPolicy,
 } from "../utils/passwordPolicy";
 import "../styles/Landing.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function Register({ setIsAuthenticated, setUser, setCompanyId }) {
   const navigate  = useNavigate();
@@ -42,7 +42,7 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
 
     (async () => {
       try {
-        const r = await fetchWithAuth(`${API}/api/invite/validate?token=${inviteToken}`);
+        const r = await fetchWithAuth(`${api}/api/invite/validate?token=${inviteToken}`);
         const data = await r.json();
         if (r.ok && data.valid) {
           setTokenData(data);
@@ -82,7 +82,7 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
     setIsLoading(true);
 
     try {
-      const response = await fetchWithAuth(`${API}/api/auth/register`, {
+      const response = await fetchWithAuth(`${api}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -248,11 +248,11 @@ function Register({ setIsAuthenticated, setUser, setCompanyId }) {
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                minLength={PASSWORD_MIN_LENGTH}
+                minLength={passwordMinLength}
                 disabled={isLoading}
               />
               <span style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
-                {PASSWORD_REQUIREMENT_TEXT}
+                {passwordRequirementText}
               </span>
             </div>
             <div className="form-group">

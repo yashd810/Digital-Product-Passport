@@ -75,7 +75,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      POSTGRES_DB: "${DB_NAME:-dpp_system}"
+      POSTGRES_DB: "${DB_NAME:-dppSystem}"
       POSTGRES_USER: "${DB_USER:-postgres}"
       POSTGRES_PASSWORD: "${DB_PASSWORD:-postgres}"
     healthcheck:

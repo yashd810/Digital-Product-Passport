@@ -287,9 +287,8 @@ select option:checked {
 }
 
 .status-tone.review,
-.status-tone.in_review,
 .status-tone.submittedForReview,
-.status-badge.in_review,
+.status-badge.inReview,
 .mini-badge.review {
   background: var(--status-review-bg);
   color: var(--status-review-text);

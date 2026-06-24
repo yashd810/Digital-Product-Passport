@@ -50,7 +50,7 @@ module.exports = function registerDppApiRoutes(app, {
   logAudit,
   accessRightsService,
   normalizePassportRequestBody,
-  SYSTEM_PASSPORT_FIELDS,
+  systemPassportFields,
   getWritablePassportColumns,
   joinQuotedSqlIdentifiers,
   toStoredPassportValue,
@@ -83,8 +83,8 @@ module.exports = function registerDppApiRoutes(app, {
     return undefined;
   }
 
-  const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
-  const MERGE_PATCH_CONTENT_TYPE = "application/merge-patch+json";
+  const validGranularities = new Set(["model", "batch", "item"]);
+  const mergePatchContentType = "application/merge-patch+json";
   const {
     normalizeSupportedElementIdPath,
     extractElementValue,
@@ -204,7 +204,7 @@ module.exports = function registerDppApiRoutes(app, {
   }) {
     const passportDppId = passport?.dppId || null;
     if (!backupProviderService || !passportDppId || !passport?.companyId) {
-      return { success: true, skipped: true, reason: "BACKUP_SERVICE_UNAVAILABLE" };
+      return { success: true, skipped: true, reason: "backupServiceUnavailable" };
     }
     return backupProviderService.replicatePassportSnapshot({
       passport,
@@ -293,7 +293,7 @@ module.exports = function registerDppApiRoutes(app, {
     await logAudit(
       editable.passport.companyId,
       user.userId,
-      "PATCH_DPP_ELEMENT",
+      "patchDppElement",
       editable.tableName,
       editable.passport.dppId,
       { [targetColumn]: editable.passport[targetColumn] ?? null },
@@ -358,7 +358,7 @@ module.exports = function registerDppApiRoutes(app, {
     findExistingPassportByInternalAliasId,
     productIdentifierService,
     complianceService,
-    SYSTEM_PASSPORT_FIELDS,
+    systemPassportFields,
     getWritablePassportColumns,
     joinQuotedSqlIdentifiers,
     toStoredPassportValue,
@@ -370,7 +370,7 @@ module.exports = function registerDppApiRoutes(app, {
     generateDppRecordId,
     buildStandardsCreateFields,
     usesConfiguredGlobalProductIdentifierScheme,
-    VALID_GRANULARITIES,
+    validGranularities,
     buildMutationPassportPayload,
     getActorIdentifier,
     replicatePassportToBackup,
@@ -381,7 +381,7 @@ module.exports = function registerDppApiRoutes(app, {
     parseDppIdentifier,
     serializePolicyDefaultValue,
     resolveManagedFacilityId,
-    MERGE_PATCH_CONTENT_TYPE,
+    mergePatchContentType,
   });
 
   registerElementRoutes(app, {

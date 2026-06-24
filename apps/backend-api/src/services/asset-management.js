@@ -35,13 +35,13 @@ module.exports = function createAssetService({
   comparableHistoryFieldValue,
   toDynamicStoredValue,
   getAssetFieldMap,
-  EDITABLE_RELEASE_STATUSES_SQL,
-  ASSET_MATCH_FIELDS,
-  ASSET_IGNORED_SYSTEM_COLUMNS,
-  ASSET_SCHEDULER_INTERVAL_MS,
-  ASSET_SOURCE_ALLOWED_HOSTS
+  editableReleaseStatusesSql,
+  assetMatchFields,
+  assetIgnoredSystemColumns,
+  assetSchedulerIntervalMs,
+  assetSourceAllowedHosts
 }) {
-  const VALID_GRANULARITIES = new Set(["model", "batch", "item"]);
+  const validGranularities = new Set(["model", "batch", "item"]);
 
   async function getCompanyDppPolicy(companyId) {
     const result = await pool.query(
@@ -65,7 +65,7 @@ module.exports = function createAssetService({
       ? null
       : String(requestedGranularity).trim().toLowerCase();
 
-    if (normalizedRequested && !VALID_GRANULARITIES.has(normalizedRequested)) {
+    if (normalizedRequested && !validGranularities.has(normalizedRequested)) {
       throw new Error("granularity must be one of: model, batch, item");
     }
     if (!companyPolicy) return normalizedRequested || enforcedGranularity;
@@ -174,7 +174,7 @@ module.exports = function createAssetService({
       throw new Error("Local ERP/API hostnames are not allowed");
     }
 
-    if (ASSET_SOURCE_ALLOWED_HOSTS.size > 0 && !ASSET_SOURCE_ALLOWED_HOSTS.has(hostname)) {
+    if (assetSourceAllowedHosts.size > 0 && !assetSourceAllowedHosts.has(hostname)) {
       throw new Error("ERP/API hostname is not in the allowed list");
     }
 
@@ -376,8 +376,8 @@ module.exports = function createAssetService({
       };
 
       Object.entries(rawRecord).forEach(([key, value]) => {
-        if (ASSET_MATCH_FIELDS.has(key)) return;
-        if (ASSET_IGNORED_SYSTEM_COLUMNS.has(key)) return;
+        if (assetMatchFields.has(key)) return;
+        if (assetIgnoredSystemColumns.has(key)) return;
 
           const fieldDef = fieldMap.get(key);
 
@@ -483,8 +483,8 @@ module.exports = function createAssetService({
       const nextProductIdProvided = rawRecord.nextProductId !== undefined;
 
       Object.entries(rawRecord).forEach(([key, value]) => {
-        if (ASSET_MATCH_FIELDS.has(key)) return;
-        if (ASSET_IGNORED_SYSTEM_COLUMNS.has(key)) return;
+        if (assetMatchFields.has(key)) return;
+        if (assetIgnoredSystemColumns.has(key)) return;
 
         const fieldDef = fieldMap.get(key);
 
@@ -740,7 +740,7 @@ module.exports = function createAssetService({
           await logAudit(
             companyId,
             userId,
-            "ASSET_CREATE",
+            "assetCreate",
             tableName,
             dppId,
             null,
@@ -778,7 +778,7 @@ module.exports = function createAssetService({
              FROM ${tableName}
              WHERE "dppId" = $1
                AND "companyId" = $2
-               AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL}
+               AND "releaseStatus" IN ${editableReleaseStatusesSql}
                AND "deletedAt" IS NULL
              ORDER BY "versionNumber" DESC
              LIMIT 1`,
@@ -817,7 +817,7 @@ module.exports = function createAssetService({
               await logAudit(
                 companyId,
                 userId,
-                "ASSET_UPDATE",
+                "assetUpdate",
                 tableName,
                 matchedGuid,
                 null,
@@ -847,7 +847,7 @@ module.exports = function createAssetService({
           await logAudit(
             companyId,
             userId,
-            "ASSET_DYNAMIC_PUSH",
+            "assetDynamicPush",
             "passportDynamicValues",
             matchedGuid,
             null,
@@ -1095,7 +1095,7 @@ module.exports = function createAssetService({
 
   function startAssetManagementScheduler() {
     if (assetSchedulerHandle) return;
-    assetSchedulerHandle = setInterval(processDueAssetJobs, ASSET_SCHEDULER_INTERVAL_MS);
+    assetSchedulerHandle = setInterval(processDueAssetJobs, assetSchedulerIntervalMs);
     assetSchedulerKickoffHandle = setTimeout(processDueAssetJobs, 5000);
   }
 

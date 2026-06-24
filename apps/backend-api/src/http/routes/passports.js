@@ -52,13 +52,13 @@ module.exports = function registerPassportRoutes(app, {
   createAccessKeyMaterial,
   createDeviceKeyMaterial,
   // passport service helpers
-  IN_REVISION_STATUSES_SQL,
-  EDITABLE_RELEASE_STATUSES_SQL,
-  REVISION_BLOCKING_STATUSES_SQL,
-  EDIT_SESSION_TIMEOUT_HOURS,
-  EDIT_SESSION_TIMEOUT_SQL,
-  IN_REVISION_STATUS,
-  SYSTEM_PASSPORT_FIELDS,
+  inRevisionStatusesSql,
+  editableReleaseStatusesSql,
+  revisionBlockingStatusesSql,
+  editSessionTimeoutHours,
+  editSessionTimeoutSql,
+  inRevisionStatus,
+  systemPassportFields,
   // pure helpers from passport-helpers.js
   getTable,
   getPassportFieldValue,
@@ -120,8 +120,8 @@ module.exports = function registerPassportRoutes(app, {
     client: params.client || pool,
   });
 
-  const ARCHIVED_HISTORY_REASON_SQL = `('beforeArchiveDelete','beforeBulkArchiveDelete','beforeDelete','beforeBulkDelete')`;
-  const ARCHIVED_HISTORY_FILTER_SQL = `("snapshotReason" IN ${ARCHIVED_HISTORY_REASON_SQL})`;
+  const archivedHistoryReasonSql = `('beforeArchiveDelete','beforeBulkArchiveDelete','beforeDelete','beforeBulkDelete')`;
+  const archivedHistoryFilterSql = `("snapshotReason" IN ${archivedHistoryReasonSql})`;
   const {
     buildApiKeyFieldWriteDecision,
     buildApiKeyHashRecord,
@@ -160,7 +160,7 @@ module.exports = function registerPassportRoutes(app, {
     signPortableDataConstruct,
   });
   const {
-    VALID_GRANULARITIES,
+    validGranularities,
     buildComplianceManagedFields,
     buildStoredProductIdentifiers,
     evaluateCompliance,
@@ -216,7 +216,7 @@ module.exports = function registerPassportRoutes(app, {
     archivePassportSnapshot,
     updatePassportRowById,
     logAudit,
-    EDITABLE_RELEASE_STATUSES_SQL,
+    editableReleaseStatusesSql,
   });
 
   // ─── PASSPORT CRUD ─────────────────────────────────────────────────────────
@@ -240,7 +240,7 @@ module.exports = function registerPassportRoutes(app, {
     buildComplianceManagedFields,
     findExistingPassportByInternalAliasId,
     normalizeReleaseStatus,
-    SYSTEM_PASSPORT_FIELDS,
+    systemPassportFields,
     getWritablePassportColumns,
     joinQuotedSqlIdentifiers,
     toStoredPassportValue,
@@ -274,10 +274,10 @@ module.exports = function registerPassportRoutes(app, {
     productIdentifierService,
     isFullRepresentationRequest,
     loadCompanySerializationContext,
-    IN_REVISION_STATUS,
-    IN_REVISION_STATUSES_SQL,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    inRevisionStatus,
+    inRevisionStatusesSql,
+    editableReleaseStatusesSql,
+    archivedHistoryFilterSql,
   });
 
   registerPreviewManagementRoutes(app, {
@@ -286,7 +286,7 @@ module.exports = function registerPassportRoutes(app, {
     checkCompanyAccess,
     requireEditor,
     createAccessKeyMaterial,
-    EDIT_SESSION_TIMEOUT_HOURS,
+    editSessionTimeoutHours,
     stripRestrictedFieldsForPublicView,
     getCompanyNameMap,
     normalizePassportRow,
@@ -322,9 +322,9 @@ module.exports = function registerPassportRoutes(app, {
     archivePassportSnapshots,
     getActorIdentifier,
     logAudit,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    IN_REVISION_STATUSES_SQL,
-    VALID_GRANULARITIES,
+    editableReleaseStatusesSql,
+    inRevisionStatusesSql,
+    validGranularities,
     hasReleasedLineageVersion,
     buildStoredProductIdentifiers,
     findExistingPassportByInternalAliasId,
@@ -334,7 +334,7 @@ module.exports = function registerPassportRoutes(app, {
     buildCarrierAuthenticityStorageValue,
     getCompanyNameMap,
     buildComplianceManagedFields,
-    SYSTEM_PASSPORT_FIELDS,
+    systemPassportFields,
   });
 
   registerLifecycleRoutes(app, {
@@ -361,17 +361,17 @@ module.exports = function registerPassportRoutes(app, {
     loadLatestLivePassport,
     reconcileManagedReleaseFields,
     evaluateCompliance,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    REVISION_BLOCKING_STATUSES_SQL,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    editableReleaseStatusesSql,
+    revisionBlockingStatusesSql,
+    archivedHistoryFilterSql,
     markOlderVersionsObsolete,
     complianceService,
     signPassport,
     recordSignedDppRelease,
     getActorIdentifier,
-    IN_REVISION_STATUS,
+    inRevisionStatus,
     submitPassportToWorkflow,
-    VALID_GRANULARITIES,
+    validGranularities,
   });
 
   // ─── BULK REVISE ───────────────────────────────────────────────────────────
@@ -394,14 +394,14 @@ module.exports = function registerPassportRoutes(app, {
     logAudit,
     replicatePassportToBackup,
     evaluateCompliance,
-    EDITABLE_RELEASE_STATUSES_SQL,
-    REVISION_BLOCKING_STATUSES_SQL,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    editableReleaseStatusesSql,
+    revisionBlockingStatusesSql,
+    archivedHistoryFilterSql,
     markOlderVersionsObsolete,
     signPassport,
     recordSignedDppRelease,
     getActorIdentifier,
-    IN_REVISION_STATUS,
+    inRevisionStatus,
     submitPassportToWorkflow,
     getPassportLineageContext,
   });
@@ -422,7 +422,7 @@ module.exports = function registerPassportRoutes(app, {
     archivePassportSnapshot,
     getActorIdentifier,
     logAudit,
-    EDITABLE_RELEASE_STATUSES_SQL,
+    editableReleaseStatusesSql,
   });
 
   // ─── DIFF & HISTORY ────────────────────────────────────────────────────────
@@ -452,7 +452,7 @@ module.exports = function registerPassportRoutes(app, {
     getPassportLineageContext,
     normalizePassportRow,
     isPublicHistoryStatus,
-    EDITABLE_RELEASE_STATUSES_SQL,
+    editableReleaseStatusesSql,
   });
 
   registerAuditAnalyticsRoutes(app, {
@@ -469,7 +469,7 @@ module.exports = function registerPassportRoutes(app, {
     anchorAuditLogRoot,
     withAuditActorAliases,
     replicateAuditAnchorToBackup,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    archivedHistoryFilterSql,
   });
 
   registerAccessGrantRoutes(app, {

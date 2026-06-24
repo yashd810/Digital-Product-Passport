@@ -8,12 +8,12 @@ const {
 } = require("../scripts/bootstrap-passport-modules");
 
 test("bootstrap options keep dry runs non-mutating", () => {
-  const parsed = parseBootstrapOptions(["--dry-run", "--module=medical-device:v1"]);
+  const parsed = parseBootstrapOptions(["--dry-run", "--module=example-product:v1"]);
 
   assert.equal(parsed.dryRun, true);
   assert.equal(parsed.skipMigrate, true);
   assert.equal(parsed.migrateOnly, false);
-  assert.deepEqual(parsed.seedArgs, ["--dry-run", "--module=medical-device:v1"]);
+  assert.deepEqual(parsed.seedArgs, ["--dry-run", "--module=example-product:v1"]);
 });
 
 test("bootstrap options can run migration only", () => {

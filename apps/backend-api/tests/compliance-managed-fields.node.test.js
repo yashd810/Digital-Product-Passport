@@ -48,13 +48,13 @@ function createMockPool({ facilities = [] } = {}) {
 function createComplianceService() {
   return {
     resolvePassportPolicyMetadata({ passportType, granularity }) {
-      const isMedicalDevice = passportType === "medicalDevicePassportV1";
+      const isExampleProduct = passportType === "exampleProductPassportV1";
       return {
-        key: isMedicalDevice ? "medicalDeviceDppV1" : "industrialSensorDppV1",
-        contentSpecificationIds: isMedicalDevice
-          ? ["medicalDeviceDictionaryV1"]
-          : ["industrialSensorDictionaryV1"],
-        defaultCarrierPolicyKey: isMedicalDevice
+        key: isExampleProduct ? "exampleProductDppV1" : "alternateProductDppV1",
+        contentSpecificationIds: isExampleProduct
+          ? ["exampleProductDictionaryV1"]
+          : ["alternateProductDictionaryV1"],
+        defaultCarrierPolicyKey: isExampleProduct
           ? "webPublicEntryV1"
           : "sensorQrPublicEntryV1",
         granularity,
@@ -72,7 +72,7 @@ test("managed policy fields use the module policy and ignore request policy over
 
   const fields = await helpers.buildComplianceManagedFields({
     companyId: 7,
-    passportType: "medicalDevicePassportV1",
+    passportType: "exampleProductPassportV1",
     requestedFields: {
       passportPolicyKey: "userSuppliedProfile",
       contentSpecificationIds: ["customSpec"],
@@ -80,8 +80,8 @@ test("managed policy fields use the module policy and ignore request policy over
     allowDefaultFacility: false,
   });
 
-  assert.equal(fields.passportPolicyKey, "medicalDeviceDppV1");
-  assert.equal(fields.contentSpecificationIds, JSON.stringify(["medicalDeviceDictionaryV1"]));
+  assert.equal(fields.passportPolicyKey, "exampleProductDppV1");
+  assert.equal(fields.contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
   assert.equal(fields.carrierPolicyKey, "webPublicEntryV1");
   assert.equal(fields.economicOperatorId, "EORI-ACME-001");
   assert.equal(fields.economicOperatorIdentifierScheme, "EORI");
@@ -99,11 +99,11 @@ test("managed policy fields can auto-select a single active facility", async () 
 
   const fields = await helpers.buildComplianceManagedFields({
     companyId: 7,
-    passportType: "industrialSensorPassportV1",
+    passportType: "alternateProductPassportV1",
     allowDefaultFacility: true,
   });
 
-  assert.equal(fields.passportPolicyKey, "industrialSensorDppV1");
+  assert.equal(fields.passportPolicyKey, "alternateProductDppV1");
   assert.equal(fields.facilityId, "PLANT-01");
 });
 
@@ -118,7 +118,7 @@ test("managed policy fields validate explicit facilities when requested", async 
 
   const fields = await helpers.buildComplianceManagedFields({
     companyId: 7,
-    passportType: "industrialSensorPassportV1",
+    passportType: "alternateProductPassportV1",
     requestedFields: { facilityId: "PLANT-01" },
     allowDefaultFacility: false,
     validateExplicitFacility: true,
@@ -129,7 +129,7 @@ test("managed policy fields validate explicit facilities when requested", async 
   await assert.rejects(
     () => helpers.buildComplianceManagedFields({
       companyId: 7,
-      passportType: "industrialSensorPassportV1",
+      passportType: "alternateProductPassportV1",
       requestedFields: { facilityId: "UNKNOWN" },
       allowDefaultFacility: false,
       validateExplicitFacility: true,

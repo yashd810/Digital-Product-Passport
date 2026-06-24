@@ -13,7 +13,7 @@ import SymbolRepositoryPicker from "../../../passports/form/components/SymbolRep
 import "../../../shared/styles/Dashboard.css";
 import "../../../shared/styles/CreatePass.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 // ── Field renderer (mirrors PassportForm logic for templates) ──
 function TemplateField({
@@ -250,7 +250,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
   useEffect(() => {
     if (!passportType) { setSections(null); return; }
     setLoadingFields(true);
-    fetchWithAuth(`${API}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${api}/api/passport-types/${passportType}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fieldsJson?.sections) {
@@ -269,7 +269,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
 
   useEffect(() => {
     if (!companyId) return;
-    fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols?flat=true`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${companyId}/repository/symbols?flat=true`, { headers: authHeaders() })
       .then((r) => r.ok ? r.json() : [])
       .then(setSymbols)
       .catch((error) => console.warn("Ignored async error", error));
@@ -327,8 +327,8 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
     setSaving(true); setError("");
     try {
       const url = isEdit
-        ? `${API}/api/companies/${companyId}/templates/${editingTemplate.id}`
-        : `${API}/api/companies/${companyId}/templates`;
+        ? `${api}/api/companies/${companyId}/templates/${editingTemplate.id}`
+        : `${api}/api/companies/${companyId}/templates`;
       const method = isEdit ? "PUT" : "POST";
       const r = await fetchWithAuth(url, {
         method,
@@ -480,7 +480,7 @@ function BulkCreateFromTemplateModal({ template, companyId, onClose, onDone }) {
         if (f.fieldValue) prefill[f.fieldKey] = f.fieldValue;
       }
 
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/bulk`, {
         method: "POST",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -600,7 +600,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates`, { headers: authHeaders() });
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/templates`, { headers: authHeaders() });
       if (r.ok) setTemplates(await r.json());
     } catch (error) {
       console.warn("Failed to load templates", error);
@@ -610,7 +610,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
   useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
 
   useEffect(() => {
-    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(setPassportTypes)
       .catch((error) => console.warn("Ignored async error", error));
@@ -619,7 +619,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
   // Load template for editing when routed to edit view
   useEffect(() => {
     if (view === "edit" && editTemplateId && !editingTemplate) {
-      fetchWithAuth(`${API}/api/companies/${companyId}/templates/${editTemplateId}`, { headers: authHeaders() })
+      fetchWithAuth(`${api}/api/companies/${companyId}/templates/${editTemplateId}`, { headers: authHeaders() })
         .then(r => r.ok ? r.json() : null)
         .then(data => { if (data) setEditingTemplate(data); else navigate(templatesPath); })
         .catch(() => navigate(templatesPath));
@@ -633,7 +633,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
 
   const openClone = async (tmpl) => {
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
       if (!r.ok) throw new Error("Failed to load template");
       const cloneTemplate = await r.json();
       navigate(newTemplatePath, { state: { cloneTemplate } });
@@ -644,7 +644,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
 
   const openBulk = async (tmpl) => {
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/templates/${tmpl.id}`, { headers: authHeaders() });
       if (r.ok) setBulkModal(await r.json());
     } catch (error) {
       console.warn("Failed to load template for bulk creation", error);
@@ -655,7 +655,7 @@ export default function TemplatesPage({ user, companyId, view = "list", editTemp
     if (!window.confirm("Delete this template? This cannot be undone.")) return;
     setDeleting(id);
     try {
-      await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${id}`, {
+      await fetchWithAuth(`${api}/api/companies/${companyId}/templates/${id}`, {
         method: "DELETE", headers: authHeaders(),
       });
       setTemplates(prev => prev.filter(t => t.id !== id));

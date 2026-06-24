@@ -74,7 +74,7 @@ async function cleanupExpiredRateLimits(pool) {
 }
 
 function startRateLimitMaintenance(pool) {
-  const intervalMs = envInt("RATE_LIMIT_CLEANUP_INTERVAL_MS", 5 * 60 * 1000);
+  const intervalMs = envInt("rateLimitCleanupIntervalMs", 5 * 60 * 1000);
   const timer = setInterval(async () => {
     try {
       const deleted = await cleanupExpiredRateLimits(pool);
@@ -97,86 +97,86 @@ const createRateLimiters = (pool) => {
   const state = {
     consecutiveDbFailures: 0,
     dbUnavailableUntil: 0,
-    failureThreshold: envInt("RATE_LIMIT_DB_FAILURE_THRESHOLD", 3),
-    cooldownMs: envInt("RATE_LIMIT_DB_FAILURE_COOLDOWN_MS", 60 * 1000)
+    failureThreshold: envInt("rateLimitDbFailureThreshold", 3),
+    cooldownMs: envInt("rateLimitDbFailureCooldownMs", 60 * 1000)
   };
   const rateLimit = createRateLimiter(pool, state);
 
   return {
     authRateLimit: rateLimit({
       key: (req) => `auth:${req.ip}:${req.path}:${String(req.body?.email || "").trim().toLowerCase()}`,
-      limit: envInt("RATE_LIMIT_AUTH_MAX", 8),
-      windowMs: envInt("RATE_LIMIT_AUTH_WINDOW_MS", 15 * 60 * 1000),
+      limit: envInt("rateLimitAuthMax", 8),
+      windowMs: envInt("rateLimitAuthWindowMs", 15 * 60 * 1000),
       message: "Too many attempts. Please wait a few minutes and try again."
     }),
 
     otpRateLimit: rateLimit({
       key: (req) => `otp:${req.ip}:${req.path}:${String(req.body?.preAuthToken || "").slice(0, 32)}`,
-      limit: envInt("RATE_LIMIT_OTP_MAX", 8),
-      windowMs: envInt("RATE_LIMIT_OTP_WINDOW_MS", 15 * 60 * 1000),
+      limit: envInt("rateLimitOtpMax", 8),
+      windowMs: envInt("rateLimitOtpWindowMs", 15 * 60 * 1000),
       message: "Too many verification attempts. Please log in again in a few minutes."
     }),
 
     passwordResetRateLimit: rateLimit({
       key: (req) => `reset:${req.ip}:${req.path}:${String(req.body?.email || req.body?.token || "").slice(0, 64)}`,
-      limit: envInt("RATE_LIMIT_PASSWORD_RESET_MAX", 5),
-      windowMs: envInt("RATE_LIMIT_PASSWORD_RESET_WINDOW_MS", 15 * 60 * 1000),
+      limit: envInt("rateLimitPasswordResetMax", 5),
+      windowMs: envInt("rateLimitPasswordResetWindowMs", 15 * 60 * 1000),
       message: "Too many password reset attempts. Please wait a few minutes and try again."
     }),
 
     publicReadRateLimit: rateLimit({
       key: (req) => `public-read:${req.ip}:${req.path}:${String(req.params?.dppId || req.params?.companyId || req.params?.typeName || "")}`,
-      limit: envInt("RATE_LIMIT_PUBLIC_READ_MAX", 120),
-      windowMs: envInt("RATE_LIMIT_PUBLIC_READ_WINDOW_MS", 60 * 1000),
+      limit: envInt("rateLimitPublicReadMax", 120),
+      windowMs: envInt("rateLimitPublicReadWindowMs", 60 * 1000),
       message: "Too many public requests. Please slow down and try again shortly."
     }),
 
     publicHeavyRateLimit: rateLimit({
       key: (req) => `public-heavy:${req.ip}:${req.path}:${String(req.params?.dppId || "")}`,
-      limit: envInt("RATE_LIMIT_PUBLIC_HEAVY_MAX", 20),
-      windowMs: envInt("RATE_LIMIT_PUBLIC_HEAVY_WINDOW_MS", 5 * 60 * 1000),
+      limit: envInt("rateLimitPublicHeavyMax", 20),
+      windowMs: envInt("rateLimitPublicHeavyWindowMs", 5 * 60 * 1000),
       message: "Too many export requests. Please try again in a few minutes."
     }),
 
     publicUnlockRateLimit: rateLimit({
       key: (req) => `public-unlock:${req.ip}:${req.path}:${String(req.params?.dppId || "")}`,
-      limit: envInt("RATE_LIMIT_PUBLIC_UNLOCK_MAX", 10),
-      windowMs: envInt("RATE_LIMIT_PUBLIC_UNLOCK_WINDOW_MS", 15 * 60 * 1000),
+      limit: envInt("rateLimitPublicUnlockMax", 10),
+      windowMs: envInt("rateLimitPublicUnlockWindowMs", 15 * 60 * 1000),
       message: "Too many unlock attempts. Please wait before trying again."
     }),
 
     publicScanRateLimit: rateLimit({
       key: (req) => `public-scan:${req.ip}:${String(req.params?.dppId || "")}`,
-      limit: envInt("RATE_LIMIT_PUBLIC_SCAN_MAX", 30),
-      windowMs: envInt("RATE_LIMIT_PUBLIC_SCAN_WINDOW_MS", 60 * 1000),
+      limit: envInt("rateLimitPublicScanMax", 30),
+      windowMs: envInt("rateLimitPublicScanWindowMs", 60 * 1000),
       message: "Too many scan requests. Please try again shortly."
     }),
 
     devicePushRateLimit: rateLimit({
       key: (req) => `device-push:${req.ip}:${String(req.params?.dppId || "")}`,
-      limit: envInt("RATE_LIMIT_DEVICE_PUSH_MAX", 120),
-      windowMs: envInt("RATE_LIMIT_DEVICE_PUSH_WINDOW_MS", 60 * 1000),
+      limit: envInt("rateLimitDevicePushMax", 120),
+      windowMs: envInt("rateLimitDevicePushWindowMs", 60 * 1000),
       message: "Too many device updates. Please slow down and try again shortly."
     }),
 
     apiKeyReadRateLimit: rateLimit({
       key: (req) => `api-key:${req.apiKey?.keyId || req.ip}:${req.path}`,
-      limit: envInt("RATE_LIMIT_API_KEY_READ_MAX", 300),
-      windowMs: envInt("RATE_LIMIT_API_KEY_READ_WINDOW_MS", 60 * 1000),
+      limit: envInt("rateLimitApiKeyReadMax", 300),
+      windowMs: envInt("rateLimitApiKeyReadWindowMs", 60 * 1000),
       message: "API rate limit exceeded. Please reduce request frequency."
     }),
 
     assetWriteRateLimit: rateLimit({
       key: (req) => `asset-write:${req.ip}:${req.assetContext?.companyId || ""}:${req.assetContext?.userId || ""}:${req.path}`,
-      limit: envInt("RATE_LIMIT_ASSET_WRITE_MAX", 90),
-      windowMs: envInt("RATE_LIMIT_ASSET_WRITE_WINDOW_MS", 60 * 1000),
+      limit: envInt("rateLimitAssetWriteMax", 90),
+      windowMs: envInt("rateLimitAssetWriteWindowMs", 60 * 1000),
       message: "Too many Passport Data Management requests. Please slow down and try again shortly."
     }),
 
     assetSourceFetchRateLimit: rateLimit({
       key: (req) => `asset-source:${req.ip}:${req.assetContext?.companyId || ""}:${req.assetContext?.userId || ""}`,
-      limit: envInt("RATE_LIMIT_ASSET_SOURCE_FETCH_MAX", 20),
-      windowMs: envInt("RATE_LIMIT_ASSET_SOURCE_FETCH_WINDOW_MS", 5 * 60 * 1000),
+      limit: envInt("rateLimitAssetSourceFetchMax", 20),
+      windowMs: envInt("rateLimitAssetSourceFetchWindowMs", 5 * 60 * 1000),
       message: "Too many ERP/API fetch requests. Please wait a few minutes and try again."
     })
   };

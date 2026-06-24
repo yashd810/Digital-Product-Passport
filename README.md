@@ -29,7 +29,6 @@ Detailed setup lives in [docs/guides/getting-started.md](./docs/guides/getting-s
 │   ├── frontend-app/             # React/Vite authenticated dashboard, including Passport Data Management
 │   ├── public-passport-viewer/   # React/Vite public passport viewer shell
 │   └── marketing-site/           # Static website served by Nginx
-├── data/                         # Source datasets used by scripts and imports
 ├── docker/                       # Local and production compose files
 ├── docs/                         # Centralized developer and product documentation
 ├── infra/                        # Nginx, Caddy, OCI, semantic resources, templates
@@ -56,8 +55,8 @@ Start with [docs/README.md](./docs/README.md). The most useful developer entry p
 
 | Layer | Technology |
 | --- | --- |
-| Dashboard | React 18, React Router, Vite |
-| Public viewer | React 18, React Router, Vite |
+| Dashboard | React 19, React Router, Vite |
+| Public viewer | React 19, React Router, Vite |
 | Backend | Node.js, Express, PostgreSQL |
 | Auth | Cookie session plus JWT/API-key support for selected flows |
 | Storage | PostgreSQL plus local/object storage abstractions |

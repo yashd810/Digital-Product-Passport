@@ -13,7 +13,7 @@ function registerAuditAnalyticsRoutes(app, deps) {
     anchorAuditLogRoot,
     withAuditActorAliases,
     replicateAuditAnchorToBackup,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    archivedHistoryFilterSql,
   } = deps;
 
   const mapAuditLogRow = (row = {}) => ({
@@ -122,7 +122,7 @@ function registerAuditAnalyticsRoutes(app, deps) {
         `SELECT COUNT(DISTINCT "dppId")
          FROM "passportArchives"
          WHERE "companyId" = $1
-           AND ${ARCHIVED_HISTORY_FILTER_SQL}`,
+           AND ${archivedHistoryFilterSql}`,
         [companyId]
       );
       const archivedCount = parseInt(archivedRes.rows[0].count, 10) || 0;

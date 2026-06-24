@@ -54,7 +54,7 @@ Place the module file in:
 
 Example:
 
-- `apps/backend-api/src/passport-modules/medical-device-v1.js`
+- `apps/backend-api/src/passport-modules/example-product-v1.js`
 
 That file must export a module definition that the loader can read through:
 
@@ -68,9 +68,9 @@ Place the semantic resources in:
 
 Example:
 
-- `apps/backend-api/resources/semantics/medical-device/v1/`
+- `apps/backend-api/resources/semantics/example-product/v1/`
 
-The current built-in models use this file set:
+Each semantic resource folder uses this file set:
 
 - `manifest.json`
 - `terms.json`
@@ -144,7 +144,7 @@ Example:
 
 ```bash
 cd apps/backend-api
-npm run seed:passport-types -- --module=medical-device:v1
+npm run seed:passport-types -- --module=example-product:v1
 ```
 
 Migration + seed together:
@@ -256,7 +256,7 @@ Example:
 
 ```bash
 cd /opt/dpp
-sudo docker exec backend-api node scripts/seed-passport-types.js --module=medical-device:v1
+sudo docker exec backend-api node scripts/seed-passport-types.js --module=example-product:v1
 ```
 
 If that environment uses a different container name, first check:

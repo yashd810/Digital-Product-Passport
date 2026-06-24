@@ -4,21 +4,21 @@ import { getNextSortDirection, sortIndicator } from "../../../shared/table/table
 import "../../../shared/styles/Dashboard.css";
 import "./PassportDataManagement.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const META_KEYS = new Set([
+const metaKeys = new Set([
   "id", "companyId", "releaseStatus", "versionNumber", "isEditable", "createdAt", "updatedAt",
   "updatedBy", "deletedAt", "qrCode", "createdBy", "fieldLabel", "createdByEmail",
   "firstName", "lastName", "_templateId", "_templateName", "_modelLockedKeys",
 ]);
 
-const BASE_FIELDS = [
+const baseFields = [
   { key: "dppId", label: "DPP ID", type: "text", system: true },
   { key: "internalAliasId", label: "Internal Alias ID", type: "text", system: true },
   { key: "modelName", label: "Model Name", type: "text", system: true },
 ];
 
-const DEFAULT_SOURCE_CONFIG = {
+const defaultSourceConfig = {
   url: "",
   method: "GET",
   recordPath: "",
@@ -116,9 +116,9 @@ function parseJsonText(text, fallback) {
 
 function buildFieldList(schemaFields = [], rows = []) {
   const fieldMap = new Map();
-  BASE_FIELDS.forEach((field) => fieldMap.set(field.key, field));
+  baseFields.forEach((field) => fieldMap.set(field.key, field));
   schemaFields.forEach((field) => {
-    if (field?.key && !META_KEYS.has(field.key)) {
+    if (field?.key && !metaKeys.has(field.key)) {
       fieldMap.set(field.key, {
         key: field.key,
         label: field.label || field.key,
@@ -129,7 +129,7 @@ function buildFieldList(schemaFields = [], rows = []) {
   });
   rows.forEach((row) => {
     Object.keys(row || {}).forEach((key) => {
-      if (!META_KEYS.has(key) && !fieldMap.has(key)) {
+      if (!metaKeys.has(key) && !fieldMap.has(key)) {
         fieldMap.set(key, { key, label: key, type: "text" });
       }
     });
@@ -139,7 +139,7 @@ function buildFieldList(schemaFields = [], rows = []) {
 
 function buildSerializableRows(rows) {
   return rows.map((row) => Object.entries(row || {}).reduce((acc, [key, value]) => {
-    if (META_KEYS.has(key) || value === undefined) return acc;
+    if (metaKeys.has(key) || value === undefined) return acc;
     acc[key] = value;
     return acc;
   }, {})).filter((row) => Object.keys(row).length > 0);
@@ -181,7 +181,7 @@ function PassportDataManagementPage({ companyId, user }) {
   const [sortConfig, setSortConfig] = useState({ key: "", direction: "" });
   const [activeView, setActiveView] = useState("all");
   const [showSources, setShowSources] = useState(false);
-  const [sourceConfig, setSourceConfig] = useState(DEFAULT_SOURCE_CONFIG);
+  const [sourceConfig, setSourceConfig] = useState(defaultSourceConfig);
   const [sourceFieldMap, setSourceFieldMap] = useState([{ source: "", target: "internalAliasId" }]);
   const [erpPresets, setErpPresets] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -193,7 +193,7 @@ function PassportDataManagementPage({ companyId, user }) {
 
   const canManagePassportData = ["editor", "companyAdmin", "superAdmin"].includes(user?.role);
   const showReadOnlyNotice = Boolean(user?.role) && !canManagePassportData;
-  const apiBase = `${API}/api/companies/${companyId}/passport-data-management`;
+  const apiBase = `${api}/api/companies/${companyId}/passport-data-management`;
 
   const templatePrefill = useMemo(() => buildTemplatePrefill(templateDetail), [templateDetail]);
   const fields = useMemo(() => buildFieldList(schemaFields, rows), [schemaFields, rows]);
@@ -255,7 +255,7 @@ function PassportDataManagementPage({ companyId, user }) {
 
   const loadTemplates = useCallback(async (typeName) => {
     if (!typeName) return;
-    const response = await fetchWithAuth(`${API}/api/companies/${companyId}/templates?passportType=${encodeURIComponent(typeName)}`, {
+    const response = await fetchWithAuth(`${api}/api/companies/${companyId}/templates?passportType=${encodeURIComponent(typeName)}`, {
       headers: authHeaders(),
     });
     if (!response.ok) {
@@ -270,7 +270,7 @@ function PassportDataManagementPage({ companyId, user }) {
       setTemplateDetail(null);
       return;
     }
-    const response = await fetchWithAuth(`${API}/api/companies/${companyId}/templates/${templateId}`, {
+    const response = await fetchWithAuth(`${api}/api/companies/${companyId}/templates/${templateId}`, {
       headers: authHeaders(),
     });
     const payload = await response.json().catch(() => ({}));
@@ -947,7 +947,7 @@ function PassportDataManagementPage({ companyId, user }) {
             <div className="pdm-source-header">
               <div>
                 <h3>Sources & Jobs</h3>
-                <p>Connect ERP/API data, import JSON, and schedule sync jobs.</p>
+                <p>Connect ERP/api data, import JSON, and schedule sync jobs.</p>
               </div>
               <button type="button" className="pdm-source-close" onClick={() => setShowSources(false)} aria-label="Close Sources and Jobs">Close</button>
             </div>

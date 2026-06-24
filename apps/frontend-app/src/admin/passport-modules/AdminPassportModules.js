@@ -4,7 +4,7 @@ import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import { formatSemanticModelLabel } from "../passport-types/semanticTermCatalog";
 import "../styles/AdminDashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 const getSemanticModelLabel = formatSemanticModelLabel;
 
@@ -32,10 +32,10 @@ function AdminPassportModules() {
       setLoading(true);
       setError("");
       const [modulesResponse, modelsResponse] = await Promise.all([
-        fetchWithAuth(`${API}/api/admin/passport-type-modules`, {
+        fetchWithAuth(`${api}/api/admin/passport-type-modules`, {
           headers: authHeaders(),
         }),
-        fetchWithAuth(`${API}/api/semantic-models`, {
+        fetchWithAuth(`${api}/api/semantic-models`, {
           headers: authHeaders(),
         }),
       ]);

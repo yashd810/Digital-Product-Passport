@@ -1,13 +1,13 @@
 function createApiKeyHelpers({ accessRightsService, crypto }) {
-  const ALLOWED_API_KEY_SCOPES = new Set(["dpp:read", "dpp:update", "dpp:history:read", "dpp:element:read", "*"]);
-  const API_KEY_PREFIX_LENGTH = 16;
-  const API_KEY_ALLOWED_OPERATOR_TYPES = new Set(
-    [...accessRightsService.VALID_AUDIENCES].filter((audience) => audience !== "consumers" && audience !== "legitimateInterest")
+  const allowedApiKeyScopes = new Set(["dpp:read", "dpp:update", "dpp:history:read", "dpp:element:read", "*"]);
+  const apiKeyPrefixLength = 16;
+  const apiKeyAllowedOperatorTypes = new Set(
+    [...accessRightsService.validAudiences].filter((audience) => audience !== "consumers" && audience !== "legitimateInterest")
   );
-  const API_KEY_ACCESS_MODES = new Set(["read", "update"]);
-  const API_KEY_CONFIDENTIALITY_LEVELS = ["public", "restricted", "confidential", "tradeSecret", "regulated"];
-  const API_KEY_CONFIDENTIALITY_RANK = new Map(
-    API_KEY_CONFIDENTIALITY_LEVELS.map((level, index) => [level, index])
+  const apiKeyAccessModes = new Set(["read", "update"]);
+  const apiKeyConfidentialityLevels = ["public", "restricted", "confidential", "tradeSecret", "regulated"];
+  const apiKeyConfidentialityRank = new Map(
+    apiKeyConfidentialityLevels.map((level, index) => [level, index])
   );
 
   function parseApiKeyScopes(scopes) {
@@ -15,7 +15,7 @@ function createApiKeyHelpers({ accessRightsService, crypto }) {
       ? scopes.map((scope) => String(scope || "").trim()).filter(Boolean)
       : ["dpp:read"];
     const unique = [...new Set(normalized)];
-    const invalid = unique.filter((scope) => !ALLOWED_API_KEY_SCOPES.has(scope));
+    const invalid = unique.filter((scope) => !allowedApiKeyScopes.has(scope));
     if (invalid.length) {
       const error = new Error(`Invalid API key scope(s): ${invalid.join(", ")}`);
       error.statusCode = 400;
@@ -31,7 +31,7 @@ function createApiKeyHelpers({ accessRightsService, crypto }) {
 
   function parseApiKeyOperatorType(value) {
     const operatorType = normalizeApiKeyOperatorType(value);
-    if (!API_KEY_ALLOWED_OPERATOR_TYPES.has(operatorType)) {
+    if (!apiKeyAllowedOperatorTypes.has(operatorType)) {
       const error = new Error(`Invalid API key operator type "${operatorType}"`);
       error.statusCode = 400;
       throw error;
@@ -42,7 +42,7 @@ function createApiKeyHelpers({ accessRightsService, crypto }) {
   function parseApiKeyAccessMode(value, scopes = []) {
     const normalized = String(value || "").trim().toLowerCase();
     if (normalized) {
-      if (!API_KEY_ACCESS_MODES.has(normalized)) {
+      if (!apiKeyAccessModes.has(normalized)) {
         const error = new Error(`Invalid API key access mode "${normalized}"`);
         error.statusCode = 400;
         throw error;
@@ -54,7 +54,7 @@ function createApiKeyHelpers({ accessRightsService, crypto }) {
 
   function parseApiKeyMaxConfidentiality(value) {
     const normalized = String(value || "").trim().toLowerCase() || "regulated";
-    if (!API_KEY_CONFIDENTIALITY_RANK.has(normalized)) {
+    if (!apiKeyConfidentialityRank.has(normalized)) {
       const error = new Error(`Invalid API key confidentiality level "${normalized}"`);
       error.statusCode = 400;
       throw error;
@@ -80,8 +80,8 @@ function flattenTypeFields(typeDef) {
   function isConfidentialityAllowedForApiKey(fieldConfidentiality, maxConfidentiality) {
     const normalizedField = String(fieldConfidentiality || "public").trim().toLowerCase() || "public";
     const normalizedMax = String(maxConfidentiality || "regulated").trim().toLowerCase() || "regulated";
-    const fieldRank = API_KEY_CONFIDENTIALITY_RANK.get(normalizedField);
-    const maxRank = API_KEY_CONFIDENTIALITY_RANK.get(normalizedMax);
+    const fieldRank = apiKeyConfidentialityRank.get(normalizedField);
+    const maxRank = apiKeyConfidentialityRank.get(normalizedMax);
     if (fieldRank === undefined || maxRank === undefined) return false;
     return fieldRank <= maxRank;
   }
@@ -131,7 +131,7 @@ function flattenTypeFields(typeDef) {
   function buildApiKeyHashRecord(rawKey) {
     const keySalt = crypto.randomBytes(16).toString("hex");
     return {
-      keyPrefix: String(rawKey || "").slice(0, API_KEY_PREFIX_LENGTH),
+      keyPrefix: String(rawKey || "").slice(0, apiKeyPrefixLength),
       keySalt,
       hashAlgorithm: "hmacSha256",
       keyHash: crypto.createHmac("sha256", keySalt).update(String(rawKey || "")).digest("hex"),

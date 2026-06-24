@@ -74,7 +74,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
     if (!moduleDefinition) {
       return {
         error: "Passport types must be created from a registered passport module.",
-        fields: [{ code: "SOURCE_MODULE_REQUIRED", field: "sourceModule" }],
+        fields: [{ code: "sourceModuleRequired", field: "sourceModule" }],
       };
     }
 
@@ -83,7 +83,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
       return {
         error: `Semantic model must stay locked to module "${sourceModule}".`,
         fields: [{
-          code: "SOURCE_MODULE_SEMANTIC_MODEL_MISMATCH",
+          code: "sourceModuleSemanticModelMismatch",
           field: "semanticModelKey",
           expected: moduleDefinition.semanticModelKey,
           actual: normalizedSemanticModelKey,
@@ -98,14 +98,14 @@ module.exports = function registerCatalogRoutes(app, deps) {
         if (field?.key) fieldKeys.add(field.key);
         if (!field?.canonicalLocked || field?.sourceModuleKey !== moduleDefinition.moduleKey || !field?.sourceModuleFieldKey) {
           issues.push({
-            code: "MODULE_FIELD_NOT_CANONICAL",
+            code: "moduleFieldNotCanonical",
             field: field?.key || null,
             message: `Field "${field?.key || "unknown"}" must come from the selected passport module.`,
           });
         }
         if (!field?.semanticId) {
           issues.push({
-            code: "FIELD_SEMANTIC_ID_REQUIRED",
+            code: "fieldSemanticIdRequired",
             field: field?.key || null,
             message: `Field "${field?.key || "unknown"}" must have an explicit semanticId from the module.`,
           });
@@ -113,7 +113,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
         for (const metadataKey of ["elementIdPath", "objectType", "valueDataType"]) {
           if (!field?.[metadataKey]) {
             issues.push({
-              code: "FIELD_RUNTIME_METADATA_REQUIRED",
+              code: "fieldRuntimeMetadataRequired",
               field: field?.key || null,
               metadataKey,
               message: `Field "${field?.key || "unknown"}" must have explicit ${metadataKey} metadata from the module.`,
@@ -124,7 +124,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
           const columns = Array.isArray(field.tableColumns) ? field.tableColumns : [];
           if (!columns.length) {
             issues.push({
-              code: "TABLE_COLUMNS_REQUIRED",
+              code: "tableColumnsRequired",
               field: field?.key || null,
               message: `Table field "${field?.key || "unknown"}" must define module table columns.`,
             });
@@ -132,7 +132,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
           for (const column of columns) {
             if (!column?.canonicalLocked || column?.sourceModuleKey !== moduleDefinition.moduleKey || !column?.sourceModuleColumnKey) {
               issues.push({
-                code: "MODULE_TABLE_COLUMN_NOT_CANONICAL",
+                code: "moduleTableColumnNotCanonical",
                 field: field?.key || null,
                 column: column?.key || null,
                 message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must come from the selected passport module.`,
@@ -140,7 +140,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
             }
             if (!column?.semanticId) {
               issues.push({
-                code: "TABLE_COLUMN_SEMANTIC_ID_REQUIRED",
+                code: "tableColumnSemanticIdRequired",
                 field: field?.key || null,
                 column: column?.key || null,
                 message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must have an explicit semanticId from the module.`,
@@ -149,7 +149,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
             for (const metadataKey of ["elementIdPath", "objectType", "valueDataType"]) {
               if (!column?.[metadataKey]) {
                 issues.push({
-                  code: "TABLE_COLUMN_RUNTIME_METADATA_REQUIRED",
+                  code: "tableColumnRuntimeMetadataRequired",
                   field: field?.key || null,
                   column: column?.key || null,
                   metadataKey,
@@ -164,13 +164,13 @@ module.exports = function registerCatalogRoutes(app, deps) {
     const businessIdentifierField = String(identity?.businessIdentifierField || "").trim();
     if (!businessIdentifierField) {
       issues.push({
-        code: "BUSINESS_IDENTIFIER_FIELD_REQUIRED",
+        code: "businessIdentifierFieldRequired",
         field: "identity.businessIdentifierField",
         message: "Passport types must include a module-defined business identifier field.",
       });
     } else if (!fieldKeys.has(businessIdentifierField)) {
       issues.push({
-        code: "BUSINESS_IDENTIFIER_FIELD_NOT_INCLUDED",
+        code: "businessIdentifierFieldNotIncluded",
         field: businessIdentifierField,
         message: `Business identifier field "${businessIdentifierField}" must be included in the passport type.`,
       });
@@ -249,7 +249,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
         return res.status(400).json({ error: "Cannot delete — passport types are using this category" });
       }
       await pool.query("DELETE FROM \"productCategories\" WHERE id = $1", [req.params.id]);
-      await logAudit(null, req.user.userId, "DELETE_PRODUCT_CATEGORY", "productCategories", req.params.id, null,
+      await logAudit(null, req.user.userId, "deleteProductCategory", "productCategories", req.params.id, null,
         { name: category.rows[0].name });
       res.json({ success: true });
     } catch {
@@ -361,7 +361,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
         const hasStoredRecords = await passportTypeHasStoredRecords(currentType.typeName);
         if (hasStoredRecords && !schemaChange.additive) {
           return res.status(409).json({
-            error: "PASSPORT_TYPE_SCHEMA_CHANGE_REQUIRES_NEW_VERSION",
+            error: "passportTypeSchemaChangeRequiresNewVersion",
             detail: "Passport type fields are additive-only once passports or archives exist. Create a new passport type version for removed fields or storage type changes.",
             removed: schemaChange.removed,
             typeChanged: schemaChange.typeChanged,
@@ -386,7 +386,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
         values
       );
 
-      await logAudit(null, req.user.userId, "UPDATE_PASSPORT_TYPE_METADATA", "passportTypes", null, null,
+      await logAudit(null, req.user.userId, "updatePassportTypeMetadata", "passportTypes", null, null,
         { typeName: existing.rows[0].typeName, updatedFields: updates });
 
       if (sections !== undefined) {
@@ -427,12 +427,12 @@ module.exports = function registerCatalogRoutes(app, deps) {
       await pool.query("DELETE FROM \"passportTypes\" WHERE id = $1", [typeId]);
 
       const tableName = getTable(typeName);
-      if (!/^"[A-Za-z_][A-Za-z0-9_]*"$/.test(tableName)) {
+      if (!/^"[A-Za-z][A-Za-z0-9]*"$/.test(tableName)) {
         throw new Error(`Refusing to drop table with unexpected name: ${tableName}`);
       }
       await pool.query(`DROP TABLE IF EXISTS ${tableName}`);
 
-      await logAudit(null, req.user.userId, "DELETE_PASSPORT_TYPE", "passportTypes", null, null,
+      await logAudit(null, req.user.userId, "deletePassportType", "passportTypes", null, null,
         { typeName, displayName });
 
       res.json({ success: true });
@@ -494,7 +494,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
         eventType: "adminCreateTable",
       });
 
-      await logAudit(null, req.user.userId, "CREATE_PASSPORT_TYPE", "passportTypes", null, null,
+      await logAudit(null, req.user.userId, "createPassportType", "passportTypes", null, null,
         { typeName, displayName, productCategory, semanticModelKey: semanticModelKey || null, sourceModule: sourceModule || null });
 
       res.status(201).json({
@@ -604,7 +604,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
       );
       res.status(201).json(result.rows[0]);
     } catch (error) {
-      if (error.code === "STORAGE_DISABLED") {
+      if (error.code === "storageDisabled") {
         return res.status(503).json({ error: error.message });
       }
       logger.error("Symbol upload error:", error.message);

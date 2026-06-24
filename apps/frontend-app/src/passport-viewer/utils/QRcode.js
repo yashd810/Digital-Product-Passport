@@ -3,30 +3,30 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { buildPublicPassportPath } from "../../passports/utils/passportRoutes";
 import { buildPublicViewerUrl } from "../../passports/utils/publicViewerUrl";
 
-const API = import.meta.env.VITE_API_URL || "";
-const PUBLIC_VIEWER_URL = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
-const DEFAULT_ERROR_CORRECTION_LEVEL = "H";
-const DEFAULT_QUIET_ZONE_MODULES = 4;
-const DEFAULT_QR_WIDTH_PX = 300;
-const MIN_MODULE_MM = 0.25;
-const DPP_GRAPHICAL_MARKING = "IEC_61406_TRIANGLE";
-const MARKETING_CONTACT_URL = "https://www.claros-dpp.online/contact.html";
+const api = import.meta.env.VITE_API_URL || "";
+const publicViewerUrl = import.meta.env.VITE_PUBLIC_VIEWER_URL || "";
+const defaultErrorCorrectionLevel = "H";
+const defaultQuietZoneModules = 4;
+const defaultQrWidthPx = 300;
+const minModuleMm = 0.25;
+const dppGraphicalMarking = "IEC_61406_TRIANGLE";
+const marketingContactUrl = "https://www.claros-dpp.online/contact.html";
 
 function shouldRenderIec61406Marker(granularity = "item") {
   return String(granularity || "item").trim().toLowerCase() !== "model";
 }
 
 export function getMarketingContactUrl() {
-  return MARKETING_CONTACT_URL;
+  return marketingContactUrl;
 }
 
 export const renderPassportQrToCanvas = async (canvas, {
   url,
-  width = DEFAULT_QR_WIDTH_PX,
-  margin = DEFAULT_QUIET_ZONE_MODULES,
+  width = defaultQrWidthPx,
+  margin = defaultQuietZoneModules,
   color = {},
   version,
-  errorCorrectionLevel = DEFAULT_ERROR_CORRECTION_LEVEL,
+  errorCorrectionLevel = defaultErrorCorrectionLevel,
 } = {}) => {
   if (!canvas || !url) return null;
   await QRCode.toCanvas(canvas, url, {
@@ -43,9 +43,9 @@ export function buildQrPrintSpecification({
   url,
   internalAliasId,
   granularity = "item",
-  widthPx = DEFAULT_QR_WIDTH_PX,
-  quietZoneModules = DEFAULT_QUIET_ZONE_MODULES,
-  errorCorrectionLevel = DEFAULT_ERROR_CORRECTION_LEVEL,
+  widthPx = defaultQrWidthPx,
+  quietZoneModules = defaultQuietZoneModules,
+  errorCorrectionLevel = defaultErrorCorrectionLevel,
   version = null,
 } = {}) {
   if (!url) return null;
@@ -59,7 +59,7 @@ export function buildQrPrintSpecification({
   const moduleCount = qrModel?.modules?.size || 0;
   const totalModules = moduleCount + (quietZoneModules * 2);
   const modulePixels = moduleCount > 0 ? widthPx / totalModules : 0;
-  const recommendedMinWidthMm = Number((totalModules * MIN_MODULE_MM).toFixed(2));
+  const recommendedMinWidthMm = Number((totalModules * minModuleMm).toFixed(2));
   const minimumRecommendedWidthPx = Math.ceil(totalModules * 4);
   const qualityChecks = [
     {
@@ -85,7 +85,7 @@ export function buildQrPrintSpecification({
   let trustedViewerHost = "";
   let trustedViewerOrigin = "";
   try {
-    const resolved = new URL(PUBLIC_VIEWER_URL || url, window?.location?.origin || "http://localhost");
+    const resolved = new URL(publicViewerUrl || url, window?.location?.origin || "http://localhost");
     trustedViewerOrigin = resolved.origin;
     trustedViewerHost = resolved.host;
   } catch (error) {
@@ -102,12 +102,12 @@ export function buildQrPrintSpecification({
     modulePixelSize: Number(modulePixels.toFixed(2)),
     minimumRecommendedPrintWidthMm: recommendedMinWidthMm,
     hriText: internalAliasId || "",
-    dppGraphicalMarking: shouldRenderIec61406Marker(granularity) ? DPP_GRAPHICAL_MARKING : null,
+    dppGraphicalMarking: shouldRenderIec61406Marker(granularity) ? dppGraphicalMarking : null,
     printAsset: {
       format: "PNG",
       colorMode: "monochrome",
       recommendedDpi: 300,
-      minimumModuleSizeMm: MIN_MODULE_MM,
+      minimumModuleSizeMm: minModuleMm,
     },
     labelLayout: {
       orientation: "portrait",
@@ -126,8 +126,8 @@ export async function renderPassportQrLabelToCanvas(canvas, {
   internalAliasId,
   granularity = "item",
   title = "Digital Product Passport",
-  width = DEFAULT_QR_WIDTH_PX,
-  margin = DEFAULT_QUIET_ZONE_MODULES,
+  width = defaultQrWidthPx,
+  margin = defaultQuietZoneModules,
 } = {}) {
   if (!canvas || !url) return null;
   const qrCanvas = document.createElement("canvas");
@@ -184,9 +184,9 @@ export const generateQRCodeBundle = async ({
   await renderPassportQrToCanvas(canvas, {
     url: passportLink,
     granularity,
-    width: DEFAULT_QR_WIDTH_PX,
-    margin: DEFAULT_QUIET_ZONE_MODULES,
-    errorCorrectionLevel: DEFAULT_ERROR_CORRECTION_LEVEL,
+    width: defaultQrWidthPx,
+    margin: defaultQuietZoneModules,
+    errorCorrectionLevel: defaultErrorCorrectionLevel,
     color: {
       dark: "#0b1826",
       light: "#ffffff",
@@ -197,9 +197,9 @@ export const generateQRCodeBundle = async ({
     url: passportLink,
     internalAliasId,
     granularity,
-    widthPx: DEFAULT_QR_WIDTH_PX,
-    quietZoneModules: DEFAULT_QUIET_ZONE_MODULES,
-    errorCorrectionLevel: DEFAULT_ERROR_CORRECTION_LEVEL,
+    widthPx: defaultQrWidthPx,
+    quietZoneModules: defaultQuietZoneModules,
+    errorCorrectionLevel: defaultErrorCorrectionLevel,
   });
 
   const safetyWarnings = [
@@ -265,7 +265,7 @@ export const generateQRCode = async ({ internalAliasId, companyName = "", modelN
 export const saveQRCodeToDatabase = async (dppId, qrCodeUrl, passportType, options = {}) => {
   try {
     if (!qrCodeUrl) return null;
-    const response = await fetchWithAuth(`${API}/api/passports/${dppId}/qrcode`, {
+    const response = await fetchWithAuth(`${api}/api/passports/${dppId}/qrcode`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -289,7 +289,7 @@ export const saveQRCodeToDatabase = async (dppId, qrCodeUrl, passportType, optio
  */
 export const fetchQRCodeFromDatabase = async (dppId) => {
   try {
-    const response = await fetchWithAuth(`${API}/api/passports/${dppId}/qrcode`);
+    const response = await fetchWithAuth(`${api}/api/passports/${dppId}/qrcode`);
 
     if (!response.ok) {
       if (response.status === 404) return null; // not yet generated — that's fine
@@ -305,7 +305,7 @@ export const fetchQRCodeFromDatabase = async (dppId) => {
 
 export const fetchQRCodeRecordFromDatabase = async (dppId) => {
   try {
-    const response = await fetchWithAuth(`${API}/api/passports/${dppId}/qrcode`);
+    const response = await fetchWithAuth(`${api}/api/passports/${dppId}/qrcode`);
 
     if (!response.ok) {
       if (response.status === 404) return null;

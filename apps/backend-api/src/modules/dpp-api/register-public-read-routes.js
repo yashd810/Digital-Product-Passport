@@ -48,9 +48,9 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       res.setHeader("Content-Type", "application/json");
       return res.json(payload);
     } catch (e) {
-      if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+      if (e.code === "ambiguousProductId") {
         return res.status(409).json({
-          error: "AMBIGUOUS_PRODUCT_ID",
+          error: "ambiguousProductId",
           message: "Multiple active passports match this internalAliasId."
         });
       }
@@ -88,7 +88,7 @@ module.exports = function registerPublicReadRoutes(app, deps) {
             identifiers.push(resolvedDppId);
           }
         } catch (e) {
-          if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+          if (e.code === "ambiguousProductId") {
             continue;
           }
           throw e;
@@ -189,9 +189,9 @@ module.exports = function registerPublicReadRoutes(app, deps) {
       res.setHeader("Content-Type", "application/json");
       return res.json(payload);
     } catch (e) {
-      if (e.code === "AMBIGUOUS_PRODUCT_ID") {
+      if (e.code === "ambiguousProductId") {
         return res.status(409).json({
-          error: "AMBIGUOUS_PRODUCT_ID",
+          error: "ambiguousProductId",
           message: "Multiple passports match this identifier. Provide companyId or use the canonical product DID."
         });
       }

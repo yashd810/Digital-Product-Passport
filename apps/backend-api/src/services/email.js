@@ -11,9 +11,9 @@ const nodemailer = require("nodemailer");
 const fs         = require("fs");
 const path       = require("path");
 
-const EMAIL_STYLES_PATH = process.env.EMAIL_STYLES_PATH
+const emailStylesPath = process.env.EMAIL_STYLES_PATH
   || path.join(__dirname, "..", "..", "frontend-app", "src", "shared", "styles", "email-styles.css");
-const emailStyles = fs.readFileSync(EMAIL_STYLES_PATH, "utf8");
+const emailStyles = fs.readFileSync(emailStylesPath, "utf8");
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;",

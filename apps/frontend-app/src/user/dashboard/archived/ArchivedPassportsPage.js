@@ -8,7 +8,7 @@ import { renderPassportQrToCanvas } from "../../../passport-viewer/utils/QRcode"
 import { getPassportSerialNumberForType } from "../passports/utils/passportListHelpers";
 import "../../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Archived Passport Collection Helpers
@@ -87,7 +87,7 @@ function ArchivedPassports({ user, companyId }) {
     if (!publicVersionNumber) return null;
 
     const response = await fetchWithAuth(
-      `${API}/api/companies/${companyId}/passports/${passport.dppId}/history`,
+      `${api}/api/companies/${companyId}/passports/${passport.dppId}/history`,
       { headers: authHeaders() }
     );
     if (!response.ok) return null;
@@ -113,7 +113,7 @@ function ArchivedPassports({ user, companyId }) {
       const params = new URLSearchParams();
       if (searchText) params.append("search", searchText);
       if (filterType) params.append("passportType", filterType);
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/archived?${params}`, { headers: authHeaders() });
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/archived?${params}`, { headers: authHeaders() });
       if (!r.ok) throw new Error();
       const data = await r.json();
       setPassports(Array.isArray(data) ? data : []);
@@ -128,7 +128,7 @@ function ArchivedPassports({ user, companyId }) {
 
   useEffect(() => {
     if (!companyId) return;
-    fetchWithAuth(`${API}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
+    fetchWithAuth(`${api}/api/companies/${companyId}/passport-types`, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : [])
       .then(d => setPassportTypes(Array.isArray(d) ? d : []))
       .catch((error) => console.warn("Ignored async error", error));
@@ -138,7 +138,7 @@ function ArchivedPassports({ user, companyId }) {
   const handleUnarchive = async (dppId) => {
     if (!window.confirm("Restore this passport from the archive?")) return;
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/${dppId}/unarchive`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/${dppId}/unarchive`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({}),
@@ -155,7 +155,7 @@ function ArchivedPassports({ user, companyId }) {
     if (!window.confirm(`Restore ${selected.length} passport${selected.length !== 1 ? "s" : ""} from archive?`)) return;
     setBulkLoading(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk-unarchive`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/bulk-unarchive`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ dppIds: selected.map(p => p.dppId) }),
@@ -185,7 +185,7 @@ function ArchivedPassports({ user, companyId }) {
       let exportedCount = 0;
       const fileCount = Object.keys(groupedByType).length;
       for (const [passportType, passportsForType] of Object.entries(groupedByType)) {
-        const typeResponse = await fetchWithAuth(`${API}/api/passport-types/${passportType}`);
+        const typeResponse = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
         const semanticModelKey = typeData.semanticModelKey || "";
@@ -201,7 +201,7 @@ function ArchivedPassports({ user, companyId }) {
             query.set("versionNumber", String(passport.versionNumber));
           }
           const response = await fetchWithAuth(
-            `${API}/api/companies/${companyId}/passports/${passport.dppId}?${query.toString()}`,
+            `${api}/api/companies/${companyId}/passports/${passport.dppId}?${query.toString()}`,
             { headers: authHeaders() }
           );
           if (!response.ok) continue;

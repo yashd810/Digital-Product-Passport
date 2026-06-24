@@ -64,10 +64,10 @@ test("implicit env backup provider is normalized before passport replication", a
       dppId: "dpp-1",
       companyId: 7,
       lineageId: "lineage-1",
-      passportType: "medicalDevicePassportV1",
+      passportType: "exampleProductPassportV1",
       versionNumber: 2,
     },
-    typeDef: { typeName: "medicalDevicePassportV1", fieldsJson: { sections: [] } },
+    typeDef: { typeName: "exampleProductPassportV1", fieldsJson: { sections: [] } },
     snapshotScope: "releasedCurrent",
   });
 
@@ -88,7 +88,7 @@ test("public handover rows expose camelCase fields expected by callers", async (
           companyId: 7,
           passportDppId: "dpp-1",
           lineageId: "lineage-1",
-          passportType: "medicalDevicePassportV1",
+          passportType: "exampleProductPassportV1",
           internalAliasId: "alias-1",
           versionNumber: 3,
           backupProviderKey: "oci-test",
@@ -113,7 +113,7 @@ test("public handover rows expose camelCase fields expected by callers", async (
   assert.equal(handover.passportDppId, "dpp-1");
   assert.equal(handover.companyId, 7);
   assert.equal(handover.lineageId, "lineage-1");
-  assert.equal(handover.passportType, "medicalDevicePassportV1");
+  assert.equal(handover.passportType, "exampleProductPassportV1");
   assert.equal(handover.internalAliasId, "alias-1");
   assert.equal(handover.versionNumber, 3);
   assert.equal(handover.backupProviderKey, "oci-test");

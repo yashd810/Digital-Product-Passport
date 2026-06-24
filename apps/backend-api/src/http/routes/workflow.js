@@ -9,7 +9,7 @@ module.exports = function registerWorkflowRoutes(app, {
   requireEditor,
   submitPassportToWorkflow,
   getTable,
-  IN_REVISION_STATUS,
+  inRevisionStatus,
   signPassport,
   markOlderVersionsObsolete,
   logAudit,
@@ -294,7 +294,7 @@ module.exports = function registerWorkflowRoutes(app, {
           `UPDATE ${tableName}
            SET "releaseStatus" = $2, "updatedAt" = NOW()
            WHERE "dppId"=$1 AND "releaseStatus"='inReview'`,
-          [dppId, pInfo.versionNumber > 1 ? IN_REVISION_STATUS : "draft"]
+          [dppId, pInfo.versionNumber > 1 ? inRevisionStatus : "draft"]
         );
         const revertedPassport = await loadLivePassportRow({ dppId, passportType: resolvedPassportType });
         if (revertedPassport) {
@@ -381,7 +381,7 @@ module.exports = function registerWorkflowRoutes(app, {
               await runBestEffort("Workflow review sign audit error", async () => logAudit(
                 wf.companyId,
                 userId,
-                "SIGN_PASSPORT",
+                "signPassport",
                 "passportSignatures",
                 dppId,
                 null,
@@ -399,7 +399,7 @@ module.exports = function registerWorkflowRoutes(app, {
             await runBestEffort("Workflow review release audit error", async () => logAudit(
               wf.companyId,
               userId,
-              "RELEASE",
+              "release",
               tableName,
               dppId,
               { releaseStatus: "inReview" },
@@ -488,7 +488,7 @@ module.exports = function registerWorkflowRoutes(app, {
             await runBestEffort("Workflow approval sign audit error", async () => logAudit(
               wf.companyId,
               userId,
-              "SIGN_PASSPORT",
+              "signPassport",
               "passportSignatures",
               dppId,
               null,
@@ -506,7 +506,7 @@ module.exports = function registerWorkflowRoutes(app, {
           await runBestEffort("Workflow approval release audit error", async () => logAudit(
             wf.companyId,
             userId,
-            "RELEASE",
+            "release",
             tableName,
             dppId,
             { releaseStatus: "inReview" },

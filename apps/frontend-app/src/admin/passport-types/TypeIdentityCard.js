@@ -88,7 +88,7 @@ export function TypeIdentityCard({
                 if (selected) setProductIcon(selected.icon);
                 setCategoryMenuOpen(true);
               }}
-              placeholder="e.g. Medical Device"
+              placeholder="e.g. Equipment"
               className={`acpt-input${hasInvalid("productCategory") ? " acpt-input-error" : ""}`}
               required
               aria-expanded={categoryMenuOpen}

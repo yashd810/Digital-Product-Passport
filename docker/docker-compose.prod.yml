@@ -58,7 +58,7 @@ services:
       REPO_DIR: /data/repository-files
       UPLOADS_DIR: /data/uploads
     volumes:
-      - local_storage_data:/data
+      - localStorageData:/data
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
@@ -96,7 +96,7 @@ services:
       POSTGRES_USER: "${DB_USER:?DB_USER is required}"
       POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgresData:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
@@ -106,9 +106,9 @@ services:
     restart: unless-stopped
 
 volumes:
-  local_storage_data:
-    name: "${LOCAL_STORAGE_VOLUME_NAME:-dpp_local_storage_data}"
+  localStorageData:
+    name: "${LOCAL_STORAGE_VOLUME_NAME:-dppLocalStorageData}"
     external: true
-  postgres_data:
-    name: "${POSTGRES_VOLUME_NAME:-dpp_postgres_data}"
+  postgresData:
+    name: "${POSTGRES_VOLUME_NAME:-dppPostgresData}"
     external: true

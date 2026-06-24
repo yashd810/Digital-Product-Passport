@@ -165,7 +165,7 @@ function createResolutionHelpers({
     });
     if (filteredMatches.length > 1 && filteredMatches[0].passport.dppId !== filteredMatches[1].passport.dppId) {
       const error = new Error(`Multiple passports match DPP identifier "${stableId}".`);
-      error.code = "AMBIGUOUS_DPP_ID";
+      error.code = "ambiguousDppId";
       throw error;
     }
 
@@ -324,7 +324,7 @@ function createResolutionHelpers({
     if (!matches.length) return null;
     if (matches.length > 1) {
       const error = new Error(`Multiple editable passports share DPP identifier "${dppId}".`);
-      error.code = "AMBIGUOUS_DPP_ID";
+      error.code = "ambiguousDppId";
       throw error;
     }
     return matches[0];
@@ -383,7 +383,7 @@ function createResolutionHelpers({
 
     if (matches.length > 1 && matches[0].passport.dppId !== matches[1].passport.dppId) {
       const error = new Error(`Multiple editable passports match identifier "${productIdentifier}".`);
-      error.code = "AMBIGUOUS_PRODUCT_ID";
+      error.code = "ambiguousProductId";
       error.companyIds = [...new Set(matches.map(({ passport }) => Number(passport.companyId)).filter(Number.isFinite))];
       throw error;
     }
@@ -400,7 +400,7 @@ function createResolutionHelpers({
     try {
       const result = await resolveReleasedPassportForIdentifier(productIdentifier, companyId, versionNumber);
       if (!result) {
-        return { productIdentifier, found: false, error: "NOT_FOUND" };
+        return { productIdentifier, found: false, error: "notFound" };
       }
 
       const requestShape = {
@@ -416,11 +416,11 @@ function createResolutionHelpers({
           payload
       };
     } catch (error) {
-      if (error.code === "AMBIGUOUS_PRODUCT_ID") {
+      if (error.code === "ambiguousProductId") {
         return {
           productIdentifier,
           found: false,
-          error: "AMBIGUOUS_PRODUCT_ID",
+          error: "ambiguousProductId",
           companyIds: error.companyIds || []
         };
       }

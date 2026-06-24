@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
 import "../../../shared/styles/Dashboard.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
-const NOTIF_ICONS = {
+const notifIcons = {
   passportReleased:  "🚀",
   passportRevised:   "🔄",
   workflowReview:    "🔍",
@@ -19,7 +19,7 @@ const NOTIF_ICONS = {
   default:            "🔔",
 };
 
-const TYPE_LABELS = {
+const typeLabels = {
   passportReleased:  "Released",
   passportRevised:   "Revised",
   workflowReview:    "Review Requested",
@@ -69,7 +69,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetchWithAuth(`${API}/api/users/me/notifications/full?limit=100`, {
+        const r = await fetchWithAuth(`${api}/api/users/me/notifications/full?limit=100`, {
           headers: authHeaders(),
         });
         if (r.ok) setNotifs(await r.json());
@@ -80,14 +80,14 @@ export default function NotificationsPage() {
   }, []);
 
   const markAllRead = async () => {
-    await fetchWithAuth(`${API}/api/users/me/notifications/read-all`, {
+    await fetchWithAuth(`${api}/api/users/me/notifications/read-all`, {
       method: "PATCH", headers: authHeaders(),
     });
     setNotifs(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const markRead = async (id) => {
-    await fetchWithAuth(`${API}/api/users/me/notifications/${id}/read`, {
+    await fetchWithAuth(`${api}/api/users/me/notifications/${id}/read`, {
       method: "PATCH", headers: authHeaders(),
     });
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
@@ -148,13 +148,13 @@ export default function NotificationsPage() {
                   setExpanded(isOpen ? null : n.id);
                 }}>
                   <div className="nwf-card-icon">
-                    {NOTIF_ICONS[n.type] || NOTIF_ICONS.default}
+                    {notifIcons[n.type] || notifIcons.default}
                   </div>
                   <div className="nwf-card-body">
                     <div className="nwf-card-top">
                       <span className="nwf-card-title">{n.title}</span>
                       <span className={`nwf-type-badge nwf-type-${n.type}`}>
-                        {TYPE_LABELS[n.type] || n.type}
+                        {typeLabels[n.type] || n.type}
                       </span>
                     </div>
                     {n.message && <div className="nwf-card-msg">{n.message}</div>}

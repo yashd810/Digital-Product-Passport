@@ -15,7 +15,7 @@ function registerPublicApiV1Routes(app, deps) {
     archivePassportSnapshot,
     updatePassportRowById,
     logAudit,
-    EDITABLE_RELEASE_STATUSES_SQL,
+    editableReleaseStatusesSql,
   } = deps;
 
   app.use("/api/v1", (req, res, next) => {
@@ -133,7 +133,7 @@ function registerPublicApiV1Routes(app, deps) {
       const tableName = getTable(resolvedPassportType);
       const current = await pool.query(
         `SELECT * FROM ${tableName}
-         WHERE "dppId" = $1 AND "releaseStatus" IN ${EDITABLE_RELEASE_STATUSES_SQL} AND "deletedAt" IS NULL
+         WHERE "dppId" = $1 AND "releaseStatus" IN ${editableReleaseStatusesSql} AND "deletedAt" IS NULL
          LIMIT 1`,
         [dppId]
       );
@@ -202,7 +202,7 @@ function registerPublicApiV1Routes(app, deps) {
       await logAudit(
         companyId,
         null,
-        "UPDATE_VIA_API_KEY",
+        "updateViaApiKey",
         tableName,
         dppId,
         null,

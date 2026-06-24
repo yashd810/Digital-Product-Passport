@@ -10,7 +10,7 @@ function createProductIdentifierService({ didService, pool = null }) {
   }
 
   function isGeneratedLocalPassportId(value) {
-    return typeof value === "string" && value.trim().toLowerCase().startsWith("dpp_");
+    return typeof value === "string" && value.trim().startsWith("dppId");
   }
 
   function getBusinessIdentifierField(typeDef = null) {

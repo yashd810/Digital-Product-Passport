@@ -3,14 +3,14 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchWithAuth } from "../../shared/api/authHeaders";
 import {
-  PASSWORD_MIN_LENGTH,
-  PASSWORD_REQUIREMENT_TEXT,
+  passwordMinLength,
+  passwordRequirementText,
   passwordStrength,
   validatePasswordPolicy,
 } from "../utils/passwordPolicy";
 import "../styles/Landing.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 export function ForgotPassword() {
   const navigate = useNavigate();
@@ -23,7 +23,7 @@ export function ForgotPassword() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/auth/forgot-password`, {
+      const r = await fetchWithAuth(`${api}/api/auth/forgot-password`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ email: email.trim() }),
@@ -118,7 +118,7 @@ export function ResetPassword() {
 
   React.useEffect(() => {
     if (!token) { setTokenOk(false); return; }
-    fetchWithAuth(`${API}/api/auth/validate-reset-token?token=${token}`)
+    fetchWithAuth(`${api}/api/auth/validate-reset-token?token=${token}`)
       .then(r => r.json())
       .then(d => { if (!d.valid) setTokenOk(false); })
       .catch(() => setTokenOk(false));
@@ -135,7 +135,7 @@ export function ResetPassword() {
     if (password !== confirm)  { setError("Passwords do not match"); return; }
     setLoading(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/auth/reset-password`, {
+      const r = await fetchWithAuth(`${api}/api/auth/reset-password`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ token, newPassword: password }),
@@ -202,13 +202,13 @@ export function ResetPassword() {
             <label htmlFor="newpw">New Password</label>
             <input
               id="newpw" type="password" value={password} required
-              placeholder={`Min. ${PASSWORD_MIN_LENGTH} characters`} disabled={loading}
+              placeholder={`Min. ${passwordMinLength} characters`} disabled={loading}
               onChange={e => setPassword(e.target.value)}
-              minLength={PASSWORD_MIN_LENGTH}
+              minLength={passwordMinLength}
               autoFocus
             />
             <span style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
-              {PASSWORD_REQUIREMENT_TEXT}
+              {passwordRequirementText}
             </span>
             {str && (
               <div style={{ marginTop:6 }}>

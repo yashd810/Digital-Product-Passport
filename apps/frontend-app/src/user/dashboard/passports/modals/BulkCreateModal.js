@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
   const [count, setCount] = useState("10");
@@ -21,7 +21,7 @@ export function BulkCreateModal({ passportType, companyId, onClose, onDone }) {
     setIsSubmitting(true);
 
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/passports/bulk`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/bulk`, {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({

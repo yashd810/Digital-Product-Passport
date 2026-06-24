@@ -20,12 +20,12 @@ function createMockPool(typeDef) {
 
 function createFixturePassportType() {
   return {
-    typeName: "medicalDevicePassportV1",
-    displayName: "Medical Device Passport v1",
-    semanticModelKey: "medicalDeviceDictionaryV1",
+    typeName: "exampleProductPassportV1",
+    displayName: "Example Product Passport v1",
+    semanticModelKey: "exampleProductDictionaryV1",
     passportPolicy: {
-      key: "medicalDeviceDppV1",
-      contentSpecificationIds: ["medicalDeviceDictionaryV1"],
+      key: "exampleProductDppV1",
+      contentSpecificationIds: ["exampleProductDictionaryV1"],
       defaultCarrierPolicyKey: "webPublicEntryV1",
     },
     fieldsJson: {
@@ -53,8 +53,8 @@ test("passport policy metadata is resolved from the selected passport type defin
     granularity: "batch",
   });
 
-  assert.equal(policy.key, "medicalDeviceDppV1");
-  assert.deepEqual(policy.contentSpecificationIds, ["medicalDeviceDictionaryV1"]);
+  assert.equal(policy.key, "exampleProductDppV1");
+  assert.deepEqual(policy.contentSpecificationIds, ["exampleProductDictionaryV1"]);
   assert.equal(policy.defaultCarrierPolicyKey, "webPublicEntryV1");
   assert.equal(policy.granularity, "batch");
 });
@@ -71,11 +71,11 @@ test("required-field evaluation is governed by passport type required flags", as
     modelIdentifier: "MODEL-X1",
   }, typeDef.typeName, typeDef);
 
-  assert.equal(result.policy.key, "medicalDeviceDppV1");
-  assert.equal(result.semanticModelKey, "medicalDeviceDictionaryV1");
+  assert.equal(result.policy.key, "exampleProductDppV1");
+  assert.equal(result.semanticModelKey, "exampleProductDictionaryV1");
   assert.equal(result.category.ruleCoverage.length, 0);
   assert.ok(
-    result.requiredFieldIssues.some((issue) => issue.code === "REQUIRED_FIELD_MISSING"),
+    result.requiredFieldIssues.some((issue) => issue.code === "requiredFieldMissing"),
     "Expected missing required passport fields to be reported"
   );
   assert.equal(result.workflowReleaseAllowed, false);
@@ -95,7 +95,7 @@ test("complete required fields allow release without category rules", async () =
     udi: "UDI-001",
   }, typeDef.typeName, typeDef);
 
-  assert.equal(result.policy.key, "medicalDeviceDppV1");
+  assert.equal(result.policy.key, "exampleProductDppV1");
   assert.deepEqual(result.requiredFieldIssues, []);
   assert.deepEqual(result.category.ruleCoverage, []);
   assert.equal(result.workflowReleaseAllowed, true);

@@ -159,7 +159,7 @@ test("OAuth auto-link keeps active users with camelCase isActive alias", async (
   const service = createOauthService({
     jwt,
     pool,
-    JWT_SECRET: "state-secret",
+    jwtSecret: "state-secret",
     generateToken: (user) => {
       assert.equal(user.id, 42);
       return "session-token";

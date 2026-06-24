@@ -7,16 +7,16 @@ const logger = require("../../services/logger");
  *
  * Usage:
  *   const createAuthMiddleware = require("./middleware/auth");
- *   const auth = createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, SESSION_COOKIE_NAME });
+ *   const auth = createAuthMiddleware({ jwt, crypto, pool, jwtSecret, sessionCookieName });
  */
 
-module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, SESSION_COOKIE_NAME }) {
+module.exports = function createAuthMiddleware({ jwt, crypto, pool, jwtSecret, sessionCookieName }) {
   const normalizeScopes = (scopes) => Array.isArray(scopes)
     ? scopes.map((scope) => String(scope || "").trim()).filter(Boolean)
     : [];
-  const API_KEY_PREFIX_LENGTH = 16;
+  const apiKeyPrefixLength = 16;
 
-  const getApiKeyPrefix = (rawKey) => String(rawKey || "").slice(0, API_KEY_PREFIX_LENGTH);
+  const getApiKeyPrefix = (rawKey) => String(rawKey || "").slice(0, apiKeyPrefixLength);
   const hashApiKeyWithSalt = (rawKey, salt) =>
     crypto.createHmac("sha256", String(salt)).update(String(rawKey || "")).digest("hex");
 
@@ -57,7 +57,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
     const tokens = [];
     const bearerToken = parseBearerToken(req);
     if (bearerToken) tokens.push(bearerToken);
-    tokens.push(...parseCookieValues(req, SESSION_COOKIE_NAME));
+    tokens.push(...parseCookieValues(req, sessionCookieName));
     return [...new Set(tokens.filter(Boolean))];
   };
 
@@ -81,7 +81,7 @@ module.exports = function createAuthMiddleware({ jwt, crypto, pool, JWT_SECRET, 
       let payload = null;
       for (const token of candidateTokens) {
         try {
-          payload = jwt.verify(token, JWT_SECRET);
+          payload = jwt.verify(token, jwtSecret);
           break;
         } catch (verifyErr) {
           // Token verification failed, try next candidate

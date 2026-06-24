@@ -4,13 +4,13 @@ const registerCatalogRoutes = require("../../modules/admin/register-catalog-rout
 const registerCompanyRoutes = require("../../modules/admin/register-company-routes");
 const registerSuperAdminRoutes = require("../../modules/admin/register-super-admin-routes");
 const registerUserAccessRoutes = require("../../modules/admin/register-user-access-routes");
-const { SYSTEM_PASSPORT_FIELDS } = require("../../shared/passports/passport-helpers");
+const { systemPassportFields } = require("../../shared/passports/passport-helpers");
 const {
   normalizeSystemPassportHeader,
   validateSystemPassportHeader,
 } = require("../../services/passport-header-fields");
 
-const COMPANY_POLICY_DEFAULTS = {
+const companyPolicyDefaults = {
   defaultGranularity: "item",
   allowGranularityOverride: false,
   mintModelDids: true,
@@ -21,7 +21,7 @@ const COMPANY_POLICY_DEFAULTS = {
   semanticDictionaryEnabled: true
 };
 
-const COMPANY_POLICY_BOOL_FIELDS = [
+const companyPolicyBoolFields = [
 "allowGranularityOverride",
 "mintModelDids",
 "mintItemDids",
@@ -30,14 +30,14 @@ const COMPANY_POLICY_BOOL_FIELDS = [
 "jsonldExportEnabled",
 "semanticDictionaryEnabled"];
 
-const COMPANY_TRUST_LEVELS = new Set(["BASIC", "VERIFIED_BUSINESS", "ENTERPRISE"]);
+const companyTrustLevels = new Set(["basic", "verifiedBusiness", "enterprise"]);
 
-const ARCHIVED_HISTORY_REASON_SQL = `('beforeArchiveDelete','beforeBulkArchiveDelete','beforeDelete','beforeBulkDelete')`;
-const ARCHIVED_HISTORY_FILTER_SQL = `("snapshotReason" IN ${ARCHIVED_HISTORY_REASON_SQL})`;
+const archivedHistoryReasonSql = `('beforeArchiveDelete','beforeBulkArchiveDelete','beforeDelete','beforeBulkDelete')`;
+const archivedHistoryFilterSql = `("snapshotReason" IN ${archivedHistoryReasonSql})`;
 
 
-const RESERVED_PASSPORT_FIELD_KEYS = [
-...SYSTEM_PASSPORT_FIELDS,
+const reservedPassportFieldKeys = [
+...systemPassportFields,
 "modelName",
 "internalAliasId",
 "uniqueProductIdentifier",
@@ -60,7 +60,7 @@ const RESERVED_PASSPORT_FIELD_KEYS = [
 "companyDid"];
 
 
-const RESERVED_PASSPORT_SEMANTIC_IDS = [
+const reservedPassportSemanticIds = [
 "dpp:digitalProductPassportId",
 "dpp:uniqueProductIdentifier",
 "dpp:granularity",
@@ -77,10 +77,10 @@ const RESERVED_PASSPORT_SEMANTIC_IDS = [
 "dpp:internalAliasId"];
 
 
-const RESERVED_PASSPORT_FIELD_KEY_SET = new Set(RESERVED_PASSPORT_FIELD_KEYS);
-const RESERVED_PASSPORT_SEMANTIC_ID_SET = new Set(RESERVED_PASSPORT_SEMANTIC_IDS);
+const reservedPassportFieldKeySet = new Set(reservedPassportFieldKeys);
+const reservedPassportSemanticIdSet = new Set(reservedPassportSemanticIds);
 
-const VALID_ACCESS_LEVELS = new Set([
+const validAccessLevels = new Set([
   "public",
   "consumers",
   "notifiedBodies",
@@ -103,7 +103,7 @@ const VALID_ACCESS_LEVELS = new Set([
   "backupDppServiceProvider",
 ]);
 
-const VALID_CONFIDENTIALITY_LEVELS = new Set([
+const validConfidentialityLevels = new Set([
   "public",
   "restricted",
   "confidential",
@@ -111,7 +111,7 @@ const VALID_CONFIDENTIALITY_LEVELS = new Set([
   "regulated",
 ]);
 
-const VALID_UPDATE_AUTHORITIES = new Set([
+const validUpdateAuthorities = new Set([
   "economicOperator",
   "delegatedOperator",
   "manufacturer",
@@ -163,11 +163,11 @@ module.exports = function registerAdminRoutes(app, {
   validatePassportTypeStorage = null,
   queryTableStats,
   publicReadRateLimit,
-  GLOBAL_SYMBOLS_DIR,
-  REPO_BASE_DIR,
-  FILES_BASE_DIR,
-  IN_REVISION_STATUS,
-  IN_REVISION_STATUSES_SQL,
+  globalSymbolsDir,
+  repoBaseDir,
+  filesBaseDir,
+  inRevisionStatus,
+  inRevisionStatusesSql,
   createTransporter,
   brandedEmail,
   renderInfoTable,
@@ -177,7 +177,7 @@ module.exports = function registerAdminRoutes(app, {
     const conflicts = [];
     for (const section of sections || []) {
       for (const field of section?.fields || []) {
-        if (RESERVED_PASSPORT_FIELD_KEY_SET.has(field?.key)) {
+        if (reservedPassportFieldKeySet.has(field?.key)) {
           conflicts.push({
             field: field.key,
             conflictType: "key",
@@ -187,7 +187,7 @@ module.exports = function registerAdminRoutes(app, {
         }
 
         const semanticId = field?.semanticId || null;
-        if (RESERVED_PASSPORT_SEMANTIC_ID_SET.has(semanticId)) {
+        if (reservedPassportSemanticIdSet.has(semanticId)) {
           conflicts.push({
             field: field.key,
             semanticId,
@@ -240,17 +240,17 @@ module.exports = function registerAdminRoutes(app, {
         const access = Array.isArray(field?.access) ? field.access.filter(Boolean) : [];
         if (!access.length) {
           issues.push({
-            code: "FIELD_ACCESS_MISSING",
+            code: "fieldAccessMissing",
             key: field.key,
             label: field.label || field.key,
             section: section.label || section.key || null,
             message: `Field "${field.label || field.key}" must expose at least one audience.`,
           });
         } else {
-          const invalidAccess = access.filter((entry) => !VALID_ACCESS_LEVELS.has(entry));
+          const invalidAccess = access.filter((entry) => !validAccessLevels.has(entry));
           if (invalidAccess.length) {
             issues.push({
-              code: "FIELD_ACCESS_INVALID",
+              code: "fieldAccessInvalid",
               key: field.key,
               label: field.label || field.key,
               section: section.label || section.key || null,
@@ -262,15 +262,15 @@ module.exports = function registerAdminRoutes(app, {
         const confidentiality = String(field?.confidentiality || "").trim().toLowerCase();
         if (!confidentiality) {
           issues.push({
-            code: "FIELD_CONFIDENTIALITY_MISSING",
+            code: "fieldConfidentialityMissing",
             key: field.key,
             label: field.label || field.key,
             section: section.label || section.key || null,
             message: `Field "${field.label || field.key}" must declare a confidentiality classification.`,
           });
-        } else if (!VALID_CONFIDENTIALITY_LEVELS.has(confidentiality)) {
+        } else if (!validConfidentialityLevels.has(confidentiality)) {
           issues.push({
-            code: "FIELD_CONFIDENTIALITY_INVALID",
+            code: "fieldConfidentialityInvalid",
             key: field.key,
             label: field.label || field.key,
             section: section.label || section.key || null,
@@ -281,17 +281,17 @@ module.exports = function registerAdminRoutes(app, {
         const updateAuthority = Array.isArray(field?.updateAuthority) ? field.updateAuthority : [];
         if (!updateAuthority.length) {
           issues.push({
-            code: "FIELD_UPDATE_AUTHORITY_MISSING",
+            code: "fieldUpdateAuthorityMissing",
             key: field.key,
             label: field.label || field.key,
             section: section.label || section.key || null,
             message: `Field "${field.label || field.key}" must declare at least one update authority.`,
           });
         } else {
-          const invalidUpdateAuthority = updateAuthority.filter((entry) => !VALID_UPDATE_AUTHORITIES.has(entry));
+          const invalidUpdateAuthority = updateAuthority.filter((entry) => !validUpdateAuthorities.has(entry));
           if (invalidUpdateAuthority.length) {
             issues.push({
-              code: "FIELD_UPDATE_AUTHORITY_INVALID",
+              code: "fieldUpdateAuthorityInvalid",
               key: field.key,
               label: field.label || field.key,
               section: section.label || section.key || null,
@@ -353,14 +353,14 @@ module.exports = function registerAdminRoutes(app, {
        ON CONFLICT ("companyId") DO NOTHING`,
       [
       companyId,
-      COMPANY_POLICY_DEFAULTS.defaultGranularity,
-      COMPANY_POLICY_DEFAULTS.allowGranularityOverride,
-      COMPANY_POLICY_DEFAULTS.mintModelDids,
-      COMPANY_POLICY_DEFAULTS.mintItemDids,
-      COMPANY_POLICY_DEFAULTS.mintFacilityDids,
-      COMPANY_POLICY_DEFAULTS.vcIssuanceEnabled,
-      COMPANY_POLICY_DEFAULTS.jsonldExportEnabled,
-      COMPANY_POLICY_DEFAULTS.semanticDictionaryEnabled]
+      companyPolicyDefaults.defaultGranularity,
+      companyPolicyDefaults.allowGranularityOverride,
+      companyPolicyDefaults.mintModelDids,
+      companyPolicyDefaults.mintItemDids,
+      companyPolicyDefaults.mintFacilityDids,
+      companyPolicyDefaults.vcIssuanceEnabled,
+      companyPolicyDefaults.jsonldExportEnabled,
+      companyPolicyDefaults.semanticDictionaryEnabled]
 
     );
   }
@@ -386,7 +386,7 @@ module.exports = function registerAdminRoutes(app, {
       nextPolicy.defaultGranularity = body.defaultGranularity;
     }
 
-    COMPANY_POLICY_BOOL_FIELDS.forEach((field) => {
+    companyPolicyBoolFields.forEach((field) => {
       if (body[field] === undefined) return;
       if (typeof body[field] !== "boolean") {
         throw new Error(`${field} must be a boolean`);
@@ -455,9 +455,9 @@ module.exports = function registerAdminRoutes(app, {
     validateCompanyDppPolicyInput,
     updateCompanyDppPolicy,
     storageService,
-    REPO_BASE_DIR,
-    FILES_BASE_DIR,
-    COMPANY_TRUST_LEVELS,
+    repoBaseDir,
+    filesBaseDir,
+    companyTrustLevels,
   });
 
   registerSuperAdminRoutes(app, {
@@ -476,7 +476,7 @@ module.exports = function registerAdminRoutes(app, {
     isSuperAdmin,
     queryTableStats,
     getTable,
-    ARCHIVED_HISTORY_FILTER_SQL,
+    archivedHistoryFilterSql,
   });
 
   registerUserAccessRoutes(app, {

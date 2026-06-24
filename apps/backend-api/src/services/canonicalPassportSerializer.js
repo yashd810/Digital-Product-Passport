@@ -10,7 +10,7 @@ function createCanonicalPassportSerializer({
   productIdentifierService = null,
   semanticModelRegistry = createSemanticModelRegistry(),
 }) {
-  const HEADER_FIELD_KEYS = {
+  const headerFieldKeys = {
     granularity: new Set(["granularity"]),
     dppSchemaVersion: new Set(["dppSchemaVersion"]),
     dppStatus: new Set(["dppStatus"]),
@@ -18,7 +18,7 @@ function createCanonicalPassportSerializer({
     facilityId: new Set(["facilityId"]),
     contentSpecificationIds: new Set(["contentSpecificationIds"]),
   };
-  const HEADER_FIELD_CONFIG = {
+  const headerFieldConfig = {
     digitalProductPassportId: { required: true, semanticId: "dpp:digitalProductPassportId", valueSource: "system" },
     uniqueProductIdentifier: { required: true, semanticId: "dpp:uniqueProductIdentifier", valueSource: "system" },
     internalAliasId: { required: true, semanticId: "dpp:internalAliasId", valueSource: "system" },
@@ -433,54 +433,54 @@ function createCanonicalPassportSerializer({
       const expectsMany = ["many", "multiple", "multi", "array", "set", "list"].includes(cardinality);
       const expectsOne = ["one", "single", "scalar"].includes(cardinality);
       if (expectsMany && !Array.isArray(value)) {
-        pushIssue("SEMANTIC_CARDINALITY_MISMATCH", `Expected multiple values for "${key}" but found a single value.`);
+        pushIssue("semanticCardinalityMismatch", `Expected multiple values for "${key}" but found a single value.`);
       }
       if (expectsOne && Array.isArray(value)) {
-        pushIssue("SEMANTIC_CARDINALITY_MISMATCH", `Expected a single value for "${key}" but found multiple values.`);
+        pushIssue("semanticCardinalityMismatch", `Expected a single value for "${key}" but found multiple values.`);
       }
     }
 
     if (Array.isArray(value) && hasMixedArrayItemTypes(value)) {
-      pushIssue("SEMANTIC_ARRAY_ITEM_TYPE_MISMATCH", `Array value for "${key}" contains mixed JSON item types.`);
+      pushIssue("semanticArrayItemTypeMismatch", `Array value for "${key}" contains mixed JSON item types.`);
     }
 
     const isMultiLanguageFieldValue = (isExplicitMultiLanguageField(fieldDef) || isMultiLanguageValue(value)) && isPlainObject(value);
 
     if (jsonType === "boolean" || xsdType.endsWith(":boolean")) {
       if (typeof value !== "boolean") {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected boolean value for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected boolean value for "${key}".`);
       }
     } else if (jsonType === "number" || xsdType.endsWith(":decimal")) {
       if (typeof value !== "number" || !Number.isFinite(value)) {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected decimal number value for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected decimal number value for "${key}".`);
       }
     } else if (jsonType === "integer" || xsdType.endsWith(":integer") || xsdType.endsWith(":int")) {
       if (!Number.isInteger(value)) {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected integer value for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected integer value for "${key}".`);
       }
     } else if (xsdType.endsWith(":datetime")) {
       if (typeof value !== "string" || !isDateTimeLike(value)) {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected xsd:dateTime string for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected xsd:dateTime string for "${key}".`);
       }
     } else if (xsdType.endsWith(":date")) {
       if (typeof value !== "string" || !isDateLike(value)) {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected xsd:date string for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected xsd:date string for "${key}".`);
       }
     } else if (xsdType.endsWith(":gyearmonth")) {
       if (typeof value !== "string" || !isYearMonthLike(value)) {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected xsd:gYearMonth string for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected xsd:gYearMonth string for "${key}".`);
       }
     } else if (xsdType.endsWith(":anyuri")) {
       if (typeof value !== "string" || !isUriLike(value)) {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected xsd:anyURI string for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected xsd:anyURI string for "${key}".`);
       }
     } else if (xsdType.endsWith(":base64binary")) {
       if (typeof value !== "string" || !isBase64BinaryLike(value)) {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected xsd:base64Binary string for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected xsd:base64Binary string for "${key}".`);
       }
     } else if ((jsonType === "string" || xsdType.endsWith(":string")) && !isMultiLanguageFieldValue) {
       if (typeof value !== "string") {
-        pushIssue("SEMANTIC_TYPE_MISMATCH", `Expected string value for "${key}".`);
+        pushIssue("semanticTypeMismatch", `Expected string value for "${key}".`);
       }
     }
 
@@ -488,7 +488,7 @@ function createCanonicalPassportSerializer({
       try {
         const regex = new RegExp(pattern);
         if (!regex.test(value)) {
-          pushIssue("SEMANTIC_PATTERN_MISMATCH", `Value for "${key}" does not match its declared pattern.`);
+          pushIssue("semanticPatternMismatch", `Value for "${key}" does not match its declared pattern.`);
         }
       } catch {
         // Ignore malformed repository patterns rather than breaking export.
@@ -496,7 +496,7 @@ function createCanonicalPassportSerializer({
     }
 
     if (unit && unit !== "none" && isPlainObject(value) && value.unit && normalizeText(value.unit).toLowerCase() !== unit) {
-      pushIssue("SEMANTIC_UNIT_MISMATCH", `Value for "${key}" uses unit "${value.unit}" but dictionary expects "${term.unit}".`);
+      pushIssue("semanticUnitMismatch", `Value for "${key}" uses unit "${value.unit}" but dictionary expects "${term.unit}".`);
     }
 
     const explicitAllowedValues = resolveAllowedValues(fieldDef, term, options);
@@ -504,7 +504,7 @@ function createCanonicalPassportSerializer({
       const invalidValues = extractDisallowedValues(value, explicitAllowedValues);
       if (invalidValues.length) {
         pushIssue(
-          "SEMANTIC_ALLOWED_VALUE_MISMATCH",
+          "semanticAllowedValueMismatch",
           `Value for "${key}" must be one of: ${explicitAllowedValues.join(", ")}.`,
           { allowedValues: explicitAllowedValues, invalidValues }
         );
@@ -584,14 +584,14 @@ function createCanonicalPassportSerializer({
     for (const [languageTag, localizedValue] of Object.entries(value)) {
       if (!isLanguageTagLike(languageTag)) {
         pushIssue(
-          "SEMANTIC_LANGUAGE_TAG_INVALID",
+          "semanticLanguageTagInvalid",
           `Value for "${key}" uses invalid language tag "${languageTag}".`,
           { languageTag }
         );
       }
       if (!isScalarValue(localizedValue)) {
         pushIssue(
-          "SEMANTIC_MULTILANGUAGE_VALUE_INVALID",
+          "semanticMultilanguageValueInvalid",
           `Value for "${key}" contains non-scalar content for language tag "${languageTag}".`,
           { languageTag }
         );
@@ -621,41 +621,41 @@ function createCanonicalPassportSerializer({
     };
 
     if (Array.isArray(value) && hasMixedArrayItemTypes(value)) {
-      pushIssue("FIELD_ARRAY_ITEM_TYPE_MISMATCH", `Array value for "${key}" contains mixed JSON item types.`);
+      pushIssue("fieldArrayItemTypeMismatch", `Array value for "${key}" contains mixed JSON item types.`);
     }
 
     if (normalizedFieldType === "table") {
       const isRowObjectArray = Array.isArray(value)
         && value.every((row) => row && typeof row === "object" && !Array.isArray(row));
       if (!isRowObjectArray) {
-        pushIssue("FIELD_TABLE_SHAPE_MISMATCH", `Table "${key}" must be a JSON array of row objects.`);
+        pushIssue("fieldTableShapeMismatch", `Table "${key}" must be a JSON array of row objects.`);
       }
       return issues;
     }
 
     if (!skipTypeValidation && (normalizedDataType === "boolean" || normalizedFieldType === "boolean")) {
       if (typeof value !== "boolean") {
-        pushIssue("FIELD_TYPE_MISMATCH", `Expected boolean value for "${key}".`);
+        pushIssue("fieldTypeMismatch", `Expected boolean value for "${key}".`);
       }
     } else if (!skipTypeValidation && normalizedDataType === "integer") {
       if (!Number.isInteger(value)) {
-        pushIssue("FIELD_TYPE_MISMATCH", `Expected integer value for "${key}".`);
+        pushIssue("fieldTypeMismatch", `Expected integer value for "${key}".`);
       }
     } else if (!skipTypeValidation && (normalizedDataType === "number" || normalizedDataType === "decimal")) {
       if (typeof value !== "number" || !Number.isFinite(value)) {
-        pushIssue("FIELD_TYPE_MISMATCH", `Expected decimal number value for "${key}".`);
+        pushIssue("fieldTypeMismatch", `Expected decimal number value for "${key}".`);
       }
     } else if (!skipTypeValidation && (normalizedDataType === "date" || normalizedFieldType === "date")) {
       if (typeof value !== "string" || !isDateLike(value)) {
-        pushIssue("FIELD_TYPE_MISMATCH", `Expected date value for "${key}".`);
+        pushIssue("fieldTypeMismatch", `Expected date value for "${key}".`);
       }
     } else if (!skipTypeValidation && normalizedDataType === "datetime") {
       if (typeof value !== "string" || !isDateTimeLike(value)) {
-        pushIssue("FIELD_TYPE_MISMATCH", `Expected date-time value for "${key}".`);
+        pushIssue("fieldTypeMismatch", `Expected date-time value for "${key}".`);
       }
     } else if (!skipTypeValidation && (normalizedDataType === "uri" || normalizedFieldType === "url")) {
       if (typeof value !== "string" || !isUriLike(value)) {
-        pushIssue("FIELD_TYPE_MISMATCH", `Expected URL/URI value for "${key}".`);
+        pushIssue("fieldTypeMismatch", `Expected URL/URI value for "${key}".`);
       }
     }
 
@@ -664,7 +664,7 @@ function createCanonicalPassportSerializer({
       const invalidValues = extractDisallowedValues(value, explicitAllowedValues);
       if (invalidValues.length) {
         pushIssue(
-          "FIELD_ALLOWED_VALUE_MISMATCH",
+          "fieldAllowedValueMismatch",
           `Value for "${key}" must be one of: ${explicitAllowedValues.join(", ")}.`,
           { allowedValues: explicitAllowedValues, invalidValues }
         );
@@ -678,7 +678,7 @@ function createCanonicalPassportSerializer({
     })));
 
     if (expectedUnit && expectedUnit !== "none" && isPlainObject(value) && value.unit && normalizeText(value.unit).toLowerCase() !== expectedUnit) {
-      pushIssue("FIELD_UNIT_MISMATCH", `Value for "${key}" uses unit "${value.unit}" but field metadata expects "${fieldDef.unit}".`);
+      pushIssue("fieldUnitMismatch", `Value for "${key}" uses unit "${value.unit}" but field metadata expects "${fieldDef.unit}".`);
     }
 
     return issues;
@@ -817,7 +817,7 @@ function createCanonicalPassportSerializer({
   }
 
   function getHeaderFieldConfig(typeDef, key) {
-    return HEADER_FIELD_CONFIG[key] || null;
+    return headerFieldConfig[key] || null;
   }
 
   function pushMissingHeaderIssue(validationIssues, typeDef, key, value) {
@@ -825,7 +825,7 @@ function createCanonicalPassportSerializer({
     if (!headerField?.required || !isBlankValue(value)) return;
     validationIssues.push({
       key,
-      code: "REQUIRED_HEADER_FIELD_MISSING",
+      code: "requiredHeaderFieldMissing",
       message: `Required passport header field "${key}" is missing from the generated standards payload.`,
       dictionaryReference: headerField.semanticId || null,
       valueSource: headerField.valueSource || null,
@@ -862,7 +862,7 @@ function createCanonicalPassportSerializer({
       if (semanticModel && !semanticTerm) {
         validationIssues.push({
           key: fieldDef.key,
-          code: "SEMANTIC_TERM_NOT_FOUND",
+          code: "semanticTermNotFound",
           message: `Field "${fieldDef.key}" is not mapped to a term in semantic model "${semanticModel.semanticModelKey}".`,
           dictionaryReference: resolveDictionaryReference(fieldDef, fieldDef.key, semanticModel),
         });
@@ -872,7 +872,7 @@ function createCanonicalPassportSerializer({
       if (isRequiredField(fieldDef) && isBlankValue(rawValue)) {
         validationIssues.push({
           key: fieldDef.key,
-          code: "REQUIRED_FIELD_MISSING",
+          code: "requiredFieldMissing",
           message: `Field "${fieldDef.key}" is required but is missing from the export.`,
           dictionaryReference: resolveDictionaryReference(fieldDef, fieldDef.key, semanticModel),
         });
@@ -912,7 +912,7 @@ function createCanonicalPassportSerializer({
       ? contentSpecificationIdsRaw
       : parseArrayValue(contentSpecificationIdsRaw);
 
-    Object.values(HEADER_FIELD_KEYS).forEach((headerKeys) => {
+    Object.values(headerFieldKeys).forEach((headerKeys) => {
       Object.keys(fields).forEach((fieldKey) => {
         if (headerKeys.has(fieldKey)) {
           delete fields[fieldKey];

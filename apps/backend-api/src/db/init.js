@@ -3,7 +3,7 @@
 const logger = require("../services/logger");
 
 function isSafeSqlIdentifier(value) {
-  return /^[a-z][a-z0-9_]*$/i.test(String(value || ""));
+  return /^[A-Za-z][A-Za-z0-9]*$/.test(String(value || ""));
 }
 
 function quoteDbIdentifier(value) {
@@ -14,7 +14,7 @@ function quoteDbIdentifier(value) {
   return `"${identifier.replace(/"/g, "\"\"")}"`;
 }
 
-const SCHEMA_MIGRATION_LOCK_KEY = 18224027;
+const schemaMigrationLockKey = 18224027;
 
 async function ensureSchemaMigrationsTable(pool) {
   await pool.query(`
@@ -86,15 +86,15 @@ async function addPassportRegistryForeignKey(pool, {
  *
  * Usage:
  *   const { initDb } = require("./db/init");
- *   await initDb(pool, { getTable, createPassportTable, IN_REVISION_STATUS });
+ *   await initDb(pool, { getTable, createPassportTable, inRevisionStatus });
  */
 
 async function initDb(pool, {
   getTable,
   createPassportTable,
-  IN_REVISION_STATUS,
+  inRevisionStatus,
 }) {
-  await pool.query(`SELECT pg_advisory_lock($1)`, [SCHEMA_MIGRATION_LOCK_KEY]);
+  await pool.query(`SELECT pg_advisory_lock($1)`, [schemaMigrationLockKey]);
   try {
     await ensureSchemaMigrationsTable(pool);
     await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
@@ -109,7 +109,7 @@ async function initDb(pool, {
       "companyRegistrationNumber" TEXT,
       "vatNumber"       TEXT,
       "websiteDomain"   TEXT,
-      "customerTrustLevel" TEXT DEFAULT 'BASIC',
+      "customerTrustLevel" TEXT DEFAULT 'basic',
       "verificationStatus" TEXT DEFAULT 'unverified',
       "authorizedContactName" TEXT,
       "authorizedContactEmail" TEXT,
@@ -1209,7 +1209,7 @@ async function initDb(pool, {
   }
   } finally {
     try {
-      await pool.query(`SELECT pg_advisory_unlock($1)`, [SCHEMA_MIGRATION_LOCK_KEY]);
+      await pool.query(`SELECT pg_advisory_unlock($1)`, [schemaMigrationLockKey]);
     } catch (error) {
       logger.warn({ err: error }, "Failed to release schema migration advisory lock");
     }

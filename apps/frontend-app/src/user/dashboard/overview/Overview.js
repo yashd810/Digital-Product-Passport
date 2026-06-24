@@ -2,15 +2,15 @@ import React, { useState, useEffect } from "react";
 import { PieChart } from "../../../passport-viewer/components/PieChart";
 import { openAnalyticsPrintReport, renderBarChartSvg, renderLineChartSvg, renderPieChartSvg } from "../../../shared/utils/analyticsPrintExport";
 import { authHeaders, fetchWithAuth } from "../../../shared/api/authHeaders";
-import { STATUS_COLORS } from "../../../shared/utils/statusColors";
+import { statusColors } from "../../../shared/utils/statusColors";
 
-const API = import.meta.env.VITE_API_URL || "";
-const OVERVIEW_BAR_COLORS = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e"];
-const OVERVIEW_LINE_COLORS = ["#14b8a6", "#38bdf8", "#f59e0b", "#f472b6", "#a78bfa", "#22c55e"];
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const api = import.meta.env.VITE_API_URL || "";
+const overviewBarColors = ["#14b8a6", "#0f766e", "#0ea5e9", "#2563eb", "#22c55e", "#d69e2e"];
+const overviewLineColors = ["#14b8a6", "#38bdf8", "#f59e0b", "#f472b6", "#a78bfa", "#22c55e"];
+const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function normalizeTrendToCurrentYear(trend, currentYear, currentMonthIndex) {
-  const visibleLabels = MONTH_LABELS.slice(0, currentMonthIndex + 1);
+  const visibleLabels = monthLabels.slice(0, currentMonthIndex + 1);
   if (!trend || !Array.isArray(trend.series)) {
     return { labels: visibleLabels, series: [] };
   }
@@ -26,7 +26,7 @@ function normalizeTrendToCurrentYear(trend, currentYear, currentMonthIndex) {
 
       const labelText = String(label || "").trim();
       const monthToken = labelText.slice(0, 3);
-      const monthIndex = MONTH_LABELS.findIndex((month) => month.toLowerCase() === monthToken.toLowerCase());
+      const monthIndex = monthLabels.findIndex((month) => month.toLowerCase() === monthToken.toLowerCase());
       if (monthIndex === -1 || monthIndex > currentMonthIndex) return;
 
       const yearMatch = labelText.match(/(\d{2}|\d{4})$/);
@@ -68,7 +68,7 @@ function BarChart({ data, height = 120 }) {
         const x  = gap + i*(barW+gap); const y = height-bh+10;
         return (
           <g key={i}>
-            <rect x={x} y={y} width={barW} height={bh} rx={4} fill={d.color || OVERVIEW_BAR_COLORS[i % OVERVIEW_BAR_COLORS.length]} opacity="0.9"/>
+            <rect x={x} y={y} width={barW} height={bh} rx={4} fill={d.color || overviewBarColors[i % overviewBarColors.length]} opacity="0.9"/>
             <text
               x={x+barW/2}
               y={height+18}
@@ -102,14 +102,14 @@ function LineChart({ labels, series }) {
   }
 
   // Fixed layout constants (SVG coordinate space)
-  const W          = 480;
-  const H          = 180;
+  const w          = 480;
+  const h          = 180;
   const leftPad    = 40;
   const rightPad   = 14;
   const topPad     = 14;
   const bottomPad  = 30;
-  const innerW     = W - leftPad - rightPad;
-  const innerH     = H - topPad - bottomPad;
+  const innerW     = w - leftPad - rightPad;
+  const innerH     = h - topPad - bottomPad;
 
   // Y-axis: nice integer max
   const allValues = series.flatMap(s => s.values || []);
@@ -125,7 +125,7 @@ function LineChart({ labels, series }) {
 
   // Gradient defs collected at SVG root (avoids in-g issues)
   const gradientDefs = series.map((item, idx) => {
-    const color = item.color || OVERVIEW_LINE_COLORS[idx % OVERVIEW_LINE_COLORS.length];
+    const color = item.color || overviewLineColors[idx % overviewLineColors.length];
     return (
       <linearGradient key={idx} id={`ovlcg-${idx}`} x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%"   stopColor={color} stopOpacity="0.15" />
@@ -138,7 +138,7 @@ function LineChart({ labels, series }) {
     <div className="overview-line-chart-wrap" onMouseLeave={() => setHoveredCol(null)}>
       <svg
         className="overview-line-chart"
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${w} ${h}`}
         preserveAspectRatio="xMidYMid meet"
       >
         <defs>{gradientDefs}</defs>
@@ -150,7 +150,7 @@ function LineChart({ labels, series }) {
           const lbl = v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`;
           return (
             <g key={i}>
-              <line x1={leftPad} y1={y} x2={W - rightPad} y2={y} className="overview-line-chart-grid" />
+              <line x1={leftPad} y1={y} x2={w - rightPad} y2={y} className="overview-line-chart-grid" />
               <text x={leftPad - 5} y={y + 4} textAnchor="end" className="overview-line-chart-tick">{lbl}</text>
             </g>
           );
@@ -158,7 +158,7 @@ function LineChart({ labels, series }) {
 
         {/* X-axis month labels */}
         {labels.map((lbl, i) => (
-          <text key={i} x={getX(i)} y={H - 8} textAnchor="middle" className="overview-line-chart-label">
+          <text key={i} x={getX(i)} y={h - 8} textAnchor="middle" className="overview-line-chart-label">
             {lbl}
           </text>
         ))}
@@ -177,7 +177,7 @@ function LineChart({ labels, series }) {
 
         {/* Lines + dots */}
         {series.map((item, idx) => {
-          const color  = item.color || OVERVIEW_LINE_COLORS[idx % OVERVIEW_LINE_COLORS.length];
+          const color  = item.color || overviewLineColors[idx % overviewLineColors.length];
           const values = item.values || [];
           if (!values.length) return null;
           const pts = values.map((v, i) => `${getX(i)},${getY(v)}`).join(" ");
@@ -212,7 +212,7 @@ function LineChart({ labels, series }) {
         {hoveredCol !== null && (
           <line
             x1={getX(hoveredCol)} y1={topPad}
-            x2={getX(hoveredCol)} y2={H - bottomPad}
+            x2={getX(hoveredCol)} y2={h - bottomPad}
             stroke="rgba(184,204,217,0.3)"
             strokeWidth="1"
             strokeDasharray="3 3"
@@ -225,7 +225,7 @@ function LineChart({ labels, series }) {
         <div className="overview-line-tooltip">
           <div className="olt-label">{labels[hoveredCol]}</div>
           {series.map((item, idx) => {
-            const color = item.color || OVERVIEW_LINE_COLORS[idx % OVERVIEW_LINE_COLORS.length];
+            const color = item.color || overviewLineColors[idx % overviewLineColors.length];
             const val   = (item.values || [])[hoveredCol] ?? 0;
             return (
               <div key={idx} className="olt-row">
@@ -247,7 +247,7 @@ function LineChart({ labels, series }) {
           <div key={idx} className="overview-line-legend-item">
             <span
               className="overview-line-legend-swatch"
-              style={{ backgroundColor: item.color || OVERVIEW_LINE_COLORS[idx % OVERVIEW_LINE_COLORS.length] }}
+              style={{ backgroundColor: item.color || overviewLineColors[idx % overviewLineColors.length] }}
             />
             <span className="overview-line-legend-name">
               {item.productIcon ? `${item.productIcon} ` : ""}
@@ -260,7 +260,7 @@ function LineChart({ labels, series }) {
   );
 }
 
-const ACTION_ICONS = { create:"✨", update:"📝", delete:"🗑️", release:"🚀", revise:"🔄", SUBMIT_REVIEW:"📤", submitReview:"📤" };
+const actionIcons = { create:"✨", update:"📝", delete:"🗑️", release:"🚀", revise:"🔄", submitReview:"📤", submitReview:"📤" };
 function timeAgo(d) {
   const s=Math.floor((Date.now()-new Date(d))/1000);
   if(s<60)return"just now"; if(s<3600)return`${Math.floor(s/60)}m ago`;
@@ -304,7 +304,7 @@ function Overview({ companyId }) {
 
   const fetchAnalytics = async () => {
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/analytics`,{ headers:{ ...authHeaders() } });
+      const r = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/analytics`,{ headers:{ ...authHeaders() } });
       if(r.ok) setAnalytics(normalizeOverviewAnalyticsPayload(await r.json()));
     } catch (error) {
       console.warn("Failed to load overview analytics", error);
@@ -312,7 +312,7 @@ function Overview({ companyId }) {
   };
   const fetchActivity = async () => {
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${resolvedCompanyId}/activity?limit=5`,{ headers:{ ...authHeaders() } });
+      const r = await fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/activity?limit=5`,{ headers:{ ...authHeaders() } });
       if(r.ok) {
         const data = await r.json();
         setActivity(normalizeActivityRows(Array.isArray(data) ? data.slice(0, 5) : []));
@@ -347,19 +347,19 @@ function Overview({ companyId }) {
         { label: "QR Scans", value: analytics?.scanStats || 0, tone: "scans" },
       ];
       const statusChartItems = [
-        { label: "Draft",       value: totalDraft,       color: STATUS_COLORS.draft },
-        { label: "In Review",   value: totalInReview,    color: STATUS_COLORS.review },
-        { label: "Released",    value: totalReleased,    color: STATUS_COLORS.released },
-        { label: "In Revision", value: totalInRevision,  color: STATUS_COLORS.revised },
+        { label: "Draft",       value: totalDraft,       color: statusColors.draft },
+        { label: "In Review",   value: totalInReview,    color: statusColors.review },
+        { label: "Released",    value: totalReleased,    color: statusColors.released },
+        { label: "In Revision", value: totalInRevision,  color: statusColors.revised },
       ].filter((item) => item.value > 0);
       const typeChartData = (analytics?.analytics || []).map((stat, index) => ({
         label: stat.passportType.charAt(0).toUpperCase() + stat.passportType.slice(1),
         value: parseInt(stat.draftCount || 0, 10) + parseInt(stat.releasedCount || 0, 10) + parseInt(stat.revisedCount || 0, 10) + parseInt(stat.inReviewCount || 0, 10),
-        color: OVERVIEW_BAR_COLORS[index % OVERVIEW_BAR_COLORS.length],
+        color: overviewBarColors[index % overviewBarColors.length],
       }));
       const trendSeries = (normalizedTrend.series || []).map((series, index) => ({
         ...series,
-        color: OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length],
+        color: overviewLineColors[index % overviewLineColors.length],
       }));
 
       openAnalyticsPrintReport({
@@ -428,22 +428,22 @@ function Overview({ companyId }) {
   const archivedCount = analytics?.archivedCount||0;
 
   const statusChartItems=[
-    { label:"Draft",       value:totalDraft,       color: STATUS_COLORS.draft },
-    { label:"In Review",   value:totalInReview,    color: STATUS_COLORS.review },
-    { label:"Released",    value:totalReleased,    color: STATUS_COLORS.released },
-    { label:"In Revision", value:totalInRevision,  color: STATUS_COLORS.revised },
+    { label:"Draft",       value:totalDraft,       color: statusColors.draft },
+    { label:"In Review",   value:totalInReview,    color: statusColors.review },
+    { label:"Released",    value:totalReleased,    color: statusColors.released },
+    { label:"In Revision", value:totalInRevision,  color: statusColors.revised },
   ].filter(s=>s.value>0);
 
   const typeChartData=analytics?.analytics?.map(s=>({
     label:s.passportType.charAt(0).toUpperCase()+s.passportType.slice(1),
     value:parseInt(s.draftCount||0)+parseInt(s.releasedCount||0)+parseInt(s.revisedCount||0)+parseInt(s.inReviewCount||0),
-    color:OVERVIEW_BAR_COLORS[
-      analytics.analytics.findIndex(item => item.passportType === s.passportType) % OVERVIEW_BAR_COLORS.length
+    color:overviewBarColors[
+      analytics.analytics.findIndex(item => item.passportType === s.passportType) % overviewBarColors.length
     ],
   }))||[];
   const trendChartData = (normalizedTrend.series || []).map((series, index) => ({
     ...series,
-    color: OVERVIEW_LINE_COLORS[index % OVERVIEW_LINE_COLORS.length],
+    color: overviewLineColors[index % overviewLineColors.length],
   }));
 
   return (
@@ -545,7 +545,7 @@ function Overview({ companyId }) {
               {activity.map((a,i)=>(
                 <div key={i} className="activity-item">
                   <span className={`activity-icon activity-icon-${(a.action || "").toLowerCase()}`}>
-                    {ACTION_ICONS[a.action]||"📋"}
+                    {actionIcons[a.action]||"📋"}
                   </span>
                   <div className="activity-body">
                     <div className="activity-row-top">

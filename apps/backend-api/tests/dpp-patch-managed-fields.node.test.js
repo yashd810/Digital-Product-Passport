@@ -16,13 +16,13 @@ function createResponse() {
 function createUseCaseHarness() {
   let capturedUpdateData = null;
   const editable = {
-    tableName: "medicalDevicePassports",
+    tableName: "exampleProductPassports",
     typeDef: {
-      typeName: "medicalDevicePassportV1",
-      productCategory: "Medical Device",
-      semanticModelKey: "medicalDeviceDictionaryV1",
+      typeName: "exampleProductPassportV1",
+      productCategory: "Example Product",
+      semanticModelKey: "exampleProductDictionaryV1",
       fieldsJson: {
-        sourceModule: "medical-device:v1",
+        sourceModule: "example-product:v1",
         sections: [{
           fields: [
             { key: "manufacturer", type: "text" },
@@ -35,11 +35,11 @@ function createUseCaseHarness() {
       dppId: "dppPatchTest",
       lineageId: "dppPatchTest",
       companyId: 7,
-      passportType: "medicalDevicePassportV1",
+      passportType: "exampleProductPassportV1",
       releaseStatus: "draft",
       granularity: "item",
       internalAliasId: "MD-PATCH-001",
-      uniqueProductIdentifier: "did:web:example.test:did:medical-device-passport-v1:item:md-patch-001",
+      uniqueProductIdentifier: "did:web:example.test:did:example-product-passport-v1:item:md-patch-001",
       passportPolicyKey: "wrongProfile",
       contentSpecificationIds: JSON.stringify(["wrongSpec"]),
       manufacturer: "Original Manufacturer",
@@ -68,23 +68,23 @@ function createUseCaseHarness() {
     productIdentifierService: {
       normalizeProductIdentifiers: ({ rawProductId, uniqueProductIdentifier }) => ({
         internalAliasIdInput: rawProductId,
-        productIdentifierDid: uniqueProductIdentifier || `did:web:example.test:did:medical-device-passport-v1:item:${rawProductId}`,
+        productIdentifierDid: uniqueProductIdentifier || `did:web:example.test:did:example-product-passport-v1:item:${rawProductId}`,
       }),
       extractBusinessProductIdentifier: () => null,
     },
     complianceService: {
       resolvePassportPolicyMetadata: () => ({
-        key: "medicalDeviceDppV1",
-        contentSpecificationIds: ["medicalDeviceDictionaryV1"],
+        key: "exampleProductDppV1",
+        contentSpecificationIds: ["exampleProductDictionaryV1"],
       }),
     },
-    SYSTEM_PASSPORT_FIELDS: new Set(["dppId", "lineageId", "releaseStatus"]),
+    systemPassportFields: new Set(["dppId", "lineageId", "releaseStatus"]),
     getWritablePassportColumns: (data) => Object.keys(data || {}),
     toStoredPassportValue: (value) => value,
     extractCarrierAuthenticityMutation: () => ({ provided: false }),
     applyCarrierAuthenticityMutation: () => null,
     extractExplicitFacilityId: (source) => source?.facilityId || null,
-    VALID_GRANULARITIES: new Set(["model", "batch", "item"]),
+    validGranularities: new Set(["model", "batch", "item"]),
     buildMutationPassportPayload: (passport) => ({
       fields: {
         passportPolicyKey: passport.passportPolicyKey,
@@ -105,7 +105,7 @@ function createUseCaseHarness() {
     parseDppIdentifier: () => ({ type: "dpp" }),
     serializePolicyDefaultValue: (value) => Array.isArray(value) ? JSON.stringify(value) : value ?? null,
     resolveManagedFacilityId: async ({ requestedFields }) => requestedFields.facilityId || null,
-    MERGE_PATCH_CONTENT_TYPE: "application/merge-patch+json",
+    mergePatchContentType: "application/merge-patch+json",
     usesConfiguredGlobalProductIdentifierScheme: (value) => String(value || "").startsWith("did:"),
   });
 
@@ -132,10 +132,10 @@ test("standards PATCH reconciles policy-owned fields from the passport type", as
 
   assert.equal(result.statusCode, 200);
   assert.deepEqual(getCapturedUpdateData(), {
-    passportPolicyKey: "medicalDeviceDppV1",
-    contentSpecificationIds: JSON.stringify(["medicalDeviceDictionaryV1"]),
+    passportPolicyKey: "exampleProductDppV1",
+    contentSpecificationIds: JSON.stringify(["exampleProductDictionaryV1"]),
   });
   assert.deepEqual(result.body.updatedFields, ["passportPolicyKey", "contentSpecificationIds"]);
-  assert.equal(result.body.passport.fields.passportPolicyKey, "medicalDeviceDppV1");
-  assert.equal(result.body.passport.fields.contentSpecificationIds, JSON.stringify(["medicalDeviceDictionaryV1"]));
+  assert.equal(result.body.passport.fields.passportPolicyKey, "exampleProductDppV1");
+  assert.equal(result.body.passport.fields.contentSpecificationIds, JSON.stringify(["exampleProductDictionaryV1"]));
 });

@@ -2,9 +2,9 @@
 
 const { rewriteRepositoryLinksDeep } = require("../repository/repository-file-links");
 
-const IN_REVISION_STATUS = "inRevision";
+const inRevisionStatus = "inRevision";
 
-const SYSTEM_PASSPORT_FIELDS = new Set([
+const systemPassportFields = new Set([
   "id",
   "dppId",
   "lineageId",
@@ -38,7 +38,7 @@ const SYSTEM_PASSPORT_FIELDS = new Set([
   "updatedAt",
 ]);
 
-const EDITABLE_PASSPORT_STATUSES = new Set(["draft", IN_REVISION_STATUS]);
+const editablePassportStatuses = new Set(["draft", inRevisionStatus]);
 
 const parseJsonOrFallback = (value, fallback = value) => {
   try {
@@ -50,7 +50,7 @@ const parseJsonOrFallback = (value, fallback = value) => {
 
 const quoteSqlIdentifier = (value) => {
   const identifier = String(value || "").trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(identifier)) {
     throw new Error(`Invalid SQL identifier: ${identifier}`);
   }
   return `"${identifier.replace(/"/g, "\"\"")}"`;
@@ -81,7 +81,7 @@ const getTable = (typeName) => {
   if (!typeName) throw new Error("typeName is required for table lookup");
   const safe = toStorageSlug(typeName);
   if (!safe) throw new Error("typeName must contain at least one alphanumeric character");
-  const identifierSafeSlug = /^[a-z]/.test(safe) ? safe : `type_${safe}`;
+  const identifierSafeSlug = /^[a-z]/.test(safe) ? safe : `type${safe}`;
   return quoteSqlIdentifier(`${toCamelIdentifier(identifierSafeSlug)}Passports`);
 };
 
@@ -93,7 +93,7 @@ const isPublicHistoryStatus = (status) => {
 };
 
 const isEditablePassportStatus = (status) =>
-  EDITABLE_PASSPORT_STATUSES.has(normalizeReleaseStatus(status));
+  editablePassportStatuses.has(normalizeReleaseStatus(status));
 
 const extractSchemaFields = (schema) => {
   if (!schema || typeof schema !== "object") return [];
@@ -275,14 +275,14 @@ const normalizePassportRequestBody = (body = {}) => {
 const normalizeInternalAliasIdValue = (value) =>
   typeof value === "string" ? value.trim() : "";
 
-const INTERNAL_ALIAS_REQUEST_ARRAY_KEYS = [
+const internalAliasRequestArrayKeys = [
   "internalAliasId",
   "internalAliasIds",
   "productIdentifiers",
 ];
 
 const collectRequestedInternalAliasIds = (body = {}) => {
-  for (const key of INTERNAL_ALIAS_REQUEST_ARRAY_KEYS) {
+  for (const key of internalAliasRequestArrayKeys) {
     const candidate = body?.[key];
     if (!Array.isArray(candidate)) continue;
     return candidate
@@ -302,14 +302,14 @@ const collectRequestedInternalAliasIds = (body = {}) => {
 const generateInternalAliasIdValue = (dppId) =>
   String(dppId || "").trim();
 
-const FACILITY_FIELD_CANDIDATES = [
+const facilityFieldCandidates = [
   "facilityId",
   "manufacturingFacilityId",
 ];
 
 const extractExplicitFacilityId = (source) => {
   if (!source || typeof source !== "object") return null;
-  for (const key of FACILITY_FIELD_CANDIDATES) {
+  for (const key of facilityFieldCandidates) {
     const value = source[key];
     if (value === undefined || value === null) continue;
     const normalized = String(value).trim();
@@ -318,11 +318,11 @@ const extractExplicitFacilityId = (source) => {
   return null;
 };
 
-const getWritablePassportColumns = (data, excluded = SYSTEM_PASSPORT_FIELDS) =>
+const getWritablePassportColumns = (data, excluded = systemPassportFields) =>
   Object.keys(data).filter((key) =>
     data[key] !== undefined &&
     !excluded.has(key) &&
-    /^[a-z][A-Za-z0-9_]*$/.test(key)
+    /^[a-z][A-Za-z0-9]*$/.test(key)
   );
 
 const getStoredPassportValues = (keys, data) =>
@@ -699,9 +699,9 @@ const toDynamicStoredValue = (value) => {
 };
 
 module.exports = {
-  IN_REVISION_STATUS,
-  SYSTEM_PASSPORT_FIELDS,
-  EDITABLE_PASSPORT_STATUSES,
+  inRevisionStatus,
+  systemPassportFields,
+  editablePassportStatuses,
   getTable,
   normalizeReleaseStatus,
   isPublicHistoryStatus,

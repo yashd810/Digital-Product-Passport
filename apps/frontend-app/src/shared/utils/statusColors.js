@@ -2,7 +2,7 @@
 // These match the CSS variables defined in src/app/styles/index.css.
 // Always import from here instead of hardcoding hex values.
 
-export const STATUS_COLORS = {
+export const statusColors = {
   draft:       "#fb923c",  // orange  — var(--status-draft-text)
   review:      "#f472b6",  // pink    — var(--status-review-text)
   released:    "#34d399",  // green   — var(--status-released-text)
@@ -13,7 +13,7 @@ export const STATUS_COLORS = {
 };
 
 // Light-mode variants for PDF exports (printed on white backgrounds)
-export const STATUS_COLORS_LIGHT = {
+export const statusColorsLight = {
   draft:       "#c2440e",
   review:      "#be185d",
   released:    "#0f8a63",

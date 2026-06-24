@@ -94,7 +94,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       await logAudit(
         passportCompanyId,
         req.user.userId,
-        "UPDATE_DATA_CARRIER",
+        "updateDataCarrier",
         tableName,
         req.params.dppId,
         null,
@@ -191,7 +191,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       await logAudit(
         companyId,
         req.user.userId,
-        "RECORD_DATA_CARRIER_VERIFICATION",
+        "recordDataCarrierVerification",
         tableName,
         dppId,
         null,
@@ -326,7 +326,7 @@ function registerCarrierSecurityRoutes(app, deps) {
       await logAudit(
         passportCompanyId,
         null,
-        "REPORT_SUSPICIOUS_CARRIER",
+        "reportSuspiciousCarrier",
         "passportSecurityEvents",
         dppId,
         null,
@@ -421,7 +421,7 @@ function registerCarrierSecurityRoutes(app, deps) {
         return res.status(400).json({ error: "Body must be an object of { fieldKey: value }" });
       }
 
-      const entries = Object.entries(updates).filter(([k]) => /^[a-z0-9_]{1,100}$/.test(k));
+      const entries = Object.entries(updates).filter(([k]) => /^[a-z][A-Za-z0-9]{0,99}$/.test(k));
       if (!entries.length) return res.status(400).json({ error: "No valid field keys provided" });
 
       for (const [fieldKey, value] of entries) {
@@ -477,7 +477,7 @@ function registerCarrierSecurityRoutes(app, deps) {
         [material.hash, material.prefix, dppId, req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Passport not found" });
-      await logAudit(req.params.companyId, req.user.userId, "ROTATE_DEVICE_KEY", "passportRegistry", dppId, null, { keyPrefix: material.prefix });
+      await logAudit(req.params.companyId, req.user.userId, "rotateDeviceKey", "passportRegistry", dppId, null, { keyPrefix: material.prefix });
       res.json({
         deviceKey: material.rawKey,
         keyPrefix: r.rows[0].deviceApiKeyPrefix,
@@ -496,7 +496,7 @@ function registerCarrierSecurityRoutes(app, deps) {
         return res.status(400).json({ error: "Body must be an object of { fieldKey: value }" });
       }
 
-      const entries = Object.entries(updates).filter(([k]) => /^[a-z0-9_]{1,100}$/.test(k));
+      const entries = Object.entries(updates).filter(([k]) => /^[a-z][A-Za-z0-9]{0,99}$/.test(k));
       if (!entries.length) return res.status(400).json({ error: "No valid field keys provided" });
 
       for (const [fieldKey, value] of entries) {

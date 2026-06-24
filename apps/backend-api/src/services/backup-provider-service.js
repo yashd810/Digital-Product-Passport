@@ -320,7 +320,7 @@ module.exports = function createBackupProviderService({
     return rows;
   }
 
-  function buildNoProviderResult(reason = "NO_BACKUP_PROVIDER") {
+  function buildNoProviderResult(reason = "noBackupProvider") {
     if (isBackupProviderRequired()) {
       return {
         success: false,
@@ -490,7 +490,7 @@ module.exports = function createBackupProviderService({
     const allowedRoots = getAllowedLocalAttachmentRoots();
     if (!allowedRoots.some((root) => isPathInsideBase(absolutePath, root))) {
       const error = new Error("Attachment file path resolves outside configured storage directories");
-      error.code = "INVALID_ATTACHMENT_FILE_PATH";
+      error.code = "invalidAttachmentFilePath";
       throw error;
     }
     return fs.promises.readFile(absolutePath);
@@ -627,7 +627,7 @@ module.exports = function createBackupProviderService({
         supportsPublicHandover: provider.supportsPublicHandover !== false,
       },
       eventCategory: "accessControl",
-      eventType: normalizeText(eventType, "ACCESS_CONTROL_CHANGE"),
+      eventType: normalizeText(eventType, "accessControlChange"),
       severity: normalizeText(severity, "normal"),
       recordedAt: new Date().toISOString(),
       revocationMode: normalizeText(revocationMode, "standard"),
@@ -782,7 +782,7 @@ module.exports = function createBackupProviderService({
     filter((provider) => !providerKey || provider.providerKey === providerKey);
 
     if (!providers.length) {
-      return buildNoProviderResult("NO_BACKUP_PROVIDER");
+      return buildNoProviderResult("noBackupProvider");
     }
 
     const results = [];
@@ -877,7 +877,7 @@ module.exports = function createBackupProviderService({
       filter((provider) => !providerKey || provider.providerKey === providerKey);
 
     if (!providers.length) {
-      return buildNoProviderResult("NO_BACKUP_PROVIDER");
+      return buildNoProviderResult("noBackupProvider");
     }
 
     const results = [];
@@ -957,7 +957,7 @@ module.exports = function createBackupProviderService({
       filter((provider) => !providerKey || provider.providerKey === providerKey);
 
     if (!providers.length) {
-      return buildNoProviderResult("NO_BACKUP_PROVIDER");
+      return buildNoProviderResult("noBackupProvider");
     }
 
     const results = [];
@@ -1286,7 +1286,7 @@ module.exports = function createBackupProviderService({
     if (!result.rows.length) return null;
     if (internalAliasId && !passportDppId && result.rows.length > 1) {
       const error = new Error("Multiple backup public handovers match this product identifier.");
-      error.code = "AMBIGUOUS_PRODUCT_ID";
+      error.code = "ambiguousProductId";
       throw error;
     }
 

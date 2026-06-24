@@ -1,16 +1,16 @@
 "use strict";
 
 const {
-  SYSTEM_PASSPORT_FIELDS,
+  systemPassportFields,
 } = require("../../shared/passports/passport-helpers");
 
-const IMPORT_BUILT_IN_EDITABLE_FIELDS = new Set([
+const importBuiltInEditableFields = new Set([
   "dppId",
   "modelName",
   "internalAliasId",
 ]);
 
-const POLICY_MANAGED_IMPORT_FIELDS = new Set([
+const policyManagedImportFields = new Set([
   "lineageId",
   "uniqueProductIdentifier",
   "productImage",
@@ -24,12 +24,12 @@ const POLICY_MANAGED_IMPORT_FIELDS = new Set([
   "manufacturingFacilityId",
 ]);
 
-const IMPORT_MANAGED_FIELD_KEYS = new Set([
-  ...SYSTEM_PASSPORT_FIELDS,
-  ...POLICY_MANAGED_IMPORT_FIELDS,
+const importManagedFieldKeys = new Set([
+  ...systemPassportFields,
+  ...policyManagedImportFields,
 ]);
 
-const MANAGED_IMPORT_FIELD_LABELS = new Map([
+const managedImportFieldLabels = new Map([
   ["carrier policy key", "carrierPolicyKey"],
   ["content specification ids", "contentSpecificationIds"],
   ["dpp status", "releaseStatus"],
@@ -49,20 +49,20 @@ function normalizeLabel(value) {
 }
 
 function isImportBuiltInEditableField(key) {
-  return IMPORT_BUILT_IN_EDITABLE_FIELDS.has(String(key || "").trim());
+  return importBuiltInEditableFields.has(String(key || "").trim());
 }
 
 function isManagedImportFieldKey(key) {
   const normalizedKey = String(key || "").trim();
   if (!normalizedKey || isImportBuiltInEditableField(normalizedKey)) return false;
-  return IMPORT_MANAGED_FIELD_KEYS.has(normalizedKey);
+  return importManagedFieldKeys.has(normalizedKey);
 }
 
 function isManagedImportFieldLabel(label) {
   const normalizedLabel = String(label || "").trim();
   if (!normalizedLabel) return false;
   return isManagedImportFieldKey(normalizedLabel)
-    || isManagedImportFieldKey(MANAGED_IMPORT_FIELD_LABELS.get(normalizeLabel(normalizedLabel)));
+    || isManagedImportFieldKey(managedImportFieldLabels.get(normalizeLabel(normalizedLabel)));
 }
 
 function resolveCsvImportField(rawLabel, typeSchema = {}) {
@@ -108,8 +108,8 @@ function buildManagedImportErrorMessage(keys = []) {
 }
 
 module.exports = {
-  IMPORT_BUILT_IN_EDITABLE_FIELDS,
-  IMPORT_MANAGED_FIELD_KEYS,
+  importBuiltInEditableFields,
+  importManagedFieldKeys,
   buildManagedImportErrorMessage,
   getInvalidImportFieldKeys,
   getManagedImportFieldKeys,

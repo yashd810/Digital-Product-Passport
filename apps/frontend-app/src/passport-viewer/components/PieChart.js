@@ -2,7 +2,7 @@ import React from "react";
 import "../styles/PassportViewer.css";
 
 // Color palette that complements the app's dark-green brand
-const COLORS = [
+const colors = [
   "#1C3738", // jet
   "#2E86AB", // cerulean
   "#F59E0B", // amber
@@ -119,7 +119,7 @@ export function PieChart({ items, title, displayMode = "percentage", showTotalNo
       endDeg:   cursor,
       midDeg,
       labelPt,
-      color:    item.color || COLORS[i % COLORS.length],
+      color:    item.color || colors[i % colors.length],
       value:    item.value,
     };
   });

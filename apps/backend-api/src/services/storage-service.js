@@ -52,7 +52,7 @@ function createLocalStorageService(options) {
       || absolutePath.startsWith(`${resolvedLocalStorageDir}${path.sep}`);
     if (!insideBase) {
       const error = new Error("Storage key resolves outside the configured storage directory");
-      error.code = "INVALID_STORAGE_KEY";
+      error.code = "invalidStorageKey";
       throw error;
     }
     return absolutePath;
@@ -119,7 +119,7 @@ function createLocalStorageService(options) {
 function createDisabledStorageService() {
   const disabledError = () => {
     const error = new Error("Storage is disabled in this environment.");
-    error.code = "STORAGE_DISABLED";
+    error.code = "storageDisabled";
     return error;
   };
 
@@ -300,7 +300,7 @@ function createStorageService(options) {
 
   function buildGlobalSymbolKey({ originalName }) {
     const ext = safeExtension(originalName, ".png");
-    return path.posix.join("uploads", "symbols", `sym_${Date.now()}_${crypto.randomUUID().slice(0, 8)}${ext}`);
+    return path.posix.join("uploads", "symbols", `symbol${Date.now()}${crypto.randomUUID().slice(0, 8)}${ext}`);
   }
 
   return {

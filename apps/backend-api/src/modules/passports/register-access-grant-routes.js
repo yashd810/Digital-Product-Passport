@@ -44,10 +44,10 @@ function registerAccessGrantRoutes(app, deps) {
 
   function normalizeAccessGrantPayload(body = {}, options = {}) {
     const audience = body.audience !== undefined ? String(body.audience || "").trim() : undefined;
-    if (options.requireAudience && (!audience || !accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public")) {
+    if (options.requireAudience && (!audience || !accessRightsService.validAudiences.has(audience) || audience === "public")) {
       return { error: "audience must be a non-public supported audience" };
     }
-    if (audience !== undefined && audience && (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public")) {
+    if (audience !== undefined && audience && (!accessRightsService.validAudiences.has(audience) || audience === "public")) {
       return { error: "audience must be a non-public supported audience" };
     }
 
@@ -216,7 +216,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         target.companyId,
         req.user.userId,
-        "GRANT_PASSPORT_AUDIENCE",
+        "grantPassportAudience",
         "passportAccessGrants",
         parsed.dppId,
         null,
@@ -304,7 +304,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         existing.companyId,
         req.user.userId,
-        "UPDATE_PASSPORT_ACCESS_GRANT",
+        "updatePassportAccessGrant",
         "passportAccessGrants",
         existing.passportDppId,
         existing,
@@ -345,7 +345,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         existing.companyId,
         req.user.userId,
-        "DELETE_PASSPORT_ACCESS_GRANT",
+        "deletePassportAccessGrant",
         "passportAccessGrants",
         existing.passportDppId,
         existing,
@@ -388,7 +388,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         existing.companyId,
         req.user.userId,
-        "REVOKE_PASSPORT_AUDIENCE",
+        "revokePassportAudience",
         "passportAccessGrants",
         existing.passportDppId,
         existing,
@@ -397,7 +397,7 @@ function registerAccessGrantRoutes(app, deps) {
       );
       await replicateAccessControlEventToBackup({
         companyId: existing.companyId,
-        eventType: "PASSPORT_ACCESS_GRANT_REVOKED",
+        eventType: "passportAccessGrantRevoked",
         severity: "high",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -409,7 +409,7 @@ function registerAccessGrantRoutes(app, deps) {
         revocationMode: "standard",
         reason,
       }).catch((error) => {
-        logger?.warn?.({ err: error, companyId: existing.companyId, grantId, eventType: "PASSPORT_ACCESS_GRANT_REVOKED" }, "Failed to replicate access grant revocation event");
+        logger?.warn?.({ err: error, companyId: existing.companyId, grantId, eventType: "passportAccessGrantRevoked" }, "Failed to replicate access grant revocation event");
       });
 
       res.json({
@@ -451,7 +451,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         existing.companyId,
         req.user.userId,
-        "EMERGENCY_REVOKE_PASSPORT_AUDIENCE",
+        "emergencyRevokePassportAudience",
         "passportAccessGrants",
         existing.passportDppId,
         existing,
@@ -460,7 +460,7 @@ function registerAccessGrantRoutes(app, deps) {
       );
       await replicateAccessControlEventToBackup({
         companyId: existing.companyId,
-        eventType: "PASSPORT_ACCESS_GRANT_EMERGENCY_REVOKED",
+        eventType: "passportAccessGrantEmergencyRevoked",
         severity: "critical",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -475,7 +475,7 @@ function registerAccessGrantRoutes(app, deps) {
           effectiveAt: result.rows[0]?.expiresAt || null,
         },
       }).catch((error) => {
-        logger?.warn?.({ err: error, companyId: existing.companyId, grantId, eventType: "PASSPORT_ACCESS_GRANT_EMERGENCY_REVOKED" }, "Failed to replicate emergency access grant revocation event");
+        logger?.warn?.({ err: error, companyId: existing.companyId, grantId, eventType: "passportAccessGrantEmergencyRevoked" }, "Failed to replicate emergency access grant revocation event");
       });
 
       res.json({
@@ -508,7 +508,7 @@ function registerAccessGrantRoutes(app, deps) {
   app.post("/api/companies/:companyId/access-audiences/users/:userId", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const audience = String(req.body?.audience || "").trim();
-      if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
+      if (!accessRightsService.validAudiences.has(audience) || audience === "public") {
         return res.status(400).json({ error: "audience must be a non-public supported audience" });
       }
       const expiresAt = req.body?.expiresAt ? new Date(req.body.expiresAt) : null;
@@ -542,7 +542,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "GRANT_USER_AUDIENCE",
+        "grantUserAudience",
         "userAccessAudiences",
         req.params.userId,
         null,
@@ -559,7 +559,7 @@ function registerAccessGrantRoutes(app, deps) {
   app.delete("/api/companies/:companyId/access-audiences/users/:userId/:audience", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const audience = String(req.params.audience || "").trim();
-      if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
+      if (!accessRightsService.validAudiences.has(audience) || audience === "public") {
         return res.status(400).json({ error: "audience must be a non-public supported audience" });
       }
 
@@ -578,7 +578,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "REVOKE_USER_AUDIENCE",
+        "revokeUserAudience",
         "userAccessAudiences",
         req.params.userId,
         result.rows[0],
@@ -587,7 +587,7 @@ function registerAccessGrantRoutes(app, deps) {
       );
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "USER_AUDIENCE_REVOKED",
+        eventType: "userAudienceRevoked",
         severity: "high",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -595,7 +595,7 @@ function registerAccessGrantRoutes(app, deps) {
         audience,
         revocationMode: "standard",
       }).catch((error) => {
-        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: req.params.userId, eventType: "USER_AUDIENCE_REVOKED" }, "Failed to replicate user audience revocation event");
+        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: req.params.userId, eventType: "userAudienceRevoked" }, "Failed to replicate user audience revocation event");
       });
 
       res.json({ success: true, accessAudience: result.rows[0] });
@@ -631,7 +631,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "REVOKE_USER_AUDIENCE",
+        "revokeUserAudience",
         "userAccessAudiences",
         String(existing.rows[0].userId),
         existing.rows[0],
@@ -640,7 +640,7 @@ function registerAccessGrantRoutes(app, deps) {
       );
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "USER_AUDIENCE_REVOKED",
+        eventType: "userAudienceRevoked",
         severity: "high",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -649,7 +649,7 @@ function registerAccessGrantRoutes(app, deps) {
         revocationMode: "standard",
         reason,
       }).catch((error) => {
-        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: existing.rows[0].userId, eventType: "USER_AUDIENCE_REVOKED" }, "Failed to replicate user audience revocation event");
+        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: existing.rows[0].userId, eventType: "userAudienceRevoked" }, "Failed to replicate user audience revocation event");
       });
 
       res.json({ success: true, revoked: true, emergency: false, accessAudience: result.rows[0] });
@@ -697,7 +697,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "EMERGENCY_REVOKE_USER_AUDIENCE",
+        "emergencyRevokeUserAudience",
         "userAccessAudiences",
         String(existing.rows[0].userId),
         existing.rows[0],
@@ -706,7 +706,7 @@ function registerAccessGrantRoutes(app, deps) {
       );
       await replicateAccessControlEventToBackup({
         companyId: req.params.companyId,
-        eventType: "USER_AUDIENCE_EMERGENCY_REVOKED",
+        eventType: "userAudienceEmergencyRevoked",
         severity: "critical",
         actorUserId: req.user.userId,
         actorIdentifier: req.user.actorIdentifier || req.user.email || `user:${req.user.userId}`,
@@ -716,7 +716,7 @@ function registerAccessGrantRoutes(app, deps) {
         reason,
         metadata: { effectiveAt, sessionsRevoked: true },
       }).catch((error) => {
-        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: existing.rows[0].userId, eventType: "USER_AUDIENCE_EMERGENCY_REVOKED" }, "Failed to replicate emergency user audience revocation event");
+        logger?.warn?.({ err: error, companyId: req.params.companyId, userId: existing.rows[0].userId, eventType: "userAudienceEmergencyRevoked" }, "Failed to replicate emergency user audience revocation event");
       });
 
       res.json({
@@ -753,7 +753,7 @@ function registerAccessGrantRoutes(app, deps) {
   app.post("/api/companies/:companyId/passports/:dppId/access-grants", authenticateToken, checkCompanyAdmin, async (req, res) => {
     try {
       const audience = String(req.body?.audience || "").trim();
-      if (!accessRightsService.VALID_AUDIENCES.has(audience) || audience === "public") {
+      if (!accessRightsService.validAudiences.has(audience) || audience === "public") {
         return res.status(400).json({ error: "audience must be a non-public supported audience" });
       }
       const granteeUserId = Number.parseInt(req.body?.granteeUserId, 10);
@@ -793,7 +793,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "GRANT_PASSPORT_AUDIENCE",
+        "grantPassportAudience",
         "passportAccessGrants",
         req.params.dppId,
         null,
@@ -829,7 +829,7 @@ function registerAccessGrantRoutes(app, deps) {
       await logAudit(
         req.params.companyId,
         req.user.userId,
-        "REVOKE_PASSPORT_AUDIENCE",
+        "revokePassportAudience",
         "passportAccessGrants",
         req.params.dppId,
         result.rows[0],

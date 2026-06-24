@@ -73,13 +73,16 @@ That area handles:
 
 ## Semantic And Product-Module Logic
 
-The backend is generic, but it ships with built-in product modules.
+The backend is generic. Product-specific modules are deployment inputs, not
+default production fixtures.
 
 Current module loader:
 
 - [apps/backend-api/src/passport-modules/index.js](/Users/yashdesai/Desktop/Digital Product Passport/Project Files/APP/files/apps/backend-api/src/passport-modules/index.js:1)
 
-Fresh deployments do not include built-in product module files. Add generated module files under `apps/backend-api/src/passport-modules/` and seed only the modules you want available.
+Fresh deployments do not include product module files. Add generated module
+files under `apps/backend-api/src/passport-modules/` and seed only the modules
+you want available.
 
 Current semantic model registry:
 

@@ -8,7 +8,7 @@ import {
 } from "../../../../shared/passports/schemaKeyUtils";
 import { buildPassportJsonLdExport } from "../../../../shared/utils/semanticPassportExport";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function mergePassportRepresentations(rawRecord = {}, fullRecord = {}) {
   const rawFields = rawRecord?.fields && typeof rawRecord.fields === "object" ? rawRecord.fields : {};
@@ -61,7 +61,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   const exportList = scopePassports[scope] || [];
 
   const loadTypeSchema = async (type) => {
-    const r = await fetchWithAuth(`${API}/api/passport-types/${type}`);
+    const r = await fetchWithAuth(`${api}/api/passport-types/${type}`);
     if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
     return r.json();
   };
@@ -71,7 +71,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     if (!targetCompanyId) {
       throw new Error("A company identifier is required for export.");
     }
-    const baseUrl = `${API}/api/companies/${targetCompanyId}/passports/${passport.dppId}?passportType=${type}`;
+    const baseUrl = `${api}/api/companies/${targetCompanyId}/passports/${passport.dppId}?passportType=${type}`;
     const query = new URLSearchParams({
       passportType: type,
       representation: "full",
@@ -81,7 +81,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
     }
     const [rawResponse, fullResponse] = await Promise.all([
       fetchWithAuth(baseUrl, { headers: authHeaders() }),
-      fetchWithAuth(`${API}/api/companies/${targetCompanyId}/passports/${passport.dppId}?${query.toString()}`, { headers: authHeaders() }),
+      fetchWithAuth(`${api}/api/companies/${targetCompanyId}/passports/${passport.dppId}?${query.toString()}`, { headers: authHeaders() }),
     ]);
     const rawData = rawResponse.ok ? await rawResponse.json() : {};
     const fullData = fullResponse.ok ? await fullResponse.json() : {};

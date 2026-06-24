@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const { buildDashboardPath } = require("../shared/navigation/dashboard-paths");
 const logger = require("./logger");
 
-const SAFE_ID_TOKEN_ALGORITHMS = new Set([
+const safeIdTokenAlgorithmSet = new Set([
   "RS256",
   "RS384",
   "RS512",
@@ -15,8 +15,8 @@ const SAFE_ID_TOKEN_ALGORITHMS = new Set([
   "PS384",
   "PS512",
 ]);
-const DEFAULT_ID_TOKEN_ALGORITHMS = ["RS256"];
-const OAUTH_FETCH_TIMEOUT_MS = Math.min(
+const defaultIdTokenAlgorithms = ["RS256"];
+const oauthFetchTimeoutMs = Math.min(
   Math.max(parseInt(process.env.OAUTH_FETCH_TIMEOUT_MS || "10000", 10) || 10000, 1000),
   30000
 );
@@ -48,7 +48,7 @@ function validateOauthUrl(value, label) {
 
 async function fetchOauth(url, init = {}, label = "OAuth URL") {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), OAUTH_FETCH_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), oauthFetchTimeoutMs);
   try {
     return await fetch(validateOauthUrl(url, label), {
       ...init,
@@ -80,12 +80,12 @@ function normalizeArray(value, fallback = []) {
   return fallback;
 }
 
-function safeIdTokenAlgorithms(values, fallback = DEFAULT_ID_TOKEN_ALGORITHMS) {
+function safeIdTokenAlgorithms(values, fallback = defaultIdTokenAlgorithms) {
   const normalized = normalizeArray(values, fallback)
     .map((alg) => alg.toUpperCase())
-    .filter((alg) => SAFE_ID_TOKEN_ALGORITHMS.has(alg));
+    .filter((alg) => safeIdTokenAlgorithmSet.has(alg));
   if (normalized.length) return normalized;
-  return fallback.length ? [...DEFAULT_ID_TOKEN_ALGORITHMS] : [];
+  return fallback.length ? [...defaultIdTokenAlgorithms] : [];
 }
 
 function sha256Base64Url(value) {
@@ -100,7 +100,7 @@ function normalizeRedirectPath(redirectTo, fallback = "/") {
   return raw;
 }
 
-function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCookie, cache, hashPassword }) {
+function createOauthService({ jwt, pool, jwtSecret, generateToken, setAuthCookie, cache, hashPassword }) {
   const rawProviders = parseJsonEnv("OAUTH_PROVIDERS_JSON", []);
   const providers = Array.isArray(rawProviders)
     ? rawProviders.map((provider) => ({
@@ -159,11 +159,11 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
   }
 
   function signState(payload) {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: "10m" });
+    return jwt.sign(payload, jwtSecret, { expiresIn: "10m" });
   }
 
   function verifyState(token) {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, jwtSecret);
   }
 
   async function exchangeCode(provider, metadata, code, redirectUri, codeVerifier) {
@@ -196,7 +196,7 @@ function createOauthService({ jwt, pool, JWT_SECRET, generateToken, setAuthCooki
       ? provider.idTokenAlgorithms
       : metadataAlgorithms.length
         ? metadataAlgorithms
-        : DEFAULT_ID_TOKEN_ALGORITHMS;
+        : defaultIdTokenAlgorithms;
     const tokenAlgorithm = String(decoded.header.alg || "").toUpperCase();
     if (!allowedAlgorithms.includes(tokenAlgorithm)) {
       throw new Error("ID token uses an unsupported signing algorithm");

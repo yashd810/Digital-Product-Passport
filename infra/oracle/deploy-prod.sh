@@ -400,7 +400,7 @@ echo "Deploying target=$DEPLOY_TARGET compose=$COMPOSE_FILE project=$COMPOSE_PRO
 if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   CURRENT_POSTGRES_VOLUMES="$(
     docker volume ls --format '{{.Name}}' 2>/dev/null \
-      | grep -E '(^|_)(postgres_data)$' \
+      | grep -E '(^|[_-])(postgresData)$' \
       || true
   )"
   if [ -n "$CURRENT_POSTGRES_VOLUMES" ]; then
@@ -409,16 +409,16 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   fi
   POSTGRES_VOLUME_COUNT="$(printf '%s\n' "$CURRENT_POSTGRES_VOLUMES" | sed '/^$/d' | wc -l | tr -d ' ')"
   if [ "${POSTGRES_VOLUME_COUNT:-0}" -gt 1 ] && [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
-    echo "Refusing deployment: multiple postgres_data-style volumes were detected, but POSTGRES_VOLUME_NAME is not set."
+    echo "Refusing deployment: multiple postgresData-style volumes were detected, but POSTGRES_VOLUME_NAME is not set."
     echo "Set POSTGRES_VOLUME_NAME in $ENV_FILE to the exact live volume you intend to use before deploying."
     echo "This guard prevents Docker Compose from attaching a fresh database volume by accident."
     exit 1
   fi
 
   LOCAL_STORAGE_VOLUME_NAME="${LOCAL_STORAGE_VOLUME_NAME:-$(read_env_var LOCAL_STORAGE_VOLUME_NAME)}"
-  LOCAL_STORAGE_VOLUME_NAME="${LOCAL_STORAGE_VOLUME_NAME:-dpp_local_storage_data}"
+  LOCAL_STORAGE_VOLUME_NAME="${LOCAL_STORAGE_VOLUME_NAME:-dppLocalStorageData}"
   POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-$(read_env_var POSTGRES_VOLUME_NAME)}"
-  POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-dpp_postgres_data}"
+  POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-dppPostgresData}"
   ensure_docker_volume "$LOCAL_STORAGE_VOLUME_NAME" "local storage"
   ensure_docker_volume "$POSTGRES_VOLUME_NAME" "PostgreSQL data"
 fi

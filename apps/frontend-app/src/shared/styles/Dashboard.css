@@ -6793,8 +6793,7 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
 }
 
 .diff-status.obsolete,
-.diff-status.inRevision,
-.diff-status.in_review {
+.diff-status.inRevision {
   background: var(--status-review-bg);
   border-color: var(--status-review-border);
   color: var(--status-review-text);
@@ -9110,8 +9109,7 @@ display:grid; grid-template-columns:6fr 1fr; gap:28px; margin-bottom:28px; }*/
   border-color: var(--status-review-border);
 }
 
-.pv-history-status.inRevision,
-.pv-history-status.in_review {
+.pv-history-status.inRevision {
   background: var(--status-review-bg);
   color: var(--status-review-text);
   border-color: var(--status-review-border);

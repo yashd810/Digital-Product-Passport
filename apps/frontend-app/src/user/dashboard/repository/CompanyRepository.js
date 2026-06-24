@@ -4,7 +4,7 @@ import { fetchWithAuth } from "../../../shared/api/authHeaders";
 import { buildDashboardPath } from "../utils/dashboardRoutes";
 import "./CompanyRepository.css";
 
-const API = import.meta.env.VITE_API_URL || "";
+const api = import.meta.env.VITE_API_URL || "";
 
 function copyText(value) {
   const text = String(value || "");
@@ -67,7 +67,7 @@ function SymbolsTab({ companyId }) {
     setLoading(true);
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols${qs}`);
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/symbols${qs}`);
       if (r.ok) setSymbols(await r.json());
     } catch (error) {
       console.warn("Failed to load repository symbols", error);
@@ -126,7 +126,7 @@ function SymbolsTab({ companyId }) {
       fd.append("file", file);
       fd.append("name", name.trim());
       if (currentFolder != null) fd.append("parentId", currentFolder);
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols/upload`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/symbols/upload`, {
         method: "POST",
         body: fd,
       });
@@ -145,7 +145,7 @@ function SymbolsTab({ companyId }) {
     if (!folderName.trim()) return;
     setFolderSaving(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/symbols/folder`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/symbols/folder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: folderName.trim(), parentId: currentFolder }),
@@ -166,7 +166,7 @@ function SymbolsTab({ companyId }) {
   const handleRename = async (symId) => {
     if (!renameValue.trim()) return;
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${symId}`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/${symId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: renameValue.trim() }),
@@ -179,7 +179,7 @@ function SymbolsTab({ companyId }) {
   const handleDelete = async (sym) => {
     setDeletingId(sym.id);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${sym.id}`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/${sym.id}`, {
         method: "DELETE",
       });
       if (!r.ok) throw new Error((await r.json()).error || "Failed");
@@ -431,7 +431,7 @@ function FilesTab({ companyId }) {
     setLoading(true);
     try {
       const qs = parentId != null ? `?parentId=${parentId}` : "";
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository${qs}`);
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository${qs}`);
       if (!r.ok) throw new Error();
       // Exclude image files (those are shown in Symbols tab)
       const data = await r.json();
@@ -477,7 +477,7 @@ function FilesTab({ companyId }) {
     if (!folderName.trim()) return;
     setFolderSaving(true);
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/folder`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/folder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: folderName.trim(), parentId: currentFolder }),
@@ -502,7 +502,7 @@ function FilesTab({ companyId }) {
       fd.append("file", file);
       fd.append("displayName", file.name);
       if (currentFolder != null) fd.append("parentId", currentFolder);
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/upload`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/upload`, {
         method: "POST",
         body: fd,
       });
@@ -520,7 +520,7 @@ function FilesTab({ companyId }) {
   const handleRename = async (itemId) => {
     if (!renameValue.trim()) return;
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${itemId}`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/${itemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: renameValue.trim() }),
@@ -533,7 +533,7 @@ function FilesTab({ companyId }) {
 
   const handleDelete = async (item) => {
     try {
-      const r = await fetchWithAuth(`${API}/api/companies/${companyId}/repository/${item.id}`, {
+      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/repository/${item.id}`, {
         method: "DELETE",
       });
       if (!r.ok) throw new Error((await r.json()).error || "Failed");

@@ -4,7 +4,7 @@
 // Public passport surfaces now use the shared navy palette
 // ============================================================
 
-const SHARED_DARK = {
+const sharedDark = {
   "--onyx": "#07111f",
   "--jet": "#10243a",
   "--charcoal": "#27435e",
@@ -28,7 +28,7 @@ const SHARED_DARK = {
   "--font": "'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 
-const SHARED_LIGHT = {
+const sharedLight = {
   "--onyx": "#0b1826",
   "--jet": "#17304a",
   "--charcoal": "#36526c",
@@ -52,20 +52,20 @@ const SHARED_LIGHT = {
   "--font": "'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 
-export const THEMES = {
+export const themes = {
   dark: {
     name: "Dark",
     emoji: "🌙",
-    ...SHARED_DARK,
+    ...sharedDark,
   },
   light: {
     name: "Light",
     emoji: "☀️",
-    ...SHARED_LIGHT,
+    ...sharedLight,
   },
 };
 
-export const PASSPORT_VIEWER_THEME = {
+export const passportViewerTheme = {
   primary: "#132840",
   secondary: "#17304a",
   accent: "#eef6ff",
@@ -75,7 +75,7 @@ export const PASSPORT_VIEWER_THEME = {
   badge: "#dce8f0",
 };
 
-export const DEFAULT_COMPANY_BRANDING = {
+export const defaultCompanyBranding = {
   primaryColor: "#0db5b0",
   secondaryColor: "#132840",
   accentColor: "#dce8f0",
@@ -89,15 +89,15 @@ export const DEFAULT_COMPANY_BRANDING = {
   supportLink: "",
 };
 
-const CONSUMER_BASE = {
+const consumerBase = {
   gradient: "linear-gradient(135deg, #0b1826 0%, #132840 52%, #17304a 100%)",
   cardBg: "rgba(220,232,240,0.2)",
   accentColor: "#0db5b0",
 };
 
-export const CONSUMER_PAGE_THEMES = {
+export const consumerPageThemes = {
   passport: {
-    ...CONSUMER_BASE,
+    ...consumerBase,
     icon: "🪪",
     headline: "Digital Product Passport",
     tagline: "Verified product identity, compliance data, and lifecycle transparency.",
@@ -107,7 +107,7 @@ export const CONSUMER_PAGE_THEMES = {
 
 export function normalizeCompanyBranding(branding) {
   const src = branding && typeof branding === "object" ? branding : {};
-  return { ...DEFAULT_COMPANY_BRANDING, ...src };
+  return { ...defaultCompanyBranding, ...src };
 }
 
 export function getViewerBrandTheme(branding) {
@@ -128,7 +128,7 @@ export function getViewerBrandTheme(branding) {
 }
 
 export function applyTheme(themeKey) {
-  const theme = THEMES[themeKey] || THEMES.dark;
+  const theme = themes[themeKey] || themes.dark;
   const root = document.documentElement;
 
   Object.entries(theme).forEach(([key, val]) => {
@@ -147,7 +147,7 @@ export function setStoredTheme(userId, themeKey) {
 }
 
 export const getConsumerTheme = (passportType, branding) => {
-  const base = CONSUMER_PAGE_THEMES.passport;
+  const base = consumerPageThemes.passport;
   const b = normalizeCompanyBranding(branding);
   return {
     ...base,

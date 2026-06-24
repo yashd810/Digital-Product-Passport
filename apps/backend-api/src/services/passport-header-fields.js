@@ -1,11 +1,11 @@
 "use strict";
 
-const DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION = {
+const defaultSystemPassportHeaderSection = {
   key: "passportHeader",
   label: "Passport Header",
 };
 
-const SYSTEM_HEADER_MANAGED_DEFINITIONS = [
+const systemHeaderManagedDefinitions = [
   { slotKey: "digitalProductPassportId", label: "Digital Product Passport ID", semanticId: "dpp:digitalProductPassportId", managedKey: "internalManagedDigitalProductPassportId", required: true },
   { slotKey: "uniqueProductIdentifier", label: "Unique Product Identifier", semanticId: "dpp:uniqueProductIdentifier", managedKey: "internalManagedUniqueProductIdentifier", required: true },
   { slotKey: "internalAliasId", label: "Internal Alias ID", semanticId: "dpp:internalAliasId", managedKey: "internalManagedInternalAliasId", required: true },
@@ -21,8 +21,8 @@ const SYSTEM_HEADER_MANAGED_DEFINITIONS = [
   { slotKey: "companyDid", label: "Company DID", semanticId: "dpp:companyDid", managedKey: "internalManagedCompanyDid", required: true },
 ];
 
-const SYSTEM_HEADER_MANAGED_KEY_SET = new Set(
-  SYSTEM_HEADER_MANAGED_DEFINITIONS.map((definition) => definition.managedKey)
+const systemHeaderManagedKeySet = new Set(
+  systemHeaderManagedDefinitions.map((definition) => definition.managedKey)
 );
 
 function cleanText(value) {
@@ -77,8 +77,8 @@ function normalizeSystemPassportHeader(input = {}) {
   const fieldMappings = normalizeFieldMappings(input);
   return {
     section: {
-      key: DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.key,
-      label: cleanText(inputSection.label) || DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION.label,
+      key: defaultSystemPassportHeaderSection.key,
+      label: cleanText(inputSection.label) || defaultSystemPassportHeaderSection.label,
     },
     fieldMappings,
     fieldKeys: uniqueFieldKeys(normalizeFieldKeys(input)),
@@ -106,7 +106,7 @@ function validateSystemPassportHeader(input = {}, sections = []) {
   const unknownManagedKeys = normalized.fieldMappings
     .filter((mapping) => mapping.sourceType === "managed")
     .map((mapping) => mapping.managedKey)
-    .filter((managedKey) => !SYSTEM_HEADER_MANAGED_KEY_SET.has(managedKey));
+    .filter((managedKey) => !systemHeaderManagedKeySet.has(managedKey));
   if (unknownManagedKeys.length) {
     return {
       valid: false,
@@ -138,8 +138,8 @@ function getSystemPassportHeaderFields(typeDef = {}) {
 }
 
 module.exports = {
-  DEFAULT_SYSTEM_PASSPORT_HEADER_SECTION,
-  SYSTEM_HEADER_MANAGED_DEFINITIONS,
+  defaultSystemPassportHeaderSection,
+  systemHeaderManagedDefinitions,
   normalizeSystemPassportHeader,
   validateSystemPassportHeader,
   getSystemPassportHeader,
