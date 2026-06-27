@@ -411,7 +411,8 @@ module.exports = function registerWorkflowRoutes(app, {
             const releasePath = buildCurrentPublicPassportPath({
               companyName: pInfo.companyName,
               modelName: pInfo.modelName,
-              internalAliasId: pInfo.internalAliasId || dppId
+              dppId,
+              internalAliasId: pInfo.internalAliasId
             });
             await runBestEffort("Workflow review approved notification error", async () => createNotification(
               wf.submittedBy,
@@ -517,7 +518,8 @@ module.exports = function registerWorkflowRoutes(app, {
           const releasePath = buildCurrentPublicPassportPath({
             companyName: pInfo.companyName,
             modelName: pInfo.modelName,
-            internalAliasId: pInfo.internalAliasId || dppId
+            dppId,
+            internalAliasId: pInfo.internalAliasId
           });
           await runBestEffort("Workflow approval approved notification error", async () => createNotification(
             wf.submittedBy,

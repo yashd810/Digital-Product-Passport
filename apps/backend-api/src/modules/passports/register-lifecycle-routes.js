@@ -289,8 +289,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const insertRes = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`, allVals);
 
       const sourceRegistry = await pool.query(
-        `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
-                "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
+        `SELECT "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
          FROM "passportRegistry"
          WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
@@ -302,9 +301,6 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         lineageId: src.lineageId,
         companyId,
         passportType,
-        accessKeyHash: sourceKeys.accessKeyHash || null,
-        accessKeyPrefix: sourceKeys.accessKeyPrefix || null,
-        accessKeyLastRotatedAt: sourceKeys.accessKeyLastRotatedAt || null,
         deviceApiKeyHash: sourceKeys.deviceApiKeyHash || null,
         deviceApiKeyPrefix: sourceKeys.deviceApiKeyPrefix || null,
         deviceKeyLastRotatedAt: sourceKeys.deviceKeyLastRotatedAt || null,
@@ -408,8 +404,7 @@ module.exports = function registerLifecycleRoutes(app, deps) {
       const insertRes = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allCols)}) VALUES (${places}) RETURNING *`, allVals);
 
       const sourceRegistry = await pool.query(
-        `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
-                "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
+        `SELECT "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
          FROM "passportRegistry"
          WHERE "dppId" = $1 AND "companyId" = $2
          LIMIT 1`,
@@ -421,9 +416,6 @@ module.exports = function registerLifecycleRoutes(app, deps) {
         lineageId: src.lineageId,
         companyId,
         passportType,
-        accessKeyHash: sourceKeys.accessKeyHash || null,
-        accessKeyPrefix: sourceKeys.accessKeyPrefix || null,
-        accessKeyLastRotatedAt: sourceKeys.accessKeyLastRotatedAt || null,
         deviceApiKeyHash: sourceKeys.deviceApiKeyHash || null,
         deviceApiKeyPrefix: sourceKeys.deviceApiKeyPrefix || null,
         deviceKeyLastRotatedAt: sourceKeys.deviceKeyLastRotatedAt || null,

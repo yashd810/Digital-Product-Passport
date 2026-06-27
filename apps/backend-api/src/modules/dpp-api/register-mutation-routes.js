@@ -1,6 +1,7 @@
 "use strict";
 
 const { createValidationMiddleware } = require("../../shared/validation/request-schema");
+const { createIntegrationCompanySlugResolver } = require("../../shared/http/integration-company-resolver");
 const { createDppUseCase } = require("./application/create-dpp");
 const { updateDppUseCase } = require("./application/update-dpp");
 
@@ -17,7 +18,6 @@ module.exports = function registerMutationRoutes(app, deps) {
     normalizeInternalAliasIdValue,
     resolveEditablePassportByDppId,
     resolveActiveReleasedPassportByDppId,
-    resolveReleasedPassportForIdentifier,
     isEditablePassportStatus,
     getCompanyNameMap,
     archivePassportSnapshot,
@@ -32,8 +32,6 @@ module.exports = function registerMutationRoutes(app, deps) {
     extractCarrierAuthenticityMutation,
     applyCarrierAuthenticityMutation,
     extractExplicitFacilityId,
-    buildCanonicalPassportPayload,
-    dppIdentity,
     generateDppRecordId,
     buildStandardsCreateFields,
     usesConfiguredGlobalProductIdentifierScheme,
@@ -42,7 +40,6 @@ module.exports = function registerMutationRoutes(app, deps) {
     getActorIdentifier,
     replicatePassportToBackup,
     buildDppIdentifierFields,
-    buildRegistrationId,
     setDppMergePatchHeaders,
     isSupportedPatchContentType,
     parseDppIdentifier,
@@ -66,8 +63,27 @@ module.exports = function registerMutationRoutes(app, deps) {
     type: "object",
     minProperties: 1,
   };
+  const integrationPassportsBase = "/api/companies/:companySlug/integrations/v1/passports";
+  const resolveIntegrationCompanySlug = createIntegrationCompanySlugResolver({ pool, logger });
 
-  app.post("/api/v1/dpps", authenticateToken, requireEditor, createValidationMiddleware({
+  function requireIntegrationCompanyAccess(req, res, next) {
+    const companyId = Number.parseInt(req.params.companyId, 10);
+    if (!Number.isFinite(companyId)) return res.status(400).json({ error: "A valid company name is required" });
+    if (req.user.role !== "superAdmin" && String(req.user.companyId) !== String(companyId)) {
+      return res.status(403).json({ error: "Unauthorised access to this company" });
+    }
+    next();
+  }
+
+  function attachIntegrationCompanyContext(req, _res, next) {
+    req.body = {
+      ...(req.body || {}),
+      companyId: req.body?.companyId ?? req.params.companyId,
+    };
+    next();
+  }
+
+  app.post(integrationPassportsBase, authenticateToken, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, attachIntegrationCompanyContext, createValidationMiddleware({
     body: dppCreateSchema,
   }), async (req, res) => {
     try {
@@ -82,17 +98,20 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.options("/api/v1/dpps/:dppId", (req, res) => {
+  app.options(`${integrationPassportsBase}/:dppId`, (req, res) => {
     setDppMergePatchHeaders(res);
     res.setHeader("Allow", "PATCH, DELETE, OPTIONS");
     return res.status(204).send();
   });
 
-  app.patch("/api/v1/dpps/:dppId", authenticateToken, requireEditor, createValidationMiddleware({
+  app.patch(`${integrationPassportsBase}/:dppId`, authenticateToken, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, createValidationMiddleware({
     params: {
       type: "object",
-      required: ["dppId"],
-      properties: { dppId: { type: "string", minLength: 1 } },
+      required: ["companySlug", "dppId"],
+      properties: {
+        companySlug: { type: "string", minLength: 1 },
+        dppId: { type: "string", minLength: 1 },
+      },
     },
     body: dppPatchSchema,
   }), async (req, res) => {
@@ -111,11 +130,13 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.delete("/api/v1/dpps/:dppId", authenticateToken, requireEditor, async (req, res) => {
+  app.delete(`${integrationPassportsBase}/:dppId`, authenticateToken, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
+      const routeCompanyId = Number.parseInt(req.params.companyId, 10);
       if (!dppId) return res.status(400).json({ error: "dppId is required" });
       if (!parseDppIdentifier(dppId)) return res.status(400).json({ error: "dppId must be a valid DPP identifier" });
+      if (!Number.isFinite(routeCompanyId)) return res.status(400).json({ error: "A valid company name route is required" });
 
       const editable = await resolveEditablePassportByDppId(dppId);
       if (!editable?.passport) {
@@ -125,14 +146,20 @@ module.exports = function registerMutationRoutes(app, deps) {
             req.user.role === "superAdmin" || Number(req.user.companyId) === Number(released.passport.companyId)
           )
         ) {
+          if (Number(released.passport.companyId) !== routeCompanyId) {
+            return res.status(404).json({ error: "Released DPP not found for this company" });
+          }
           return res.status(409).json({
             error: "releasedDppRequiresArchive",
             message: "Released DPPs must use the archive lifecycle action instead of DELETE.",
-            archiveEndpoint: `/api/v1/dpps/${encodeURIComponent(dppId)}/archive`,
+            archiveEndpoint: `/api/companies/${encodeURIComponent(req.params.companySlug)}/integrations/v1/passports/${encodeURIComponent(dppId)}/archive`,
             ...buildDppIdentifierFields(released.passport)
           });
         }
         return res.status(404).json({ error: "Editable passport not found" });
+      }
+      if (Number(editable.passport.companyId) !== routeCompanyId) {
+        return res.status(404).json({ error: "Editable passport not found for this company" });
       }
       if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
         return res.status(403).json({ error: "Forbidden" });
@@ -219,15 +246,20 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.post("/api/v1/dpps/:dppId/archive", authenticateToken, requireEditor, async (req, res) => {
+  app.post(`${integrationPassportsBase}/:dppId/archive`, authenticateToken, requireEditor, resolveIntegrationCompanySlug, requireIntegrationCompanyAccess, async (req, res) => {
     try {
       const dppId = decodeURIComponent(req.params.dppId || "");
+      const routeCompanyId = Number.parseInt(req.params.companyId, 10);
       if (!dppId) return res.status(400).json({ error: "dppId is required" });
       if (!parseDppIdentifier(dppId)) return res.status(400).json({ error: "dppId must be a valid DPP identifier" });
+      if (!Number.isFinite(routeCompanyId)) return res.status(400).json({ error: "A valid company name route is required" });
 
       const released = await resolveActiveReleasedPassportByDppId(dppId);
       if (!released?.passport) {
         return res.status(404).json({ error: "Released DPP not found" });
+      }
+      if (Number(released.passport.companyId) !== routeCompanyId) {
+        return res.status(404).json({ error: "Released DPP not found for this company" });
       }
       if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(released.passport.companyId)) {
         return res.status(403).json({ error: "Forbidden" });
@@ -303,96 +335,4 @@ module.exports = function registerMutationRoutes(app, deps) {
     }
   });
 
-  app.post("/api/v1/registerDPP", authenticateToken, requireEditor, async (req, res) => {
-    try {
-      const productIdentifier = decodeURIComponent(String(req.body?.productIdentifier || "").trim());
-      const registryName = String(req.body?.registryName || "local").trim().toLowerCase();
-      const submittedCompanyId = req.body?.companyId !== undefined ? Number.parseInt(req.body.companyId, 10) : null;
-      const companyId = req.user.role === "superAdmin" ?
-        submittedCompanyId :
-        Number.parseInt(req.user.companyId, 10);
-
-      if (!productIdentifier) {
-        return res.status(400).json({ error: "productIdentifier is required" });
-      }
-      if (!Number.isFinite(companyId)) {
-        return res.status(400).json({ error: "A valid companyId is required" });
-      }
-      if (!registryName || !/^[a-z][A-Za-z0-9-]{1,119}$/.test(registryName)) {
-        return res.status(400).json({ error: "registryName must be 2-120 chars using camelCase letters, numbers, or dashes" });
-      }
-
-      const result = await resolveReleasedPassportForIdentifier(productIdentifier, companyId);
-      if (!result) {
-        return res.status(404).json({ error: "Passport not found or not released" });
-      }
-
-      const canonicalPayload = buildCanonicalPassportPayload(result.passport, result.typeDef, { companyName: result.companyName });
-      const platformExtensions = canonicalPayload.extensions?.platform || null;
-      const registrationPayload = {
-        digitalProductPassportId: canonicalPayload.digitalProductPassportId,
-        uniqueProductIdentifier: canonicalPayload.uniqueProductIdentifier,
-        internalAliasId: canonicalPayload.internalAliasId || result.passport.internalAliasId || null,
-        subjectDid: canonicalPayload.subjectDid,
-        dppDid: canonicalPayload.dppDid,
-        companyDid: canonicalPayload.companyDid,
-        publicUrl: dppIdentity.buildCanonicalPublicUrl(result.passport, result.companyName),
-        contentSpecificationIds: canonicalPayload.contentSpecificationIds || [],
-        requestedBy: req.user.userId,
-        ...(platformExtensions ? { extensions: { platform: platformExtensions } } : {})
-      };
-
-      const upsert = await pool.query(
-        `INSERT INTO "dppRegistryRegistrations" (
-           "passportDppId", "companyId", "productIdentifier", "dppId", "registryName", status, "registrationPayload", "registeredBy"
-         )
-         VALUES ($1, $2, $3, $4, $5, 'registered', $6::jsonb, $7)
-         ON CONFLICT ("registryName", "dppId")
-         DO UPDATE SET
-           "productIdentifier" = EXCLUDED."productIdentifier",
-           status = 'registered',
-           "registrationPayload" = EXCLUDED."registrationPayload",
-           "registeredBy" = EXCLUDED."registeredBy",
-           "updatedAt" = NOW()
-         RETURNING id, "passportDppId", "companyId", "productIdentifier", "dppId", "registryName", status, "registeredAt", "updatedAt"`,
-        [
-          result.passport.dppId,
-          result.passport.companyId,
-          canonicalPayload.uniqueProductIdentifier || productIdentifier,
-          canonicalPayload.digitalProductPassportId,
-          registryName,
-          JSON.stringify(registrationPayload),
-          req.user.userId
-        ]
-      );
-      await replicatePassportToBackup({
-        passport: result.passport,
-        typeDef: result.typeDef,
-        companyName: result.companyName,
-        reason: "registryRegistration",
-        snapshotScope: "releasedCurrent"
-      }).catch((error) => {
-        logger.warn({ err: error, dppId: result.passport?.dppId, reason: "registryRegistration" }, "Failed to replicate registry registration to backup");
-      });
-
-      const registration = upsert.rows[0];
-
-      return res.status(201).json({
-        statusCode: "SuccessCreated",
-        registrationId: buildRegistrationId(registration),
-        success: true,
-        registration,
-        payload: registrationPayload
-      });
-    } catch (e) {
-      if (e.code === "ambiguousProductId") {
-        return res.status(409).json({
-          error: "ambiguousProductId",
-          message: "Multiple passports match this identifier. Provide companyId or use the canonical product DID."
-        });
-      }
-      logger.error({ err: e }, "[Standards DPP register API]");
-      return res.status(500).json({ error: "Failed to register DPP" });
-    }
-  });
 };

@@ -12,12 +12,25 @@ export function tableColumnKeyFromLabel(label, emptyKey = "column") {
     .join("");
 }
 
+function semanticTerminalSegment(semanticId = "") {
+  const raw = String(semanticId || "").trim();
+  if (!raw) return "";
+  const withoutQuery = raw.split("?")[0].replace(/\/+$/g, "");
+  const hashSegment = withoutQuery.includes("#") ? withoutQuery.split("#").pop() : "";
+  const pathSegment = withoutQuery.split("/").pop();
+  const colonSegment = withoutQuery.split(":").pop();
+  return hashSegment || pathSegment || colonSegment || "";
+}
+
 export function createTableColumn(index = 0, overrides = {}) {
   const rawLabel = overrides.label ?? `Column ${index + 1}`;
   const label = typeof rawLabel === "string" ? rawLabel : String(rawLabel);
   const normalizedLabel = label.trim() || `Column ${index + 1}`;
   return {
-    key: String(overrides.key || tableColumnKeyFromLabel(normalizedLabel, `column${index + 1}`)).trim() || `column${index + 1}`,
+    key: String(
+      overrides.key
+      || tableColumnKeyFromLabel(semanticTerminalSegment(overrides.semanticId) || normalizedLabel, `column${index + 1}`)
+    ).trim() || `column${index + 1}`,
     label: normalizedLabel === `Column ${index + 1}` && !String(label).trim() ? normalizedLabel : label,
     ...(overrides.semanticId ? { semanticId: overrides.semanticId } : {}),
     ...(overrides.elementIdPath ? { elementIdPath: overrides.elementIdPath } : {}),

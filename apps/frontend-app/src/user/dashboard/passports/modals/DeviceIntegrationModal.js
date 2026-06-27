@@ -4,12 +4,17 @@ import { authHeaders, fetchWithAuth } from "../../../../shared/api/authHeaders";
 
 const api = import.meta.env.VITE_API_URL || "";
 
-export function DeviceIntegrationModal({ passport, passportType, companyId, onClose }) {
-  const [deviceKey, setDeviceKey] = useState(null);
-  const [deviceKeyMeta, setDeviceKeyMeta] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
-  const [copied, setCopied] = useState(false);
+function slugifyCompanyName(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-+/g, "-");
+}
+
+export function DeviceIntegrationModal({ passport, passportType, companyId, companyName = "", onClose }) {
   const [dynFields, setDynFields] = useState([]);
   const [manualVals, setManualVals] = useState({});
   const [saving, setSaving] = useState(false);
@@ -19,13 +24,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
   const dialogDescriptionId = useId();
 
   useEffect(() => {
-    fetchWithAuth(`${api}/api/companies/${companyId}/passports/${passport.dppId}/device-key`, { headers: authHeaders() })
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d) setDeviceKeyMeta(d); })
-      .catch((error) => console.warn("Ignored async error", error))
-      .finally(() => setLoading(false));
-
-    fetchWithAuth(`${api}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${api}/api/internal/passport-types/${passportType}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (!d) return;
@@ -34,7 +33,7 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
       })
       .catch((error) => console.warn("Ignored async error", error));
 
-    fetchWithAuth(`${api}/api/passports/${passport.dppId}/dynamic-values`)
+    fetchWithAuth(`${api}/api/companies/${encodeURIComponent(companyId)}/passports/${encodeURIComponent(passport.dppId)}/dynamic-values`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (d?.values) {
@@ -54,28 +53,6 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  const handleRegenerate = async () => {
-    if (!window.confirm("Regenerate the device key? The old key will stop working immediately.")) return;
-    setRegenerating(true);
-    try {
-      const r = await fetchWithAuth(`${api}/api/companies/${companyId}/passports/${passport.dppId}/device-key/regenerate`, {
-        method: "POST",
-        headers: authHeaders(),
-      });
-      const d = await r.json();
-      if (r.ok) {
-        setDeviceKey(d.deviceKey);
-        setDeviceKeyMeta({
-          hasDeviceKey: true,
-          keyPrefix: d.keyPrefix || null,
-          lastRotatedAt: d.lastRotatedAt || new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      console.warn("Failed to regenerate device key", error);
-    } finally { setRegenerating(false); }
-  };
-
   const handleSaveManual = async () => {
     setSaving(true);
     setSaveMsg("");
@@ -94,14 +71,8 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
     }
   };
 
-  const copyKey = () => {
-    if (!deviceKey) return;
-    navigator.clipboard.writeText(deviceKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const endpoint = `${apiBase}/api/passports/${passport.dppId}/dynamic-values`;
+  const companySlug = slugifyCompanyName(companyName || passport.companyName);
+  const endpoint = `${apiBase}/api/companies/${companySlug}/integrations/v1/passports/${passport.dppId}/dynamic-values`;
   const exampleBody = dynFields.length
     ? `{\n${dynFields.map((field) => `  "${field.key}": "value"`).join(",\n")}\n}`
     : `{\n  "fieldKey": "value"\n}`;
@@ -136,36 +107,19 @@ export function DeviceIntegrationModal({ passport, passportType, companyId, onCl
               border: 0,
             }}
           >
-            Issue a device key, review the push endpoint, and override dynamic field values for this passport.
+            Review the Bearer-token push endpoint and override dynamic field values for this passport.
           </p>
           <section className="device-section">
-            <h4 className="device-section-title">Device api Key</h4>
-            <p className="device-section-desc">
-              Your IoT device uses this key to push live values. Send it in the <code>x-device-key</code> header.
-            </p>
-            {loading ? (
-              <div className="device-key-row"><span className="device-loading-copy">Loading…</span></div>
-            ) : (
-              <div className="device-key-row">
-                <code className="device-key-code">{deviceKey || deviceKeyMeta?.keyPrefix || "Not issued yet"}</code>
-                <button type="button" className="device-copy-btn" onClick={copyKey} disabled={!deviceKey}>
-                  {copied ? "✓ Copied" : "Copy"}
-                </button>
-                <button type="button" className="device-regen-btn" onClick={handleRegenerate} disabled={regenerating}>
-                  {regenerating ? "…" : deviceKeyMeta?.hasDeviceKey ? "Regenerate" : "Issue Key"}
-                </button>
-              </div>
-            )}
-          </section>
-
-          <section className="device-section">
             <h4 className="device-section-title">Push Endpoint</h4>
+            <p className="device-section-desc">
+              Use a company service Bearer token with permission to update this company passport.
+            </p>
             <div className="device-code-block">
               <div className="device-code-line"><span className="device-code-method">POST</span> <span className="device-code-url">{endpoint}</span></div>
               <div className="device-code-line device-code-line-spaced">
                 <span className="device-code-comment">Headers:</span>
               </div>
-              <div className="device-code-line device-code-indent">x-device-key: <em>&lt;your device key&gt;</em></div>
+              <div className="device-code-line device-code-indent">Authorization: Bearer <em>&lt;company service token&gt;</em></div>
               <div className="device-code-line device-code-indent">Content-Type: application/json</div>
               <div className="device-code-line device-code-line-spaced">
                 <span className="device-code-comment">Body:</span>

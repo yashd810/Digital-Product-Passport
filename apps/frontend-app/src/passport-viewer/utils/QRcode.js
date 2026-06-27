@@ -164,6 +164,7 @@ export async function renderPassportQrLabelToCanvas(canvas, {
 }
 
 export const generateQRCodeBundle = async ({
+  dppId = "",
   internalAliasId,
   companyName = "",
   modelName = "",
@@ -176,6 +177,7 @@ export const generateQRCodeBundle = async ({
     manufacturerName,
     manufacturedBy,
     modelName,
+    dppId,
     internalAliasId,
   });
   if (!passportPath) return null;
@@ -242,9 +244,10 @@ export const generateQRCodeBundle = async ({
  * physical X-dimension at or above 0.25 mm when rendered in print workflows.
  * Returns base64 encoded PNG data URL.
  */
-export const generateQRCode = async ({ internalAliasId, companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "", granularity = "item" }) => {
+export const generateQRCode = async ({ dppId = "", internalAliasId, companyName = "", modelName = "", manufacturerName = "", manufacturedBy = "", granularity = "item" }) => {
   try {
     const bundle = await generateQRCodeBundle({
+      dppId,
       internalAliasId,
       companyName,
       modelName,
@@ -262,10 +265,10 @@ export const generateQRCode = async ({ internalAliasId, companyName = "", modelN
  * Save the canonical public passport URL to database.
  * passportType is required so the server knows which table to update.
  */
-export const saveQRCodeToDatabase = async (dppId, qrCodeUrl, passportType, options = {}) => {
+export const saveQRCodeToDatabase = async (companyId, dppId, qrCodeUrl, passportType, options = {}) => {
   try {
-    if (!qrCodeUrl) return null;
-    const response = await fetchWithAuth(`${api}/api/passports/${dppId}/qrcode`, {
+    if (!companyId || !qrCodeUrl) return null;
+    const response = await fetchWithAuth(`${api}/api/companies/${encodeURIComponent(companyId)}/passports/${encodeURIComponent(dppId)}/qrcode`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -289,7 +292,7 @@ export const saveQRCodeToDatabase = async (dppId, qrCodeUrl, passportType, optio
  */
 export const fetchQRCodeFromDatabase = async (dppId) => {
   try {
-    const response = await fetchWithAuth(`${api}/api/passports/${dppId}/qrcode`);
+    const response = await fetchWithAuth(`${api}/api/public/passports/${encodeURIComponent(dppId)}/qrcode`);
 
     if (!response.ok) {
       if (response.status === 404) return null; // not yet generated — that's fine
@@ -305,7 +308,7 @@ export const fetchQRCodeFromDatabase = async (dppId) => {
 
 export const fetchQRCodeRecordFromDatabase = async (dppId) => {
   try {
-    const response = await fetchWithAuth(`${api}/api/passports/${dppId}/qrcode`);
+    const response = await fetchWithAuth(`${api}/api/public/passports/${encodeURIComponent(dppId)}/qrcode`);
 
     if (!response.ok) {
       if (response.status === 404) return null;

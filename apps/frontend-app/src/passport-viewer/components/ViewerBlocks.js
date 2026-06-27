@@ -7,7 +7,7 @@ import { fetchWithAuth } from "../../shared/api/authHeaders";
 import { normalizeSystemPassportHeader, resolveSystemHeaderEntries } from "../../admin/passport-types/builderHelpers";
 import { normalizeTableColumns, parseTableRows } from "../../shared/passports/tableSchemaUtils";
 import { resolveManagedSystemHeaderValue } from "../../shared/passports/systemHeaderManagedValues";
-import { accessLabelMap, appendUnitToDisplayValue, renderTextBlock, isHeroSummaryField, getFieldPresentation, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
+import { appendUnitToDisplayValue, renderTextBlock, isHeroSummaryField, getFieldPresentation, toInlineText, formatLinkLabel, formatFieldLabelWithUnit, formatIsoDate } from "../utils/viewerHelpers";
 import { getMarketingContactUrl } from "../utils/QRcode";
 
 const api = import.meta.env.VITE_API_URL || "";
@@ -250,7 +250,7 @@ export function PassportHeaderPanel({ passport, typeDef }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Viewer UI Blocks
 // ─────────────────────────────────────────────────────────────────────────────
-export function Header({ displayName, lang, setLang, dppId, companyData, brandTheme }) {
+export function Header({ displayName, lang, setLang, companyData, brandTheme }) {
   return (
     <header className="viewer-header">
       <div className="viewer-header-inner viewer-header-shell">
@@ -268,7 +268,6 @@ export function Header({ displayName, lang, setLang, dppId, companyData, brandTh
           {companyData?.companyLogo && (
             <img src={companyData.companyLogo} alt={`${companyData.companyName || "Company"} logo`} className="viewer-header-brand-logo" />
           )}
-          <ScanBadge dppId={dppId} />
           <ViewerLangSelector lang={lang} setLang={setLang} />
         </div>
       </div>
@@ -289,16 +288,10 @@ export function Footer({ brandTheme }) {
   );
 }
 
-export function LockedFieldCell({ field, onUnlock }) {
-  const who = (field.access || [])
-    .filter(a => a !== "public")
-    .map(a => accessLabelMap[a] || a)
-    .join(", ");
+export function LockedFieldCell({ field }) {
+  void field;
   return (
-    <button type="button" className="locked-field-btn" onClick={onUnlock}>
-      Unlock field
-      {who && <span className="locked-field-who"> ({who})</span>}
-    </button>
+    <span className="locked-field-btn locked-field-static">Restricted</span>
   );
 }
 
@@ -325,7 +318,7 @@ export function LiveBadge({ updatedAt }) {
   );
 }
 
-export function SectionView({ sectionDef, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, sectionId = "", onRefreshFieldUrl = null }) {
+export function SectionView({ sectionDef, passport, unlockedPassport, dynamicValues, lang, sectionId = "", onRefreshFieldUrl = null }) {
   const [expandedKey, setExpandedKey] = useState(null);   // which dynamic field is open
   const [chartTypes,  setChartTypes]  = useState({});     // { [fieldKey]: "line"|"histogram" }
   const [history,     setHistory]     = useState({});     // { [fieldKey]: { data, loading } }
@@ -336,7 +329,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     if (!history[fieldKey]) {
       setHistory(p => ({ ...p, [fieldKey]: { data: [], loading: true } }));
       try {
-        const r = await fetchWithAuth(`${api}/api/passports/${passport.dppId}/dynamic-values/${fieldKey}/history?limit=500`);
+        const r = await fetchWithAuth(`${api}/api/public/passports/${encodeURIComponent(passport.dppId)}/dynamic-values/${encodeURIComponent(fieldKey)}/history?limit=500`);
         const d = r.ok ? await r.json() : null;
         setHistory(p => ({ ...p, [fieldKey]: { data: d?.history || [], loading: false } }));
       } catch {
@@ -351,25 +344,38 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
   if (!sectionDef || !passport) return null;
   const isFileUrl = v => typeof v === "string" && v.startsWith("http");
   const sectionTitle = translateSchemaLabel(lang, sectionDef);
+  const scopedUnlockedPassport = (() => {
+    if (!unlockedPassport) return null;
+    if (String(unlockedPassport.dppId || "") !== String(passport.dppId || "")) return null;
+    if (String(unlockedPassport.passportType || "") !== String(passport.passportType || "")) return null;
+    if (unlockedPassport.versionNumber !== null && unlockedPassport.versionNumber !== undefined
+      && passport.versionNumber !== null && passport.versionNumber !== undefined
+      && Number(unlockedPassport.versionNumber) !== Number(passport.versionNumber)) {
+      return null;
+    }
+    return unlockedPassport;
+  })();
   const visibleFields = (sectionDef.fields || []).filter(field => !isHeroSummaryField(field, translateSchemaLabel(lang, field)));
   const fieldEntries = visibleFields.map(f => {
-    const access = f.access || ["public"];
-    const isPublic = access.includes("public");
+    const isPublic = String(f.confidentiality || "public").toLowerCase() !== "restricted";
     const fieldLabel = formatFieldLabelWithUnit(translateSchemaLabel(lang, f), f);
     const isDynamic = !!f.dynamic;
     const dynEntry = isDynamic ? dynamicValues?.[f.key] : null;
-    const src = unlockedPassport || passport;
-    const raw = isPublic || unlockedPassport
-      ? (isDynamic ? (dynEntry?.value ?? null) : src[f.key])
+    const isUnlocked = !isPublic
+      && !!scopedUnlockedPassport
+      && Object.prototype.hasOwnProperty.call(scopedUnlockedPassport, f.key);
+    const src = isPublic ? passport : (isUnlocked ? scopedUnlockedPassport : passport);
+    const raw = isPublic || isUnlocked
+      ? (isDynamic ? (dynEntry?.value ?? src[f.key] ?? null) : src[f.key])
       : null;
-    const isLocked = !isPublic && !unlockedPassport;
+    const isLocked = !isPublic && !isUnlocked;
 
     let display = "—";
     if (isLocked) {
       display = (
         <div className="pv-locked-state">
           <p className="pv-locked-copy">This value is available to authorised parties only.</p>
-          <LockedFieldCell field={f} onUnlock={onRequestUnlock} />
+          <LockedFieldCell field={f} />
         </div>
       );
     } else if (f.type === "boolean") {
@@ -437,7 +443,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
     const twoColumn = false;
     const tags = [];
     if (!isPublic) tags.push("Restricted");
-    if (unlockedPassport && !isPublic) tags.push("Authorised view");
+    if (isUnlocked) tags.push("Authorised view");
     if (f.composition) tags.push("Breakdown");
     if (f.type === "table") tags.push("Dataset");
     if (f.type === "url") tags.push("External link");
@@ -446,6 +452,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
       field: f,
       fieldLabel,
       isPublic,
+      isUnlocked,
       isDynamic,
       dynEntry,
       isLocked,
@@ -495,7 +502,7 @@ export function SectionView({ sectionDef, passport, unlockedPassport, onRequestU
                 </div>
               </div>
 
-              {entry.isDynamic && (entry.isPublic || unlockedPassport) && (
+              {entry.isDynamic && entry.isPublic && (
                 <div className="pv-field-actions">
                   <button
                     type="button"
@@ -722,22 +729,6 @@ export function SignatureBadge({ verification }) {
   );
 }
 
-export function ScanBadge({ dppId }) {
-  const [count, setCount] = useState(null);
-  useEffect(() => {
-    fetchWithAuth(`${api}/api/passports/${dppId}/scan-stats`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && d.total > 0) setCount(d.total); })
-      .catch((error) => console.warn("Ignored async error", error));
-  }, [dppId]);
-  if (!count) return null;
-  return (
-    <div className="viewer-scan-badge">
-      📊 {count} unique scan{count !== 1 ? "s" : ""}
-    </div>
-  );
-}
-
 // ─── Empty state ──────────────────────────────────────────────
 export function EmptySectionsState() {
   return (
@@ -776,20 +767,15 @@ export function PrintView({ passport, companyData, sections }) {
           <table className="print-table">
             <tbody>
               {section.fields.map(f => {
-                const access   = f.access || ["public"];
-                const isPublic = access.includes("public");
+                const isPublic = String(f.confidentiality || "public").toLowerCase() !== "restricted";
                 const raw = passport[f.key];
                 let display;
 
                 if (!isPublic) {
-                  // Non-public fields appear redacted in print unless already unlocked
-                  const who = access
-                    .filter(a => a !== "public")
-                    .map(a => accessLabelMap[a] || a)
-                    .join(", ");
+                  // Restricted fields appear redacted in print unless already unlocked.
                   display = (
                     <span className="print-restricted-note">
-                      🔒 Restricted — accessible by: {who || "authorised parties"}
+                      🔒 Restricted
                     </span>
                   );
                 } else if (f.type === "boolean") {

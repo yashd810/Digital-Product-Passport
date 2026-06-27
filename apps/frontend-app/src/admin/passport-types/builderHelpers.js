@@ -2,68 +2,13 @@ import { languages } from "../../app/providers/i18n";
 
 export const transLangs = languages.filter((language) => language.code !== "en");
 
-export const accessLevels = [
-  { value: "public",              label: "Public" },
-  { value: "consumers",           label: "Consumers" },
-  { value: "economicOperator",   label: "Economic Operators" },
-  { value: "manufacturer",        label: "Manufacturers" },
-  { value: "authorizedRepresentative", label: "Authorized Representatives" },
-  { value: "importer",            label: "Importers" },
-  { value: "distributor",         label: "Distributors" },
-  { value: "dealer",              label: "Dealers" },
-  { value: "fulfilmentServiceProvider", label: "Fulfilment Service Providers" },
-  { value: "delegatedOperator",  label: "Delegated Operators" },
-  { value: "professionalRepairer", label: "Professional Repairers" },
-  { value: "independentOperator", label: "Independent Operators" },
-  { value: "recycler",            label: "Recyclers" },
-  { value: "notifiedBodies",     label: "Notified Bodies" },
-  { value: "marketSurveillance", label: "Market Surveillance Authorities" },
-  { value: "customsAuthority",   label: "Customs Authorities" },
-  { value: "euCommission",       label: "The EU Commission" },
-  { value: "mainDppServiceProvider", label: "Main DPP Service Providers" },
-  { value: "backupDppServiceProvider", label: "Back-up DPP Service Providers" },
-  { value: "legitimateInterest", label: "Person with Legitimate Interest" },
-];
-
 export const confidentialityLevels = [
   { value: "public", label: "Public" },
   { value: "restricted", label: "Restricted" },
-  { value: "confidential", label: "Confidential" },
-  { value: "tradeSecret", label: "Trade Secret" },
-  { value: "regulated", label: "Regulated" },
 ];
-
-export const updateAuthorities = [
-  { value: "economicOperator", label: "Economic Operators" },
-  { value: "manufacturer", label: "Manufacturers" },
-  { value: "authorizedRepresentative", label: "Authorized Representatives" },
-  { value: "importer", label: "Importers" },
-  { value: "distributor", label: "Distributors" },
-  { value: "dealer", label: "Dealers" },
-  { value: "fulfilmentServiceProvider", label: "Fulfilment Service Providers" },
-  { value: "delegatedOperator", label: "Delegated Operators" },
-  { value: "professionalRepairer", label: "Professional Repairers" },
-  { value: "independentOperator", label: "Independent Operators" },
-  { value: "recycler", label: "Recyclers" },
-  { value: "notifiedBodies", label: "Notified Bodies" },
-  { value: "marketSurveillance", label: "Market Surveillance Authorities" },
-  { value: "customsAuthority", label: "Customs Authorities" },
-  { value: "euCommission", label: "The EU Commission" },
-  { value: "mainDppServiceProvider", label: "Main DPP Service Providers" },
-  { value: "backupDppServiceProvider", label: "Back-up DPP Service Providers" },
-  { value: "system", label: "System" },
-];
-
-export const accessLevelLabels = Object.fromEntries(
-  accessLevels.map((entry) => [entry.value, entry.label])
-);
 
 export const confidentialityLevelLabels = Object.fromEntries(
   confidentialityLevels.map((entry) => [entry.value, entry.label])
-);
-
-export const updateAuthorityLabels = Object.fromEntries(
-  updateAuthorities.map((entry) => [entry.value, entry.label])
 );
 
 export const fieldTypes = [
@@ -472,19 +417,9 @@ export const parseCSV = (text) => {
       ?? headerIndexMap.get("type")
       ?? 2)
     : 2;
-  const accessIndex = hasStructuredHeader
-    ? (headerIndexMap.get("access")
-      ?? headerIndexMap.get("audience")
-      ?? headerIndexMap.get("audiences"))
-    : undefined;
   const confidentialityIndex = hasStructuredHeader
     ? (headerIndexMap.get("confidentiality")
       ?? headerIndexMap.get("classification"))
-    : undefined;
-  const updateAuthorityIndex = hasStructuredHeader
-    ? (headerIndexMap.get("updateauthority")
-      ?? headerIndexMap.get("updateauthorities")
-      ?? headerIndexMap.get("authority"))
     : undefined;
 
   return rows.slice(start)
@@ -495,56 +430,50 @@ export const parseCSV = (text) => {
         fieldLabel: row[fieldIndex],
         sectionLabel: row[sectionIndex]?.trim() || "General",
         fieldType: validTypes.has(rawType) ? rawType : "text",
-        access: parseGovernanceList(row[accessIndex], accessLevels, ["public"]),
         confidentiality: parseGovernanceList(row[confidentialityIndex], confidentialityLevels, ["public"])[0] || "public",
-        updateAuthority: parseGovernanceList(row[updateAuthorityIndex], updateAuthorities, ["economicOperator"]),
       };
     });
 };
 
 export const buildSectionsFromCSV = (rows) => {
   const map = new Map();
-  for (const { fieldLabel, sectionLabel, fieldType, access, confidentiality, updateAuthority } of rows) {
+  for (const { fieldLabel, sectionLabel, fieldType, confidentiality } of rows) {
     if (!map.has(sectionLabel)) map.set(sectionLabel, []);
     map.get(sectionLabel).push({
       label: fieldLabel,
       type: fieldType,
-      access,
       confidentiality,
-      updateAuthority,
     });
   }
   return [...map.entries()].map(([sectionLabel, fields]) => ({
     localId: Math.random().toString(36).slice(2),
     key: toSlug(sectionLabel),
     label: sectionLabel,
-    fields: fields.map(({ label, type, access, confidentiality, updateAuthority }) => ({
+    fields: fields.map(({ label, type, confidentiality }) => ({
       localId: Math.random().toString(36).slice(2),
       key: toFieldKey(label),
       label,
       type,
-      access: Array.isArray(access) && access.length ? access : ["public"],
       confidentiality: confidentiality || "public",
-      updateAuthority: Array.isArray(updateAuthority) && updateAuthority.length ? updateAuthority : ["economicOperator"],
     })),
   }));
 };
 
 export const downloadTemplate = () => {
   const csv = [
-    "Field Label,Section,Type,Access,Confidentiality,Update Authority",
-    "Manufacturer,General,text,manufacturer|marketSurveillance,regulated,economicOperator|marketSurveillance",
-    "Model Number,General,text,public,public,economicOperator",
-    "Internal Alias ID,General,text,public,public,economicOperator",
-    "Weight (kg),Technical Specifications,text,public,public,economicOperator",
-    "Dimensions,Technical Specifications,text,public,public,economicOperator",
-    "Material Composition,Technical Specifications,textarea,public,public,economicOperator",
-    "Is Recyclable,Sustainability,boolean,public,public,economicOperator",
-    "Manufacture Date,General,date,public,public,economicOperator",
-    "Product URL,General,url,public,public,economicOperator",
-    "Recycled Content (%),Sustainability,text,public,public,economicOperator",
-    "Carbon Footprint,Sustainability,text,legitimateInterest,restricted,economicOperator",
-    "Compliance Certificate,Compliance Documents,file,notifiedBodies|marketSurveillance,regulated,economicOperator|notifiedBodies",
+    "Field Label,Section,Type,Confidentiality",
+    "Manufacturer,General,text,public",
+    "Model Number,General,text,public",
+    "Internal Alias ID,General,text,public",
+    "Weight (kg),Technical Specifications,text,public",
+    "Dimensions,Technical Specifications,text,public",
+    "Material Composition,Technical Specifications,textarea,public",
+    "Is Recyclable,Sustainability,boolean,public",
+    "Manufacture Date,General,date,public",
+    "Product URL,General,url,public",
+    "Recycled Content (%),Sustainability,text,public",
+    "Carbon Footprint,Sustainability,text,restricted",
+    "Compliance Certificate,Compliance Documents,file,restricted",
   ].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const anchor = document.createElement("a");
@@ -571,8 +500,6 @@ export function newField(label = "") {
     label,
     labelI18n: {},
     type: "text",
-    access: ["public"],
     confidentiality: "public",
-    updateAuthority: ["economicOperator"],
   };
 }

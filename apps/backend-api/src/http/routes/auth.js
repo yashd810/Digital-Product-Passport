@@ -787,26 +787,6 @@ module.exports = function registerAuthRoutes(app, {
         return res.status(403).json({ error: "Admin only" });
       const deactivated = await pool.query('UPDATE users SET "isActive" = false, "sessionVersion" = COALESCE("sessionVersion", 1) + 1, "updatedAt" = NOW() WHERE id = $1 AND "companyId" = $2 RETURNING id, role, "sessionVersion" AS "sessionVersion", "isActive" AS "isActive"',
         [req.params.userId, req.params.companyId]);
-      await pool.query(
-        `UPDATE "userAccessAudiences"
-         SET "isActive" = false,
-             "updatedAt" = NOW()
-        WHERE "userId" = $1
-          AND ("companyId" = $2 OR "companyId" IS NULL)`,
-        [req.params.userId, req.params.companyId]
-      ).catch((error) => {
-        logger.warn({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to deactivate delegated user audiences");
-      });
-      await pool.query(
-        `UPDATE "passportAccessGrants"
-         SET "isActive" = false,
-             "updatedAt" = NOW()
-         WHERE "granteeUserId" = $1
-           AND "companyId" = $2`,
-        [req.params.userId, req.params.companyId]
-      ).catch((error) => {
-        logger.warn({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to deactivate passport access grants for user");
-      });
       await logAudit(
         req.params.companyId,
         req.user.userId,
@@ -830,8 +810,6 @@ module.exports = function registerAuthRoutes(app, {
         revocationMode: "emergency",
         metadata: {
           sessionVersion: deactivated.rows[0]?.sessionVersion || null,
-          revokedDelegatedAudiences: true,
-          revokedPassportGrants: true,
         },
       }).catch((error) => {
         logger.warn({ err: error, companyId: req.params.companyId, userId: req.params.userId }, "Failed to replicate user deactivation event");

@@ -11,7 +11,6 @@ const {
   validateQrPrintSpecification,
 } = require("../../shared/passports/carrier-authenticity");
 const registerApiKeyRoutes = require("../../modules/passports/register-api-key-routes");
-const registerAccessGrantRoutes = require("../../modules/passports/register-access-grant-routes");
 const registerAuditAnalyticsRoutes = require("../../modules/passports/register-audit-analytics-routes");
 const registerBackupRoutes = require("../../modules/passports/register-backup-routes");
 const registerCarrierSecurityRoutes = require("../../modules/passports/register-carrier-security-routes");
@@ -22,7 +21,6 @@ const registerDeleteRoutes = require("../../modules/passports/register-delete-ro
 const registerHistoryReadRoutes = require("../../modules/passports/register-history-read-routes");
 const registerLifecycleRoutes = require("../../modules/passports/register-lifecycle-routes");
 const registerPreviewManagementRoutes = require("../../modules/passports/register-preview-management-routes");
-const registerPublicApiV1Routes = require("../../modules/passports/register-public-api-v1-routes");
 const registerPassportSupportRoutes = require("../../modules/passports/register-support-routes");
 const registerUpdateRoutes = require("../../modules/passports/register-update-routes");
 const { createApiKeyHelpers } = require("../../modules/passports/api-key-helpers");
@@ -41,15 +39,12 @@ module.exports = function registerPassportRoutes(app, {
   checkCompanyAdmin,
   requireEditor,
   requireDraftEditor,
-  authenticateApiKey,
-  requireApiKeyScope,
   publicReadRateLimit,
-  apiKeyReadRateLimit,
+  publicUnlockRateLimit,
   assetWriteRateLimit,
   upload,
   validatePdfUpload,
   hashSecret,
-  createAccessKeyMaterial,
   createDeviceKeyMaterial,
   // passport service helpers
   inRevisionStatusesSql,
@@ -107,7 +102,6 @@ module.exports = function registerPassportRoutes(app, {
   buildSemanticPassportJsonExport,
   storageService,
   complianceService,
-  accessRightsService,
   didService,
   productIdentifierService,
   backupProviderService,
@@ -123,15 +117,13 @@ module.exports = function registerPassportRoutes(app, {
   const archivedHistoryReasonSql = `('beforeArchiveDelete','beforeBulkArchiveDelete','beforeDelete','beforeBulkDelete')`;
   const archivedHistoryFilterSql = `("snapshotReason" IN ${archivedHistoryReasonSql})`;
   const {
-    buildApiKeyFieldWriteDecision,
     buildApiKeyHashRecord,
-    buildApiKeyScopesForAccessMode,
-    flattenTypeFields,
-    parseApiKeyAccessMode,
-    parseApiKeyMaxConfidentiality,
-    parseApiKeyOperatorType,
-    sanitizePassportForApiKey,
-  } = createApiKeyHelpers({ accessRightsService, crypto });
+    buildSecurityGroupApiKeyScopes,
+    checkSecurityGroupApiKeyAccess,
+    getSecurityGroupKeyFromRequest,
+    isRestrictedField,
+    resolveSecurityGroupApiKey,
+  } = createApiKeyHelpers({ crypto });
   const {
     getActorIdentifier,
     replicateAccessControlEventToBackup,
@@ -147,9 +139,7 @@ module.exports = function registerPassportRoutes(app, {
   const {
     buildCarrierAuthenticityStorageValue,
     buildDataCarrierVerificationRecord,
-    getTrustedViewerHost,
     maybeSignCarrierPayload,
-    parseUrlHost,
     recordPassportSecurityEvent,
   } = createCarrierSecurityHelpers({
     pool,
@@ -193,30 +183,11 @@ module.exports = function registerPassportRoutes(app, {
     checkCompanyAdmin,
     logAudit,
     buildApiKeyHashRecord,
-    buildApiKeyScopesForAccessMode,
-    parseApiKeyAccessMode,
-    parseApiKeyOperatorType,
-    parseApiKeyMaxConfidentiality,
-    replicateAccessControlEventToBackup,
-  });
-
-  registerPublicApiV1Routes(app, {
-    pool,
-    logger,
-    authenticateApiKey,
-    requireApiKeyScope,
-    apiKeyReadRateLimit,
-    normalizePassportRequestBody,
-    getPassportTypeSchema,
+    buildSecurityGroupApiKeyScopes,
     getTable,
+    isRestrictedField,
     normalizePassportRow,
-    sanitizePassportForApiKey,
-    flattenTypeFields,
-    buildApiKeyFieldWriteDecision,
-    archivePassportSnapshot,
-    updatePassportRowById,
-    logAudit,
-    editableReleaseStatusesSql,
+    replicateAccessControlEventToBackup,
   });
 
   // ─── PASSPORT CRUD ─────────────────────────────────────────────────────────
@@ -282,12 +253,11 @@ module.exports = function registerPassportRoutes(app, {
 
   registerPreviewManagementRoutes(app, {
     pool,
+    crypto,
     authenticateToken,
     checkCompanyAccess,
     requireEditor,
-    createAccessKeyMaterial,
     editSessionTimeoutHours,
-    stripRestrictedFieldsForPublicView,
     getCompanyNameMap,
     normalizePassportRow,
     resolveCompanyPreviewPassport,
@@ -472,15 +442,6 @@ module.exports = function registerPassportRoutes(app, {
     archivedHistoryFilterSql,
   });
 
-  registerAccessGrantRoutes(app, {
-    pool,
-    accessRightsService,
-    authenticateToken,
-    checkCompanyAccess,
-    checkCompanyAdmin,
-    logAudit,
-    replicateAccessControlEventToBackup,
-  });
   registerBackupRoutes(app, {
     backupProviderService,
     authenticateToken,
@@ -501,6 +462,7 @@ module.exports = function registerPassportRoutes(app, {
     checkCompanyAccess,
     requireEditor,
     publicReadRateLimit,
+    publicUnlockRateLimit,
     hashSecret,
     createDeviceKeyMaterial,
     logAudit,
@@ -516,9 +478,10 @@ module.exports = function registerPassportRoutes(app, {
     maybeSignCarrierPayload,
     buildCarrierAuthenticityStorageValue,
     buildDataCarrierVerificationRecord,
+    checkSecurityGroupApiKeyAccess,
+    getSecurityGroupKeyFromRequest,
     recordPassportSecurityEvent,
-    getTrustedViewerHost,
-    parseUrlHost,
+    resolveSecurityGroupApiKey,
   });
 
 };

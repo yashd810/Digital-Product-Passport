@@ -185,7 +185,7 @@ function ArchivedPassports({ user, companyId }) {
       let exportedCount = 0;
       const fileCount = Object.keys(groupedByType).length;
       for (const [passportType, passportsForType] of Object.entries(groupedByType)) {
-        const typeResponse = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
+        const typeResponse = await fetchWithAuth(`${api}/api/internal/passport-types/${passportType}`);
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
         const semanticModelKey = typeData.semanticModelKey || "";

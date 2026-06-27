@@ -81,6 +81,7 @@ module.exports = function createPassportService({
     return {
       typeName: typeRes.rows[0].typeName,
       displayName: typeRes.rows[0].displayName,
+      fieldsJson: typeRes.rows[0].fieldsJson,
       schemaFields,
       allowedKeys: new Set(schemaFields.map(field => field.key).filter(Boolean)),
     };
@@ -179,7 +180,6 @@ module.exports = function createPassportService({
     if (!passport || !passportType) return passport;
     const sanitized = { ...passport };
     delete sanitized.companyId;
-    delete sanitized.companyId;
     try {
       const typeRes = await pool.query(
         'SELECT "fieldsJson" AS "fieldsJson" FROM "passportTypes" WHERE "typeName" = $1',
@@ -189,8 +189,8 @@ module.exports = function createPassportService({
       const sections = typeRes.rows[0].fieldsJson?.sections || [];
       for (const section of sections) {
         for (const field of (section.fields || [])) {
-          const access = field.access || ["public"];
-          if (!access.includes("public")) delete sanitized[field.key];
+          const confidentiality = String(field.confidentiality || "public").trim().toLowerCase();
+          if (confidentiality === "restricted") delete sanitized[field.key];
         }
       }
     } catch {

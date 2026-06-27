@@ -66,6 +66,13 @@ function updateDppUseCase(deps) {
 
     const editable = await resolveEditablePassportByDppId(dppId);
     if (!editable?.passport) return { statusCode: 404, body: { error: "Editable passport not found" } };
+    const routeCompanyId = req.params?.companyId !== undefined ? Number.parseInt(req.params.companyId, 10) : null;
+    if (req.params?.companyId !== undefined && !Number.isFinite(routeCompanyId)) {
+      return { statusCode: 400, body: { error: "A valid companyId is required" } };
+    }
+    if (Number.isFinite(routeCompanyId) && Number(editable.passport.companyId) !== routeCompanyId) {
+      return { statusCode: 404, body: { error: "Editable passport not found for this company" } };
+    }
     if (req.user.role !== "superAdmin" && Number(req.user.companyId) !== Number(editable.passport.companyId)) {
       return { statusCode: 403, body: { error: "Forbidden" } };
     }

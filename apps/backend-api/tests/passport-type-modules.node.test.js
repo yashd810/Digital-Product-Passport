@@ -181,3 +181,27 @@ test("passport type module fields carry locked canonical source semantics", () =
     }
   }
 }));
+
+test("passport type module rejects field keys that do not match semantic term keys", () => withTempModules((modulesDir) => {
+  const invalidDefinition = createModuleDefinition({
+    sections: [{
+      key: "deviceIdentity",
+      label: "Device Identity",
+      fields: [{
+        key: "modelId",
+        label: "Model Identifier",
+        type: "text",
+        semanticId: "https://example.test/dictionary/example-product/v1/terms/model-identifier",
+        elementIdPath: "deviceIdentity.modelId",
+        objectType: "SingleValuedDataElement",
+        valueDataType: "String",
+      }],
+    }],
+  });
+  writeModuleFile(modulesDir, "invalid-product-v1.js", invalidDefinition);
+
+  assert.throws(
+    () => getPassportTypeModules({ modulesDir }),
+    /must use canonical semantic key "modelIdentifier"/
+  );
+}));

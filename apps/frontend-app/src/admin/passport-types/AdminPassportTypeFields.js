@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
-  accessLevelLabels,
   confidentialityLevelLabels,
-  updateAuthorityLabels,
   normalizeSystemPassportHeader,
   resolveSystemHeaderEntries,
 } from "./builderHelpers";
@@ -30,7 +28,7 @@ function AdminPassportTypeFields() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetchWithAuth(`${api}/api/passport-types/${typeName}`);
+        const res = await fetchWithAuth(`${api}/api/internal/passport-types/${typeName}`);
         if (!res.ok) throw new Error("Passport type not found");
         const data = await res.json();
         setTypeDef({ ...data, typeName });
@@ -51,11 +49,6 @@ function AdminPassportTypeFields() {
   const systemHeader = normalizeSystemPassportHeader(typeDef.fieldsJson?.systemHeader);
   const systemHeaderEntries = resolveSystemHeaderEntries(sections, systemHeader);
   const fieldCount = sections.reduce((sum, s) => sum + (s.fields?.length || 0), 0);
-  const describeList = (values = [], labelMap = {}) =>
-    (Array.isArray(values) ? values : [])
-      .map((value) => labelMap[value] || value)
-      .join(", ") || "—";
-
   return (
     <div className="apt-page">
       <div className="apt-toolbar admin-toolbar-compact">
@@ -110,16 +103,14 @@ function AdminPassportTypeFields() {
               <div className="apt-fv-section-title apt-fv-section-title-strong">{section.label}</div>
               <table className="apt-fv-table apt-fv-table-full apt-fv-table-custom">
                 <caption className="apt-sr-only">
-                  {section.label} fields with access audience, confidentiality, and update authority rules.
+                  {section.label} fields with confidentiality rules.
                 </caption>
                 <thead>
                   <tr>
                     <th>Label</th>
                     <th>Key</th>
                     <th>Type</th>
-                    <th>Access</th>
                     <th>Confidentiality</th>
-                    <th>Update Authority</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -128,9 +119,7 @@ function AdminPassportTypeFields() {
                       <td>{field.label}</td>
                       <td><code>{field.key}</code></td>
                       <td><span className={`apt-fv-type apt-fv-type-${field.type}`}>{field.type}</span></td>
-                      <td>{describeList(field.access, accessLevelLabels)}</td>
                       <td>{confidentialityLevelLabels[field.confidentiality] || field.confidentiality || "—"}</td>
-                      <td>{describeList(field.updateAuthority, updateAuthorityLabels)}</td>
                     </tr>
                   ))}
                 </tbody>

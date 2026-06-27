@@ -156,7 +156,6 @@ function registerBackupRoutes(app, deps) {
         },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || null,
-          audience: Array.isArray(req.user.accessAudiences) ? req.user.accessAudiences.join(",") : null,
         }
       );
 
@@ -208,7 +207,6 @@ function registerBackupRoutes(app, deps) {
         },
         {
           actorIdentifier: req.user.actorIdentifier || req.user.globallyUniqueOperatorId || null,
-          audience: Array.isArray(req.user.accessAudiences) ? req.user.accessAudiences.join(",") : null,
         }
       );
 

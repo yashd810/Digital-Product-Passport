@@ -524,7 +524,7 @@ module.exports = function createBackupProviderService({
         fieldKey: attachment.fieldKey || null,
         label: fieldDef?.label || attachment.fieldKey || "Attachment",
         mandatory: isMandatoryField(fieldDef),
-        accessMode: attachment.isPublic ? "publicDownload" : "controlledPrivate",
+        deliveryMode: attachment.isPublic ? "publicDownload" : "controlledPrivate",
         isPublic: attachment.isPublic === true,
         publicDownloadUrl: attachment.isPublic ? publicDownloadUrl : null,
         sourceReference: attachment.fileUrl || publicDownloadUrl || null,

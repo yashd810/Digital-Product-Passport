@@ -162,6 +162,7 @@ export function PassportListModalStack({
           passport={deviceModal.passport}
           passportType={deviceModal.pType}
           companyId={companyId}
+          companyName={user?.companyName || deviceModal.passport?.companyName || ""}
           onClose={() => setDeviceModal(null)}
         />
       )}

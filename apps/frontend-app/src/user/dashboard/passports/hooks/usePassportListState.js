@@ -76,18 +76,20 @@ export function usePassportListState({ user, companyId, filterByUser }) {
     if (!passport?.dppId) return null;
 
     const normalizedStatus = normalizePassportStatus(passport.releaseStatus);
-    if (!forcePreview && normalizedStatus === "released" && passport.internalAliasId) {
+    if (!forcePreview && normalizedStatus === "released") {
       return buildPublicPassportPath({
         companyName: user?.companyName,
         modelName: passport.modelName,
+        dppId: passport.dppId,
         internalAliasId: passport.internalAliasId,
       });
     }
 
-    if (!forcePreview && isObsoletePassportStatus(normalizedStatus) && passport.internalAliasId && passport.versionNumber != null) {
+    if (!forcePreview && isObsoletePassportStatus(normalizedStatus) && passport.versionNumber != null) {
       return buildInactivePassportPath({
         companyName: user?.companyName,
         modelName: passport.modelName,
+        dppId: passport.dppId,
         internalAliasId: passport.internalAliasId,
         versionNumber: passport.versionNumber,
       });

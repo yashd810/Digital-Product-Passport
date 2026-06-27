@@ -77,7 +77,7 @@ const sample = {
           categoryKey: "product-identification",
           categoryLabel: "Product Identification",
           unitKey: "none",
-          accessRights: "public",
+          confidentiality: "public",
         },
         {
           fieldKey: "modelIdentifier",
@@ -89,7 +89,7 @@ const sample = {
           categoryKey: "product-identification",
           categoryLabel: "Product Identification",
           unitKey: "none",
-          accessRights: "public",
+          confidentiality: "public",
         },
         {
           fieldKey: "manufacturerName",
@@ -101,7 +101,7 @@ const sample = {
           categoryKey: "product-identification",
           categoryLabel: "Product Identification",
           unitKey: "none",
-          accessRights: "public",
+          confidentiality: "public",
         },
       ],
     },
@@ -121,7 +121,7 @@ const sample = {
           unitKey: "percent",
           unitLabel: "Percent",
           unitSymbol: "%",
-          accessRights: "public",
+          confidentiality: "public",
         },
       ],
     },
@@ -137,7 +137,7 @@ const fieldsCsvColumns = [
   "dataType",
   "unitLabel",
   "unitSymbol",
-  "accessRights",
+  "confidentiality",
   "queryable",
   "indexed",
   "tableColumns",
@@ -145,7 +145,7 @@ const fieldsCsvColumns = [
 
 const fieldTypeOptions = new Set(["text", "textarea", "boolean", "date", "url", "file", "symbol", "table"]);
 const dataTypeOptions = new Set(["string", "number", "integer", "boolean", "date", "datetime", "uri"]);
-const accessRightsOptions = new Set(["public", "restricted"]);
+const confidentialityOptions = new Set(["public", "restricted"]);
 const objectTypeOptions = new Set([
   "SingleValuedDataElement",
   "MultiValuedDataElement",
@@ -458,7 +458,7 @@ function getFieldsCsvRowsFromSpec(spec = readSpec()) {
       dataType: field.dataType || "string",
       unitLabel: field.unitLabel || "",
       unitSymbol: field.unitSymbol || "",
-      accessRights: field.accessRights || "public",
+      confidentiality: field.confidentiality || "public",
       queryable: field.queryable ? "true" : "false",
       indexed: field.indexed ? "true" : "false",
       tableColumns: field.fieldType === "table" ? JSON.stringify(field.tableColumns || []) : "",
@@ -524,7 +524,7 @@ function readFieldsCsvRows(text) {
           dataType,
           unitLabel: entry.unitLabel || "",
           unitSymbol: entry.unitSymbol || "",
-          accessRights: normalizeCsvOption(entry.accessRights, accessRightsOptions, "public"),
+          confidentiality: normalizeCsvOption(entry.confidentiality, confidentialityOptions, "public"),
           queryable: parseBooleanCell(entry.queryable),
           indexed: parseBooleanCell(entry.indexed),
           tableColumns,
@@ -631,6 +631,10 @@ function maybeAutoModuleValues() {
 }
 
 function columnKeyFromLabel(value) {
+  return canonicalKeyFromSemanticSlug(value);
+}
+
+function canonicalKeyFromSemanticSlug(value) {
   const words = splitWords(value).map((word) => word.toLowerCase());
   if (!words.length) return "";
   return words
@@ -705,9 +709,9 @@ function setupFieldAutoFill(node) {
   const unitKeyInput = $("[data-field='unitKey']", node);
   const unitLabelInput = $("[data-field='unitLabel']", node);
 
-  bindDerivedInput(keyInput, () => camelCaseFromWords(labelInput.value), [labelInput]);
+  bindDerivedInput(semanticSlugInput, () => slugFromValue(labelInput.value), [labelInput]);
+  bindDerivedInput(keyInput, () => canonicalKeyFromSemanticSlug(semanticSlugInput.value || slugFromValue(labelInput.value)), [semanticSlugInput, labelInput]);
   bindDerivedInput(labelInput, () => titleCase(keyInput.value), [keyInput]);
-  bindDerivedInput(semanticSlugInput, () => slugFromValue(labelInput.value || keyInput.value), [labelInput, keyInput]);
   bindDerivedInput(categoryKeyInput, () => slugFromValue(categoryLabelInput.value), [categoryLabelInput]);
   bindDerivedInput(categoryLabelInput, () => titleCase(categoryKeyInput.value), [categoryKeyInput]);
   bindDerivedInput(unitKeyInput, () => unitKeyFromLabel(unitLabelInput.value), [unitLabelInput]);
@@ -720,9 +724,9 @@ function setupTableColumnAutoFill(row, node) {
   const unitKeyInput = $("[data-column='unitKey']", node);
   const unitLabelInput = $("[data-column='unitLabel']", node);
 
-  bindDerivedInput(keyInput, () => columnKeyFromLabel(labelInput.value), [labelInput]);
+  bindDerivedInput(semanticSlugInput, () => slugFromValue(labelInput.value), [labelInput]);
+  bindDerivedInput(keyInput, () => canonicalKeyFromSemanticSlug(semanticSlugInput.value || slugFromValue(labelInput.value)), [semanticSlugInput, labelInput]);
   bindDerivedInput(labelInput, () => titleCase(keyInput.value), [keyInput]);
-  bindDerivedInput(semanticSlugInput, () => slugFromValue(labelInput.value || keyInput.value), [labelInput, keyInput]);
   bindDerivedInput(unitKeyInput, () => unitKeyFromLabel(unitLabelInput.value), [unitLabelInput]);
 
   labelInput.addEventListener("input", () => {
@@ -734,10 +738,11 @@ function setupTableColumnAutoFill(row, node) {
 }
 
 function getTableColumnDefaults(index = 0) {
+  const semanticSlug = `column-${index + 1}`;
   return {
-    columnKey: `column${index + 1}`,
+    columnKey: canonicalKeyFromSemanticSlug(semanticSlug),
     columnLabel: `Column ${index + 1}`,
-    semanticSlug: `column-${index + 1}`,
+    semanticSlug,
     dataType: "string",
     unitKey: "none",
     unitLabel: "",
@@ -753,6 +758,8 @@ function readTableColumns(row) {
     for (const input of $$("[data-column]", columnNode)) {
       column[input.dataset.column] = input.type === "checkbox" ? input.checked : input.value.trim();
     }
+    column.semanticSlug = slugFromValue(column.semanticSlug || column.columnLabel || column.columnKey);
+    column.columnKey = canonicalKeyFromSemanticSlug(column.semanticSlug || column.columnLabel || column.columnKey);
     return column;
   });
 }
@@ -1166,6 +1173,8 @@ function readField(row) {
   if (field.fieldType === "table") {
     field.tableColumns = readTableColumns(row);
   }
+  field.semanticSlug = slugFromValue(field.semanticSlug || field.fieldLabel || field.fieldKey);
+  field.fieldKey = canonicalKeyFromSemanticSlug(field.semanticSlug || field.fieldLabel || field.fieldKey);
   return field;
 }
 
@@ -1295,7 +1304,7 @@ function downloadFieldsCsvTemplate() {
       dataType: "string",
       unitLabel: "",
       unitSymbol: "",
-      accessRights: "public",
+      confidentiality: "public",
       queryable: "false",
       indexed: "false",
       tableColumns: "",
@@ -1309,7 +1318,7 @@ function downloadFieldsCsvTemplate() {
       dataType: "string",
       unitLabel: "",
       unitSymbol: "",
-      accessRights: "public",
+      confidentiality: "public",
       queryable: "false",
       indexed: "false",
       tableColumns: JSON.stringify([

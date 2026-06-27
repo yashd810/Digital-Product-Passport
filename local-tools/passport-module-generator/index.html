@@ -245,9 +245,10 @@
             <span>Data type</span>
             <span>Unit</span>
             <span>Symbol</span>
-            <span>Access</span>
+            <span>Confidentiality</span>
             <span>Actions</span>
             <span>More</span>
+            <span>Remove</span>
           </div>
           <div class="field-grid-filters" aria-label="Field column filters">
             <label><span>Filter label</span><input data-field-filter="fieldLabel" placeholder="Search label"></label>
@@ -280,8 +281,8 @@
             </label>
             <label><span>Filter unit</span><input data-field-filter="unitLabel" placeholder="Search unit"></label>
             <label><span>Filter symbol</span><input data-field-filter="unitSymbol" placeholder="Search symbol"></label>
-            <label><span>Filter access</span>
-              <select data-field-filter="accessRights">
+            <label><span>Filter confidentiality</span>
+              <select data-field-filter="confidentiality">
                 <option value="">All</option>
                 <option value="public">public</option>
                 <option value="restricted">restricted</option>
@@ -289,6 +290,7 @@
             </label>
             <button type="button" class="clear-filters" data-clear-filters>Clear</button>
             <label><span>Filter more metadata</span><input data-field-filter="advanced" placeholder="Search key/slug/schema"></label>
+            <span class="field-filter-spacer" aria-hidden="true"></span>
           </div>
           <div data-fields class="field-grid-body"></div>
         </div>
@@ -325,8 +327,8 @@
         </label>
         <label class="field-cell field-cell-unit"><span>Unit label</span><input data-field="unitLabel" placeholder="Kilogram"></label>
         <label class="field-cell field-cell-symbol"><span>Unit symbol</span><input data-field="unitSymbol" placeholder="kg"></label>
-        <label class="field-cell field-cell-access"><span>Access</span>
-          <select data-field="accessRights">
+        <label class="field-cell field-cell-confidentiality"><span>Confidentiality</span>
+          <select data-field="confidentiality">
             <option value="public">public</option>
             <option value="restricted">restricted</option>
           </select>
@@ -334,7 +336,6 @@
         <div class="field-actions">
           <label class="check"><input type="checkbox" data-field="queryable"> queryable</label>
           <label class="check"><input type="checkbox" data-field="indexed"> indexed</label>
-          <button type="button" data-remove-field>Remove field</button>
         </div>
         <div class="field-cell field-cell-more">
           <details class="auto-group field-more-group">
@@ -363,7 +364,7 @@
                   <option value="Object">Object</option>
                 </select>
               </label>
-              <label>Field key <input data-field="fieldKey" placeholder="manufacturerName"></label>
+              <input type="hidden" data-field="fieldKey">
               <label>Semantic slug <input data-field="semanticSlug" placeholder="manufacturer-name"></label>
               <label>Category key <input data-field="categoryKey" placeholder="product-identification"></label>
               <label>Unit key <input data-field="unitKey" value="none" placeholder="none"></label>
@@ -387,6 +388,9 @@
               <div class="table-columns" data-table-columns></div>
             </div>
           </div>
+        </div>
+        <div class="field-remove-actions">
+          <button type="button" data-remove-field>Remove field</button>
         </div>
       </div>
     </template>
@@ -417,7 +421,7 @@
         <details class="auto-group table-column-more">
           <summary>Auto-filled</summary>
           <div class="auto-group-grid">
-            <label>Column key <input data-column="columnKey" placeholder="casNumber"></label>
+            <input type="hidden" data-column="columnKey">
             <label>Semantic slug <input data-column="semanticSlug" placeholder="cas-number"></label>
             <label>Unit key <input data-column="unitKey" value="none" placeholder="none"></label>
             <label>Object type

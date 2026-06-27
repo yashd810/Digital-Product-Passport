@@ -80,56 +80,9 @@ const reservedPassportSemanticIds = [
 const reservedPassportFieldKeySet = new Set(reservedPassportFieldKeys);
 const reservedPassportSemanticIdSet = new Set(reservedPassportSemanticIds);
 
-const validAccessLevels = new Set([
-  "public",
-  "consumers",
-  "notifiedBodies",
-  "marketSurveillance",
-  "customsAuthority",
-  "euCommission",
-  "legitimateInterest",
-  "economicOperator",
-  "delegatedOperator",
-  "manufacturer",
-  "authorizedRepresentative",
-  "importer",
-  "distributor",
-  "dealer",
-  "fulfilmentServiceProvider",
-  "professionalRepairer",
-  "independentOperator",
-  "recycler",
-  "mainDppServiceProvider",
-  "backupDppServiceProvider",
-]);
-
 const validConfidentialityLevels = new Set([
   "public",
   "restricted",
-  "confidential",
-  "tradeSecret",
-  "regulated",
-]);
-
-const validUpdateAuthorities = new Set([
-  "economicOperator",
-  "delegatedOperator",
-  "manufacturer",
-  "authorizedRepresentative",
-  "importer",
-  "distributor",
-  "dealer",
-  "fulfilmentServiceProvider",
-  "professionalRepairer",
-  "independentOperator",
-  "recycler",
-  "notifiedBodies",
-  "marketSurveillance",
-  "customsAuthority",
-  "euCommission",
-  "mainDppServiceProvider",
-  "backupDppServiceProvider",
-  "system",
 ]);
 
 module.exports = function registerAdminRoutes(app, {
@@ -237,28 +190,6 @@ module.exports = function registerAdminRoutes(app, {
 
     for (const section of sections) {
       for (const field of section?.fields || []) {
-        const access = Array.isArray(field?.access) ? field.access.filter(Boolean) : [];
-        if (!access.length) {
-          issues.push({
-            code: "fieldAccessMissing",
-            key: field.key,
-            label: field.label || field.key,
-            section: section.label || section.key || null,
-            message: `Field "${field.label || field.key}" must expose at least one audience.`,
-          });
-        } else {
-          const invalidAccess = access.filter((entry) => !validAccessLevels.has(entry));
-          if (invalidAccess.length) {
-            issues.push({
-              code: "fieldAccessInvalid",
-              key: field.key,
-              label: field.label || field.key,
-              section: section.label || section.key || null,
-              message: `Field "${field.label || field.key}" uses unsupported access values: ${invalidAccess.join(", ")}.`,
-            });
-          }
-        }
-
         const confidentiality = String(field?.confidentiality || "").trim().toLowerCase();
         if (!confidentiality) {
           issues.push({
@@ -276,28 +207,6 @@ module.exports = function registerAdminRoutes(app, {
             section: section.label || section.key || null,
             message: `Field "${field.label || field.key}" uses unsupported confidentiality value "${field.confidentiality}".`,
           });
-        }
-
-        const updateAuthority = Array.isArray(field?.updateAuthority) ? field.updateAuthority : [];
-        if (!updateAuthority.length) {
-          issues.push({
-            code: "fieldUpdateAuthorityMissing",
-            key: field.key,
-            label: field.label || field.key,
-            section: section.label || section.key || null,
-            message: `Field "${field.label || field.key}" must declare at least one update authority.`,
-          });
-        } else {
-          const invalidUpdateAuthority = updateAuthority.filter((entry) => !validUpdateAuthorities.has(entry));
-          if (invalidUpdateAuthority.length) {
-            issues.push({
-              code: "fieldUpdateAuthorityInvalid",
-              key: field.key,
-              label: field.label || field.key,
-              section: section.label || section.key || null,
-              message: `Field "${field.label || field.key}" uses unsupported updateAuthority values: ${invalidUpdateAuthority.join(", ")}.`,
-            });
-          }
         }
       }
     }

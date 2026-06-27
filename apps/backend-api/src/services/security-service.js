@@ -69,16 +69,6 @@ function generateOpaqueSecret(prefix, size = 24) {
   return `${String(prefix || "")}${value}`;
 }
 
-function createAccessKeyMaterial() {
-  const rawKey = generateOpaqueSecret("pak", 24);
-  return {
-    rawKey,
-    hash: hashSecret(rawKey),
-    prefix: buildSecretPrefix(rawKey),
-    rotatedAt: new Date().toISOString(),
-  };
-}
-
 function createDeviceKeyMaterial() {
   const rawKey = generateOpaqueSecret("dpk", 32);
   return {
@@ -96,6 +86,5 @@ module.exports = {
   hashOtpCode,
   generateOtpCode,
   timingSafeEqualHex,
-  createAccessKeyMaterial,
   createDeviceKeyMaterial,
 };

@@ -1,51 +1,19 @@
-import React from "react";
 import { toFieldKey } from "./builderHelpers";
 import { normalizeSemanticModelKey } from "./semanticTermCatalog";
 import { normalizeTableColumns } from "../../shared/passports/tableSchemaUtils";
 
-export function summarizeSelectedValues(
-  values = [],
-  labelMap = {},
-  emptyLabel = "Select options",
-) {
-  const normalized = Array.isArray(values) ? values : [];
-  if (!normalized.length) return emptyLabel;
-  if (normalized.length <= 2) {
-    return normalized.map((value) => labelMap[value] || value).join(", ");
-  }
-  const [first, second] = normalized;
-  return `${labelMap[first] || first}, ${labelMap[second] || second} +${normalized.length - 2}`;
+function semanticTerminalSegment(semanticId = "") {
+  const raw = String(semanticId || "").trim();
+  if (!raw) return "";
+  const withoutQuery = raw.split("?")[0].replace(/\/+$/g, "");
+  const hashSegment = withoutQuery.includes("#") ? withoutQuery.split("#").pop() : "";
+  const pathSegment = withoutQuery.split("/").pop();
+  const colonSegment = withoutQuery.split(":").pop();
+  return hashSegment || pathSegment || colonSegment || "";
 }
 
-export function CheckboxDropdown({
-  label,
-  icon,
-  summary,
-  isOpen,
-  onToggle,
-  children,
-  className = "",
-}) {
-  return (
-    <div
-      className={`acpt-checkbox-dropdown ${className}${isOpen ? " open" : ""}`}
-    >
-      <span className="acpt-access-label">
-        {icon} {label}:
-      </span>
-      <button
-        type="button"
-        className="acpt-checkbox-dropdown-trigger"
-        onClick={onToggle}
-      >
-        <span className="acpt-checkbox-dropdown-summary">{summary}</span>
-        <span className="acpt-checkbox-dropdown-caret">
-          {isOpen ? "▲" : "▼"}
-        </span>
-      </button>
-      {isOpen && <div className="acpt-checkbox-dropdown-menu">{children}</div>}
-    </div>
-  );
+export function canonicalFieldKeyFromSemanticId(semanticId = "", fallback = "") {
+  return toFieldKey(semanticTerminalSegment(semanticId) || fallback);
 }
 
 export function normalizeFieldForSemanticModel(
@@ -55,7 +23,7 @@ export function normalizeFieldForSemanticModel(
 ) {
   const nextField = {
     ...field,
-    key: field.key || toFieldKey(field.label || ""),
+    key: field.key || canonicalFieldKeyFromSemanticId(field.semanticId, field.label || ""),
   };
 
   if (nextField.type === "table") {

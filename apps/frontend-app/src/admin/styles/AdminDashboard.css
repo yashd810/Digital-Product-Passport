@@ -2629,11 +2629,64 @@
   margin: 6px 0 0 26px;
   min-width: 0;
 }
+.acpt-field-semantic-row .acpt-field-semantic {
+  margin: 0;
+  width: 100%;
+}
 .acpt-field-side-options {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+}
+.acpt-field-options-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.acpt-field-options-grid .acpt-field-governance-stack,
+.acpt-field-options-grid .acpt-field-side-options {
+  display: contents;
+}
+.acpt-field-options-grid .acpt-field-access,
+.acpt-field-options-grid .acpt-field-required,
+.acpt-field-options-grid .acpt-field-composition,
+.acpt-field-options-grid .acpt-field-dynamic {
+  min-width: 0;
+  min-height: 40px;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+.acpt-field-options-grid .acpt-field-required,
+.acpt-field-options-grid .acpt-field-dynamic,
+.acpt-field-options-grid .acpt-field-composition:not(:has(.acpt-composition-column-config)) {
+  display: flex;
+  align-items: center;
+}
+.acpt-field-options-grid .acpt-access-check,
+.acpt-field-options-grid .acpt-required-toggle,
+.acpt-field-options-grid .acpt-composition-toggle,
+.acpt-field-options-grid .acpt-dynamic-toggle {
+  height: 100%;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.acpt-field-options-grid .acpt-governance-select {
+  min-height: 28px;
+  min-width: 104px;
+  padding: 4px 26px 4px 8px;
+  width: 100%;
+}
+.acpt-field-options-grid .admin-select-trigger-label,
+.acpt-field-options-grid .acpt-required-label,
+.acpt-field-options-grid .acpt-composition-label,
+.acpt-field-options-grid .acpt-dynamic-label {
+  font-size: 11px;
+  line-height: 1.2;
+}
+.acpt-field-options-grid input[type="checkbox"] {
+  margin: 0;
 }
 .acpt-module-source-grid {
   display: grid;
@@ -2686,7 +2739,7 @@
   flex: 1;
   margin: 0;
 }
-.acpt-field-top-row:has(.acpt-composition-column-config) {
+.acpt-field-top-row:not(.acpt-field-options-grid):has(.acpt-composition-column-config) {
   grid-template-columns: 1fr;
 }
 @media (max-width: 1080px) {
@@ -2695,6 +2748,14 @@
     grid-template-columns: 1fr;
   }
   .acpt-composition-column-row {
+    grid-template-columns: 1fr;
+  }
+  .acpt-field-options-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .acpt-field-options-grid {
     grid-template-columns: 1fr;
   }
 } /* ── Field option panels: theme-aligned overrides ────────── */

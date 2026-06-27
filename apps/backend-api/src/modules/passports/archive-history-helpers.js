@@ -219,6 +219,7 @@ function createArchiveHistoryHelpers({
             manufacturerName: version.manufacturer,
             manufacturedBy: version.manufacturedBy,
             modelName: version.modelName,
+            dppId: version.dppId,
             internalAliasId: version.internalAliasId,
           }),
           inactivePath: buildInactivePublicPassportPath({
@@ -226,6 +227,7 @@ function createArchiveHistoryHelpers({
             manufacturerName: version.manufacturer,
             manufacturedBy: version.manufacturedBy,
             modelName: version.modelName,
+            dppId: version.dppId,
             internalAliasId: version.internalAliasId,
             versionNumber,
           }),

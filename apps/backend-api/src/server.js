@@ -1,6 +1,7 @@
 "use strict";
 const path           = require("path");
 const {
+  assertDatabaseName,
   assertProductionStorageReadiness,
   assertRequiredProductionEnvironment,
   deriveRuntimeFlags,
@@ -36,7 +37,7 @@ const createOauthService       = require("./services/oauth-service");
 const createPasswordService    = require("./services/password-service");
 const logger                   = require("./services/logger");
 const { createTransporter, brandedEmail, sendOtpEmail, renderInfoTable } = require("./services/email");
-const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, passwordMinLength, createAccessKeyMaterial, createDeviceKeyMaterial } = require("./services/security-service");
+const { validatePasswordPolicy, hashSecret, hashOtpCode, generateOtpCode, passwordMinLength, createDeviceKeyMaterial } = require("./services/security-service");
 const createAuthMiddleware     = require("./http/middleware/auth");
 const { createRateLimiters, startRateLimitMaintenance } = require("./http/middleware/rate-limit");
 const createAssetService       = require("./services/asset-management");
@@ -46,7 +47,6 @@ const createPassportRepresentationService = require("./services/passport-represe
 const dppIdentity                         = require("./services/dpp-identity-service");
 const createSemanticModelRegistry         = require("./services/semantic-model-registry");
 const createComplianceService             = require("./services/required-fields-service");
-const createAccessRightsService           = require("./services/access-rights-service");
 const createProductIdentifierService      = require("./services/product-identifier-service");
 const createBackupProviderService         = require("./services/backup-provider-service");
 const canonicalizeJson                    = require("./services/json-canonicalization");
@@ -90,6 +90,7 @@ const { isProduction: isProduction, runSchemaMigrations: runSchemaMigrations, al
 
 // Validate required environment variables in production
 assertRequiredProductionEnvironment({ isProduction: isProduction, logger });
+assertDatabaseName({ logger });
 configureHttp(app, {
   allowedOriginSet,
   cspConnectSrc,
@@ -250,14 +251,14 @@ const oauthService = createOauthService({
 // ─── AUTH MIDDLEWARE ─────────────────────────────────────────────────────────
 const {
   authenticateToken, isSuperAdmin, checkCompanyAccess,
-  requireEditor, requireDraftEditor, checkCompanyAdmin, authenticateApiKey, requireApiKeyScope,
-} = createAuthMiddleware({ jwt, crypto, pool, jwtSecret, sessionCookieName });
+  requireEditor, requireDraftEditor, checkCompanyAdmin,
+} = createAuthMiddleware({ jwt, pool, jwtSecret, sessionCookieName });
 
 // ─── RATE LIMITERS ───────────────────────────────────────────────────────────
 const {
   authRateLimit, otpRateLimit, passwordResetRateLimit, publicReadRateLimit,
   publicHeavyRateLimit, publicUnlockRateLimit,
-  apiKeyReadRateLimit, assetWriteRateLimit, assetSourceFetchRateLimit,
+  assetWriteRateLimit, assetSourceFetchRateLimit,
 } = createRateLimiters(pool);
 const rateLimitMaintenanceTimer = startRateLimitMaintenance(pool);
 
@@ -377,7 +378,6 @@ const complianceService = createComplianceService({
   semanticModelRegistry,
   buildCanonicalPassportPayload,
 });
-const accessRightsService = createAccessRightsService({ pool });
 const backupProviderService = createBackupProviderService({
   pool,
   storageService,
@@ -512,7 +512,6 @@ registerAppRoutes(app, {
   publicReadRateLimit,
   publicHeavyRateLimit,
   publicUnlockRateLimit,
-  apiKeyReadRateLimit,
   assetWriteRateLimit,
   assetSourceFetchRateLimit,
   authenticateToken,
@@ -521,8 +520,6 @@ registerAppRoutes(app, {
   requireEditor,
   requireDraftEditor,
   checkCompanyAdmin,
-  authenticateApiKey,
-  requireApiKeyScope,
   hashPassword,
   verifyPassword,
   verifyPasswordAndUpgrade,
@@ -555,7 +552,6 @@ registerAppRoutes(app, {
   validateRepositoryPdfUpload: validatePdfUpload,
   validateRepositorySymbolUpload: validateSymbolUpload,
   hashSecret,
-  createAccessKeyMaterial,
   createDeviceKeyMaterial,
   getTable,
   getPassportFieldValue,
@@ -603,7 +599,6 @@ registerAppRoutes(app, {
   buildSemanticPassportJsonExport,
   storageService,
   complianceService,
-  accessRightsService,
   productIdentifierService,
   buildExpandedPassportPayload,
   createPassportTable,

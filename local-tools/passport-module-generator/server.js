@@ -116,6 +116,10 @@ function camelCase(value) {
   }).join("");
 }
 
+function canonicalKeyFromSemanticSlug(value, fallback = "") {
+  return camelCase(clean(value) || fallback);
+}
+
 function pascalCase(value) {
   const camel = camelCase(value);
   return `${camel.charAt(0).toUpperCase()}${camel.slice(1)}`;
@@ -129,9 +133,9 @@ function normalizeTableColumnKey(value) {
 
 function normalizeTableColumns(columns = [], fieldLabel = "Table") {
   const normalized = (columns || []).map((column, index) => {
-    const columnKey = normalizeTableColumnKey(column.columnKey || column.key || column.columnLabel || column.label || `column${index + 1}`);
-    const columnLabel = clean(column.columnLabel || column.label) || titleCase(columnKey || `column ${index + 1}`);
-    const semanticSlug = kebabCase(column.semanticSlug || columnLabel || columnKey);
+    const columnLabel = clean(column.columnLabel || column.label) || titleCase(column.columnKey || column.key || `column ${index + 1}`);
+    const semanticSlug = kebabCase(column.semanticSlug || columnLabel || column.columnKey || column.key || `column-${index + 1}`);
+    const columnKey = canonicalKeyFromSemanticSlug(semanticSlug, column.columnKey || column.key || columnLabel || `column${index + 1}`);
     const unitKey = clean(column.unitKey || column.unit || "none").toLowerCase() || "none";
     return {
       columnKey,
@@ -141,8 +145,11 @@ function normalizeTableColumns(columns = [], fieldLabel = "Table") {
       unitKey,
       unitLabel: clean(column.unitLabel) || (unitKey === "none" ? "None" : titleCase(unitKey)),
       unitSymbol: unitKey === "none" ? "" : clean(column.unitSymbol || unitKey),
-      objectType: normalizeObjectType(column.objectType, `${fieldLabel} column "${columnLabel}"`),
-      valueDataType: normalizeValueDataType(column.valueDataType, `${fieldLabel} column "${columnLabel}"`),
+      objectType: normalizeObjectType(column.objectType || "SingleValuedDataElement", `${fieldLabel} column "${columnLabel}"`),
+      valueDataType: normalizeValueDataType(
+        column.valueDataType || defaultValueDataTypeForField("text", normalizeJsonType(column.dataType)),
+        `${fieldLabel} column "${columnLabel}"`
+      ),
     };
   }).filter((column) => column.columnKey);
 
@@ -380,9 +387,11 @@ function validateSpec(input) {
     key: clean(section.key) || camelCase(section.label),
     label: clean(section.label) || titleCase(section.key),
     fields: (section.fields || []).map((field) => {
-      const fieldKey = clean(field.fieldKey) || clean(field.key) || camelCase(field.fieldLabel || field.label);
-      const fieldLabel = clean(field.fieldLabel) || clean(field.label) || titleCase(fieldKey);
-      const semanticSlug = kebabCase(field.semanticSlug || fieldLabel || fieldKey);
+      const rawFieldKey = clean(field.fieldKey || field.key);
+      const fieldLabel = clean(field.fieldLabel) || clean(field.label) || titleCase(rawFieldKey);
+      const semanticSlug = kebabCase(field.semanticSlug || fieldLabel || rawFieldKey);
+      const fieldKey = canonicalKeyFromSemanticSlug(semanticSlug, field.fieldKey || field.key || fieldLabel);
+      const resolvedFieldLabel = fieldLabel || titleCase(fieldKey);
       const categoryKey = kebabCase(field.categoryKey || "general");
       const categoryLabel = clean(field.categoryLabel) || titleCase(categoryKey);
       const unitKey = clean(field.unitKey || field.unit || "none").toLowerCase() || "none";
@@ -391,10 +400,10 @@ function validateSpec(input) {
       const fieldType = normalizeFieldType(field.fieldType || field.type, jsonType);
       const normalized = {
         fieldKey,
-        fieldLabel,
+        fieldLabel: resolvedFieldLabel,
         fieldType,
         semanticSlug,
-        definition: clean(field.definition) || `${fieldLabel} for the ${productCategory} passport.`,
+        definition: clean(field.definition) || `${resolvedFieldLabel} for the ${productCategory} passport.`,
         specRef: clean(field.specRef),
         dataType: jsonType,
         categoryKey,
@@ -403,7 +412,7 @@ function validateSpec(input) {
         unitKey,
         unitLabel: clean(field.unitLabel) || (unitKey === "none" ? "None" : titleCase(unitKey)),
         unitSymbol,
-        accessRights: clean(field.accessRights || field.access || "public").toLowerCase(),
+        confidentiality: clean(field.confidentiality || "public").toLowerCase() === "restricted" ? "restricted" : "public",
         queryable: Boolean(field.queryable),
         indexed: Boolean(field.indexed),
         storageType: clean(field.storageType),
@@ -739,12 +748,11 @@ function buildModuleJs(spec) {
   const sectionLines = spec.sections.map((section) => {
     const fieldLines = section.fields.map((field) => {
       const args = {
-        key: field.fieldKey,
         label: field.fieldLabel,
         semanticSlug: field.semanticSlug,
       };
       if (field.fieldType !== "text") args.type = field.fieldType;
-      if (field.accessRights !== "public") args.accessLevel = "restricted";
+      if (field.confidentiality === "restricted") args.confidentiality = "restricted";
       if (field.unitKey !== "none") args.unit = field.unitSymbol;
       if (field.dataType !== "string") args.dataType = field.dataType === "integer" ? "integer" : field.dataType;
       if (field.queryable) args.queryable = true;
@@ -759,7 +767,6 @@ function buildModuleJs(spec) {
       args.valueDataType = field.valueDataType;
       if (field.fieldType === "table") {
         args.tableColumns = (field.tableColumns || []).map((column) => ({
-          key: column.columnKey,
           label: column.columnLabel,
           semanticSlug: column.semanticSlug,
           elementIdPath: column.elementIdPath,
@@ -781,28 +788,28 @@ function buildModuleJs(spec) {
 
 const semanticBaseUrl = ${jsValue(semanticBase)};
 
-const publicFieldDefaults = {
-  access: ["public"],
-  confidentiality: "public",
-  updateAuthority: ["economicOperator"],
-};
-
-const restrictedFieldDefaults = {
-  access: ["economicOperator", "manufacturer", "marketSurveillance", "notifiedBodies"],
-  confidentiality: "restricted",
-  updateAuthority: ["economicOperator", "manufacturer"],
-};
-
 function term(slug) {
   return \`${"${semanticBaseUrl}"}/\${slug}\`;
 }
 
+function keyFromSemanticSlug(slug, fallback = "") {
+  const words = String(slug || fallback || "")
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((word) => word.toLowerCase());
+  if (!words.length) return "";
+  return words
+    .map((word, index) => index === 0 ? word : \`\${word.charAt(0).toUpperCase()}\${word.slice(1)}\`)
+    .join("");
+}
+
 function field({
-  key,
   label,
   semanticSlug,
   type = "text",
-  accessLevel = "public",
+  confidentiality = "public",
   unit = "",
   dataType = "string",
   queryable = false,
@@ -820,12 +827,12 @@ function field({
   objectType,
   valueDataType,
 }) {
-  const access = accessLevel === "restricted" ? restrictedFieldDefaults : publicFieldDefaults;
+  const key = keyFromSemanticSlug(semanticSlug, label);
   return {
-    ...access,
     key,
     label,
     type,
+    confidentiality: confidentiality === "restricted" ? "restricted" : "public",
     semanticId: term(semanticSlug),
     elementIdPath,
     unit,
@@ -842,7 +849,7 @@ function field({
     ...(type === "table" ? {
       tableColumnCount: tableColumns.length,
       tableColumns: tableColumns.map((column) => ({
-        key: column.key,
+        key: keyFromSemanticSlug(column.semanticSlug, column.label),
         label: column.label,
         semanticId: term(column.semanticSlug),
         elementIdPath: column.elementIdPath,

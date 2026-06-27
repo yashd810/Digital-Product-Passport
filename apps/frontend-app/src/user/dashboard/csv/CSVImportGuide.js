@@ -94,7 +94,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
   // ─────────────────────────────────────────────
   const handleDownloadTemplate = async () => {
     try {
-      const response = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
+      const response = await fetchWithAuth(`${api}/api/internal/passport-types/${passportType}`);
       if (!response.ok) { setCreateError("Failed to fetch passport type definition"); return; }
       const passportTypeData = await response.json();
       const sections = passportTypeData.fieldsJson?.sections || [];
@@ -124,7 +124,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
     setIsImporting(true);
     setCreateError("");
     try {
-      const typeResponse = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
+      const typeResponse = await fetchWithAuth(`${api}/api/internal/passport-types/${passportType}`);
       if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
       const passportTypeData = await typeResponse.json();
       const sections = passportTypeData.fieldsJson?.sections || [];
@@ -206,7 +206,7 @@ function CSVImportGuide({ user, companyId, activeTab }) {
       if (passports.some((passport) => passport?.dppId)) {
         throw new Error("Create-only JSON import does not accept dppId. Remove update identifiers and use new internalAliasId values.");
       }
-      const typeResponse = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
+      const typeResponse = await fetchWithAuth(`${api}/api/internal/passport-types/${passportType}`);
       if (!typeResponse.ok) throw new Error("Failed to fetch passport type definition");
       const passportTypeData = await typeResponse.json();
       const allowedJsonKeys = new Set([
@@ -275,8 +275,8 @@ function CSVImportGuide({ user, companyId, activeTab }) {
         <h1>📊 Import Passports — {passportType}</h1>
 
         <div className="upsert-info-box">
-          <strong>Governance note:</strong> `access`, `confidentiality`, and `updateAuthority` belong to the passport type schema,
-          not to individual passport rows. Set those in the admin passport-type builder. CSV and JSON imports here are only for field values.
+          <strong>Governance note:</strong> field confidentiality belongs to the passport type schema,
+          not to individual passport rows. Set public or restricted in the admin passport-type builder. CSV and JSON imports here are only for field values.
         </div>
 
         {/* Tab switcher */}

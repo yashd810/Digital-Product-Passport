@@ -157,7 +157,7 @@ module.exports = function createRequiredFieldsService({
         key: field.key,
         label: field.label || field.key,
         type: field.type || "text",
-        access: Array.isArray(field.access) ? field.access : ["public"],
+        confidentiality: String(field.confidentiality || "public").trim().toLowerCase() === "restricted" ? "restricted" : "public",
         requirementLevel: null,
         mandatory: true,
         section: field.sectionLabel || field.sectionKey || null,

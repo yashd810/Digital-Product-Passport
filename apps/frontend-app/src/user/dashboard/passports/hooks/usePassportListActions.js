@@ -142,6 +142,7 @@ export function usePassportListActions({
         const passportPath = buildPublicPassportPath({
           companyName: user?.companyName,
           modelName: passport.modelName,
+          dppId: passport.dppId,
           internalAliasId: passport.internalAliasId,
         });
         if (!passportPath) throw new Error("Passport link is unavailable for this QR code");
@@ -282,7 +283,7 @@ export function usePassportListActions({
       let exportedCount = 0;
       const fileCount = Object.keys(grouped).length;
       for (const [passportType, passportsForType] of Object.entries(grouped)) {
-        const typeResponse = await fetchWithAuth(`${api}/api/passport-types/${passportType}`);
+        const typeResponse = await fetchWithAuth(`${api}/api/internal/passport-types/${passportType}`);
         if (!typeResponse.ok) throw new Error(`Failed to fetch field definitions for ${passportType}`);
         const typeData = await typeResponse.json();
         const semanticModelKey = typeData.semanticModelKey || "";

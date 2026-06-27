@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { normalizeSystemPassportHeader, validateSystemPassportHeader } = require("../services/passport-header-fields");
+const { canonicalKeyFromSemanticId } = require("../shared/passports/canonical-field-keys");
 
 const defaultModulesDir = __dirname;
 
@@ -41,6 +42,10 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null)
     ...section,
     sourceModuleKey,
     fields: (section.fields || []).map((field) => {
+      const canonicalFieldKey = canonicalKeyFromSemanticId(field.semanticId);
+      if (canonicalFieldKey && field.key !== canonicalFieldKey) {
+        throw new Error(`Passport module field "${field.key || "unknown"}" must use canonical semantic key "${canonicalFieldKey}".`);
+      }
       const nextField = {
         ...field,
         canonicalLocked: true,
@@ -53,7 +58,13 @@ function normalizeCanonicalModuleSections(sections = [], sourceModuleKey = null)
           canonicalLocked: true,
           sourceModuleKey,
           sourceModuleColumnKey: column.key,
-        }));
+        })).map((column) => {
+          const canonicalColumnKey = canonicalKeyFromSemanticId(column.semanticId);
+          if (canonicalColumnKey && column.key !== canonicalColumnKey) {
+            throw new Error(`Passport module table column "${field.key || "unknown"}.${column.key || "unknown"}" must use canonical semantic key "${canonicalColumnKey}".`);
+          }
+          return column;
+        });
         nextField.tableColumnCount = nextField.tableColumns.length;
       }
       return nextField;

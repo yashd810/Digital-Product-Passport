@@ -181,8 +181,7 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
             const insertedRevision = await pool.query(`INSERT INTO ${tableName} (${joinQuotedSqlIdentifiers(allColumns)}) VALUES (${placeholders}) RETURNING *`, allValues);
 
             const sourceRegistry = await pool.query(
-              `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
-                      "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
+              `SELECT "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt"
                FROM "passportRegistry"
                WHERE "dppId" = $1 AND "companyId" = $2
                LIMIT 1`,
@@ -194,9 +193,6 @@ module.exports = function registerBulkLifecycleRoutes(app, deps) {
               lineageId: source.lineageId,
               companyId,
               passportType,
-              accessKeyHash: sourceKeys.accessKeyHash || null,
-              accessKeyPrefix: sourceKeys.accessKeyPrefix || null,
-              accessKeyLastRotatedAt: sourceKeys.accessKeyLastRotatedAt || null,
               deviceApiKeyHash: sourceKeys.deviceApiKeyHash || null,
               deviceApiKeyPrefix: sourceKeys.deviceApiKeyPrefix || null,
               deviceKeyLastRotatedAt: sourceKeys.deviceKeyLastRotatedAt || null,

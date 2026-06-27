@@ -1,19 +1,11 @@
-function createApiKeyHelpers({ accessRightsService, crypto }) {
-  const allowedApiKeyScopes = new Set(["dpp:read", "dpp:update", "dpp:history:read", "dpp:element:read", "*"]);
+function createApiKeyHelpers({ crypto }) {
+  const allowedApiKeyScopes = new Set(["dpp:read", "dpp:restricted:read", "*"]);
   const apiKeyPrefixLength = 16;
-  const apiKeyAllowedOperatorTypes = new Set(
-    [...accessRightsService.validAudiences].filter((audience) => audience !== "consumers" && audience !== "legitimateInterest")
-  );
-  const apiKeyAccessModes = new Set(["read", "update"]);
-  const apiKeyConfidentialityLevels = ["public", "restricted", "confidential", "tradeSecret", "regulated"];
-  const apiKeyConfidentialityRank = new Map(
-    apiKeyConfidentialityLevels.map((level, index) => [level, index])
-  );
 
   function parseApiKeyScopes(scopes) {
     const normalized = Array.isArray(scopes)
       ? scopes.map((scope) => String(scope || "").trim()).filter(Boolean)
-      : ["dpp:read"];
+      : ["dpp:read", "dpp:restricted:read"];
     const unique = [...new Set(normalized)];
     const invalid = unique.filter((scope) => !allowedApiKeyScopes.has(scope));
     if (invalid.length) {
@@ -21,111 +13,190 @@ function createApiKeyHelpers({ accessRightsService, crypto }) {
       error.statusCode = 400;
       throw error;
     }
-    return unique.length ? unique : ["dpp:read"];
+    return unique.length ? unique : ["dpp:read", "dpp:restricted:read"];
   }
 
-  function normalizeApiKeyOperatorType(value) {
-    const normalized = String(value || "").trim();
-    return normalized || "economicOperator";
-  }
-
-  function parseApiKeyOperatorType(value) {
-    const operatorType = normalizeApiKeyOperatorType(value);
-    if (!apiKeyAllowedOperatorTypes.has(operatorType)) {
-      const error = new Error(`Invalid API key operator type "${operatorType}"`);
-      error.statusCode = 400;
-      throw error;
-    }
-    return operatorType;
-  }
-
-  function parseApiKeyAccessMode(value, scopes = []) {
-    const normalized = String(value || "").trim().toLowerCase();
-    if (normalized) {
-      if (!apiKeyAccessModes.has(normalized)) {
-        const error = new Error(`Invalid API key access mode "${normalized}"`);
-        error.statusCode = 400;
-        throw error;
-      }
-      return normalized;
-    }
-    return Array.isArray(scopes) && (scopes.includes("dpp:update") || scopes.includes("*")) ? "update" : "read";
-  }
-
-  function parseApiKeyMaxConfidentiality(value) {
-    const normalized = String(value || "").trim().toLowerCase() || "regulated";
-    if (!apiKeyConfidentialityRank.has(normalized)) {
-      const error = new Error(`Invalid API key confidentiality level "${normalized}"`);
-      error.statusCode = 400;
-      throw error;
-    }
-    return normalized;
-  }
-
-  function buildApiKeyScopesForAccessMode(accessMode, requestedScopes = []) {
+  function buildSecurityGroupApiKeyScopes(requestedScopes = []) {
     const derived = new Set(parseApiKeyScopes(requestedScopes));
     derived.add("dpp:read");
-    if (accessMode === "update") derived.add("dpp:update");
+    derived.add("dpp:restricted:read");
     return [...derived];
   }
 
-function flattenTypeFields(typeDef) {
+  function flattenTypeFields(typeDef) {
     return (typeDef?.fieldsJson?.sections || []).flatMap((section) => section.fields || []);
   }
 
-  function getApiKeyAudiences(apiKey) {
-    return new Set(accessRightsService.expandAudienceAssignments([apiKey?.operatorType || "economicOperator"]));
+  function isRestrictedField(field) {
+    return String(field?.confidentiality || "public").trim().toLowerCase() === "restricted";
   }
 
-  function isConfidentialityAllowedForApiKey(fieldConfidentiality, maxConfidentiality) {
-    const normalizedField = String(fieldConfidentiality || "public").trim().toLowerCase() || "public";
-    const normalizedMax = String(maxConfidentiality || "regulated").trim().toLowerCase() || "regulated";
-    const fieldRank = apiKeyConfidentialityRank.get(normalizedField);
-    const maxRank = apiKeyConfidentialityRank.get(normalizedMax);
-    if (fieldRank === undefined || maxRank === undefined) return false;
-    return fieldRank <= maxRank;
+  function normalizeApiKeyFieldKeys(apiKey) {
+    return new Set(
+      (Array.isArray(apiKey?.fieldKeys) ? apiKey.fieldKeys : [])
+        .map((key) => String(key || "").trim())
+        .filter(Boolean)
+    );
   }
 
-  function buildApiKeyFieldReadDecision(field, apiKey) {
-    const access = Array.isArray(field?.access) && field.access.length ? field.access : ["public"];
-    const confidentiality = String(field?.confidentiality || (access.includes("public") ? "public" : "restricted")).trim().toLowerCase() || "public";
-    const audiences = getApiKeyAudiences(apiKey);
-    const matchedAudience = access.find((audience) => audience === "public" || audiences.has(audience)) || null;
-    const confidentialityAllowed = isConfidentialityAllowedForApiKey(confidentiality, apiKey?.maxConfidentiality);
-    return {
-      allowed: Boolean(matchedAudience) && confidentialityAllowed,
-      matchedAudience,
-      confidentiality,
-      audiences: access,
-    };
+  function normalizeApiKeyPassportDppIds(apiKey) {
+    return new Set(
+      (Array.isArray(apiKey?.passportDppIds) ? apiKey.passportDppIds : [])
+        .map((dppId) => String(dppId || "").trim())
+        .filter(Boolean)
+    );
   }
 
-  function buildApiKeyFieldWriteDecision(field, apiKey) {
-    const updateAuthority = Array.isArray(field?.updateAuthority) && field.updateAuthority.length
-      ? field.updateAuthority
-      : ["economicOperator"];
-    const confidentiality = String(field?.confidentiality || "public").trim().toLowerCase() || "public";
-    const audiences = getApiKeyAudiences(apiKey);
-    const matchedAuthority = updateAuthority.find((audience) => audiences.has(audience)) || null;
-    const confidentialityAllowed = isConfidentialityAllowedForApiKey(confidentiality, apiKey?.maxConfidentiality);
-    return {
-      allowed: apiKey?.accessMode === "update" && Boolean(matchedAuthority) && confidentialityAllowed,
-      matchedAuthority,
-      confidentiality,
-      updateAuthority,
-    };
+  function idsMatch(left, right) {
+    if (left === null || left === undefined || right === null || right === undefined) return false;
+    const leftNumber = Number.parseInt(left, 10);
+    const rightNumber = Number.parseInt(right, 10);
+    if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) return leftNumber === rightNumber;
+    return String(left) === String(right);
+  }
+
+  function apiKeyAppliesToPassport(apiKey, passport) {
+    if (!apiKey || !passport) return false;
+    const passportType = String(passport.passportType || "").trim();
+    if (String(apiKey.passportType || "").trim() !== passportType) return false;
+    const scopeType = String(apiKey.scopeType || "passportType").trim();
+    if (scopeType !== "passports") return true;
+    return normalizeApiKeyPassportDppIds(apiKey).has(String(passport.dppId || ""));
   }
 
   function sanitizePassportForApiKey(passport, typeDef, apiKey) {
     if (!passport || !typeDef) return passport;
     const sanitized = { ...passport };
+    delete sanitized.companyId;
+    delete sanitized.internalAliasId;
+    delete sanitized.internalAliasIds;
+    const selectedFieldKeys = normalizeApiKeyFieldKeys(apiKey);
+    const appliesToPassport = apiKeyAppliesToPassport(apiKey, passport);
     for (const field of flattenTypeFields(typeDef)) {
-      const decision = buildApiKeyFieldReadDecision(field, apiKey);
-      if (!decision.allowed) {
+      if (!isRestrictedField(field)) continue;
+      if (!appliesToPassport || !selectedFieldKeys.has(field.key)) {
         delete sanitized[field.key];
       }
     }
     return sanitized;
+  }
+
+  function verifyApiKeyHashRecord(rawKey, record) {
+    if (!record || record.hashAlgorithm !== "hmacSha256" || !record.keySalt) return false;
+    const storedHash = String(record.keyHash || "").trim();
+    if (!/^[a-f0-9]{64}$/i.test(storedHash)) return false;
+    const computed = crypto.createHmac("sha256", String(record.keySalt)).update(String(rawKey || "")).digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(storedHash, "hex"), Buffer.from(computed, "hex"));
+  }
+
+  function findMatchingApiKeyRecord(rawKey, records = []) {
+    return records.find((record) => verifyApiKeyHashRecord(rawKey, record)) || null;
+  }
+
+  function getSecurityGroupKeyFromRequest(req) {
+    const headerValue = req?.headers?.["x-security-group-key"] || req?.headers?.["x-api-key"];
+    const raw = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+    return String(raw || "").trim();
+  }
+
+  async function resolveSecurityGroupApiKey(pool, rawApiKey) {
+    const keyPrefix = String(rawApiKey || "").slice(0, apiKeyPrefixLength);
+    if (!keyPrefix) {
+      const error = new Error("API key is required");
+      error.statusCode = 400;
+      throw error;
+    }
+    const keyRows = await pool.query(
+      `SELECT id,
+              "companyId" AS "companyId",
+              name,
+              "keyHash" AS "keyHash",
+              "keySalt" AS "keySalt",
+              "hashAlgorithm" AS "hashAlgorithm",
+              "passportType" AS "passportType",
+              "scopeType" AS "scopeType",
+              "fieldKeys" AS "fieldKeys",
+              "passportDppIds" AS "passportDppIds"
+       FROM "apiKeys"
+       WHERE "keyPrefix" = $1
+         AND "isActive" = true
+         AND ("expiresAt" IS NULL OR "expiresAt" > NOW())`,
+      [keyPrefix]
+    );
+    const matchedKey = findMatchingApiKeyRecord(rawApiKey, keyRows.rows);
+    if (!matchedKey) {
+      const error = new Error("Invalid or revoked API key");
+      error.statusCode = 401;
+      throw error;
+    }
+    return matchedKey;
+  }
+
+  function checkSecurityGroupApiKeyAccess(apiKey, passport) {
+    if (!apiKey) return { allowed: false, statusCode: 401, error: "Invalid or revoked API key" };
+    if (!idsMatch(apiKey.companyId, passport?.companyId)) {
+      return { allowed: false, statusCode: 403, error: "API key is not valid for this company" };
+    }
+    if (String(apiKey.passportType || "") !== String(passport?.passportType || "")) {
+      return { allowed: false, statusCode: 403, error: "API key is not valid for this passport type" };
+    }
+    if (!apiKeyAppliesToPassport(apiKey, passport)) {
+      return { allowed: false, statusCode: 403, error: "API key is not valid for this passport" };
+    }
+    return { allowed: true, statusCode: 200, error: "" };
+  }
+
+  async function buildRestrictedUnlockPassportPayload({
+    pool,
+    passport,
+    typeDef,
+    apiKey,
+    includeDynamicLatest = true,
+    normalizePassportRow = (row) => row,
+  }) {
+    const selectedFieldKeys = normalizeApiKeyFieldKeys(apiKey);
+    const allowedRestrictedFields = flattenTypeFields(typeDef)
+      .filter((field) => field?.key && isRestrictedField(field) && selectedFieldKeys.has(field.key));
+    const normalizedPassport = {
+      ...normalizePassportRow(passport, typeDef),
+      passportType: passport?.passportType || typeDef?.typeName || null,
+    };
+    const unlockedPassport = {
+      dppId: normalizedPassport.dppId || passport?.dppId || null,
+      passportType: normalizedPassport.passportType,
+    };
+    if (normalizedPassport.versionNumber !== null && normalizedPassport.versionNumber !== undefined) {
+      unlockedPassport.versionNumber = normalizedPassport.versionNumber;
+    }
+
+    for (const field of allowedRestrictedFields) {
+      if (Object.prototype.hasOwnProperty.call(normalizedPassport, field.key)) {
+        unlockedPassport[field.key] = normalizedPassport[field.key];
+      }
+    }
+
+    const passportDppId = String(unlockedPassport.dppId || "").trim();
+    const dynamicFieldKeys = allowedRestrictedFields
+      .filter((field) => field.dynamic)
+      .map((field) => field.key);
+    if (includeDynamicLatest && pool && passportDppId && dynamicFieldKeys.length) {
+      const dynamicRows = await pool.query(
+        `SELECT DISTINCT ON ("fieldKey") "fieldKey", value
+         FROM "passportDynamicValues"
+         WHERE "passportDppId" = $1
+           AND "fieldKey" = ANY($2::text[])
+         ORDER BY "fieldKey", "updatedAt" DESC`,
+        [passportDppId, dynamicFieldKeys]
+      );
+      for (const dynamicRow of dynamicRows.rows) {
+        unlockedPassport[dynamicRow.fieldKey] = dynamicRow.value;
+      }
+    }
+
+    return {
+      passport: unlockedPassport,
+      unlockedFieldKeys: allowedRestrictedFields.map((field) => field.key),
+    };
   }
 
   function buildApiKeyHashRecord(rawKey) {
@@ -139,14 +210,20 @@ function flattenTypeFields(typeDef) {
   }
 
   return {
-    buildApiKeyFieldWriteDecision,
+    apiKeyAppliesToPassport,
     buildApiKeyHashRecord,
-    buildApiKeyScopesForAccessMode,
+    buildRestrictedUnlockPassportPayload,
+    buildSecurityGroupApiKeyScopes,
+    checkSecurityGroupApiKeyAccess,
+    findMatchingApiKeyRecord,
     flattenTypeFields,
-    parseApiKeyAccessMode,
-    parseApiKeyMaxConfidentiality,
-    parseApiKeyOperatorType,
+    getSecurityGroupKeyFromRequest,
+    isRestrictedField,
+    normalizeApiKeyFieldKeys,
+    normalizeApiKeyPassportDppIds,
     sanitizePassportForApiKey,
+    resolveSecurityGroupApiKey,
+    verifyApiKeyHashRecord,
   };
 }
 

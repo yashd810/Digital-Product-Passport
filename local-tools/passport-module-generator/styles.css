@@ -543,8 +543,9 @@ textarea {
     130px
     110px
     120px
-    190px
-    minmax(980px, 1.2fr);
+    174px
+    minmax(600px, 0.65fr)
+    104px;
   margin-top: 14px;
   overflow-x: auto;
   border: 1px solid #dbe6f0;
@@ -558,7 +559,7 @@ textarea {
 .field-row {
   display: grid;
   grid-template-columns: var(--field-grid-columns);
-  min-width: 2480px;
+  min-width: 2188px;
 }
 
 .field-grid-header {
@@ -588,12 +589,17 @@ textarea {
   background: linear-gradient(180deg, #f8fbfe 0%, #f3f8fc 100%);
 }
 
-.field-grid-filters label {
+.field-grid-filters label,
+.field-filter-spacer {
   display: grid;
   min-width: 0;
   min-height: 48px;
   padding: 6px;
   border-right: 1px solid #e4ebf3;
+}
+
+.field-filter-spacer {
+  border-right: 0;
 }
 
 .field-grid-filters label > span {
@@ -728,31 +734,75 @@ textarea {
 
 .field-more-group {
   margin: 0;
+  border-radius: 8px;
 }
 
 .field-more-group[open] {
   border-color: #bdd4e6;
-  box-shadow: 0 10px 24px rgba(17, 44, 72, 0.08);
+  box-shadow: 0 6px 14px rgba(17, 44, 72, 0.06);
 }
 
 .field-more-group summary {
-  min-height: 34px;
-  padding: 7px 9px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .field-cell-more .auto-group-grid {
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
-  padding: 10px;
+  grid-template-columns:
+    minmax(124px, 1.1fr)
+    minmax(94px, 0.8fr)
+    minmax(134px, 1fr)
+    minmax(126px, 1fr)
+    minmax(64px, 0.55fr);
+  gap: 5px;
+  padding: 6px;
+}
+
+.field-cell-more .auto-group-grid label {
+  gap: 2px;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.field-cell-more .auto-group-grid input,
+.field-cell-more .auto-group-grid select {
+  min-height: 28px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
 }
 
 .field-actions {
   display: flex;
   grid-column: auto;
   justify-content: flex-start;
-  align-content: start;
+  align-items: center;
+  align-content: center;
+  flex-wrap: nowrap;
+  gap: 6px;
   min-height: 56px;
   padding: 8px;
   border-right: 1px solid #edf2f7;
+}
+
+.field-actions .check {
+  flex: 0 0 auto;
+  gap: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.field-remove-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 56px;
+  padding: 8px;
+}
+
+.field-remove-actions [data-remove-field] {
+  width: 100%;
 }
 
 .table-config {
@@ -1001,6 +1051,15 @@ textarea {
   border-color: #f0d5b0;
   background: linear-gradient(180deg, #fffaf2 0%, #fff2e1 100%);
   color: var(--warning-text);
+}
+
+[data-remove-field] {
+  min-height: 30px;
+  align-self: start;
+  padding: 0 9px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 #clearAll:hover,

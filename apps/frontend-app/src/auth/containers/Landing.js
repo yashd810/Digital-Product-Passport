@@ -133,11 +133,11 @@ function Landing({ isAuthenticated, user, onLogout }) {
           </h2>
           <div className="lp-types-grid">
             {[
-              { icon: "🧩", title: "Custom Schemas", reg: "Define sections, fields, tables, and governance rules." },
+              { icon: "🧩", title: "Custom Schemas", reg: "Define sections, fields, tables, and confidentiality." },
               { icon: "🏷️", title: "Product Identity", reg: "Support model, batch, item, and internal alias identifiers." },
               { icon: "📎", title: "Evidence", reg: "Connect files, certificates, symbols, and repository records." },
               { icon: "🔎", title: "Public Viewer", reg: "Publish clear passport views with QR-ready access." },
-              { icon: "🛡️", title: "Controlled Access", reg: "Separate public, restricted, and regulated field audiences." },
+              { icon: "🛡️", title: "Security Groups", reg: "Share selected restricted fields with scoped API keys." },
             ].map(t => (
               <div key={t.title} className="lp-type-card">
                 <div className="lp-type-icon" aria-hidden="true">{t.icon}</div>

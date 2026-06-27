@@ -238,6 +238,43 @@ test("admin cannot create manual passport type without a registered module sourc
   assert.equal(audits.length, 0);
 });
 
+test("admin cannot create module passport type when field key differs from semantic term key", async () => {
+  const calls = [];
+  const createdTables = [];
+  const audits = [];
+  const moduleDefinition = createModulePreviewFixture();
+  const app = createCatalogApp({
+    calls,
+    createdTables,
+    audits,
+    moduleDefinitions: [moduleDefinition],
+  });
+  const sections = JSON.parse(JSON.stringify(moduleDefinition.fieldsJson.sections));
+  sections[0].fields[0].key = "modelId";
+
+  const response = await invokeRoute(app, {
+    path: "/api/admin/passport-types",
+    body: {
+      typeName: moduleDefinition.typeName,
+      displayName: moduleDefinition.displayName,
+      productCategory: moduleDefinition.productCategory,
+      productIcon: moduleDefinition.productIcon,
+      semanticModelKey: moduleDefinition.semanticModelKey,
+      sourceModule: moduleDefinition.moduleKey,
+      identity: moduleDefinition.fieldsJson.identity,
+      systemHeader: { section: { label: "Passport Header" } },
+      sections,
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.body.error, "Passport type fields must use canonical module semantics only.");
+  assert.equal(response.body.fields.some((issue) => issue.code === "fieldKeyMustMatchSemanticTerm"), true);
+  assert.equal(calls.some((call) => call.sql.includes("INSERT INTO \"passportTypes\"")), false);
+  assert.deepEqual(createdTables, []);
+  assert.equal(audits.length, 0);
+});
+
 test("admin can preview registered passport type modules before seeding", async () => {
   const app = createCatalogApp({
     calls: [],

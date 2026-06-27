@@ -1,8 +1,8 @@
 "use strict";
 
 // ─── DPP IDENTITY SERVICE ─────────────────────────────────────────────────────
-// Stable, product-id-based DID generation for the Digital Product Passport Platform platform.
-// All DIDs use companyId + internalAliasId — never the record ID.
+// Stable DID generation for the Digital Product Passport Platform.
+// Consumer-facing public URLs use dppId; internalAliasId remains an internal company key.
 //
 // Domain is derived from APP_URL env var at call time (not module load time)
 // so that tests or server can override APP_URL after require().
@@ -267,24 +267,23 @@ function didToDocumentUrl(did) {
 /**
  * Build the consumer-facing HTTPS public URL for a passport.
  *
- * Pattern: <appUrl>/dpp/<manufacturerSlug>/<modelSlug>/<encodedProductId>
+ * Pattern: <appUrl>/dpp/<manufacturerSlug>/<modelSlug>/<encodedDppId>
  *
- * Uses internalAliasId (NOT the record ID). Falls back to the record DPP ID only if no internalAliasId exists.
+ * Uses the public DPP ID. internalAliasId stays an internal company identifier.
  *
- * @param {object} passport  - passport row (must have internalAliasId, modelName, dppId, companyId)
+ * @param {object} passport  - passport row (must have dppId, modelName, companyId)
  * @param {string} companyName - human-readable company name (used to derive manufacturerSlug)
  */
 function buildCanonicalPublicUrl(passport, companyName) {
   const appUrl = getAppUrl();
 
-  const internalAliasId = passport.internalAliasId;
-  const routeProductId = internalAliasId || passport.dppId || passport.guid;
+  const routePassportId = passport.dppId || passport.guid;
 
   const manufacturerSlug = slugify(companyName || String(passport.companyId));
-  const modelSlug = slugify(passport.modelName || routeProductId);
-  const encodedProductId = encodeURIComponent(String(routeProductId));
+  const modelSlug = slugify(passport.modelName || routePassportId);
+  const encodedPassportId = encodeURIComponent(String(routePassportId));
 
-  return `${appUrl}/dpp/${manufacturerSlug}/${modelSlug}/${encodedProductId}`;
+  return `${appUrl}/dpp/${manufacturerSlug}/${modelSlug}/${encodedPassportId}`;
 }
 
 // ─── EXPORTS ──────────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  assertDatabaseName,
   assertRequiredProductionEnvironment,
 } = require("../src/bootstrap/runtime-config");
 
@@ -83,4 +84,43 @@ test("production environment guard rejects non-HTTPS production URLs", () => {
   const result = captureProductionGuard({ APP_URL: "http://app.example.com" });
   assert.equal(result.exited, true);
   assert.equal(result.code, 1);
+});
+
+function captureDatabaseNameGuard(dbName) {
+  const previousDbName = process.env.DB_NAME;
+  const errors = [];
+  const originalExit = process.exit;
+  process.env.DB_NAME = dbName;
+  process.exit = (code) => {
+    const error = new Error(`process.exit:${code}`);
+    error.code = code;
+    throw error;
+  };
+  try {
+    assertDatabaseName({
+      logger: {
+        error: (...args) => errors.push(args),
+      },
+    });
+    return { exited: false, errors };
+  } catch (error) {
+    return { exited: true, code: error.code, errors };
+  } finally {
+    if (previousDbName === undefined) delete process.env.DB_NAME;
+    else process.env.DB_NAME = previousDbName;
+    process.exit = originalExit;
+  }
+}
+
+test("database name guard accepts canonical camel-case app database", () => {
+  const result = captureDatabaseNameGuard("dppSystem");
+  assert.equal(result.exited, false);
+});
+
+test("database name guard rejects non-canonical app database", () => {
+  const result = captureDatabaseNameGuard("legacyDppSystem");
+  assert.equal(result.exited, true);
+  assert.equal(result.code, 1);
+  assert.equal(result.errors[0][0].expected, "dppSystem");
+  assert.equal(result.errors[0][0].actual, "legacyDppSystem");
 });

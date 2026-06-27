@@ -32,6 +32,11 @@ apps/backend-api/resources/semantics/<family>/<version>/units.json
 apps/backend-api/resources/semantics/<family>/<version>/catalog.jsonld
 ```
 
+Field and table column keys are derived from the semantic slug. For example,
+`asset-serial-number` becomes the module field key `assetSerialNumber`.
+Do not maintain a separate field-key layer in generated modules; labels are
+display text, while semantic slugs define the operational camelCase keys.
+
 After writing files, review them and run:
 
 ```bash

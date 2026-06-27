@@ -24,10 +24,12 @@ export function buildPublicPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
+  dppId = "",
   internalAliasId = "",
 }) {
-  if (!internalAliasId) return null;
-  return `/dpp/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId })}/${encodeURIComponent(internalAliasId)}`;
+  const publicPassportId = String(dppId || "").trim() || String(internalAliasId || "").trim();
+  if (!publicPassportId) return null;
+  return `/dpp/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId: publicPassportId })}/${encodeURIComponent(publicPassportId)}`;
 }
 
 export function buildTechnicalPassportPath({
@@ -35,6 +37,7 @@ export function buildTechnicalPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
+  dppId = "",
   internalAliasId = "",
 }) {
   return buildPublicPassportPath({
@@ -42,6 +45,7 @@ export function buildTechnicalPassportPath({
     manufacturerName,
     manufacturedBy,
     modelName,
+    dppId,
     internalAliasId,
   });
 }
@@ -51,11 +55,13 @@ export function buildInactivePassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
+  dppId = "",
   internalAliasId = "",
   versionNumber = "",
 }) {
-  if (!internalAliasId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
-  return `/dpp/inactive/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId })}/${encodeURIComponent(internalAliasId)}/${encodeURIComponent(versionNumber)}`;
+  const publicPassportId = String(dppId || "").trim() || String(internalAliasId || "").trim();
+  if (!publicPassportId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
+  return `/dpp/inactive/${getManufacturerSegment({ companyName, manufacturerName, manufacturedBy })}/${getModelSegment({ modelName, internalAliasId: publicPassportId })}/${encodeURIComponent(publicPassportId)}/${encodeURIComponent(versionNumber)}`;
 }
 
 export function buildInactiveTechnicalPassportPath({
@@ -63,6 +69,7 @@ export function buildInactiveTechnicalPassportPath({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
+  dppId = "",
   internalAliasId = "",
   versionNumber = "",
 }) {
@@ -71,6 +78,7 @@ export function buildInactiveTechnicalPassportPath({
     manufacturerName,
     manufacturedBy,
     modelName,
+    dppId,
     internalAliasId,
     versionNumber,
   });

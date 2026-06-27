@@ -24,7 +24,6 @@ module.exports = function registerCompanyRoutes(app, {
   authenticateToken,
   checkCompanyAccess,
   requireEditor,
-  publicReadRateLimit,
   // passport helpers
   getTable,
   getPassportFieldValue,
@@ -44,21 +43,12 @@ module.exports = function registerCompanyRoutes(app, {
   buildSemanticPassportJsonExport,
   buildExpandedPassportPayload,
   productIdentifierService,
-  complianceService,
-  accessRightsService
+  complianceService
 }) {
   const governanceImportTokens = new Set([
-    "access",
-    "audience",
-    "audiences",
-    "fieldaccess",
     "confidentiality",
     "classification",
     "fieldconfidentiality",
-    "updateauthority",
-    "updateauthorities",
-    "updateauthority",
-    "fieldupdateauthority",
   ]);
 
   function normalizeGovernanceToken(value) {
@@ -76,7 +66,7 @@ module.exports = function registerCompanyRoutes(app, {
   }
 
   function buildGovernanceImportErrorMessage(keys = []) {
-    return `Schema governance fields (${keys.join(", ")}) cannot be imported as passport row data. Configure access, confidentiality, and updateAuthority on the passport type in admin instead.`;
+    return `Schema governance fields (${keys.join(", ")}) cannot be imported as passport row data. Configure confidentiality on the passport type in admin instead.`;
   }
 
   function createImportExcludedFieldSet(extraFields = []) {
@@ -145,18 +135,22 @@ module.exports = function registerCompanyRoutes(app, {
 
   // ─── COMPANY PROFILE ─────────────────────────────────────────────────────
 
-  app.get("/api/companies/:companyId/profile", publicReadRateLimit, async (req, res) => {
+  app.get("/api/companies/:companyId/profile", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
       const r = await pool.query(
-        `SELECT id,
-                "companyName" AS "companyName",
-                "companyLogo" AS "companyLogo"
+        `SELECT "companyName" AS "companyName",
+                "companyLogo" AS "companyLogo",
+                "didSlug" AS "didSlug"
          FROM companies
          WHERE id = $1`,
         [req.params.companyId]
       );
       if (!r.rows.length) return res.status(404).json({ error: "Company not found" });
-      res.json(mapCompanyRow(r.rows[0]));
+      res.json({
+        companyName: r.rows[0].companyName || "",
+        companyLogo: r.rows[0].companyLogo || null,
+        didSlug: r.rows[0].didSlug || null,
+      });
     } catch {res.status(500).json({ error: "Failed to fetch company profile" });}
   });
 

@@ -2,14 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authHeaders, fetchWithAuth } from "../../shared/api/authHeaders";
 import {
-  accessLevelLabels,
-  accessLevels,
   confidentialityLevels,
   fieldTypes,
   iconPresets,
   transLangs,
-  updateAuthorityLabels,
-  updateAuthorities,
   buildProductCategoryOptions,
   buildSectionsFromCSV,
   downloadTemplate,
@@ -19,7 +15,6 @@ import {
   parseCSV,
   rekeySection,
   resolveSystemHeaderEntries,
-  toFieldKey,
   toSlug,
 } from "./builderHelpers";
 import {
@@ -40,10 +35,9 @@ import {
   tableColumnKeyFromLabel,
 } from "../../shared/passports/tableSchemaUtils";
 import {
-  CheckboxDropdown,
+  canonicalFieldKeyFromSemanticId,
   normalizeFieldForSemanticModel,
   rekeyModuleSection,
-  summarizeSelectedValues,
   syncSectionsWithSemanticModel,
   unlockModuleSection,
 } from "./AdminCreatePassportTypeHelpers";
@@ -82,7 +76,6 @@ function AdminCreatePassportType() {
   const [success,  setSuccess]  = useState("");
   const [csvError, setCsvError] = useState("");
   const [invalidFields, setInvalidFields] = useState([]);  // section/field IDs with errors
-  const [openGovernanceDropdown, setOpenGovernanceDropdown] = useState(null);
   const [semanticModels, setSemanticModels] = useState([]);
   const [passportModules, setPassportModules] = useState([]);
   const [semanticTermCatalog, setSemanticTermCatalog] = useState([]);
@@ -112,18 +105,6 @@ function AdminCreatePassportType() {
     if (!success || !successAlertRef.current) return;
     successAlertRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [success]);
-
-  useEffect(() => {
-    if (!openGovernanceDropdown) return undefined;
-    const handleClickOutside = (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (target.closest(".acpt-checkbox-dropdown")) return;
-      setOpenGovernanceDropdown(null);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openGovernanceDropdown]);
 
   useEffect(() => {
     Promise.all([
@@ -198,11 +179,9 @@ function AdminCreatePassportType() {
             key: normalizedField.key,
             label: normalizedField.label,
             type: normalizedField.type,
-            access: normalizedField.access && normalizedField.access.length > 0 ? normalizedField.access : ["public"],
-            confidentiality: normalizedField.confidentiality || "public",
-            updateAuthority: normalizedField.updateAuthority && normalizedField.updateAuthority.length > 0
-              ? normalizedField.updateAuthority
-              : ["economicOperator"],
+            confidentiality: confidentialityLevels.some((level) => level.value === normalizedField.confidentiality)
+              ? normalizedField.confidentiality
+              : "public",
           };
           const fi18n = Object.fromEntries(
             Object.entries(normalizedField.labelI18n || {}).filter(([, v]) => v?.trim())
@@ -572,7 +551,7 @@ function AdminCreatePassportType() {
           }
 
           if (!f.canonicalLocked && "label" in canonicalPatch && !updated._keyManual) {
-            updated.key = toFieldKey(canonicalPatch.label || "");
+            updated.key = canonicalFieldKeyFromSemanticId(updated.semanticId, canonicalPatch.label || "");
           }
 
           if (!f.canonicalLocked && "label" in canonicalPatch && !canonicalPatch.label) {
@@ -628,6 +607,7 @@ function AdminCreatePassportType() {
           }
           return {
             ...f,
+            key: canonicalFieldKeyFromSemanticId(selected.semanticId, selected.key || f.key || f.label),
             semanticId: selected.semanticId,
             unit: deriveSemanticTermUnit(selected),
             dataType: deriveSemanticTermDataType(selected),
@@ -709,7 +689,7 @@ function AdminCreatePassportType() {
               : patch;
             const nextColumn = { ...column, ...canonicalPatch };
             if (!column.canonicalLocked && !f.canonicalLocked && "label" in canonicalPatch && !column._keyManual && !("key" in canonicalPatch)) {
-              nextColumn.key = tableColumnKeyFromLabel(canonicalPatch.label, `column${index + 1}`);
+              nextColumn.key = canonicalFieldKeyFromSemanticId(nextColumn.semanticId, canonicalPatch.label || `column${index + 1}`);
             }
             if ("key" in canonicalPatch) {
               nextColumn.key = tableColumnKeyFromLabel(canonicalPatch.key, `column${index + 1}`);
@@ -754,8 +734,10 @@ function AdminCreatePassportType() {
                 _semanticSearch: selectionValue,
               };
             }
+            const nextKey = canonicalFieldKeyFromSemanticId(selected.semanticId, selected.key || column.key || column.label);
             return {
               ...column,
+              key: nextKey,
               semanticId: selected.semanticId,
               unit: deriveSemanticTermUnit(selected),
               dataType: deriveSemanticTermDataType(selected),
@@ -763,7 +745,18 @@ function AdminCreatePassportType() {
               _semanticSearch: `${selected.key} - ${selected.label}`,
             };
           });
-          return { ...f, tableColumns: columns, tableColumnCount: columns.length };
+          const currentColumn = normalizeTableColumns(f)[columnIndex];
+          const nextColumn = columns[columnIndex];
+          const nextField = { ...f, tableColumns: columns, tableColumnCount: columns.length };
+          if (currentColumn?.key && nextColumn?.key && currentColumn.key !== nextColumn.key) {
+            if (nextField.compositionLabelColumnKey === currentColumn.key) {
+              nextField.compositionLabelColumnKey = nextColumn.key;
+            }
+            if (nextField.compositionValueColumnKey === currentColumn.key) {
+              nextField.compositionValueColumnKey = nextColumn.key;
+            }
+          }
+          return nextField;
         }),
       };
     }));
@@ -1030,7 +1023,7 @@ function AdminCreatePassportType() {
           <h2>{editMode ? "✏️ Edit Passport Type Metadata" : "📋 Create New Passport Type"}</h2>
           <p className="acpt-header-note">
             {editMode
-              ? "Update display name, flags (dynamic/composition), and access settings. The type name and DB schema cannot change."
+              ? "Update display name, flags (dynamic/composition), and confidentiality settings. The type name and DB schema cannot change."
               : "Once created and in use, a type cannot be edited. Create a new type for any changes."}
           </p>
         </div>
@@ -1196,8 +1189,7 @@ function AdminCreatePassportType() {
           )}
           <div className="acpt-csv-hint">
             CSV format supports <strong>Field Label</strong>, <strong>Section</strong>, <strong>Type</strong>,
-            <strong>Access</strong>, <strong>Confidentiality</strong>, and <strong>Update Authority</strong>.
-            Use <code>|</code>, comma, or semicolon to separate multiple audiences or authorities. Importing replaces the current field builder.
+            and <strong>Confidentiality</strong>. Importing replaces the current field builder.
           </div>
 
           {sections.map((section, si) => (
@@ -1288,10 +1280,6 @@ function AdminCreatePassportType() {
                         field.semanticId || ""
                       );
                       const semanticSearchValue = getSemanticSearchDisplayValue(field, semanticTermCatalog);
-                      const accessSummary = summarizeSelectedValues(field.access || ["public"], accessLevelLabels, "Select access");
-                      const updateAuthoritySummary = summarizeSelectedValues(field.updateAuthority || ["economicOperator"], updateAuthorityLabels, "Select authority");
-                      const accessDropdownId = `${section.localId}:${field.localId}:access`;
-                      const updateDropdownId = `${section.localId}:${field.localId}:authority`;
                       const tableColumnsForField = field.type === "table" ? normalizeTableColumns(field) : [];
                       const compositionColumnOptions = [
                         { value: "", label: "Select column" },
@@ -1419,48 +1407,8 @@ function AdminCreatePassportType() {
                         onClick={() => removeField(section.localId, field.localId)} title="Remove field">✕</button>
                     </div>
 
-                    <div className="acpt-field-top-row">
+                    <div className="acpt-field-top-row acpt-field-options-grid">
                       <div className="acpt-field-governance-stack">
-                        {/* ── Access level config (applies to all field types) ── */}
-                        <div className="acpt-field-access">
-                          <CheckboxDropdown
-                            label="Access"
-                            icon="🔒"
-                            summary={accessSummary}
-                            isOpen={openGovernanceDropdown === accessDropdownId}
-                            onToggle={() => setOpenGovernanceDropdown((current) => current === accessDropdownId ? null : accessDropdownId)}
-                          >
-                            {accessLevels.map(level => {
-                              const currentAccess = field.access || ["public"];
-                              const isPublicChecked = currentAccess.includes("public");
-                              const isChecked = currentAccess.includes(level.value);
-                              const isDisabled = level.value !== "public" && isPublicChecked;
-                              return (
-                                <label key={level.value} className={`acpt-access-check${isDisabled ? " acpt-access-disabled" : ""}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    disabled={isDisabled}
-                                    onChange={e => {
-                                      if (level.value === "public") {
-                                        updateField(section.localId, field.localId, {
-                                          access: e.target.checked ? ["public"] : [],
-                                        });
-                                      } else {
-                                        const next = e.target.checked
-                                          ? [...currentAccess.filter(a => a !== "public"), level.value]
-                                          : currentAccess.filter(a => a !== level.value);
-                                        updateField(section.localId, field.localId, { access: next });
-                                      }
-                                    }}
-                                  />
-                                  <span>{level.label}</span>
-                                </label>
-                              );
-                            })}
-                          </CheckboxDropdown>
-                        </div>
-
                         <div className="acpt-field-access">
                           <label className="acpt-access-check">
                             <span>🛡️ Confidentiality:</span>
@@ -1478,38 +1426,6 @@ function AdminCreatePassportType() {
                               ariaLabel="Confidentiality"
                             />
                           </label>
-                        </div>
-
-                        <div className="acpt-field-access">
-                          <CheckboxDropdown
-                            label="Update Authority"
-                            icon="✍️"
-                            summary={updateAuthoritySummary}
-                            isOpen={openGovernanceDropdown === updateDropdownId}
-                            onToggle={() => setOpenGovernanceDropdown((current) => current === updateDropdownId ? null : updateDropdownId)}
-                          >
-                            {updateAuthorities.map(level => {
-                              const currentAuthorities = field.updateAuthority || ["economicOperator"];
-                              const isChecked = currentAuthorities.includes(level.value);
-                              return (
-                                <label key={level.value} className="acpt-access-check">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={e => {
-                                      const next = e.target.checked
-                                        ? [...new Set([...currentAuthorities, level.value])]
-                                        : currentAuthorities.filter(a => a !== level.value);
-                                      updateField(section.localId, field.localId, {
-                                        updateAuthority: next.length ? next : ["economicOperator"],
-                                      });
-                                    }}
-                                  />
-                                  <span>{level.label}</span>
-                                </label>
-                              );
-                            })}
-                          </CheckboxDropdown>
                         </div>
                       </div>
 
@@ -1605,7 +1521,6 @@ function AdminCreatePassportType() {
                           </label>
                         </div>
                       </div>
-
                     </div>
 
                     <div className="acpt-field-semantic-row">

@@ -277,7 +277,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Types",
       audience: "Super admins publishing the catalog",
       title: "Manage product categories and the published passport-type catalog",
-      summary: "Passport Types is the central catalog workspace. Product categories provide the visual grouping, while versioned code modules and admin-created custom types provide the actual passport definitions that companies can receive through access grants.",
+      summary: "Passport Types is the central catalog workspace. Product categories provide the visual grouping, while versioned code modules and admin-created custom types provide the actual passport definitions assigned to companies.",
       simpleGuide: {
         title: "What this page really controls",
         intro: "This page decides what kinds of passports the platform can create.",
@@ -349,10 +349,10 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       title: "Design passport types with the builder and field modeler",
       summary: "The passport-type builder is where custom type schemas and schema experiments are designed. For production product categories, the same concepts should usually be captured in versioned backend passport modules so schema, semantic model, and compliance behavior can be reviewed and shipped as code.",
       facts: [
-        { label: "Builder outputs", value: "Sections, fields, translations, field access, composition flags, semantic mapping, and dynamic settings" },
+        { label: "Builder outputs", value: "Sections, fields, translations, field confidentiality, composition flags, semantic mapping, and dynamic settings" },
         { label: "Module outputs", value: "moduleKey, typeName, display metadata, semanticModelKey, passportPolicy, sections, and fields" },
         { label: "Input helpers", value: "Draft save/resume, clone workflows, and CSV import for builder definitions" },
-        { label: "Field-level access", value: "Public, Notified Bodies, Market Surveillance, EU Commission, and Legitimate Interest" },
+        { label: "Field confidentiality", value: "Public or restricted" },
         { label: "Special field flags", value: "Composition, semantic IDs, dictionary mapping, dynamic field behavior, and field table configuration" },
       ],
       journeys: [
@@ -377,7 +377,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
         {
           title: "Design for visibility and translation",
           items: [
-            "Assign access levels to fields based on who should see them in the public experience or restricted unlock paths.",
+            "Set field confidentiality to public or restricted based on what the public experience can show before an unlock key is provided.",
             "Add translations for sections and fields so multilingual public viewers can render the same passport structure cleanly.",
             "Use table-column configuration carefully because it defines how structured row data will be authored later by company users.",
           ],
@@ -438,7 +438,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           items: [
             "Open the matching semantic dictionary while designing a backend module or editing a custom passport type.",
             "Search by term label, definition, slug, IRI, or semantic identifier.",
-            "Confirm the expected data type, unit, access rights, static/dynamic behavior, element ID, and regulation references.",
+            "Confirm the expected data type, unit, confidentiality, static/dynamic behavior, element ID, and regulation references.",
             "Map builder fields to dictionary terms intentionally so JSON-LD export uses the correct canonical identifiers.",
             "Remember that company dashboard visibility is derived from company access to passport types that use the semantic model. A company with two granted types using two models can see both dictionaries; unrelated dictionaries stay hidden.",
           ],
@@ -560,14 +560,14 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       category: "Security",
       audience: "Super admins who need to explain or support integrations",
       title: "Understand the platform's credential model before supporting any integration",
-      summary: "Super admins are often asked the same operational questions: which session or token should a human user use, which key should an outside reader use, how do device pushes work, how do delegated audiences work, and how is Asset Management protected. This section gives the simple answer: every credential has a narrow purpose, and mixing them is both confusing and unsafe.",
+      summary: "Super admins are often asked the same operational questions: which session or token should a human user use, which key should an outside reader use, how do integration writes work, and how is Asset Management protected. This section gives the simple answer: every credential has a narrow purpose, and mixing them is both confusing and unsafe.",
       facts: [
         { label: "Super-admin perspective", value: "You usually explain or govern these credentials rather than using all of them personally" },
         { label: "Dashboard access", value: "Uses browser session cookies; bearer tokens are optional for scripts/tests" },
-        { label: "Read-only external access", value: "Uses company API keys, not dashboard sessions or bearer tokens" },
-        { label: "Controlled audiences", value: "Use user/passport access grants for regulated audience access" },
+        { label: "Read-only external access", value: "Uses security group API keys, not dashboard sessions or bearer tokens" },
+        { label: "Restricted read access", value: "Use security group API keys scoped to one passport type and selected restricted fields" },
         { label: "Asset Management protection", value: "Uses a launch token and can require an additional shared secret" },
-        { label: "Public-view restriction", value: "Restricted fields unlock with a passport access key, not with a company API key" },
+        { label: "Public-view restriction", value: "Restricted fields unlock with a security group API key scoped to the passport type or selected passports" },
       ],
       journeys: [
         {
@@ -575,24 +575,23 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
           items: [
             "Tell dashboard users to rely on the browser session for normal UI use.",
             "Tell integration testers to use bearer tokens only when a script cannot use the browser session.",
-            "Tell external read-only partners to use company API keys only on `/api/v1/passports`.",
-            "Tell device or IoT teams to use the passport's own device key on the dynamic-value push endpoint.",
-            "Tell public-view stakeholders that restricted fields are unlocked with a passport access key, not by sharing a company API key.",
-            "Tell regulated-audience users that logged-in controlled access is governed by audience grants, not by public unlock keys.",
+            "Tell external read-only partners to use security group API keys only on `/api/public/passports/:dppId`.",
+            "Tell device or IoT teams to use the company integration Bearer token on the dynamic-value push endpoint.",
+            "Tell public-view stakeholders that restricted fields are unlocked with a security group API key generated in the Security page.",
           ],
         },
         {
           title: "Support without weakening security",
           items: [
             "If a tenant wants recurring bulk updates, decide whether they really need Asset Management or whether normal company APIs are enough.",
-            "If a tenant wants outside read access, encourage one named company API key per external integration so revocation is simple later.",
+            "If a tenant wants outside read access, encourage one named security group API key per external integration so revocation is simple later.",
             "If Asset Management is enabled with a shared secret, make sure support teams understand that missing `x-asset-key` causes authorization failures even when the asset launch token is valid.",
           ],
         },
       ],
       tables: [securityKeyTable, governanceSecurityApiTable],
       warnings: [
-        "There is no separate special raw API key just for audiences such as the EU Commission. External read access is handled with company API keys, public viewer unlocks, or logged-in audience grants depending on the use case.",
+        "There is no separate special raw API key for a particular audience. External restricted read access is handled with scoped security group API keys.",
       ],
     },
     {
@@ -641,7 +640,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       summary: "This section focuses on the APIs that super admins are most likely to explain, test, or monitor while operating the platform. It is not limited to one screen. Instead, it groups the endpoints that shape tenants, categories, passport types, super-admin access, and Asset Management availability.",
       facts: [
         { label: "Auth model", value: "Admin endpoints use dashboard session or bearer authentication plus the super-admin role" },
-        { label: "Tenant controls", value: "Company creation, DPP policy, access grants, analytics, and Asset Management enablement" },
+        { label: "Tenant controls", value: "Company creation, DPP policy, passport-type assignments, analytics, and Asset Management enablement" },
         { label: "Catalog controls", value: "Categories, type CRUD, activation, drafts, and builder operations" },
         { label: "Operator controls", value: "Super-admin invitations, revocation, and restoration" },
       ],
@@ -661,7 +660,7 @@ export function buildAdminSections({ user, companies, adminPassportTypes, catego
       facts: [
         { label: "Core tables", value: "30+ named tables in the current public schema, plus generated `<type>_passports` tables" },
         { label: "Catalog pattern", value: "Passport types define fields in `passportTypes`, then runtime records live in type-specific passport tables" },
-        { label: "Key registry", value: "`passportRegistry` connects DPP ID, company, passport type, and the hashed metadata for public access keys and device keys" },
+        { label: "Key registry", value: "`passportRegistry` connects DPP ID, company, passport type; security groups live in `apiKeys`" },
         { label: "API families", value: `${backendApiFamilies.length} major endpoint families mapped in this manual` },
       ],
       journeys: [

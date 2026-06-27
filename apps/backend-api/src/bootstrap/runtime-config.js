@@ -138,6 +138,19 @@ function validateProductionUrl(name, logger) {
   }
 }
 
+function assertDatabaseName({ logger }) {
+  const expectedDatabaseName = "dppSystem";
+  const configuredDatabaseName = String(process.env.DB_NAME || "").trim();
+
+  if (configuredDatabaseName !== expectedDatabaseName) {
+    logger.error(
+      { env: "DB_NAME", expected: expectedDatabaseName, actual: configuredDatabaseName || null },
+      "Invalid database name. Use the canonical camel-case app database name."
+    );
+    process.exit(1);
+  }
+}
+
 function deriveRuntimeFlags(port) {
   const isProduction = process.env.NODE_ENV === "production";
   const runSchemaMigrations =
@@ -223,6 +236,7 @@ function assertProductionStorageReadiness({ isProduction, logger }) {
 }
 
 module.exports = {
+  assertDatabaseName,
   assertProductionStorageReadiness,
   assertRequiredProductionEnvironment,
   deriveRuntimeFlags,

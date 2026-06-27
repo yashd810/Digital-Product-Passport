@@ -32,7 +32,7 @@ function createDppUseCase(deps) {
 
   return async function createDpp({ req }) {
     const normalizedBody = normalizePassportRequestBody ? normalizePassportRequestBody(req.body) : req.body || {};
-    const submittedCompanyId = normalizedBody.companyId;
+    const submittedCompanyId = normalizedBody.companyId ?? req.params?.companyId;
     const companyId = req.user.role === "superAdmin"
       ? Number.parseInt(submittedCompanyId, 10)
       : Number.parseInt(req.user.companyId, 10);

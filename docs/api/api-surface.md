@@ -18,10 +18,10 @@ If you are tracing a frontend request, first figure out which group it belongs t
 | Messaging | `/api/messaging/...` | conversations and messages |
 | Notifications | `/api/users/me/notifications...` | notification feeds and read state |
 | Passport data management | `/api/companies/:companyId/passport-data-management...` | ERP-style passport data sync and jobs |
-| Passports (company side) | routes registered from `src/http/routes/passports.js` | create, update, lifecycle, API keys, access grants, history, backup |
-| Public passports | `/api/passports/...`, `/api/public/dpp/...`, `/did/...`, `/resolve`, `/contexts/...` | public reads, semantic outputs, signatures, DID resolution |
+| Passports (company side) | routes registered from `src/http/routes/passports.js` | create, update, lifecycle, security group API keys, history, backup |
+| Public passports | `/api/public/passports/:dppId...`, `/api/public/companies/:companySlug/profile`, `/did/...`, `/resolve`, `/contexts/...` | public-safe reads, optional security-group restricted-field unlocks, semantic outputs, signatures, DID resolution |
 | Semantic models | `/api/semantic-models...`, `/dictionary/:family/:version...` | semantic model metadata and dictionary browsing |
-| Standards API | `/api/v1/...` | standards-oriented DPP routes |
+| Integration write API | `/api/companies/:companySlug/integrations/v1/passports...` | company automation create, patch, delete, archive, and dynamic-value writes with Bearer authentication |
 | Health | `/health`, `/health/storage` | runtime health |
 
 ## Main Route Files

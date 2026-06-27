@@ -152,20 +152,6 @@ const createRateLimiters = (pool) => {
       message: "Too many scan requests. Please try again shortly."
     }),
 
-    devicePushRateLimit: rateLimit({
-      key: (req) => `device-push:${req.ip}:${String(req.params?.dppId || "")}`,
-      limit: envInt("rateLimitDevicePushMax", 120),
-      windowMs: envInt("rateLimitDevicePushWindowMs", 60 * 1000),
-      message: "Too many device updates. Please slow down and try again shortly."
-    }),
-
-    apiKeyReadRateLimit: rateLimit({
-      key: (req) => `api-key:${req.apiKey?.keyId || req.ip}:${req.path}`,
-      limit: envInt("rateLimitApiKeyReadMax", 300),
-      windowMs: envInt("rateLimitApiKeyReadWindowMs", 60 * 1000),
-      message: "API rate limit exceeded. Please reduce request frequency."
-    }),
-
     assetWriteRateLimit: rateLimit({
       key: (req) => `asset-write:${req.ip}:${req.assetContext?.companyId || ""}:${req.assetContext?.userId || ""}:${req.path}`,
       limit: envInt("rateLimitAssetWriteMax", 90),

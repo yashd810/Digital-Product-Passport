@@ -2,16 +2,16 @@
 
 const { buildCanonicalIdentityBundle } = require("../../shared/identifiers/canonical-identity-bundle");
 const { rewriteRepositoryLinksForSignedAccessDeep } = require("../../shared/repository/repository-file-links");
+const { createApiKeyHelpers } = require("./api-key-helpers");
 
 module.exports = function registerPreviewManagementRoutes(app, deps) {
   const {
     pool,
+    crypto,
     authenticateToken,
     checkCompanyAccess,
     requireEditor,
-    createAccessKeyMaterial,
     editSessionTimeoutHours,
-    stripRestrictedFieldsForPublicView,
     normalizePassportRow,
     getCompanyNameMap,
     resolveCompanyPreviewPassport,
@@ -26,6 +26,11 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     logAudit,
   } = deps;
   const previewAppBaseUrl = process.env.PUBLIC_APP_URL || process.env.APP_URL || process.env.SERVER_URL || "http://localhost:3001";
+  const {
+    buildRestrictedUnlockPassportPayload,
+    checkSecurityGroupApiKeyAccess,
+    findMatchingApiKeyRecord,
+  } = createApiKeyHelpers({ crypto });
 
   app.get("/api/companies/:companyId/passports/:passportKey/preview", authenticateToken, checkCompanyAccess, async (req, res) => {
     try {
@@ -109,6 +114,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
+          dppId: passport.dppId,
           internalAliasId: passport.internalAliasId,
         }),
         inactivePath: buildInactivePublicPassportPath({
@@ -116,6 +122,7 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
           manufacturerName: passport.manufacturer,
           manufacturedBy: passport.manufacturedBy,
           modelName: passport.modelName,
+          dppId: passport.dppId,
           internalAliasId: passport.internalAliasId,
           versionNumber: passport.versionNumber,
         }),
@@ -123,6 +130,110 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     } catch (error) {
       if (error.code === "ambiguousProductId") return res.status(409).json({ error: error.message });
       res.status(500).json({ error: "Failed to fetch passport preview" });
+    }
+  });
+
+  function getSecurityGroupKeyFromRequest(req) {
+    const headerValue = req.headers["x-security-group-key"] || req.headers["x-api-key"];
+    const raw = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+    return String(raw || "").trim();
+  }
+
+  app.get("/api/companies/:companyId/passports/:dppId/preview-unlock", authenticateToken, checkCompanyAccess, async (req, res) => {
+    try {
+      const { companyId, dppId } = req.params;
+      const apiKey = getSecurityGroupKeyFromRequest(req);
+      if (!apiKey) return res.status(400).json({ error: "apiKey is required" });
+
+      const resolved = await resolveCompanyPreviewPassport({ companyId, passportKey: dppId });
+      if (!resolved?.passport) return res.status(404).json({ error: "Passport not found" });
+
+      const sourcePassport = resolved.passport;
+      const resolvedCompanyId = sourcePassport.companyId ?? companyId ?? null;
+      const typeDefResult = await pool.query(
+        `SELECT id, "typeName", "displayName", "productCategory", "productIcon", "fieldsJson"
+         FROM "passportTypes"
+         WHERE "typeName" = $1
+         LIMIT 1`,
+        [sourcePassport.passportType]
+      );
+      const typeDef = typeDefResult.rows[0] || resolved.typeDef || null;
+
+      const keyPrefix = String(apiKey || "").slice(0, 16);
+      const keyRows = await pool.query(
+        `SELECT id,
+                "companyId" AS "companyId",
+                name,
+                "keyHash" AS "keyHash",
+                "keySalt" AS "keySalt",
+                "hashAlgorithm" AS "hashAlgorithm",
+                "passportType" AS "passportType",
+                "scopeType" AS "scopeType",
+                "fieldKeys" AS "fieldKeys",
+                "passportDppIds" AS "passportDppIds"
+         FROM "apiKeys"
+         WHERE "keyPrefix" = $1
+           AND "isActive" = true
+           AND ("expiresAt" IS NULL OR "expiresAt" > NOW())`,
+        [keyPrefix]
+      );
+      const matchedKey = findMatchingApiKeyRecord(apiKey, keyRows.rows);
+      if (!matchedKey) return res.status(401).json({ error: "Invalid or revoked API key" });
+
+      const normalizedPassport = {
+        ...normalizePassportRow(sourcePassport, typeDef),
+        dppId: sourcePassport.dppId || dppId,
+        companyId: resolvedCompanyId,
+        passportType: sourcePassport.passportType,
+      };
+      const accessDecision = checkSecurityGroupApiKeyAccess(matchedKey, normalizedPassport);
+      if (!accessDecision.allowed) {
+        return res.status(accessDecision.statusCode).json({ error: accessDecision.error });
+      }
+
+      const unlockPayload = await buildRestrictedUnlockPassportPayload({
+        pool,
+        passport: normalizedPassport,
+        typeDef,
+        apiKey: matchedKey,
+        normalizePassportRow: (passportRow) => passportRow,
+      });
+      pool.query('UPDATE "apiKeys" SET "lastUsedAt" = NOW() WHERE id = $1', [matchedKey.id]).catch(() => {});
+
+      if (typeof logAudit === "function") {
+        Promise.resolve(logAudit(
+          resolvedCompanyId,
+          req.user?.userId || null,
+          "previewRestrictedFieldsUnlocked",
+          "passportRegistry",
+          normalizedPassport.dppId,
+          null,
+          {
+            apiKeyId: matchedKey.id,
+            passportType: normalizedPassport.passportType,
+            scopeType: matchedKey.scopeType || "passportType",
+            unlockedFieldKeys: unlockPayload.unlockedFieldKeys,
+          },
+          {
+            actorIdentifier: req.user?.email || req.user?.userId || null,
+            audience: "securityGroup",
+          }
+        )).catch(() => {});
+      }
+
+      res.json({
+        success: true,
+        passport: unlockPayload.passport,
+        unlockedFieldKeys: unlockPayload.unlockedFieldKeys,
+        securityGroup: {
+          id: matchedKey.id,
+          name: matchedKey.name || null,
+          scopeType: matchedKey.scopeType || "passportType",
+        },
+      });
+    } catch (error) {
+      if (error.code === "ambiguousProductId") return res.status(409).json({ error: error.message });
+      res.status(500).json({ error: "Failed to unlock passport preview" });
     }
   });
 
@@ -169,50 +280,4 @@ module.exports = function registerPreviewManagementRoutes(app, deps) {
     }
   });
 
-  app.get("/api/companies/:companyId/passports/:dppId/access-key", authenticateToken, checkCompanyAccess, async (req, res) => {
-    try {
-      const result = await pool.query(
-        `SELECT "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt"
-         FROM "passportRegistry"
-         WHERE "dppId" = $1 AND "companyId" = $2`,
-        [req.params.dppId, req.params.companyId]
-      );
-      if (!result.rows.length) return res.status(404).json({ error: "Passport not found" });
-
-      res.json({
-        hasAccessKey: !!result.rows[0].accessKeyHash,
-        keyPrefix: result.rows[0].accessKeyPrefix || null,
-        lastRotatedAt: result.rows[0].accessKeyLastRotatedAt || null,
-        revealable: false,
-      });
-    } catch {
-      res.status(500).json({ error: "Failed to get access key" });
-    }
-  });
-
-  app.post("/api/companies/:companyId/passports/:dppId/access-key/regenerate", authenticateToken, checkCompanyAccess, requireEditor, async (req, res) => {
-    try {
-      const { dppId, companyId } = req.params;
-      const material = createAccessKeyMaterial();
-      const updated = await pool.query(
-        `UPDATE "passportRegistry"
-         SET "accessKeyHash" = $1,
-             "accessKeyPrefix" = $2,
-             "accessKeyLastRotatedAt" = NOW()
-         WHERE "dppId" = $3 AND "companyId" = $4
-         RETURNING "accessKeyPrefix", "accessKeyLastRotatedAt"`,
-        [material.hash, material.prefix, dppId, companyId]
-      );
-      if (!updated.rows.length) return res.status(404).json({ error: "Passport not found" });
-
-      await logAudit(companyId, req.user.userId, "rotateAccessKey", "passportRegistry", dppId, null, { keyPrefix: material.prefix });
-      res.json({
-        accessKey: material.rawKey,
-        keyPrefix: updated.rows[0].accessKeyPrefix,
-        lastRotatedAt: updated.rows[0].accessKeyLastRotatedAt,
-      });
-    } catch {
-      res.status(500).json({ error: "Failed to rotate access key" });
-    }
-  });
 };

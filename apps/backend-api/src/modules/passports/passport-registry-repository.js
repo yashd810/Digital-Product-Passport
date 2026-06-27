@@ -6,9 +6,6 @@ async function insertPassportRegistry({
   lineageId,
   companyId,
   passportType,
-  accessKeyHash = null,
-  accessKeyPrefix = null,
-  accessKeyLastRotatedAt = null,
   deviceApiKeyHash = null,
   deviceApiKeyPrefix = null,
   deviceKeyLastRotatedAt = null,
@@ -16,18 +13,14 @@ async function insertPassportRegistry({
   return client.query(
     `INSERT INTO "passportRegistry"
        ("dppId", "lineageId", "companyId", "passportType",
-        "accessKeyHash", "accessKeyPrefix", "accessKeyLastRotatedAt",
         "deviceApiKeyHash", "deviceApiKeyPrefix", "deviceKeyLastRotatedAt")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT ("dppId") DO NOTHING`,
     [
       dppId,
       lineageId,
       companyId,
       passportType,
-      accessKeyHash,
-      accessKeyPrefix,
-      accessKeyLastRotatedAt,
       deviceApiKeyHash,
       deviceApiKeyPrefix,
       deviceKeyLastRotatedAt,

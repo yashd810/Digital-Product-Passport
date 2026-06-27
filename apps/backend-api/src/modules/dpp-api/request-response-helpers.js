@@ -184,19 +184,30 @@ function createRequestResponseHelpers({
     return buildCanonicalPassportPayload(passport, typeDef, { companyName });
   }
 
+  function scrubInternalPublicIdentifiers(value) {
+    if (Array.isArray(value)) return value.map(scrubInternalPublicIdentifiers);
+    if (!value || typeof value !== "object") return value;
+    const scrubbed = {};
+    for (const [key, childValue] of Object.entries(value)) {
+      if (key === "internalAliasId" || key === "internalAliasIds" || key === "companyId") continue;
+      scrubbed[key] = scrubInternalPublicIdentifiers(childValue);
+    }
+    return scrubbed;
+  }
+
   async function buildPassportResponse(req, passport, typeDef, companyName) {
     const sanitized = rewriteRepositoryLinksForSignedAccessDeep(
       await stripRestrictedFieldsForPublicView(passport, passport.passportType),
       { appBaseUrl: getAppUrl() }
     );
     if (getRepresentation(req) === "full") {
-      return buildExpandedPassportPayload(sanitized, typeDef, { companyName });
+      return scrubInternalPublicIdentifiers(buildExpandedPassportPayload(sanitized, typeDef, { companyName }));
     }
-    return buildOperationalDppPayload(sanitized, typeDef, {
+    return scrubInternalPublicIdentifiers(buildOperationalDppPayload(sanitized, typeDef, {
       companyName,
       granularity: sanitized.granularity || "model",
       dppIdentity
-    });
+    }));
   }
 
   async function dbLookupByCompanyAndProduct(companyId, internalAliasId) {

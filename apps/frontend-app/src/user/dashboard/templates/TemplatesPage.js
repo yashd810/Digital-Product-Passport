@@ -250,7 +250,7 @@ function TemplateEditor({ companyId, passportTypes, editingTemplate, cloneTempla
   useEffect(() => {
     if (!passportType) { setSections(null); return; }
     setLoadingFields(true);
-    fetchWithAuth(`${api}/api/passport-types/${passportType}`)
+    fetchWithAuth(`${api}/api/internal/passport-types/${passportType}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fieldsJson?.sections) {

@@ -45,7 +45,7 @@ function VersionDiff({ companyId }) {
     setError("");
 
     Promise.all([
-      fetchWithAuth(`${api}/api/passport-types/${pt}`).then((response) => (response.ok ? response.json() : null)),
+      fetchWithAuth(`${api}/api/internal/passport-types/${pt}`).then((response) => (response.ok ? response.json() : null)),
       fetchWithAuth(`${api}/api/companies/${companyId}/passports/${dppId}/diff?passportType=${pt}`, {
         headers: authHeaders(),
       }).then(async (response) => {

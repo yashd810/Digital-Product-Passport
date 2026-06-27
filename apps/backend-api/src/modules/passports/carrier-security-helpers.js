@@ -27,6 +27,7 @@ function createCarrierSecurityHelpers({
       return buildCurrentPublicPassportPath({
         companyName,
         modelName: passport.modelName,
+        dppId: passport.dppId,
         internalAliasId: passport.internalAliasId,
       });
     }
@@ -141,13 +142,18 @@ function createCarrierSecurityHelpers({
     const publicAccessUrl = buildPublicAccessUrl(publicPath);
     const dppId = passport?.dppId || null;
     const internalAliasId = passport?.internalAliasId || null;
+    const storedProductIdentifier = passport?.productIdentifierDid || passport?.uniqueProductIdentifier || null;
+    const uniqueProductIdentifier = storedProductIdentifier
+      && String(storedProductIdentifier) !== String(internalAliasId || "")
+      ? storedProductIdentifier
+      : null;
     const credential = await signPortableDataConstruct({
       type: "DataCarrierBindingCredential",
       id: `${publicAccessUrl || `urn:dpp:${dppId || "unknown"}`}#carrier-binding`,
       subjectId: `${publicAccessUrl || `urn:dpp:${dppId || "unknown"}`}#carrier`,
       payload: {
         digitalProductPassportId: dppId,
-        uniqueProductIdentifier: internalAliasId,
+        uniqueProductIdentifier,
         publicAccessUrl,
         carrierSecurityStatus: metadata.carrierSecurityStatus || null,
         carrierAuthenticationMethod: metadata.carrierAuthenticationMethod || null,

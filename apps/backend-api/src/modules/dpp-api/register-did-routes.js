@@ -4,17 +4,11 @@ const { createValidationMiddleware } = require("../../shared/validation/request-
 
 module.exports = function registerDidRoutes(app, deps) {
   const {
-    pool,
     logger,
     publicReadRateLimit,
-    getTable,
-    normalizePassportRow,
-    getCompanyNameMap,
     dbLookupByInternalAliasIdOnly,
     getAppUrl,
-    didService,
     dppIdentity,
-    productIdentifierService,
   } = deps;
   const facilityParamsSchema = {
     type: "object",
@@ -132,61 +126,4 @@ module.exports = function registerDidRoutes(app, deps) {
     }
   });
 
-  app.get("/api/passports/:dppId/public-url", publicReadRateLimit, createValidationMiddleware({
-    params: {
-      type: "object",
-      required: ["dppId"],
-      properties: {
-        dppId: { type: "string", minLength: 1 },
-      },
-    },
-  }), async (req, res) => {
-    try {
-      const { dppId } = req.params;
-
-      const reg = await pool.query(
-        `SELECT "passportType", "companyId"
-         FROM "passportRegistry"
-         WHERE "dppId" = $1`,
-        [dppId]
-      );
-      if (!reg.rows.length) return res.status(404).json({ error: "Passport not found" });
-
-      const { passportType, companyId } = reg.rows[0];
-      const tableName = getTable(passportType);
-
-      const r = await pool.query(
-        `SELECT "dppId", "lineageId", "internalAliasId", "modelName", "companyId" FROM ${tableName}
-         WHERE "dppId" = $1 AND "deletedAt" IS NULL
-         LIMIT 1`,
-        [dppId]
-      );
-      if (!r.rows.length) return res.status(404).json({ error: "Passport record not found" });
-
-      const passport = normalizePassportRow(r.rows[0]);
-      passport.passportType = passportType;
-
-      const companyNameMap = await getCompanyNameMap([companyId]);
-      const companyName = companyNameMap.get(String(companyId)) || "";
-
-      const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
-      const productDid = passport.productIdentifierDid || passport.uniqueProductIdentifier || null;
-      const pDppDid = (passport.lineageId || passport.dppId || passport.internalAliasId) ?
-        dppIdentity.dppDid("model", passport.lineageId || passport.dppId || passport.internalAliasId) :
-        null;
-
-      res.json({
-        publicUrl,
-        internalAliasId: passport.internalAliasId || null,
-        productIdentifierDid: productDid,
-        modelName: passport.modelName || null,
-        companyName,
-        dppDid: pDppDid,
-        productDid
-      });
-    } catch (e) {
-      logger.error({ err: e }, "[Public URL]");
-      res.status(500).json({ error: "Failed to resolve public URL" });
-    }
-  });
 };

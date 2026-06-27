@@ -1,5 +1,7 @@
 "use strict";
 
+const { canonicalKeyFromSemanticId } = require("../../shared/passports/canonical-field-keys");
+
 const path = require("path");
 const logger = require("../../services/logger");
 const { getPassportTypeModules } = require("../../passport-modules");
@@ -14,7 +16,6 @@ module.exports = function registerCatalogRoutes(app, deps) {
     verifyPassword,
     logAudit,
     getTable,
-    publicReadRateLimit,
     createPassportTable,
     passportTypeHasStoredRecords,
     buildPassportTypeSchemaChange,
@@ -109,6 +110,16 @@ module.exports = function registerCatalogRoutes(app, deps) {
             field: field?.key || null,
             message: `Field "${field?.key || "unknown"}" must have an explicit semanticId from the module.`,
           });
+        } else {
+          const canonicalFieldKey = canonicalKeyFromSemanticId(field.semanticId);
+          if (canonicalFieldKey && field.key !== canonicalFieldKey) {
+            issues.push({
+              code: "fieldKeyMustMatchSemanticTerm",
+              field: field?.key || null,
+              expected: canonicalFieldKey,
+              message: `Field "${field?.key || "unknown"}" must use canonical semantic key "${canonicalFieldKey}".`,
+            });
+          }
         }
         for (const metadataKey of ["elementIdPath", "objectType", "valueDataType"]) {
           if (!field?.[metadataKey]) {
@@ -145,6 +156,17 @@ module.exports = function registerCatalogRoutes(app, deps) {
                 column: column?.key || null,
                 message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must have an explicit semanticId from the module.`,
               });
+            } else {
+              const canonicalColumnKey = canonicalKeyFromSemanticId(column.semanticId);
+              if (canonicalColumnKey && column.key !== canonicalColumnKey) {
+                issues.push({
+                  code: "tableColumnKeyMustMatchSemanticTerm",
+                  field: field?.key || null,
+                  column: column?.key || null,
+                  expected: canonicalColumnKey,
+                  message: `Table column "${field?.key || "unknown"}.${column?.key || "unknown"}" must use canonical semantic key "${canonicalColumnKey}".`,
+                });
+              }
             }
             for (const metadataKey of ["elementIdPath", "objectType", "valueDataType"]) {
               if (!column?.[metadataKey]) {
@@ -281,7 +303,7 @@ module.exports = function registerCatalogRoutes(app, deps) {
     }
   });
 
-  app.get("/api/passport-types/:typeName", publicReadRateLimit, async (req, res) => {
+  app.get("/api/internal/passport-types/:typeName", authenticateToken, async (req, res) => {
     try {
       const result = await pool.query(
         `SELECT id,
@@ -295,6 +317,18 @@ module.exports = function registerCatalogRoutes(app, deps) {
         [req.params.typeName]
       );
       if (!result.rows.length) return res.status(404).json({ error: "Passport type not found" });
+      if (req.user.role !== "superAdmin") {
+        const access = await pool.query(
+          `SELECT 1
+           FROM "companyPassportAccess" cpa
+           WHERE cpa."companyId" = $1
+             AND cpa."passportTypeId" = $2
+             AND COALESCE(cpa."accessRevoked", false) = false
+           LIMIT 1`,
+          [req.user.companyId, result.rows[0].id]
+        );
+        if (!access.rows.length) return res.status(403).json({ error: "Unauthorised access to this passport type" });
+      }
       res.json(mapPassportTypeRow(result.rows[0]));
     } catch {
       res.status(500).json({ error: "Failed to fetch passport type" });

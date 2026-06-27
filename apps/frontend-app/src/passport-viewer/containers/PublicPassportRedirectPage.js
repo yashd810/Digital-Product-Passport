@@ -10,19 +10,19 @@ function RedirectState({ message }) {
 
 export default function PublicPassportRedirectPage() {
   const navigate = useNavigate();
-  const { internalAliasId, versionNumber } = useParams();
+  const { dppId, versionNumber } = useParams();
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const encodedProductId = encodeURIComponent(internalAliasId || "");
-    if (!encodedProductId) {
+    const encodedDppId = encodeURIComponent(dppId || "");
+    if (!encodedDppId) {
       setError("Public passport page not found.");
       return;
     }
 
     const endpoint = versionNumber
-      ? `${api}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
-      : `${api}/api/passports/by-product/${encodedProductId}`;
+      ? `${api}/api/public/passports/${encodedDppId}?version=${encodeURIComponent(versionNumber)}`
+      : `${api}/api/public/passports/${encodedDppId}`;
 
     let cancelled = false;
     setError("");
@@ -42,7 +42,7 @@ export default function PublicPassportRedirectPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate, internalAliasId, versionNumber]);
+  }, [navigate, dppId, versionNumber]);
 
   if (error) return <RedirectState message={error} />;
   return <RedirectState message="Opening passport…" />;

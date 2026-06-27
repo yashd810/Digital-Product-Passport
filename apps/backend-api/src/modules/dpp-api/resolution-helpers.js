@@ -465,8 +465,7 @@ function createResolutionHelpers({
 
   function buildPassportServiceEndpoints(subjectDid, passport, typeDef, companyName) {
     const appUrl = getAppUrl();
-    const { internalAliasId } = passport;
-    const encodedPid = encodeURIComponent(String(internalAliasId));
+    const encodedDppId = encodeURIComponent(String(passport.dppId || ""));
     const publicUrl = dppIdentity.buildCanonicalPublicUrl(passport, companyName);
 
     return [
@@ -478,24 +477,19 @@ function createResolutionHelpers({
       {
         id: `${subjectDid}#passport-json`,
         type: "DPPOperationalAPI",
-        serviceEndpoint: `${appUrl}/api/v1/dppsByProductId/${encodedPid}`,
+        serviceEndpoint: `${appUrl}/api/public/passports/${encodedDppId}`,
         accept: ["application/json"]
       },
       {
         id: `${subjectDid}#passport-jsonld`,
         type: "DPPLinkedData",
-        serviceEndpoint: `${appUrl}/api/v1/dppsByProductId/${encodedPid}`,
+        serviceEndpoint: `${appUrl}/api/public/passports/${encodedDppId}?format=semantic`,
         accept: ["application/ld+json"]
       },
       {
         id: `${subjectDid}#passport-credential`,
         type: "VerifiableCredential",
-        serviceEndpoint: `${appUrl}/api/passports/${passport.dppId}/signature`
-      },
-      {
-        id: `${subjectDid}#passport-schema`,
-        type: "DPPSchema",
-        serviceEndpoint: `${appUrl}/api/passport-types/${passport.passportType}`
+        serviceEndpoint: `${appUrl}/api/public/passports/${passport.dppId}/signature`
       }
     ];
   }

@@ -423,7 +423,7 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
   useEffect(() => {
     if (!activePassportType) return;
     setLoadingType(true);
-    fetchWithAuth(`${api}/api/passport-types/${activePassportType}`)
+    fetchWithAuth(`${api}/api/internal/passport-types/${activePassportType}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.fieldsJson?.sections) {
@@ -1439,8 +1439,8 @@ function PassportForm({ user, companyId, mode = "create", passportType: typeProp
             </div>
           )}
           <div className="pf-governance-panel">
-            Field confidentiality, access audiences, and update authority are set on the passport type by admins.
-            This form shows those governance rules for each field, but editors cannot change them per passport record.
+            Field confidentiality is set on the passport type by admins.
+            Editors cannot change it per passport record.
           </div>
           {error && <div className="alert alert-error" role="alert">{error}</div>}
           {success && <div className="alert alert-success" role="status" aria-live="polite">{success}</div>}

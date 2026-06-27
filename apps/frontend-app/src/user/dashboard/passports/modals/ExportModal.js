@@ -61,7 +61,7 @@ export function ExportModal({ passports, filteredPassports, pagePassports, selec
   const exportList = scopePassports[scope] || [];
 
   const loadTypeSchema = async (type) => {
-    const r = await fetchWithAuth(`${api}/api/passport-types/${type}`);
+    const r = await fetchWithAuth(`${api}/api/internal/passport-types/${type}`);
     if (!r.ok) throw new Error(`Failed to fetch field definitions for ${type}`);
     return r.json();
   };

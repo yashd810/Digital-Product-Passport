@@ -107,22 +107,37 @@ function getSchemaFieldValue(source, key) {
   return undefined;
 }
 
+function isUnlockPayloadForPassport(passport, unlockedPassport) {
+  if (!passport || !unlockedPassport) return false;
+  if (String(unlockedPassport.dppId || "") !== String(passport.dppId || "")) return false;
+  if (String(unlockedPassport.passportType || "") !== String(passport.passportType || "")) return false;
+  if (unlockedPassport.versionNumber !== null && unlockedPassport.versionNumber !== undefined
+    && passport.versionNumber !== null && passport.versionNumber !== undefined) {
+    return Number(unlockedPassport.versionNumber) === Number(passport.versionNumber);
+  }
+  return true;
+}
+
 function resolveFieldValue(field, passport, unlockedPassport, dynamicValues) {
-  const access = field.access || ["public"];
-  const isPublic = access.includes("public");
+  const isPublic = String(field.confidentiality || "public").toLowerCase() !== "restricted";
   const isDynamic = !!field.dynamic;
   const dynEntry = isDynamic ? dynamicValues?.[field.key] : null;
-  const source = unlockedPassport || passport;
-  const raw = isPublic || unlockedPassport
-    ? (isDynamic ? (dynEntry?.value ?? null) : getSchemaFieldValue(source, field.key))
+  const scopedUnlockedPassport = isUnlockPayloadForPassport(passport, unlockedPassport) ? unlockedPassport : null;
+  const hasUnlockedField = !isPublic
+    && !!scopedUnlockedPassport
+    && Object.prototype.hasOwnProperty.call(scopedUnlockedPassport, field.key);
+  const source = isPublic ? passport : (hasUnlockedField ? scopedUnlockedPassport : passport);
+  const raw = isPublic || hasUnlockedField
+    ? (isDynamic ? (dynEntry?.value ?? getSchemaFieldValue(source, field.key) ?? null) : getSchemaFieldValue(source, field.key))
     : null;
 
   return {
     raw,
     isPublic,
     isDynamic,
+    isUnlocked: hasUnlockedField,
     dynEntry,
-    isLocked: !isPublic && !unlockedPassport,
+    isLocked: !isPublic && !hasUnlockedField,
   };
 }
 
@@ -337,20 +352,33 @@ function DataArtifactPreview({ field, raw, label, onPreviewImage, onRefreshField
   return null;
 }
 
-function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, onPreviewImage, onRefreshFieldUrl = null }) {
+function DataFieldValue({
+  field,
+  passport,
+  unlockedPassport,
+  dynamicValues,
+  dynamicHistoryBasePath = "",
+  securityGroupApiKey = "",
+  lang,
+  onPreviewImage,
+  onRefreshFieldUrl = null,
+}) {
   const [expandedHistory, setExpandedHistory] = useState(false);
   const [chartType, setChartType] = useState("line");
   const [historyState, setHistoryState] = useState({ loading: false, loaded: false, data: [] });
 
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
-  const { raw, isLocked, isDynamic, dynEntry } = resolved;
+  const { raw, isLocked, isDynamic, isPublic, dynEntry } = resolved;
   const pieItems = getCompositionItems(field, raw);
 
   useEffect(() => {
-    if (!expandedHistory || !isDynamic || historyState.loaded || !passport?.dppId) return;
+    if (!expandedHistory || !isDynamic || historyState.loaded || !dynamicHistoryBasePath) return;
     let cancelled = false;
     setHistoryState({ loading: true, loaded: false, data: [] });
-    fetchWithAuth(`${api}/api/passports/${passport.dppId}/dynamic-values/${field.key}/history?limit=500`)
+    fetchWithAuth(
+      `${api}${dynamicHistoryBasePath}/${encodeURIComponent(field.key)}/history?limit=500`,
+      securityGroupApiKey ? { headers: { "X-API-Key": securityGroupApiKey } } : undefined
+    )
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         if (cancelled) return;
@@ -367,7 +395,7 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
     return () => {
       cancelled = true;
     };
-  }, [expandedHistory, field.key, historyState.loaded, isDynamic, passport?.dppId]);
+  }, [dynamicHistoryBasePath, expandedHistory, field.key, historyState.loaded, isDynamic, securityGroupApiKey]);
 
   let content = <span className="field-value-empty">—</span>;
 
@@ -375,7 +403,7 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
     content = (
       <div className="field-value-locked">
         <p>This value is available to authorised parties only.</p>
-        <LockedFieldCell field={field} onUnlock={onRequestUnlock} />
+        <LockedFieldCell field={field} />
       </div>
     );
   } else if (field.type === "boolean") {
@@ -420,7 +448,7 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
   return (
     <div className="field-value-stack">
       {content}
-      {isDynamic && !isLocked && (
+      {isDynamic && isPublic && !isLocked && (
         <div className="field-dynamic-block">
           <div className="field-dynamic-top">
             <LiveBadge updatedAt={dynEntry?.updatedAt} />
@@ -468,7 +496,16 @@ function DataFieldValue({ field, passport, unlockedPassport, onRequestUnlock, dy
   );
 }
 
-function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynamicValues, lang, onRefreshFieldUrl = null }) {
+function DocumentCard({
+  item,
+  passport,
+  unlockedPassport,
+  dynamicValues,
+  dynamicHistoryBasePath = "",
+  securityGroupApiKey = "",
+  lang,
+  onRefreshFieldUrl = null,
+}) {
   const { field, fieldLabel, isLocked } = item;
   const resolved = resolveFieldValue(field, passport, unlockedPassport, dynamicValues);
   const documentValue = !isLocked && isFilled(resolved.raw) ? resolved.raw : null;
@@ -508,8 +545,9 @@ function DocumentCard({ item, passport, unlockedPassport, onRequestUnlock, dynam
             field={field}
             passport={passport}
             unlockedPassport={unlockedPassport}
-            onRequestUnlock={onRequestUnlock}
             dynamicValues={dynamicValues}
+            dynamicHistoryBasePath={dynamicHistoryBasePath}
+            securityGroupApiKey={securityGroupApiKey}
             lang={lang}
             onRefreshFieldUrl={onRefreshFieldUrl}
           />
@@ -529,6 +567,8 @@ export default function PublicPassportPortal({
   unlockedPassport,
   onRequestUnlock,
   dynamicValues,
+  dynamicHistoryBasePath = "",
+  securityGroupApiKey = "",
   lang,
   sigVerification,
   verificationBundle,
@@ -570,16 +610,13 @@ export default function PublicPassportPortal({
   }, [publicHistoryPayload]);
 
   useEffect(() => {
-    if (publicHistoryPayload || (!passport?.internalAliasId && !passport?.dppId) || publicHistoryState.loaded || publicHistoryState.loading) return;
+    if (publicHistoryPayload || !passport?.dppId || publicHistoryState.loaded || publicHistoryState.loading) return;
     let cancelled = false;
     const loadHistory = async () => {
       setPublicHistoryState({ loading: true, loaded: false, data: [], failed: false });
       const endpoints = [
         passport?.dppId
-          ? `${api}/api/passports/${encodeURIComponent(passport.dppId)}/history`
-          : null,
-        passport?.internalAliasId
-          ? `${api}/api/passports/by-product/${encodeURIComponent(passport.internalAliasId)}/history`
+          ? `${api}/api/public/passports/${encodeURIComponent(passport.dppId)}/history`
           : null,
       ].filter(Boolean);
 
@@ -675,6 +712,16 @@ export default function PublicPassportPortal({
                 {page.label}
               </button>
             ))}
+          </div>
+          <div className="nav-actions">
+            <button
+              type="button"
+              className="restricted-access-btn"
+              onClick={onRequestUnlock}
+            >
+              Access restricted fields
+            </button>
+            {unlockedPassport && <span className="badge ok">Unlocked</span>}
           </div>
         </div>
       </nav>
@@ -940,8 +987,9 @@ export default function PublicPassportPortal({
                           field={field}
                           passport={passport}
                           unlockedPassport={unlockedPassport}
-                          onRequestUnlock={onRequestUnlock}
                           dynamicValues={dynamicValues}
+                          dynamicHistoryBasePath={dynamicHistoryBasePath}
+                          securityGroupApiKey={securityGroupApiKey}
                           lang={lang}
                           onPreviewImage={(src, label) => setPreviewImage({ src, label })}
                           onRefreshFieldUrl={onRefreshFieldUrl}
@@ -996,8 +1044,9 @@ export default function PublicPassportPortal({
                 item={item}
                 passport={passport}
                 unlockedPassport={unlockedPassport}
-                onRequestUnlock={onRequestUnlock}
                 dynamicValues={dynamicValues}
+                dynamicHistoryBasePath={dynamicHistoryBasePath}
+                securityGroupApiKey={securityGroupApiKey}
                 lang={lang}
                 onRefreshFieldUrl={onRefreshFieldUrl}
               />

@@ -346,13 +346,14 @@ const buildCurrentPublicPassportPath = ({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
+  dppId = "",
   internalAliasId = "",
 }) => {
-  const resolvedProductId = normalizeInternalAliasIdValue(internalAliasId);
-  if (!resolvedProductId) return null;
+  const publicPassportId = String(dppId || "").trim() || normalizeInternalAliasIdValue(internalAliasId);
+  if (!publicPassportId) return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
-  const modelSlug = slugifyRouteSegment(modelName || resolvedProductId, "product");
-  return `/dpp/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(resolvedProductId)}`;
+  const modelSlug = slugifyRouteSegment(modelName || publicPassportId, "product");
+  return `/dpp/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(publicPassportId)}`;
 };
 
 const buildInactivePublicPassportPath = ({
@@ -360,14 +361,15 @@ const buildInactivePublicPassportPath = ({
   manufacturerName = "",
   manufacturedBy = "",
   modelName = "",
+  dppId = "",
   internalAliasId = "",
   versionNumber,
 }) => {
-  const resolvedProductId = normalizeInternalAliasIdValue(internalAliasId);
-  if (!resolvedProductId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
+  const publicPassportId = String(dppId || "").trim() || normalizeInternalAliasIdValue(internalAliasId);
+  if (!publicPassportId || versionNumber === null || versionNumber === undefined || versionNumber === "") return null;
   const manufacturerSlug = slugifyRouteSegment(companyName || manufacturerName || manufacturedBy, "manufacturer");
-  const modelSlug = slugifyRouteSegment(modelName || resolvedProductId, "product");
-  return `/dpp/inactive/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(resolvedProductId)}/${encodeURIComponent(versionNumber)}`;
+  const modelSlug = slugifyRouteSegment(modelName || publicPassportId, "product");
+  return `/dpp/inactive/${manufacturerSlug}/${modelSlug}/${encodeURIComponent(publicPassportId)}/${encodeURIComponent(versionNumber)}`;
 };
 
 const buildPreviewPassportPath = ({

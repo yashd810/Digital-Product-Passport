@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { generateQRCodeBundle, saveQRCodeToDatabase } from "../utils/QRcode";
 import { getViewerBrandTheme } from "../../app/providers/ThemeContext";
@@ -18,10 +18,9 @@ import "../styles/PassportViewer.css";
 const api = import.meta.env.VITE_API_URL || "";
 
 function PassportViewer({ previewMode = false, previewCompanyId = null }) {
-  const { internalAliasId, versionNumber, previewId } = useParams();
+  const { dppId, versionNumber, previewId } = useParams();
   const navigate   = useNavigate();
   const location   = useLocation();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Viewer state
   const [lang,             setLang]             = useState(() => localStorage.getItem("dppLang") || "en");
@@ -37,32 +36,38 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
 
   // Dynamic field values — live data polled independently
   const [dynamicValues, setDynamicValues] = useState({});
+  const [dynamicValuesDppId, setDynamicValuesDppId] = useState("");
 
   // Signature verification
   const [sigVerification, setSigVerification] = useState(null);
   const [verificationBundle, setVerificationBundle] = useState(null);
 
-  // Access-control state
-  const [unlockedPassport,  setUnlockedPassport]  = useState(null);   // full data after valid key
-  const [showAccessForm,    setShowAccessForm]    = useState(false);  // unlock modal visible?
-  const [accessKeyInput,    setAccessKeyInput]    = useState("");
-  const [accessError,       setAccessError]       = useState("");
-  const [unlocking,         setUnlocking]         = useState(false);
-  const [passportAccessKeyMeta, setPassportAccessKeyMeta] = useState(null);
-  const [passportAccessKey, setPassportAccessKey] = useState(null);   // one-time reveal after rotation
-  const [accessKeyBusy,     setAccessKeyBusy]     = useState(false);
-  const [keyCopied,         setKeyCopied]         = useState(false);
-  const encodedProductId = encodeURIComponent(internalAliasId || "");
+  // Restricted-field unlock state
+  const [unlockedPassport,  setUnlockedPassport]  = useState(null);
+  const [showRestrictedUnlockForm, setShowRestrictedUnlockForm] = useState(false);
+  const [apiKeyInput,      setApiKeyInput]       = useState("");
+  const [securityGroupApiKey, setSecurityGroupApiKey] = useState("");
+  const [unlockError,      setUnlockError]       = useState("");
+  const [unlocking,        setUnlocking]         = useState(false);
+  const encodedDppId = encodeURIComponent(dppId || "");
   const encodedPreviewId = encodeURIComponent(previewId || "");
   const isPreviewMode = !!previewMode && !!previewId;
   const isInactiveView = !!versionNumber;
+  const passportIdentityKey = passport
+    ? [
+        passport.dppId || "",
+        passport.passportType || "",
+        passport.versionNumber ?? "",
+        isPreviewMode ? "preview" : (isInactiveView ? "inactive" : "public"),
+      ].join(":")
+    : "";
 
   const passportEndpoint = (
     isPreviewMode
       ? `${api}/api/companies/${previewCompanyId}/passports/${encodedPreviewId}/preview`
       : versionNumber
-        ? `${api}/api/passports/by-product/${encodedProductId}?version=${encodeURIComponent(versionNumber)}`
-        : `${api}/api/passports/by-product/${encodedProductId}`
+        ? `${api}/api/public/passports/${encodedDppId}?version=${encodeURIComponent(versionNumber)}`
+        : `${api}/api/public/passports/${encodedDppId}`
   );
 
   const fetchPassportRecord = useCallback(async ({ applyState = false } = {}) => {
@@ -81,13 +86,22 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     return data;
   }, [isPreviewMode, passportEndpoint, previewCompanyId]);
 
+  useEffect(() => {
+    setUnlockedPassport(null);
+    setShowRestrictedUnlockForm(false);
+    setApiKeyInput("");
+    setSecurityGroupApiKey("");
+    setUnlockError("");
+    setDynamicValues({});
+    setDynamicValuesDppId("");
+    setSigVerification(null);
+    setVerificationBundle(null);
+  }, [passportIdentityKey]);
+
   const fetchPublicHistoryPayload = useCallback(async (passportData) => {
     const endpoints = [
-      passportData?.internalAliasId
-        ? `${api}/api/passports/by-product/${encodeURIComponent(passportData.internalAliasId)}/history`
-        : null,
       passportData?.dppId
-        ? `${api}/api/passports/${encodeURIComponent(passportData.dppId)}/history`
+        ? `${api}/api/public/passports/${encodeURIComponent(passportData.dppId)}/history`
         : null,
     ].filter(Boolean);
 
@@ -116,7 +130,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       setError("Passport preview not found");
       return;
     }
-    if (!isPreviewMode && !internalAliasId) {
+    if (!isPreviewMode && !dppId) {
       setLoading(false);
       setError("Passport not found");
       return;
@@ -129,17 +143,23 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         const data = await fetchPassportRecord({ applyState: true });
         const resolvedCompanyId = data?.companyId || previewCompanyId || null;
 
-        // 2. Fetch company branding in parallel with type definition
+        const embeddedViewerSchema = data?.viewerSchema || null;
+
+        // 2. Fetch company branding and type definition when needed
         const [profileRes, typeRes, historyPayload] = await Promise.all([
           isPreviewMode && resolvedCompanyId
             ? fetchWithAuth(`${api}/api/companies/${resolvedCompanyId}/profile`)
             : Promise.resolve(null),
-          fetchWithAuth(`${api}/api/passport-types/${data.passportType}`),
+          embeddedViewerSchema
+            ? Promise.resolve(null)
+            : fetchWithAuth(`${api}/api/internal/passport-types/${data.passportType}`, { headers: authHeaders() }),
           fetchPublicHistoryPayload(data),
         ]);
 
         if (profileRes?.ok) setCompanyData(await profileRes.json());
-        if (typeRes.ok) {
+        if (embeddedViewerSchema) {
+          setTypeDef(embeddedViewerSchema);
+        } else if (typeRes?.ok) {
           setTypeDef(await typeRes.json());
         } else {
           setTypeDef({ sections: [] });
@@ -151,7 +171,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         setLoading(false);
       }
     })();
-  }, [encodedPreviewId, encodedProductId, fetchPassportRecord, fetchPublicHistoryPayload, isPreviewMode, previewCompanyId, previewId, internalAliasId, versionNumber]);
+  }, [dppId, fetchPassportRecord, fetchPublicHistoryPayload, isPreviewMode, previewCompanyId, previewId]);
 
   useEffect(() => {
     if (!isPreviewMode || !previewCompanyId) return;
@@ -163,21 +183,14 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       .catch((error) => console.warn("Ignored async error", error));
   }, [isPreviewMode, previewCompanyId]);
 
-  useEffect(() => {
-    fetchWithAuth(`${api}/api/users/me`, {
-      headers: authHeaders(),
-    })
-      .then(r => setIsLoggedIn(r.ok))
-      .catch(() => setIsLoggedIn(false));
-  }, []);
-
   // Secondary data loading
   useEffect(() => {
-    if (!passport?.dppId || !passport?.internalAliasId) return;
+    if (!passport?.dppId) return;
     (async () => {
       setQrLoading(true);
       try {
         const generatedBundle = await generateQRCodeBundle({
+          dppId: passport.dppId,
           internalAliasId: passport.internalAliasId,
           companyName: companyData?.companyName,
           manufacturerName: passport.manufacturer,
@@ -188,15 +201,18 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         if (generatedBundle?.qrCodeDataUrl) {
           setQrCode(generatedBundle.qrCodeDataUrl);
           setCarrierAuthenticity(generatedBundle.carrierAuthenticity || null);
-          try {
-            await saveQRCodeToDatabase(
-              passport.dppId,
-              generatedBundle.publicUrl,
-              passport.passportType,
-              generatedBundle.carrierAuthenticity
-            );
-          } catch (error) {
-            console.warn("Failed to save generated QR code", error);
+          if (isPreviewMode && passport.companyId) {
+            try {
+              await saveQRCodeToDatabase(
+                passport.companyId,
+                passport.dppId,
+                generatedBundle.publicUrl,
+                passport.passportType,
+                generatedBundle.carrierAuthenticity
+              );
+            } catch (error) {
+              console.warn("Failed to save generated QR code", error);
+            }
           }
         }
       } catch (e) {
@@ -206,25 +222,35 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         setQrLoading(false);
       }
     })();
-  }, [companyData?.companyName, passport?.dppId, passport?.manufacturedBy, passport?.manufacturer, passport?.modelName, passport?.passportType, passport?.internalAliasId]);
+  }, [companyData?.companyName, isPreviewMode, passport?.companyId, passport?.dppId, passport?.granularity, passport?.manufacturedBy, passport?.manufacturer, passport?.modelName, passport?.passportType, passport?.internalAliasId]);
 
   // Fetch + poll dynamic field values every 30 s
   useEffect(() => {
     if (!passport?.dppId || isInactiveView) return;
+    const dynamicValuesEndpoint = isPreviewMode && passport.companyId
+      ? `${api}/api/companies/${encodeURIComponent(passport.companyId)}/passports/${encodeURIComponent(passport.dppId)}/dynamic-values`
+      : `${api}/api/public/passports/${encodeURIComponent(passport.dppId)}/dynamic-values`;
     const fetchDynamic = () =>
-      fetchWithAuth(`${api}/api/passports/${passport.dppId}/dynamic-values`)
+      fetchWithAuth(dynamicValuesEndpoint, !isPreviewMode && securityGroupApiKey
+        ? { headers: { "X-API-Key": securityGroupApiKey } }
+        : undefined)
         .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d?.values) setDynamicValues(d.values); })
+        .then(d => {
+          if (d?.values) {
+            setDynamicValues(d.values);
+            setDynamicValuesDppId(passport.dppId);
+          }
+        })
         .catch((error) => console.warn("Ignored async error", error));
     fetchDynamic();
     const timer = setInterval(fetchDynamic, 30000);
     return () => clearInterval(timer);
-  }, [passport?.dppId, isInactiveView]);
+  }, [isInactiveView, isPreviewMode, passport?.companyId, passport?.dppId, securityGroupApiKey]);
 
   // Fetch signature verification for released passports
   useEffect(() => {
     if (!passport?.dppId || !isReleasedPassportStatus(passport?.releaseStatus)) return;
-    fetchWithAuth(`${api}/api/passports/${passport.dppId}/signature`)
+    fetchWithAuth(`${api}/api/public/passports/${passport.dppId}/signature`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setSigVerification(d); })
       .catch((error) => console.warn("Ignored async error", error));
@@ -233,70 +259,69 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
   useEffect(() => {
     if (!passport?.dppId) return;
     if (!isReleasedPassportStatus(passport?.releaseStatus) && !isObsoletePassportStatus(passport?.releaseStatus)) return;
-    fetchWithAuth(`${api}/api/public/dpp/${passport.dppId}/verification-bundle.json`)
+    const versionQuery = isInactiveView && passport?.versionNumber
+      ? `?version=${encodeURIComponent(passport.versionNumber)}`
+      : "";
+    fetchWithAuth(`${api}/api/public/passports/${passport.dppId}/verification-bundle${versionQuery}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d) setVerificationBundle(d); })
       .catch((error) => console.warn("Ignored async error", error));
-  }, [passport?.dppId, passport?.releaseStatus]);
-
-  // Fetch access-key metadata for logged-in company users.
-  useEffect(() => {
-    if (!isLoggedIn || !passport?.dppId || !passport?.companyId) return;
-    fetchWithAuth(`${api}/api/companies/${passport.companyId}/passports/${passport.dppId}/access-key`, {
-      headers: authHeaders(),
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then((d) => { if (d) setPassportAccessKeyMeta(d); })
-      .catch((error) => console.warn("Ignored async error", error));
-  }, [passport?.dppId, passport?.companyId, isLoggedIn]);
-
-  const handleRegenerateAccessKey = async () => {
-    if (!passport?.dppId || !passport?.companyId) return;
-    if (!window.confirm("Issue a new passport access key? The previous key will stop working immediately.")) return;
-    setAccessKeyBusy(true);
-    try {
-      const r = await fetchWithAuth(`${api}/api/companies/${passport.companyId}/passports/${passport.dppId}/access-key/regenerate`, {
-        method: "POST",
-        headers: authHeaders(),
-      });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "Failed to rotate access key");
-      setPassportAccessKey(d.accessKey || null);
-      setPassportAccessKeyMeta({
-        hasAccessKey: true,
-        keyPrefix: d.keyPrefix || null,
-        lastRotatedAt: d.lastRotatedAt || new Date().toISOString(),
-      });
-      setKeyCopied(false);
-    } catch (e) {
-      setAccessError(e.message || "Failed to rotate access key");
-    } finally {
-      setAccessKeyBusy(false);
-    }
-  };
+  }, [isInactiveView, passport?.dppId, passport?.releaseStatus, passport?.versionNumber]);
 
   // UI event handlers
   const handleUnlock = async () => {
-    if (!accessKeyInput.trim()) return;
+    if (!apiKeyInput.trim()) return;
     setUnlocking(true);
-    setAccessError("");
+    setUnlockError("");
     try {
-      const r = await fetchWithAuth(`${api}/api/passports/${passport.dppId}/unlock`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ accessKey: accessKeyInput.trim() }),
+      if (isPreviewMode && !passport?.companyId) {
+        throw new Error("Passport preview is missing company context");
+      }
+      const versionQuery = !isPreviewMode && isInactiveView && passport?.versionNumber
+        ? `?version=${encodeURIComponent(passport.versionNumber)}`
+        : "";
+      const unlockEndpoint = isPreviewMode
+        ? `${api}/api/companies/${encodeURIComponent(passport.companyId)}/passports/${encodeURIComponent(passport.dppId)}/preview-unlock`
+        : `${api}/api/public/passports/${encodeURIComponent(passport.dppId)}${versionQuery}`;
+      const r = await fetchWithAuth(unlockEndpoint, isPreviewMode ? {
+        method: "GET",
+        headers: { "X-API-Key": apiKeyInput.trim() },
+      } : {
+        method: "GET",
+        headers: { "X-API-Key": apiKeyInput.trim() },
       });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Invalid access key");
-      setUnlockedPassport(d.passport);
-      setShowAccessForm(false);
-      setAccessKeyInput("");
+      if (!r.ok) throw new Error(d.error || "Invalid API key");
+      setUnlockedPassport(d.unlockedPassport || d.passport || {});
+      setSecurityGroupApiKey(apiKeyInput.trim());
+      if (!isPreviewMode && d?.viewerSchema) setTypeDef(d.viewerSchema);
+      setShowRestrictedUnlockForm(false);
+      setApiKeyInput("");
     } catch (e) {
-      setAccessError(e.message);
+      setUnlockError(e.message);
     } finally {
       setUnlocking(false);
     }
   };
+
+  const activeUnlockedPassport = useMemo(() => {
+    if (!passport || !unlockedPassport) return null;
+    if (String(unlockedPassport.dppId || "") !== String(passport.dppId || "")) return null;
+    if (String(unlockedPassport.passportType || "") !== String(passport.passportType || "")) return null;
+    const unlockedVersion = unlockedPassport.versionNumber;
+    const passportVersion = passport.versionNumber;
+    if (isInactiveView && Number(unlockedVersion) !== Number(passportVersion)) return null;
+    if (unlockedVersion !== null && unlockedVersion !== undefined && passportVersion !== null && passportVersion !== undefined) {
+      if (Number(unlockedVersion) !== Number(passportVersion)) return null;
+    }
+    return unlockedPassport;
+  }, [isInactiveView, passport, unlockedPassport]);
+
+  const activeDynamicValues = useMemo(() => {
+    if (isInactiveView) return {};
+    if (!passport?.dppId || dynamicValuesDppId !== passport.dppId) return {};
+    return dynamicValues;
+  }, [dynamicValues, dynamicValuesDppId, isInactiveView, passport?.dppId]);
 
   // Derived viewer data
   const brandTheme = getViewerBrandTheme();
@@ -305,6 +330,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
+    dppId: passport?.dppId,
     internalAliasId: passport?.internalAliasId,
   });
   const canonicalTechnicalPath = buildTechnicalPassportPath({
@@ -312,6 +338,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
+    dppId: passport?.dppId,
     internalAliasId: passport?.internalAliasId,
   });
   const canonicalInactivePath = buildInactivePassportPath({
@@ -319,6 +346,7 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
     manufacturerName: passport?.manufacturer,
     manufacturedBy: passport?.manufacturedBy,
     modelName: passport?.modelName,
+    dppId: passport?.dppId,
     internalAliasId: passport?.internalAliasId,
     versionNumber,
   });
@@ -380,41 +408,6 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
       style={brandTheme.style}
     >
       <div className="no-print">
-        {isLoggedIn && (passportAccessKeyMeta || passportAccessKey) && (
-          <div className="access-key-bar">
-            <span className="access-key-bar-icon">🔑</span>
-            <div className="access-key-bar-text">
-              <strong>Passport Access Key</strong>
-              <span className="access-key-bar-hint">
-                Access keys are now write-only for security. Issue a new key when you need to share restricted-field access with an authorised party.
-              </span>
-            </div>
-            <code className="access-key-bar-code">
-              {passportAccessKey || passportAccessKeyMeta?.keyPrefix || "Not issued yet"}
-            </code>
-            {passportAccessKey ? (
-              <button
-                className="access-key-bar-copy"
-                onClick={() => {
-                  navigator.clipboard.writeText(passportAccessKey);
-                  setKeyCopied(true);
-                  setTimeout(() => setKeyCopied(false), 2000);
-                }}
-              >
-                {keyCopied ? "✓ Copied" : "Copy"}
-              </button>
-            ) : (
-              <button
-                className="access-key-bar-copy"
-                onClick={handleRegenerateAccessKey}
-                disabled={accessKeyBusy}
-              >
-                {accessKeyBusy ? "Issuing…" : passportAccessKeyMeta?.hasAccessKey ? "Regenerate" : "Issue Key"}
-              </button>
-            )}
-          </div>
-        )}
-
         <PublicPassportPortal
           passport={passport}
           companyData={companyData}
@@ -422,9 +415,13 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
           publicHistoryPayload={publicHistoryPayload}
           qrCode={qrCode}
           qrLoading={qrLoading}
-          unlockedPassport={unlockedPassport}
-          onRequestUnlock={() => setShowAccessForm(true)}
-          dynamicValues={dynamicValues}
+          unlockedPassport={activeUnlockedPassport}
+          onRequestUnlock={() => setShowRestrictedUnlockForm(true)}
+          dynamicValues={activeDynamicValues}
+          dynamicHistoryBasePath={isPreviewMode && passport.companyId
+            ? `/api/companies/${encodeURIComponent(passport.companyId)}/passports/${encodeURIComponent(passport.dppId)}/dynamic-values`
+            : `/api/public/passports/${encodeURIComponent(passport.dppId)}/dynamic-values`}
+          securityGroupApiKey={isPreviewMode ? "" : securityGroupApiKey}
           lang={lang}
           sigVerification={sigVerification}
           verificationBundle={verificationBundle}
@@ -438,31 +435,31 @@ function PassportViewer({ previewMode = false, previewCompanyId = null }) {
         />
       </div>
 
-      {/* ── Access Key Unlock Modal ── */}
-      {showAccessForm && (
-        <div className="access-unlock-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAccessForm(false); }}>
-          <div className="access-unlock-modal">
-            <button className="access-unlock-close" onClick={() => { setShowAccessForm(false); setAccessError(""); setAccessKeyInput(""); }}>✕</button>
-            <div className="access-unlock-icon">🔒</div>
-            <h3 className="access-unlock-title">Restricted Data</h3>
-            <p className="access-unlock-desc">
-              This field is restricted to authorised parties only. Enter the access key provided by the manufacturer to view it.
+      {/* ── Restricted Fields Unlock Modal ── */}
+      {showRestrictedUnlockForm && (
+        <div className="restricted-unlock-overlay" onClick={e => { if (e.target === e.currentTarget) setShowRestrictedUnlockForm(false); }}>
+          <div className="restricted-unlock-modal">
+            <button className="restricted-unlock-close" onClick={() => { setShowRestrictedUnlockForm(false); setUnlockError(""); setApiKeyInput(""); }}>✕</button>
+            <div className="restricted-unlock-icon">🔒</div>
+            <h3 className="restricted-unlock-title">Restricted Data</h3>
+            <p className="restricted-unlock-desc">
+              Enter the security group API key provided by the company. Only the restricted fields selected for that group will become visible.
             </p>
             <input
               type="text"
-              value={accessKeyInput}
-              onChange={e => { setAccessKeyInput(e.target.value); setAccessError(""); }}
+              value={apiKeyInput}
+              onChange={e => { setApiKeyInput(e.target.value); setUnlockError(""); }}
               onKeyDown={e => e.key === "Enter" && handleUnlock()}
-              placeholder="Enter access key"
-              className="access-unlock-input"
+              placeholder="Enter API key"
+              className="restricted-unlock-input"
               autoFocus
             />
-            {accessError && <div className="access-unlock-error">{accessError}</div>}
-            <div className="access-unlock-actions">
-              <button className="access-unlock-btn cancel" onClick={() => { setShowAccessForm(false); setAccessError(""); setAccessKeyInput(""); }}>
+            {unlockError && <div className="restricted-unlock-error">{unlockError}</div>}
+            <div className="restricted-unlock-actions">
+              <button className="restricted-unlock-btn cancel" onClick={() => { setShowRestrictedUnlockForm(false); setUnlockError(""); setApiKeyInput(""); }}>
                 Cancel
               </button>
-              <button className="access-unlock-btn submit" onClick={handleUnlock} disabled={unlocking || !accessKeyInput.trim()}>
+              <button className="restricted-unlock-btn submit" onClick={handleUnlock} disabled={unlocking || !apiKeyInput.trim()}>
                 {unlocking ? "Verifying…" : "Unlock"}
               </button>
             </div>
