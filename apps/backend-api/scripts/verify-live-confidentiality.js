@@ -41,6 +41,19 @@ function containsValue(payload, value) {
   return JSON.stringify(payload).includes(value);
 }
 
+function getAllowedMutationOrigin() {
+  const firstConfiguredOrigin = String(process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)[0];
+  return String(
+    process.env.LIVE_VERIFY_ALLOWED_ORIGIN
+      || process.env.APP_URL
+      || firstConfiguredOrigin
+      || "http://127.0.0.1:3000"
+  ).replace(/\/+$/, "");
+}
+
 async function removeProbeData(pool, companyId = null, typeId = null) {
   await pool.query(`DROP TABLE IF EXISTS ${tableName}`).catch(() => {});
 
@@ -225,11 +238,21 @@ async function run() {
       process.env.JWT_SECRET,
       { expiresIn: "10m" }
     );
+    const integrationBase = "/api/companies/codex-verification-company/integrations/v1/passports";
+    const missingOriginCookieMutation = await fetchJson(integrationBase, {
+      method: "POST",
+      headers: {
+        cookie: `${process.env.SESSION_COOKIE_NAME || "dppSession"}=${adminToken}`,
+        "content-type": "application/json",
+      },
+      body: "{}",
+    });
+    assert.equal(missingOriginCookieMutation.response.status, process.env.NODE_ENV === "production" ? 403 : 401);
     const cookieOnlyHeaders = {
       cookie: `${process.env.SESSION_COOKIE_NAME || "dppSession"}=${adminToken}`,
       "content-type": "application/json",
+      origin: getAllowedMutationOrigin(),
     };
-    const integrationBase = "/api/companies/codex-verification-company/integrations/v1/passports";
     const cookieOnlyMutations = [
       [integrationBase, { method: "POST", headers: cookieOnlyHeaders, body: "{}" }],
       [`${integrationBase}/${dppId}`, { method: "PATCH", headers: cookieOnlyHeaders, body: "{}" }],
