@@ -324,6 +324,16 @@ async function initDb(pool, {
     )
   `);
   await pool.query(`
+    UPDATE users
+       SET role = CASE
+         WHEN role = ('super' || chr(95) || 'admin') THEN 'superAdmin'
+         WHEN role = ('company' || chr(95) || 'admin') THEN 'companyAdmin'
+         WHEN role = 'admin' THEN 'companyAdmin'
+         ELSE role
+       END
+     WHERE role IN (('super' || chr(95) || 'admin'), ('company' || chr(95) || 'admin'), 'admin')
+  `);
+  await pool.query(`
     DO $$
     BEGIN
       IF NOT EXISTS (
