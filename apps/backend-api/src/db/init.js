@@ -720,6 +720,34 @@ async function initDb(pool, {
         )
     )
   `);
+  await pool.query(`
+    ALTER TABLE "apiKeys"
+      ADD COLUMN IF NOT EXISTS "keySalt" VARCHAR(64),
+      ADD COLUMN IF NOT EXISTS "hashAlgorithm" VARCHAR(32) DEFAULT 'hmacSha256',
+      ADD COLUMN IF NOT EXISTS "passportType" VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS "scopeType" VARCHAR(24) DEFAULT 'passportType',
+      ADD COLUMN IF NOT EXISTS "fieldKeys" TEXT[] DEFAULT ARRAY[]::text[],
+      ADD COLUMN IF NOT EXISTS "passportDppIds" TEXT[] DEFAULT ARRAY[]::text[],
+      ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMPTZ DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS "lastUsedAt" TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true
+  `);
+  await pool.query(`
+    UPDATE "apiKeys"
+       SET "hashAlgorithm" = COALESCE("hashAlgorithm", 'hmacSha256'),
+           "scopeType" = COALESCE("scopeType", 'passportType'),
+           "fieldKeys" = COALESCE("fieldKeys", ARRAY[]::text[]),
+           "passportDppIds" = COALESCE("passportDppIds", ARRAY[]::text[]),
+           "updatedAt" = COALESCE("updatedAt", NOW()),
+           "isActive" = CASE
+             WHEN "passportType" IS NULL
+               OR "keySalt" IS NULL
+               OR "keySalt" = ''
+               OR cardinality(COALESCE("fieldKeys", ARRAY[]::text[])) = 0
+             THEN false
+             ELSE COALESCE("isActive", true)
+           END
+  `);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxApiKeysCompany" ON "apiKeys"("companyId")`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxApiKeysHash"    ON "apiKeys"("keyHash")`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "idxApiKeysPrefix"   ON "apiKeys"("keyPrefix")`);
