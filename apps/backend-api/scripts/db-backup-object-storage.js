@@ -163,7 +163,7 @@ function buildKeys(config) {
 async function pruneOldBackups(client, config, manifests) {
   const stale = manifests.slice(config.retentionCount);
   if (!stale.length) {
-    return { deleted: 0 };
+    return { deleted: 0, skippedRetained: 0 };
   }
 
   const toDelete = [];
@@ -173,17 +173,28 @@ async function pruneOldBackups(client, config, manifests) {
   }
 
   if (!toDelete.length) {
-    return { deleted: 0 };
+    return { deleted: 0, skippedRetained: 0 };
   }
 
+  let deleted = 0;
+  let skippedRetained = 0;
   for (const item of toDelete) {
-    await client.send(new DeleteObjectCommand({
-      Bucket: config.bucket,
-      Key: item.Key
-    }));
+    try {
+      await client.send(new DeleteObjectCommand({
+        Bucket: config.bucket,
+        Key: item.Key
+      }));
+      deleted += 1;
+    } catch (error) {
+      if (/retention rule/i.test(String(error?.message || ""))) {
+        skippedRetained += 1;
+        continue;
+      }
+      throw error;
+    }
   }
 
-  return { deleted: toDelete.length };
+  return { deleted, skippedRetained };
 }
 
 async function uploadBackup() {
@@ -253,7 +264,8 @@ async function uploadBackup() {
     manifestKey: keys.manifestKey,
     sha256: checksum,
     sizeBytes: stat.size,
-    prunedObjects: pruneResult.deleted
+    prunedObjects: pruneResult.deleted,
+    retainedObjectsSkipped: pruneResult.skippedRetained
   }) + "\n");
 }
 
