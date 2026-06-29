@@ -85,6 +85,13 @@ The deploy helper pulls `main`, reuses `COMPOSE_PROJECT_NAME` from
 performs local and public health checks. Do not run with a different compose
 project name unless you are deliberately creating a separate environment.
 
+For backend deployments, the helper also verifies the named local-storage and
+Postgres Docker volumes exist before compose starts. It prepares
+`passport-files`, `repository-files`, and `uploads` inside the local-storage
+volume for the container `node` user. This is required even when production
+uses S3 object storage, because public-file guards still validate local
+attachment paths against `FILES_DIR` during live verification.
+
 ## Post-Deployment Verification
 
 Run these checks after both hosts are updated:
@@ -113,14 +120,15 @@ Check external port exposure from your workstation:
 
 ```bash
 for host in <frontend-host-ip> <backend-host-ip>; do
-  for port in 22 80 443 3000 3001 3004 5432 8080; do
+  for port in 22 80 111 443 3000 3001 3004 5432 8080; do
     nc -G 3 -z "$host" "$port" && echo "$host:$port open" || echo "$host:$port closed"
   done
 done
 ```
 
 Expected result: `22`, `80`, and `443` may be open. Direct app and database
-ports should be closed externally.
+ports should be closed externally. Port `111` may listen locally on the host
+when `rpcbind` is installed, but it must not be reachable externally.
 
 ## Refactor-Specific Checks
 

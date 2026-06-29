@@ -390,6 +390,23 @@ ensure_docker_volume() {
   echo "Created fresh $label volume: $name"
 }
 
+prepare_local_storage_volume() {
+  local name="$1"
+  local mountpoint
+  mountpoint="$(docker volume inspect "$name" --format '{{.Mountpoint}}' 2>/dev/null || true)"
+  if [ -z "$mountpoint" ] || [ ! -d "$mountpoint" ]; then
+    echo "Unable to prepare local storage volume: $name"
+    exit 1
+  fi
+
+  install -d -o 1000 -g 1000 -m 0755 \
+    "$mountpoint/passport-files" \
+    "$mountpoint/repository-files" \
+    "$mountpoint/uploads" \
+    "$mountpoint/uploads/symbols"
+  echo "Prepared local storage volume directories for container user: $name"
+}
+
 EXPLICIT_POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-}"
 if [ -z "$EXPLICIT_POSTGRES_VOLUME_NAME" ]; then
   EXPLICIT_POSTGRES_VOLUME_NAME="$(read_env_var POSTGRES_VOLUME_NAME)"
@@ -421,6 +438,7 @@ if [ "$DEPLOY_TARGET" = "backend" ] || [ "$DEPLOY_TARGET" = "all" ]; then
   POSTGRES_VOLUME_NAME="${POSTGRES_VOLUME_NAME:-dppPostgresData}"
   ensure_docker_volume "$LOCAL_STORAGE_VOLUME_NAME" "local storage"
   ensure_docker_volume "$POSTGRES_VOLUME_NAME" "PostgreSQL data"
+  prepare_local_storage_volume "$LOCAL_STORAGE_VOLUME_NAME"
 fi
 
 (
