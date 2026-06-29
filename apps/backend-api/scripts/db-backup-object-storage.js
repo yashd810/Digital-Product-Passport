@@ -89,6 +89,10 @@ function sha256Hex(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
 
+function sha256Base64(buffer) {
+  return crypto.createHash("sha256").update(buffer).digest("base64");
+}
+
 async function streamToBuffer(body) {
   if (!body) return Buffer.alloc(0);
   if (Buffer.isBuffer(body)) return body;
@@ -184,6 +188,7 @@ async function uploadBackup() {
   const stat = await fs.promises.stat(filePath);
   const keys = buildKeys(config);
   const checksum = sha256Hex(fileBuffer);
+  const checksumSha256 = sha256Base64(fileBuffer);
 
   const manifest = {
     schemaVersion: 1,
@@ -203,6 +208,7 @@ async function uploadBackup() {
     Key: keys.dumpKey,
     Body: fileBuffer,
     ContentType: "application/octet-stream",
+    ChecksumSHA256: checksumSha256,
     Metadata: {
       sha256: checksum,
       dbname: config.dbName,
@@ -210,11 +216,13 @@ async function uploadBackup() {
     }
   }));
 
+  const manifestBuffer = Buffer.from(JSON.stringify(manifest, null, 2));
   await client.send(new PutObjectCommand({
     Bucket: config.bucket,
     Key: keys.manifestKey,
-    Body: Buffer.from(JSON.stringify(manifest, null, 2)),
-    ContentType: "application/json"
+    Body: manifestBuffer,
+    ContentType: "application/json",
+    ChecksumSHA256: sha256Base64(manifestBuffer)
   }));
 
   const manifestKeys = await listAllManifestKeys(client, config);
@@ -336,6 +344,7 @@ async function putObjectFile() {
     Key: key,
     Body: fileBuffer,
     ContentType: contentType,
+    ChecksumSHA256: sha256Base64(fileBuffer),
     Metadata: {
       sha256: checksum,
     }
