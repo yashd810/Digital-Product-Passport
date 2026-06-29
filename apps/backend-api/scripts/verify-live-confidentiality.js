@@ -43,25 +43,56 @@ function containsValue(payload, value) {
 
 async function removeProbeData(pool, companyId = null, typeId = null) {
   await pool.query(`DROP TABLE IF EXISTS ${tableName}`).catch(() => {});
-  if (companyId) {
-    await pool.query(
-      `DELETE FROM "passportDynamicValues"
-       WHERE "passportDppId" IN (
-         SELECT "dppId" FROM "passportRegistry" WHERE "companyId" = $1
-       )`,
-      [companyId]
-    ).catch(() => {});
+
+  const companyIds = new Set();
+  if (companyId) companyIds.add(Number(companyId));
+  const staleCompanies = await pool.query(
+    `SELECT id FROM companies
+     WHERE "companyName" = $1
+        OR "didSlug" = $2
+        OR "companyName" LIKE 'Codex Foreign Verification %'
+        OR "didSlug" LIKE 'codex-foreign-%'`,
+    [companyName, "codex-verification-company"]
+  ).catch(() => ({ rows: [] }));
+  for (const row of staleCompanies.rows || []) {
+    if (row.id) companyIds.add(Number(row.id));
+  }
+
+  if (companyIds.size) {
+    const ids = [...companyIds].filter(Number.isFinite);
+    const passportIds = await pool.query(
+      `SELECT "dppId" FROM "passportRegistry" WHERE "companyId" = ANY($1::int[])`,
+      [ids]
+    ).catch(() => ({ rows: [] }));
+    const dppIds = (passportIds.rows || []).map((row) => row.dppId).filter(Boolean);
+
+    if (dppIds.length) {
+      await pool.query(
+        `DELETE FROM "passportDynamicValues" WHERE "passportDppId" = ANY($1::text[])`,
+        [dppIds]
+      ).catch(() => {});
+      await pool.query(
+        `DELETE FROM "passportHistoryVisibility" WHERE "passportDppId" = ANY($1::text[])`,
+        [dppIds]
+      ).catch(() => {});
+    }
     await pool.query("SET session_replication_role = replica");
     try {
-      await pool.query("DELETE FROM \"auditLogAnchors\" WHERE \"companyId\" = $1", [companyId]);
-      await pool.query("DELETE FROM \"auditLogs\" WHERE \"companyId\" = $1", [companyId]);
+      await pool.query("DELETE FROM \"auditLogAnchors\" WHERE \"companyId\" = ANY($1::int[])", [ids]);
+      await pool.query("DELETE FROM \"auditLogs\" WHERE \"companyId\" = ANY($1::int[])", [ids]);
     } finally {
       await pool.query("SET session_replication_role = origin");
     }
-    await pool.query("DELETE FROM companies WHERE id = $1", [companyId]).catch(() => {});
-  } else {
-    await pool.query("DELETE FROM companies WHERE \"companyName\" = $1", [companyName]).catch(() => {});
+    await pool.query("DELETE FROM \"apiKeys\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
+    await pool.query("DELETE FROM \"passportAttachments\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
+    await pool.query("DELETE FROM \"passportArchives\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
+    await pool.query("DELETE FROM \"passportRegistry\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
+    await pool.query("DELETE FROM \"companyPassportAccess\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
+    await pool.query("DELETE FROM \"companyDppPolicies\" WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
+    await pool.query("DELETE FROM users WHERE \"companyId\" = ANY($1::int[])", [ids]).catch(() => {});
+    await pool.query("DELETE FROM companies WHERE id = ANY($1::int[])", [ids]).catch(() => {});
   }
+
   if (typeId) {
     await pool.query("DELETE FROM \"passportTypes\" WHERE id = $1", [typeId]).catch(() => {});
   } else {
